@@ -26,6 +26,7 @@ export type NativeAgentLaunch = {
   model: string;
   credentialHome?: string;
   providerNetwork?: NativeProviderNetwork;
+  gatewayScope?: string;
   workspace?: NativeWorkspaceSelection;
   capabilities?: Readonly<Record<string, 1>>;
   onSessionUpdate?: (params: unknown) => void;
@@ -94,6 +95,14 @@ export class NativeAgentProcess {
   }
 
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
+    if (
+      options.gatewayScope !== undefined &&
+      (!/^[a-f0-9]{64}$/.test(options.gatewayScope) ||
+        options.provider !== "openai-compatible" ||
+        !options.providerNetwork ||
+        options.credentialHome)
+    )
+      throw new Error("native_agent_gateway_profile_invalid");
     for (const directory of [
       options.resourcesPath,
       options.stateDirectory,
@@ -154,6 +163,8 @@ export class NativeAgentProcess {
     if (options.credentialHome)
       args.push("--credential-home", options.credentialHome);
     if (providerEgress) args.push("--supervised-provider");
+    if (options.gatewayScope)
+      args.push("--supervised-gateway-scope", options.gatewayScope);
     if (permissionProfile)
       args.push("--permission-profile", permissionProfile.profile);
     const processOwner = new NativeAgentProcess(

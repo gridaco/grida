@@ -360,6 +360,18 @@ pub struct GgOptions {
     pub max_output_tokens: u64,
 }
 
+impl GgOptions {
+    fn validate(&self) -> Result<()> {
+        if !(1..=65_536).contains(&self.max_output_tokens) {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "invalid_output_token_limit",
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl Host {
     pub fn open(state_dir: &Path, provider: Option<ProviderOptions>) -> Result<Self> {
         Self::open_with(
@@ -379,6 +391,30 @@ impl Host {
         )
     }
 
+    // GRIDA-SEC-006 — the Desktop supervisor owns the scoped bearer.
+    pub fn open_supervised_gateway(
+        state_dir: &Path,
+        options: GgOptions,
+        endpoint: &str,
+        scope: &str,
+        supervisor: crate::SupervisedProvider,
+    ) -> Result<Self> {
+        options.validate()?;
+        let connection = Arc::new(crate::gg::SupervisedGg::new(endpoint, scope, supervisor)?);
+        Self::open_with(
+            state_dir,
+            Some(|| {
+                Execution::new_gg(
+                    options,
+                    connection.scope,
+                    connection.binding.clone(),
+                    connection.clone(),
+                    Credential::SupervisedGg(connection),
+                )
+            }),
+        )
+    }
+
     // GRIDA-SEC-006 / GRIDA-GG: provider — bind execution to the admitted scope.
     /// Embed a host with a current, invocation-owned grant and its approved
     /// transport. The transport receives no account credentials.
@@ -389,15 +425,18 @@ impl Host {
         transport: Arc<dyn StreamingTransport>,
     ) -> Result<Self> {
         connection.validate()?;
-        if !(1..=65_536).contains(&options.max_output_tokens) {
-            return Err(problem(
-                ErrorKind::InvalidInput,
-                "invalid_output_token_limit",
-            ));
-        }
+        options.validate()?;
         let mut host = Self::open_with(
             state_dir,
-            Some(|| Execution::new_gg(options, connection.clone(), transport)),
+            Some(|| {
+                Execution::new_gg(
+                    options,
+                    connection.scope_fingerprint(),
+                    connection.binding().clone(),
+                    transport,
+                    Credential::Gg(connection.clone()),
+                )
+            }),
         )?;
         host.gg_connection = Some(connection);
         Ok(host)
@@ -1675,15 +1714,12 @@ impl Execution {
 
     fn new_gg(
         options: GgOptions,
-        connection: Arc<GgConnection>,
+        scope: Fingerprint,
+        binding: ProviderBinding,
         transport: Arc<dyn StreamingTransport>,
+        credential: Credential,
     ) -> Result<Self> {
-        let configuration = Fingerprint::of(&(
-            "gg-chat-selection-v1",
-            connection.scope_fingerprint(),
-            &options.model,
-        ))?;
-        let binding = connection.binding().clone();
+        let configuration = Fingerprint::of(&("gg-chat-selection-v1", scope, &options.model))?;
         let provider = Arc::new(OpenAiCompatible::new(
             binding.clone(),
             BTreeMap::from([(
@@ -1704,7 +1740,7 @@ impl Execution {
             options.max_output_tokens,
             provider,
             binding,
-            Credential::Gg(connection),
+            credential,
         )
     }
 
@@ -1779,6 +1815,7 @@ fn text_capabilities(protocol: &str) -> Result<ModelCapabilities> {
 enum Credential {
     Http(Arc<HttpTransport>),
     Gg(Arc<GgConnection>),
+    SupervisedGg(Arc<crate::gg::SupervisedGg>),
 }
 
 struct ExecutionAuthority {
@@ -1805,6 +1842,7 @@ impl AuthorityValidator for ExecutionAuthority {
             match &self.credential {
                 Credential::Http(transport) => transport.validate_credential().await,
                 Credential::Gg(connection) => connection.ensure_current().await,
+                Credential::SupervisedGg(connection) => connection.validate(),
             }
         })
     }

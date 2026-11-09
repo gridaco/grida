@@ -1,21 +1,25 @@
 //! GRIDA-SEC-006 / GRIDA-GG: token — invocation-scoped native GG chat authority.
 
 use agent_kit_core::authority::AuthorityBinding;
-use agent_kit_core::inference::ProviderBinding;
+use agent_kit_core::inference::{ProviderBinding, RequestControl};
 use agent_kit_core::{
     BindingId, BoxFuture, CancellationToken, Error, ErrorKind, Fingerprint, PrincipalId,
     ProviderId, Result, ScopeId,
 };
-use agent_kit_providers::{TransportOperation, TransportRequest};
+use agent_kit_providers::{
+    StreamingTransport, TransportFailure, TransportOperation, TransportRequest, TransportResponse,
+};
 use grida_auth::{GgGrant, GgGrantScope};
 use reqwest::Url;
-use reqwest::header::HeaderValue;
+use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::watch;
 use tokio::time::{Instant, timeout_at};
 use uuid::Uuid;
 use zeroize::Zeroizing;
+
+use crate::SupervisedProvider;
 
 const RENEWAL_MARGIN_MS: i64 = 30_000;
 const FAILED_RENEWAL_COOLDOWN: Duration = Duration::from_secs(1);
@@ -38,6 +42,84 @@ pub struct GgConnection {
     scope: Fingerprint,
     credential: Arc<Mutex<Credential>>,
     renewal: Option<Arc<Renewal>>,
+}
+
+/// A private Desktop launch carries a verified scope label and delegates the
+/// fixed request to its bearer owner without receiving a credential.
+pub(crate) struct SupervisedGg {
+    pub(crate) scope: Fingerprint,
+    pub(crate) binding: ProviderBinding,
+    target: Url,
+    supervisor: SupervisedProvider,
+}
+
+impl SupervisedGg {
+    pub(crate) fn new(endpoint: &str, scope: &str, supervisor: SupervisedProvider) -> Result<Self> {
+        let mut target = Url::parse(endpoint).map_err(|_| invalid_origin())?;
+        if target.host_str().is_none()
+            || !target.username().is_empty()
+            || target.password().is_some()
+            || target.query().is_some()
+            || target.fragment().is_some()
+            || target.path() != "/api/v1/ai"
+            || !(target.scheme() == "https"
+                || (target.scheme() == "http"
+                    && matches!(target.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"))))
+        {
+            return Err(invalid_origin());
+        }
+        if scope.len() != 64
+            || !scope
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(Error::new(ErrorKind::InvalidInput, "gg_scope_invalid"));
+        }
+        let scope = Fingerprint::of(&(
+            "supervised-gg-chat-scope-v1",
+            target.origin().ascii_serialization(),
+            scope,
+        ))?;
+        target.set_path("/api/v1/ai/chat/completions");
+        Ok(Self {
+            scope,
+            binding: gg_binding(scope)?,
+            target,
+            supervisor,
+        })
+    }
+
+    pub(crate) fn validate(&self) -> Result<()> {
+        self.supervisor.validate()
+    }
+}
+
+impl StreamingTransport for SupervisedGg {
+    fn send(
+        &self,
+        request: TransportRequest,
+        control: RequestControl,
+    ) -> BoxFuture<'_, std::result::Result<TransportResponse, TransportFailure>> {
+        Box::pin(async move {
+            if request.binding != self.binding
+                || request.operation != TransportOperation::ChatCompletions
+            {
+                return Err(TransportFailure::Unavailable);
+            }
+            let mut headers = HeaderMap::new();
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            headers.insert(ACCEPT, HeaderValue::from_static("text/event-stream"));
+            self.supervisor
+                .send(
+                    self.target.clone(),
+                    headers,
+                    request.body,
+                    request.max_response_bytes,
+                    control,
+                )
+                .await
+        })
+    }
 }
 
 /// The account owner mints within the verified scope and completes any
@@ -141,19 +223,9 @@ impl GgConnection {
         target.set_path("/api/v1/ai/chat/completions");
         let scope =
             Fingerprint::of(&("gg-chat-scope-v1", origin, account_subject, organization_id))?;
-        let principal =
-            Uuid::from_bytes(scope.bytes()[..16].try_into().expect("fingerprint prefix"));
-        let binding = ProviderBinding {
-            provider: ProviderId::new("gg")?,
-            authority: AuthorityBinding {
-                principal: PrincipalId::new(format!("gg:{principal}"))?,
-                binding: BindingId::new(Uuid::new_v4().to_string())?,
-                scope: ScopeId::new("gg-chat-completions")?,
-            },
-        };
         Ok(Self {
             target,
-            binding,
+            binding: gg_binding(scope)?,
             scope,
             credential: Arc::new(Mutex::new(Credential::capture(token, expires_at_ms)?)),
             renewal: None,
@@ -277,6 +349,18 @@ impl GgConnection {
     }
 }
 
+fn gg_binding(scope: Fingerprint) -> Result<ProviderBinding> {
+    let principal = Uuid::from_bytes(scope.bytes()[..16].try_into().expect("fingerprint prefix"));
+    Ok(ProviderBinding {
+        provider: ProviderId::new("gg")?,
+        authority: AuthorityBinding {
+            principal: PrincipalId::new(format!("gg:{principal}"))?,
+            binding: BindingId::new(Uuid::new_v4().to_string())?,
+            scope: ScopeId::new("gg-chat-completions")?,
+        },
+    })
+}
+
 impl Renewal {
     fn ensure_open(&self) -> Result<()> {
         if self.closing.is_cancelled() {
@@ -353,6 +437,41 @@ fn now_ms() -> Result<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn desktop_scope_retains_identity_without_a_bearer() {
+        let endpoint = "https://grida.example/api/v1/ai";
+        let scope = "a".repeat(64);
+        let capture = |endpoint: &str, scope: &str| {
+            SupervisedGg::new(endpoint, scope, SupervisedProvider::default())
+        };
+        let first = capture(endpoint, &scope).unwrap();
+        let restart = capture(endpoint, &scope).unwrap();
+        let other = capture(endpoint, &"b".repeat(64)).unwrap();
+        assert_eq!(first.scope, restart.scope);
+        assert_eq!(
+            first.binding.authority.principal,
+            restart.binding.authority.principal
+        );
+        assert_ne!(
+            first.binding.authority.binding,
+            restart.binding.authority.binding
+        );
+        assert_ne!(
+            first.binding.authority.principal,
+            other.binding.authority.principal
+        );
+        assert_eq!(first.target.path(), "/api/v1/ai/chat/completions");
+        assert!(first.validate().is_err());
+        for invalid in [
+            "https://grida.example/v1",
+            "https://grida.example/api/v1/ai?forward=1",
+            "http://grida.example/api/v1/ai",
+        ] {
+            assert!(capture(invalid, &scope).is_err());
+        }
+        assert!(capture(endpoint, "scope-label").is_err());
+    }
 
     #[test]
     fn separates_current_authority_from_conversation_scope() {

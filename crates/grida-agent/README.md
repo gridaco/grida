@@ -65,6 +65,14 @@ streams a bounded response on the private pipe. The supervised mode has no
 direct network client. Losing the pipe after dispatch leaves the attempt
 interrupted.
 
+Desktop's Gateway profile uses the same pipe. Main captures the signed-in
+account and organization, and passes an opaque scope with the selected model
+to the child. The child builds the fixed Gateway chat request without a
+bearer. Main attaches the short-lived grant at dispatch. A restart under the
+same scope can continue the chat after a grant refresh. A different scope can
+read the saved transcript through the ordinary workspace boundary, but cannot
+use it to start provider work under the replacement account or organization.
+
 Responses and Gemini retain opaque model history across restarts when their
 protected credential proof still matches. A changed credential invalidates replay of
 that opaque history. The replay identity is separate from the live dispatch

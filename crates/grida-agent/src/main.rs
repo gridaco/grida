@@ -1,6 +1,6 @@
 use agent_kit_core::{Error, ErrorKind, ModelId, Result, SessionId};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
-use grida_agent::host::Host;
+use grida_agent::host::{GgOptions, Host};
 use grida_agent::process::{self, RunOptions};
 use grida_agent::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol, acp, mcp};
 use serde_json::json;
@@ -95,6 +95,18 @@ fn command() -> Command {
                         .long("supervised-provider")
                         .requires("stdio")
                         .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("supervised-gateway-scope")
+                        .long("supervised-gateway-scope")
+                        .value_name("SCOPE")
+                        .requires("supervised-provider")
+                        .conflicts_with_all([
+                            "credential-env",
+                            "credential-home",
+                            "compatible-output-limit-field",
+                        ])
+                        .hide(true),
                 )
                 .arg(
                     Arg::new("listen")
@@ -289,9 +301,29 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         .transpose()?;
     let supervisor = (name == "serve" && args.get_flag("supervised-provider"))
         .then(grida_agent::SupervisedProvider::default);
-    let host = match &supervisor {
-        Some(supervisor) => Host::open_supervised(state_dir, provider, supervisor.clone())?,
-        None => Host::open(state_dir, Some(provider))?,
+    let gateway_scope = if name == "serve" {
+        args.get_one::<String>("supervised-gateway-scope")
+    } else {
+        None
+    };
+    let host = match (&supervisor, gateway_scope) {
+        (Some(supervisor), Some(scope)) => {
+            if provider.protocol != ProviderProtocol::OpenAiCompatible {
+                return Err(problem(ErrorKind::InvalidInput, "gg_protocol_invalid"));
+            }
+            Host::open_supervised_gateway(
+                state_dir,
+                GgOptions {
+                    model: provider.model,
+                    max_output_tokens: provider.max_output_tokens,
+                },
+                &provider.endpoint,
+                scope,
+                supervisor.clone(),
+            )?
+        }
+        (Some(supervisor), None) => Host::open_supervised(state_dir, provider, supervisor.clone())?,
+        (None, _) => Host::open(state_dir, Some(provider))?,
     };
     let host = Arc::new(match permissions {
         Some(profile) => host.with_permission_profile(profile),

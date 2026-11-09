@@ -5,6 +5,7 @@ import type {
   DesktopGatewayGrant,
 } from "./account-session";
 import type { NativeProviderNetwork } from "./native-provider-egress";
+import type { NativeAgentLaunch } from "./native-agent-process";
 
 const RENEWAL_MARGIN_MS = 30_000;
 type Account = Pick<DesktopAccountSession, "withGatewayGrant">;
@@ -94,6 +95,21 @@ export class NativeGatewayConnection implements NativeProviderNetwork {
         return null;
       }
       return dispatch ? dispatch(body, signal) : null;
+    };
+  }
+
+  launch(
+    model: string
+  ): Pick<
+    NativeAgentLaunch,
+    "provider" | "endpoint" | "model" | "providerNetwork" | "gatewayScope"
+  > {
+    return {
+      provider: "openai-compatible",
+      endpoint: this.endpoint,
+      model,
+      providerNetwork: this,
+      gatewayScope: this.scope,
     };
   }
 

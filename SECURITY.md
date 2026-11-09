@@ -872,6 +872,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   memory-only Chromium session, and starts one POST without following
   redirects. Upload and pull are bounded. Cancelling the exchange or closing
   the child aborts the request. This mode has no native direct-network fallback.
+  The [Gateway launch profile](crates/grida-agent/src/gg.rs) accepts only a
+  scope label, the selected model, and the fixed Gateway base. It sends no
+  credential over the pipe. The retained execution fingerprint prevents a
+  different Gateway account or organization scope from dispatching the chat.
 - [Configured native provider selection](desktop/src/main/native-provider-selection.ts)
   resolves a registered model through the authenticated settings owner and
   binds its anonymous request to the approved chat endpoint. A configured key

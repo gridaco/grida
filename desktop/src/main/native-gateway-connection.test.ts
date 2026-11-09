@@ -1,4 +1,7 @@
 // GRIDA-SEC-006 — the account-scoped bearer stays in the main connector.
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { expect, it, vi } from "vitest";
 import type {
   DesktopAccountSession,
@@ -6,6 +9,7 @@ import type {
 } from "./account-session";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import type { NativeProviderNetwork } from "./native-provider-egress";
+import { NativeAgentProcess } from "./native-agent-process";
 
 const origin = "https://grida.test";
 const target = `${origin}/api/v1/ai/chat/completions`;
@@ -124,3 +128,83 @@ it("does not dispatch after a scope change, a cancelled request, or close during
   expect(await pending).toBeNull();
   expect(owner.dispatch).not.toHaveBeenCalled();
 });
+
+const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
+it.skipIf(!resourcesPath)(
+  "restarts a native Gateway chat under its captured scope only",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-gateway-scope-")
+    );
+    const cwd = path.join(root, "workspace");
+    await fs.mkdir(cwd);
+    const first = fixture();
+    const rotated = fixture({ token: "synthetic.fixture.rotated" });
+    const changed = fixture({ organizationId: 19 });
+    const connections = await Promise.all(
+      [first, rotated, changed].map((owner) =>
+        NativeGatewayConnection.open(owner.options)
+      )
+    );
+    expect(connections[0].scope).toBe(connections[1].scope);
+    expect(connections[2].scope).not.toBe(connections[0].scope);
+    for (const owner of [first, rotated, changed]) {
+      owner.dispatch.mockImplementation(async (data) => {
+        expect(JSON.parse(data.toString()).model).toBe("fixture");
+        const reply =
+          'data: {"id":"fixture","choices":[{"index":0,"delta":{"content":"Scoped reply"},"finish_reason":null}]}\n\n' +
+          'data: {"id":"fixture","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n' +
+          "data: [DONE]\n\n";
+        return new Response(reply, {
+          headers: { "content-type": "text/event-stream" },
+        });
+      });
+    }
+    const stateDirectory = path.join(root, "state");
+    const open = (connection: NativeGatewayConnection) =>
+      NativeAgentProcess.start({
+        ...connection.launch("fixture"),
+        resourcesPath: resourcesPath!,
+        stateDirectory,
+      });
+    const prompt = (agent: NativeAgentProcess, sessionId: string) =>
+      agent.request("session/prompt", {
+        sessionId,
+        prompt: [{ type: "text", text: "Fixture prompt" }],
+      });
+    let agent: NativeAgentProcess | undefined;
+    try {
+      agent = await open(connections[0]);
+      const { sessionId } = (await agent.request("session/new", {
+        cwd,
+        mcpServers: [],
+      })) as { sessionId: string };
+      await expect(prompt(agent, sessionId)).resolves.toMatchObject({
+        stopReason: "end_turn",
+      });
+      await agent.close();
+      agent = await open(connections[1]);
+      await agent.request("session/load", { sessionId, cwd, mcpServers: [] });
+      await expect(prompt(agent, sessionId)).resolves.toMatchObject({
+        stopReason: "end_turn",
+      });
+      await agent.close();
+      agent = await open(connections[2]);
+      await agent.request("session/load", { sessionId, cwd, mcpServers: [] });
+      await expect(prompt(agent, sessionId)).rejects.toThrow(
+        "session_execution_configuration_changed"
+      );
+      expect(first.dispatch).toHaveBeenCalledTimes(1);
+      expect(rotated.dispatch).toHaveBeenCalledTimes(1);
+      expect(changed.dispatch).not.toHaveBeenCalled();
+    } finally {
+      try {
+        await agent?.close();
+      } finally {
+        connections.forEach((connection) => connection.close());
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  },
+  20_000
+);

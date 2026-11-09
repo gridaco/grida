@@ -34,6 +34,17 @@ enum Connection {
 }
 
 impl SupervisedProvider {
+    pub(crate) fn validate(&self) -> Result<()> {
+        if matches!(*self.connection.lock().unwrap(), Connection::Attached(_)) {
+            Ok(())
+        } else {
+            Err(Error::new(
+                ErrorKind::Unavailable,
+                "provider_supervisor_unavailable",
+            ))
+        }
+    }
+
     pub(crate) fn attach(&self, connection: ConnectionTo<Client>) -> Result<()> {
         let mut current = self.connection.lock().unwrap();
         if !matches!(*current, Connection::Waiting) {
