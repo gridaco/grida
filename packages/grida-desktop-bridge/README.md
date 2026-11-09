@@ -42,6 +42,9 @@ Pause, Resume, and Stop use an observation issued for that attachment.
 Streamed text carries message and turn IDs, a UTF-8 byte offset, and a
 replacement flag. A resync notice or local delivery limit ends confidence in
 the streamed view. The retained snapshot remains the source for task state.
+`transcript` reads committed user and assistant text for the current attachment.
+Reads are bounded at 1 MiB and 1,024 messages and report an explicit error if
+the transcript exceeds either bound. A replay does not stop the live turn.
 Navigating away releases attachments and subscriptions while accepted work
 stays owned by the native host.
 

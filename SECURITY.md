@@ -893,6 +893,8 @@ lazy reads, read-only mutation, and symlink escape refusal.
   through the [typed bridge](packages/grida-desktop-bridge/src/native-chat.ts).
   [IPC fixtures](desktop/src/main/native-chat-ipc.test.ts) exercise frame and
   workspace isolation, exact control targeting, and navigation cleanup.
+  Transcript reads use the same attachment and recheck scope after a bounded
+  replay of committed visible text. Live updates keep their own attribution.
 - The [native text observer](crates/grida-agent/src/acp/live.rs) projects
   assistant text from owned turns on negotiated private stdio. It checks
   attachment before serialization and uses the existing bounded ACP delivery

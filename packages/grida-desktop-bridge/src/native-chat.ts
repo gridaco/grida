@@ -30,6 +30,12 @@ export type NativeChatObservation = Readonly<{
   snapshot: NativeChatSnapshot;
 }>;
 
+export type NativeChatMessage = Readonly<{
+  messageId: string;
+  role: "user" | "assistant";
+  text: string;
+}>;
+
 export type NativeChatAcceptance = Readonly<{
   sessionId: string;
   inputId: string;
@@ -94,6 +100,7 @@ export type DesktopNativeChat = {
     inputId: string
   ): Promise<NativeChatAcceptance>;
   observe(attachmentId: string): Promise<NativeChatObservation>;
+  transcript(attachmentId: string): Promise<readonly NativeChatMessage[]>;
   control(
     attachmentId: string,
     control: NativeChatControl

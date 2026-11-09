@@ -29,6 +29,7 @@ export type ActiveNativeChat = Readonly<{
     | "submit"
     | "inputReceipt"
     | "observe"
+    | "transcript"
     | "pause"
     | "stop"
     | "resume"
@@ -132,6 +133,13 @@ export class NativeChatIpc {
     const observationId = randomUUID();
     attachment.observations.set(observationId, snapshot);
     return { observationId, snapshot };
+  }
+
+  async transcript(event: IpcMainInvokeEvent, attachmentId: string) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const messages = await owner.active.chat.transcript(attachment.session);
+    this.revalidate(owner, attachment);
+    return messages;
   }
 
   async control(

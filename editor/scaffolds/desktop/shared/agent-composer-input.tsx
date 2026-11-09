@@ -108,6 +108,9 @@ export type AgentComposerInputProps = {
    * THIS client streams. Defaults to `isStreaming` when omitted.
    */
   busy?: boolean;
+  /** Preserve the draft until the host acknowledges an idle submission. */
+  awaitSubmission?: boolean;
+  canSubmit?: boolean;
   /**
    * Stable identity for the currently bound chat session. A late queue
    * acknowledgement from an older scope must never clear an identical draft
@@ -198,6 +201,8 @@ function AgentComposerInner({
   onSubmit,
   isStreaming,
   busy,
+  awaitSubmission = false,
+  canSubmit = true,
   submissionScope,
   onStop,
   placeholder = "Ask anything…",
@@ -460,6 +465,7 @@ function AgentComposerInner({
   );
 
   const submit = async () => {
+    if (!canSubmit) return;
     if (queueSubmitGuard.inFlightFor(submissionScope)) return;
     // Hold a submit while resource preparation is still in flight — otherwise a
     // pick-then-Enter races the async router and sends without the
@@ -543,7 +549,7 @@ function AgentComposerInner({
       lowered.files.length > 0 ? lowered.files : undefined,
       lowered.extras,
     ] as const;
-    if (isBusy) {
+    if (isBusy || awaitSubmission) {
       // Busy/admission-blocked submits take the durable text queue path. Keep
       // the draft and its resource ledger intact until enqueue is confirmed;
       // otherwise a transient bridge failure would clear the only copy of the
@@ -574,7 +580,11 @@ function AgentComposerInner({
         }
       } catch {
         if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
-          notify("Couldn't queue the message — your draft is still here.");
+          notify(
+            awaitSubmission
+              ? "Couldn't confirm the send — your draft is still here."
+              : "Couldn't queue the message — your draft is still here."
+          );
         }
       } finally {
         if (queueSubmitGuard.finish(lease)) {
@@ -689,7 +699,7 @@ function AgentComposerInner({
               size="icon-xs"
               className="size-7 rounded-full"
               onClick={submit}
-              disabled={isEncodingFiles || isQueueing}
+              disabled={!canSubmit || isEncodingFiles || isQueueing}
               aria-label={
                 allowEmptySubmit &&
                 emptySubmitLabel &&

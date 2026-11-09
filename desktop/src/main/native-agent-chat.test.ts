@@ -149,6 +149,13 @@ it.runIf(Boolean(packaged))(
         );
       });
       expect(otherUpdates).toEqual([]);
+      const committed = await client.transcript(session);
+      expect(committed).toEqual([
+        expect.objectContaining({
+          role: "user",
+          text: "Keep working until stopped",
+        }),
+      ]);
       expect(
         await client.submit(
           session,

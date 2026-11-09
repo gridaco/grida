@@ -4,6 +4,7 @@ import path from "node:path";
 import type {
   NativeChatAcceptance,
   NativeChatControlReceipt,
+  NativeChatMessage,
   NativeChatSnapshot,
   NativeChatStreamUpdate,
   NativeChatTurn,
@@ -43,6 +44,8 @@ const INPUT_DISPOSITIONS = [
 ] as const;
 const MAX_TEXT_BYTES = 512 * 1024;
 const MAX_UPDATE_BYTES = 8 * 1024;
+const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
+const MAX_TRANSCRIPT_MESSAGES = 1024;
 const IDENTITY = /^[A-Za-z0-9_.:@/-]{1,256}$/;
 
 export type NativeAgentChatLaunch = Omit<
@@ -65,10 +68,18 @@ type TaskBasis = Readonly<{
 // A retained basis can retry an identical control after the native child is
 // replaced. The replacement still requires a fresh attachment to that session.
 const observed = new WeakMap<NativeChatSnapshot, string>();
+type TranscriptCapture = {
+  messages: Map<string, NativeChatMessage>;
+  bytes: number;
+  overflow: boolean;
+  result?: Promise<readonly NativeChatMessage[]>;
+};
 
 export class NativeAgentChat {
   private readonly attached = new Map<string, NativeChatSession>();
   private readonly loading = new Map<string, Promise<NativeChatSession>>();
+  private readonly transcripts = new Map<string, TranscriptCapture>();
+  private readonly unverifiedTranscripts = new Set<string>();
   private readonly listeners = new Map<
     string,
     Set<(update: NativeChatStreamUpdate) => void>
@@ -134,6 +145,14 @@ export class NativeAgentChat {
         object(reply);
         return this.attach(id);
       })
+      .catch((error: unknown) => {
+        if (
+          error instanceof Error &&
+          error.message === "native_agent_request_timeout"
+        )
+          this.unverifiedTranscripts.add(id);
+        throw error;
+      })
       .finally(() => this.loading.delete(id));
     this.loading.set(id, requested);
     return requested;
@@ -195,6 +214,47 @@ export class NativeAgentChat {
     });
     observed.set(snapshot, this.scope);
     return snapshot;
+  }
+
+  async transcript(
+    session: NativeChatSession
+  ): Promise<readonly NativeChatMessage[]> {
+    const id = this.requireAttached(session);
+    if (this.unverifiedTranscripts.has(id))
+      throw new Error("native_chat_transcript_delivery_unverified");
+    const existing = this.transcripts.get(id)?.result;
+    if (existing) return existing;
+    const capture: TranscriptCapture = {
+      messages: new Map(),
+      bytes: 0,
+      overflow: false,
+    };
+    this.transcripts.set(id, capture);
+    capture.result = this.process
+      .request("session/load", {
+        sessionId: id,
+        cwd: this.cwd,
+        mcpServers: [],
+      })
+      .then((reply) => {
+        object(reply);
+        this.requireAttached(session);
+        if (capture.overflow)
+          throw new Error("native_chat_transcript_too_large");
+        return [...capture.messages.values()];
+      })
+      .catch((error: unknown) => {
+        // ACP replay chunks have no request ID. A timed-out replay can still
+        // produce chunks on this connection, so it cannot be retried in place.
+        if (
+          error instanceof Error &&
+          error.message === "native_agent_request_timeout"
+        )
+          this.unverifiedTranscripts.add(id);
+        throw error;
+      })
+      .finally(() => this.transcripts.delete(id));
+    return capture.result;
   }
 
   pause(
@@ -270,8 +330,10 @@ export class NativeAgentChat {
   private publish(params: unknown): void {
     try {
       const notification = object(params);
-      const listeners = this.listeners.get(identity(notification.sessionId));
-      if (!listeners) return;
+      const sessionId = identity(notification.sessionId);
+      const listeners = this.listeners.get(sessionId);
+      const capture = this.transcripts.get(sessionId);
+      if (!listeners && !capture) return;
       const update = object(notification.update);
       const role =
         update.sessionUpdate === "agent_message_chunk"
@@ -280,9 +342,6 @@ export class NativeAgentChat {
             ? "user"
             : null;
       if (!role) return;
-      const attribution = object(
-        object(notification._meta)["co.grida/session/updates"]
-      );
       const content = object(update.content);
       if (
         content.type !== "text" ||
@@ -290,6 +349,16 @@ export class NativeAgentChat {
         Buffer.byteLength(content.text) > MAX_UPDATE_BYTES
       )
         return;
+      const meta = notification._meta
+        ? object(notification._meta)["co.grida/session/updates"]
+        : undefined;
+      if (meta === undefined) {
+        if (capture)
+          captureText(capture, identity(update.messageId), role, content.text);
+        return;
+      }
+      if (!listeners) return;
+      const attribution = object(meta);
       const projected: NativeChatStreamUpdate =
         attribution.resyncRequired === true && content.text === ""
           ? Object.freeze({ kind: "resync" })
@@ -383,6 +452,30 @@ export class NativeAgentChat {
   private requireOpen(): void {
     if (this.closed) throw new Error("native_chat_closed");
   }
+}
+
+function captureText(
+  capture: TranscriptCapture,
+  messageId: string,
+  role: NativeChatMessage["role"],
+  text: string
+): void {
+  if (capture.overflow) return;
+  const previous = capture.messages.get(messageId);
+  capture.bytes += Buffer.byteLength(text);
+  if (
+    capture.bytes > MAX_TRANSCRIPT_BYTES ||
+    (!previous && capture.messages.size >= MAX_TRANSCRIPT_MESSAGES)
+  ) {
+    capture.overflow = true;
+    capture.messages.clear();
+    return;
+  }
+  capture.messages.set(messageId, {
+    messageId,
+    role,
+    text: (previous?.text ?? "") + text,
+  });
 }
 
 function acceptance(

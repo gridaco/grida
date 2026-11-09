@@ -50,6 +50,7 @@ import { cn } from "@app/ui/lib/utils";
 import {
   AGENT_SESSION_AGENT,
   getDesktopBridge,
+  useDesktopBridge,
   sessions as bridgeSessions,
   type AgentRunOptions,
   type Workspace,
@@ -121,6 +122,9 @@ import {
   findPendingApproval,
   type PendingApproval,
 } from "../shared/agent-approval";
+import type { DesktopNativeChat } from "@grida/desktop-bridge";
+import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
+import { NativeAgentPane } from "./native-agent-pane";
 import styles from "./agent-pane.module.css";
 
 export type AgentPaneProps = {
@@ -155,7 +159,7 @@ export function AgentPane({
 }: AgentPaneProps) {
   return (
     <div className={cn("flex h-full flex-col bg-background", className)}>
-      <AgentPaneContent
+      <AgentPaneRoute
         workspace={workspace}
         surfaceHost={surfaceHost}
         activeRelPath={activeRelPath}
@@ -168,6 +172,57 @@ export function AgentPane({
 }
 
 type AgentPaneContentProps = Omit<AgentPaneProps, "className">;
+
+function AgentPaneRoute(props: AgentPaneContentProps) {
+  const bridge = useDesktopBridge();
+  if (!bridge) return null;
+  return bridge.nativeChat ? (
+    <NativeAgentPaneGate
+      key={props.workspace.id}
+      bridge={bridge.nativeChat}
+      legacy={props}
+    />
+  ) : (
+    <AgentPaneContent {...props} />
+  );
+}
+
+function NativeAgentPaneGate({
+  bridge,
+  legacy,
+}: {
+  bridge: DesktopNativeChat;
+  legacy: AgentPaneContentProps;
+}) {
+  const params = useSearchParams();
+  const [selection, setSelection] = useState<{
+    bridge: DesktopNativeChat;
+    available: boolean | null;
+  }>();
+  useEffect(
+    () =>
+      NativeChatController.watchAvailability(bridge, (available) =>
+        setSelection({ bridge, available })
+      ),
+    [bridge]
+  );
+  if (selection?.bridge !== bridge) return null;
+  if (selection.available === null)
+    return (
+      <div role="alert" className="px-3 py-2 text-xs text-destructive">
+        Couldn't check chat availability.
+      </div>
+    );
+  if (!selection.available) return <AgentPaneContent {...legacy} />;
+  return (
+    <NativeAgentPane
+      key={params.get("session")}
+      bridge={bridge}
+      workspaceId={legacy.workspace.id}
+      initialSession={params.get("session")}
+    />
+  );
+}
 
 function AgentPaneContent({
   workspace,

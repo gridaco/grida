@@ -165,6 +165,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, (event, id: string) =>
     nativeChat.observe(event, id)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, (event, id: string) =>
+    nativeChat.transcript(event, id)
+  );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_CONTROL,
     (event, id: string, control: unknown) =>

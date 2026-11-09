@@ -392,6 +392,8 @@ const bridge: DesktopBridge = {
       ),
     observe: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
+    transcript: (attachmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, attachmentId),
     control: (attachmentId, control) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_CONTROL,

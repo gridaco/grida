@@ -103,6 +103,9 @@ function setup() {
     async observe(session) {
       return snapshot(session.id);
     },
+    async transcript() {
+      return [];
+    },
     async stop(session, observed, requestId) {
       return this.pause(session, observed, requestId);
     },
