@@ -3335,3 +3335,4 @@ incident investigations out of the architectural guarantee.
 Please email security@grida.co or universe@grida.co. We respond within 48 hours.
 
 Include the affected route, authentication context and reproduction steps when reporting a routing vulnerability.
+- The [verified sidecar drain](desktop/src/main/agent-sidecar-supervisor.ts) withdraws the daemon endpoint, requires a matching cleanup acknowledgment on the inherited private pipe, and waits for the captured child to close cleanly. A generation that dispatched a legacy command is ineligible for this proof because a descendant could outlive the child. The [built sidecar fixture](desktop/src/sidecar/media-startup.test.ts) exercises the acknowledgment and exit with an actual legacy SQLite writer before lease retirement. This evidence covers that cooperating generation. Older writers require separate deployment evidence.

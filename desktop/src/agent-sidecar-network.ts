@@ -67,8 +67,8 @@ export class AgentSidecarNetwork {
   private closed = false;
   private bootstrapResolve: ((value: Bootstrap) => void) | null = null;
   private bootstrapReject: ((error: Error) => void) | null = null;
-  private shutdownHandler: (() => void) | null = null;
-  private shutdownRequested = false;
+  private shutdownHandler: ((requestId: string | null) => void) | null = null;
+  private shutdownRequest: { id: string | null } | undefined;
   private shutdownDelivered = false;
   private fatalHandler: ((error: Error) => void) | null = null;
   private fatalValue: Error | null = null;
@@ -120,7 +120,7 @@ export class AgentSidecarNetwork {
     });
   }
 
-  onShutdown(handler: () => void): void {
+  onShutdown(handler: (requestId: string | null) => void): void {
     this.shutdownHandler = handler;
     this.deliverShutdown();
   }
@@ -136,6 +136,12 @@ export class AgentSidecarNetwork {
 
   async ready(port: number): Promise<void> {
     await this.send({ v: 1, type: "ready", port });
+  }
+
+  async acknowledgeShutdown(requestId: string): Promise<void> {
+    if (!this.shutdownDelivered || this.shutdownRequest?.id !== requestId)
+      throw new Error("agent sidecar shutdown identity changed");
+    await this.send({ v: 1, type: "shutdown.complete", requestId });
   }
 
   close(reason = "agent network channel closed"): void {
@@ -434,7 +440,9 @@ export class AgentSidecarNetwork {
         this.onCommandError(frame);
         return;
       case "shutdown":
-        this.shutdownRequested = true;
+        if (frame.requestId !== undefined && this.shutdownRequest)
+          throw new Error("duplicate identified sidecar shutdown");
+        this.shutdownRequest ??= { id: frame.requestId ?? null };
         this.deliverShutdown();
         return;
       default:
@@ -647,14 +655,14 @@ export class AgentSidecarNetwork {
 
   private deliverShutdown(): void {
     if (
-      !this.shutdownRequested ||
+      !this.shutdownRequest ||
       this.shutdownDelivered ||
       !this.shutdownHandler
     ) {
       return;
     }
     this.shutdownDelivered = true;
-    this.shutdownHandler();
+    this.shutdownHandler(this.shutdownRequest.id);
   }
 
   private async send(

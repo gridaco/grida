@@ -23,6 +23,62 @@ import {
 describe("AgentNetworkHost", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("correlates the shutdown acknowledgement and denies new dispatch during drain", async () => {
+    const fetch = vi.fn<() => Promise<Response>>();
+    const harness = createHarness({ fetch });
+    await harness.start();
+    const drained = harness.host.requestDrain();
+    expect(harness.host.requestDrain()).toBe(drained);
+    const shutdown = await harness.untilFrame("shutdown");
+    expect(shutdown.requestId).toEqual(expect.any(String));
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.start",
+      requestId: "pending",
+      grantId: "provider:built-in",
+      method: "GET",
+      url: "https://openrouter.ai/api/v1/models",
+      headers: [],
+      hasBody: false,
+    });
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.end",
+      requestId: "pending",
+      sequence: 0,
+    });
+    expect((await harness.untilFrame("response.error")).code).toBe("denied");
+    expect(fetch).not.toHaveBeenCalled();
+    await harness.sidecar.write({
+      v: 1,
+      type: "shutdown.complete",
+      requestId: shutdown.requestId!,
+    });
+    await drained;
+    harness.host.close();
+    expect(harness.fatal).not.toHaveBeenCalled();
+    expect(
+      harness.frames.filter((frame) => frame.type === "shutdown")
+    ).toHaveLength(1);
+  });
+
+  it("rejects an unrelated cleanup acknowledgement", async () => {
+    const harness = createHarness({ fetch: vi.fn<() => Promise<Response>>() });
+    await harness.start();
+    const result = harness.host.requestDrain();
+    const rejected = result.catch((error: unknown) => error);
+    await harness.untilFrame("shutdown");
+    await harness.sidecar.write({
+      v: 1,
+      type: "shutdown.complete",
+      requestId: "wrong",
+    });
+    expect(await rejected).toMatchObject({
+      message: "agent sidecar shutdown acknowledgement changed",
+    });
+    expect(harness.fatal).toHaveBeenCalledTimes(1);
+  });
+
   it("reuses one nonpersistent Chromium network context across restarts", async () => {
     const setProxy = vi.fn<(config: unknown) => Promise<void>>(
       async () => undefined
@@ -189,6 +245,12 @@ describe("AgentNetworkHost", () => {
       truncated: false,
       durationMs: 12,
     });
+    await expect(harness.host.requestDrain()).rejects.toThrow(
+      "agent_sidecar_drain_unverified"
+    );
+    expect(harness.frames.some((frame) => frame.type === "shutdown")).toBe(
+      false
+    );
     harness.host.close();
   });
 

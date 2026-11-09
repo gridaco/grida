@@ -136,6 +136,8 @@ const frames: readonly AgentSidecarChannel.Frame[] = [
     message: "command scope denied",
   },
   { v: 1, type: "shutdown" },
+  { v: 1, type: "shutdown", requestId: "drain_1" },
+  { v: 1, type: "shutdown.complete", requestId: "drain_1" },
 ];
 
 describe("AgentSidecarChannel.parse", () => {

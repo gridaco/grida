@@ -218,6 +218,13 @@ export namespace AgentSidecarChannel {
   export type ShutdownFrame = Readonly<{
     v: typeof VERSION;
     type: "shutdown";
+    requestId?: string;
+  }>;
+
+  export type ShutdownCompleteFrame = Readonly<{
+    v: typeof VERSION;
+    type: "shutdown.complete";
+    requestId: string;
   }>;
 
   export type HostToSidecarFrame =
@@ -235,6 +242,7 @@ export namespace AgentSidecarChannel {
 
   export type SidecarToHostFrame =
     | ReadyFrame
+    | ShutdownCompleteFrame
     | GrantAppliedFrame
     | RequestStartFrame
     | RequestChunkFrame
@@ -452,7 +460,16 @@ export namespace AgentSidecarChannel {
         expectBoundedString(frame.message, "message", 1, 2048);
         break;
       case "shutdown":
-        expectExactKeys(frame, ["v", "type"]);
+        if ("requestId" in frame) {
+          expectExactKeys(frame, ["v", "type", "requestId"]);
+          expectIdentifier(frame.requestId, "requestId");
+        } else {
+          expectExactKeys(frame, ["v", "type"]);
+        }
+        break;
+      case "shutdown.complete":
+        expectExactKeys(frame, ["v", "type", "requestId"]);
+        expectIdentifier(frame.requestId, "requestId");
         break;
       default:
         throw protocolError(`unknown frame type: ${frame.type}`);

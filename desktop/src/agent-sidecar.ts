@@ -236,20 +236,34 @@ async function main() {
     process.exit(1);
   }
 
-  const shutdown = (signal: string) => {
+  let stopping = false;
+  const shutdown = (signal: string, requestId: string | null = null) => {
+    if (stopping) return;
+    stopping = true;
     console.log(`[agent-sidecar] shutdown (${signal})`);
     daemonSockets?.close();
+    const deadline = setTimeout(
+      () => process.exit(1),
+      requestId ? 8_000 : 1_000
+    );
     void host
       .stop()
-      .catch((err) => {
-        console.warn("[agent-sidecar] server close error:", err);
+      .then(async () => {
+        if (requestId) await network.acknowledgeShutdown(requestId);
       })
-      .finally(() => {
-        process.exit(0);
-      });
-    setTimeout(() => process.exit(0), 1_000).unref();
+      .then(
+        () => {
+          clearTimeout(deadline);
+          process.exit(0);
+        },
+        () => {
+          clearTimeout(deadline);
+          console.warn("[agent-sidecar] server close could not be verified");
+          process.exit(1);
+        }
+      );
   };
-  network.onShutdown(() => shutdown("host-shutdown"));
+  network.onShutdown((requestId) => shutdown("host-shutdown", requestId));
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 }

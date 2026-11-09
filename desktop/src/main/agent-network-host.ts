@@ -2,6 +2,7 @@
 // GRIDA-SEC-006 — transient scoped-GG transport, never account-session custody.
 // GRIDA-GG: token — destination-authorized requests through the private Chromium session.
 import { isIP } from "node:net";
+import { randomUUID } from "node:crypto";
 import { Readable, type Writable } from "node:stream";
 import { net, session, type IncomingMessage, type Session } from "electron";
 import type {
@@ -16,6 +17,7 @@ import type { NativeProviderNetwork } from "./native-provider-egress";
 
 const READY_TIMEOUT_MS = 15_000;
 const GRANT_ACK_TIMEOUT_MS = 5_000;
+const DRAIN_TIMEOUT_MS = 8_000;
 const MAX_CONCURRENT_REQUESTS = 32;
 const MAX_DISCARDED_UPLOADS = 32;
 const REQUEST_UPLOAD_TIMEOUT_MS = 30_000;
@@ -87,6 +89,15 @@ export class AgentNetworkHost {
     }
   >();
   private closed = false;
+  private readyObserved = false;
+  private dispatchedCommand = false;
+  private drained = false;
+  private drain:
+    | (PromiseWithResolvers<void> & {
+        requestId: string;
+        timeout: NodeJS.Timeout;
+      })
+    | undefined;
   private readyResolve: ((port: number) => void) | null = null;
   private readyReject: ((error: Error) => void) | null = null;
 
@@ -101,6 +112,7 @@ export class AgentNetworkHost {
   ) {
     this.writer = new AgentSidecarChannel.Writer(output);
     input.on("data", (chunk: Buffer | string) => {
+      if (this.closed) return;
       try {
         const bytes = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
         for (const frame of this.decoder.push(bytes)) this.onFrame(frame);
@@ -268,8 +280,33 @@ export class AgentNetworkHost {
 
   close(): void {
     if (this.closed) return;
-    void this.writer.write({ v: 1, type: "shutdown" }).catch(() => undefined);
+    if (!this.drain && !this.drained)
+      void this.writer.write({ v: 1, type: "shutdown" }).catch(() => undefined);
     this.fail(new Error("agent provider network stopped"), false);
+  }
+
+  /** Correlate sidecar cleanup on the inherited pipe. The supervisor joins exit separately. */
+  requestDrain(): Promise<void> {
+    if (this.drained) return Promise.resolve();
+    if (this.closed || !this.readyObserved || this.dispatchedCommand)
+      return Promise.reject(new Error("agent_sidecar_drain_unverified"));
+    if (this.drain) return this.drain.promise;
+    const requestId = randomUUID();
+    const pending = Promise.withResolvers<void>();
+    this.drain = {
+      ...pending,
+      requestId,
+      timeout: setTimeout(
+        () => this.fail(new Error("agent_sidecar_drain_timeout")),
+        DRAIN_TIMEOUT_MS
+      ),
+    };
+    for (const controller of this.requestControllers.values())
+      controller.abort();
+    void this.send({ v: 1, type: "shutdown", requestId }).catch((error) =>
+      this.fail(asError(error))
+    );
+    return pending.promise;
   }
 
   private static electronAdapter(networkSession: Session): NetworkAdapter {
@@ -291,7 +328,18 @@ export class AgentNetworkHost {
         const resolve = this.readyResolve;
         this.readyResolve = null;
         this.readyReject = null;
+        this.readyObserved = true;
         resolve(frame.port);
+        return;
+      }
+      case "shutdown.complete": {
+        const pending = this.drain;
+        if (!pending || pending.requestId !== frame.requestId)
+          throw new Error("agent sidecar shutdown acknowledgement changed");
+        clearTimeout(pending.timeout);
+        this.drain = undefined;
+        this.drained = true;
+        pending.resolve();
         return;
       }
       case "grant.applied": {
@@ -338,7 +386,7 @@ export class AgentNetworkHost {
     ) {
       throw new Error("duplicate host command request");
     }
-    if (!this.commandExecutor) {
+    if (!this.commandExecutor || this.drain || this.drained) {
       this.rememberTerminalCommand(frame.requestId);
       void this.commandError(
         frame.requestId,
@@ -356,6 +404,7 @@ export class AgentNetworkHost {
     }
 
     const controller = new AbortController();
+    this.dispatchedCommand = true;
     this.activeCommands.set(frame.requestId, controller);
     const scope: ShellExecutionScope = Object.freeze({
       workspace_root: frame.workspaceRoot,
@@ -621,6 +670,7 @@ export class AgentNetworkHost {
       return;
     }
     try {
+      if (this.drain || this.drained) throw deniedError();
       // Authorization at request.start limits what we buffer. Re-authorizing
       // against the current authority here makes revocation effective even if
       // a compromised sidecar holds an upload open across grant.update.
@@ -1040,6 +1090,11 @@ export class AgentNetworkHost {
     this.readyReject?.(error);
     this.readyResolve = null;
     this.readyReject = null;
+    if (this.drain) {
+      clearTimeout(this.drain.timeout);
+      this.drain.reject(error);
+      this.drain = undefined;
+    }
     for (const controller of this.requestControllers.values())
       controller.abort();
     for (const response of this.active.values()) {
@@ -1061,7 +1116,7 @@ export class AgentNetworkHost {
       pending.reject(error);
     }
     this.grantAcks.clear();
-    if (fatal) this.onFatal(error);
+    if (fatal && !this.drained) this.onFatal(error);
   }
 }
 

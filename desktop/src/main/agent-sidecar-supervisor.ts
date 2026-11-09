@@ -77,6 +77,7 @@ export type AgentSidecarInfo = {
 };
 
 const STARTUP_TIMEOUT_MS = 15_000; // bumped from 8s — srt init adds proxy startup time
+const DRAIN_EXIT_TIMEOUT_MS = 10_000;
 const BACKOFF_INITIAL_MS = 250;
 const BACKOFF_MAX_MS = 10_000;
 
@@ -101,6 +102,8 @@ export class AgentSidecarSupervisor {
   private info: AgentSidecarInfo | null = null;
   private restartBackoffMs = BACKOFF_INITIAL_MS;
   private isShuttingDown = false;
+  private verifiedDrain: Promise<void> | undefined;
+  private drainingChild: ChildProcess | null = null;
   private restartTimer: NodeJS.Timeout | null = null;
   private sandboxReady = false;
   private scratchBase: string | null = null;
@@ -160,6 +163,7 @@ export class AgentSidecarSupervisor {
   }
 
   async start(): Promise<AgentSidecarInfo> {
+    if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
     if (this.agentEnabled) this.legacyLaunchStarted = true;
     if (this.info) return this.info;
     if (this.restartTimer) {
@@ -201,6 +205,63 @@ export class AgentSidecarSupervisor {
 
   getInfo(): AgentSidecarInfo | null {
     return this.info;
+  }
+
+  /** Permanently retire this ready generation and verify its exact cleanup. */
+  drain(): Promise<void> {
+    return (this.verifiedDrain ??= this.drainCurrent());
+  }
+
+  private async drainCurrent(): Promise<void> {
+    const {
+      child,
+      activeGeneration: generation,
+      networkHost,
+      daemonSocketHost,
+    } = this;
+    if (
+      !app.hasSingleInstanceLock() ||
+      this.isShuttingDown ||
+      !this.info ||
+      !child ||
+      !networkHost ||
+      !daemonSocketHost
+    )
+      throw new Error("agent_sidecar_drain_unverified");
+
+    this.isShuttingDown = true;
+    this.drainingChild = child;
+    this.info = null;
+    if (this.restartTimer) {
+      clearTimeout(this.restartTimer);
+      this.restartTimer = null;
+    }
+    daemonSocketHost.close();
+    const exited = Promise.withResolvers<void>();
+    const onClose = (code: number | null, signal: NodeJS.Signals | null) => {
+      if (code === 0 && signal === null) exited.resolve();
+      else exited.reject(new Error("agent_sidecar_drain_unverified"));
+    };
+    const timer = setTimeout(
+      () => exited.reject(new Error("agent_sidecar_drain_unverified")),
+      DRAIN_EXIT_TIMEOUT_MS
+    );
+    child.once("close", onClose);
+    try {
+      await Promise.all([networkHost.requestDrain(), exited.promise]);
+    } catch (error) {
+      this.retireGeneration(child, generation, false);
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      child.off("close", onClose);
+      this.drainingChild = null;
+      if (this.isCurrentGeneration(child, generation)) {
+        this.closeCurrentHosts();
+        this.child = null;
+        this.activeGeneration = 0;
+      }
+    }
   }
 
   stop() {
@@ -653,6 +714,9 @@ export class AgentSidecarSupervisor {
           `exited code=${code}${signal ? ` signal=${signal}` : ""}`,
           "warn"
         );
+        // Node may emit exit with a cleanup acknowledgment still buffered in
+        // stdout. The verified drain owns these hosts until pipe close.
+        if (this.drainingChild === child) return;
         spawnDaemonSocketHost?.close();
         if (this.daemonSocketHost === spawnDaemonSocketHost) {
           this.daemonSocketHost = null;

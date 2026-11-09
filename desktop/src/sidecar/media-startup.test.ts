@@ -16,6 +16,8 @@ vi.mock("electron", () => ({ net: {}, session: {} }));
 import { AgentNetworkHost } from "../main/agent-network-host";
 import { AgentNetworkAuthority } from "../main/agent-network-authority";
 import { AgentDaemonSocketHost } from "../main/agent-daemon-socket-host";
+import { LegacyChatArchive } from "../main/legacy-chat-archive";
+import { LegacyChatSourceLease } from "../main/legacy-chat-source-lease";
 
 const desktop = fileURLToPath(new URL("../..", import.meta.url));
 const fixture = fileURLToPath(new URL("./testing/", import.meta.url));
@@ -387,6 +389,105 @@ describe("built Desktop media startup", () => {
       }
     }
   }, 120_000);
+
+  it.skipIf(process.platform === "win32")(
+    "joins a real legacy database writer before retiring its isolated source",
+    async () => {
+      const root = await fs.mkdtemp(
+        path.join(await fs.realpath(os.tmpdir()), "grida-legacy-writer-")
+      );
+      const userData = path.join(root, "state");
+      const mediaRoot = path.join(root, "media");
+      const output = path.join(root, "build");
+      const home = path.join(root, "home");
+      const temporary = path.join(root, "tmp");
+      const scratchBase = path.join(root, "scratch");
+      let active: Sidecar | undefined;
+      try {
+        for (const directory of [
+          userData,
+          mediaRoot,
+          home,
+          temporary,
+          scratchBase,
+        ])
+          await fs.mkdir(directory, { mode: 0o700 });
+        const env = {
+          HOME: home,
+          USERPROFILE: home,
+          TMPDIR: temporary,
+          TMP: temporary,
+          TEMP: temporary,
+        };
+        await runBuild(root, output, env);
+        await fs.symlink(
+          path.join(desktop, "node_modules"),
+          path.join(root, "node_modules"),
+          "dir"
+        );
+        const source = { userDataPath: userData, scratchBase };
+        const lease = new LegacyChatSourceLease(source);
+        const writer = await lease.claimWriter();
+        const metadata = ggContractFixture([]);
+        active = await Sidecar.start({
+          root,
+          output,
+          userData,
+          mediaRoot,
+          env,
+          runtime: await sidecarRuntime(),
+          generation: 1,
+          fetchProvider: async (url) =>
+            metadata.response(url) ?? new Response(null, { status: 403 }),
+          legacyScratch: scratchBase,
+        });
+        const handshake = await active.post("/handshake");
+        expect((await handshake.json()).capabilities).toMatchObject({
+          agent: true,
+          sessions: true,
+          shell: false,
+        });
+        const created = await active.post("/sessions", {
+          agent: "fixture",
+          title: "Saved legacy chat",
+        });
+        expect(created.status).toBe(200);
+        await expect(lease.claimWriter()).rejects.toThrow(
+          "legacy_chat_source_dirty"
+        );
+        const owned = active;
+        await writer.completeDrain(async (claimId) => {
+          if (claimId !== writer.claimId) return false;
+          await owned.stop();
+          return true;
+        });
+        active = undefined;
+        const archive = new LegacyChatArchive(source);
+        const retired = await lease.retire({
+          requestId: "fixture-retirement",
+          verifyWriterAdmission: async () => true,
+          verifyArchive: async () => {
+            const captured = await archive.snapshotQuiesced();
+            return captured ? (await archive.verify(captured.id)).id : null;
+          },
+        });
+        expect(retired.archiveId).toMatch(/^[a-f0-9]{64}$/);
+        expect(await archive.verify(retired.archiveId!)).toMatchObject({
+          sessionCount: 1,
+        });
+        await expect(lease.claimWriter()).rejects.toThrow(
+          "legacy_chat_source_retired"
+        );
+      } finally {
+        try {
+          await active?.stop(false);
+        } finally {
+          await fs.rm(root, { recursive: true, force: true });
+        }
+      }
+    },
+    120_000
+  );
 });
 
 type StartOptions = {
@@ -399,6 +500,7 @@ type StartOptions = {
   fetchProvider: (url: string, init: RequestInit) => Promise<Response>;
   generation: number;
   nativeChat?: boolean;
+  legacyScratch?: string;
 };
 
 class Sidecar {
@@ -414,11 +516,12 @@ class Sidecar {
   private port = 0;
   private constructor(
     private readonly child: ChildProcess,
-    fetchProvider: StartOptions["fetchProvider"]
+    fetchProvider: StartOptions["fetchProvider"],
+    private readonly legacy: boolean
   ) {
     this.exit = new Promise((resolve, reject) => {
       child.once("error", reject);
-      child.once("exit", (code, signal) => resolve({ code, signal }));
+      child.once("close", (code, signal) => resolve({ code, signal }));
     });
     void this.exit.catch(() => undefined);
     child.stderr!.on("data", (chunk) => {
@@ -439,10 +542,17 @@ class Sidecar {
     const child = spawn(
       options.runtime.executable,
       [
-        "--require",
-        path.join(fixture, "media-startup-guard.cjs"),
+        ...(options.legacyScratch
+          ? []
+          : ["--require", path.join(fixture, "media-startup-guard.cjs")]),
         path.join(options.output, "sidecar.cjs"),
-        options.nativeChat ? "--agent=native-chat" : "--agent=disabled",
+        ...(options.legacyScratch
+          ? [
+              "--agent=enabled",
+              `--scratch-base=${options.legacyScratch}`,
+              `--skills-root=${options.legacyScratch}`,
+            ]
+          : [options.nativeChat ? "--agent=native-chat" : "--agent=disabled"]),
         `--user-data=${options.userData}`,
         `--media-root=${options.mediaRoot}`,
         `--editor-base-url=${origin}`,
@@ -462,7 +572,11 @@ class Sidecar {
         stdio: ["pipe", "pipe", "pipe", "ipc"],
       }
     );
-    const sidecar = new Sidecar(child, options.fetchProvider);
+    const sidecar = new Sidecar(
+      child,
+      options.fetchProvider,
+      options.legacyScratch !== undefined
+    );
     let startupTimer: ReturnType<typeof setTimeout>;
     const deadline = new Promise<never>((_resolve, reject) => {
       startupTimer = setTimeout(
@@ -531,22 +645,32 @@ class Sidecar {
     if (this.stopped) return;
     this.stopped = true;
     this.sockets.close();
-    this.network.close();
-    const timer = setTimeout(() => this.child.kill("SIGKILL"), 5_000);
-    this.child.kill("SIGTERM");
+    const timer = setTimeout(() => this.child.kill("SIGKILL"), 10_000);
     try {
+      if (assertClean) await this.network.requestDrain();
+      else {
+        this.network.close();
+        this.child.kill("SIGTERM");
+      }
       const status = await this.exit;
       if (assertClean) {
         assert.deepEqual(status, { code: 0, signal: null });
         assert.deepEqual(this.errors, []);
         assert.equal(this.stderr.includes(key), false);
         assert.equal(this.stderr.includes(ggToken), false);
-        assert.doesNotMatch(
-          this.stderr,
-          /SQLite|scratch|skills-root|forbidden imports|forbidden network/
-        );
+        if (!this.legacy)
+          assert.doesNotMatch(
+            this.stderr,
+            /SQLite|scratch|skills-root|forbidden imports|forbidden network/
+          );
       }
+    } catch (error) {
+      this.network.close();
+      this.child.kill("SIGTERM");
+      await this.exit;
+      throw error;
     } finally {
+      this.network.close();
       clearTimeout(timer);
     }
   }

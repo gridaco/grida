@@ -48,6 +48,55 @@ describe("AgentSidecarSupervisor recovery", () => {
     vi.useRealTimers();
   });
 
+  it("withdraws admission and joins both the cleanup receipt and exact child close", async () => {
+    const supervisor = new AgentSidecarSupervisor();
+    const child = fakeChild();
+    const ack = Promise.withResolvers<void>();
+    const requestDrain = vi.fn<() => Promise<void>>(() => ack.promise);
+    const close = vi.fn<() => void>();
+    Object.assign(supervisor, {
+      child: child.value,
+      activeGeneration: 3,
+      info: { port: 43123, password: "fixture" },
+      networkHost: { requestDrain, close: vi.fn<() => void>() },
+      daemonSocketHost: { close },
+    });
+    const shutdown = supervisor.drain();
+    expect(supervisor.drain()).toBe(shutdown);
+    expect(supervisor.getInfo()).toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(requestDrain).toHaveBeenCalledTimes(1);
+    let settled = false;
+    const observed = shutdown.then(() => {
+      settled = true;
+    });
+    ack.resolve();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    child.value.emit("close", 0, null);
+    await observed;
+    expect(child.kill).not.toHaveBeenCalled();
+    await expect(supervisor.start()).rejects.toThrow(
+      "agent_sidecar_shutting_down"
+    );
+  });
+
+  it("refuses a cleanup receipt without a clean child exit", async () => {
+    const supervisor = new AgentSidecarSupervisor();
+    const child = fakeChild();
+    Object.assign(supervisor, {
+      child: child.value,
+      activeGeneration: 3,
+      info: { port: 43123, password: "fixture" },
+      networkHost: { requestDrain: async () => {}, close: vi.fn<() => void>() },
+      daemonSocketHost: { close: vi.fn<() => void>() },
+    });
+    const shutdown = supervisor.drain();
+    child.value.emit("close", 1, null);
+    await expect(shutdown).rejects.toThrow("agent_sidecar_drain_unverified");
+    expect(supervisor.getInfo()).toBeNull();
+  });
+
   it("starts the media sandbox without preparing scratch or command authority", async () => {
     const supervisor = new AgentSidecarSupervisor({ agent: false });
     const state = supervisor as unknown as {
