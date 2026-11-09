@@ -9,8 +9,8 @@ use agent_kit_core::{
 };
 use agent_kit_sessions::{
     ClaimOutcome, ClaimRequest, ClaimedTurn, ControlRequest, CreateSession, DriverOutcome,
-    RecoveryRequest, RunDisposition, SessionControl, SessionStore, Sessions, Submission,
-    TurnDisposition, TurnDriver, TurnSelection,
+    InputDisposition, RecoveryRequest, RunDisposition, SessionControl, SessionStore, Sessions,
+    Submission, TurnDisposition, TurnDriver, TurnSelection,
 };
 use agent_kit_store_sqlite::SqliteStore;
 use std::sync::Arc;
@@ -1003,6 +1003,88 @@ async fn history_preserves_turn_creation_and_append_order_after_reopen() {
         reopened.history(session(), Some(foreign_turn)).await,
         ErrorKind::InvalidInput,
         "turn_missing",
+    );
+    assert_eq!(reopened.inspect(session()).await.unwrap(), before);
+}
+
+#[tokio::test]
+async fn input_observation_preserves_payload_and_disposition_after_reopen() {
+    let (directory, store) = store().await;
+    let input = submission("observed", "retained input");
+    assert!(
+        store
+            .input(session(), input.id.clone())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    store.submit(session(), input.clone()).await.unwrap();
+    let queued = store
+        .input(session(), input.id.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(queued.input, input);
+    assert_eq!(queued.disposition, InputDisposition::Queued);
+    let owner = claim(&store, "claim", vec![input.id.clone()]).await;
+    let claimed = store
+        .input(session(), input.id.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(claimed.position, queued.position);
+    assert_eq!(
+        claimed.disposition,
+        InputDisposition::Claimed { turn: turn() }
+    );
+    commit(
+        &owner,
+        "finish",
+        vec![JournalAction::Settle(TurnOutcome {
+            status: OutcomeStatus::Succeeded,
+            account: None,
+            evidence: vec![],
+        })],
+    )
+    .await;
+    drop(owner);
+    let other = SessionId::new("other").unwrap();
+    store
+        .create(CreateSession {
+            id: other.clone(),
+            request: change("create"),
+            configuration: payload("other"),
+        })
+        .await
+        .unwrap();
+    drop(store);
+
+    let reopened = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    let before = reopened.inspect(session()).await.unwrap();
+    let completed = reopened
+        .input(session(), input.id.clone())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(completed.input, input);
+    assert_eq!(completed.position, queued.position);
+    assert_eq!(
+        completed.disposition,
+        InputDisposition::Completed { turn: turn() }
+    );
+    assert!(
+        reopened
+            .input(other, input.id.clone())
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert_error(
+        reopened
+            .input(SessionId::new("missing").unwrap(), input.id)
+            .await,
+        ErrorKind::InvalidInput,
+        "session_missing",
     );
     assert_eq!(reopened.inspect(session()).await.unwrap(), before);
 }

@@ -173,6 +173,15 @@ impl SqliteStore {
         })
     }
 
+    /// Observe a submission's retained payload and disposition in its session.
+    pub async fn input(&self, session: SessionId, input: ChangeId) -> Result<Option<InputView>> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            load_session(connection, &session)?;
+            find_input(connection, &session, &input)
+        })
+        .await
+    }
+
     /// Read committed history in turn creation and record append order.
     ///
     /// A `before_turn` cut excludes that turn and all subsequent turns. The
@@ -869,7 +878,16 @@ fn save_session(
 }
 
 fn load_input(connection: &Connection, session: &SessionId, id: &ChangeId) -> Result<InputView> {
-    let (position, bytes, turn, completed, fingerprint) = connection
+    find_input(connection, session, id)?
+        .ok_or_else(|| error(ErrorKind::InvalidInput, "submission_missing"))
+}
+
+fn find_input(
+    connection: &Connection,
+    session: &SessionId,
+    id: &ChangeId,
+) -> Result<Option<InputView>> {
+    let Some((position, bytes, turn, completed, fingerprint)) = connection
         .query_row(
             "SELECT position,payload,turn_id,completed,fingerprint FROM submissions WHERE session=?1 AND id=?2",
             params![session.as_str(), id.as_str()],
@@ -884,8 +902,9 @@ fn load_input(connection: &Connection, session: &SessionId, id: &ChangeId) -> Re
             },
         )
         .optional()
-        .map_err(database_error)?
-        .ok_or_else(|| error(ErrorKind::InvalidInput, "submission_missing"))?;
+        .map_err(database_error)? else {
+            return Ok(None);
+        };
     let disposition = match turn {
         None => InputDisposition::Queued,
         Some(turn) if completed => InputDisposition::Completed {
@@ -905,11 +924,11 @@ fn load_input(connection: &Connection, session: &SessionId, id: &ChangeId) -> Re
             "stored_input_fingerprint_mismatch",
         ));
     }
-    Ok(InputView {
+    Ok(Some(InputView {
         input,
         position: unsigned(position)?,
         disposition,
-    })
+    }))
 }
 
 fn turn_inputs(
