@@ -113,7 +113,10 @@ impl Host {
             .store
             .context_history_with(session, before_turn, project)
             .await?;
-        let (messages, omissions, _) = context_material(retained)?;
+        let (mut messages, omissions, _) = context_material(retained)?;
+        if let Some(context) = &self.side_context {
+            messages.insert(0, context.background.clone());
+        }
         Ok(PriorContext {
             messages,
             disclosure: omissions.context_disclosure(),

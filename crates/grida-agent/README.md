@@ -131,6 +131,11 @@ List supplies an absolute workspace `cwd` and returns up to 32 saved session
 identities in newest-created order. Follow `nextCursor` with the same workspace.
 Listing leaves chats detached and reads no transcripts.
 
+Private stdio clients can negotiate the side-chat open, ask, and close
+operations. Each side chat uses temporary state and the selected model with
+no tool access. Its captured background can include the parent's installed
+summary. Closing it leaves the parent task under its original controls.
+
 Clients can negotiate both `co.grida/session/questions` and
 `co.grida/session/answer-question` at version `1`. Prompts accepted through the
 product submit and queue extensions then capture question availability. Plain

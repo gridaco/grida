@@ -7,6 +7,7 @@ pub mod goals;
 pub mod history;
 pub mod hooks;
 pub mod questions;
+pub mod side_context;
 pub mod usage;
 pub mod wakeups;
 

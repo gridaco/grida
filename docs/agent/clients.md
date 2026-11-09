@@ -232,6 +232,23 @@ clients on the exact numeric loopback address. It supports MCP revisions
 The headless service offers `surface_open`. Its result reports that no
 presentation was requested because no editor is attached.
 
+## Ask in a temporary side chat
+
+A private stdio client can open a read-only side chat from an attached parent.
+It captures committed background, including an installed summary when present.
+The parent can keep working. The selected model treats that snapshot as quoted
+reference and answers the side chat's new questions. The open response identifies
+the source context and reports omitted material.
+
+Side chats accept text and use the host's selected model. They have no workspace
+tools or scheduled work. Close ends that side chat and discards its conversation.
+A disconnect also discards it. The parent keeps its own history and controls.
+
+Negotiate version 1 for `co.grida/side-chat/open`, `ask`, and `close` separately.
+Open supplies the parent session and a request ID. Ask supplies the returned side
+chat ID, a request ID, and text, and returns a completion account. Close supplies
+the side chat ID. These IDs work only on the connection that opened the chat.
+
 ## Use durable client operations
 
 A capable client can opt in to individual version-1 operations through

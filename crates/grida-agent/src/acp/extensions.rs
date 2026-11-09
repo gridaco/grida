@@ -6,6 +6,7 @@ mod goals;
 mod history;
 mod lifecycle;
 mod questions;
+mod side_chats;
 mod skills;
 mod wakeups;
 
@@ -67,6 +68,7 @@ fn capability_keys(reviewer: bool) -> impl Iterator<Item = &'static str> {
         .chain([compaction::COMPACT])
         .chain([skills::CATALOG])
         .chain(goals::CAPABILITIES)
+        .chain(side_chats::capabilities(reviewer))
         .chain(wakeups::capabilities(reviewer))
 }
 
@@ -277,6 +279,7 @@ pub(super) fn handlers(
     host: Arc<Host>,
     sessions: Arc<Mutex<ConnectionSessions>>,
     reviewer: bool,
+    side_chats: Option<Arc<crate::host::side_chats::SideChats>>,
 ) -> Builder<
     Agent,
     impl HandleDispatchFrom<Client>,
@@ -317,6 +320,11 @@ pub(super) fn handlers(
             image_intake,
         ))
         .with_connection_builder(wakeups::handlers(host.clone(), sessions.clone()))
+        .with_connection_builder(side_chats::handlers(
+            host.clone(),
+            sessions.clone(),
+            side_chats,
+        ))
         .on_receive_request(
             async move |request: Submit, responder, _| {
                 let result = async {

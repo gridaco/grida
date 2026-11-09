@@ -129,7 +129,7 @@ struct Inner {
     owners: Mutex<BTreeMap<(SessionId, TurnId), Weak<()>>>,
     changed: Notify,
     catalog: Option<catalog::ScopeProjection>,
-    _lock: File,
+    _lock: Option<File>,
 }
 
 struct SessionRecord {
@@ -159,6 +159,16 @@ enum PreparedClaim {
 }
 
 impl SqliteStore {
+    /// Use the same session and turn journal without a database file.
+    /// Its state lives only while this store or a bound journal is retained.
+    pub fn open_in_memory() -> Result<Self> {
+        let connection = Connection::open_in_memory().map_err(database_error)?;
+        connection
+            .pragma_update(None, "temp_store", "MEMORY")
+            .map_err(database_error)?;
+        Self::initialize(connection, None, None)
+    }
+
     /// Open a private application database with synchronous WAL commits.
     ///
     /// The parent directory must exist. One process owns this database while
@@ -197,19 +207,29 @@ impl SqliteStore {
             .map_err(|_| error(ErrorKind::Unavailable, "store_already_owned"))?;
         let database = open_private_file(&path)?;
         drop(database);
-        let mut connection = Connection::open(&path).map_err(database_error)?;
+        let connection = Connection::open(&path).map_err(database_error)?;
+        Self::initialize(connection, catalog, Some(lock))
+    }
+
+    fn initialize(
+        mut connection: Connection,
+        catalog: Option<catalog::ScopeProjection>,
+        lock: Option<File>,
+    ) -> Result<Self> {
         connection
             .busy_timeout(Duration::from_secs(5))
             .map_err(database_error)?;
         connection
             .pragma_update(None, "foreign_keys", true)
             .map_err(database_error)?;
-        connection
-            .pragma_update(None, "journal_mode", "WAL")
-            .map_err(database_error)?;
-        connection
-            .pragma_update(None, "synchronous", "FULL")
-            .map_err(database_error)?;
+        if lock.is_some() {
+            connection
+                .pragma_update(None, "journal_mode", "WAL")
+                .map_err(database_error)?;
+            connection
+                .pragma_update(None, "synchronous", "FULL")
+                .map_err(database_error)?;
+        }
         let version: i64 = connection
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .map_err(database_error)?;

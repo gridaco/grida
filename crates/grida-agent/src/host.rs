@@ -11,6 +11,7 @@ mod lifecycle;
 pub(crate) mod live;
 mod permissions;
 mod questions;
+pub(crate) mod side_chats;
 mod skills;
 mod wakeups;
 pub use catalog::SessionCatalog;
@@ -99,6 +100,7 @@ pub struct Host {
     configuration: Option<Arc<Configuration>>,
     permissions: Option<Arc<crate::permissions::PermissionProfile>>,
     require_completion_text: bool,
+    side_context: Option<Arc<grida_agent_master::side_context::SideContext>>,
     #[cfg(unix)]
     guidance_root: Option<Arc<skills::HeadlessGuidance>>,
     configuration_admission: Arc<Mutex<()>>,
@@ -500,6 +502,7 @@ impl Host {
             configuration,
             permissions: None,
             require_completion_text: false,
+            side_context: None,
             #[cfg(unix)]
             guidance_root: None,
             configuration_admission: Arc::default(),
@@ -1009,12 +1012,21 @@ impl Host {
         } else {
             None
         };
-        let runtime = goal_authority
+        let runtime = self
+            .side_context
             .as_ref()
-            .map(|goal| {
+            .map(|_| {
+                let authority = Arc::new(side_chats::InferenceOnly::new(execution));
                 execution
                     .runtime
-                    .with_authorization(goal.clone(), goal.clone())
+                    .with_authorization(authority.clone(), authority)
+            })
+            .or_else(|| {
+                goal_authority.as_ref().map(|goal| {
+                    execution
+                        .runtime
+                        .with_authorization(goal.clone(), goal.clone())
+                })
             })
             .or_else(|| {
                 tool_authority.as_ref().map(|authorization| {
@@ -1066,6 +1078,12 @@ impl Host {
             goal.insert(&mut inventory, &mut authority.tools)?;
         }
         let selected = authority.tools.keys().cloned().collect::<Vec<_>>();
+        if self.side_context.is_some() && !selected.is_empty() {
+            return Err(problem(
+                ErrorKind::InvalidState,
+                "side_chat_tools_unavailable",
+            ));
+        }
         let tools = inventory.snapshot(&selected)?;
         if !closing && prepared.questions {
             execution.questions.reconcile(&operations, &tools).await?;
@@ -1186,7 +1204,20 @@ impl Host {
         let execution = self.execution()?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
         let permission_capture = self.capture_permissions(session, &id)?;
-        let guidance = skills::capture_guidance(self.guidance_scope(session)?, &parts).await?;
+        let guidance = if self.side_context.is_some() {
+            if questions
+                || allow_wakeups
+                || configuration_permission != crate::ConfigurationPermission::Disabled
+                || parts
+                    .iter()
+                    .any(|part| !matches!(part, PromptPart::Text { .. }))
+            {
+                return Err(problem(ErrorKind::Unsupported, "side_chat_text_only"));
+            }
+            None
+        } else {
+            skills::capture_guidance(self.guidance_scope(session)?, &parts).await?
+        };
         let parts = if parts
             .iter()
             .any(|part| matches!(part, PromptPart::Image { .. }))
@@ -1248,6 +1279,14 @@ impl Host {
         authority: InputAuthority,
     ) -> Result<PreparedInput> {
         let mut config = execution.config.clone();
+        if self.side_context.is_some() {
+            if !config.instructions.is_empty() {
+                config.instructions.push_str("\n\n");
+            }
+            config
+                .instructions
+                .push_str(grida_agent_master::side_context::INSTRUCTIONS);
+        }
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
         let (
             messages,

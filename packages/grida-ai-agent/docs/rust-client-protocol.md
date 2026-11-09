@@ -232,6 +232,27 @@ capacity changes. An explicit task pause is independent of answer receipt.
 An embedded `run --questions` returns a verified `input_required` result and
 exit code `6` when it suspends for an answer.
 
+### Temporary side chats
+
+Private stdio clients negotiate all three version-1 keys under
+`co.grida/side-chat/`. Side chat IDs belong to the current connection.
+
+| Method suffix | Parameters and result                                                                                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open`        | `sessionId`, `requestId`. Capture an attached parent's current context and return `sideChatId`, `parentSessionId`, `sourceContext`, policy, and omission information. |
+| `ask`         | `sideChatId`, `requestId`, `text`. Run one side turn and return `turnId`, `status`, `account`, and `textTruncated`.                                                   |
+| `close`       | `sideChatId`. Stop active side work, verify worker shutdown, and discard the temporary conversation.                                                                  |
+
+An open retry returns the original capture while the side chat is open.
+An ask retry with identical text returns its recorded terminal account.
+One question can run per side chat at a time. Each question accepts at most
+16 KiB of text. The response caps answer text at 64 KiB. The connection can
+open up to four chats at once, with six turns per chat and 32 open requests
+over the connection's lifetime. Disconnect closes the temporary chats.
+The host uses the existing selected model with no tool inventory. Source
+context uses the installed summary and committed suffix when available.
+Parent controls and history are independent of side execution.
+
 ### One-shot task wake-ups
 
 Private stdio clients negotiate `co.grida/session/wakeups`,

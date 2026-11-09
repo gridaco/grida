@@ -41,7 +41,22 @@ pub async fn serve_stdio(
     host: Arc<Host>,
     provider: Option<crate::SupervisedProvider>,
 ) -> std::result::Result<(), ServeError> {
-    serve(host, tokio::io::stdin(), tokio::io::stdout(), provider).await
+    serve_stdio_with_side_chats(host, provider, Arc::default()).await
+}
+
+pub(crate) async fn serve_stdio_with_side_chats(
+    host: Arc<Host>,
+    provider: Option<crate::SupervisedProvider>,
+    side_chats: Arc<crate::host::side_chats::SideChats>,
+) -> std::result::Result<(), ServeError> {
+    serve(
+        host,
+        tokio::io::stdin(),
+        tokio::io::stdout(),
+        provider,
+        side_chats,
+    )
+    .await
 }
 
 async fn serve(
@@ -49,6 +64,7 @@ async fn serve(
     input: impl AsyncRead + Unpin,
     output: impl AsyncWrite + Unpin,
     provider: Option<crate::SupervisedProvider>,
+    side_chats: Arc<crate::host::side_chats::SideChats>,
 ) -> std::result::Result<(), ServeError> {
     let delivery = Arc::new(Delivery::new());
     let (sdk, wire) = Channel::duplex();
@@ -58,17 +74,28 @@ async fn serve(
         if let Some(provider) = &provider {
             provider.detach();
         }
+        let _ = side_chats.close_all().await;
         result
     };
     let result = tokio::try_join!(
-        serve_connection(host.clone(), sdk, delivery.clone(), true, provider.clone()),
+        serve_connection(
+            host.clone(),
+            sdk,
+            delivery.clone(),
+            provider.clone(),
+            Some(side_chats.clone())
+        ),
         read,
         transport::write(output, incoming, delivery.clone()),
     );
     if let Some(provider) = &provider {
         provider.detach();
     }
-    host.shutdown().await.map_err(ServeError::Shutdown)?;
+    let sides = side_chats.close_all().await;
+    host.shutdown()
+        .await
+        .and(sides)
+        .map_err(ServeError::Shutdown)?;
     result.map(|_| ()).map_err(ServeError::Protocol)
 }
 
@@ -103,9 +130,10 @@ async fn serve_connection(
     host: Arc<Host>,
     channel: Channel,
     delivery: Arc<Delivery>,
-    reviewer: bool,
     provider: Option<crate::SupervisedProvider>,
+    side_chats: Option<Arc<crate::host::side_chats::SideChats>>,
 ) -> Result<()> {
+    let reviewer = side_chats.is_some();
     let sessions = Arc::new(Mutex::new(ConnectionSessions::default()));
     let initialized_sessions = sessions.clone();
     let initialized_host = host.clone();
@@ -129,6 +157,7 @@ async fn serve_connection(
             host.clone(),
             sessions.clone(),
             reviewer,
+            side_chats,
         ))
         .on_receive_request(
             async move |request: InitializeRequest, responder, connection| {

@@ -77,8 +77,9 @@ async fn serve_stdio(
     signal: impl Future<Output = Result<()>>,
 ) -> Result<u8> {
     let supervised = provider.is_some();
+    let side_chats = Arc::new(crate::host::side_chats::SideChats::default());
     tokio::select! {
-        result = acp::serve_stdio(host.clone(), provider) => match result {
+        result = acp::serve_stdio_with_side_chats(host.clone(), provider, side_chats.clone()) => match result {
             Ok(()) => {}
             Err(acp::ServeError::Shutdown(error)) => return Err(error),
             Err(acp::ServeError::Protocol(error)) => {
@@ -89,8 +90,9 @@ async fn serve_stdio(
             }
         },
         result = signal => {
+            let sides = side_chats.close_all().await;
+            host.shutdown().await.and(sides)?;
             result?;
-            host.shutdown().await?;
             return Ok(130);
         }
     }

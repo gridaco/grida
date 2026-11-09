@@ -49,6 +49,10 @@ files use owner-only permissions, and existing symlinks or hard-linked files are
 rejected. Other platforms rely on the host's application-directory access policy.
 The lock file is retained so its identity remains stable across opens.
 
+`SqliteStore::open_in_memory` keeps the same session, lease, and journal
+contracts in one memory-only database. Its state lasts only as long as a
+store clone or bound journal remains alive.
+
 A session admits at most 256 queued inputs and 32 MiB of encoded pending payloads.
 Each input uses the core's bounded versioned envelope. A single turn snapshot is
 limited to 64 MiB. An over-limit write is rejected before its transaction commits.

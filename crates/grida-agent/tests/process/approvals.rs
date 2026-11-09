@@ -153,23 +153,33 @@ impl Stdio {
     }
 
     pub(super) async fn request(&mut self, method: &str, params: Value) -> Value {
+        let id = self.send(method, params).await;
+        loop {
+            let response = self.read_reply().await;
+            if response["id"] == id {
+                return response;
+            }
+        }
+    }
+
+    pub(super) async fn send(&mut self, method: &str, params: Value) -> u64 {
         self.id += 1;
         let id = self.id;
         let frame = json!({"jsonrpc":"2.0","id":id,"method":method,"params":params});
+        timeout(WAIT, self.stdin.write_all(format!("{frame}\n").as_bytes()))
+            .await
+            .unwrap()
+            .unwrap();
+        id
+    }
+
+    pub(super) async fn read_reply(&mut self) -> Value {
         timeout(WAIT, async {
-            self.stdin
-                .write_all(format!("{frame}\n").as_bytes())
-                .await
-                .unwrap();
             loop {
                 let mut line = String::new();
-                assert_ne!(
-                    self.stdout.read_line(&mut line).await.unwrap(),
-                    0,
-                    "{method}"
-                );
+                assert_ne!(self.stdout.read_line(&mut line).await.unwrap(), 0);
                 let response: Value = serde_json::from_str(&line).unwrap();
-                if response["id"] == id {
+                if !response["id"].is_null() {
                     return response;
                 }
             }

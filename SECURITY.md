@@ -1076,6 +1076,13 @@ Today:
   bounded recorded answer without filesystem, command, or network access. The
   handler stays outside the model's tool inventory. [Process tests](crates/grida-agent/tests/process/hooks.rs)
   cover captured selection, refusal after a launch change, and Stop without the handler.
+- [Private side-chat controls](crates/grida-agent/src/acp/extensions/side_chats.rs)
+  require negotiation and an attached parent. The [side-chat owner](crates/grida-agent/src/host/side_chats.rs)
+  keeps a separate in-memory journal, uses only the selected inference authority,
+  and denies tool dispatch. The [context projection](crates/grida-agent-master/src/side_context.rs)
+  excludes source system instructions, tool payloads, and provider continuation state.
+  [Process tests](crates/grida-agent/tests/process/side_chats.rs) verify private
+  scope and concurrent parent work through side-chat closure.
 - [Native-provider auth routes](packages/grida-ai-agent/src/http/routes/chatgpt-auth.ts) — the full-agent composition alone mounts the existing private ceremony behind the same perimeter; fixed paths now come from their neutral protocol owner. Credential and callback mechanisms remain GRIDA-SEC-008.
 - [Desktop media startup proof](desktop/src/sidecar/media-startup.test.ts), [build fixture](desktop/src/sidecar/testing/media-startup-build.mjs), and [runtime guard](desktop/src/sidecar/testing/media-startup-guard.cjs) — actual Vite sidecar output, private framed provider/control traffic and main-transferred loopback sockets, with synthetic BYOK/GG responses and owned temporary state. Import/network tripwires and absent chat/scratch files test startup isolation; they are not an OS-sandbox, installed-app or provider integration certification.
 - [Host media error mapping](packages/grida-ai-agent/src/http/routes/media-generation-errors.ts) — callers supply safely projected SDK failures before logging/status adaptation. The mapper logs supplied details and must never receive raw upstream errors; provider details are removed by each operation and route boundary.
