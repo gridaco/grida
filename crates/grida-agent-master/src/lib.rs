@@ -5,7 +5,7 @@ pub mod configuration;
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
-    FailureKind, InferenceRequest, InferenceStatus, PreparedRequest, Provider,
+    FailureKind, InferenceRequest, InferenceStatus, MeasurementKind, PreparedRequest, Provider,
 };
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::InventorySnapshot;
@@ -19,6 +19,7 @@ use agent_kit_runtime::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::num::NonZeroU64;
 use std::sync::Arc;
 
 const CONTINUATION_SCHEMA: &str = "grida.agent.conversation";
@@ -39,6 +40,8 @@ pub struct Account {
     pub unresolved: Vec<OperationId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_reason: Option<StopReason>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure: Option<Error>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,6 +70,7 @@ pub struct Master {
     tools: InventorySnapshot,
     authority: MasterAuthority,
     history: Vec<Message>,
+    input_limit: Option<NonZeroU64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -94,12 +98,19 @@ impl Master {
             tools,
             authority,
             history: Vec::new(),
+            input_limit: None,
         })
     }
 
     /// Supply an immutable projection of preceding conversation turns.
     pub fn with_history(mut self, history: Vec<Message>) -> Self {
         self.history = history;
+        self
+    }
+
+    /// Apply the accepted task's hard limit to the complete provider input.
+    pub fn with_input_limit(mut self, limit: Option<NonZeroU64>) -> Self {
+        self.input_limit = limit;
         self
     }
 
@@ -167,7 +178,32 @@ impl Master {
             let request = match &continuation.request {
                 Some(request) => request.clone(),
                 None => {
-                    let request = self.prepare(&turn)?;
+                    let request = match self.prepare(&turn) {
+                        Ok(request) => request,
+                        Err(error) => {
+                            let mut outcome = self.account(
+                                &turn,
+                                OutcomeStatus::Failed,
+                                continuation.step,
+                                "The model input could not be prepared with the selected configuration.",
+                                None,
+                            )?;
+                            let mut account =
+                                read_account(outcome.account.as_ref().expect("master account"))?;
+                            account.failure = Some(error);
+                            outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+                            continuation.outcome = Some(outcome);
+                            turn.checkpoint(
+                                OperationKey::new(format!(
+                                    "conversation/{}/input-rejected",
+                                    continuation.step
+                                ))?,
+                                encode(CONTINUATION_SCHEMA, &continuation)?,
+                            )
+                            .await?;
+                            continue;
+                        }
+                    };
                     continuation.request = Some(request.clone());
                     turn.checkpoint(
                         OperationKey::new(format!("conversation/{}/request", continuation.step))?,
@@ -350,7 +386,10 @@ impl Master {
     }
 
     fn continuation(&self, turn: &Turn) -> Result<Continuation> {
-        let fingerprint = Fingerprint::of(&(&self.config, &self.history))?;
+        let fingerprint = match self.input_limit {
+            Some(limit) => Fingerprint::of(&(&self.config, &self.history, limit))?,
+            None => Fingerprint::of(&(&self.config, &self.history))?,
+        };
         let view = turn.view();
         match view.state.checkpoint() {
             None => Ok(Continuation {
@@ -362,7 +401,10 @@ impl Master {
             }),
             Some(envelope) => {
                 let value: Continuation = decode(CONTINUATION_SCHEMA, envelope)?;
-                if value.configuration != fingerprint {
+                let legacy = self.input_limit.is_none()
+                    && self.history.is_empty()
+                    && value.configuration == Fingerprint::of(&self.config)?;
+                if value.configuration != fingerprint && !legacy {
                     return Err(Error::new(
                         ErrorKind::Conflict,
                         "master_configuration_changed",
@@ -394,13 +436,26 @@ impl Master {
             let HistoryRecord::Message(message) = record;
             message.clone()
         }));
-        self.provider.prepare(InferenceRequest {
+        let request = self.provider.prepare(InferenceRequest {
             model: self.config.model.clone(),
             messages,
             tools: self.tools.offers()?,
             max_output_tokens: Some(self.config.max_output_tokens),
             extension: None,
-        })
+        })?;
+        if let Some(limit) = self.input_limit {
+            let measurement = self.provider.measure_input(&request)?;
+            if measurement.kind == MeasurementKind::Estimate {
+                return Err(Error::new(
+                    ErrorKind::Unsupported,
+                    "input_bound_unavailable",
+                ));
+            }
+            if measurement.tokens > limit.get() {
+                return Err(Error::new(ErrorKind::LimitExceeded, "input_token_limit"));
+            }
+        }
+        Ok(request)
     }
 
     async fn cancelled_outcome(&self, turn: &Turn, steps: u32) -> Result<TurnOutcome> {
@@ -491,6 +546,7 @@ impl Master {
                     steps,
                     unresolved,
                     stop_reason,
+                    failure: None,
                 },
             )?),
             evidence,

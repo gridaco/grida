@@ -4,8 +4,8 @@ use agent_kit_core::authority::{
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
     InferenceControl, InferenceOutcome, InferenceRequest, InferenceRun, InferenceStatus,
-    InferenceUpdate, InputFormat, Modality, ModelCapabilities, PreparedRequest, Provider,
-    ProviderBinding, ProviderEvent,
+    InferenceUpdate, InputFormat, InputMeasurement, MeasurementKind, Modality, ModelCapabilities,
+    PreparedRequest, Provider, ProviderBinding, ProviderEvent,
 };
 use agent_kit_core::messages::{
     Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
@@ -113,9 +113,22 @@ struct ScriptProvider {
     script: Script,
     calls: AtomicUsize,
     requests: Mutex<Vec<InferenceRequest>>,
+    measurement: Mutex<Option<InputMeasurement>>,
+    measured_requests: Mutex<Vec<InferenceRequest>>,
 }
 
 impl Provider for ScriptProvider {
+    fn measure_input(&self, request: &PreparedRequest) -> Result<InputMeasurement> {
+        self.measured_requests
+            .lock()
+            .unwrap()
+            .push(request.request().clone());
+        self.measurement
+            .lock()
+            .unwrap()
+            .ok_or_else(|| Error::new(ErrorKind::Unsupported, "input_measurement_unavailable"))
+    }
+
     fn capabilities(&self, _: &ModelId) -> Result<ModelCapabilities> {
         Ok(ModelCapabilities {
             revision: BindingId::new("script-v1")?,
@@ -282,6 +295,8 @@ impl Fixture {
             script,
             calls: AtomicUsize::new(0),
             requests: Mutex::new(vec![]),
+            measurement: Mutex::new(None),
+            measured_requests: Mutex::new(vec![]),
         });
         let tool = Arc::new(EchoTool::new());
         let mut inventory = Inventory::new();
@@ -1330,4 +1345,110 @@ async fn a_recovered_turn_requires_the_same_preceding_context() {
     };
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn automatic_input_budget_does_not_request_a_hard_measurement() {
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    fixture
+        .master(4, "Be concise")
+        .run(opened.turn, input())
+        .await
+        .unwrap();
+    assert!(
+        fixture
+            .provider
+            .measured_requests
+            .lock()
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+async fn hard_input_limit_measures_the_assembled_request_before_dispatch() {
+    let fixture = Fixture::new(Script::Answer);
+    *fixture.provider.measurement.lock().unwrap() = Some(InputMeasurement {
+        tokens: 100,
+        kind: MeasurementKind::UpperBound,
+    });
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let prior = message(
+        "prior-context",
+        Role::Assistant,
+        Content::Text("Prior work".into()),
+    );
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Be concise")
+        .with_history(vec![prior.clone()])
+        .with_input_limit(std::num::NonZeroU64::new(100))
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected settlement")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    let measured = fixture.provider.measured_requests.lock().unwrap();
+    assert_eq!(measured.len(), 1);
+    assert_eq!(measured[0].messages[0].role, Role::System);
+    assert_eq!(measured[0].messages[1], prior);
+    assert_eq!(measured[0].messages[2], input()[0]);
+    assert!(!measured[0].tools.is_empty());
+    assert_eq!(fixture.provider.requests.lock().unwrap()[0], measured[0]);
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn unsupported_estimated_and_excessive_input_settle_without_provider_dispatch() {
+    for (measurement, code) in [
+        (None, "input_measurement_unavailable"),
+        (
+            Some(InputMeasurement {
+                tokens: 1,
+                kind: MeasurementKind::Estimate,
+            }),
+            "input_bound_unavailable",
+        ),
+        (
+            Some(InputMeasurement {
+                tokens: 101,
+                kind: MeasurementKind::Exact,
+            }),
+            "input_token_limit",
+        ),
+    ] {
+        let fixture = Fixture::new(Script::Answer);
+        *fixture.provider.measurement.lock().unwrap() = measurement;
+        let store = fixture.store();
+        let claim = fixture.claim(&store).await;
+        let opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let MasterOutcome::Settled(receipt) = fixture
+            .master(4, "Be concise")
+            .with_input_limit(std::num::NonZeroU64::new(100))
+            .run(opened.turn, input())
+            .await
+            .unwrap()
+        else {
+            panic!("expected failed settlement")
+        };
+        assert_eq!(receipt.outcome.status, OutcomeStatus::Failed);
+        let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+        assert_eq!(account.failure.unwrap().code, code);
+        assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
+        store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+        assert_eq!(
+            store
+                .inspect_turn(session_id(), turn_id())
+                .await
+                .unwrap()
+                .disposition,
+            TurnDisposition::Settled
+        );
+    }
 }

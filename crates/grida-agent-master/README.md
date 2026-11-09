@@ -22,3 +22,8 @@ control and history positions on which the master made its decision.
 Completion accounts expose typed output-limit, refusal, and step-limit reasons
 for client adapters. Reviewed default-setting definitions live here, while the
 native host owns their persistence and user operations.
+
+A supplied hard input limit measures the complete prepared provider request.
+It requires an exact count or conservative bound before dispatch. An unavailable
+counter, estimate, or excessive input produces a persisted failed account.
+Automatic budgeting leaves that optional measurement to the selected policy.
