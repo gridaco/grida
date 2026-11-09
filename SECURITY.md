@@ -846,6 +846,13 @@ lazy reads, read-only mutation, and symlink escape refusal.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
+- [Native agent package staging](desktop/scripts/native-agent-package.mjs),
+  [Forge hooks](desktop/forge.config.ts), and the
+  [package verifier](desktop/scripts/verify-packaged-bundle.mjs) bind the optional
+  native build input to fixed architecture-checked executables in application
+  resources outside the archive. The build output directory is deployment-owned.
+  Launch-time trust and helper identity remain enforced by the native host.
+
 - Portable Rust provider contracts: [crates/grida-ai/src/catalogue.rs](crates/grida-ai/src/catalogue.rs),
   [crates/grida-ai/src/discovery.rs](crates/grida-ai/src/discovery.rs),
   [crates/grida-ai/src/input.rs](crates/grida-ai/src/input.rs),

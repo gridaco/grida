@@ -116,6 +116,26 @@ adapter still wires the core.
 
 ## Distributions
 
+To include native agent executables in a package build, set
+`GRIDA_DESKTOP_NATIVE_ARTIFACTS` to an absolute build-output directory with one
+`<platform>-<arch>` subdirectory per target. Each target contains `grida-agent`
+and `agent-kit-sandbox-helper` built from the same locked workspace. The Windows
+x64 target contains `grida-agent.exe`. For a local macOS arm64 package:
+
+```sh
+cargo build --locked -p grida-agent -p agent-kit-sandbox \
+  --bin grida-agent --bin agent-kit-sandbox-helper
+artifacts=$(mktemp -d)
+mkdir "$artifacts/darwin-arm64"
+cp target/debug/{grida-agent,agent-kit-sandbox-helper} "$artifacts/darwin-arm64/"
+GRIDA_DESKTOP_NATIVE_ARTIFACTS="$artifacts" pnpm --dir desktop package --arch=arm64
+```
+
+Forge stages the executables in `resources/native-agent` before signing and
+verifies their architecture, names and permissions in the completed package.
+Native resource packaging and chat runtime selection have separate acceptance
+checks.
+
 We support macOS, Windows, and Linux distributions.
 
 [See All Releases](https://github.com/gridaco/grida/releases/latest)

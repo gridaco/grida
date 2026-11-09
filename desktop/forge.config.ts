@@ -175,6 +175,28 @@ const config: ForgeConfig = {
     ],
   },
   hooks: {
+    packageAfterCopy: async (
+      _forgeConfig,
+      appPath,
+      _version,
+      platform,
+      arch
+    ) => {
+      const artifacts = process.env.GRIDA_DESKTOP_NATIVE_ARTIFACTS;
+      if (!artifacts) return;
+      const script = path.join(
+        __dirname,
+        "scripts",
+        "native-agent-package.mjs"
+      );
+      execFileSync(
+        process.execPath,
+        [script, path.dirname(appPath), artifacts, platform, arch],
+        {
+          stdio: "inherit",
+        }
+      );
+    },
     // node-pty's npm tarball ships the darwin prebuilt `spawn-helper`
     // with mode 0644 (no exec bit) and never chmods it, so PTY spawn
     // fails with `posix_spawnp failed`. Fix the bit BEFORE asar packing:
@@ -207,7 +229,16 @@ const config: ForgeConfig = {
         "verify-packaged-bundle.mjs"
       );
       for (const outputPath of outputPaths) {
-        execFileSync(process.execPath, [script, outputPath], {
+        const args = [script, outputPath];
+        if (process.env.GRIDA_DESKTOP_NATIVE_ARTIFACTS) {
+          const target = /-(darwin|linux|win32)-(arm64|x64)$/.exec(
+            path.basename(outputPath)
+          );
+          if (!target)
+            throw new Error("Unsupported native agent package target");
+          args.push("--native-agent", target[1], target[2]);
+        }
+        execFileSync(process.execPath, args, {
           stdio: "inherit",
         });
       }
