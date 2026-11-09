@@ -203,6 +203,7 @@ Each suffix in a grouped row uses the displayed prefix and is negotiated separat
 | `co.grida/session/pause`, `resume`, `steer`       | Pause a turn, resume its verified suspension, or send a correction to that turn.     |
 | `co.grida/session/stop`, `resume-queue`           | Stop a turn and pause queue advancement, then reopen queue admission when ready.     |
 | `co.grida/session/questions`, `answer-question`   | Inspect pending questions and submit a correlated choice, free-text answer, or skip. |
+| `co.grida/session/approvals`, `answer-approval`   | Inspect requests for additional access and decide each exact action.                 |
 | `co.grida/session/history`, `fork`, `revise`      | Browse retained message anchors, branch a chat, or replace an earlier text message.  |
 | `co.grida/session/compact`                        | Summarize earlier model context and keep the original transcript available.          |
 | `co.grida/session/skills`                         | List available skills for this chat and select a versioned reference for a prompt.   |
@@ -225,6 +226,13 @@ Negotiate both question operations to enable question tools for new inputs.
 An answer can resume suspended work when its other conditions allow execution.
 An explicit Pause remains effective after the answer. Ordinary ACP prompts keep
 their existing text-only profile.
+
+A host operator can enable native workspace tools with a trusted
+`--permission-profile` on macOS or Linux. The profile selects named directories,
+allowed operations, and which actions require review. Only a private
+supervising stdio client can approve once or decline. A shared WebSocket
+client can inspect pending requests. Restarting the host cannot grant access
+to a changed directory or executable.
 
 Select a named skill with `run --skill NAME` or through the ACP skill catalog.
 Repeat the flag to select more than one. Bundled skills include `dotcanvas`,
