@@ -32,6 +32,9 @@ tokio-tungstenite = { version = "=0.30.0", default-features = false, features = 
 uuid = { version = "1", features = ["v4"] }
 zeroize = "1"
 
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", features = ["fs", "process"] }
+
 [dev-dependencies]
 socket2 = "0.6"
 tokio = { version = "1", features = ["net", "process"] }

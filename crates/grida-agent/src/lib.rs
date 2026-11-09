@@ -5,6 +5,8 @@ pub mod command;
 pub mod configuration;
 mod custody;
 pub mod host;
+pub mod scratch;
+pub mod workspace;
 mod http;
 
 pub use http::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol};

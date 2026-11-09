@@ -174,3 +174,18 @@ The host reads `config.toml` from its private state directory and retains an
 immutable defaults snapshot with each accepted input. A setting change applies
 to later inputs. The current compatible adapter rejects an explicit input-token
 cap before dispatch when it cannot establish a hard bound.
+
+## Filesystem services
+
+The workspace and scratch modules provide host-owned filesystem building blocks.
+Workspace membership records named roots and a primary default. Independent
+grants bind to captured native directory identities. Restored targets require
+current membership, grants and protected-root checks before a tool opens them.
+Directory binding requires native creation identity.
+
+Scratch retains exact input bytes separately from editable working copies.
+Retry and restart validate source identity, digest and durable publication.
+A recorded copy that disappears remains unavailable. Managed copy limits apply
+at admission. Executors own quotas for their separate working areas and outputs.
+These private-storage helpers currently support macOS and Linux. The native
+host's tool composition supplies their grants and lifecycle.

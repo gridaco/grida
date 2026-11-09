@@ -983,6 +983,7 @@ Today:
 - `desktop/src/main/agent-network-host.ts` and `agent-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization, per-spawn built-in/custom grant state, and the capped private dispatch seam into the command host.
 - `desktop/src/main/agent-command-host.ts` and `main/sandbox/manager.ts` — main-owned finite-command execution: canonical exact-root validation, shared-scratch/secret/media-root denies, own-scratch/workspace/private-temp grants, a fixed no-network policy, fresh per-command SRT wrapping, raw spawn only after the wrapper succeeds, and terminal cleanup before abort acknowledgement. The long-lived sidecar may persist generated media; an individual model-authored command cannot read or mutate that library.
 - The native command adapter retains the authorized scope, owns cleanup across runtime cancellation, and reconciles the original attempt. [Adapter](crates/grida-agent/src/command.rs) and [tests](crates/grida-agent/tests/commands.rs).
+- The native [workspace bindings](crates/grida-agent/src/workspace.rs) and [retained input store](crates/grida-agent/src/scratch.rs) separate captured locations from current grants and enforce supplied protected roots. Working-copy receipts retain their source identity. [Workspace tests](crates/grida-agent/tests/workspace.rs) and [scratch tests](crates/grida-agent/tests/scratch.rs) exercise replacement, traversal, private publication and restart.
 - `desktop/src/main/agent-sandbox-policy.ts` — binds Desktop's strict sandbox posture: empty direct external egress, host-routed provider HTTP, no generic local bind/connect authority, and an exact read/write grant for the long-lived sidecar's app-managed media root.
 - `desktop/src/main/agent-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; initializes the OS sandbox wrapper when supported; owns both private channels, forwards the one main-owned media-root fact, and removes direct provider hosts from the sidecar policy (Desktop deliberately withholds srt's alpha Windows backend pending a supported lifecycle).
 - `desktop/src/main/desktop-entry-window.ts` — owns the exact bridge-attached entry window and admits auxiliary native windows only while the authenticated main role is active; the Grida-account transition is additionally bound by GRIDA-SEC-005.
@@ -2894,6 +2895,10 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [credential continuity store](crates/grida-auth/src/credential_continuity.rs),
   [native agent custody](crates/grida-agent/src/custody.rs),
   [native agent custody tests](crates/grida-agent/tests/custody.rs),
+  [native workspace protection](crates/grida-agent/src/workspace.rs),
+  [private retained inputs](crates/grida-agent/src/scratch.rs),
+  [workspace tests](crates/grida-agent/tests/workspace.rs),
+  [retained input tests](crates/grida-agent/tests/scratch.rs),
   [crates/grida-auth/tests/process.rs](crates/grida-auth/tests/process.rs),
   [crates/grida-auth/tests/providers.rs](crates/grida-auth/tests/providers.rs),
   [scripts/cli-contracts/auth-driver.mjs](scripts/cli-contracts/auth-driver.mjs),
