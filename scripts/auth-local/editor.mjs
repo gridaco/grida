@@ -95,7 +95,8 @@ async function main() {
   await writeFile(
     path.join(editor, "next.config.ts"),
     `import original from ${JSON.stringify(path.join(state.repoRoot, "editor", "next.config.ts"))};
-export default { ...original, turbopack: { ...original.turbopack, root: ${JSON.stringify(state.repoRoot)} }, logging: false };
+import { guards } from ${JSON.stringify(path.join(scripts, "guards.mjs"))};
+export default { ...original, rewrites: async () => guards.editorRewrites(await original.rewrites()), turbopack: { ...original.turbopack, root: ${JSON.stringify(state.repoRoot)} }, logging: false };
 `
   );
   // Auth tests do not need Google Fonts. Next's own test hook supplies local CSS
@@ -125,7 +126,6 @@ export default { ...original, turbopack: { ...original.turbopack, root: ${JSON.s
     NEXT_TELEMETRY_DISABLED: "1",
     NEXT_PUBLIC_GRIDA_USE_TELEMETRY: "0",
     NEXT_PUBLIC_DOCS_URL: setup.editorOrigin,
-    NEXT_PUBLIC_BLOG_URL: setup.editorOrigin,
     NEXT_FONT_GOOGLE_MOCKED_RESPONSES: fonts,
     NODE_OPTIONS: `--require=${JSON.stringify(path.join(scripts, "network.cjs"))}`,
   };
