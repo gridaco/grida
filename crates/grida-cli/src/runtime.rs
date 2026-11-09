@@ -535,21 +535,23 @@ async fn authority(
             check(&worker_token)?;
             let org = account::select(&client, selected.as_ref())?;
             check(&worker_token)?;
-            let origin = host.config.api_origin;
-            let authority = client
+            client
                 .request_gg_with(org.id, |grant| {
                     if worker_token.is_cancelled() {
                         return Err(grida_auth::Error::new("cancelled"));
                     }
-                    Ok(ExecutionAuthority::Gateway {
-                        token: grant.token().into(),
-                        base_url: origin.clone(),
-                        expires_at_ms: parse_date(&grant.expires_at)
-                            .map_err(|_| grida_auth::Error::new("invalid_response"))?,
-                    })
+                    let origin = grant.api_origin().to_owned();
+                    Ok((
+                        ExecutionAuthority::Gateway {
+                            token: grant.token().into(),
+                            base_url: origin.clone(),
+                            expires_at_ms: parse_date(grant.expires_at())
+                                .map_err(|_| grida_auth::Error::new("invalid_response"))?,
+                        },
+                        Some(origin),
+                    ))
                 })
-                .map_err(account::failure)?;
-            Ok((authority, Some(origin)))
+                .map_err(account::failure)
         })
         .await
         .map_err(|_| unavailable())??;

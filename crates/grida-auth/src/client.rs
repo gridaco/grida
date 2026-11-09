@@ -1,4 +1,5 @@
 // GRIDA-SEC-010 — fixed registration, rotating custody, and local-session revoke.
+// GRIDA-SEC-006 / GRIDA-GG: token — scoped, in-memory native grant handoff.
 use crate::{
     Backend, Config, Error, Identity, Logout, OrganizationsPage, Result, Status, StorageInfo,
     config::opaque,
@@ -48,16 +49,52 @@ pub trait Transport: Send + Sync {
     fn send(&self, request: Request) -> Result<Response>;
 }
 
-/// Secret-bearing, memory-only GG handoff. Intentionally not Debug or Serialize.
+/// Secret-bearing, memory-only GG handoff. Scope metadata is read-only.
+///
+/// ```compile_fail
+/// fn change_organization(grant: &mut grida_auth::GgGrant) {
+///     grant.organization_id = 42;
+/// }
+/// ```
 pub struct GgGrant {
     token: Zeroizing<String>,
-    pub organization_id: i64,
-    pub organization_name: String,
-    pub expires_at: String,
+    account_subject: String,
+    api_origin: String,
+    organization_id: i64,
+    organization_name: String,
+    expires_at: String,
+    expires_at_ms: i64,
 }
 impl GgGrant {
     pub fn token(&self) -> &str {
         &self.token
+    }
+
+    /// The account identity bound to the native session used for this mint.
+    pub fn account_subject(&self) -> &str {
+        &self.account_subject
+    }
+
+    /// The API origin of the trusted registration that minted this grant.
+    pub fn api_origin(&self) -> &str {
+        &self.api_origin
+    }
+
+    pub fn organization_id(&self) -> i64 {
+        self.organization_id
+    }
+
+    pub fn organization_name(&self) -> &str {
+        &self.organization_name
+    }
+
+    pub fn expires_at(&self) -> &str {
+        &self.expires_at
+    }
+
+    /// The validated expiration in milliseconds since the Unix epoch.
+    pub fn expires_at_ms(&self) -> i64 {
+        self.expires_at_ms
     }
 }
 
@@ -359,9 +396,12 @@ impl AuthClient {
         self.request_gg_with(organization_id, |grant| {
             Ok(GgGrant {
                 token: Zeroizing::new(grant.token().into()),
+                account_subject: grant.account_subject.clone(),
+                api_origin: grant.api_origin.clone(),
                 organization_id: grant.organization_id,
                 organization_name: grant.organization_name.clone(),
                 expires_at: grant.expires_at.clone(),
+                expires_at_ms: grant.expires_at_ms,
             })
         })
     }
@@ -422,11 +462,14 @@ impl AuthClient {
             }
             let grant = GgGrant {
                 token: Zeroizing::new(token.into()),
+                account_subject: s.identity.id.clone(),
+                api_origin: self.config.api_origin.clone(),
                 organization_id,
                 organization_name: name.into(),
                 expires_at: expires_at.into(),
+                expires_at_ms: expiry,
             };
-            if wire::timestamp(&grant.expires_at).is_none_or(|expiry| expiry <= now()) {
+            if grant.expires_at_ms <= now() {
                 return Err(failure("invalid_response"));
             }
             self.check(generation)?;
@@ -990,6 +1033,47 @@ mod tests {
         assert!(!serde_json::to_string(&page).unwrap().contains("token"));
         assert!(script.0.lock().unwrap().is_empty());
         assert!(matches!(client.status().unwrap(), Status::SignedIn { .. }));
+    }
+
+    #[test]
+    fn gg_grant_binds_the_mint_to_its_session_organization_and_registration() {
+        let expires_at = (chrono::Utc::now() + chrono::Duration::minutes(1))
+            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let body = json!({
+            "token": "synthetic.gg.grant",
+            "organization": {"id": 7, "name": "scope-fixture"},
+            "expires_at": expires_at,
+            "account_subject": "untrusted-response-subject",
+            "api_origin": "https://untrusted-response.example"
+        });
+        let (_temp, client, script) = client(vec![
+            ("/api/v1/auth/gg", 200, body.clone()),
+            ("/api/v1/auth/gg", 200, body),
+        ]);
+        let mut current = session(&client.config);
+        current.expires_at = now() + 3_600_000;
+        client
+            .store
+            .exclusive(|tx| tx.write(Some(current)))
+            .unwrap();
+
+        let assert_binding = |grant: &GgGrant| {
+            assert_eq!(grant.account_subject(), "synthetic-user");
+            assert_eq!(grant.api_origin(), "https://api.example");
+            assert_eq!(grant.organization_id(), 7);
+            assert_eq!(grant.organization_name(), "scope-fixture");
+            assert_eq!(grant.expires_at(), expires_at);
+            assert_eq!(Some(grant.expires_at_ms()), wire::timestamp(&expires_at));
+            assert_eq!(grant.token(), "synthetic.gg.grant");
+        };
+        client
+            .request_gg_with(7, |grant| {
+                assert_binding(grant);
+                Ok(())
+            })
+            .unwrap();
+        assert_binding(&client.request_gg(7).unwrap());
+        assert!(script.0.lock().unwrap().is_empty());
     }
     #[test]
     fn status_never_uses_network_and_empty_logout_advances_revision() {

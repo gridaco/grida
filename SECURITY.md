@@ -1361,7 +1361,9 @@ levels into one.
    exchange. Its synchronous `request_gg_with` callback constructs invocation-owned
    media authority while the account profile lock still fences acceptance. Account
    JWTs never enter media execution or its HTTP transport. GG commands inspect no
-   BYOK environment keys. Completion drops invocation authority; it neither
+   BYOK environment keys. The immutable Rust grant carries the verified session
+   subject and configured API origin for consumers to bind their execution authority.
+   Completion drops invocation authority; it neither
    persists, refreshes nor automatically re-mints a GG grant. CLI destination and
    output controls are independently registered under GRIDA-SEC-013.
    The shared media/provider host composition owns exactly one GG store for
@@ -1524,6 +1526,9 @@ governs the surface, this record governs its security half.
   independent account custody remains GRIDA-SEC-010.
   [Credential-store tests](packages/grida-auth/src/credential-store.test.ts)
   also pin invalid sink configuration before durable I/O.
+- [Rust native grant handoff and fixtures](crates/grida-auth/src/client.rs) —
+  project account and destination binding from the authenticated session and
+  fixed registration during the memory-only exchange.
 - [CLI account host](crates/grida-cli/src/host.rs) and
   [host tests](crates/grida-cli/src/host_tests.rs),
   [media composition](crates/grida-cli/src/runtime.rs) and

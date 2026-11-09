@@ -40,7 +40,9 @@ Cache-related counters retain their provider-specific meanings.
 
 - `OpenAiCompatible` validates the configured output-token field and usage
   option. Completion requires a finish reason and `[DONE]`. It emits calls
-  after the tool-call finish reason and JSON validation. [Chat Completions streaming](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
+  after the tool-call finish reason and JSON validation. Compatible reasoning
+  deltas remain separate from answer text and are omitted from portable request
+  history. The Ollama profile uses the `max_tokens` field. [Ollama compatibility](https://docs.ollama.com/api/openai-compatibility) · [Chat Completions streaming](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
 - `Anthropic` requires an explicit output-token limit and lowers leading
   instructions to the system field. It emits a call after its complete
   tool-use block. Completion requires a stop reason and `message_stop`.

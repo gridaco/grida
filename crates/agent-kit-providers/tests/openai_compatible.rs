@@ -156,6 +156,108 @@ async fn model_profile_selects_legacy_token_field_without_implied_usage_support(
     assert!(body.get("max_completion_tokens").is_none());
 }
 
+// Ollama's compatible stream sends reasoning as its own delta. The terminal
+// usage frame and marker use the common Chat Completions contract.
+#[tokio::test]
+async fn compatible_reasoning_remains_separate_from_text_and_portable_history() {
+    let transport = FixtureTransport::new([
+        Ok(response(
+            [
+                choice(
+                    json!({"role":"assistant","content":"","reasoning":"Consider "}),
+                    None,
+                ),
+                choice(json!({"content":"","reasoning":"the prompt"}), None),
+                choice(json!({"content":"Answer"}), None),
+                choice(json!({}), Some("stop")),
+                frame(json!({"id":"response-local","choices":[],"usage":{
+                    "prompt_tokens":11,"completion_tokens":7,"total_tokens":18
+                }})),
+                done(),
+            ],
+            false,
+        )),
+        Ok(response(text_response("Continuing"), false)),
+    ]);
+    let provider = configured(
+        transport.clone(),
+        ModelProfile {
+            output_limit: OutputLimitField::Tokens,
+            ..profile()
+        },
+        limits(),
+    );
+    let mut continuation = request();
+    let mut run = provider
+        .start(
+            provider.prepare(continuation.clone()).unwrap(),
+            control("local"),
+        )
+        .unwrap();
+    let mut reasoning = String::new();
+    let mut text = String::new();
+    while let Some(update) = run.next().await {
+        match update {
+            InferenceUpdate::ReasoningDelta { text, .. } => reasoning.push_str(&text),
+            InferenceUpdate::TextDelta { text: delta, .. } => text.push_str(&delta),
+            _ => {}
+        }
+    }
+    let outcome = run.finish().await;
+    assert_eq!(outcome.status, InferenceStatus::Completed);
+    assert_eq!(reasoning, "Consider the prompt");
+    assert_eq!(text, "Answer");
+    assert_eq!(
+        outcome.messages[0].content,
+        [Content::Reasoning(reasoning), Content::Text(text)]
+    );
+    assert!(outcome.usage.iter().any(|usage| {
+        usage.category == "output_tokens" && usage.quantity == 7 && usage.final_value
+    }));
+
+    continuation.messages.extend(outcome.messages);
+    continuation.messages.push(message(
+        "continuation",
+        Role::User,
+        vec![Content::Text("Go on".into())],
+    ));
+    assert_eq!(
+        execute(&provider, continuation, "local-continuation")
+            .await
+            .status,
+        InferenceStatus::Completed
+    );
+    let requests = transport.requests.lock().unwrap();
+    let body: Value = serde_json::from_slice(&requests[1].0.body).unwrap();
+    assert_eq!(body["max_tokens"], 32);
+    assert_eq!(body["stream_options"]["include_usage"], true);
+    assert!(body.get("max_completion_tokens").is_none());
+    assert_eq!(
+        body["messages"][1],
+        json!({"role":"assistant","content":"Answer"})
+    );
+}
+
+#[tokio::test]
+async fn compatible_reasoning_content_is_retained_on_interruption() {
+    let transport = FixtureTransport::new([Ok(response(
+        [
+            choice(json!({"reasoning_content":"Partial reasoning"}), None),
+            choice(json!({"content":"Partial answer"}), None),
+        ],
+        false,
+    ))]);
+    let outcome = execute(&adapter(transport), request(), "interrupted-reasoning").await;
+    assert_eq!(outcome.status, InferenceStatus::Interrupted);
+    assert_eq!(
+        outcome.messages[0].content,
+        [
+            Content::Reasoning("Partial reasoning".into()),
+            Content::Text("Partial answer".into()),
+        ]
+    );
+}
+
 #[test]
 fn unsupported_inputs_and_request_bounds_fail_before_dispatch() {
     let transport = FixtureTransport::new([]);

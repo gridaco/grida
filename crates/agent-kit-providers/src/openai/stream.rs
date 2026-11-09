@@ -36,6 +36,7 @@ pub(super) fn events(
         response_id: None,
         receipt: None,
         text: String::new(),
+        reasoning: String::new(),
         refusal: String::new(),
         call_parts: BTreeMap::new(),
         calls: Vec::new(),
@@ -60,6 +61,7 @@ struct ResponseStream {
     response_id: Option<String>,
     receipt: Option<Envelope>,
     text: String,
+    reasoning: String,
     refusal: String,
     call_parts: BTreeMap<usize, CallParts>,
     calls: Vec<ToolCall>,
@@ -97,6 +99,8 @@ struct Choice {
 struct Delta {
     role: Option<String>,
     content: Option<String>,
+    #[serde(alias = "reasoning_content")]
+    reasoning: Option<String>,
     refusal: Option<String>,
     tool_calls: Option<Vec<CallDelta>>,
 }
@@ -245,6 +249,14 @@ impl ResponseStream {
             .is_some_and(|role| role != "assistant")
         {
             return Err("unexpected_message_role");
+        }
+        if let Some(text) = choice.delta.reasoning.filter(|text| !text.is_empty()) {
+            self.reasoning.push_str(&text);
+            self.updates
+                .push_back(ProviderEvent::Update(InferenceUpdate::ReasoningDelta {
+                    message: self.message_id.clone(),
+                    text,
+                }));
         }
         if let Some(text) = choice.delta.content.filter(|text| !text.is_empty()) {
             self.text.push_str(&text);
@@ -403,6 +415,9 @@ impl ResponseStream {
         self.finished = true;
         self.wire.close();
         let mut content = Vec::new();
+        if !self.reasoning.is_empty() {
+            content.push(Content::Reasoning(std::mem::take(&mut self.reasoning)));
+        }
         if !self.text.is_empty() {
             content.push(Content::Text(std::mem::take(&mut self.text)));
         }
