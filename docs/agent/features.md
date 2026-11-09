@@ -14,10 +14,11 @@ Rust rebuild so existing capabilities and unfinished work remain visible.
 The current column covers the shared agent package and its Desktop wiring, with
 external-driver differences called out where relevant.
 
-The source-built Rust host also supports bounded text tasks, durable turn
-records, and standard ACP v1 stdio clients. Its [client guide](./clients.md)
-describes the verified entrypoints. Feature acceptance for the complete native
-product remains recorded separately from those component and process checks.
+The source-built Rust host supports bounded text tasks, durable controls,
+questions, configuration tools and standard ACP v1 clients. Its
+[client guide](./clients.md) describes the verified entrypoints. Native file and
+command adapters have separate platform checks. Complete Desktop feature
+acceptance remains separate from component and process checks.
 
 Each feature records the current fact, the intended user outcome, and any limit
 that changes what a person can rely on. The linked behavior
@@ -79,7 +80,7 @@ The native history features apply to conversations created by the new runtime.
 | Scheduled wake-ups           | Absent. The current session scheduler manages queued turns, without future-time wake-ups. [Source][scheduler]                                                                                                                                                                      | Add a timed self-reminder that wakes the task to check or continue its work. Keep its time and purpose visible and cancellable.                                                                            | [Wake-ups](../wg/ai/agent/experience.md#schedule-a-wake-up)                                                   |
 | Reusable personal memory     | Absent. Conversation history and task todos do not provide a separately managed personal-memory store. [Source][todos]                                                                                                                                                             | Open. Define retention, inspection, correction, and removal before committing the feature.                                                                                                                 | [Memory](../wg/ai/agent/experience.md#use-the-material-i-gave-it)                                             |
 
-The [configuration proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-config-proposal.md) records candidate fields and the shared inspect/update contract.
+The [configuration contract](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-config-proposal.md) records the reviewed input-limit field and shared inspect/update operations.
 
 Additional media HTTP/SDK operations are documented by the [agent package][package].
 Their presence does not make every operation a tool available to the native agent.
