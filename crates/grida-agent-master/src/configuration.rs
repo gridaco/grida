@@ -43,7 +43,7 @@ pub const CONTEXT_MAX_INPUT_TOKENS: FieldDefinition = FieldDefinition {
     value_type: "integer",
     units: "tokens",
     minimum: 1,
-    maximum: i64::MAX as u64,
+    maximum: 9_007_199_254_740_991,
     default_rule: "Automatic budgeting within the selected model and host limits.",
     scope: "User defaults on this host. A task-only request uses its own override.",
     activation: "Applies to later accepted tasks. Existing work retains its captured settings.",

@@ -239,7 +239,7 @@ fn parse(bytes: Option<&[u8]>) -> Result<UserDefaults> {
         if let Some(limit) = context.get("max_input_tokens") {
             let limit = limit
                 .as_integer()
-                .filter(|value| *value > 0)
+                .filter(|value| *value > 0 && *value as u64 <= CONTEXT_MAX_INPUT_TOKENS.maximum)
                 .ok_or_else(|| invalid("config_value_out_of_range"))?;
             defaults.context.max_input_tokens = NonZeroU64::new(limit as u64);
         }

@@ -20,10 +20,10 @@ schema_version = 1
 max_input_tokens = 64000
 ```
 
-| Field                      | Meaning                                   | Accepted values                                                                       |
-| -------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
-| `schema_version`           | Configuration-file format                 | `1`                                                                                   |
-| `context.max_input_tokens` | Hard upper limit for complete model input | An integer from `1` through `9223372036854775807`, or omitted for automatic budgeting |
+| Field                      | Meaning                                   | Accepted values                                                                    |
+| -------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| `schema_version`           | Configuration-file format                 | `1`                                                                                |
+| `context.max_input_tokens` | Hard upper limit for complete model input | An integer from `1` through `9007199254740991`, or omitted for automatic budgeting |
 
 The input limit covers instructions, conversation history, media representation,
 tool declarations, and provider framing. The provider must establish an exact

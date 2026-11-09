@@ -149,6 +149,42 @@ fn invalid_startup_configuration_is_rejected_without_echoing_contents() {
 }
 
 #[test]
+fn managed_and_manual_limits_remain_exact_in_javascript_clients() {
+    let directory = state();
+    let configuration = Configuration::open(directory.path()).unwrap();
+    let maximum = grida_agent_master::configuration::CONTEXT_MAX_INPUT_TOKENS.maximum;
+    assert_eq!(maximum, 9_007_199_254_740_991);
+    let accepted = configuration.update(None, set(maximum)).unwrap();
+    let json = serde_json::to_value(&accepted).unwrap();
+    assert_eq!(
+        json["defaults"]["context"]["max_input_tokens"].as_u64(),
+        Some(maximum)
+    );
+    assert_eq!(
+        configuration
+            .update(accepted.source_revision, set(maximum + 1))
+            .unwrap_err()
+            .code,
+        "config_value_out_of_range"
+    );
+    write(
+        directory.path(),
+        &format!(
+            "schema_version = 1\n[context]\nmax_input_tokens = {}\n",
+            maximum + 1
+        ),
+    );
+    assert_eq!(
+        configuration
+            .reload(configuration.inspect().unwrap().file_revision)
+            .unwrap_err()
+            .code,
+        "config_value_out_of_range"
+    );
+    assert_eq!(configuration.snapshot().unwrap(), accepted);
+}
+
+#[test]
 fn rejected_reload_retains_the_active_snapshot_and_reports_the_file() {
     let directory = state();
     let configuration = Configuration::open(directory.path()).unwrap();
