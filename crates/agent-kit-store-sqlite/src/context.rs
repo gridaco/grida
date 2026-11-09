@@ -89,9 +89,9 @@ impl SqliteStore {
             }
             let history = read_context(&transaction, id, session.revision, None, &|_| Vec::new())?;
             require_basis(&history.basis, &request.expected_context)?;
-            let mut state = TurnState::new(TurnBinding {
+            let mut state = TurnState::with_driver_state(TurnBinding {
                 session: id.clone(), turn: request.turn.clone(), epoch: 1,
-            })?;
+            }, session.driver_state.clone())?;
             state.apply(JournalChange::new(
                 request.request.clone(),
                 state.binding().clone(),

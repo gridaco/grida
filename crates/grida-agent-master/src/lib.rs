@@ -3,6 +3,7 @@
 pub mod compaction;
 pub mod configuration;
 pub mod conversation_seed;
+pub mod goals;
 pub mod history;
 pub mod questions;
 pub mod usage;

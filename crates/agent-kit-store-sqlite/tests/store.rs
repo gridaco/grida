@@ -426,6 +426,7 @@ async fn previous_schema_upgrades_without_changing_completed_or_queued_input() {
          ALTER TABLE submissions DROP COLUMN queue_order;
          ALTER TABLE submissions DROP COLUMN replacement_id;
          ALTER TABLE submissions DROP COLUMN withdrawn;
+         ALTER TABLE sessions DROP COLUMN driver_state;
          PRAGMA user_version=1;",
         )
         .unwrap();
@@ -1941,6 +1942,7 @@ async fn version_two_upgrades_with_original_history_view() {
             "DROP TABLE session_context_replacements;
          DROP TABLE session_history_views;
          DROP INDEX session_turn_order;
+         ALTER TABLE sessions DROP COLUMN driver_state;
          PRAGMA user_version=2;",
         )
         .unwrap();
@@ -1955,7 +1957,7 @@ async fn version_two_upgrades_with_original_history_view() {
     let version: i64 = reopened
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 4);
+    assert_eq!(version, 5);
 }
 
 #[tokio::test]
@@ -2359,5 +2361,82 @@ async fn context_candidate_cannot_install_after_a_new_turn_claim() {
             .unwrap()
             .into_records(),
         [original, later]
+    );
+}
+
+#[tokio::test]
+async fn upgrades_context_store_without_inventing_driver_state() {
+    let (directory, store) = store().await;
+    let filename = directory.path().join("sessions.sqlite");
+    let accepted = submission("prior-input", "pending user work");
+    store.submit(session(), accepted.clone()).await.unwrap();
+    let before = store.inspect(session()).await.unwrap();
+    drop(store);
+
+    let previous = rusqlite::Connection::open(&filename).unwrap();
+    previous
+        .execute_batch("ALTER TABLE sessions DROP COLUMN driver_state; PRAGMA user_version=4;")
+        .unwrap();
+    drop(previous);
+
+    let reopened = SqliteStore::open(filename).unwrap();
+    let after = reopened.inspect(session()).await.unwrap();
+    assert_eq!(after, before);
+    assert!(after.driver_state.is_initial());
+    assert_eq!(after.queued[0].input, accepted);
+}
+
+#[tokio::test]
+async fn rejects_an_oversized_state_change_without_publishing_its_control() {
+    use agent_kit_core::Envelope;
+    use agent_kit_core::driver_state::{
+        DriverStateChange, DriverStateRevision, DriverStateSnapshot,
+    };
+    use agent_kit_core::turn::ControlDirective;
+    use agent_kit_sessions::TurnControl;
+
+    let (_directory, store) = store().await;
+    let accepted = submission("request", "hello");
+    store.submit(session(), accepted.clone()).await.unwrap();
+    let lease = claim(&store, "claim", vec![accepted.id]).await;
+    let before = store.inspect(session()).await.unwrap();
+    let payload = Envelope::new(
+        SchemaId::new("test.state").unwrap(),
+        1,
+        vec![0; DriverStateSnapshot::MAX_BYTES + 1],
+    )
+    .unwrap();
+    assert_error(
+        store
+            .control(ControlRequest {
+                id: change("invalid-state"),
+                session: session(),
+                expected_revision: before.revision,
+                action: SessionControl::DriverState {
+                    change: DriverStateChange {
+                        expected: DriverStateRevision(0),
+                        value: Some(payload),
+                    },
+                    turn: Some(TurnControl {
+                        turn: turn(),
+                        expected: ControlRevision(0),
+                        directive: ControlDirective::Pause,
+                    }),
+                },
+            })
+            .await,
+        ErrorKind::LimitExceeded,
+        "driver_state_limit",
+    );
+    assert_eq!(store.inspect(session()).await.unwrap(), before);
+    assert!(
+        !lease
+            .lease
+            .journal()
+            .load()
+            .await
+            .unwrap()
+            .controls()
+            .paused
     );
 }

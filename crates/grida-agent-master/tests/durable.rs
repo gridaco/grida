@@ -1,6 +1,7 @@
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, GrantSelection,
 };
+use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceRequest,
@@ -18,8 +19,8 @@ use agent_kit_core::tools::{
 };
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlReader, ControlRevision, ControlSnapshot,
-    JournalAction, JournalChange, ResponseContract, TurnBinding, TurnJournal, TurnLease, TurnState,
-    WaitRecord, bind_lease,
+    JournalAction, JournalChange, ResponseContract, TurnBinding, TurnJournal, TurnLease,
+    TurnOutcome, TurnState, WaitRecord, bind_lease,
 };
 use agent_kit_core::{
     BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, GrantId, MessageId, ModelId,
@@ -27,19 +28,21 @@ use agent_kit_core::{
     WaitId,
 };
 use agent_kit_runtime::{
-    AdmissionContext, ExecutionLimits, ExecutionServices, Runtime, ToolAdmission, ToolDecision,
-    ToolGate,
+    AdmissionContext, CompletionDraft, ExecutionLimits, ExecutionServices, FinishOutcome, Runtime,
+    ToolAdmission, ToolDecision, ToolGate,
 };
 use agent_kit_sessions::{
     ClaimOutcome, ClaimRequest, ClaimedTurn, ControlRequest, CreateSession, RecoveryRequest,
-    SessionControl, SessionStore, Submission, TurnDisposition, TurnSelection,
+    SessionControl, SessionStore, Submission, TurnControl, TurnDisposition, TurnSelection,
 };
 use agent_kit_store_sqlite::SqliteStore;
 use futures_util::stream;
+use grida_agent_master::goals::{Allowance, Goal, Objective, Status, WorkOutcome};
 use grida_agent_master::{
     Master, MasterAuthority, MasterConfig, MasterOutcome, StopReason, read_account,
 };
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroU32;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -2184,4 +2187,235 @@ async fn pausing_an_input_count_preserves_the_last_generation_step() {
         1
     );
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[tokio::test]
+async fn goal_controls_and_terminal_account_share_exact_durable_state() {
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let runtime = fixture.runtime();
+    let session = session_id();
+    let turn = turn_id();
+    let accepted = change_id("goal-work");
+    store
+        .create(CreateSession {
+            id: session.clone(),
+            request: change_id("create-goal-session"),
+            configuration: envelope("configuration"),
+        })
+        .await
+        .unwrap();
+    let mut goal = Goal::start(
+        change_id("start-goal"),
+        Objective {
+            description: "Verify the handoff".into(),
+            criteria: vec!["The exported file opens".into()],
+        },
+        Allowance {
+            work_turns: NonZeroU32::new(3).unwrap(),
+            inference_steps: NonZeroU32::new(8).unwrap(),
+        },
+    )
+    .unwrap();
+    let original_basis = goal.basis().clone();
+    goal.reserve(&original_basis, turn.clone(), NonZeroU32::new(2).unwrap())
+        .unwrap();
+    let start = ControlRequest {
+        id: change_id("accept-goal"),
+        session: session.clone(),
+        expected_revision: store.inspect(session.clone()).await.unwrap().revision,
+        action: SessionControl::DriverState {
+            change: DriverStateChange {
+                expected: DriverStateRevision(0),
+                value: Some(goal.encode().unwrap()),
+            },
+            turn: None,
+        },
+    };
+    let started = store.control(start.clone()).await.unwrap();
+    assert_eq!(started.driver_state_revision, Some(DriverStateRevision(1)));
+    assert_eq!(store.control(start).await.unwrap(), started);
+    store
+        .submit(
+            session.clone(),
+            Submission {
+                id: accepted.clone(),
+                payload: envelope("continue the goal"),
+            },
+        )
+        .await
+        .unwrap();
+    let ClaimOutcome::Acquired(claim) = store
+        .claim(ClaimRequest {
+            id: change_id("claim-goal"),
+            session: session.clone(),
+            expected_revision: store.inspect(session.clone()).await.unwrap().revision,
+            selection: TurnSelection::New {
+                turn: turn.clone(),
+                inputs: vec![accepted],
+            },
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected goal work ownership");
+    };
+    let mut opened = runtime.open(claim.lease).await.unwrap();
+    assert_eq!(
+        opened.turn.view().state.driver_state().value(),
+        Some(&goal.encode().unwrap())
+    );
+
+    let mut stale = goal.clone();
+    stale.account(&turn, WorkOutcome::NotDispatched).unwrap();
+    goal.set_paused(&original_basis, true).unwrap();
+    let before = store.inspect(session.clone()).await.unwrap();
+    let current = before.current.unwrap();
+    let pause_change = DriverStateChange {
+        expected: DriverStateRevision(1),
+        value: Some(goal.encode().unwrap()),
+    };
+    let targetless = ControlRequest {
+        id: change_id("missing-pause-target"),
+        session: session.clone(),
+        expected_revision: before.revision,
+        action: SessionControl::DriverState {
+            change: pause_change.clone(),
+            turn: None,
+        },
+    };
+    assert_eq!(
+        store.control(targetless).await.unwrap_err().code,
+        "driver_state_requires_turn_control"
+    );
+    let paused = store
+        .control(ControlRequest {
+            id: change_id("pause-goal"),
+            session: session.clone(),
+            expected_revision: before.revision,
+            action: SessionControl::DriverState {
+                change: pause_change,
+                turn: Some(TurnControl {
+                    turn: turn.clone(),
+                    expected: current.controls.revision,
+                    directive: ControlDirective::Pause,
+                }),
+            },
+        })
+        .await
+        .unwrap();
+    assert_eq!(paused.driver_state_revision, Some(DriverStateRevision(2)));
+    let observed = store.inspect(session.clone()).await.unwrap();
+    let current = observed.current.unwrap();
+    assert!(current.controls.paused);
+    assert!(
+        Goal::decode(observed.driver_state.value().unwrap())
+            .unwrap()
+            .paused()
+    );
+    let FinishOutcome::Continue(rejected) = opened
+        .turn
+        .try_finish_with_driver_state(
+            CompletionDraft {
+                expected_control: current.controls.revision,
+                expected_history: current.history_position,
+                outcome: TurnOutcome {
+                    status: OutcomeStatus::Succeeded,
+                    account: None,
+                    evidence: vec![],
+                },
+            },
+            DriverStateChange {
+                expected: DriverStateRevision(1),
+                value: Some(stale.encode().unwrap()),
+            },
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("a stale decision settled the turn");
+    };
+    assert_eq!(rejected.code, "driver_state_revision_changed");
+    assert!(
+        store
+            .inspect_turn(session.clone(), turn.clone())
+            .await
+            .unwrap()
+            .outcome
+            .is_none()
+    );
+
+    goal.clear(&goal.basis().clone()).unwrap();
+    let cleared = store
+        .control(ControlRequest {
+            id: change_id("clear-goal"),
+            session: session.clone(),
+            expected_revision: observed.revision,
+            action: SessionControl::DriverState {
+                change: DriverStateChange {
+                    expected: DriverStateRevision(2),
+                    value: Some(goal.encode().unwrap()),
+                },
+                turn: Some(TurnControl {
+                    turn: turn.clone(),
+                    expected: current.controls.revision,
+                    directive: ControlDirective::Cancel,
+                }),
+            },
+        })
+        .await
+        .unwrap();
+    assert_eq!(cleared.driver_state_revision, Some(DriverStateRevision(3)));
+    goal.account(&turn, WorkOutcome::NotDispatched).unwrap();
+    let final_goal = goal.encode().unwrap();
+    let current = store
+        .inspect_turn(session.clone(), turn.clone())
+        .await
+        .unwrap();
+    assert!(current.controls.cancelled);
+    let FinishOutcome::Settled(receipt) = opened
+        .turn
+        .try_finish_with_driver_state(
+            CompletionDraft {
+                expected_control: current.controls.revision,
+                expected_history: current.history_position,
+                outcome: TurnOutcome {
+                    status: OutcomeStatus::Cancelled,
+                    account: Some(final_goal.clone()),
+                    evidence: vec![],
+                },
+            },
+            DriverStateChange {
+                expected: DriverStateRevision(3),
+                value: Some(final_goal),
+            },
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("expected atomic goal settlement");
+    };
+    assert_eq!(
+        receipt.record.driver_state_revision,
+        Some(DriverStateRevision(4))
+    );
+    drop(opened);
+    drop(store);
+
+    let reopened = fixture.reopen().await;
+    reopened
+        .verify(CommitReceipt::Settled(*receipt))
+        .await
+        .unwrap();
+    let observed = reopened.inspect(session).await.unwrap();
+    assert!(observed.current.is_none());
+    assert_eq!(observed.driver_state.revision(), DriverStateRevision(4));
+    let restored = Goal::decode(observed.driver_state.value().unwrap()).unwrap();
+    assert_eq!(restored.status(), Status::Cleared);
+    assert!(restored.reservation().is_none());
+    assert_eq!(
+        observed.latest.unwrap().outcome.unwrap().account.as_ref(),
+        observed.driver_state.value()
+    );
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
 }

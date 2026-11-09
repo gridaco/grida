@@ -20,6 +20,12 @@ must wait until ownership is released. Different sessions execute independently
 while short database transactions serialize. Database I/O runs on blocking
 workers. The host needs a Tokio runtime to poll asynchronous operations.
 
+An optional bounded driver-state envelope has its own revision and is carried
+into each claimed turn. State changes share the transaction with an exact
+active-turn control or a turn journal commit. The committed revision appears
+in the receipt. The adapter preserves the driver's bytes without interpreting
+its policy. Earlier databases upgrade with empty driver state.
+
 A live lease blocks recovery of its turn. Dropping it makes interrupted execution
 eligible for an explicit recovery request. Reopening the database preserves the
 turn's operations and outcomes, and recovery advances its writer epoch. Inspection

@@ -3,6 +3,7 @@
 pub mod context;
 pub mod history;
 
+use agent_kit_core::driver_state::DriverStateSnapshot;
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlReader, ControlRevision, ControlSnapshot,
@@ -26,7 +27,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
-const SCHEMA_VERSION: i64 = 4;
+const SCHEMA_VERSION: i64 = 5;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -42,7 +43,8 @@ CREATE TABLE sessions (
     revision INTEGER NOT NULL,
     paused INTEGER NOT NULL,
     active_turn TEXT,
-    next_input INTEGER NOT NULL
+    next_input INTEGER NOT NULL,
+    driver_state BLOB
 );
 CREATE TABLE submissions (
     session TEXT NOT NULL REFERENCES sessions(id),
@@ -129,6 +131,7 @@ struct Inner {
 
 struct SessionRecord {
     configuration: Envelope,
+    driver_state: DriverStateSnapshot,
     revision: SessionRevision,
     paused: bool,
     active_turn: Option<TurnId>,
@@ -211,7 +214,7 @@ impl SqliteStore {
                 transaction.commit().map_err(database_error)?;
             }
             SCHEMA_VERSION => {}
-            1..=3 => {
+            1..=4 => {
                 let transaction = connection.transaction().map_err(database_error)?;
                 if version == 1 {
                     transaction
@@ -223,8 +226,13 @@ impl SqliteStore {
                         .execute_batch(HISTORY_VIEWS)
                         .map_err(database_error)?;
                 }
+                if version <= 3 {
+                    transaction
+                        .execute_batch(CONTEXT_REPLACEMENTS)
+                        .map_err(database_error)?;
+                }
                 transaction
-                    .execute_batch(CONTEXT_REPLACEMENTS)
+                    .execute_batch("ALTER TABLE sessions ADD COLUMN driver_state BLOB")
                     .map_err(database_error)?;
                 transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
@@ -377,11 +385,11 @@ impl SqliteStore {
                         if exists {
                             return Err(error(ErrorKind::Conflict, "turn_exists"));
                         }
-                        let state = TurnState::new(TurnBinding {
+                        let state = TurnState::with_driver_state(TurnBinding {
                             session: request.session.clone(),
                             turn: turn.clone(),
                             epoch: 1,
-                        })?;
+                        }, session.driver_state.clone())?;
                         let mut selected = Vec::with_capacity(inputs.len());
                         for id in inputs {
                             let input = load_input(&transaction, &request.session, id)?;
@@ -605,6 +613,7 @@ impl SessionStore for SqliteStore {
             }
             let mut session = load_session(&transaction, &request.session)?;
             require_revision(&session, request.expected_revision)?;
+            let state_revision = session.driver_state.revision();
             let action = match &request.action {
                 SessionControl::PauseAdmission => {
                     session.paused = true;
@@ -724,12 +733,36 @@ impl SessionStore for SqliteStore {
                         vec![JournalAction::Control(ControlDirective::Cancel)],
                     ))
                 }
+                SessionControl::DriverState {
+                    change,
+                    turn: Some(control),
+                } => Some((
+                    &control.turn,
+                    control.expected,
+                    vec![
+                        JournalAction::SetDriverState(change.clone()),
+                        JournalAction::Control(control.directive),
+                    ],
+                )),
+                SessionControl::DriverState { change, turn: None } => {
+                    if session.active_turn.is_some() {
+                        return Err(error(
+                            ErrorKind::Conflict,
+                            "driver_state_requires_turn_control",
+                        ));
+                    }
+                    session.driver_state.apply(change.clone())?;
+                    None
+                }
             };
             let turn_receipt = if let Some((turn, expected, actions)) = action {
                 if session.active_turn.as_ref() != Some(turn) {
                     return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
                 }
                 let mut state = load_turn(&transaction, &request.session, turn)?;
+                if state.driver_state() != &session.driver_state {
+                    return Err(error(ErrorKind::Conflict, "driver_state_snapshot_mismatch"));
+                }
                 if state.controls().cancelled
                     && actions.iter().any(|action| {
                         matches!(
@@ -748,6 +781,7 @@ impl SessionStore for SqliteStore {
                     actions,
                 )?;
                 let receipt = state.apply(change)?;
+                session.driver_state = state.driver_state().clone();
                 save_turn(&transaction, &state)?;
                 Some(receipt)
             } else {
@@ -760,6 +794,8 @@ impl SessionStore for SqliteStore {
                 request: request.id.clone(),
                 revision: session.revision,
                 turn: turn_receipt,
+                driver_state_revision: (state_revision != session.driver_state.revision())
+                    .then_some(session.driver_state.revision()),
             };
             save_request(
                 &transaction,
@@ -816,6 +852,7 @@ impl SessionStore for SqliteStore {
                 session: session_id,
                 revision: session.revision,
                 configuration: session.configuration,
+                driver_state: session.driver_state,
                 admission_paused: session.paused,
                 queued,
                 current,
@@ -875,20 +912,38 @@ impl TurnJournal for SqliteJournal {
                 .map_err(database_error)?;
             let mut state = load_turn(&transaction, &binding.session, &binding.turn)?;
             require_binding(&state, &binding)?;
+            let before = change
+                .actions()
+                .iter()
+                .any(|action| matches!(action, JournalAction::SetDriverState(_)))
+                .then(|| state.driver_state().clone());
             let receipt = state.apply(change)?;
             save_turn(&transaction, &state)?;
-            if state.outcome().is_some() {
+            let previous = before.filter(|snapshot| snapshot != state.driver_state());
+            let settled = state.outcome().is_some();
+            if settled || previous.is_some() {
                 let mut session = load_session(&transaction, &binding.session)?;
                 if session.active_turn.as_ref() == Some(&binding.turn) {
-                    session.active_turn = None;
-                    bump_revision(&mut session)?;
-                    save_session(&transaction, &binding.session, &session)?;
-                    transaction
-                        .execute(
+                    if let Some(previous) = previous {
+                        if previous != session.driver_state {
+                            return Err(error(
+                                ErrorKind::Conflict,
+                                "driver_state_snapshot_mismatch",
+                            ));
+                        }
+                        session.driver_state = state.driver_state().clone();
+                    }
+                    if settled {
+                        session.active_turn = None;
+                        transaction.execute(
                             "UPDATE submissions SET completed=1 WHERE session=?1 AND turn_id=?2",
                             params![binding.session.as_str(), binding.turn.as_str()],
-                        )
-                        .map_err(database_error)?;
+                        ).map_err(database_error)?;
+                    }
+                    bump_revision(&mut session)?;
+                    save_session(&transaction, &binding.session, &session)?;
+                } else if previous.is_some() {
+                    return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
                 }
             }
             transaction.commit().map_err(commit_error)?;
@@ -1004,7 +1059,7 @@ fn insert_session(
 fn load_session(connection: &Connection, id: &SessionId) -> Result<SessionRecord> {
     let row = connection
         .query_row(
-            "SELECT configuration,revision,paused,active_turn,next_input FROM sessions WHERE id=?1",
+            "SELECT configuration,revision,paused,active_turn,next_input,driver_state FROM sessions WHERE id=?1",
             [id.as_str()],
             |row| {
                 Ok((
@@ -1013,6 +1068,7 @@ fn load_session(connection: &Connection, id: &SessionId) -> Result<SessionRecord
                     row.get::<_, bool>(2)?,
                     row.get::<_, Option<String>>(3)?,
                     row.get::<_, i64>(4)?,
+                    row.get::<_, Option<Vec<u8>>>(5)?,
                 ))
             },
         )
@@ -1021,6 +1077,12 @@ fn load_session(connection: &Connection, id: &SessionId) -> Result<SessionRecord
         .ok_or_else(|| error(ErrorKind::InvalidInput, "session_missing"))?;
     Ok(SessionRecord {
         configuration: decode(&row.0)?,
+        driver_state: row
+            .5
+            .as_deref()
+            .map(decode)
+            .transpose()?
+            .unwrap_or_default(),
         revision: SessionRevision(unsigned(row.1)?),
         paused: row.2,
         active_turn: row.3.map(TurnId::new).transpose()?,
@@ -1033,15 +1095,19 @@ fn save_session(
     id: &SessionId,
     session: &SessionRecord,
 ) -> Result<()> {
+    let driver_state = (!session.driver_state.is_initial())
+        .then(|| encode(&session.driver_state))
+        .transpose()?;
     transaction
         .execute(
-            "UPDATE sessions SET revision=?2,paused=?3,active_turn=?4,next_input=?5 WHERE id=?1",
+            "UPDATE sessions SET revision=?2,paused=?3,active_turn=?4,next_input=?5,driver_state=?6 WHERE id=?1",
             params![
                 id.as_str(),
                 sql_number(session.revision.0)?,
                 session.paused,
                 session.active_turn.as_ref().map(TurnId::as_str),
-                sql_number(session.next_input)?
+                sql_number(session.next_input)?,
+                driver_state,
             ],
         )
         .map_err(database_error)?;

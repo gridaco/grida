@@ -5,6 +5,7 @@
 
 pub mod authority;
 pub mod context;
+pub mod driver_state;
 pub mod history;
 pub mod inference;
 pub mod messages;

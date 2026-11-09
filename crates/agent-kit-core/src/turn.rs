@@ -1,4 +1,5 @@
 use crate::authority::GrantSelection;
+use crate::driver_state::{DriverStateChange, DriverStateRevision, DriverStateSnapshot};
 use crate::history::{History, HistoryRecord};
 use crate::inference::{InferenceOutcome, PreparedRequest};
 use crate::messages::OutcomeStatus;
@@ -225,6 +226,7 @@ pub enum JournalAction {
     },
     WithdrawWait(WaitId),
     SetCheckpoint(Envelope),
+    SetDriverState(DriverStateChange),
     Control(ControlDirective),
     Suspend,
     Settle(TurnOutcome),
@@ -335,6 +337,8 @@ pub struct RecordedPosition {
     pub position: JournalPosition,
     pub fingerprint: Fingerprint,
     pub content_fingerprint: Fingerprint,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub driver_state_revision: Option<DriverStateRevision>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -375,6 +379,8 @@ pub struct TurnState {
     operations: BTreeMap<OperationId, OperationState>,
     waits: BTreeMap<WaitId, WaitRecord>,
     checkpoint: Option<Envelope>,
+    #[serde(skip_serializing_if = "DriverStateSnapshot::is_initial")]
+    driver_state: DriverStateSnapshot,
     suspended: bool,
     outcome: Option<TurnOutcome>,
     receipts: BTreeMap<ChangeId, CommitReceipt>,
@@ -382,6 +388,13 @@ pub struct TurnState {
 
 impl TurnState {
     pub fn new(binding: TurnBinding) -> Result<Self> {
+        Self::with_driver_state(binding, DriverStateSnapshot::default())
+    }
+
+    pub fn with_driver_state(
+        binding: TurnBinding,
+        driver_state: DriverStateSnapshot,
+    ) -> Result<Self> {
         if binding.epoch == 0 {
             return Err(Error::new(ErrorKind::InvalidInput, "invalid_writer_epoch"));
         }
@@ -399,6 +412,7 @@ impl TurnState {
             operations: BTreeMap::new(),
             waits: BTreeMap::new(),
             checkpoint: None,
+            driver_state,
             suspended: false,
             outcome: None,
             receipts: BTreeMap::new(),
@@ -424,6 +438,9 @@ impl TurnState {
     }
     pub fn checkpoint(&self) -> Option<&Envelope> {
         self.checkpoint.as_ref()
+    }
+    pub fn driver_state(&self) -> &DriverStateSnapshot {
+        &self.driver_state
     }
     pub fn outcome(&self) -> Option<&TurnOutcome> {
         self.outcome.as_ref()
@@ -649,6 +666,19 @@ impl TurnState {
                 "multiple_lifecycle_transitions",
             ));
         }
+        if change
+            .actions
+            .iter()
+            .filter(|action| matches!(action, JournalAction::SetDriverState(_)))
+            .take(2)
+            .count()
+            > 1
+        {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "multiple_driver_state_changes",
+            ));
+        }
         let mut next = self.clone();
         for action in change.actions {
             next.apply_action(action)?;
@@ -663,6 +693,8 @@ impl TurnState {
             position: next.position,
             fingerprint: change.fingerprint,
             content_fingerprint: change.content_fingerprint,
+            driver_state_revision: (next.driver_state.revision() != self.driver_state.revision())
+                .then_some(next.driver_state.revision()),
         };
         let receipt = if settles == 1 {
             CommitReceipt::Settled(SettlementReceipt {
@@ -916,6 +948,7 @@ impl TurnState {
             JournalAction::SetCheckpoint(checkpoint) => {
                 self.checkpoint = Some(checkpoint);
             }
+            JournalAction::SetDriverState(change) => self.driver_state.apply(change)?,
             JournalAction::Control(directive) => {
                 let interruption = match directive {
                     ControlDirective::Pause if !self.controls.cancelled => {
@@ -985,6 +1018,8 @@ impl<'de> Deserialize<'de> for TurnState {
             operations: BTreeMap<OperationId, OperationState>,
             waits: BTreeMap<WaitId, WaitRecord>,
             checkpoint: Option<Envelope>,
+            #[serde(default)]
+            driver_state: DriverStateSnapshot,
             suspended: bool,
             outcome: Option<TurnOutcome>,
             receipts: BTreeMap<ChangeId, CommitReceipt>,
@@ -998,6 +1033,7 @@ impl<'de> Deserialize<'de> for TurnState {
             operations: value.operations,
             waits: value.waits,
             checkpoint: value.checkpoint,
+            driver_state: value.driver_state,
             suspended: value.suspended,
             outcome: value.outcome,
             receipts: value.receipts,

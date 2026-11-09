@@ -1,5 +1,6 @@
 use crate::*;
 use agent_kit_core::authority::AuthorityRequest;
+use agent_kit_core::driver_state::DriverStateChange;
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceStatus, MeasurementKind,
@@ -168,6 +169,23 @@ impl Turn {
     }
 
     pub async fn try_finish(&mut self, draft: CompletionDraft) -> Result<FinishOutcome> {
+        self.finish(draft, None).await
+    }
+
+    /// Publish a conditional driver-state update with the same terminal receipt.
+    pub async fn try_finish_with_driver_state(
+        &mut self,
+        draft: CompletionDraft,
+        change: DriverStateChange,
+    ) -> Result<FinishOutcome> {
+        self.finish(draft, Some(change)).await
+    }
+
+    async fn finish(
+        &mut self,
+        draft: CompletionDraft,
+        state_change: Option<DriverStateChange>,
+    ) -> Result<FinishOutcome> {
         self.inner.closing.store(true, Ordering::SeqCst);
         let _serial = self.inner.serial.lock().await;
         let state = self.inner.refresh().await?;
@@ -190,12 +208,25 @@ impl Turn {
                 "work_unsettled",
             )));
         }
-        let id = phase_id(&self.inner.binding.turn, "settle", &draft.outcome)?;
+        let mut actions = Vec::new();
+        let id = match state_change {
+            Some(change) => {
+                let id = phase_id(
+                    &self.inner.binding.turn,
+                    "settle",
+                    &(&draft.outcome, &change),
+                )?;
+                actions.push(JournalAction::SetDriverState(change));
+                id
+            }
+            None => phase_id(&self.inner.binding.turn, "settle", &draft.outcome)?,
+        };
+        actions.push(JournalAction::Settle(draft.outcome));
         let receipt = match self
             .inner
             .commit_with_basis(
                 id,
-                vec![JournalAction::Settle(draft.outcome)],
+                actions,
                 Some(CommitBasis::Completion(
                     draft.expected_control,
                     draft.expected_history,

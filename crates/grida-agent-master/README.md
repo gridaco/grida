@@ -61,3 +61,11 @@ Inference usage is derived from recorded attempts. Newer cumulative observations
 replace older values for the same source, category, and unit. Missing reports
 remain explicit, and cached usage stays in its own category. Prices and spending
 authority are supplied by the host separately.
+
+Goal policy retains an explicit objective, success criteria, revision, progress,
+and cumulative work-turn and inference-step allowances. Each reservation is
+bound to its exact turn. Uncertain work retains the reserved allowance until
+reconciled. A changed goal can account for older work while rejecting its
+progress or completion proposal. Completion requires a verified evidence link
+for every criterion. The current policy and SQLite fixtures exercise these
+transitions before the host exposes goal tools or automatic continuation.

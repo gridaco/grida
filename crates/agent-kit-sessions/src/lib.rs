@@ -1,5 +1,6 @@
 //! Durable submissions and exclusive turn ownership around an injected driver.
 
+use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision, DriverStateSnapshot};
 use agent_kit_core::history::{HistoryPosition, HistoryRecord};
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlRevision, ControlSnapshot, JournalPosition,
@@ -93,6 +94,13 @@ pub struct RecoveryRequest {
     pub expected_epoch: u64,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TurnControl {
+    pub turn: TurnId,
+    pub expected: ControlRevision,
+    pub directive: ControlDirective,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SessionControl {
@@ -137,6 +145,12 @@ pub enum SessionControl {
         turn: TurnId,
         expected: ControlRevision,
     },
+    /// Change driver-owned state. With an active turn, this must carry its exact
+    /// control so admission and the state transition observe the same commit.
+    DriverState {
+        change: DriverStateChange,
+        turn: Option<TurnControl>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -153,6 +167,8 @@ pub struct ControlReceipt {
     pub request: ChangeId,
     pub revision: SessionRevision,
     pub turn: Option<CommitReceipt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub driver_state_revision: Option<DriverStateRevision>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -179,6 +195,8 @@ pub struct SessionView {
     pub session: SessionId,
     pub revision: SessionRevision,
     pub configuration: Envelope,
+    #[serde(default, skip_serializing_if = "DriverStateSnapshot::is_initial")]
+    pub driver_state: DriverStateSnapshot,
     pub admission_paused: bool,
     pub queued: Vec<InputView>,
     pub current: Option<TurnView>,
