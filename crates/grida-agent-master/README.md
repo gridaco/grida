@@ -73,3 +73,10 @@ operation. The master limits the reserved turn, accounts for recorded attempts,
 and commits the result with the goal update. A completion claim cites recorded
 tool calls. An explicit verifier must establish their relevance to each
 criterion. The host still supplies tool grants and automatic continuation.
+
+Timed continuation policy records one wake-up for an existing task. The
+prepared tool waits without a worker or inference request. Its due time is
+fixed at first registration, and the same recorded answer can be replayed.
+Pause holds due delivery. Cancel Wake-up clears automatic delivery, while
+Stop closes the task's admission. The host supplies a clock, grants and timer
+delivery, and claims any continuation through the usual task controls.

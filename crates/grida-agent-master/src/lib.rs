@@ -7,6 +7,7 @@ pub mod goals;
 pub mod history;
 pub mod questions;
 pub mod usage;
+pub mod wakeups;
 
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::history::{HistoryPosition, HistoryRecord};
