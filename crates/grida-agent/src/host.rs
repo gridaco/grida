@@ -5,6 +5,7 @@ mod history;
 mod lifecycle;
 mod permissions;
 mod questions;
+mod skills;
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
@@ -82,6 +83,8 @@ pub struct Host {
     gg_connection: Option<Arc<GgConnection>>,
     configuration: Option<Arc<Configuration>>,
     permissions: Option<Arc<crate::permissions::PermissionProfile>>,
+    #[cfg(unix)]
+    guidance_root: Option<Arc<skills::HeadlessGuidance>>,
     configuration_admission: Arc<Mutex<()>>,
     controls: Arc<Semaphore>,
     work: Arc<Mutex<Work>>,
@@ -162,6 +165,9 @@ pub enum PromptPart {
         uri: String,
         mime_type: Option<String>,
     },
+    Skill {
+        reference: crate::skills::SkillReference,
+    },
 }
 
 #[derive(Clone)]
@@ -204,6 +210,8 @@ struct StoredPrompt {
     configuration_permission: crate::ConfigurationPermission,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     permission_capture: Option<crate::permissions::PermissionCapture>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    guidance: Option<crate::skills::CapturedGuidance>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -280,6 +288,7 @@ struct PreparedInput {
     configuration_permission: crate::ConfigurationPermission,
     captured: Option<ConfigurationSnapshot>,
     permission_capture: Option<crate::permissions::PermissionCapture>,
+    guidance: Option<Message>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -369,6 +378,8 @@ impl Host {
             gg_connection: None,
             configuration,
             permissions: None,
+            #[cfg(unix)]
+            guidance_root: None,
             configuration_admission: Arc::default(),
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
             work: Arc::default(),
@@ -811,13 +822,15 @@ impl Host {
             }
             prepared.config.instructions.push_str(&disclosure);
         }
+        let mut prior = history.messages;
+        prior.extend(prepared.guidance);
         let master = Master::new(
             prepared.config,
             execution.provider.clone(),
             tools,
             authority,
         )?
-        .with_history(history.messages)
+        .with_history(prior)
         .with_input_limit(prepared.limit);
         Ok(Some(Admitted {
             opened,
@@ -900,6 +913,7 @@ impl Host {
         let execution = self.execution()?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
         let permission_capture = self.capture_permissions(session, &id)?;
+        let guidance = skills::capture_guidance(self.guidance_scope(session)?, &parts).await?;
         Ok(Submission {
             id,
             payload: encode(
@@ -918,6 +932,7 @@ impl Host {
                     questions,
                     configuration_permission,
                     permission_capture,
+                    guidance,
                 },
             )?,
         })
@@ -931,59 +946,77 @@ impl Host {
     ) -> Result<PreparedInput> {
         let mut config = execution.config.clone();
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
-        let (messages, limit, questions, configuration_permission, captured, permission_capture) =
-            match input.payload.version() {
-                1 if input.payload.schema().as_str() == INPUT_SCHEMA => {
-                    authority.validate(None, &execution.authority.inference.authority)?;
-                    config.max_steps = 1;
-                    (
-                        decode_input(input)?,
-                        None,
-                        false,
-                        crate::ConfigurationPermission::Disabled,
-                        None,
-                        None,
-                    )
+        let (
+            messages,
+            limit,
+            questions,
+            configuration_permission,
+            captured,
+            permission_capture,
+            guidance,
+        ) = match input.payload.version() {
+            1 if input.payload.schema().as_str() == INPUT_SCHEMA => {
+                authority.validate(None, &execution.authority.inference.authority)?;
+                config.max_steps = 1;
+                (
+                    decode_input(input)?,
+                    None,
+                    false,
+                    crate::ConfigurationPermission::Disabled,
+                    None,
+                    None,
+                    None,
+                )
+            }
+            2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
+                let stored: StoredPrompt = decode_input(input)?;
+                authority.validate(
+                    stored.authority.as_ref(),
+                    &execution.authority.inference.authority,
+                )?;
+                if stored
+                    .model
+                    .as_ref()
+                    .is_some_and(|model| *model != config.model)
+                {
+                    return Err(problem(ErrorKind::Conflict, "retained_model_changed"));
                 }
-                2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
-                    let stored: StoredPrompt = decode_input(input)?;
-                    authority.validate(
-                        stored.authority.as_ref(),
-                        &execution.authority.inference.authority,
-                    )?;
-                    if stored
-                        .model
-                        .as_ref()
-                        .is_some_and(|model| *model != config.model)
-                    {
-                        return Err(problem(ErrorKind::Conflict, "retained_model_changed"));
-                    }
-                    if let Some(permission) = &stored.permission_capture {
-                        config.instructions.push_str(permission.context());
-                    }
-                    config.max_steps = stored.max_steps.unwrap_or(1);
-                    config.max_output_tokens =
-                        stored.max_output_tokens.unwrap_or(config.max_output_tokens);
-                    (
-                        prompt_input(&input.id, &stored.parts)?,
-                        stored.configuration.defaults.context.max_input_tokens,
-                        stored.questions,
-                        stored.configuration_permission,
-                        Some(stored.configuration),
-                        if cancellation_only {
-                            None
-                        } else {
-                            stored.permission_capture
-                        },
-                    )
+                if let Some(permission) = &stored.permission_capture {
+                    config.instructions.push_str(permission.context());
                 }
-                _ => {
-                    return Err(problem(
-                        ErrorKind::Unsupported,
-                        "unsupported_submission_schema",
-                    ));
+                let guidance = stored
+                    .guidance
+                    .as_ref()
+                    .map(|guidance| guidance.message(&input.id))
+                    .transpose()?;
+                if guidance.is_some() {
+                    config.instructions.push_str("\n\n");
+                    config.instructions.push_str(crate::skills::GUIDANCE_POLICY);
                 }
-            };
+                config.max_steps = stored.max_steps.unwrap_or(1);
+                config.max_output_tokens =
+                    stored.max_output_tokens.unwrap_or(config.max_output_tokens);
+                (
+                    prompt_input(&input.id, &stored.parts)?,
+                    stored.configuration.defaults.context.max_input_tokens,
+                    stored.questions,
+                    stored.configuration_permission,
+                    Some(stored.configuration),
+                    if cancellation_only {
+                        None
+                    } else {
+                        stored.permission_capture
+                    },
+                    guidance,
+                )
+            }
+            _ => {
+                return Err(problem(
+                    ErrorKind::Unsupported,
+                    "unsupported_submission_schema",
+                ));
+            }
+        };
         if let Some(capture) = &permission_capture {
             self.permissions
                 .as_ref()
@@ -1001,6 +1034,7 @@ impl Host {
             configuration_permission,
             captured,
             permission_capture,
+            guidance,
         })
     }
 
@@ -1712,6 +1746,9 @@ fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
                 // A reference is context supplied by the user. It is neither
                 // imported nor granted filesystem or network authority here.
                 Content::Text(serde_json::to_string(reference).expect("serializable reference"))
+            }
+            PromptPart::Skill { reference } => {
+                Content::Text(format!("\n\nSelected skill {}.", reference.name()))
             }
         })
         .collect();

@@ -33,6 +33,7 @@
       "stdout": {
         "includes": [
           "Usage: grida agent run --provider gg",
+          "--skill NAME",
           "Results are JSON Lines",
           "Documentation: https://grida.co/docs/cli/agent"
         ]

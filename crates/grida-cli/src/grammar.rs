@@ -63,6 +63,7 @@ pub enum AgentAction {
         cwd: PathBuf,
         session: Option<SessionId>,
         prompt: Option<String>,
+        skills: Vec<grida_agent::skills::SkillReference>,
         questions: bool,
         deadline_ms: u64,
     },
@@ -230,7 +231,7 @@ const STRINGS: &[&str] = &[
     "deadline-ms",
     "max-output-tokens",
 ];
-const REPEATED: &[&str] = &["reference", "param"];
+const REPEATED: &[&str] = &["reference", "param", "skill"];
 const REQUEST_FLAGS: &[&str] = &[
     "prompt",
     "prompt-file",
@@ -554,7 +555,14 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
         "no-input",
     ];
     if run {
-        allowed.extend(["cwd", "session", "prompt", "questions", "deadline-ms"]);
+        allowed.extend([
+            "cwd",
+            "session",
+            "prompt",
+            "skill",
+            "questions",
+            "deadline-ms",
+        ]);
     } else {
         allowed.push("stdio");
     }
@@ -593,6 +601,13 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
                     .transpose()
                     .map_err(|_| Failure::usage())?,
                 prompt: tokens.value("prompt").map(str::to_owned),
+                skills: tokens
+                    .values("skill")
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(grida_agent::skills::SkillReference::named)
+                    .collect::<agent_kit_core::Result<_>>()
+                    .map_err(|_| Failure::usage())?,
                 questions: tokens.flag("questions"),
                 deadline_ms: integer("deadline-ms", "120000", 600_000)?,
             }
@@ -870,6 +885,44 @@ mod tests {
         assert_eq!(
             parsed(&["help", "ai", "providers", "configure", "tripo"]).command,
             Command::Help(Topic::ProvidersConfigure)
+        );
+    }
+
+    #[test]
+    fn agent_run_accepts_repeated_named_skill_references() {
+        let invocation = parsed(&[
+            "agent",
+            "run",
+            "--provider=gg",
+            "--model=fixture",
+            "--state-dir=/state",
+            "--cwd=/workspace",
+            "--skill=slides",
+            "--skill=svg",
+        ]);
+        let Command::Agent(AgentCommand {
+            action: AgentAction::Run { skills, .. },
+            ..
+        }) = invocation.command
+        else {
+            panic!("expected agent run");
+        };
+        assert_eq!(
+            skills.iter().map(|skill| skill.name()).collect::<Vec<_>>(),
+            ["slides", "svg"]
+        );
+        assert_eq!(
+            parse(&args(&[
+                "agent",
+                "run",
+                "--provider=gg",
+                "--model=fixture",
+                "--state-dir=/state",
+                "--cwd=/workspace",
+                "--skill=../outside",
+            ]))
+            .unwrap_err(),
+            Failure::usage()
         );
     }
 

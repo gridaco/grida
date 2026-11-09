@@ -14,6 +14,7 @@ pub mod mcp;
 pub mod permissions;
 pub mod process;
 pub mod scratch;
+pub mod skills;
 pub mod surface_tools;
 pub mod tool_host;
 pub mod workspace;

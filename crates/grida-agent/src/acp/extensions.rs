@@ -5,6 +5,7 @@ pub(super) mod compaction;
 mod history;
 mod lifecycle;
 mod questions;
+mod skills;
 
 use super::{ConnectionSessions, host_error, prompt_part, unavailable};
 use crate::host::{DurableSubmission, Host, InputSettings, PromptRequest};
@@ -62,6 +63,7 @@ fn capability_keys(reviewer: bool) -> impl Iterator<Item = &'static str> {
         .chain(approvals::capabilities(reviewer))
         .chain(history::CAPABILITIES)
         .chain([compaction::COMPACT])
+        .chain([skills::CATALOG])
 }
 
 pub(super) fn configuration_permission(
@@ -297,6 +299,7 @@ pub(super) fn handlers(
         ))
         .with_connection_builder(history::handlers(host.clone(), sessions.clone()))
         .with_connection_builder(compaction::handlers(host.clone(), sessions.clone()))
+        .with_connection_builder(skills::handlers(host.clone(), sessions.clone()))
         .on_receive_request(
             async move |request: Submit, responder, _| {
                 let result = async {

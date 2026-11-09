@@ -119,6 +119,22 @@ summaries, with `sessionRevision`, `controlRevision`, `historyPosition`,
 | `fork`                                   | `sessionId`, `requestId`, `expectedHistory`, and `anchor`. Return the independent `sessionId` for a committed prefix through that message.                                  |
 | `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `allowConfigurationChanges`. Return the installed view and accepted input. |
 | `compact`                                | `sessionId`, `requestId`, and optional `recover`. Run or inspect one retained context compaction. Return its status and available usage/failure evidence.                   |
+| `skills`                                 | `sessionId`. Read names, descriptions, sources, and versioned ACP resource-link URIs for available skills.                                                                  |
+
+Select a skill by including its catalog URI as an ACP `resource_link` alongside
+the prompt. Skill references use `grida-skill:<name>@<revision>`. The catalog
+returns metadata and omits local paths and bodies. A stale or unavailable
+selection rejects the new input before inference. Use a new submission or
+queued replacement to change skills for accepted work. Steering keeps the
+active turn's captured guidance.
+
+Bundled skills are available to every session. Project discovery reads only
+the explicitly readable primary root supplied by the host. It checks
+`.agents/skills` before `.claude/skills`, followed by bundled skills, and uses
+the first available definition for each name. An accepted input retains its
+chosen skill bodies and any root `AGENTS.md` guidance. The `input` operation
+reports selected skill versions and the project instruction revision when
+present. These sources supply model context without changing tool permissions.
 
 History returns `basis`, `sessionRevision`, up to 128 `messages`, `nextOffset`,
 and optional `seed` provenance. Echo the basis as `expectedHistory` on later

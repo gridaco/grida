@@ -82,6 +82,7 @@ pub fn project(invocation: &Invocation) -> Value {
                     cwd,
                     session,
                     prompt,
+                    skills,
                     questions,
                     deadline_ms,
                 } => {
@@ -92,6 +93,13 @@ pub fn project(invocation: &Invocation) -> Value {
                         session.as_ref().map(|id| id.as_str()),
                     );
                     optional(&mut object, "prompt", prompt.as_deref());
+                    if !skills.is_empty() {
+                        put(
+                            &mut object,
+                            "skills",
+                            skills.iter().map(|skill| skill.name()).collect::<Vec<_>>(),
+                        );
+                    }
                     put(&mut object, "questions", *questions);
                     put(&mut object, "deadlineMs", *deadline_ms);
                     "agent run"

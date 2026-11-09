@@ -1687,6 +1687,13 @@ into scratch (where the shell can then exfiltrate them).
    read/copy. BOTH load paths — the materializing loader and
    `nodeSkillBodyLoader` — go through it, so no loader trusts a stale
    discovered string path.
+6. **Native project authority** — a local one-shot invocation pins its
+   explicit project root. ACP discovers project guidance only inside the
+   primary root of a host-supplied profile with read access already allowed.
+   A client-provided working directory alone selects bundled skills. The native
+   reader opens fixed names relative to a pinned directory, refuses links and
+   nonregular files, and bounds document reads. The accepted snapshot carries
+   text and provenance. It grants no tool access and follows no companion paths.
 
 **Files bound by this id.**
 
@@ -1696,6 +1703,11 @@ into scratch (where the shell can then exfiltrate them).
 - [packages/grida-ai-agent/src/skills/materialize.ts](packages/grida-ai-agent/src/skills/materialize.ts)
 - [packages/grida-ai-agent/src/skills/skills-fs.test.ts](packages/grida-ai-agent/src/skills/skills-fs.test.ts)
 - [packages/grida-ai-agent/src/skills/materialize.test.ts](packages/grida-ai-agent/src/skills/materialize.test.ts)
+- [Native catalog and capture](crates/grida-agent/src/skills.rs),
+  [native document reads](crates/grida-agent/src/skills/native.rs),
+  [project authority](crates/grida-agent/src/host/skills.rs),
+  [permission profile](crates/grida-agent/src/permissions.rs), and
+  [native process fixtures](crates/grida-agent/tests/process/skills.rs).
 
 **What does NOT belong here.** Following a symlink out of a skill tree.
 Accepting a skill name with a path separator. Materializing anywhere but the

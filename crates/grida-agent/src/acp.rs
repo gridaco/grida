@@ -390,11 +390,18 @@ fn session_id(id: &agent_client_protocol::v1::schema::SessionId) -> Result<Sessi
 fn prompt_part(block: ContentBlock) -> Result<PromptPart> {
     match block {
         ContentBlock::Text(text) => Ok(PromptPart::Text { text: text.text }),
-        ContentBlock::ResourceLink(link) => Ok(PromptPart::ResourceLink {
-            name: link.name,
-            uri: link.uri,
-            mime_type: link.mime_type,
-        }),
+        ContentBlock::ResourceLink(link) => {
+            if let Some(reference) =
+                crate::skills::SkillReference::from_uri(&link.uri).map_err(host_error)?
+            {
+                return Ok(PromptPart::Skill { reference });
+            }
+            Ok(PromptPart::ResourceLink {
+                name: link.name,
+                uri: link.uri,
+                mime_type: link.mime_type,
+            })
+        }
         _ => Err(Error::invalid_params().data("unsupported_prompt_content")),
     }
 }

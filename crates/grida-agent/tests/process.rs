@@ -38,6 +38,9 @@ mod lifecycle;
 mod questions;
 #[path = "process/responses.rs"]
 mod responses;
+#[cfg(unix)]
+#[path = "process/skills.rs"]
+mod skills;
 
 const WAIT: Duration = Duration::from_secs(15);
 const TEST_CREDENTIAL: &str = "fixture-only-bearer-token";
@@ -1284,6 +1287,16 @@ async fn shared_server_with_credential(
     endpoint: &str,
     credential: &str,
 ) -> (Child, String) {
+    shared_server_with_profile(state, endpoint, credential, None).await
+}
+
+#[cfg(unix)]
+async fn shared_server_with_profile(
+    state: &Path,
+    endpoint: &str,
+    credential: &str,
+    profile: Option<&Path>,
+) -> (Child, String) {
     let mut command = executable();
     command
         .args([
@@ -1295,6 +1308,9 @@ async fn shared_server_with_credential(
         ])
         .env("GRIDA_AGENT_FIXTURE_SERVER_TOKEN", SERVER_TOKEN);
     configured(&mut command, state, endpoint);
+    if let Some(profile) = profile {
+        command.arg("--permission-profile").arg(profile);
+    }
     command.env("GRIDA_AGENT_PROCESS_TEST_KEY", credential);
     let mut child = command
         .stdin(Stdio::null())

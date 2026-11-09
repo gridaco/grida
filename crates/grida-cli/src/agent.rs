@@ -77,6 +77,7 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
             cwd,
             session,
             prompt,
+            skills,
             questions,
             deadline_ms,
         } => {
@@ -108,6 +109,7 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
                 cwd,
                 session,
                 prompt: Some(prompt),
+                skills,
                 questions,
                 timeout: Duration::from_millis(deadline_ms),
             })

@@ -165,6 +165,7 @@ with an underscore.
 | `co.grida/session/stop`, `resume-queue`           | Stop the current turn and pause admission, or reopen queue admission separately.    |
 | `co.grida/session/history`, `fork`, `revise`      | Read message anchors, branch a committed prefix, or revise an earlier user message. |
 | `co.grida/session/compact`                        | Summarize model context for future turns and retain the original transcript.        |
+| `co.grida/session/skills`                         | List available named skills and their versioned prompt references.                  |
 | `co.grida/config/inspect`, `update`, `reload`     | Read, change, or activate the host's reviewed defaults.                             |
 
 Standard `session/prompt` streams its response. Durable submission and enqueue
@@ -200,6 +201,14 @@ The host reads `config.toml` from its private state directory and retains an
 immutable defaults snapshot with each accepted input. A setting change applies
 to later inputs. The current compatible adapter rejects an explicit input-token
 cap before generation when it cannot establish a hard bound.
+
+Use repeatable `--skill NAME` options with `run` to select guidance for that
+input. ACP clients can select a versioned reference from the skill catalog.
+Bundled skills are available without project access. On Unix, project skills
+override bundled names when the local run selects its project or the ACP host
+supplies a readable primary root. Project guidance comes from that root's
+`AGENTS.md`. The accepted input retains the exact versions it used. Later inputs
+resolve the current files, and stale explicit references require reselection.
 
 ## Filesystem services
 

@@ -64,6 +64,15 @@ fn command() -> Command {
                         .help("Allow questions and exit with an identified input-required result."),
                 )
                 .arg(
+                    Arg::new("skill")
+                        .long("skill")
+                        .value_name("NAME")
+                        .action(ArgAction::Append)
+                        .help(
+                            "Select a named skill for this prompt. Repeat for additional skills.",
+                        ),
+                )
+                .arg(
                     Arg::new("prompt")
                         .long("prompt")
                         .value_name("TEXT")
@@ -292,6 +301,13 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 .map(SessionId::new)
                 .transpose()?,
             prompt: args.get_one::<String>("prompt").cloned(),
+            skills: args
+                .get_many::<String>("skill")
+                .into_iter()
+                .flatten()
+                .cloned()
+                .map(grida_agent::skills::SkillReference::named)
+                .collect::<Result<_>>()?,
             questions: args.get_flag("questions"),
             timeout: Duration::from_millis(
                 args.get_one::<u64>("deadline-ms")

@@ -205,6 +205,7 @@ Each suffix in a grouped row uses the displayed prefix and is negotiated separat
 | `co.grida/session/questions`, `answer-question`   | Inspect pending questions and submit a correlated choice, free-text answer, or skip. |
 | `co.grida/session/history`, `fork`, `revise`      | Browse retained message anchors, branch a chat, or replace an earlier text message.  |
 | `co.grida/session/compact`                        | Summarize earlier model context and keep the original transcript available.          |
+| `co.grida/session/skills`                         | List available skills for this chat and select a versioned reference for a prompt.   |
 | `co.grida/config/inspect`, `update`, `reload`     | Inspect, change, or reload the host defaults.                                        |
 
 Use ordinary `session/prompt` for a streamed reply. Use durable submission or
@@ -224,6 +225,17 @@ Negotiate both question operations to enable question tools for new inputs.
 An answer can resume suspended work when its other conditions allow execution.
 An explicit Pause remains effective after the answer. Ordinary ACP prompts keep
 their existing text-only profile.
+
+Select a named skill with `run --skill NAME` or through the ACP skill catalog.
+Repeat the flag to select more than one. Bundled skills include `dotcanvas`,
+`slides`, and `svg`. On Unix, a local run can also use skills in its selected
+project. An ACP host must explicitly allow reads from the primary project
+directory. Project skills override bundled skills with the same name.
+
+An accepted prompt keeps the skill and project instruction versions it used.
+Changes on disk apply to later prompts. If a saved skill selection has changed,
+refresh the catalog and select it again. Skills guide the task within its
+existing permissions.
 
 Configuration changes apply to later accepted inputs. Existing inputs retain
 their captured defaults. An explicit hard context-input cap requires supported

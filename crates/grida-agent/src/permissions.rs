@@ -190,6 +190,31 @@ impl PermissionProfile {
                 .is_ok_and(|directory| directory.root() == cwd)
     }
 
+    #[cfg(unix)]
+    // GRIDA-SEC-007 admits guidance only from the already-readable pinned root.
+    pub(crate) fn guidance_root(
+        &self,
+        cwd: &std::path::Path,
+    ) -> Result<Option<crate::skills::ProjectRoot>> {
+        let Some(primary) = self.workspace.primary() else {
+            return Ok(None);
+        };
+        if self
+            .directories
+            .get(primary)
+            .is_none_or(|access| access.read != AccessRule::Allow)
+        {
+            return Ok(None);
+        }
+        let directory = self
+            .workspace
+            .permission_directory(Some(primary), &self.protected)?;
+        if directory.root() != cwd {
+            return Ok(None);
+        }
+        crate::skills::ProjectRoot::from_pinned(directory.pinned_directory()).map(Some)
+    }
+
     pub fn capture(&self, scope: ScopeId) -> PermissionCapture {
         PermissionCapture {
             scope,

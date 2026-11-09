@@ -36,6 +36,10 @@ pub struct InputSettings {
     pub questions: bool,
     #[serde(default)]
     pub configuration_permission: crate::ConfigurationPermission,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<crate::skills::SkillDescription>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_instruction_revision: Option<String>,
 }
 
 pub struct InputInspection {
@@ -67,6 +71,16 @@ impl InputSettings {
                     max_output_tokens: stored.max_output_tokens,
                     questions: stored.questions,
                     configuration_permission: stored.configuration_permission,
+                    skills: stored
+                        .guidance
+                        .as_ref()
+                        .map(|guidance| guidance.selected())
+                        .unwrap_or_default(),
+                    project_instruction_revision: stored
+                        .guidance
+                        .as_ref()
+                        .and_then(|guidance| guidance.project_revision())
+                        .map(str::to_owned),
                 })
             }
             _ => Err(problem(
@@ -165,7 +179,7 @@ impl Host {
             .await?
             .ok_or_else(|| problem(ErrorKind::Unavailable, "input_unavailable"))?;
         let settings = InputSettings::for_input(&view.input)?;
-        let parts = if view.input.payload.version() == 1 {
+        let mut parts: Vec<_> = if view.input.payload.version() == 1 {
             let messages: Vec<Message> = decode_input(&view.input)?;
             messages
                 .into_iter()
@@ -178,6 +192,20 @@ impl Host {
         } else {
             decode_input::<StoredPrompt>(&view.input)?.parts
         };
+        for part in &mut parts {
+            if let PromptPart::Skill { reference } = part
+                && reference.uri().is_none()
+                && let Some(selected) = settings
+                    .skills
+                    .iter()
+                    .find(|skill| skill.name == reference.name())
+            {
+                *reference =
+                    crate::skills::SkillReference::from_uri(&selected.uri)?.ok_or_else(|| {
+                        problem(ErrorKind::InvalidState, "invalid_captured_skill_reference")
+                    })?;
+            }
+        }
         Ok(InputInspection {
             receipt: DurableSubmission {
                 session,
@@ -382,6 +410,15 @@ impl Host {
         expected_history: HistoryPosition,
         parts: Vec<PromptPart>,
     ) -> Result<ControlReceipt> {
+        if parts
+            .iter()
+            .any(|part| matches!(part, PromptPart::Skill { .. }))
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "skill_selection_requires_new_input",
+            ));
+        }
         let mut messages = prompt_input(&control.request, &parts)?;
         for message in &mut messages {
             message.id = MessageId::new(format!("steer/{}", message.id.as_str()))?;

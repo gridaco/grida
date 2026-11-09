@@ -23,6 +23,7 @@ pub struct RunOptions {
     pub cwd: PathBuf,
     pub session: Option<SessionId>,
     pub prompt: Option<String>,
+    pub skills: Vec<crate::skills::SkillReference>,
     pub questions: bool,
     pub timeout: Duration,
 }
@@ -36,7 +37,10 @@ pub async fn run(
     let result = if options.timeout.is_zero() || options.timeout > MAX_RUN_TIMEOUT {
         Err(problem(ErrorKind::InvalidInput, "invalid_run_deadline"))
     } else {
-        run_once(host, options, signal).await
+        match host.clone().with_headless_guidance(&options.cwd) {
+            Ok(scoped) => run_once(&scoped, options, signal).await,
+            Err(error) => Err(error),
+        }
     };
     host.shutdown().await?;
     result
@@ -170,10 +174,17 @@ async fn admit_run(host: &Host, options: RunOptions) -> Result<AcceptedRun> {
     } else {
         host.new_session(options.cwd).await?
     };
+    let mut parts = vec![PromptPart::Text { text: prompt }];
+    parts.extend(
+        options
+            .skills
+            .into_iter()
+            .map(|reference| PromptPart::Skill { reference }),
+    );
     host.start_prompt(PromptRequest {
         id: change_id()?,
         session,
-        parts: vec![PromptPart::Text { text: prompt }],
+        parts,
         questions: options.questions,
         configuration_permission: crate::ConfigurationPermission::Disabled,
     })

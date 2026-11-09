@@ -391,5 +391,9 @@ fn prompt_block(part: PromptPart) -> ContentBlock {
             uri,
             mime_type,
         } => ContentBlock::ResourceLink(ResourceLink::new(name, uri).mime_type(mime_type)),
+        PromptPart::Skill { reference } => reference.uri().map_or_else(
+            || format!("Selected skill {}.", reference.name()).into(),
+            |uri| ContentBlock::ResourceLink(ResourceLink::new(reference.name(), uri)),
+        ),
     }
 }
