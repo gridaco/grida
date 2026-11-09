@@ -1,6 +1,7 @@
 //! Bounded conversational policy composed over the reusable execution runtime.
 
 pub mod configuration;
+pub mod usage;
 
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::history::HistoryRecord;
@@ -42,6 +43,8 @@ pub struct Account {
     pub stop_reason: Option<StopReason>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failure: Option<Error>,
+    #[serde(default)]
+    pub inference_usage: usage::InferenceUsage,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -547,6 +550,7 @@ impl Master {
                     unresolved,
                     stop_reason,
                     failure: None,
+                    inference_usage: usage::InferenceUsage::from_turn(&view.state)?,
                 },
             )?),
             evidence,

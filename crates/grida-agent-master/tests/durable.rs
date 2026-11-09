@@ -5,7 +5,7 @@ use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
     InferenceControl, InferenceOutcome, InferenceRequest, InferenceRun, InferenceStatus,
     InferenceUpdate, InputFormat, InputMeasurement, MeasurementKind, Modality, ModelCapabilities,
-    PreparedRequest, Provider, ProviderBinding, ProviderEvent,
+    PreparedRequest, Provider, ProviderBinding, ProviderEvent, UsageObservation,
 };
 use agent_kit_core::messages::{
     Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
@@ -104,6 +104,7 @@ fn input() -> Vec<Message> {
 #[derive(Clone, Copy)]
 enum Script {
     Answer,
+    UsageAnswer,
     ToolThenAnswer,
     ToolAndDeferred,
     Tools,
@@ -183,6 +184,28 @@ impl Provider for ScriptProvider {
                 _ => None,
             })
             .collect();
+        let usage = if matches!(self.script, Script::UsageAnswer) {
+            [
+                ("input_tokens", 1, 5),
+                ("input_tokens", 2, 7),
+                ("cached_input_tokens", 2, 2),
+                ("input_tokens", 1, 5),
+            ]
+            .into_iter()
+            .map(|(category, revision, quantity)| UsageObservation {
+                attempt: control.attempt.clone(),
+                source: "fixture".into(),
+                category: category.into(),
+                unit: "tokens".into(),
+                revision,
+                quantity,
+                certainty: MeasurementKind::Exact,
+                final_value: revision == 2,
+            })
+            .collect()
+        } else {
+            vec![]
+        };
         let outcome = InferenceOutcome {
             status: InferenceStatus::Completed,
             messages: vec![Message {
@@ -196,7 +219,7 @@ impl Provider for ScriptProvider {
                     fingerprint: None,
                 },
             }],
-            usage: vec![],
+            usage,
             failure: None,
             receipt: None,
         };
@@ -578,6 +601,8 @@ async fn answer_settles_with_a_persisted_account_and_observation_starts_no_work(
     assert_eq!(account.text, "Finished");
     assert_eq!(account.steps, 1);
     assert!(account.unresolved.is_empty());
+    assert!(account.inference_usage.observations.is_empty());
+    assert_eq!(account.inference_usage.unreported_attempts.len(), 1);
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
     assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 0);
     drop(store);
@@ -1451,4 +1476,41 @@ async fn unsupported_estimated_and_excessive_input_settle_without_provider_dispa
             TurnDisposition::Settled
         );
     }
+}
+
+#[tokio::test]
+async fn persisted_usage_keeps_latest_cumulative_values_and_separate_categories() {
+    let fixture = Fixture::new(Script::UsageAnswer);
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Be concise")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected settlement")
+    };
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+    drop(store);
+    let store = fixture.reopen().await;
+    let state = store.inspect_turn(session_id(), turn_id()).await.unwrap();
+    let account = read_account(state.outcome.unwrap().account.as_ref().unwrap()).unwrap();
+    assert!(account.inference_usage.unreported_attempts.is_empty());
+    let observations = account.inference_usage.observations;
+    assert_eq!(observations.len(), 2);
+    assert!(
+        observations
+            .iter()
+            .any(|observation| observation.category == "input_tokens"
+                && observation.quantity == 7
+                && observation.final_value)
+    );
+    assert!(
+        observations
+            .iter()
+            .any(|observation| observation.category == "cached_input_tokens"
+                && observation.quantity == 2)
+    );
 }

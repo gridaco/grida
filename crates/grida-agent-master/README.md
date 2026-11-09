@@ -27,3 +27,8 @@ A supplied hard input limit measures the complete prepared provider request.
 It requires an exact count or conservative bound before dispatch. An unavailable
 counter, estimate, or excessive input produces a persisted failed account.
 Automatic budgeting leaves that optional measurement to the selected policy.
+
+Inference usage is derived from recorded attempts. Newer cumulative observations
+replace older values for the same source, category, and unit. Missing reports
+remain explicit, and cached usage stays in its own category. Prices and spending
+authority are supplied by the host separately.
