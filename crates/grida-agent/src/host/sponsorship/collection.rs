@@ -1,6 +1,8 @@
 //! GRIDA-SEC-004 — Read the bounded result of the exact sponsored review.
 
-use super::{CHILD_INPUT, CHILD_TURN, delegation_definition, delegation_grant, related_changed};
+use super::{
+    CHILD_INPUT, CHILD_TURN, delegation_definition, delegation_grant, named, related_changed,
+};
 use crate::host::{
     INPUT_SCHEMA, PromptPart, StoredPrompt, decode_input, problem, session_configuration,
 };
@@ -18,7 +20,9 @@ use agent_kit_sessions::{SessionStore, TurnDisposition, TurnView};
 use agent_kit_store_sqlite::SqliteStore;
 use grida_agent_master::effort::COLLECT_REVIEW;
 use grida_agent_master::read_account;
-use grida_agent_master::subagents::{INFERENCE_STEPS_PER_ASSIGNMENT, sponsored_identity};
+use grida_agent_master::subagents::{
+    INFERENCE_STEPS_PER_ASSIGNMENT, Sponsorship, sponsored_identity,
+};
 use serde::Serialize;
 use serde_json::json;
 use std::sync::Arc;
@@ -65,6 +69,19 @@ impl CollectReview {
     }
 
     pub(super) async fn read(&self) -> Result<Option<TurnView>> {
+        if let Some(target) =
+            named::Target::load(&self.store, &self.parent.session, &self.parent.turn).await?
+        {
+            let Some(record) = target
+                .read(&self.store, &self.parent.session, &self.parent.turn)
+                .await?
+            else {
+                return Ok(None);
+            };
+            let turn = record.accepted.turn.ok_or_else(related_changed)?;
+            self.verify(record.stored, &record.sponsor).await?;
+            return Ok(Some(turn));
+        }
         let (view, accepted) = match self
             .store
             .inspect_with_input(self.child.clone(), ChangeId::new(CHILD_INPUT)?)
@@ -84,7 +101,6 @@ impl CollectReview {
                 sponsor.parent_turn == self.parent.turn && sponsor.admission.is_some()
             })
             .ok_or_else(related_changed)?;
-        let attempt = sponsor.attempt.clone().ok_or_else(related_changed)?;
         let accepted = accepted.ok_or_else(related_changed)?;
         let turn = accepted
             .turn
@@ -97,6 +113,12 @@ impl CollectReview {
             return Err(related_changed());
         }
         let stored: StoredPrompt = decode_input(&input)?;
+        self.verify(stored, sponsor).await?;
+        Ok(Some(turn))
+    }
+
+    async fn verify(&self, stored: StoredPrompt, sponsor: &Sponsorship) -> Result<()> {
+        let attempt = sponsor.attempt.clone().ok_or_else(related_changed)?;
         if stored.goal.is_some()
             || stored.effort.is_some()
             || stored.max_steps != Some(INFERENCE_STEPS_PER_ASSIGNMENT)
@@ -132,8 +154,7 @@ impl CollectReview {
                 }
                 Ok(())
             })
-            .await?;
-        Ok(Some(turn))
+            .await
     }
 
     async fn observe(&self, deadline: Option<Instant>) -> Result<ToolOutcome> {
@@ -152,7 +173,7 @@ impl CollectReview {
                 tokio::time::sleep_until(next.into()).await;
                 let read = self
                     .store
-                    .inspect_turn(self.child.clone(), turn.binding.turn.clone());
+                    .inspect_turn(turn.binding.session.clone(), turn.binding.turn.clone());
                 match tokio::time::timeout_at(deadline.into(), read).await {
                     Ok(result) => turn = result?,
                     Err(_) => break,
@@ -351,10 +372,13 @@ mod tests {
             Some(json!({"disposition": "not_started"}))
         );
 
-        let request = host
-            .sponsored_claim(source.clone(), tool.child.clone(), instructions)
+        let super::super::SponsoredClaim::Fresh(request) = host
+            .sponsored_claim(source.clone(), tool.child.clone(), None, instructions)
             .await
-            .unwrap();
+            .unwrap()
+        else {
+            panic!("expected fresh child claim")
+        };
         let ClaimOutcome::Acquired(child) = host.store.claim_from_operation(request).await.unwrap()
         else {
             panic!("expected the exact sponsored claim");

@@ -1431,7 +1431,10 @@ export class NativeChatController {
             error instanceof Error &&
             error.message.includes("goal_child_allowance_unavailable")
               ? "Increase the inference allowance to fund an Ultra review, or choose Standard."
-              : "Couldn't confirm the goal start. Your draft is still here.",
+              : error instanceof Error &&
+                  error.message.includes("goal_named_child_unavailable")
+                ? "Choose an available named subagent from this chat."
+                : "Couldn't confirm the goal start. Your draft is still here.",
         });
         await this.refresh(scope);
       }
@@ -3598,7 +3601,13 @@ function revisionChanged(error: unknown): boolean {
 
 function goalRequestProblem(
   request: NativeChatGoalRequest,
-  view: Pick<NativeChatView, "goalEffortAvailable" | "wakeupsAvailable">
+  view: Pick<
+    NativeChatView,
+    | "goalEffortAvailable"
+    | "wakeupsAvailable"
+    | "observation"
+    | "operatingRegime"
+  >
 ): string | null {
   if (request.allowWakeup && request.effort === "ultra")
     return "Choose Standard effort to allow a scheduled goal check-in.";
@@ -3606,6 +3615,13 @@ function goalRequestProblem(
     return "Scheduled goal check-ins are unavailable on this connection.";
   if (request.effort === "ultra" && !view.goalEffortAvailable)
     return "Ultra is unavailable for goals on this connection.";
+  if (
+    request.namedChildId &&
+    (request.effort !== "ultra" ||
+      view.operatingRegime !== "act" ||
+      !view.observation?.snapshot.goalNamedChildAvailable)
+  )
+    return "Choose Act and Ultra to use a named reviewer on a supported connection.";
   if (!request.objective.trim() || utf8.encode(request.objective).length > 8192)
     return "Enter a goal objective of at most 8 KiB.";
   if (

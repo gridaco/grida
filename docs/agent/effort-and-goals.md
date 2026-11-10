@@ -51,6 +51,12 @@ turn. If work finishes before the review can be accounted for, the goal keeps
 its held steps. Choose **Refresh held allowance** to account for any settled
 review. That control reads the recorded work and starts no new work.
 
+In **Act** with **Ultra**, supported connections let you choose an existing
+subagent under **Goal reviewer**. The Goal keeps that reviewer for eligible
+later turns. Each funded assignment shares the Goal’s review allowance and
+uses one assignment from the subagent’s own allowance. An unavailable
+reviewer leaves the review unassigned.
+
 Standard goals on supported connections can schedule a check-in during their
 first turn. [Schedule a follow-up](./scheduled-work.md)
 

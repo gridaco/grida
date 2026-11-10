@@ -157,6 +157,7 @@ export class NativeAgentProcess {
   private savedChatDeletionPreview = false;
   private goalCompletionReview = false;
   private goalFundedReview = false;
+  private goalNamedChild = false;
   private editorSurfaces = false;
   private editorSurfaceOpen = false;
   private editorSvgText = false;
@@ -252,6 +253,12 @@ export class NativeAgentProcess {
 
   get acceptsGoalEffort(): boolean {
     return this.connected && this.goalFundedReview;
+  }
+
+  get acceptsGoalNamedChild(): boolean {
+    return (
+      this.acceptsGoalEffort && this.acceptsSubagents && this.goalNamedChild
+    );
   }
 
   get acceptsSubagents(): boolean {
@@ -510,6 +517,7 @@ export class NativeAgentProcess {
                   ...SUBAGENT_CAPABILITIES,
                   [SESSION_EFFORT]: 1,
                   [NativeAgentGoals.fundedReviewCapability]: 1,
+                  [NativeAgentGoals.namedChildCapability]: 1,
                   [CHILD_STEERING]: 1,
                   [CHILD_MESSAGING]: 1,
                   [CHILD_QUEUE[0]]: 1,
@@ -591,6 +599,8 @@ export class NativeAgentProcess {
       processOwner.goalFundedReview =
         processOwner.agentEffort &&
         advertised?.[NativeAgentGoals.fundedReviewCapability] === 1;
+      processOwner.goalNamedChild =
+        advertised?.[NativeAgentGoals.namedChildCapability] === 1;
       processOwner.namedChildren =
         options.subagents === true &&
         Object.keys(SUBAGENT_CAPABILITIES).every(

@@ -67,6 +67,15 @@ pub struct OperationClaim {
     pub driver_state: DriverStateChange,
 }
 
+/// Claim one new input in an existing idle session from a live operation.
+#[derive(Clone, Debug, Serialize)]
+pub struct ExistingOperationClaim {
+    pub source: OperationClaimSource,
+    pub claim: ClaimRequest,
+    pub input: Submission,
+    pub driver_state: DriverStateChange,
+}
+
 const SCHEMA: &str = "
 CREATE TABLE sessions (
     id TEXT PRIMARY KEY,
@@ -591,15 +600,55 @@ impl SqliteStore {
         {
             return Err(error(ErrorKind::InvalidInput, "invalid_operation_claim"));
         }
+        let fingerprint = Fingerprint::of(&request)?;
+        self.claim_operation(
+            request.source,
+            Some(request.create),
+            request.claim,
+            request.input,
+            request.driver_state,
+            fingerprint,
+        )
+        .await
+    }
+
+    pub async fn claim_existing_from_operation(
+        &self,
+        request: ExistingOperationClaim,
+    ) -> Result<ClaimOutcome> {
+        if request.claim.session == request.source.binding.session
+            || !matches!(&request.claim.selection, TurnSelection::New { inputs, .. } if inputs == std::slice::from_ref(&request.input.id))
+        {
+            return Err(error(ErrorKind::InvalidInput, "invalid_operation_claim"));
+        }
+        let fingerprint = Fingerprint::of(&request)?;
+        self.claim_operation(
+            request.source,
+            None,
+            request.claim,
+            request.input,
+            request.driver_state,
+            fingerprint,
+        )
+        .await
+    }
+
+    async fn claim_operation(
+        &self,
+        source: OperationClaimSource,
+        create: Option<CreateSession>,
+        claim: ClaimRequest,
+        input: Submission,
+        driver_state: DriverStateChange,
+        fingerprint: Fingerprint,
+    ) -> Result<ClaimOutcome> {
         let inner = Arc::clone(&self.inner);
         let prepared = execute(Arc::clone(&inner), move |inner, connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
-            let fingerprint = Fingerprint::of(&request)?;
-            let source_key =
-                operation_claim_key(&request.source.binding.turn, &request.source.operation)?;
-            let source_session = &request.source.binding.session;
+            let source_key = operation_claim_key(&source.binding.turn, &source.operation)?;
+            let source_session = &source.binding.session;
             if let Some(receipt) = lookup_request::<OperationClaimRecord>(
                 &transaction,
                 source_session,
@@ -610,20 +659,17 @@ impl SqliteStore {
                 let state = load_turn(&transaction, &receipt.session, &receipt.turn)?;
                 return Ok(PreparedClaim::Existing(turn_view(inner, &state)?));
             }
-            let _source_owner = require_operation_owner(inner, &transaction, &request.source)?;
-            record_creation(
-                &transaction,
-                &request.create,
-                inner.catalog,
-                Fingerprint::of(&request.create)?,
-            )?;
-            let prepared = prepare_claim(
-                inner,
-                &transaction,
-                request.claim,
-                Some(request.driver_state),
-                Some(request.input),
-            )?;
+            let _source_owner = require_operation_owner(inner, &transaction, &source)?;
+            if let Some(create) = create {
+                record_creation(
+                    &transaction,
+                    &create,
+                    inner.catalog,
+                    Fingerprint::of(&create)?,
+                )?;
+            }
+            let prepared =
+                prepare_claim(inner, &transaction, claim, Some(driver_state), Some(input))?;
             let PreparedClaim::Acquired(claim) = &prepared else {
                 return Err(error(
                     ErrorKind::Conflict,

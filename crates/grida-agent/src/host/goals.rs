@@ -22,6 +22,19 @@ pub struct GoalRequest {
     pub automatic: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub user_review: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub named_child: Option<SessionId>,
+}
+
+impl GoalRequest {
+    fn start(&self, id: ChangeId) -> Result<Goal> {
+        let mut goal =
+            Goal::start_with_review(id, self.objective.clone(), self.allowance, self.user_review)?;
+        if let Some(child) = &self.named_child {
+            goal.select_named_child(child.clone())?;
+        }
+        Ok(goal)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,6 +84,8 @@ pub struct GoalView {
     pub automatic: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effort: Option<EffortPreset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub named_child_id: Option<SessionId>,
     pub progress: Option<String>,
     pub allowance: Allowance,
     pub spent: Usage,
@@ -109,6 +124,12 @@ impl Host {
         allow_wakeups: bool,
     ) -> Result<DurableSubmission> {
         let effort = request.effort.unwrap_or(EffortPreset::Standard);
+        if goal.named_child.is_some() && effort != EffortPreset::Ultra {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "goal_named_child_requires_ultra",
+            ));
+        }
         if allow_wakeups && effort == EffortPreset::Ultra {
             return Err(problem(
                 ErrorKind::Unsupported,
@@ -116,12 +137,7 @@ impl Host {
             ));
         }
         validate_prompt_parts(&request.parts)?;
-        Goal::start_with_review(
-            request.id.clone(),
-            goal.objective.clone(),
-            goal.allowance,
-            goal.user_review,
-        )?;
+        goal.start(request.id.clone())?;
         let _admission = self.configuration_admission.lock().await;
         if let Some(accepted) = self
             .store
@@ -161,10 +177,20 @@ impl Host {
         let view = self.store.inspect(request.session.clone()).await?;
         self.check_execution(&view)?;
         require_goal_start(&view)?;
+        if let Some(child) = &goal.named_child {
+            self.require_goal_named_child(&request.session, child)
+                .await?;
+        }
         self.check_ready_capacity(&request.session).await?;
         let mut request = request;
         request.effort = Some(effort);
         let mut policy = self.submission_policy(&request, allow_wakeups)?;
+        if goal.named_child.is_some() && !policy.operating_regime.is_act() {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "goal_named_child_requires_act",
+            ));
+        }
         policy.allow_host_tools = false;
         policy.desktop_image_generation = None;
         policy.allow_image_placement = false;
@@ -195,6 +221,34 @@ impl Host {
         })
     }
 
+    async fn require_goal_named_child(&self, parent: &SessionId, child: &SessionId) -> Result<()> {
+        let unavailable = || problem(ErrorKind::Unavailable, "goal_named_child_unavailable");
+        if !self.subagents_available() {
+            return Err(unavailable());
+        }
+        let child_view = self
+            .store
+            .inspect(child.clone())
+            .await
+            .map_err(|_| unavailable())?;
+        let profile = session_configuration(&child_view)
+            .map_err(|_| unavailable())?
+            .subagent
+            .filter(|profile| profile.parent() == parent && profile.sponsorship().is_none())
+            .ok_or_else(unavailable)?;
+        self.check_execution(&child_view)
+            .map_err(|_| unavailable())?;
+        let allocation = profile
+            .allocation(&child_view.driver_state)
+            .map_err(|_| unavailable())?;
+        if allocation.reserved >= allocation.work_turns {
+            return Err(unavailable());
+        }
+        profile
+            .require_authority(&self.execution()?.authority.inference.authority)
+            .map_err(|_| unavailable())
+    }
+
     /// Read the committed goal without claiming a turn or scheduling work.
     pub async fn inspect_goal(&self, session: SessionId) -> Result<GoalInspection> {
         let view = self.store.inspect(session.clone()).await?;
@@ -208,6 +262,7 @@ impl Host {
                 paused: goal.paused(),
                 automatic,
                 effort: captured.effort.as_ref().map(EffortPolicy::preset),
+                named_child_id: goal.named_child().cloned(),
                 progress: goal.progress().map(str::to_owned),
                 allowance: goal.allowance(),
                 spent: goal.spent(),
@@ -633,12 +688,7 @@ pub(super) fn claim_update(
         GoalInput::Start(request) => {
             // Later accepted inputs remain behind the explicit goal start.
             require_no_active_goal(view)?;
-            Goal::start_with_review(
-                input.clone(),
-                request.objective.clone(),
-                request.allowance,
-                request.user_review,
-            )?
+            request.start(input.clone())?
         }
         GoalInput::Continue(continuation) => {
             let value = view

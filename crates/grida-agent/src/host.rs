@@ -80,7 +80,7 @@ use agent_kit_sessions::{
     InputDisposition, RecoveryRequest, SessionControl, SessionRevision, SessionStore, SessionView,
     Submission, TurnDisposition, TurnSelection, TurnView,
 };
-use agent_kit_store_sqlite::{OperationClaim, OperationPairReceipt, SqliteStore};
+use agent_kit_store_sqlite::{OperationPairReceipt, SqliteStore};
 use grida_agent_master::configuration::SettingChange;
 use grida_agent_master::effort::Policy as EffortPolicy;
 use grida_agent_master::hooks::CompletionChecks;
@@ -404,7 +404,7 @@ enum Launch {
         policy: SubmissionPolicy,
     },
     Queued(Option<Acceptance>),
-    Sponsored(Box<OperationClaim>),
+    Sponsored(Box<sponsorship::SponsoredClaim>),
     Compact(ChangeId),
     RecoverCompaction(RecoveryRequest),
     Resume(ClaimRequest),
@@ -1323,7 +1323,7 @@ impl Host {
                     }
                     (None, _, _) => match (&request.selection, subagent.as_ref()) {
                         (TurnSelection::ResumePaused { .. }, Some(profile))
-                            if profile.sponsorship().is_some() =>
+                            if profile.funded_turn(&view.driver_state, turn)? =>
                         {
                             self.claim_sponsored_resume(request, &view, profile).await?
                         }
@@ -2002,7 +2002,9 @@ impl Host {
                     })?;
                     profile.require_assignment(assignment, !stored.operating_regime.is_act())?;
                     if !cancellation_only
-                        && !(if profile.sponsorship().is_some() {
+                        && !(if profile.sponsorship().is_some()
+                            || assignment.named_sponsorship.is_some()
+                        {
                             self.sponsorship_available()
                         } else {
                             self.subagents_available()

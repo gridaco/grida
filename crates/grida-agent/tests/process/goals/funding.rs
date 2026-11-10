@@ -30,7 +30,10 @@ async fn open(state: &Path, endpoint: &str) -> PrivateStdio {
         "goal/control",
         "goal/recover",
         "goal/funded-review",
+        "goal/named-child",
         "session/effort",
+        "subagent/create",
+        "subagent/assign",
         "subagent/inspect",
     ] {
         request["clientCapabilities"]["_meta"][format!("co.grida/{capability}")] = 1.into();
@@ -48,11 +51,30 @@ async fn open(state: &Path, endpoint: &str) -> PrivateStdio {
 }
 
 async fn accepted(client: &mut PrivateStdio, workspace: &Path, inference_steps: u32) -> String {
+    accepted_with_reviewer(client, workspace, inference_steps, false)
+        .await
+        .0
+}
+
+async fn accepted_with_reviewer(
+    client: &mut PrivateStdio,
+    workspace: &Path,
+    inference_steps: u32,
+    named: bool,
+) -> (String, Option<String>) {
     let created = client
         .request("session/new", json!({"cwd":workspace,"mcpServers":[]}))
         .await;
     let session = created["result"]["sessionId"].as_str().unwrap().to_owned();
-    let request = json!({
+    let child = if named {
+        let created = read(client, "_co.grida/subagent/create", json!({
+            "parentSessionId":session,"requestId":"create-goal-reviewer","name":"Researcher","workTurns":2
+        })).await;
+        Some(created["childId"].as_str().unwrap().to_owned())
+    } else {
+        None
+    };
+    let mut request = json!({
         "sessionId":session,"inputId":"funded-goal","effort":"ultra",
         "prompt":[{"type":"text","text":"Check the export."}],
         "goal":{
@@ -60,6 +82,30 @@ async fn accepted(client: &mut PrivateStdio, workspace: &Path, inference_steps: 
             "allowance":{"work_turns":3,"inference_steps":inference_steps},"automatic":true
         }
     });
+    if let Some(child) = &child {
+        request["goal"]["named_child"] = child.clone().into();
+        let mut standard = request.clone();
+        standard["effort"] = "standard".into();
+        let denied = client.request("_co.grida/goal/start", standard).await;
+        assert_eq!(
+            denied["error"]["data"], "goal_named_child_requires_ultra",
+            "{denied}"
+        );
+        let mut plan = request.clone();
+        plan["operatingRegime"] = "plan".into();
+        let denied = client.request("_co.grida/goal/start", plan).await;
+        assert_eq!(
+            denied["error"]["data"], "goal_named_child_requires_act",
+            "{denied}"
+        );
+        let mut foreign = request.clone();
+        foreign["goal"]["named_child"] = "unrelated-child".into();
+        let denied = client.request("_co.grida/goal/start", foreign).await;
+        assert_eq!(
+            denied["error"]["data"], "goal_named_child_unavailable",
+            "{denied}"
+        );
+    }
     let mut invalid = request.clone();
     invalid["goal"]["allowance"]["inference_steps"] = 2.into();
     let denied = client.request("_co.grida/goal/start", invalid).await;
@@ -72,10 +118,17 @@ async fn accepted(client: &mut PrivateStdio, workspace: &Path, inference_steps: 
         .await;
     assert_eq!(submitted["result"]["inputId"], "funded-goal", "{submitted}");
     let mut changed = request;
-    changed["effort"] = "standard".into();
+    if named {
+        changed["goal"]
+            .as_object_mut()
+            .unwrap()
+            .remove("named_child");
+    } else {
+        changed["effort"] = "standard".into();
+    }
     let denied = client.request("_co.grida/goal/start", changed).await;
     assert_eq!(denied["error"]["data"], "input_identity_reused", "{denied}");
-    session
+    (session, child)
 }
 
 fn offers(request: &Value, tool: &str) -> bool {
@@ -173,6 +226,15 @@ async fn goal_ultra_charges_the_actual_review_and_limits_later_goal_work() {
 
 #[tokio::test]
 async fn late_review_is_held_then_charged_once_across_restart_without_stale_progress() {
+    late_review(false).await;
+}
+
+#[tokio::test]
+async fn named_goal_review_reconciles_the_exact_assignment_then_reuses_the_child() {
+    late_review(true).await;
+}
+
+async fn late_review(named: bool) {
     let root = TempDir::new().unwrap();
     let workspace = TempDir::new().unwrap();
     let state = root.path().join("state");
@@ -185,24 +247,50 @@ async fn late_review_is_held_then_charged_once_across_restart_without_stale_prog
         let child_gate = child_gate.clone();
         Reply::Choose(Box::new(move |request| {
             if offers(request, "collect_review") {
-                Reply::Release(
-                    "The Goal work finished before review.",
-                    parent_gate.lock().unwrap().take().unwrap(),
-                )
+                if named {
+                    Reply::Tool(
+                        "delegate_review",
+                        r#"{"instructions":"Try another review."}"#,
+                    )
+                } else {
+                    Reply::Release(
+                        "The Goal work finished before review.",
+                        parent_gate.lock().unwrap().take().unwrap(),
+                    )
+                }
             } else {
                 Reply::Release(FINDING, child_gate.lock().unwrap().take().unwrap())
             }
         }))
     };
-    let mut endpoint = Endpoint::start(vec![
+    let mut replies = vec![
         Reply::Tool("delegate_review", DELEGATE),
         concurrent(),
         concurrent(),
-    ])
-    .await;
+    ];
+    if named {
+        replies.push(Reply::Choose(Box::new(move |request| {
+            let messages = request["messages"].as_array().unwrap();
+            let rejected = messages.iter().rfind(|row| row["role"] == "tool").unwrap();
+            let result: Value =
+                serde_json::from_str(rejected["content"].as_str().unwrap()).unwrap();
+            assert_eq!(result["status"], "failed");
+            Reply::Release(
+                "The Goal work finished before review.",
+                parent_gate.lock().unwrap().take().unwrap(),
+            )
+        })));
+        replies.push(Reply::Choose(Box::new(|request| {
+            assert!(!offers(request, "goal_report"));
+            assert!(request["messages"].to_string().contains(FINDING));
+            Reply::Finished("Finished a later ordinary assignment.")
+        })));
+    }
+    let mut endpoint = Endpoint::start(replies).await;
     let mut client = open(&state, &endpoint.url).await;
-    let session = accepted(&mut client, workspace.path(), 7).await;
-    for _ in 0..3 {
+    let (session, chosen) = accepted_with_reviewer(&mut client, workspace.path(), 7, named).await;
+    let spent = if named { 4 } else { 3 };
+    for _ in 0..spent {
         endpoint.request().await;
     }
     let select = json!({"sessionId":session});
@@ -211,11 +299,17 @@ async fn late_review_is_held_then_charged_once_across_restart_without_stale_prog
     assert_eq!(running["goal"]["effort"], "ultra");
     assert_eq!(reservation["child_inference_steps"], 2);
     assert_eq!(reservation["inference_steps"], 7);
-    let child = sponsored_identity(
-        &SessionId::new(&session).unwrap(),
-        &agent_kit_core::TurnId::new(reservation["turn"].as_str().unwrap()).unwrap(),
-    )
-    .unwrap();
+    let child = if let Some(chosen) = &chosen {
+        assert_eq!(running["goal"]["namedChildId"], *chosen);
+        assert_eq!(reservation["named_child"], *chosen);
+        SessionId::new(chosen).unwrap()
+    } else {
+        sponsored_identity(
+            &SessionId::new(&session).unwrap(),
+            &agent_kit_core::TurnId::new(reservation["turn"].as_str().unwrap()).unwrap(),
+        )
+        .unwrap()
+    };
     let control = |view: &Value, request: &str, action: Value| {
         json!({
             "sessionId":session,"requestId":request,"expectedSessionRevision":view["revision"],
@@ -240,7 +334,7 @@ async fn late_review_is_held_then_charged_once_across_restart_without_stale_prog
         |view| view["goal"]["status"]["reason"] == "uncertain_work",
     )
     .await;
-    assert_eq!(held["goal"]["reservation"]["uncertain_steps"], 3);
+    assert_eq!(held["goal"]["reservation"]["uncertain_steps"], spent);
     assert_eq!(held["goal"]["spent"]["inference_steps"], 0);
     assert_eq!(held["goal"]["remaining"]["inference_steps"], 0);
     let reconcile = json!({"action":"reconcile_review","turn":reservation["turn"]});
@@ -299,9 +393,9 @@ async fn late_review_is_held_then_charged_once_across_restart_without_stale_prog
     let accounted = read(&mut restarted, "_co.grida/goal/inspect", select.clone()).await;
     assert_eq!(
         accounted["goal"]["spent"],
-        json!({"work_turns":1,"inference_steps":3})
+        json!({"work_turns":1,"inference_steps":spent})
     );
-    assert_eq!(accounted["goal"]["remaining"]["inference_steps"], 4);
+    assert_eq!(accounted["goal"]["remaining"]["inference_steps"], 7 - spent);
     assert_eq!(
         accounted["goal"]["objective"]["description"],
         "An updated objective"
@@ -310,9 +404,30 @@ async fn late_review_is_held_then_charged_once_across_restart_without_stale_prog
     assert!(accounted["goal"]["reservation"].is_null());
     read(&mut restarted, "_co.grida/goal/recover", select.clone()).await;
     assert_eq!(
-        read(&mut restarted, "_co.grida/goal/inspect", select).await,
+        read(&mut restarted, "_co.grida/goal/inspect", select.clone()).await,
         accounted
     );
+    if let Some(chosen) = chosen {
+        assert_eq!(accounted["goal"]["namedChildId"], chosen);
+        let manual = json!({
+            "parentSessionId":session,"childId":chosen,"parentTurnId":reservation["turn"],
+            "inputId":"later-child-assignment","instructions":"Check the next export."
+        });
+        read(&mut restarted, "_co.grida/subagent/assign", manual).await;
+        endpoint.request().await;
+        let reused = wait_for(
+            &mut restarted,
+            "_co.grida/subagent/inspect",
+            json!({"parentSessionId":session,"childId":chosen,"inputId":"later-child-assignment"}),
+            |view| view["assignment"]["turn"]["status"] == "succeeded",
+        )
+        .await;
+        assert_eq!(reused["allocation"]["reserved"], 2);
+        assert_eq!(
+            read(&mut restarted, "_co.grida/goal/inspect", select).await,
+            accounted
+        );
+    }
     restarted.close().await;
     assert!(endpoint.requests.try_recv().is_err());
     endpoint.done().await;
@@ -320,16 +435,26 @@ async fn late_review_is_held_then_charged_once_across_restart_without_stale_prog
 
 #[tokio::test]
 async fn stopping_the_paused_funded_goal_keeps_both_uncertain_attempts_held() {
+    stop_paused_funded_goal(false).await;
+}
+
+#[tokio::test]
+async fn pausing_and_stopping_named_goal_work_controls_the_exact_assignment() {
+    stop_paused_funded_goal(true).await;
+}
+
+async fn stop_paused_funded_goal(named: bool) {
     let root = TempDir::new().unwrap();
     let workspace = TempDir::new().unwrap();
+    let state = root.path().join("state");
     let mut endpoint = Endpoint::start(vec![
         Reply::Tool("delegate_review", DELEGATE),
         Reply::Hold("Partial parent or review work."),
         Reply::Hold("Partial review or parent work."),
     ])
     .await;
-    let mut client = open(&root.path().join("state"), &endpoint.url).await;
-    let session = accepted(&mut client, workspace.path(), 7).await;
+    let mut client = open(&state, &endpoint.url).await;
+    let (session, chosen) = accepted_with_reviewer(&mut client, workspace.path(), 7, named).await;
     for _ in 0..3 {
         endpoint.request().await;
     }
@@ -337,7 +462,10 @@ async fn stopping_the_paused_funded_goal_keeps_both_uncertain_attempts_held() {
     let snapshot = "_co.grida/session/snapshot";
     let running = read(&mut client, snapshot, select.clone()).await;
     let turn = agent_kit_core::TurnId::new(running["current"]["turnId"].as_str().unwrap()).unwrap();
-    let child = sponsored_identity(&SessionId::new(&session).unwrap(), &turn).unwrap();
+    let child = match chosen {
+        Some(child) => SessionId::new(child).unwrap(),
+        None => sponsored_identity(&SessionId::new(&session).unwrap(), &turn).unwrap(),
+    };
     let inspect_child = "_co.grida/subagent/inspect";
     let child_select = json!({"parentSessionId":session,"childId":child});
     read(
@@ -346,7 +474,7 @@ async fn stopping_the_paused_funded_goal_keeps_both_uncertain_attempts_held() {
         task_basis(&running, &session, "pause-task"),
     )
     .await;
-    let paused = wait_for(&mut client, snapshot, select.clone(), |view| {
+    let mut paused = wait_for(&mut client, snapshot, select.clone(), |view| {
         view["current"]["disposition"] == "suspended" && view["current"]["paused"] == true
     })
     .await;
@@ -354,6 +482,21 @@ async fn stopping_the_paused_funded_goal_keeps_both_uncertain_attempts_held() {
         view["current"]["disposition"] == "suspended" && view["current"]["paused"] == true
     })
     .await;
+    if named {
+        client.close().await;
+        client = open(&state, &endpoint.url).await;
+        read(
+            &mut client,
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+        paused = read(&mut client, snapshot, select.clone()).await;
+        assert_eq!(paused["current"]["paused"], true);
+        let child = read(&mut client, inspect_child, child_select.clone()).await;
+        assert_eq!(child["current"]["paused"], true);
+        assert!(endpoint.requests.try_recv().is_err());
+    }
     let stop = task_basis(&paused, &session, "stop-task");
     let stopped = read(&mut client, "_co.grida/session/stop", stop.clone()).await;
     wait_for(&mut client, snapshot, select.clone(), |view| {

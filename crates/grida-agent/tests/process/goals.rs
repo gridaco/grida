@@ -39,6 +39,7 @@ fn goal() -> GoalRequest {
         },
         automatic: false,
         user_review: false,
+        named_child: None,
     }
 }
 

@@ -127,6 +127,7 @@ fn capability_keys(
         .chain(subagents::capabilities(reviewer && subagents))
         .chain((reviewer && effort).then_some(EFFORT))
         .chain((reviewer && effort).then_some(goals::FUNDED_REVIEW))
+        .chain((reviewer && effort && subagents).then_some(goals::NAMED_CHILD))
         .chain((reviewer && files).then_some(FILE_INTAKE))
         .chain(reviewer.then_some(super::projection::TRANSCRIPT_WINDOW))
 }

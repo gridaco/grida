@@ -1039,6 +1039,9 @@ export class NativeAgentChat {
       ...(this.process.acceptsSubagents && {
         subagentsAvailable: true as const,
       }),
+      ...(this.process.acceptsGoalNamedChild && {
+        goalNamedChildAvailable: true as const,
+      }),
       ...(current?.disposition === "running" &&
         !current.paused &&
         !current.cancelled &&
@@ -1323,7 +1326,11 @@ export class NativeAgentChat {
       sessionId,
       identity(inputId),
       request,
-      { fundedReview: this.acceptsGoalEffort, wakeups: this.acceptsWakeups }
+      {
+        fundedReview: this.acceptsGoalEffort,
+        namedChild: this.process.acceptsGoalNamedChild,
+        wakeups: this.acceptsWakeups,
+      }
     );
     return acceptance(accepted, sessionId, inputId);
   }

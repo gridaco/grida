@@ -245,9 +245,7 @@ impl Host {
                     editor_presentation: false,
                     editor_svg_target: None,
                     operating_regime: OperatingRegime::Act,
-                    subagent: Some(Assignment {
-                        parent_turn: parent_turn.clone(),
-                    }),
+                    subagent: Some(Assignment::new(parent_turn.clone())),
                     effort: None,
                 },
             )

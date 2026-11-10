@@ -34,6 +34,7 @@ export type NativeGoalInspection = Readonly<{
 export class NativeAgentGoals {
   static readonly completionCapability = "co.grida/goal/confirm-completion";
   static readonly fundedReviewCapability = "co.grida/goal/funded-review";
+  static readonly namedChildCapability = "co.grida/goal/named-child";
   private readonly issued = new WeakSet<NativeGoalInspection>();
 
   constructor(
@@ -51,9 +52,16 @@ export class NativeAgentGoals {
         ? undefined
         : member(input.effort, ["standard", "ultra"] as const);
     const allowWakeup = input.allowWakeup === true;
+    const namedChildId =
+      input.namedChildId === undefined
+        ? undefined
+        : identity(input.namedChildId);
     if (
       Object.keys(input).length !==
-        4 + Number(effort !== undefined) + Number(allowWakeup) ||
+        4 +
+          Number(effort !== undefined) +
+          Number(allowWakeup) +
+          Number(namedChildId !== undefined) ||
       Object.keys(allowance).length !== 2
     )
       throw invalid();
@@ -66,6 +74,7 @@ export class NativeAgentGoals {
       },
       automatic: flag(input.automatic),
       ...(effort && { effort }),
+      ...(namedChildId && { namedChildId }),
       ...(allowWakeup && { allowWakeup: true }),
     };
   }
@@ -73,11 +82,15 @@ export class NativeAgentGoals {
   static readStoredRequest(value: unknown): NativeChatGoalRequest {
     const row = object(value);
     const objective = object(row.objective);
+    const namedChildId = row.namedChildId ?? row.named_child;
     return Object.freeze({
       objective: text(objective.description, OBJECTIVE_LIMIT),
       criteria: Object.freeze(criteria(objective.criteria)),
       allowance: usage(row.allowance, 1),
       automatic: flag(row.automatic),
+      ...(namedChildId === undefined
+        ? {}
+        : { namedChildId: identity(namedChildId) }),
       ...(row.effort === undefined
         ? {}
         : { effort: member(row.effort, ["ultra"] as const) }),
@@ -88,20 +101,34 @@ export class NativeAgentGoals {
     sessionId: string,
     inputId: string,
     request: unknown,
-    capabilities: { fundedReview: boolean; wakeups: boolean }
+    capabilities: {
+      fundedReview: boolean;
+      namedChild: boolean;
+      wakeups: boolean;
+    }
   ): Promise<unknown> {
-    const { objective, criteria, allowance, automatic, effort, allowWakeup } =
-      NativeAgentGoals.readRequest(request);
+    const {
+      objective,
+      criteria,
+      allowance,
+      automatic,
+      effort,
+      allowWakeup,
+      namedChildId,
+    } = NativeAgentGoals.readRequest(request);
     if (allowWakeup && (!capabilities.wakeups || effort === "ultra"))
       throw new Error("native_chat_goal_wakeup_unavailable");
     if (effort === "ultra" && !capabilities.fundedReview)
       throw new Error("native_chat_goal_effort_unavailable");
+    if (namedChildId && (effort !== "ultra" || !capabilities.namedChild))
+      throw new Error("native_chat_goal_named_child_unavailable");
     return this.request("_co.grida/goal/start", {
       sessionId,
       inputId,
       prompt: [{ type: "text", text: objective }],
       ...(effort === "ultra" && { effort }),
-      ...(allowWakeup && { operatingRegime: "act", allowWakeups: true }),
+      ...((allowWakeup || namedChildId) && { operatingRegime: "act" }),
+      ...(allowWakeup && { allowWakeups: true }),
       goal: {
         objective: { description: objective, criteria },
         allowance: {
@@ -109,6 +136,7 @@ export class NativeAgentGoals {
           inference_steps: allowance.inferenceSteps,
         },
         automatic,
+        ...(namedChildId && { named_child: namedChildId }),
       },
     });
   }

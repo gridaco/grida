@@ -28,6 +28,8 @@ pub enum OperationRelatedControl {
     /// attests only to that identity's absence. The caller supplies the same
     /// deterministic identity when claiming related work.
     Absent { session: SessionId },
+    /// An existing destination has not claimed the exact proposed turn.
+    Unclaimed { session: SessionId, turn: TurnId },
     /// Apply a control to the exact turn named by the source operation's claim.
     Apply {
         operation: OperationId,
@@ -44,7 +46,9 @@ pub enum OperationRelatedControl {
 impl OperationRelatedControl {
     pub(super) fn require_distinct(&self, source: &SessionId) -> Result<()> {
         let destination = match self {
-            Self::Absent { session } | Self::Settled { session, .. } => session,
+            Self::Absent { session }
+            | Self::Unclaimed { session, .. }
+            | Self::Settled { session, .. } => session,
             Self::Apply { request, .. } => {
                 control_turn(&request.action)?;
                 &request.session
@@ -166,6 +170,22 @@ pub(super) fn apply_related_control(
     match related {
         OperationRelatedControl::Absent { session } => {
             require_absent(transaction, session)?;
+            Ok(None)
+        }
+        OperationRelatedControl::Unclaimed { session, turn } => {
+            let exists: bool = transaction
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM turns WHERE session=?1 AND id=?2)",
+                    params![session.as_str(), turn.as_str()],
+                    |row| row.get(0),
+                )
+                .map_err(database_error)?;
+            if exists {
+                return Err(error(
+                    ErrorKind::Conflict,
+                    "operation_pair_destination_exists",
+                ));
+            }
             Ok(None)
         }
         OperationRelatedControl::Apply { operation, request } => {

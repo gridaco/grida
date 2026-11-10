@@ -12,6 +12,7 @@ const CONTROL: &str = "co.grida/goal/control";
 const RECOVER: &str = "co.grida/goal/recover";
 const CONFIRM_COMPLETION: &str = "co.grida/goal/confirm-completion";
 pub(super) const FUNDED_REVIEW: &str = "co.grida/goal/funded-review";
+pub(super) const NAMED_CHILD: &str = "co.grida/goal/named-child";
 pub(super) const CAPABILITIES: [&str; 5] = [START, INSPECT, CONTROL, RECOVER, CONFIRM_COMPLETION];
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -93,6 +94,9 @@ pub(super) fn handlers(
                     }
                     let parts = prompt_parts(request.prompt, image_intake, false)?;
                     let mut goal = request.goal;
+                    if goal.named_child.is_some() {
+                        require(&start.1, NAMED_CHILD, None)?;
+                    }
                     let review = require(&start.1, CONFIRM_COMPLETION, None).is_ok();
                     if goal.user_review && !review {
                         return Err(Error::method_not_found());
@@ -140,6 +144,14 @@ pub(super) fn handlers(
                         && let Some(goal) = result.goal.as_mut()
                     {
                         goal.review = None;
+                    }
+                    if require(&inspect.1, NAMED_CHILD, None).is_err()
+                        && let Some(goal) = result.goal.as_mut()
+                    {
+                        goal.named_child_id = None;
+                        if let Some(reservation) = goal.reservation.as_mut() {
+                            reservation.named_child = None;
+                        }
                     }
                     Ok(Inspection(result))
                 }

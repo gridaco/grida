@@ -20,6 +20,40 @@ const REQUEST: NativeChatGoalRequest = {
   automatic: false,
 };
 
+it("binds a named reviewer only to a negotiated Ultra Goal start", async () => {
+  const request =
+    vi.fn<(method: string, params: unknown) => Promise<unknown>>();
+  const goals = new NativeAgentGoals(request);
+  const named = { ...REQUEST, effort: "ultra", namedChildId: "named-reviewer" };
+  const capabilities = { fundedReview: true, namedChild: true, wakeups: true };
+  expect(() =>
+    goals.start("session", "input", named, {
+      ...capabilities,
+      namedChild: false,
+    })
+  ).toThrow("native_chat_goal_named_child_unavailable");
+  expect(() =>
+    goals.start(
+      "session",
+      "input",
+      { ...named, effort: "standard" },
+      capabilities
+    )
+  ).toThrow("native_chat_goal_named_child_unavailable");
+  expect(request).not.toHaveBeenCalled();
+  await goals.start("session", "input", named, capabilities);
+  expect(request).toHaveBeenCalledExactlyOnceWith(
+    "_co.grida/goal/start",
+    expect.objectContaining({
+      sessionId: "session",
+      inputId: "input",
+      effort: "ultra",
+      operatingRegime: "act",
+      goal: expect.objectContaining({ named_child: "named-reviewer" }),
+    })
+  );
+});
+
 it("sends confirmation only for the exact negotiated goal review", async () => {
   const basis = { goal: "goal-id", revision: 2 };
   const pending = {

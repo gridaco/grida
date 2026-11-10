@@ -2,6 +2,7 @@
 
 mod collection;
 mod funding;
+mod named;
 
 pub(super) use funding::GoalChildWork;
 
@@ -17,12 +18,12 @@ use agent_kit_core::turn::{OperationInput, TurnBinding};
 use agent_kit_core::{GrantId, ToolId};
 use agent_kit_runtime::TurnOperations;
 use agent_kit_store_sqlite::{
-    OperationClaimSource, OperationPairControl, OperationPairReceipt, OperationRelatedControl,
-    ResumeCompanion,
+    ExistingOperationClaim, OperationClaim, OperationClaimSource, OperationPairControl,
+    OperationPairReceipt, OperationRelatedControl, ResumeCompanion,
 };
 use grida_agent_master::effort::COLLECT_REVIEW;
 use grida_agent_master::subagents::{
-    self, Assignment, PauseCause, Profile, Sponsorship, sponsored_identity,
+    self, Assignment, NamedSponsorship, PauseCause, Profile, Sponsorship, sponsored_identity,
 };
 use serde_json::json;
 use std::num::NonZeroU32;
@@ -30,6 +31,14 @@ use std::num::NonZeroU32;
 const DELEGATE: &str = "delegate_review";
 const CHILD_INPUT: &str = "sponsored-assignment";
 const CHILD_TURN: &str = "sponsored-turn";
+
+pub(super) enum SponsoredClaim {
+    Fresh(OperationClaim),
+    Named {
+        request: ExistingOperationClaim,
+        configuration: Envelope,
+    },
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct SponsoredWake {
@@ -65,9 +74,10 @@ impl SponsoredWake {
         }
         let profile = session_configuration(view)?
             .subagent
-            .filter(|profile| profile.sponsorship().is_some())
             .ok_or_else(related_changed)?;
-        if profile.sponsored_pause(&view.driver_state)?.effective() {
+        if !profile.funded_turn(&view.driver_state, &turn.binding.turn)?
+            || profile.sponsored_pause(&view.driver_state)?.effective()
+        {
             return Ok(None);
         }
         // A message may advance the session after the related control. The
@@ -247,12 +257,14 @@ impl Tool for DelegationTool {
         Box::pin(async move {
             let result = async {
                 let source = self.source(&invocation, &context)?;
-                let slot = sponsored_identity(&source.binding.session, &source.binding.turn)?;
+                let target = self.access.host.named_target(&source.binding).await?;
+                let slot = child_slot(&source.binding, target.as_ref())?;
                 self.access
                     .host
-                    .start_sponsored_child(
+                    .start_sponsored_at(
                         source,
                         assignment_text(invocation.arguments())?.to_owned(),
+                        target,
                     )
                     .await?;
                 Ok::<_, Error>(slot)
@@ -275,7 +287,8 @@ impl Tool for DelegationTool {
             let result = async {
                 let source = self.source(&recovery.invocation, &context)?;
                 let instructions = assignment_text(recovery.invocation.arguments())?;
-                let slot = sponsored_identity(&source.binding.session, &source.binding.turn)?;
+                let target = self.access.host.named_target(&source.binding).await?;
+                let slot = child_slot(&source.binding, target.as_ref())?;
                 self.access
                     .host
                     .verify_delegation(&source, instructions)
@@ -283,7 +296,7 @@ impl Tool for DelegationTool {
                 let work = self
                     .access
                     .host
-                    .sponsored_work(&source, &slot, instructions, true)
+                    .sponsored_work(&source, &slot, target.as_ref(), instructions, true)
                     .await?;
                 Ok::<_, Error>(work.map(|_| slot))
             }
@@ -294,6 +307,13 @@ impl Tool for DelegationTool {
                 Err(_) => ToolOutcome::uncertain(),
             }
         })
+    }
+}
+
+fn child_slot(parent: &TurnBinding, target: Option<&named::Target>) -> Result<SessionId> {
+    match target {
+        Some(target) => Ok(target.child.clone()),
+        None => sponsored_identity(&parent.session, &parent.turn),
     }
 }
 
@@ -373,22 +393,39 @@ impl Host {
         source: OperationClaimSource,
         instructions: String,
     ) -> Result<SubagentWork> {
+        let target = self.named_target(&source.binding).await?;
+        self.start_sponsored_at(source, instructions, target).await
+    }
+
+    async fn named_target(&self, binding: &TurnBinding) -> Result<Option<named::Target>> {
+        named::Target::load(&self.store, &binding.session, &binding.turn).await
+    }
+
+    async fn start_sponsored_at(
+        &self,
+        source: OperationClaimSource,
+        instructions: String,
+        target: Option<named::Target>,
+    ) -> Result<SubagentWork> {
         if !self.sponsorship_available() {
             return Err(problem(ErrorKind::Unsupported, "subagents_unavailable"));
         }
         subagents::validate_assignment(&instructions)?;
         self.verify_delegation(&source, &instructions).await?;
-        let slot = sponsored_identity(&source.binding.session, &source.binding.turn)?;
+        let slot = child_slot(&source.binding, target.as_ref())?;
         if let Some(work) = self
-            .sponsored_work(&source, &slot, &instructions, false)
+            .sponsored_work(&source, &slot, target.as_ref(), &instructions, false)
             .await?
         {
             return Ok(work);
         }
         let request = self
-            .sponsored_claim(source.clone(), slot.clone(), &instructions)
+            .sponsored_claim(source.clone(), slot.clone(), target.as_ref(), &instructions)
             .await?;
-        let turn = TurnId::new(CHILD_TURN)?;
+        let turn = target
+            .as_ref()
+            .map(|target| Ok(target.turn.clone()))
+            .unwrap_or_else(|| TurnId::new(CHILD_TURN))?;
         let ticket = {
             let mut work = self.work.lock().await;
             self.register(
@@ -407,7 +444,7 @@ impl Host {
             Err(error) => Err(error),
         };
         if let Some(work) = self
-            .sponsored_work(&source, &slot, &instructions, false)
+            .sponsored_work(&source, &slot, target.as_ref(), &instructions, false)
             .await?
         {
             return Ok(work);
@@ -459,31 +496,43 @@ impl Host {
         &self,
         source: &OperationClaimSource,
         slot: &SessionId,
+        target: Option<&named::Target>,
         instructions: &str,
         recovery: bool,
     ) -> Result<Option<SubagentWork>> {
-        let input = ChangeId::new(CHILD_INPUT)?;
-        let (view, accepted) = match self
-            .store
-            .inspect_with_input(slot.clone(), input.clone())
-            .await
-        {
-            Ok(value) => value,
-            Err(error) if error.code == "session_missing" => return Ok(None),
-            Err(error) => return Err(error),
+        let (accepted, stored, sponsor) = if let Some(target) = target {
+            let Some(record) = target
+                .read(&self.store, &source.binding.session, &source.binding.turn)
+                .await?
+            else {
+                return Ok(None);
+            };
+            (record.accepted, record.stored, record.sponsor)
+        } else {
+            let (view, accepted) = match self
+                .store
+                .inspect_with_input(slot.clone(), ChangeId::new(CHILD_INPUT)?)
+                .await
+            {
+                Ok(value) => value,
+                Err(error) if error.code == "session_missing" => return Ok(None),
+                Err(error) => return Err(error),
+            };
+            let profile = session_configuration(&view)?
+                .subagent
+                .ok_or_else(sponsored_slot_used)?;
+            let sponsor = profile
+                .sponsorship()
+                .filter(|sponsor| {
+                    profile.parent() == &source.binding.session
+                        && sponsor.parent_turn == source.binding.turn
+                })
+                .cloned()
+                .ok_or_else(sponsored_slot_used)?;
+            let accepted = accepted.ok_or_else(sponsored_slot_used)?;
+            let stored = decode_input(&accepted.input.input)?;
+            (accepted, stored, sponsor)
         };
-        let profile = session_configuration(&view)?
-            .subagent
-            .ok_or_else(sponsored_slot_used)?;
-        let sponsor = profile
-            .sponsorship()
-            .filter(|sponsor| {
-                profile.parent() == &source.binding.session
-                    && sponsor.parent_turn == source.binding.turn
-            })
-            .ok_or_else(sponsored_slot_used)?;
-        let accepted = accepted.ok_or_else(sponsored_slot_used)?;
-        let stored: StoredPrompt = decode_input(&accepted.input.input)?;
         if recovery {
             if sponsor.admission.is_none() || sponsor.attempt.is_none() {
                 return Err(sponsored_slot_used());
@@ -510,8 +559,9 @@ impl Host {
         &self,
         source: OperationClaimSource,
         child: SessionId,
+        target: Option<&named::Target>,
         instructions: &str,
-    ) -> Result<OperationClaim> {
+    ) -> Result<SponsoredClaim> {
         let execution = self.execution()?;
         let view = self.store.inspect(source.binding.session.clone()).await?;
         self.check_execution(&view)?;
@@ -549,6 +599,7 @@ impl Host {
                 || !goal.reservation().is_some_and(|work| {
                     work.turn == source.binding.turn
                         && &work.basis == goal.basis()
+                        && work.named_child.as_ref() == target.map(|target| &target.child)
                         && work.child_inference_steps.is_some_and(|steps| {
                             steps.get() == subagents::INFERENCE_STEPS_PER_ASSIGNMENT
                         })
@@ -560,20 +611,12 @@ impl Host {
                 ));
             }
         }
-        let profile = Profile::sponsored(
-            source.binding.session.clone(),
-            "Independent reviewer".into(),
-            Sponsorship {
-                parent_turn: source.binding.turn.clone(),
-                operation: source.operation.clone(),
-                admission: Some(Fingerprint::of(&source)?),
-                attempt: Some(source.attempt.clone()),
-            },
-            &execution.authority.inference.authority,
-        )?;
-        let driver_state = profile.reserve(&Default::default())?;
-        config.subagent = Some(profile);
-        config.execution = execution.configuration;
+        let sponsor = Sponsorship {
+            parent_turn: source.binding.turn.clone(),
+            operation: source.operation.clone(),
+            admission: Some(Fingerprint::of(&source)?),
+            attempt: Some(source.attempt.clone()),
+        };
         captured.parts = vec![PromptPart::Text {
             text: instructions.to_owned(),
         }];
@@ -595,15 +638,58 @@ impl Host {
         captured.editor_presentation = false;
         captured.editor_svg_target = None;
         captured.guidance = None;
-        captured.subagent = Some(Assignment {
-            parent_turn: source.binding.turn.clone(),
-        });
+        let mut assignment = Assignment::new(source.binding.turn.clone());
+        if let Some(target) = target {
+            assignment.named_sponsorship = Some(NamedSponsorship {
+                goal: target.goal.clone(),
+                sponsor: sponsor.clone(),
+            });
+        }
+        captured.subagent = Some(assignment);
         captured.completion_checks = None;
         let input = Submission {
-            id: ChangeId::new(CHILD_INPUT)?,
+            id: match target {
+                Some(target) => target.input.clone(),
+                None => ChangeId::new(CHILD_INPUT)?,
+            },
             payload: encode(INPUT_SCHEMA, 2, &captured)?,
         };
-        Ok(OperationClaim {
+        if let Some(target) = target {
+            let view = self.store.inspect(child.clone()).await?;
+            self.check_execution(&view)?;
+            require_idle(&view)?;
+            if !view.queued.is_empty() {
+                return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
+            }
+            let profile = target.profile(&source.binding.session, &view)?;
+            profile.require_authority(&execution.authority.inference.authority)?;
+            let driver_state =
+                profile.reserve_named_funding(&view.driver_state, target.turn.clone())?;
+            return Ok(SponsoredClaim::Named {
+                configuration: view.configuration,
+                request: ExistingOperationClaim {
+                    source,
+                    claim: new_claim(
+                        child,
+                        target.turn.clone(),
+                        view.revision,
+                        vec![input.id.clone()],
+                    )?,
+                    input,
+                    driver_state,
+                },
+            });
+        }
+        let profile = Profile::sponsored(
+            source.binding.session.clone(),
+            "Independent reviewer".into(),
+            sponsor,
+            &execution.authority.inference.authority,
+        )?;
+        let driver_state = profile.reserve(&Default::default())?;
+        config.subagent = Some(profile);
+        config.execution = execution.configuration;
+        Ok(SponsoredClaim::Fresh(OperationClaim {
             source,
             create: CreateSession {
                 id: child.clone(),
@@ -621,22 +707,40 @@ impl Host {
             },
             input,
             driver_state,
-        })
+        }))
     }
 
     pub(super) async fn admit_sponsored(
         &self,
-        request: OperationClaim,
+        request: SponsoredClaim,
     ) -> Result<Option<Admitted>> {
         let execution = self.execution()?;
-        let config = decode_session_configuration(&request.create.configuration)?;
+        let (configuration, session, input, history) = match &request {
+            SponsoredClaim::Fresh(request) => (
+                &request.create.configuration,
+                request.create.id.clone(),
+                &request.input,
+                Vec::new(),
+            ),
+            SponsoredClaim::Named {
+                request,
+                configuration,
+            } => (
+                configuration,
+                request.claim.session.clone(),
+                &request.input,
+                self.provider_history(request.claim.session.clone(), None)
+                    .await?
+                    .messages,
+            ),
+        };
+        let config = decode_session_configuration(configuration)?;
         let profile = config.subagent.ok_or_else(sponsored_slot_used)?;
         profile.require_authority(&execution.authority.inference.authority)?;
-        let session = request.create.id.clone();
         let prepared = self.prepare_input(
             execution,
             &session,
-            &request.input,
+            input,
             Some(&profile),
             InputAuthority::RequireCaptured,
         )?;
@@ -649,8 +753,15 @@ impl Host {
                 tools: BTreeMap::new(),
             },
         )?
+        .with_history(history)
         .with_input_limit(prepared.limit);
-        let ClaimOutcome::Acquired(claim) = self.store.claim_from_operation(request).await? else {
+        let claimed = match request {
+            SponsoredClaim::Fresh(request) => self.store.claim_from_operation(request).await?,
+            SponsoredClaim::Named { request, .. } => {
+                self.store.claim_existing_from_operation(request).await?
+            }
+        };
+        let ClaimOutcome::Acquired(claim) = claimed else {
             return Ok(None);
         };
         let turn = claim.lease.binding().turn.clone();
@@ -690,7 +801,11 @@ impl Host {
         {
             return self.ordinary_control(request).await;
         }
-        let slot = sponsored_identity(&request.session, turn)?;
+        let target = named::Target::load(&self.store, &request.session, turn).await?;
+        let slot = match &target {
+            Some(target) => target.child.clone(),
+            None => sponsored_identity(&request.session, turn)?,
+        };
         let mut conflict = problem(ErrorKind::Conflict, "sponsored_subagent_control_changed");
         for _ in 0..4 {
             let ordinary = self.store.control_receipt(request.clone()).await?;
@@ -703,7 +818,9 @@ impl Host {
                     destination: None,
                 });
             }
-            let related = self.sponsored_control(&request, turn, &slot, stop).await?;
+            let related = self
+                .sponsored_control(&request, turn, &slot, target.as_ref(), stop)
+                .await?;
             if matches!(related, OperationRelatedControl::Absent { .. })
                 && !self.sponsorship_available()
             {
@@ -742,9 +859,9 @@ impl Host {
         request: ControlRequest,
     ) -> Result<ControlReceipt> {
         let session = self.store.inspect(request.session.clone()).await?;
-        if let Some(profile) = session_configuration(&session)?
-            .subagent
-            .filter(|profile| profile.sponsorship().is_some())
+        if let Some(profile) = session_configuration(&session)?.subagent
+            && let SessionControl::Turn { turn, .. } = &request.action
+            && profile.funded_turn(&session.driver_state, turn)?
         {
             return self
                 .store
@@ -784,15 +901,21 @@ impl Host {
         request: ClaimRequest,
         turn: &TurnId,
     ) -> Result<ClaimOutcome> {
-        let slot = sponsored_identity(&request.session, turn)?;
-        let Some((child, profile)) = self.related_child(&request.session, turn, &slot).await?
+        let target = named::Target::load(&self.store, &request.session, turn).await?;
+        let slot = match &target {
+            Some(target) => target.child.clone(),
+            None => sponsored_identity(&request.session, turn)?,
+        };
+        let Some((child, profile, sponsor, related_turn)) = self
+            .related_assignment(&request.session, turn, &slot, target.as_ref())
+            .await?
         else {
             return self.store.claim(request).await;
         };
         let Some(current) = child
             .current
             .as_ref()
-            .filter(|turn| !turn.controls.cancelled)
+            .filter(|turn| turn.binding == related_turn.binding && !turn.controls.cancelled)
         else {
             return self.store.claim(request).await;
         };
@@ -809,11 +932,7 @@ impl Host {
             return Err(problem(ErrorKind::Unsupported, "subagents_unavailable"));
         }
         let related = OperationRelatedControl::Apply {
-            operation: profile
-                .sponsorship()
-                .ok_or_else(related_changed)?
-                .operation
-                .clone(),
+            operation: sponsor.operation,
             request: ControlRequest {
                 id: change_id()?,
                 session: child.session,
@@ -888,22 +1007,23 @@ impl Host {
         request: &ControlRequest,
         parent_turn: &TurnId,
         slot: &SessionId,
+        target: Option<&named::Target>,
         stop: bool,
     ) -> Result<OperationRelatedControl> {
-        let Some((child, profile)) = self
-            .related_child(&request.session, parent_turn, slot)
+        let Some((child, profile, sponsor, turn)) = self
+            .related_assignment(&request.session, parent_turn, slot, target)
             .await?
         else {
-            return Ok(OperationRelatedControl::Absent {
-                session: slot.clone(),
+            return Ok(match target {
+                Some(target) => OperationRelatedControl::Unclaimed {
+                    session: target.child.clone(),
+                    turn: target.turn.clone(),
+                },
+                None => OperationRelatedControl::Absent {
+                    session: slot.clone(),
+                },
             });
         };
-        let sponsor = profile.sponsorship().ok_or_else(related_changed)?;
-        let turn = child
-            .current
-            .as_ref()
-            .or(child.latest.as_ref())
-            .ok_or_else(related_changed)?;
         if turn.disposition == TurnDisposition::Settled {
             return Ok(OperationRelatedControl::Settled {
                 operation: sponsor.operation.clone(),
@@ -911,7 +1031,13 @@ impl Host {
                 turn: turn.binding.turn.clone(),
             });
         }
-        let action = if stop || turn.controls.cancelled {
+        let action = if (stop || turn.controls.cancelled) && target.is_some() {
+            SessionControl::Turn {
+                turn: turn.binding.turn.clone(),
+                expected: turn.controls.revision,
+                directive: ControlDirective::Cancel,
+            }
+        } else if stop || turn.controls.cancelled {
             SessionControl::PauseAndCancel {
                 turn: turn.binding.turn.clone(),
                 expected: turn.controls.revision,
@@ -937,6 +1063,40 @@ impl Host {
                 action,
             },
         })
+    }
+
+    async fn related_assignment(
+        &self,
+        parent: &SessionId,
+        parent_turn: &TurnId,
+        slot: &SessionId,
+        target: Option<&named::Target>,
+    ) -> Result<Option<(SessionView, Profile, Sponsorship, TurnView)>> {
+        if let Some(target) = target {
+            let Some(record) = target.read(&self.store, parent, parent_turn).await? else {
+                return Ok(None);
+            };
+            let turn = record.accepted.turn.ok_or_else(related_changed)?;
+            if turn.disposition != TurnDisposition::Settled
+                && !record
+                    .profile
+                    .funded_turn(&record.view.driver_state, &turn.binding.turn)?
+            {
+                return Err(related_changed());
+            }
+            return Ok(Some((record.view, record.profile, record.sponsor, turn)));
+        }
+        let Some((child, profile)) = self.related_child(parent, parent_turn, slot).await? else {
+            return Ok(None);
+        };
+        let sponsor = profile.sponsorship().cloned().ok_or_else(related_changed)?;
+        let turn = child
+            .current
+            .as_ref()
+            .or(child.latest.as_ref())
+            .cloned()
+            .ok_or_else(related_changed)?;
+        Ok(Some((child, profile, sponsor, turn)))
     }
 
     async fn related_child(
@@ -1238,10 +1398,13 @@ mod tests {
             capture_delegation(host, root, OperatingRegime::Act, instructions).await;
         let parent = source.binding.session.clone();
         let child = sponsored_identity(&parent, &source.binding.turn).unwrap();
-        let work = host
-            .sponsored_claim(source.clone(), child.clone(), instructions)
+        let SponsoredClaim::Fresh(work) = host
+            .sponsored_claim(source.clone(), child.clone(), None, instructions)
             .await
-            .unwrap();
+            .unwrap()
+        else {
+            panic!("expected fresh child claim")
+        };
         let ClaimOutcome::Acquired(child_owner) =
             host.store.claim_from_operation(work).await.unwrap()
         else {

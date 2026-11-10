@@ -1250,6 +1250,13 @@ lazy reads, read-only mutation, and symlink escape refusal.
   Current launch and provider authority are checked before dispatch. A later
   paired Pause or Stop fences an earlier wake. Replaying a committed Resume
   can recover readiness after a lost response or process restart.
+- A named Goal reviewer is an existing child of the attached parent and
+  shares its funded review slot. [Goal admission](crates/grida-agent/src/host/goals.rs)
+  checks ownership and captured provider authority. The [named assignment owner](crates/grida-agent/src/host/sponsorship/named.rs)
+  binds the Goal revision, parent turn, child input and exact child turn.
+  The existing claim transaction consumes the slot and the child's
+  allocation together. Paired controls and late accounting follow that
+  assignment, with ordinary child work retaining separate accounting.
 - [Ultra](crates/grida-agent/src/host/sponsorship.rs) captures the
   separate parent and child allowances with the accepted input. Only that
   turn receives the exact review start and collection grants. The start

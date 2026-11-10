@@ -90,6 +90,8 @@ pub struct Reservation {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub child_inference_steps: Option<NonZeroU32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub named_child: Option<SessionId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     objective_fingerprint: Option<Fingerprint>,
 }
 
@@ -229,6 +231,8 @@ struct State {
     user_review: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     review: Option<CompletionReview>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    named_child: Option<SessionId>,
 }
 
 impl Goal {
@@ -258,8 +262,34 @@ impl Goal {
                 last_work: None,
                 user_review,
                 review: None,
+                named_child: None,
             },
         })
+    }
+
+    pub fn select_named_child(&mut self, child: SessionId) -> Result<()> {
+        if self.state.basis.revision != 1
+            || self.state.reservation.is_some()
+            || self.state.last_work.is_some()
+            || self.state.named_child.is_some()
+            || self.state.paused
+            || self.state.status != Status::Active
+        {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "goal_named_child_selection_closed",
+            ));
+        }
+        self.state.named_child = Some(child);
+        Ok(())
+    }
+
+    pub fn named_child(&self) -> Option<&SessionId> {
+        self.state.named_child.as_ref()
+    }
+
+    pub fn reservation_for_turn(state: &TurnState) -> Result<Option<Reservation>> {
+        Ok(settlement::work_goal(state)?.and_then(|goal| goal.state.reservation))
     }
 
     pub fn encode(&self) -> Result<Envelope> {
@@ -529,6 +559,7 @@ impl Goal {
             inference_steps,
             uncertain_steps: None,
             child_inference_steps,
+            named_child: child_inference_steps.and(self.state.named_child.clone()),
             objective_fingerprint: Some(Fingerprint::of(&self.state.objective)?),
         };
         self.state.reservation = Some(reservation.clone());
@@ -733,6 +764,10 @@ impl Goal {
                 || value
                     .child_inference_steps
                     .is_some_and(|child| child >= value.inference_steps)
+                || value.named_child.as_ref()
+                    != value
+                        .child_inference_steps
+                        .and(self.state.named_child.as_ref())
                 || value.inference_steps.get()
                     > state
                         .allowance

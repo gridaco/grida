@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
 import type {
   NativeChatEffort,
   NativeChatGoal,
@@ -13,6 +13,7 @@ import type {
   NativeChatController,
   NativeChatView,
 } from "@/lib/agent-chat/native-chat-controller";
+import type { NativeSubagentController } from "@/lib/agent-chat/native-subagent-controller";
 
 const BLOCKER = {
   needs_input: "Input required",
@@ -41,9 +42,18 @@ export function NativeGoalPanel({
   const fundedTurn = goalTurn && !!goal?.reservation?.reviewInferenceSteps;
   const canStart = controller.canStartGoal;
   const canAllowWakeup = view.wakeupsAvailable && effort === "standard";
+  const namedReviewers =
+    effort === "ultra" &&
+    view.operatingRegime === "act" &&
+    view.observation?.snapshot.goalNamedChildAvailable
+      ? view.subagents
+      : null;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const fields = new FormData(event.currentTarget);
+    const namedChildId = namedReviewers
+      ? String(fields.get("namedChildId") ?? "")
+      : "";
     void controller
       .startGoal({
         objective: String(fields.get("objective") ?? "").trim(),
@@ -57,6 +67,7 @@ export function NativeGoalPanel({
         },
         automatic: fields.has("automatic"),
         ...(effort === "ultra" && { effort }),
+        ...(namedChildId && { namedChildId }),
         ...(canAllowWakeup &&
           fields.has("allowWakeup") && { allowWakeup: true }),
       })
@@ -142,6 +153,12 @@ export function NativeGoalPanel({
                 {goal.reservation.reviewInferenceSteps} of the held steps are
                 reserved for independent review.
               </p>
+            )}
+            {goal.namedChildId && view.subagents && (
+              <GoalReviewerName
+                controller={view.subagents}
+                childId={goal.namedChildId}
+              />
             )}
             <p>
               {goal.remaining.workTurns} work turns and{" "}
@@ -273,6 +290,12 @@ export function NativeGoalPanel({
               </select>
             </label>
           )}
+          {namedReviewers && (
+            <GoalReviewerField
+              controller={namedReviewers}
+              disabled={view.acting}
+            />
+          )}
           <label className="flex items-center gap-2">
             <input name="automatic" type="checkbox" disabled={view.acting} />
             Continue automatically within these limits
@@ -317,6 +340,77 @@ export function NativeGoalPanel({
       ) : null}
     </section>
   );
+}
+
+function GoalReviewerField({
+  controller,
+  disabled,
+}: {
+  controller: NativeSubagentController;
+  disabled: boolean;
+}) {
+  const state = useSyncExternalStore(
+    controller.subscribe,
+    controller.read,
+    controller.read
+  );
+  return (
+    <div className="space-y-1">
+      <label className="flex items-center gap-2">
+        Goal reviewer
+        <select
+          name="namedChildId"
+          className="min-w-0 rounded border bg-background px-1 py-0.5"
+          disabled={disabled}
+        >
+          <option value="">Independent reviewer</option>
+          {state.children.map(({ childId, name }) => (
+            <option key={childId} value={childId}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {!state.open && (!state.children.length || state.next) && (
+        <Button
+          type="button"
+          size="xs"
+          variant="ghost"
+          disabled={disabled}
+          onClick={() => controller.toggle()}
+        >
+          Show named subagents
+        </Button>
+      )}
+      {state.open && state.next && (
+        <Button
+          type="button"
+          size="xs"
+          variant="ghost"
+          disabled={disabled || state.listing}
+          onClick={() => void controller.list(true)}
+        >
+          Load more reviewers
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function GoalReviewerName({
+  controller,
+  childId,
+}: {
+  controller: NativeSubagentController;
+  childId: string;
+}) {
+  const state = useSyncExternalStore(
+    controller.subscribe,
+    controller.read,
+    controller.read
+  );
+  const name = state.children.find((child) => child.childId === childId)?.name;
+  return <p>{name ? `Reviewer · ${name}` : "Reviewer · Named subagent"}</p>;
 }
 
 function goalStatus(

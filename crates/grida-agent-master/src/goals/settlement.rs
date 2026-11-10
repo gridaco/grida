@@ -113,10 +113,11 @@ pub(crate) fn prepare(
         WorkOutcome::Uncertain {
             observed_steps: inference_steps,
         }
-    } else if state
-        .operations()
-        .values()
-        .all(|operation| operation.attempts.is_empty())
+    } else if child_steps == 0
+        && state
+            .operations()
+            .values()
+            .all(|operation| operation.attempts.is_empty())
     {
         WorkOutcome::NotDispatched
     } else {

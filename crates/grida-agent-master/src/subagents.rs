@@ -52,6 +52,20 @@ pub struct SponsoredPause {
     ancestor: bool,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NamedAllocation {
+    reserved: u8,
+    funded: Option<FundedTurn>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FundedTurn {
+    turn: TurnId,
+    pause: SponsoredPause,
+}
+
 impl SponsoredPause {
     pub fn effective(self) -> bool {
         self.independent || self.ancestor
@@ -120,8 +134,16 @@ impl Profile {
     pub fn require_assignment(&self, assignment: &Assignment, plan: bool) -> Result<()> {
         self.validate()?;
         if self.sponsorship.as_ref().map_or(plan, |sponsor| {
-            sponsor.parent_turn != assignment.parent_turn
-        }) {
+            sponsor.parent_turn != assignment.parent_turn || assignment.named_sponsorship.is_some()
+        }) || assignment
+            .named_sponsorship
+            .as_ref()
+            .is_some_and(|funding| {
+                funding.sponsor.parent_turn != assignment.parent_turn
+                    || funding.sponsor.admission.is_none()
+                    || funding.sponsor.attempt.is_none()
+            })
+        {
             return Err(problem(ErrorKind::InvalidInput, "invalid_subagent_sponsor"));
         }
         Ok(())
@@ -158,20 +180,9 @@ impl Profile {
                 reserved,
             });
         }
-        let invalid = || problem(ErrorKind::InvalidState, "invalid_subagent_allocation");
-        let reserved = match state.value() {
-            None if state.is_initial() => 0,
-            Some(value) if value.schema().as_str() == ALLOCATION_SCHEMA && value.version() == 1 => {
-                serde_json::from_slice::<u8>(value.bytes()).map_err(|_| invalid())?
-            }
-            _ => return Err(invalid()),
-        };
-        if reserved > self.work_turns || u64::from(reserved) != state.revision().0 {
-            return Err(invalid());
-        }
         Ok(Allocation {
             work_turns: self.work_turns,
-            reserved,
+            reserved: self.named_allocation(state)?.reserved,
         })
     }
 
@@ -188,6 +199,15 @@ impl Profile {
         if self.sponsorship.is_some() {
             return sponsored_change(state, SponsoredPause::default());
         }
+        if state.value().is_some_and(|value| value.version() == 2) {
+            return named_change(
+                state,
+                NamedAllocation {
+                    reserved: allocation.reserved + 1,
+                    funded: None,
+                },
+            );
+        }
         let next = serde_json::to_vec(&(allocation.reserved + 1))
             .map_err(|_| problem(ErrorKind::InvalidState, "invalid_subagent_allocation"))?;
         Ok(DriverStateChange {
@@ -196,8 +216,82 @@ impl Profile {
         })
     }
 
+    pub fn reserve_named_funding(
+        &self,
+        state: &DriverStateSnapshot,
+        turn: TurnId,
+    ) -> Result<DriverStateChange> {
+        let allocation = self.allocation(state)?;
+        if self.sponsorship.is_some() || allocation.reserved >= allocation.work_turns {
+            return Err(problem(
+                ErrorKind::LimitExceeded,
+                "subagent_allocation_exhausted",
+            ));
+        }
+        named_change(
+            state,
+            NamedAllocation {
+                reserved: allocation.reserved + 1,
+                funded: Some(FundedTurn {
+                    turn,
+                    pause: SponsoredPause::default(),
+                }),
+            },
+        )
+    }
+
+    pub fn funded_turn(&self, state: &DriverStateSnapshot, turn: &TurnId) -> Result<bool> {
+        if self.sponsorship.is_some() {
+            return Ok(true);
+        }
+        Ok(self
+            .named_allocation(state)?
+            .funded
+            .is_some_and(|funding| &funding.turn == turn))
+    }
+
+    fn named_allocation(&self, state: &DriverStateSnapshot) -> Result<NamedAllocation> {
+        let revision = state.revision().0;
+        let allocation = match state.value() {
+            None if state.is_initial() => NamedAllocation {
+                reserved: 0,
+                funded: None,
+            },
+            Some(value) if value.schema().as_str() == ALLOCATION_SCHEMA => match value.version() {
+                1 => {
+                    let reserved: u8 =
+                        serde_json::from_slice(value.bytes()).map_err(|_| invalid_allocation())?;
+                    if u64::from(reserved) != revision {
+                        return Err(invalid_allocation());
+                    }
+                    NamedAllocation {
+                        reserved,
+                        funded: None,
+                    }
+                }
+                2 => serde_json::from_slice(value.bytes()).map_err(|_| invalid_allocation())?,
+                _ => return Err(invalid_allocation()),
+            },
+            _ => return Err(invalid_allocation()),
+        };
+        if allocation.reserved > self.work_turns
+            || u64::from(allocation.reserved) > revision
+            || (!state.is_initial() && allocation.reserved == 0)
+        {
+            return Err(invalid_allocation());
+        }
+        Ok(allocation)
+    }
+
     pub fn sponsored_pause(&self, state: &DriverStateSnapshot) -> Result<SponsoredPause> {
         self.validate()?;
+        if self.sponsorship.is_none() {
+            return self
+                .named_allocation(state)?
+                .funded
+                .map(|funding| funding.pause)
+                .ok_or_else(invalid_sponsored_allocation);
+        }
         let value = state
             .value()
             .filter(|value| {
@@ -222,6 +316,15 @@ impl Profile {
         match cause {
             PauseCause::Independent => next.independent = paused,
             PauseCause::Ancestor => next.ancestor = paused,
+        }
+        if self.sponsorship.is_none() {
+            let mut allocation = self.named_allocation(state)?;
+            allocation
+                .funded
+                .as_mut()
+                .ok_or_else(invalid_sponsored_allocation)?
+                .pause = next;
+            return Ok((named_change(state, allocation)?, next));
         }
         Ok((sponsored_change(state, next)?, next))
     }
@@ -255,6 +358,21 @@ fn invalid_sponsored_allocation() -> Error {
     )
 }
 
+fn named_change(
+    state: &DriverStateSnapshot,
+    allocation: NamedAllocation,
+) -> Result<DriverStateChange> {
+    let bytes = serde_json::to_vec(&allocation).map_err(|_| invalid_allocation())?;
+    Ok(DriverStateChange {
+        expected: state.revision(),
+        value: Some(Envelope::new(SchemaId::new(ALLOCATION_SCHEMA)?, 2, bytes)?),
+    })
+}
+
+fn invalid_allocation() -> Error {
+    problem(ErrorKind::InvalidState, "invalid_subagent_allocation")
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Allocation {
@@ -265,6 +383,24 @@ pub struct Allocation {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Assignment {
     pub parent_turn: TurnId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub named_sponsorship: Option<NamedSponsorship>,
+}
+
+impl Assignment {
+    pub fn new(parent_turn: TurnId) -> Self {
+        Self {
+            parent_turn,
+            named_sponsorship: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NamedSponsorship {
+    pub goal: crate::goals::Basis,
+    pub sponsor: Sponsorship,
 }
 
 pub fn validate_assignment(instructions: &str) -> Result<()> {
@@ -325,17 +461,12 @@ mod tests {
             sponsored_identity(&parent, &turn).unwrap(),
             sponsored_identity(&parent, &TurnId::new("other-turn").unwrap()).unwrap(),
         );
-        let assignment = Assignment { parent_turn: turn };
+        let assignment = Assignment::new(turn);
         assert!(first.require_assignment(&assignment, true).is_ok());
         assert!(first.require_assignment(&assignment, false).is_ok());
         assert!(
             first
-                .require_assignment(
-                    &Assignment {
-                        parent_turn: TurnId::new("other-turn").unwrap()
-                    },
-                    false
-                )
+                .require_assignment(&Assignment::new(TurnId::new("other-turn").unwrap()), false)
                 .is_err()
         );
         let manual = Profile::new(parent, "Manual review".into(), 1, &owner).unwrap();

@@ -597,6 +597,19 @@ the same effort. While a funded turn owns work, use the ordinary task
 Pause, Resume, or Stop operations. Goal-specific state controls return
 `goal_use_task_controls_for_funded_review` in that case.
 
+An attached private client can negotiate `co.grida/goal/named-child`
+version 1. With Ultra and Act, Goal Start accepts `goal.named_child` for
+one existing named child of the parent session. The choice is fixed for
+that Goal. An eligible later reservation carries the same identity.
+The Goal inspection reports `namedChildId` and the reservation's
+`named_child` when present.
+
+The existing review operation claims one exact assignment in that child
+using the same funded share. Admission consumes one unit of the child's
+ordinary allocation and rejects a competing use of the same share.
+Controls and reconciliation follow that exact assignment. Later ordinary
+assignments keep the child's conversation and their own accounting.
+
 If a review is unsettled when the parent finishes, Goal inspection keeps the
 held reservation and `uncertain_steps` records the attempts observed so far.
 Inspection projects `effort: "ultra"` when the original Goal Start captured
