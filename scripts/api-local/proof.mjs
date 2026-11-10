@@ -58,6 +58,7 @@ const copiedFiles = [
   "lib/platform/product-billing.ts",
   "lib/ai/openai-compat/wire.ts",
   "lib/desktop/csp.ts",
+  "lib/library/storage.ts",
   "lib/domains/index.ts",
   "lib/platform/index.ts",
   "lib/platform/billing-consumer.ts",

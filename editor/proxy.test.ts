@@ -69,7 +69,7 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
     }
   });
 
-  // The first-party Grida Library (the app's own Supabase storage) IS allowed in
+  // The first-party Grida Library's selected storage origin IS allowed in
   // img-src: reference pins are kept as URLs and rendered directly. It is one
   // first-party origin, image-only — distinct from generation-provider CDNs.
   describe("first-party library carve-out", () => {
@@ -86,6 +86,28 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
       // image only — not media-src, not connect-src
       expect(directiveOf(withLib, "media-src")).not.toContain(libOrigin);
       expect(directiveOf(withLib, "connect-src")).not.toContain(libOrigin);
+    });
+
+    it("keeps Tigris and saved Supabase images inside the image-only boundary", () => {
+      const tigris = "https://library.grida.co";
+      const src = buildDesktopCsp("n", [tigris, libOrigin]);
+      for (const origin of [tigris, libOrigin]) {
+        expect(directiveOf(src, "img-src")).toContain(origin);
+        expect(directiveOf(src, "media-src")).not.toContain(origin);
+        expect(directiveOf(src, "connect-src")).not.toContain(origin);
+      }
+    });
+
+    it("normalizes and deduplicates compatibility origins independently", () => {
+      const src = buildDesktopCsp("n", [
+        "https://library.grida.co",
+        "https://library.grida.co/unused/path",
+        "https://evil.example.com; script-src 'unsafe-inline'",
+      ]);
+      expect(directiveOf(src, "img-src")).toBe(
+        "img-src 'self' data: blob: grida-workspace: https://library.grida.co"
+      );
+      expect(src).not.toContain("evil.example.com");
     });
 
     it("still excludes generation-provider CDNs with the library origin set", () => {

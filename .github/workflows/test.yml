@@ -6,7 +6,6 @@ on:
       - main
   pull_request:
     paths-ignore:
-      - ".agents/**"
       - "docs/**"
       - "**/*.md"
       - "**/*.mdx"
@@ -27,6 +26,12 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Test optional local Library importer
+        run: python -m unittest discover -s .agents/skills/opt-library/scripts -p 'test_*.py'
       - name: Test CI change selection and release tagging
         run: node --test .github/scripts/ci-changes.test.mjs .github/scripts/npm-release-tag.test.cjs
       - name: Install Dependencies

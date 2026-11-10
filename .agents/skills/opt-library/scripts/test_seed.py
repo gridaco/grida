@@ -4,11 +4,14 @@
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest.mock
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -118,9 +121,7 @@ class LocalSupabaseStatusTest(unittest.TestCase):
                 unittest.mock.patch.object(
                     seed.shutil, "which", return_value="/usr/bin/psql"
                 ),
-                unittest.mock.patch.object(
-                    seed.subprocess, "run", return_value=result
-                ),
+                unittest.mock.patch.object(seed.subprocess, "run", return_value=result),
                 self.assertRaises(seed.SeedError),
             ):
                 seed.LocalSupabaseStatus.discover(root)
@@ -229,6 +230,142 @@ class LocalLibraryTransportTest(unittest.TestCase):
         sql = seed.build_import_sql([], [], [])
 
         self.assertEqual(sql.count("WHERE source.payload IS NOT NULL"), 5)
+
+    def test_catalog_identity_does_not_come_from_storage_response(self) -> None:
+        payload = b"local corpus fixture"
+        digest = hashlib.sha256(payload).hexdigest()
+        obj = seed.CorpusObject(
+            ref=f"sha256:{digest}",
+            sha256=digest,
+            asset_path=f"assets/{digest}.png",
+            metadata={"mimetype": "image/png", "title": "Fixture"},
+        )
+        embedding = seed.CorpusEmbedding(obj.ref, [1.0] + [0.0] * 1535, None)
+        catalog_id = uuid.UUID("10000000-0000-4000-8000-000000000001")
+        storage_id = "20000000-0000-4000-8000-000000000002"
+        library = seed.LocalLibrary(self.status)
+        with tempfile.TemporaryDirectory() as directory:
+            archive_path = Path(directory) / "corpus.zip"
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                archive.writestr(obj.asset_path, payload)
+            corpus = seed.VerifiedCorpus(
+                archive_path, {}, [], [obj], {obj.ref: embedding}
+            )
+            with (
+                unittest.mock.patch.object(
+                    library, "_existing_objects", return_value={}
+                ),
+                unittest.mock.patch.object(
+                    library, "_request_json", return_value={"Id": storage_id}
+                ) as request,
+                unittest.mock.patch.object(library, "_import_database") as database,
+                unittest.mock.patch.object(library, "_verify_public_asset"),
+                unittest.mock.patch.object(seed.uuid, "uuid4", return_value=catalog_id),
+                unittest.mock.patch("builtins.print"),
+            ):
+                library.seed(corpus, [obj], {obj.ref: embedding})
+
+        _, objects, embeddings = database.call_args.args
+        self.assertEqual(objects[0]["id"], str(catalog_id))
+        self.assertNotEqual(objects[0]["id"], storage_id)
+        self.assertEqual(objects[0]["path"], obj.storage_path)
+        self.assertEqual(embeddings[0]["object_id"], str(catalog_id))
+        self.assertEqual(
+            embeddings[0]["gemini_embedding_2__image"],
+            seed.vector_literal(embedding.image),
+        )
+        self.assertIsNone(embeddings[0]["gemini_embedding_2__text"])
+        self.assertEqual(request.call_args.kwargs["headers"]["x-upsert"], "false")
+
+    def test_existing_duplicate_hash_adopts_first_ordered_catalog_record(self) -> None:
+        digest = "a" * 64
+        rows = [
+            {"id": "first", "path": "legacy/first.png", "sha256": digest},
+            {"id": "peer", "path": "legacy/peer.png", "sha256": digest},
+        ]
+        library = seed.LocalLibrary(self.status)
+        with unittest.mock.patch.object(
+            library, "_request_json", return_value=rows
+        ) as request:
+            existing = library._existing_objects()
+        self.assertEqual(existing[digest]["id"], "first")
+        self.assertEqual(len(rows), 2)
+        query = request.call_args.args[1]
+        self.assertIn("order=created_at.asc,id.asc", query)
+
+    def test_existing_hash_scan_continues_past_api_page_cap(self) -> None:
+        rows = [
+            {
+                "id": str(uuid.UUID(int=index + 1)),
+                "path": f"{index:064x}.png",
+                "sha256": f"{index:064x}",
+            }
+            for index in range(1001)
+        ]
+        library = seed.LocalLibrary(self.status)
+        with unittest.mock.patch.object(
+            library, "_request_json", side_effect=[rows[:1000], rows[1000:]]
+        ) as request:
+            existing = library._existing_objects()
+        self.assertEqual(len(existing), 1001)
+        self.assertIn("limit=1000&offset=1000", request.call_args.args[1])
+
+    def test_previously_stored_bytes_are_verified_before_adoption(self) -> None:
+        payload = b"already stored fixture"
+        digest = hashlib.sha256(payload).hexdigest()
+        library = seed.LocalLibrary(self.status)
+        response = unittest.mock.MagicMock()
+        response.__enter__.return_value.read.return_value = payload
+        duplicate = seed.urllib.error.HTTPError(
+            "http://127.0.0.1:54321/storage/v1/object/library/fixture.png",
+            400,
+            "Bad Request",
+            None,
+            io.BytesIO(b'{"statusCode":"409","error":"Duplicate"}'),
+        )
+        library._local_opener.open = unittest.mock.MagicMock(
+            side_effect=[duplicate, response]
+        )
+        self.assertIsNone(library._upload(f"{digest}.png", payload, "image/png"))
+        calls = library._local_opener.open.call_args_list
+        self.assertEqual(len(calls), 2)
+        upload = calls[0].args[0]
+        request_headers = {k.lower(): v for k, v in upload.header_items()}
+        self.assertEqual(request_headers["x-upsert"], "false")
+        self.assertEqual(upload.data, payload)
+        self.assertEqual(calls[1].args[0].get_method(), "GET")
+
+    def test_conflicting_stored_bytes_are_never_overwritten(self) -> None:
+        library = seed.LocalLibrary(self.status)
+        response = unittest.mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b"different bytes"
+        duplicate = seed.urllib.error.HTTPError(
+            "http://127.0.0.1:54321/storage/v1/object/library/fixture.png",
+            409,
+            "Conflict",
+            None,
+            io.BytesIO(b'{"statusCode":"409","error":"Duplicate"}'),
+        )
+        library._local_opener.open = unittest.mock.MagicMock(
+            side_effect=[duplicate, response]
+        )
+        with self.assertRaisesRegex(seed.SeedError, "failed verification"):
+            library._upload("fixture.png", b"intended bytes", "image/png")
+        self.assertEqual(library._local_opener.open.call_count, 2)
+
+    def test_permission_failure_is_not_an_already_exists_success(self) -> None:
+        library = seed.LocalLibrary(self.status)
+        denied = seed.urllib.error.HTTPError(
+            "http://127.0.0.1:54321/storage/v1/object/library/fixture.png",
+            403,
+            "Forbidden",
+            None,
+            io.BytesIO(b'{"statusCode":"403","error":"Unauthorized"}'),
+        )
+        library._local_opener.open = unittest.mock.MagicMock(side_effect=denied)
+        with self.assertRaisesRegex(seed.SeedError, "403"):
+            library._upload("fixture.png", b"intended bytes", "image/png")
+        self.assertEqual(library._local_opener.open.call_count, 1)
 
 
 class CorpusVerificationTest(unittest.TestCase):

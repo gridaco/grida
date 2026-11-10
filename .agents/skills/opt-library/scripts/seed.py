@@ -17,6 +17,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 import zipfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -582,11 +583,12 @@ class LocalLibrary:
                     storage_path = required_string(existing, "path")
                 else:
                     asset = archive.read(obj.asset_path)
-                    catalog_id = self._upload(
+                    self._upload(
                         obj.storage_path,
                         asset,
                         required_string(obj.metadata, "mimetype"),
                     )
+                    catalog_id = str(uuid.uuid4())
                     storage_path = obj.storage_path
                 catalog_ids[obj.ref] = catalog_id
                 storage_paths[obj.ref] = storage_path
@@ -641,9 +643,10 @@ class LocalLibrary:
             page = self._request_json(
                 "GET",
                 "/rest/v1/object"
-                "?select=id,path,sha256"
+                "?select=id,path,sha256,created_at"
                 "&sha256=not.is.null"
-                f"&limit=5000&offset={offset}",
+                "&order=created_at.asc,id.asc"
+                f"&limit=1000&offset={offset}",
                 schema="grida_library",
             )
             if not isinstance(page, list) or not all(
@@ -653,16 +656,18 @@ class LocalLibrary:
                     "local Library object query returned an invalid response"
                 )
             rows.extend(page)
-            if len(page) < 5_000:
+            if len(page) < 1_000:
                 break
             offset += len(page)
-        return {
-            row["sha256"]: row
-            for row in rows
-            if isinstance(row, dict) and is_sha256(row.get("sha256"))
-        }
+        existing: dict[str, Mapping[str, Any]] = {}
+        for row in rows:
+            if is_sha256(row.get("sha256")):
+                # Historical duplicate hashes retain every catalog identity.
+                # Adopt the earliest (created_at, id) without rekeying peers.
+                existing.setdefault(row["sha256"], row)
+        return existing
 
-    def _upload(self, path: str, payload: bytes, mimetype: str) -> str:
+    def _upload(self, path: str, payload: bytes, mimetype: str) -> None:
         encoded_path = urllib.parse.quote(f"library/{path}", safe="/")
         response = self._request_json(
             "POST",
@@ -671,15 +676,16 @@ class LocalLibrary:
             headers={
                 "Content-Type": mimetype,
                 "Cache-Control": "max-age=3600",
-                "x-upsert": "true",
+                "x-upsert": "false",
             },
+            allow_storage_duplicate=True,
         )
-        if not isinstance(response, dict):
+        if response is None:
+            # A prior run may have stored bytes before its SQL transaction.
+            # Adopt only identical bytes; never overwrite a conflicting path.
+            self._verify_public_asset(path, hashlib.sha256(payload).hexdigest())
+        elif not isinstance(response, dict):
             raise SeedError(f"{path}: local Storage returned an invalid response")
-        storage_id = response.get("Id") or response.get("id")
-        if not isinstance(storage_id, str) or not storage_id:
-            raise SeedError(f"{path}: local Storage did not return an object ID")
-        return storage_id
 
     @staticmethod
     def _object_row(
@@ -767,6 +773,7 @@ class LocalLibrary:
         schema: str | None = None,
         headers: Mapping[str, str] | None = None,
         expect_json: bool = True,
+        allow_storage_duplicate: bool = False,
     ) -> Any:
         request_headers = {
             "apikey": self._key,
@@ -789,6 +796,22 @@ class LocalLibrary:
                 payload = response.read()
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", errors="replace")
+            if (
+                allow_storage_duplicate
+                and method == "POST"
+                and path.startswith("/storage/v1/object/")
+                and error.code in (400, 409)
+            ):
+                try:
+                    failure = json.loads(detail)
+                except json.JSONDecodeError:
+                    failure = None
+                if (
+                    isinstance(failure, dict)
+                    and failure.get("error") == "Duplicate"
+                    and (error.code == 409 or str(failure.get("statusCode")) == "409")
+                ):
+                    return None
             raise SeedError(
                 f"local Supabase request failed ({error.code} {path}): {detail}"
             ) from error

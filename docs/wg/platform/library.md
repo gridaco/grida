@@ -73,10 +73,9 @@ automation, in-product generation — that share no state, no transaction, and
 no common code path. When identity is minted by the act of writing (an
 identifier assigned at insert time, a randomly named location), the same bytes
 ingested twice become two assets silently, and no producer can ask _"do you
-already have this?"_. Content addressing inverts this: identity derives from
-the **bytes**, so it is producer-independent and reproducible, ingestion is
-idempotent by construction, and producers share a coordination key without
-coordinating.
+already have this?"_. Content addressing derives byte identity from the
+**bytes**, so storage placement is producer-independent and reproducible.
+Producers share a coordination key without replacing catalog identity.
 
 ### 3.1 Two identities, deliberately
 
@@ -84,7 +83,7 @@ Every asset carries two identifiers, and the distinction is load-bearing:
 
 - **Catalog identity** — a surrogate identifier assigned once, stable for the
   asset's lifetime. All references (collections, representations, links) point
-  to it.
+  to it. Its validity does not depend on a byte-store record or identifier.
 - **Content address** — the SHA-256 of the asset's **currently stored bytes**,
   encoded as 64 lowercase hexadecimal characters. A function of the bytes, and
   only of the bytes.
@@ -100,9 +99,13 @@ address is deliberately _not_ the catalog's primary reference.
 - Every newly registered asset **MUST** carry its content address, computed by
   the producer over the exact bytes submitted, before registration. A
   registration without an address **MUST** be rejected.
-- The address **MUST** be unique across the corpus. Registering bytes whose
-  address already exists **MUST** resolve to the existing asset — no new
-  entry, no new blob, no new enrichment.
+- The address identifies a byte sequence, not a unique catalog record.
+  Historical assets **MAY** share it; their identities, metadata,
+  representations and collection references **MUST** survive hash backfill.
+  Repeated ingestion **SHOULD** adopt an existing asset without creating
+  another blob or enrichment event. When several catalog records share an
+  address, adoption **MUST** choose the record with the earliest creation time,
+  then the lowest catalog identifier to break ties.
 - On a duplicate hit the existing asset's facts stand (**first-writer-wins**).
   Metadata corrections are a deliberate curation act on the existing asset;
   re-submission **MUST NOT** be used as a correction channel.
@@ -129,7 +132,7 @@ non-cryptographic hashes (collision posture wrong for an _identity_ key).
   permanent: once public, a location is never rewritten or reused.
 
 This is **SHOULD**, not MUST, by honest necessity: a byte store cannot enforce
-naming, and correctness already lives in address uniqueness (§3.2). The
+naming, and byte integrity already lives in the content hash (§3.2). The
 convention buys self-describing placement — an object named by its own hash
 can be verified in place — and a store a human can audit at a glance.
 
@@ -139,14 +142,14 @@ The order of operations is fixed: **hash** the exact bytes → optionally
 **pre-check** whether the address is known (on a hit, adopt the existing asset
 and stop with zero writes) → **store** the blob at the conventional location
 (an "already exists" outcome is a _success signal_, not an error) →
-**register** the asset with its address (a duplicate-address outcome resolves
-to the existing asset). Every step is idempotent, so a crash anywhere is
-healed by retrying the whole sequence; a failure between store and register
-leaves an inert, unregistered blob, collected by a reconciliation sweep that
-compares the store against the catalog.
+**register** the asset with its address (a conflict on the unique storage
+location resolves to the existing asset selected under §3.2). Every step is
+idempotent, so a crash anywhere is healed by retrying the whole sequence; a
+failure between store and register leaves an inert, unregistered blob,
+collected by a reconciliation sweep that compares the store against the catalog.
 
 Producers **MUST** compute the address themselves, register through the
-sanctioned write surface, and adopt the canonical asset a registration
+sanctioned write surface, and adopt the catalog record a registration
 returns. Producers **MUST NOT** mint identities any other way, overwrite
 existing blobs, or delete from the store. **Enrichment never mints identity**:
 representations, derived visual attributes, and curation operate on the
@@ -154,8 +157,9 @@ catalog identity of assets that already exist.
 
 Corpus writes are restricted to a small circle of trusted operators, so
 addresses are producer-asserted; the self-verification invariant plus
-continuous audit bounds what a defective producer can do, and a duplicate
-address can never create a second asset regardless of producer behavior.
+continuous audit bounds what a defective producer can do. Immutable hash-derived
+locations deduplicate stored bytes without requiring historical catalog records
+to be merged.
 
 ### 3.5 Regimes and adoption
 
@@ -178,8 +182,8 @@ is acceptable forever.
 
 Adoption path: address optional → mandatory for new assets → corpus backfill
 (stored bytes must be re-read and hashed; store-layer metadata offers no
-substitute for a true byte hash) → surfaced duplicates collapsed by hand
-(expected rare) → address mandatory corpus-wide.
+substitute for a true byte hash) → shared byte addresses retained without
+collapsing catalog records → address mandatory corpus-wide.
 
 | date       | convention change                                                                                                                                                        |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -267,7 +271,7 @@ sequenceDiagram
     P->>S: store blob at the conventional location (§3.3)
     Note over S: "already exists" = success signal
     P->>R: register (address, metadata)
-    alt address already registered
+    alt existing asset adopted
         R-->>P: existing asset (first-writer-wins)
     else genuine registration
         R-->>P: new asset (catalog identity)
@@ -431,8 +435,8 @@ As an evolving RFC, the following are deliberately unsettled:
   own generation facts (its prompt, its generator). Does a per-event log
   deserve to exist alongside the per-asset entry?
 - **Algorithm succession.** A successor hash algorithm is a sibling field by
-  construction (§3.2), but the choreography of switching the uniqueness
-  guarantee between algorithms over a live corpus is not yet specified.
+  construction (§3.2), but the choreography of switching byte addressing
+  between algorithms over a live corpus is not yet specified.
 - **Staged/final admission.** The synchronous-producer story (§3.6) — serve a
   provisional location and re-key, or make submission asynchronous — is
   unresolved, and is the gate on canonical-format identity.

@@ -29,15 +29,21 @@ const mocks = vi.hoisted(() => ({
     >(),
   upload: vi.fn<
     (
-      path: string,
-      bytes: Uint8Array,
-      options: { contentType: string }
+      client: unknown,
+      file: { mediaType: string; uint8Array: Uint8Array },
+      request: { model: string; prompt: string; width: number; height: number }
     ) => Promise<{
-      data: { id: string };
-      error: null;
+      object: {
+        id: string;
+        bytes: number;
+        width: number;
+        height: number;
+        mimetype: string;
+      };
+      publicUrl: string;
     }>
   >(),
-  single: vi.fn<() => Promise<{ data: { id: string }; error: null }>>(),
+  libraryClient: {},
 }));
 
 vi.mock("ai", () => ({ generateImage: mocks.generate }));
@@ -52,21 +58,10 @@ vi.mock("@/lib/ai/server", () => ({
   gridaProviderOptions: mocks.options,
 }));
 vi.mock("@/lib/supabase/server", () => ({
-  service_role: {
-    library: {
-      storage: {
-        from: () => ({
-          upload: mocks.upload,
-          getPublicUrl: () => ({
-            data: { publicUrl: "https://example.invalid/image.png" },
-          }),
-        }),
-      },
-      from: () => ({
-        insert: () => ({ select: () => ({ single: mocks.single }) }),
-      }),
-    },
-  },
+  service_role: { library: mocks.libraryClient },
+}));
+vi.mock("@/lib/library/upload.server", () => ({
+  LibraryUpload: { generated: mocks.upload },
 }));
 
 const variants = [
@@ -95,8 +90,16 @@ beforeEach(() => {
       },
     ],
   });
-  mocks.upload.mockResolvedValue({ data: { id: "stored-image" }, error: null });
-  mocks.single.mockResolvedValue({ data: { id: "stored-image" }, error: null });
+  mocks.upload.mockResolvedValue({
+    object: {
+      id: "stored-image",
+      bytes: bytes.length,
+      width: 1024,
+      height: 1024,
+      mimetype: "image/png",
+    },
+    publicUrl: "https://example.invalid/image.png",
+  });
 });
 
 describe.each(variants)("generateAiImage (%s)", (model) => {
@@ -123,7 +126,8 @@ describe.each(variants)("generateAiImage (%s)", (model) => {
           providerOptions: { grida: billing, openai: { quality } },
         })
       );
-      expect(mocks.upload.mock.calls[0]?.[1]).toBe(bytes);
+      expect(mocks.upload.mock.calls[0]?.[0]).toBe(mocks.libraryClient);
+      expect(mocks.upload.mock.calls[0]?.[1].uint8Array).toBe(bytes);
       expect(result).toMatchObject({ success: true });
     }
   );

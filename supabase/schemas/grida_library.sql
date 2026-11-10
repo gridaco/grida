@@ -103,12 +103,13 @@ CREATE POLICY "public_read" ON grida_library.category FOR SELECT TO public USING
 -- [Object] --
 ---------------------------------------------------------------------
 CREATE TABLE grida_library.object (
-  id UUID PRIMARY KEY REFERENCES storage.objects(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   path TEXT NOT NULL UNIQUE,
   -- Content address: SHA-256 of the currently stored bytes, lowercase hex (#929;
   -- docs/wg/platform/library.md §3). NULL = legacy (pre-backfill) regime only —
   -- new rows are forced to carry it by the object_require_sha256 trigger below.
-  -- Flips to NOT NULL once the legacy corpus is backfilled.
+  -- Legacy rows stay nullable until their stored bytes are explicitly backfilled.
+  -- Multiple catalog records may reference the same content hash.
   sha256 TEXT CONSTRAINT object_sha256_format_chk CHECK (sha256 ~ '^[0-9a-f]{64}$'),
   path_tokens TEXT[] GENERATED ALWAYS AS (string_to_array(path, '/'::text)) STORED,
   title TEXT,
@@ -150,10 +151,9 @@ ALTER TABLE grida_library.object ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public_read" ON grida_library.object FOR SELECT TO public USING (true);
 CREATE TRIGGER enqueue_object_embedding_on_insert AFTER INSERT ON grida_library.object FOR EACH ROW EXECUTE FUNCTION enqueue_object_embedding_job();
 
--- Content-address dedup: unique over hashed rows only (legacy rows stay NULL
--- until backfill). Same bytes registered twice → unique_violation, producer
--- resolves the existing row.
-CREATE UNIQUE INDEX object_sha256_key ON grida_library.object (sha256) WHERE sha256 IS NOT NULL;
+-- Content lookup is nonunique: historical catalog UUIDs remain distinct even
+-- when their bytes match. The unique path still serializes hash-path inserts.
+CREATE INDEX object_sha256_idx ON grida_library.object (sha256) WHERE sha256 IS NOT NULL;
 
 -- INSERT-only guard: new objects MUST carry their content address. Deliberately
 -- a trigger and not a CHECK ... NOT VALID — a NOT VALID check still fires on

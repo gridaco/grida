@@ -9,6 +9,7 @@ import { Button } from "@app/ui/components/button";
 import { getBlurDataURLFromColor } from "@/utils/placeholder";
 import Similar from "./similar";
 import Link from "next/link";
+import { DownloadLink } from "../../_components/download-link";
 
 export async function generateMetadata(props: {
   params: Promise<{ id: string }>;
@@ -144,9 +145,9 @@ export default async function ObjectPage(props: {
         </div>
 
         <footer className="mt-10">
-          <Link href={object.download} download>
+          <DownloadLink href={object.download}>
             <Button>Download</Button>
-          </Link>
+          </DownloadLink>
         </footer>
       </section>
       <section>

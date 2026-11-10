@@ -20,6 +20,7 @@ import {
 } from "@app/ui/components/tooltip";
 import dynamic from "next/dynamic";
 import { Spinner } from "@app/ui/components/spinner";
+import { DownloadLink } from "./download-link";
 
 const Masonry: ComponentType<MasonryProps<ObjectDetail>> = dynamic(
   () => import("masonic").then((mod) => mod.Masonry),
@@ -231,16 +232,15 @@ function ImageCard({
                   Free for commercial use, no attribution required.
                 </TooltipContent>
               </Tooltip>
-              <Link
+              <DownloadLink
                 href={object.download}
-                download
                 className="pointer-events-auto"
               >
                 <Button variant="ghost">
                   <DownloadIcon className="size-4" />
                   Download
                 </Button>
-              </Link>
+              </DownloadLink>
             </div>
           </div>
         </div>

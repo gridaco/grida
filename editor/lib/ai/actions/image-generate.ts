@@ -6,10 +6,10 @@
  * Library bucket and a row inserted in `object`.
  */
 
-import { generateImage, type GeneratedFile } from "ai";
+import { generateImage } from "ai";
 import imageSize from "image-size";
 import { service_role } from "@/lib/supabase/server";
-import { LibraryCAS } from "@/lib/library/cas";
+import { LibraryUpload } from "@/lib/library/upload.server";
 import ai from "@/lib/ai";
 import { computeImageCostMills } from "@/lib/ai/image-cost";
 import {
@@ -109,15 +109,16 @@ export async function generateAiImage(
 
       const meta = generation.responses[0];
       const { width, height } = imageSize(generation.image.uint8Array);
-      const { object, publicUrl } = await uploadGeneratedToLibrary({
-        request: {
+      const { object, publicUrl } = await LibraryUpload.generated(
+        service_role.library,
+        generation.image,
+        {
           model: model.card.id,
           prompt: input.prompt,
           width,
           height,
-        },
-        file: generation.image,
-      });
+        }
+      );
 
       return {
         object,
@@ -129,102 +130,4 @@ export async function generateAiImage(
       } satisfies GenerateAiImageData;
     }
   );
-}
-
-async function uploadGeneratedToLibrary({
-  file,
-  request,
-}: {
-  file: GeneratedFile;
-  request: {
-    model: ai.image.ImageModelId;
-    prompt: string;
-    width: number;
-    height: number;
-  };
-}) {
-  // service_role for both storage upload and `object` insert — the
-  // `object` table has RLS that an unauthed/RLS-restricted user client
-  // can't satisfy for AI-generated rows. The original route did the
-  // same; the type annotation lied (declared `createLibraryClient` but
-  // passed service_role at runtime).
-  const client = service_role.library;
-  const { mediaType, uint8Array } = file;
-
-  // #929 content addressing: identity = sha256 of the bytes; storage path =
-  // the flat CAS location `<sha256>.<ext>` (docs/wg/platform/library.md §3).
-  const sha256 = LibraryCAS.sha256Hex(uint8Array);
-  const path = LibraryCAS.path(sha256, mediaType);
-
-  const { data: uploaded, error: upload_err } = await client.storage
-    .from("library")
-    .upload(path, uint8Array, {
-      contentType: mediaType,
-    });
-
-  // Same bytes → same CAS path: "already exists" means the blob is already
-  // stored (a prior run or another producer) — success signal, not an error.
-  if (upload_err && !LibraryCAS.isDuplicateError(upload_err)) {
-    throw new Error(upload_err.message);
-  }
-
-  // Storage object id: fresh upload → from the response; duplicate upload →
-  // the row usually exists too (adopted below via 23505), but an orphan blob
-  // from a crashed prior attempt needs its id recovered to register.
-  let storage_id = uploaded?.id;
-  if (!storage_id) {
-    const { data: info, error: info_err } = await client.storage
-      .from("library")
-      .info(path);
-    if (info_err || !info?.id) {
-      throw new Error(
-        info_err?.message ?? `library: cannot resolve storage id for ${path}`
-      );
-    }
-    storage_id = info.id;
-  }
-
-  const { data: object, error: object_err } = await client
-    .from("object")
-    .insert({
-      id: storage_id,
-      bytes: uint8Array.length,
-      category: "generated",
-      path,
-      sha256,
-      mimetype: mediaType,
-      generator: request.model,
-      prompt: request.prompt,
-      width: request.width,
-      height: request.height,
-      transparency: false,
-    })
-    .select()
-    .single();
-
-  if (object_err) {
-    // unique_violation: the same bytes are already registered (sha256 — or
-    // the id/path of the already-registered blob). First-writer-wins
-    // (WG §3.2): adopt the canonical row; this generation's prompt and
-    // generator are dropped by design.
-    if (object_err.code === "23505") {
-      const { data: existing, error: existing_err } = await client
-        .from("object")
-        .select()
-        .eq("sha256", sha256)
-        .single();
-      if (!existing_err && existing) {
-        const publicUrl = client.storage
-          .from("library")
-          .getPublicUrl(existing.path).data.publicUrl;
-        return { object: existing, publicUrl };
-      }
-    }
-    throw new Error(object_err.message);
-  }
-
-  const publicUrl = client.storage.from("library").getPublicUrl(object.path)
-    .data.publicUrl;
-
-  return { object, publicUrl };
 }
