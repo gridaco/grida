@@ -103,6 +103,12 @@ reviewer can answer that approval. A general ACP observer can inspect it.
 
 ### Plan before carrying out a task
 
+In the native Desktop workspace pane, choose **Plan** or **Act** using
+**Mode for next message**. The choice applies to the next message, including
+one you queue while the agent is working. **Send to current turn** keeps
+that turn's accepted mode. To carry out a proposal, choose **Act** and send
+a new message in the same chat.
+
 Use `--mode plan` with `run` or `serve` to investigate and prepare a proposal.
 The agent can read permitted material and ask enabled questions. Commands,
 working-copy edits, settings changes through agent tools, and timed wake-ups

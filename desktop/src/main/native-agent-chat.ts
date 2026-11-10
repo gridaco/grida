@@ -10,6 +10,7 @@ import type {
   NativeChatGoalReceipt,
   NativeChatGoalRequest,
   NativeChatMessage,
+  NativeChatOperatingRegime,
   NativeChatPage,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
@@ -38,6 +39,7 @@ import {
 
 const CAPABILITIES = {
   "co.grida/session/submit": 1,
+  "co.grida/session/operating-regime": 1,
   "co.grida/session/enqueue": 1,
   "co.grida/session/replace": 1,
   "co.grida/session/withdraw": 1,
@@ -120,6 +122,7 @@ type QueuePosition = Readonly<{
   inputId: string;
   inputPosition: number;
   goalStart?: NativeChatGoalRequest;
+  operatingRegime?: NativeChatOperatingRegime;
 }>;
 const observed = new WeakMap<
   NativeChatSnapshot,
@@ -300,24 +303,27 @@ export class NativeAgentChat {
   submit(
     session: NativeChatSession,
     inputId: string,
-    text: string
+    text: string,
+    operatingRegime?: NativeChatOperatingRegime
   ): Promise<NativeChatAcceptance> {
-    return this.send("submit", session, inputId, text);
+    return this.send("submit", session, inputId, text, operatingRegime);
   }
 
   enqueue(
     session: NativeChatSession,
     inputId: string,
-    text: string
+    text: string,
+    operatingRegime?: NativeChatOperatingRegime
   ): Promise<NativeChatAcceptance> {
-    return this.send("enqueue", session, inputId, text);
+    return this.send("enqueue", session, inputId, text, operatingRegime);
   }
 
   private async send(
     mode: "submit" | "enqueue",
     session: NativeChatSession,
     inputId: string,
-    text: string
+    text: string,
+    operatingRegime?: NativeChatOperatingRegime
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     identity(inputId);
@@ -326,6 +332,7 @@ export class NativeAgentChat {
         sessionId,
         inputId,
         prompt: textPrompt(text),
+        ...(operatingRegime && { operatingRegime }),
       }),
       sessionId,
       inputId
@@ -407,6 +414,7 @@ export class NativeAgentChat {
         inputId: row.inputId,
         preview,
         ...(row.goalStart && { goalStart: row.goalStart }),
+        ...(row.operatingRegime && { operatingRegime: row.operatingRegime }),
       });
     }
     return {
@@ -1066,6 +1074,9 @@ function queuePositions(
     return {
       inputId: identity(row.inputId),
       inputPosition: revision(row.inputPosition),
+      ...(settings.operatingRegime === "plan" && {
+        operatingRegime: "plan" as const,
+      }),
       ...(settings.goalStart === undefined
         ? {}
         : {

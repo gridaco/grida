@@ -248,7 +248,7 @@ export function NativeAgentPane({
               id: item.inputId,
               text: item.goalStart
                 ? `Goal: ${item.preview ?? item.goalStart.objective}`
-                : (item.preview ?? "Queued input with other content"),
+                : `${item.operatingRegime === "plan" ? "Plan: " : ""}${item.preview ?? "Queued input with other content"}`,
             }))}
             actions={(inputId, index) => {
               const position = queue.offset + index;
@@ -464,6 +464,22 @@ export function NativeAgentPane({
           onStop={() => void controller.control("stop")}
           toolbarStart={
             <>
+              {bridge.submitInRegime && !state.steering && (
+                <select
+                  aria-label="Mode for next message"
+                  className="rounded-md bg-transparent px-1.5 text-xs"
+                  value={state.operatingRegime}
+                  disabled={state.acting}
+                  onChange={(event) =>
+                    controller.selectOperatingRegime(
+                      event.currentTarget.value === "plan" ? "plan" : "act"
+                    )
+                  }
+                >
+                  <option value="act">Act</option>
+                  <option value="plan">Plan</option>
+                </select>
+              )}
               {running && !goalTurn ? (
                 <Button
                   type="button"

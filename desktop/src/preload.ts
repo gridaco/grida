@@ -407,6 +407,16 @@ const bridge: DesktopBridge = {
         inputId,
         text
       ),
+    submitInRegime: (action, attachmentId, inputId, text, operatingRegime) =>
+      ipcRenderer.invoke(
+        action === "enqueue"
+          ? IPC_CHANNELS.NATIVE_CHAT_ENQUEUE
+          : IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
+        attachmentId,
+        inputId,
+        text,
+        operatingRegime
+      ),
     enqueue: (attachmentId, inputId, text) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,

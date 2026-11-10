@@ -101,6 +101,41 @@ function fixture() {
   };
 }
 
+it("keeps the original mode and input identity when a draft is retried", async () => {
+  const { bridge, controller } = fixture();
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "claimed",
+      inputPosition: 1,
+      turnId: "turn-a",
+    })
+  );
+  send.mockRejectedValueOnce(new Error("fixture lost reply"));
+  bridge.submitInRegime = send;
+  await controller.select("chat-a");
+  controller.selectOperatingRegime("plan");
+  await expect(controller.submit("Investigate")).rejects.toThrow("lost reply");
+  const first = send.mock.calls[0];
+  expect(first).toEqual([
+    "submit",
+    "chat-a",
+    expect.any(String),
+    "Investigate",
+    "plan",
+  ]);
+  controller.selectOperatingRegime("act");
+  await expect(controller.submit("Investigate")).rejects.toThrow(
+    "native_chat_pending_regime_changed"
+  );
+  expect(send).toHaveBeenCalledTimes(1);
+  controller.selectOperatingRegime("plan");
+  await controller.submit("Investigate");
+  expect(send.mock.calls[1]).toEqual(first);
+  controller.disconnect();
+});
+
 it("reviews the exact pending request and removes authority on chat switch", async () => {
   const { bridge, controller, waiting } = fixture();
   waiting.add("chat-a");

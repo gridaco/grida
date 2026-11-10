@@ -4,6 +4,8 @@ export type NativeChatAttachment = Readonly<{
   sessionId: string;
 }>;
 
+export type NativeChatOperatingRegime = "act" | "plan";
+
 export type NativeChatPage = Readonly<{
   sessionIds: readonly string[];
   nextCursor: string | null;
@@ -81,6 +83,7 @@ export type NativeChatQueueItem = Readonly<{
   inputId: string;
   preview: string | null;
   goalStart?: NativeChatGoalRequest;
+  operatingRegime?: NativeChatOperatingRegime;
 }>;
 
 export type NativeChatQueuePage = Readonly<{
@@ -260,6 +263,13 @@ export type DesktopNativeChat = {
     attachmentId: string,
     inputId: string,
     text: string
+  ): Promise<NativeChatAcceptance>;
+  submitInRegime?(
+    action: "submit" | "enqueue",
+    attachmentId: string,
+    inputId: string,
+    text: string,
+    operatingRegime: NativeChatOperatingRegime
   ): Promise<NativeChatAcceptance>;
   inputReceipt(
     attachmentId: string,

@@ -108,11 +108,14 @@ it.runIf(Boolean(packaged))(
       );
       await vi.waitFor(() => expect(endpoint.requests).toHaveLength(1));
       await ipc.enqueue(event, attachmentId, "a", "Alpha next.");
-      await ipc.enqueue(event, attachmentId, "b", "Beta next.");
+      await expect(
+        ipc.enqueue(event, attachmentId, "b", "Beta next.", "invalid-mode")
+      ).rejects.toThrow("native_chat_operating_regime_invalid");
+      await ipc.enqueue(event, attachmentId, "b", "Beta next.", "plan");
       await ipc.enqueue(event, attachmentId, "c", "Gamma next.");
       expect((await page()).items).toEqual([
         { inputId: "a", preview: "Alpha next." },
-        { inputId: "b", preview: "Beta next." },
+        { inputId: "b", preview: "Beta next.", operatingRegime: "plan" },
         { inputId: "c", preview: "Gamma next." },
       ]);
       const captured = await snapshot();
@@ -152,6 +155,7 @@ it.runIf(Boolean(packaged))(
         "Beta revised.",
         "Gamma next.",
       ]);
+      expect((await page()).items[1].operatingRegime).toBe("plan");
 
       await ipc.editQueue(event, attachmentId, {
         action: "move",
@@ -210,6 +214,8 @@ it.runIf(Boolean(packaged))(
         requestId: "resume-queue",
       });
       await vi.waitFor(() => expect(endpoint.requests).toHaveLength(4));
+      expect(endpoint.requests[2]).not.toContain("Plan is active");
+      expect(endpoint.requests[3]).toContain("Plan is active");
       await vi.waitFor(async () => {
         expect((await snapshot()).snapshot.current).toBeNull();
         expect(

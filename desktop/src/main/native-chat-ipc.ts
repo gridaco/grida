@@ -9,6 +9,7 @@ import type {
   NativeChatGoalReceipt,
   NativeChatControlResult,
   NativeChatObservation,
+  NativeChatOperatingRegime,
   NativeChatPage,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
@@ -311,13 +312,15 @@ export class NativeChatIpc {
     event: IpcMainInvokeEvent,
     attachmentId: string,
     inputId: string,
-    text: string
+    text: string,
+    regime?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const result = await owner.active.chat.submit(
       attachment.session,
       inputId,
-      text
+      text,
+      operatingRegime(regime)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -327,13 +330,15 @@ export class NativeChatIpc {
     event: IpcMainInvokeEvent,
     attachmentId: string,
     inputId: string,
-    text: string
+    text: string,
+    regime?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const result = await owner.active.chat.enqueue(
       attachment.session,
       inputId,
-      text
+      text,
+      operatingRegime(regime)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -990,6 +995,13 @@ function sameBasis(
 
 function token(value: unknown): value is string {
   return typeof value === "string" && TOKEN.test(value);
+}
+
+function operatingRegime(
+  value: unknown
+): NativeChatOperatingRegime | undefined {
+  if (value === undefined || value === "act" || value === "plan") return value;
+  throw new Error("native_chat_operating_regime_invalid");
 }
 
 function requireObservation(

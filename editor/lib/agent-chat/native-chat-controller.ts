@@ -10,6 +10,7 @@ import type {
   NativeChatGoalRequest,
   NativeChatMessage,
   NativeChatObservation,
+  NativeChatOperatingRegime,
   NativeChatPage,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
@@ -48,6 +49,7 @@ export type NativeChatView = Readonly<{
   queueLoading: boolean;
   queueDraft: Readonly<{ inputId: string; text: string }> | null;
   steering: boolean;
+  operatingRegime: NativeChatOperatingRegime;
   goal: NativeChatGoalObservation | null;
   goalReady: boolean;
   loading: boolean;
@@ -81,7 +83,12 @@ type Scope = {
   pendingGoalStart?: { key: string; inputId: string };
   pendingGoalControl?: NativeChatGoalControl;
   replay: boolean;
-  pending?: { text: string; inputId: string; mode: "submit" | "enqueue" };
+  pending?: {
+    text: string;
+    inputId: string;
+    mode: "submit" | "enqueue";
+    operatingRegime?: NativeChatOperatingRegime;
+  };
   awaitingTurn?: string;
 };
 
@@ -105,6 +112,7 @@ const EMPTY: NativeChatView = Object.freeze({
   queueLoading: false,
   queueDraft: null,
   steering: false,
+  operatingRegime: "act",
   goal: null,
   goalReady: false,
   loading: false,
@@ -259,6 +267,7 @@ export class NativeChatController {
       queueLoading: false,
       queueDraft: null,
       steering: false,
+      operatingRegime: "act",
       goal: null,
       goalReady: false,
       loading: sessionId !== null,
@@ -513,35 +522,56 @@ export class NativeChatController {
     }
   }
 
+  selectOperatingRegime(operatingRegime: NativeChatOperatingRegime): void {
+    if (this.bridge.submitInRegime && !this.view.acting && !this.view.steering)
+      this.update({ operatingRegime });
+  }
+
   async submit(text: string): Promise<void> {
     const scope = this.scope;
     if (!scope || !this.canSubmit || !text.trim())
       throw new Error("native_chat_not_ready");
     if (this.view.steering) return this.submitSteering(scope, text);
     const mode = this.needsQueue ? "enqueue" : "submit";
+    const operatingRegime = this.bridge.submitInRegime
+      ? this.view.operatingRegime
+      : undefined;
     this.update({ acting: true, error: null });
     try {
       await this.open(scope);
       const attachment = this.attachment(scope);
-      const pending: NonNullable<Scope["pending"]> =
-        scope.pending?.text === text
-          ? scope.pending
-          : {
-              text,
-              inputId: crypto.randomUUID(),
-              mode,
-            };
+      const retained = scope.pending?.text === text ? scope.pending : undefined;
+      if (retained && retained.operatingRegime !== operatingRegime)
+        throw new Error("native_chat_pending_regime_changed");
+      const pending: NonNullable<Scope["pending"]> = retained ?? {
+        text,
+        inputId: crypto.randomUUID(),
+        mode,
+        operatingRegime,
+      };
       scope.pending = pending;
       let accepted;
       try {
-        const send = this.bridge[pending.mode];
-        if (!send) throw new Error("native_chat_enqueue_unavailable");
-        accepted = await send.call(
-          this.bridge,
-          attachment.attachmentId,
-          pending.inputId,
-          pending.text
-        );
+        if (pending.operatingRegime) {
+          if (!this.bridge.submitInRegime)
+            throw new Error("native_chat_operating_regime_unavailable");
+          accepted = await this.bridge.submitInRegime(
+            pending.mode,
+            attachment.attachmentId,
+            pending.inputId,
+            pending.text,
+            pending.operatingRegime
+          );
+        } else {
+          const send = this.bridge[pending.mode];
+          if (!send) throw new Error("native_chat_enqueue_unavailable");
+          accepted = await send.call(
+            this.bridge,
+            attachment.attachmentId,
+            pending.inputId,
+            pending.text
+          );
+        }
       } catch (error) {
         this.attachment(scope);
         // A lost acknowledgement does not authorize sending a second input.
@@ -1341,10 +1371,12 @@ function applyText(
 }
 
 function describe(error: unknown, fallback: string): string {
-  return error instanceof Error &&
-    error.message.includes("native_chat_transcript_too_large")
-    ? "This chat is too large to restore in the workspace pane."
-    : fallback;
+  if (!(error instanceof Error)) return fallback;
+  if (error.message.includes("native_chat_transcript_too_large"))
+    return "This chat is too large to restore in the workspace pane.";
+  if (error.message.includes("native_chat_pending_regime_changed"))
+    return "Retry this draft in its original mode, or change the text to send a new message.";
+  return fallback;
 }
 
 function revisionChanged(error: unknown): boolean {
