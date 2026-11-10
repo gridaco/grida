@@ -506,6 +506,18 @@ counting for the complete request. A remote counter receives the prepared input.
 If counting is unavailable or the input exceeds the cap, the turn records a
 failure before generation. [Agent configuration](../reference/agent-configuration.md).
 
+### Use a chat command
+
+In the native Desktop workspace pane, type `/` to see the commands supported
+by the connected host. Select one and send it on its own.
+
+- **`/fork`** makes a separate chat from the latest committed message. The
+  source stays selected. Choose **Open fork** when you are ready to switch.
+  If Desktop cannot confirm the result, retry the same command in that chat.
+- **`/compact`** summarizes earlier model context in an idle chat with an open,
+  empty queue. Use **Stop** to interrupt it. The original transcript stays
+  available. An uncertain result also preserves the previous model context.
+
 ### Branch or revise a chat
 
 Read a history page to select a committed message and its basis. A fork creates

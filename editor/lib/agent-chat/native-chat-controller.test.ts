@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   DesktopNativeChat,
+  NativeChatCommand,
+  NativeChatCommandResult,
   NativeChatCatalogEntry,
   NativeChatMessage,
   NativeChatObservation,
@@ -104,6 +106,42 @@ function fixture() {
     controller: new NativeChatController(bridge),
   };
 }
+
+it("runs only exact slash commands, preserves a lost fork identity and keeps the source selected", async () => {
+  const { bridge, controller } = fixture();
+  const submit = vi.spyOn(bridge, "submit");
+  bridge.commands = async () => ["compact", "fork"];
+  const run =
+    vi.fn<
+      (
+        attachment: string,
+        command: NativeChatCommand,
+        requestId: string
+      ) => Promise<NativeChatCommandResult>
+    >();
+  run.mockRejectedValueOnce(new Error("native_chat_command_unverified"));
+  run.mockResolvedValueOnce({ command: "fork", sessionId: "forked" });
+  bridge.runCommand = run;
+  controller.connect(null);
+  await controller.select("source");
+  await vi.waitFor(() =>
+    expect(controller.read().commands).toEqual(["compact", "fork"])
+  );
+  await expect(controller.submit(" /fork ")).rejects.toThrow(
+    "native_chat_command_unverified"
+  );
+  await expect(controller.runCommand("compact")).rejects.toThrow(
+    "native_chat_command_pending"
+  );
+  await controller.runCommand("fork");
+  expect(run.mock.calls[0]).toEqual(run.mock.calls[1]);
+  expect(submit).not.toHaveBeenCalled();
+  expect(controller.read()).toMatchObject({
+    selected: "source",
+    commandFork: "forked",
+  });
+  controller.disconnect();
+});
 
 it("keeps a cancelled deletion open and ignores replay after a confirmed retirement", async () => {
   const { bridge, controller, updates, transcripts } = fixture();

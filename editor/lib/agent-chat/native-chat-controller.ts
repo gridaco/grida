@@ -5,6 +5,8 @@ import type {
   NativeChatAttachment,
   NativeChatCatalogChange,
   NativeChatCatalogEntry,
+  NativeChatCommand,
+  NativeChatCommandResult,
   NativeChatControl,
   NativeChatGoalAction,
   NativeChatGoalControl,
@@ -47,6 +49,10 @@ export type NativeChatView = Readonly<{
   catalogEntry: NativeChatCatalogEntry | null;
   catalogEntryError: string | null;
   catalogChanging: boolean;
+  commands: readonly NativeChatCommand[];
+  commandRunning: NativeChatCommand | null;
+  commandNotice: string | null;
+  commandFork: string | null;
   catalogDraft: Readonly<{
     text: string;
     basis: NativeChatCatalogEntry;
@@ -109,6 +115,7 @@ type Scope = {
   awaitingGoalId?: string;
   pendingGoalStart?: { key: string; inputId: string };
   pendingGoalControl?: NativeChatGoalControl;
+  pendingCommand?: { command: NativeChatCommand; requestId: string };
   replay: boolean;
   pending?: {
     text: string;
@@ -133,6 +140,10 @@ const EMPTY: NativeChatView = Object.freeze({
   catalogEntry: null,
   catalogEntryError: null,
   catalogChanging: false,
+  commands: [],
+  commandRunning: null,
+  commandNotice: null,
+  commandFork: null,
   catalogDraft: null,
   messages: [],
   sideChat: null,
@@ -319,6 +330,10 @@ export class NativeChatController {
       catalogEntry: null,
       catalogEntryError: null,
       catalogChanging: false,
+      commands: [],
+      commandRunning: null,
+      commandNotice: null,
+      commandFork: null,
       catalogDraft: null,
       messages: [],
       sideChat: null,
@@ -374,6 +389,7 @@ export class NativeChatController {
       !!this.scope &&
       !this.view.loading &&
       !this.view.acting &&
+      !this.view.commandRunning &&
       !this.view.imageReading &&
       (!this.scope.image || this.view.imageInput) &&
       (this.view.steering
@@ -983,6 +999,9 @@ export class NativeChatController {
   }
 
   async submit(text: string): Promise<void> {
+    const literal = text.trim();
+    if (literal === "/compact" || literal === "/fork")
+      return this.runCommand(literal === "/compact" ? "compact" : "fork");
     const scope = this.scope;
     if (!scope || !this.canSubmit || !text.trim())
       throw new Error("native_chat_not_ready");
@@ -1115,6 +1134,100 @@ export class NativeChatController {
       throw error;
     } finally {
       if (this.owns(scope)) this.update({ acting: false });
+    }
+  }
+
+  async runCommand(command: NativeChatCommand): Promise<void> {
+    const scope = this.scope;
+    const attachment = scope?.attachment;
+    if (
+      !scope ||
+      !attachment ||
+      !this.bridge.runCommand ||
+      !this.view.commands.includes(command)
+    ) {
+      this.update({
+        error: "This command is unavailable for the selected chat.",
+      });
+      throw new Error("native_chat_command_unavailable");
+    }
+    if (this.view.commandRunning || this.view.acting)
+      throw new Error("native_chat_command_in_progress");
+    if (scope.image || this.view.imageReading) {
+      this.update({
+        error: "Remove the pending PNG before using a chat command.",
+      });
+      throw new Error("native_chat_command_image_pending");
+    }
+    const retained = scope.pendingCommand;
+    if (retained && retained.command !== command) {
+      this.update({
+        error: `Retry /${retained.command} to confirm its outcome.`,
+      });
+      throw new Error("native_chat_command_pending");
+    }
+    const snapshot = scope.observation?.snapshot;
+    if (
+      !retained &&
+      command === "compact" &&
+      (!snapshot ||
+        snapshot.current ||
+        snapshot.admissionPaused ||
+        snapshot.queuedInputs)
+    ) {
+      this.update({
+        error: "Compaction needs an idle chat with an open, empty queue.",
+      });
+      throw new Error("native_chat_compaction_requires_idle");
+    }
+    const pending = (scope.pendingCommand ??= {
+      command,
+      requestId: crypto.randomUUID(),
+    });
+    this.update({
+      commandRunning: command,
+      commandNotice: null,
+      commandFork: null,
+      error: null,
+    });
+    try {
+      const receipt = this.bridge.runCommand(
+        attachment.attachmentId,
+        command,
+        pending.requestId
+      );
+      if (command === "compact") void this.refresh(scope);
+      const result = await receipt;
+      if (!this.owns(scope)) return;
+      if (result.command !== command)
+        throw new Error("native_chat_command_unverified");
+      scope.pendingCommand = undefined;
+      if (result.command === "fork") {
+        this.update({
+          commandNotice: "Fork created.",
+          commandFork: result.sessionId,
+        });
+        void this.listChats();
+      } else {
+        this.update({ commandNotice: COMPACTION_NOTICE[result.status] });
+      }
+    } catch (error) {
+      if (this.owns(scope)) {
+        const reason = error instanceof Error ? error.message : "";
+        const uncertain = reason.includes("native_chat_command_unverified");
+        if (
+          !uncertain &&
+          !(retained && reason.includes("native_chat_command_in_progress"))
+        )
+          scope.pendingCommand = undefined;
+        this.update({ error: commandError(command, reason) });
+      }
+      throw error;
+    } finally {
+      if (this.owns(scope)) {
+        this.update({ commandRunning: null });
+        if (command === "compact") void this.refresh(scope);
+      }
     }
   }
 
@@ -1422,6 +1535,7 @@ export class NativeChatController {
       });
       this.save();
       void this.readCatalogEntry(scope);
+      void this.readCommands(scope);
       await this.renewSubscription(scope);
     });
     this.attachments = opening.catch(() => {});
@@ -1458,6 +1572,19 @@ export class NativeChatController {
       if (this.owns(scope))
         this.update({ catalogEntryError: "Couldn't load the chat details." });
       return null;
+    }
+  }
+
+  private async readCommands(scope: Scope): Promise<void> {
+    if (!scope.attachment || !this.bridge.commands || !this.bridge.runCommand)
+      return;
+    try {
+      const commands = await this.bridge.commands(
+        scope.attachment.attachmentId
+      );
+      if (this.owns(scope)) this.update({ commands });
+    } catch {
+      // An older or detached owner can leave the composer without commands.
     }
   }
 
@@ -1601,6 +1728,7 @@ export class NativeChatController {
           observable &&
           this.owns(scope) &&
           (scope.observation?.snapshot.current ||
+            this.view.commandRunning === "compact" ||
             (scope.observation?.snapshot.queuedInputs &&
               !scope.observation.snapshot.admissionPaused) ||
             scope.replay ||
@@ -1993,6 +2121,37 @@ export class NativeChatController {
       /* Browser storage may be disabled. */
     }
   }
+}
+
+const COMPACTION_NOTICE: Record<
+  Extract<NativeChatCommandResult, { command: "compact" }>["status"],
+  string
+> = {
+  running: "Compaction is still running.",
+  suspended: "Compaction is paused.",
+  interrupted:
+    "Compaction was interrupted. Earlier context is still available.",
+  installed: "Earlier context summarized. The transcript is still available.",
+  stale: "Context changed before the summary could be installed.",
+  failed: "Compaction failed. Earlier context is still available.",
+  stopped: "Compaction stopped. Earlier context is still available.",
+  uncertain:
+    "The compaction outcome is uncertain. Earlier context is still available.",
+  no_change: "There is no earlier context to summarize.",
+};
+
+function commandError(command: NativeChatCommand, reason: string): string {
+  if (reason.includes("native_chat_command_unverified"))
+    return `Couldn't confirm /${command}. Retry the same command.`;
+  if (reason.includes("history_anchor_missing"))
+    return "There is no committed message to fork yet.";
+  if (reason.includes("history_basis_changed"))
+    return "The chat changed before the fork. Try again from its current history.";
+  if (reason.includes("fork_tail_unavailable"))
+    return "This host cannot locate the latest message of a long chat.";
+  return command === "compact"
+    ? "Couldn't start compaction."
+    : "Couldn't fork this chat.";
 }
 
 function deletedAttachment(error: unknown): boolean {

@@ -138,9 +138,10 @@ async fn a_fork_captures_committed_live_history_without_starting_or_stopping_wor
     endpoint.request().await;
     let before = page(&mut socket, &source, None).await;
     assert_eq!(previews(&before), ["Initial request"]);
+    assert_eq!(before["latestAnchor"], before["messages"][0]["anchor"]);
     let fork = json!({
         "sessionId":source,"requestId":"fork-live","expectedHistory":before["basis"],
-        "anchor":before["messages"][0]["anchor"],
+        "anchor":before["latestAnchor"],
     });
     let created = ws_rpc(&mut socket, 4, "_co.grida/session/fork", fork.clone()).await;
     let destination = created["result"]["sessionId"]

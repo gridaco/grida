@@ -936,6 +936,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   chat attachment. Organization derives its target from the frame's exact
   attachment, forwards the metadata revision, and revalidates the attachment
   after the native reply.
+  The [command adapter](desktop/src/main/native-agent-commands.ts) dispatches
+  only negotiated compact and fork controls for the attached chat. Main
+  captures the fork basis and anchor together from bounded committed history
+  and rechecks the attachment before dispatch and after the reply.
   The [configuration adapter](desktop/src/main/native-agent-configuration.ts)
   keeps file revisions in Main. An owner-bound context-limit change requires a
   native confirmation of its exact value. Conversational permission requires a

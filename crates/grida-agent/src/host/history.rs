@@ -30,6 +30,7 @@ pub struct HistoryPage {
     pub basis: HistoryBasis,
     pub messages: Vec<HistoryMessage>,
     pub next_offset: Option<usize>,
+    pub latest_anchor: Option<ConversationAnchor>,
     pub seed: Option<HistoryLineage>,
 }
 
@@ -71,27 +72,7 @@ impl Host {
             .store
             .retained_history_with(session.clone(), HistorySelection::Current, project)
             .await?;
-        let anchor = history
-            .records
-            .iter()
-            .rev()
-            .find_map(|item| {
-                let HistoryRecord::Message(message) = &item.record;
-                visible_message(message).then(|| ConversationAnchor::Turn {
-                    turn: item.turn.clone(),
-                    message: message.id.clone(),
-                })
-            })
-            .or_else(|| {
-                history.seed.as_ref().and_then(|seed| {
-                    seed.records.iter().rev().find_map(|record| {
-                        let HistoryRecord::Message(message) = record;
-                        visible_message(message).then(|| ConversationAnchor::Inherited {
-                            message: message.id.clone(),
-                        })
-                    })
-                })
-            })
+        let anchor = latest_anchor(&history)
             .ok_or_else(|| problem(ErrorKind::InvalidInput, "history_anchor_missing"))?;
         self.fork_session(
             session,
@@ -146,6 +127,7 @@ impl Host {
         {
             return Err(problem(ErrorKind::Conflict, "history_basis_changed"));
         }
+        let latest_anchor = latest_anchor(&retained);
         let inherited = decode_seed(retained.seed)?;
         let lineage = inherited.as_ref().map(|seed| {
             let provenance = seed.provenance();
@@ -198,6 +180,7 @@ impl Host {
             basis: retained.basis,
             messages,
             next_offset,
+            latest_anchor,
             seed: lineage,
         })
     }
@@ -429,5 +412,33 @@ fn visible_message(message: &Message) -> bool {
         && message.content.iter().any(|part| {
             matches!(part, Content::Text(text) if !text.is_empty())
                 || matches!(part, Content::Media(media) if is_retained_image(media))
+        })
+}
+
+fn latest_anchor(history: &RetainedHistory) -> Option<ConversationAnchor> {
+    history
+        .records
+        .iter()
+        .rev()
+        .find_map(|item| {
+            let HistoryRecord::Message(message) = &item.record;
+            visible_message(message).then(|| ConversationAnchor::Turn {
+                turn: item.turn.clone(),
+                message: message.id.clone(),
+            })
+        })
+        .or_else(|| {
+            history
+                .seed
+                .as_ref()?
+                .records
+                .iter()
+                .rev()
+                .find_map(|record| {
+                    let HistoryRecord::Message(message) = record;
+                    visible_message(message).then(|| ConversationAnchor::Inherited {
+                        message: message.id.clone(),
+                    })
+                })
         })
 }

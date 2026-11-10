@@ -7,6 +7,8 @@ import type {
   NativeChatApprovalDecision,
   NativeChatCatalogChange,
   NativeChatCatalogEntry,
+  NativeChatCommand,
+  NativeChatCommandResult,
   NativeChatConfigurationInput,
   NativeChatControlReceipt,
   NativeChatGoalControl,
@@ -35,6 +37,7 @@ import {
   type ContextLimitBasis,
 } from "./native-agent-configuration";
 import { NativeAgentDeletion } from "./native-agent-deletion";
+import { NativeAgentCommands } from "./native-agent-commands";
 import {
   NativeAgentGoals,
   type NativeGoalInspection,
@@ -167,6 +170,9 @@ type TranscriptCapture = {
 };
 
 export class NativeAgentChat {
+  private readonly chatCommands = new NativeAgentCommands((method, params) =>
+    this.process.request(method, params)
+  );
   private readonly configuration = new NativeAgentConfiguration(
     (method, params) => this.process.request(method, params, 10_000)
   );
@@ -281,6 +287,32 @@ export class NativeAgentChat {
     )
       throw invalidResponse();
     return { sessionIds, nextCursor, ...(titles.length && { titles }) };
+  }
+
+  commands(session: NativeChatSession): readonly NativeChatCommand[] {
+    this.requireAttached(session);
+    return this.process.availableCommands;
+  }
+
+  async runCommand(
+    session: NativeChatSession,
+    command: NativeChatCommand,
+    requestId: string,
+    check: () => void
+  ): Promise<NativeChatCommandResult> {
+    if (!this.commands(session).includes(command))
+      throw new Error("native_chat_command_unavailable");
+    const result = await this.chatCommands.run(
+      session,
+      command,
+      identity(requestId),
+      () => {
+        this.requireAttached(session);
+        check();
+      }
+    );
+    this.requireAttached(session);
+    return result;
   }
 
   async catalogEntry(

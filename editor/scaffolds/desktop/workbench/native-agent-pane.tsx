@@ -26,7 +26,10 @@ import {
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 import type { ComposerController } from "@/kits/composer";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
-import { AgentComposerInput } from "../shared/agent-composer-input";
+import {
+  AgentComposerInput,
+  type ComposerCommandAction,
+} from "../shared/agent-composer-input";
 import { QueuedMessageRows } from "../shared/queued-messages";
 import { NativeGoalPanel } from "./native-goal-panel";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
@@ -34,6 +37,10 @@ import { NativeTurnSummary } from "./native-turn-summary";
 import { NativeContextLimitPanel } from "./native-context-limit-panel";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
+const COMMAND_DESCRIPTIONS = {
+  compact: "Summarize earlier context while keeping the transcript",
+  fork: "Create a separate chat from the latest committed message",
+};
 const MAX_DRAFT_BYTES = 512 * 1024;
 const APPROVAL_ACTION = {
   read_file: "Read file",
@@ -646,9 +653,39 @@ export function NativeAgentPane({
             </Button>
           </div>
         )}
+        {(state.commandRunning || state.commandNotice) && (
+          <div className="flex items-center gap-2 px-1 pb-1 text-xs">
+            <span role="status">
+              {state.commandRunning === "compact"
+                ? "Compacting…"
+                : state.commandRunning === "fork"
+                  ? "Creating fork…"
+                  : state.commandNotice}
+            </span>
+            {state.commandFork && (
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                onClick={() => void controller.select(state.commandFork)}
+              >
+                Open fork
+              </Button>
+            )}
+          </div>
+        )}
         <AgentComposerInput
           key={state.scope}
           catalog={TEXT_CATALOG}
+          commandActions={state.commands.map(
+            (command): ComposerCommandAction => ({
+              id: command,
+              title: command,
+              description: COMMAND_DESCRIPTIONS[command],
+              standalone: true,
+              run: () => controller.runCommand(command),
+            })
+          )}
           attach={false}
           operableFiles={false}
           awaitSubmission

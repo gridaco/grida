@@ -5,6 +5,7 @@ import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentDeletion } from "./native-agent-deletion";
+import { NativeAgentCommands } from "./native-agent-commands";
 import {
   NativeAgentPermissions,
   type NativeWorkspaceSelection,
@@ -74,6 +75,7 @@ export class NativeAgentProcess {
   private imageInput = false;
   private artifacts = false;
   private savedChatDeletion = false;
+  private readonly commandCapabilities = new Set<string>();
   private observedExit = false;
   private shutdown: Promise<void> | undefined;
   private failure: Error | undefined;
@@ -137,6 +139,14 @@ export class NativeAgentProcess {
 
   get acceptsSavedChatDeletion(): boolean {
     return this.connected && this.savedChatDeletion;
+  }
+
+  get availableCommands() {
+    return this.connected
+      ? NativeAgentCommands.available((key) =>
+          this.commandCapabilities.has(key)
+        )
+      : [];
   }
 
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
@@ -245,6 +255,7 @@ export class NativeAgentProcess {
             clientCapabilities: {
               _meta: {
                 ...capabilities,
+                ...NativeAgentCommands.capabilities,
                 [NativeAgentArtifacts.capability]: 1,
                 ...(requestDeletion && { [NativeAgentDeletion.capability]: 1 }),
               },
@@ -267,6 +278,9 @@ export class NativeAgentProcess {
       }
       processOwner.imageInput =
         object(agentCapabilities?.promptCapabilities)?.image === true;
+      for (const key of Object.keys(NativeAgentCommands.capabilities)) {
+        if (advertised?.[key] === 1) processOwner.commandCapabilities.add(key);
+      }
       processOwner.artifacts =
         advertised?.[NativeAgentArtifacts.capability] === 1;
       processOwner.savedChatDeletion =

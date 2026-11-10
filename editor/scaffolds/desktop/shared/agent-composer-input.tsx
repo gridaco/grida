@@ -83,6 +83,7 @@ export type ComposerCommandAction = {
   id: string;
   title: string;
   description?: string;
+  standalone?: true;
   run: () => void | Promise<void>;
 };
 
@@ -501,6 +502,50 @@ function AgentComposerInner({
       .filter((p) => p.type === "command")
       .map((p) => (p as { id: string }).id)
       .filter((id) => actionById.has(id));
+    const parts = message.parts.filter(
+      (part) => part.type !== "text" || part.text.trim()
+    );
+    const first = parts[0];
+    const literal =
+      parts.length === 1 &&
+      first?.type === "text" &&
+      first.text.trim().startsWith("/")
+        ? actionById.get(first.text.trim().slice(1))
+        : undefined;
+    const standalone =
+      actions
+        .map((id) => actionById.get(id))
+        .find((action) => action?.standalone) ??
+      (literal?.standalone ? literal : undefined);
+    if (standalone) {
+      if (parts.length !== 1 || message.meta.attachments.length) {
+        notify(`Send /${standalone.id} on its own.`);
+        return;
+      }
+      const lease = queueSubmitGuard.begin(submissionScope);
+      if (!lease) return;
+      setQueueingLease(lease);
+      try {
+        await standalone.run();
+        if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
+          const current = composer.submit({
+            submitted_at: message.meta.submitted_at,
+            allow_empty: true,
+          });
+          if (current && isSameComposerDraft(message, current))
+            composer.clear();
+          notify(null);
+        }
+      } catch {
+        if (queueSubmitGuard.owns(lease, submissionScopeRef.current))
+          notify("Couldn't confirm the command — your draft is still here.");
+      } finally {
+        if (queueSubmitGuard.finish(lease)) {
+          setQueueingLease((current) => (current === lease ? null : current));
+        }
+      }
+      return;
+    }
     if (actions.length > 0) {
       preparedResources.current.clear();
       composer.clear();

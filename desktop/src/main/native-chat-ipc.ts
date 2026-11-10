@@ -6,6 +6,8 @@ import type {
   NativeChatAttachment,
   NativeChatApproval,
   NativeChatCatalogEntry,
+  NativeChatCommand,
+  NativeChatCommandResult,
   NativeChatConfigurationInput,
   NativeChatControlReceipt,
   NativeChatGoalObservation,
@@ -100,6 +102,8 @@ export type ActiveNativeChat = Readonly<{
         | "acceptsSavedChatDeletion"
         | "deleteSavedChat"
         | "ownsSession"
+        | "commands"
+        | "runCommand"
         | "readArtifact"
       >
     >;
@@ -288,6 +292,35 @@ export class NativeChatIpc {
     sessionId: string
   ): Promise<NativeChatAttachment> {
     return this.attach(event, (chat) => chat.load(sessionId));
+  }
+
+  commands(
+    event: IpcMainInvokeEvent,
+    attachmentId: string
+  ): readonly NativeChatCommand[] {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    return owner.active.chat.commands?.(attachment.session) ?? [];
+  }
+
+  async runCommand(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    command: unknown,
+    requestId: unknown
+  ): Promise<NativeChatCommandResult> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    if ((command !== "compact" && command !== "fork") || !token(requestId))
+      throw new Error("native_chat_command_invalid");
+    const chat = owner.active.chat;
+    if (!chat.runCommand) throw new Error("native_chat_command_unavailable");
+    const result = await chat.runCommand(
+      attachment.session,
+      command,
+      requestId,
+      () => this.revalidate(owner, attachment)
+    );
+    this.revalidate(owner, attachment);
+    return result;
   }
 
   async catalogEntry(

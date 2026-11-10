@@ -233,6 +233,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, id: string, observationId: unknown, catalogRevision: unknown) =>
       nativeChat.deleteSavedChat(event, id, observationId, catalogRevision)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_COMMANDS, (event, id: string) =>
+    nativeChat.commands(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_RUN_COMMAND,
+    (event, id: string, command: unknown, requestId: unknown) =>
+      nativeChat.runCommand(event, id, command, requestId)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_CREATE, (event) => nativeChat.create(event));
   guarded(IPC_CHANNELS.NATIVE_CHAT_LOAD, (event, id: string) =>
     nativeChat.load(event, id)

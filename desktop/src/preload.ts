@@ -387,6 +387,15 @@ const bridge: DesktopBridge = {
         observationId,
         catalogRevision
       ),
+    commands: (attachmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_COMMANDS, attachmentId),
+    runCommand: (attachmentId, command, requestId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_RUN_COMMAND,
+        attachmentId,
+        command,
+        requestId
+      ),
     create: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
     load: (sessionId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),

@@ -207,8 +207,10 @@ reports selected skill versions and the project instruction revision when
 present. These sources supply model context without changing tool permissions.
 
 History returns `basis`, `sessionRevision`, up to 128 `messages`, `nextOffset`,
-and optional `seed` provenance. Echo the basis as `expectedHistory` on later
-pages and writes. A changed basis requires a fresh history read. Anchors are
+and optional `seed` provenance. It also returns `latestAnchor` for the latest
+visible message in that same basis, or null for an empty view. Older hosts
+may omit this field. Echo the basis as `expectedHistory` on later pages and
+writes. A changed basis requires a fresh history read. Anchors are
 scoped to the selected view and carry either a local turn and message ID or an
 inherited message ID. `view` can read an earlier retained view. Standard session
 load replays the current view in the same causal order.

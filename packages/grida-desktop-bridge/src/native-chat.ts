@@ -6,6 +6,24 @@ export type NativeChatAttachment = Readonly<{
 
 export type NativeChatOperatingRegime = "act" | "plan";
 
+export type NativeChatCommand = "compact" | "fork";
+export type NativeChatCommandResult =
+  | Readonly<{ command: "fork"; sessionId: string }>
+  | Readonly<{
+      command: "compact";
+      turnId: string | null;
+      status:
+        | "running"
+        | "suspended"
+        | "interrupted"
+        | "installed"
+        | "stale"
+        | "failed"
+        | "stopped"
+        | "uncertain"
+        | "no_change";
+    }>;
+
 export type NativeChatImageInput = Readonly<{
   action: "submit" | "enqueue";
   inputId: string;
@@ -330,6 +348,12 @@ export type DesktopNativeChat = {
     catalogRevision: number
   ): Promise<boolean>;
   create(): Promise<NativeChatAttachment>;
+  commands?(attachmentId: string): Promise<readonly NativeChatCommand[]>;
+  runCommand?(
+    attachmentId: string,
+    command: NativeChatCommand,
+    requestId: string
+  ): Promise<NativeChatCommandResult>;
   load(sessionId: string): Promise<NativeChatAttachment>;
   openSideChat?(
     attachmentId: string,
