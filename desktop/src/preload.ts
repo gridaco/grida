@@ -459,6 +459,29 @@ const bridge: DesktopBridge = {
     observe: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
     acceptsPng: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
+    acceptsWakeups: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_WAKEUPS),
+    submitWithWakeup: (attachmentId, inputId, text) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_WAKEUP,
+        attachmentId,
+        inputId,
+        text
+      ),
+    scheduledWakeup: (attachmentId, observationId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SCHEDULED_WAKEUP,
+        attachmentId,
+        observationId
+      ),
+    controlWakeup: (attachmentId, observationId, waitId, action) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CONTROL_WAKEUP,
+        attachmentId,
+        observationId,
+        waitId,
+        action
+      ),
     contextLimit: () =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT),
     saveContextLimit: (reviewId, limit) =>

@@ -6,6 +6,7 @@ import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type {
   NativeChatSnapshot,
   NativeChatStreamUpdate,
+  NativeChatWakeup,
 } from "@grida/desktop-bridge";
 import { describe, expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "../bridge/contract";
@@ -28,6 +29,95 @@ const UPDATE = {
   offsetBytes: 0,
   replace: true,
 } as const;
+
+it("scopes a scheduled check-in and its controls to the attached, observed turn", async () => {
+  const { ipc, chat, first, second } = setup();
+  const a = await ipc.load(first.event, "chat-a");
+  const b = await ipc.load(second.event, "chat-b");
+  expect(ipc.acceptsWakeups(first.event)).toBe(false);
+  Object.defineProperty(chat, "acceptsWakeups", { value: true });
+  chat.submitWithWakeup = vi.fn<typeof chat.submit>(chat.submit);
+  let schedule: NativeChatWakeup = {
+    turnId: "turn",
+    waitId: "wait",
+    dueAtMs: 1_800_000_000_000,
+    reason: "Check the export",
+    status: "waiting",
+    armed: true,
+  };
+  chat.scheduledWakeup = async (session) =>
+    session.id === "chat-a" ? schedule : null;
+  chat.controlWakeup = vi.fn<NonNullable<typeof chat.controlWakeup>>(
+    async (_session, _snapshot, _wait, action) => {
+      expect(action).toBe("cancel");
+      schedule = { ...schedule, armed: false, status: "cancelled" };
+      return schedule;
+    }
+  );
+  const observe = chat.observe.bind(chat);
+  chat.observe = async (session) => {
+    const snapshot = await observe(session);
+    return {
+      ...snapshot,
+      current: { ...snapshot.current!, disposition: "suspended" },
+    };
+  };
+  const aObserved = await ipc.observe(first.event, a.attachmentId);
+  const bObserved = await ipc.observe(second.event, b.attachmentId);
+  expect(ipc.acceptsWakeups(first.event)).toBe(true);
+  await expect(
+    ipc.submitWithWakeup(first.event, a.attachmentId, "input", "Check once")
+  ).resolves.toMatchObject({ sessionId: "chat-a", inputId: "input" });
+  await expect(
+    ipc.scheduledWakeup(first.event, a.attachmentId, aObserved.observationId)
+  ).resolves.toEqual(schedule);
+  await expect(
+    ipc.scheduledWakeup(second.event, b.attachmentId, aObserved.observationId)
+  ).rejects.toThrow("native_chat_observation_unavailable");
+  await expect(
+    ipc.controlWakeup(
+      second.event,
+      b.attachmentId,
+      bObserved.observationId,
+      "wait",
+      "cancel"
+    )
+  ).rejects.toThrow("native_chat_wakeup_changed");
+  await expect(
+    ipc.controlWakeup(
+      first.event,
+      a.attachmentId,
+      aObserved.observationId,
+      "other",
+      "cancel"
+    )
+  ).rejects.toThrow("native_chat_wakeup_changed");
+  await expect(
+    ipc.controlWakeup(
+      first.event,
+      a.attachmentId,
+      aObserved.observationId,
+      "wait",
+      "cancel"
+    )
+  ).resolves.toMatchObject({ status: "cancelled", armed: false });
+  expect(chat.controlWakeup).toHaveBeenCalledTimes(1);
+  const resume = vi.spyOn(chat, "resume");
+  await expect(
+    ipc.control(first.event, a.attachmentId, {
+      action: "resume",
+      requestId: "continue",
+      observationId: aObserved.observationId,
+      cancelledWakeupId: "wait",
+    })
+  ).resolves.toMatchObject({ action: "resume" });
+  expect(resume).toHaveBeenCalledWith(
+    expect.objectContaining({ id: "chat-a" }),
+    expect.objectContaining({ sessionId: "chat-a" }),
+    "continue",
+    "wait"
+  );
+});
 
 function windowAt(url = WORKSPACE_URL) {
   let loading = false;

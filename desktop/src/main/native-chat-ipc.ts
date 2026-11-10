@@ -28,6 +28,7 @@ import type {
   NativeChatSnapshot,
   NativeChatTurnSummary,
   NativeChatUpdate,
+  NativeChatWakeup,
   NativeContextLimit,
   NativeContextLimitResult,
 } from "@grida/desktop-bridge";
@@ -46,6 +47,7 @@ import {
   type ContextLimitBasis,
 } from "./native-agent-configuration";
 import { NativeAgentDeletion } from "./native-agent-deletion";
+import { NativeAgentWakeups } from "./native-agent-wakeups";
 
 const MAX_ATTACHMENTS = 16;
 const MAX_OBSERVATIONS = 16;
@@ -105,6 +107,10 @@ export type ActiveNativeChat = Readonly<{
         | "commands"
         | "runCommand"
         | "readArtifact"
+        | "acceptsWakeups"
+        | "submitWithWakeup"
+        | "scheduledWakeup"
+        | "controlWakeup"
       >
     >;
 }>;
@@ -532,6 +538,95 @@ export class NativeChatIpc {
     );
     this.revalidate(owner, attachment);
     return result;
+  }
+
+  acceptsWakeups(event: IpcMainInvokeEvent): boolean {
+    return this.owner(event).active.chat.acceptsWakeups === true;
+  }
+
+  async submitWithWakeup(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    inputId: string,
+    text: string
+  ): Promise<NativeChatAcceptance> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (!chat.acceptsWakeups || !chat.submitWithWakeup)
+      throw new Error("native_chat_wakeup_unavailable");
+    const result = await chat.submitWithWakeup(
+      attachment.session,
+      inputId,
+      text
+    );
+    this.revalidate(owner, attachment);
+    return result;
+  }
+
+  async scheduledWakeup(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string
+  ): Promise<NativeChatWakeup | null> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = requireObservation(attachment, observationId);
+    const chat = owner.active.chat;
+    if (!chat.acceptsWakeups || !chat.scheduledWakeup) return null;
+    const selected = NativeAgentWakeups.turn(snapshot);
+    if (!selected) return null;
+    const requireCurrent = () => {
+      const latest = attachment.latestObservation;
+      if (
+        !latest ||
+        NativeAgentWakeups.turn(latest)?.turnId !== selected.turnId
+      )
+        throw new Error("native_chat_wakeup_changed");
+    };
+    requireCurrent();
+    const result = await chat.scheduledWakeup(attachment.session, snapshot);
+    this.revalidate(owner, attachment);
+    requireCurrent();
+    return result;
+  }
+
+  async controlWakeup(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string,
+    waitId: unknown,
+    action: unknown
+  ): Promise<NativeChatWakeup> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = requireObservation(attachment, observationId);
+    const chat = owner.active.chat;
+    const turn = snapshot.current;
+    const requireCurrent = () => {
+      const latest = attachment.latestObservation?.current;
+      if (!turn || latest?.turnId !== turn.turnId || latest.cancelled)
+        throw new Error("native_chat_wakeup_changed");
+    };
+    if (
+      !chat.acceptsWakeups ||
+      !chat.scheduledWakeup ||
+      !chat.controlWakeup ||
+      typeof waitId !== "string" ||
+      (action !== "cancel" && action !== "recover")
+    )
+      throw new Error("native_chat_wakeup_unavailable");
+    requireCurrent();
+    const schedule = await chat.scheduledWakeup(attachment.session, snapshot);
+    this.revalidate(owner, attachment);
+    requireCurrent();
+    if (schedule?.waitId !== waitId)
+      throw new Error("native_chat_wakeup_changed");
+    const updated = await chat.controlWakeup(
+      attachment.session,
+      snapshot,
+      waitId,
+      action
+    );
+    this.revalidate(owner, attachment);
+    return updated;
   }
 
   async inputReceipt(
@@ -1045,15 +1140,38 @@ export class NativeChatIpc {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const control = record(input);
     const action = control?.action;
+    const cancelledWakeupId = control?.cancelledWakeupId;
     if (
       (action !== "pause" && action !== "stop" && action !== "resume") ||
       !token(control?.observationId) ||
-      typeof control?.requestId !== "string"
+      typeof control?.requestId !== "string" ||
+      (cancelledWakeupId !== undefined &&
+        (action !== "resume" || typeof cancelledWakeupId !== "string"))
     )
       throw new Error("native_chat_control_invalid");
     const snapshot = attachment.observations.get(control.observationId);
     if (!snapshot) throw new Error("native_chat_observation_unavailable");
     const { chat } = owner.active;
+    if (cancelledWakeupId !== undefined) {
+      const turn = snapshot.current;
+      if (
+        !chat.acceptsWakeups ||
+        !chat.scheduledWakeup ||
+        !turn ||
+        turn.paused ||
+        turn.cancelled ||
+        turn.disposition !== "suspended"
+      )
+        throw new Error("native_chat_wakeup_unavailable");
+      const schedule = await chat.scheduledWakeup(attachment.session, snapshot);
+      this.revalidate(owner, attachment);
+      if (
+        schedule?.waitId !== cancelledWakeupId ||
+        schedule.status !== "cancelled" ||
+        schedule.turnId !== turn.turnId
+      )
+        throw new Error("native_chat_wakeup_changed");
+    }
     const result =
       action === "resume"
         ? ({
@@ -1061,7 +1179,8 @@ export class NativeChatIpc {
             turn: await chat.resume(
               attachment.session,
               snapshot,
-              control.requestId
+              control.requestId,
+              cancelledWakeupId
             ),
           } as const)
         : ({

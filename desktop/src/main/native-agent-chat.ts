@@ -29,8 +29,11 @@ import type {
   NativeChatStreamUpdate,
   NativeChatTurn,
   NativeChatTurnSummary,
+  NativeChatWakeup,
+  NativeChatWakeupAction,
 } from "@grida/desktop-bridge";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
+import { NativeAgentWakeups } from "./native-agent-wakeups";
 import type { NativeApprovalReview } from "./native-agent-permissions";
 import {
   NativeAgentConfiguration,
@@ -202,6 +205,10 @@ export class NativeAgentChat {
 
   get acceptsPng(): boolean {
     return this.connected && this.process.acceptsPng;
+  }
+
+  get acceptsWakeups(): boolean {
+    return this.connected && this.process.acceptsWakeups;
   }
 
   get acceptsSavedChatDeletion(): boolean {
@@ -471,6 +478,56 @@ export class NativeAgentChat {
     return this.send("enqueue", session, inputId, text, operatingRegime);
   }
 
+  submitWithWakeup(
+    session: NativeChatSession,
+    inputId: string,
+    text: string
+  ): Promise<NativeChatAcceptance> {
+    if (!this.acceptsWakeups)
+      return Promise.reject(new Error("native_chat_wakeup_unavailable"));
+    return this.send("submit", session, inputId, text, "act", {
+      allowWakeups: true,
+    });
+  }
+
+  async scheduledWakeup(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot
+  ): Promise<NativeChatWakeup | null> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const selected = NativeAgentWakeups.turn(snapshot);
+    if (!this.acceptsWakeups || !selected) return null;
+    const turnId = selected.turnId;
+    const response = await this.process.request(
+      NativeAgentWakeups.methods.read,
+      { sessionId, turnId },
+      10_000
+    );
+    this.requireAttached(session);
+    return NativeAgentWakeups.decode(response, sessionId, turnId);
+  }
+
+  async controlWakeup(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    waitId: string,
+    action: NativeChatWakeupAction
+  ): Promise<NativeChatWakeup> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const turnId = snapshot.current?.turnId;
+    if (!this.acceptsWakeups || !turnId || snapshot.current?.cancelled)
+      throw new Error("native_chat_wakeup_unavailable");
+    const response = await this.process.request(
+      NativeAgentWakeups.methods[action],
+      { sessionId, turnId, waitId: identity(waitId) },
+      10_000
+    );
+    this.requireAttached(session);
+    const wakeup = NativeAgentWakeups.decode(response, sessionId, turnId);
+    if (wakeup?.waitId !== waitId) throw invalidResponse();
+    return wakeup;
+  }
+
   async submitImage(
     session: NativeChatSession,
     value: unknown
@@ -486,7 +543,7 @@ export class NativeAgentChat {
       identity(input.inputId),
       input.text,
       choice(input.operatingRegime, ["act", "plan"] as const),
-      pngPrompt(input.png)
+      { image: pngPrompt(input.png) }
     );
   }
 
@@ -496,11 +553,15 @@ export class NativeAgentChat {
     inputId: string,
     text: string,
     operatingRegime?: NativeChatOperatingRegime,
-    image?: ReturnType<typeof pngPrompt>,
-    allowConfigurationChanges = false
+    options: {
+      image?: ReturnType<typeof pngPrompt>;
+      allowConfigurationChanges?: true;
+      allowWakeups?: true;
+    } = {}
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     identity(inputId);
+    const { image, allowConfigurationChanges, allowWakeups } = options;
     return acceptance(
       await this.process.request(`_co.grida/session/${mode}`, {
         sessionId,
@@ -508,6 +569,7 @@ export class NativeAgentChat {
         prompt: [...textPrompt(text), ...(image ? [image] : [])],
         ...(operatingRegime && { operatingRegime }),
         ...(allowConfigurationChanges && { allowConfigurationChanges }),
+        ...(allowWakeups && { allowWakeups }),
       }),
       sessionId,
       inputId
@@ -538,8 +600,7 @@ export class NativeAgentChat {
         input.inputId,
         input.text,
         "act",
-        undefined,
-        true
+        { allowConfigurationChanges: true }
       );
     } catch (error) {
       if (
@@ -1083,13 +1144,16 @@ export class NativeAgentChat {
   async resume(
     session: NativeChatSession,
     snapshot: NativeChatSnapshot,
-    requestId: string
+    requestId: string,
+    cancelledWakeupId?: string
   ): Promise<NativeChatTurn> {
     const { task, current } = this.task(session, snapshot, requestId);
     if (
       current.disposition !== "suspended" ||
-      !current.paused ||
-      current.cancelled
+      current.cancelled ||
+      (cancelledWakeupId === undefined
+        ? !current.paused
+        : current.paused || !this.acceptsWakeups)
     )
       throw new Error("native_chat_verified_pause_required");
     const response = object(
@@ -1097,6 +1161,9 @@ export class NativeAgentChat {
         task,
         expectedEpoch: current.epoch,
         expectedJournalPosition: current.journalPosition,
+        ...(cancelledWakeupId !== undefined && {
+          cancelledWakeupId: identity(cancelledWakeupId),
+        }),
       })
     );
     const resumed = turn(response.turn);

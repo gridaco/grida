@@ -990,6 +990,14 @@ lazy reads, read-only mutation, and symlink escape refusal.
   A queued goal retains its start request across restart. The Host refuses
   generic replacement while the goal is queued. Withdrawal uses the original
   input identity and the observed queue revision.
+- The [Desktop check-in adapter](desktop/src/main/native-agent-wakeups.ts)
+  projects one bounded timer for the attached chat's observed task. An Act
+  submission must opt in explicitly. The renderer receives the wait identity,
+  due time, reason, and status. The scheduled continuation stays in the host.
+  [Main](desktop/src/main/native-chat-ipc.ts) rechecks the frame and the exact
+  wait before cancel, restore, or continuation after cancellation. The
+  [process fixture](desktop/src/main/native-agent-wakeups.test.ts) covers
+  cancellation, explicit continuation, and restore through a native restart.
 - The [Desktop approval coordinator](desktop/src/main/native-agent-permissions.ts)
   derives a read profile from main-owned workspace selection. An approval
   answer takes a review issued by the coordinator for the exact session,

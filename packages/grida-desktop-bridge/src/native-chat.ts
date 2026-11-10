@@ -118,6 +118,17 @@ export type NativeChatObservation = Readonly<{
   snapshot: NativeChatSnapshot;
 }>;
 
+export type NativeChatWakeup = Readonly<{
+  turnId: string;
+  waitId: string;
+  dueAtMs: number;
+  reason: string;
+  status: "waiting" | "paused" | "delivered" | "cancelled" | "stopped";
+  armed: boolean;
+}>;
+
+export type NativeChatWakeupAction = "cancel" | "recover";
+
 export type NativeChatImageArtifact = Readonly<{
   id: string;
   kind: "image";
@@ -174,6 +185,7 @@ export type NativeChatControl = Readonly<{
   action: "pause" | "stop" | "resume";
   observationId: string;
   requestId: string;
+  cancelledWakeupId?: string;
 }>;
 
 export type NativeChatQueueItem = Readonly<{
@@ -387,6 +399,22 @@ export type DesktopNativeChat = {
     operatingRegime: NativeChatOperatingRegime
   ): Promise<NativeChatAcceptance>;
   acceptsPng?(): Promise<boolean>;
+  acceptsWakeups?(): Promise<boolean>;
+  submitWithWakeup?(
+    attachmentId: string,
+    inputId: string,
+    text: string
+  ): Promise<NativeChatAcceptance>;
+  scheduledWakeup?(
+    attachmentId: string,
+    observationId: string
+  ): Promise<NativeChatWakeup | null>;
+  controlWakeup?(
+    attachmentId: string,
+    observationId: string,
+    waitId: string,
+    action: NativeChatWakeupAction
+  ): Promise<NativeChatWakeup>;
   submitImage?(
     attachmentId: string,
     input: NativeChatImageInput

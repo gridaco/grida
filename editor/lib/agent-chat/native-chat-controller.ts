@@ -26,6 +26,8 @@ import type {
   NativeChatTextUpdate,
   NativeChatTurnSummary,
   NativeChatUpdate,
+  NativeChatWakeup,
+  NativeChatWakeupAction,
   NativeContextLimit,
 } from "@grida/desktop-bridge";
 import { NativeSideChatController } from "./native-side-chat-controller";
@@ -62,6 +64,10 @@ export type NativeChatView = Readonly<{
   imageInput: boolean;
   imageReading: boolean;
   imageDraft: Readonly<{ name: string; size: number }> | null;
+  wakeupsAvailable: boolean;
+  allowWakeup: boolean;
+  scheduledWakeup: NativeChatWakeup | null;
+  wakeupError: string | null;
   contextLimitOpen: boolean;
   contextLimit: NativeContextLimit | null;
   contextLimitDraft: string;
@@ -95,6 +101,9 @@ type Scope = {
   sideChat?: NativeSideChatController;
   image?: ArrayBuffer;
   imageRead?: object;
+  wakeupRead?: { observationId: string };
+  wakeupSettled?: string;
+  pendingWakeupContinue?: NativeChatControl;
   opening?: Promise<void>;
   refreshing?: Promise<void>;
   timer?: ReturnType<typeof setTimeout>;
@@ -124,6 +133,7 @@ type Scope = {
     operatingRegime?: NativeChatOperatingRegime;
     image?: ArrayBuffer;
     reviewConfiguration: boolean;
+    allowWakeup: boolean;
   };
   awaitingTurn?: string;
 };
@@ -150,6 +160,10 @@ const EMPTY: NativeChatView = Object.freeze({
   imageInput: false,
   imageReading: false,
   imageDraft: null,
+  wakeupsAvailable: false,
+  allowWakeup: false,
+  scheduledWakeup: null,
+  wakeupError: null,
   contextLimitOpen: false,
   contextLimit: null,
   contextLimitDraft: "",
@@ -340,6 +354,10 @@ export class NativeChatController {
       imageInput: false,
       imageReading: false,
       imageDraft: null,
+      wakeupsAvailable: false,
+      allowWakeup: false,
+      scheduledWakeup: null,
+      wakeupError: null,
       contextLimitOpen: false,
       contextLimit: null,
       contextLimitDraft: "",
@@ -366,6 +384,7 @@ export class NativeChatController {
       error: null,
     });
     void this.readImageCapability(scope);
+    void this.readWakeupCapability(scope);
     if (sessionId === null) {
       this.save();
       return;
@@ -396,7 +415,9 @@ export class NativeChatController {
         ? this.canSteer &&
           this.scope.steeringTarget ===
             this.view.observation?.snapshot.current?.turnId
-        : !this.needsQueue || !!this.bridge.enqueue)
+        : !this.needsQueue ||
+          !!this.bridge.enqueue ||
+          (this.view.allowWakeup && !!this.scope.pending?.allowWakeup))
     );
   }
 
@@ -407,7 +428,8 @@ export class NativeChatController {
       !this.view.loading &&
       !this.view.acting &&
       !this.view.steering &&
-      !this.view.reviewConfiguration
+      !this.view.reviewConfiguration &&
+      !this.view.allowWakeup
     );
   }
 
@@ -466,6 +488,42 @@ export class NativeChatController {
     if (this.owns(scope)) this.update({ imageInput: supported === true });
   }
 
+  private async readWakeupCapability(scope: Scope): Promise<void> {
+    if (
+      !this.bridge.acceptsWakeups ||
+      !this.bridge.submitWithWakeup ||
+      !this.bridge.scheduledWakeup ||
+      !this.bridge.controlWakeup
+    )
+      return;
+    const supported = await this.bridge.acceptsWakeups().catch(() => false);
+    if (!this.owns(scope)) return;
+    this.update({ wakeupsAvailable: supported });
+    if (supported && scope.attachment && scope.observation)
+      this.refreshWakeup(scope, scope.attachment, scope.observation);
+  }
+
+  get canAllowWakeup(): boolean {
+    return (
+      !!this.scope &&
+      this.view.wakeupsAvailable &&
+      this.view.operatingRegime === "act" &&
+      !this.view.loading &&
+      !this.view.acting &&
+      !this.view.commandRunning &&
+      !this.view.steering &&
+      !this.view.reviewConfiguration &&
+      !this.scope.image &&
+      !this.scope.imageRead &&
+      (!this.needsQueue || this.scope.pending?.allowWakeup === true)
+    );
+  }
+
+  setAllowWakeup(requested: boolean): void {
+    if (!this.view.acting && (!requested || this.canAllowWakeup))
+      this.update({ allowWakeup: requested, error: null });
+  }
+
   get hasContextLimit(): boolean {
     return !!this.bridge.contextLimit && !!this.bridge.saveContextLimit;
   }
@@ -479,6 +537,7 @@ export class NativeChatController {
       this.view.operatingRegime === "act" &&
       !this.view.steering &&
       !this.view.acting &&
+      !this.view.allowWakeup &&
       !this.scope.image &&
       !this.scope.imageRead
     );
@@ -817,6 +876,7 @@ export class NativeChatController {
       !this.scope?.image &&
       !this.scope?.imageRead &&
       !this.view.reviewConfiguration &&
+      !this.view.allowWakeup &&
       !!turn &&
       !turn.cancelled &&
       (turn.disposition === "running" || turn.disposition === "suspended")
@@ -994,7 +1054,10 @@ export class NativeChatController {
     if (this.bridge.submitInRegime && !this.view.acting && !this.view.steering)
       this.update({
         operatingRegime,
-        ...(operatingRegime === "plan" && { reviewConfiguration: false }),
+        ...(operatingRegime === "plan" && {
+          reviewConfiguration: false,
+          allowWakeup: false,
+        }),
       });
   }
 
@@ -1008,7 +1071,23 @@ export class NativeChatController {
     if (this.view.steering) return this.submitSteering(scope, text);
     const mode = this.needsQueue ? "enqueue" : "submit";
     const image = scope.image;
+    const allowWakeup = this.view.allowWakeup;
     const reviewConfiguration = this.view.reviewConfiguration;
+    const retained =
+      scope.pending?.text === text && scope.pending.image === image
+        ? scope.pending
+        : undefined;
+    if (retained && retained.allowWakeup !== allowWakeup) {
+      const error =
+        "Retry with the original check-in permission, or edit the message to send a new one.";
+      this.update({ error });
+      throw new Error(error);
+    }
+    if (allowWakeup && !retained && (!this.canAllowWakeup || this.needsQueue)) {
+      const error = "Allow a check-in when sending from an idle Act chat.";
+      this.update({ error });
+      throw new Error(error);
+    }
     if (reviewConfiguration && !this.canReviewConfiguration)
       throw new Error("native_context_limit_unavailable");
     if (
@@ -1020,17 +1099,13 @@ export class NativeChatController {
       throw new Error(error);
     }
     const operatingRegime =
-      image || reviewConfiguration || this.bridge.submitInRegime
+      image || reviewConfiguration || allowWakeup || this.bridge.submitInRegime
         ? this.view.operatingRegime
         : undefined;
     this.update({ acting: true, error: null });
     try {
       await this.open(scope);
       const attachment = this.attachment(scope);
-      const retained =
-        scope.pending?.text === text && scope.pending.image === image
-          ? scope.pending
-          : undefined;
       if (retained && retained.operatingRegime !== operatingRegime)
         throw new Error("native_chat_pending_regime_changed");
       if (retained && retained.reviewConfiguration !== reviewConfiguration)
@@ -1042,11 +1117,20 @@ export class NativeChatController {
         operatingRegime,
         image,
         reviewConfiguration,
+        allowWakeup,
       };
       scope.pending = pending;
       let accepted;
       try {
-        if (pending.reviewConfiguration) {
+        if (pending.allowWakeup) {
+          if (!this.bridge.submitWithWakeup || !this.view.wakeupsAvailable)
+            throw new Error("native_chat_wakeup_unavailable");
+          accepted = await this.bridge.submitWithWakeup(
+            attachment.attachmentId,
+            pending.inputId,
+            pending.text
+          );
+        } else if (pending.reviewConfiguration) {
           if (!this.bridge.submitWithConfigurationReview)
             throw new Error("native_context_limit_unavailable");
           accepted = await this.bridge.submitWithConfigurationReview(
@@ -1089,7 +1173,7 @@ export class NativeChatController {
         }
       } catch (error) {
         this.attachment(scope);
-        if (pending.reviewConfiguration) throw error;
+        if (pending.reviewConfiguration || pending.allowWakeup) throw error;
         // A lost acknowledgement does not authorize sending a second input.
         accepted = await this.bridge
           .inputReceipt(attachment.attachmentId, pending.inputId)
@@ -1101,6 +1185,7 @@ export class NativeChatController {
       if (this.owns(scope)) {
         if (pending.reviewConfiguration)
           this.update({ reviewConfiguration: false });
+        if (pending.allowWakeup) this.update({ allowWakeup: false });
         if (pending.image && scope.image === pending.image) {
           scope.image = undefined;
           this.update({ imageDraft: null });
@@ -1392,13 +1477,35 @@ export class NativeChatController {
     )
       return;
     const observationId = scope.observation.observationId;
+    const turn = scope.observation.snapshot.current;
+    const wakeup = this.view.scheduledWakeup;
+    const cancelledWakeupId =
+      action === "resume" &&
+      turn.disposition === "suspended" &&
+      !turn.paused &&
+      !turn.cancelled &&
+      wakeup?.turnId === turn.turnId &&
+      wakeup.status === "cancelled"
+        ? wakeup.waitId
+        : undefined;
+    const retained = scope.pendingWakeupContinue;
+    const input: NativeChatControl =
+      retained &&
+      cancelledWakeupId === retained.cancelledWakeupId &&
+      observationId === retained.observationId
+        ? retained
+        : {
+            action,
+            observationId,
+            requestId: crypto.randomUUID(),
+            ...(cancelledWakeupId !== undefined && { cancelledWakeupId }),
+          };
+    if (cancelledWakeupId !== undefined) scope.pendingWakeupContinue = input;
     this.update({ acting: true, error: null });
     try {
-      await this.bridge.control(scope.attachment.attachmentId, {
-        action,
-        observationId,
-        requestId: crypto.randomUUID(),
-      });
+      await this.bridge.control(scope.attachment.attachmentId, input);
+      if (cancelledWakeupId !== undefined)
+        scope.pendingWakeupContinue = undefined;
     } catch (error) {
       if (this.owns(scope))
         this.update({
@@ -1415,11 +1522,83 @@ export class NativeChatController {
     }
   }
 
+  canControlWakeup(action: NativeChatWakeupAction): boolean {
+    const turn = this.scope?.observation?.snapshot.current;
+    const wakeup = this.view.scheduledWakeup;
+    if (
+      !this.view.wakeupsAvailable ||
+      !this.bridge.controlWakeup ||
+      this.view.acting ||
+      !wakeup ||
+      !turn ||
+      turn.cancelled ||
+      turn.turnId !== wakeup.turnId
+    )
+      return false;
+    const pending = wakeup.status === "waiting" || wakeup.status === "paused";
+    return action === "cancel"
+      ? pending
+      : !wakeup.armed &&
+          turn.disposition === "suspended" &&
+          (pending || wakeup.status === "delivered");
+  }
+
+  async controlWakeup(action: NativeChatWakeupAction): Promise<void> {
+    const scope = this.scope;
+    const attachment = scope?.attachment;
+    const observation = scope?.observation;
+    const wakeup = this.view.scheduledWakeup;
+    const control = this.bridge.controlWakeup;
+    if (
+      !scope ||
+      !attachment ||
+      !observation ||
+      !wakeup ||
+      !control ||
+      !this.canControlWakeup(action)
+    )
+      return;
+    scope.wakeupRead = undefined;
+    this.update({ acting: true, wakeupError: null });
+    try {
+      const updated = await control.call(
+        this.bridge,
+        attachment.attachmentId,
+        observation.observationId,
+        wakeup.waitId,
+        action
+      );
+      const current = scope.observation?.snapshot;
+      if (
+        this.owns(scope) &&
+        scope.attachment === attachment &&
+        (current?.current ?? current?.latest)?.turnId === updated.turnId
+      ) {
+        scope.wakeupRead = undefined;
+        scope.wakeupSettled = undefined;
+        this.update({ scheduledWakeup: updated, wakeupError: null });
+      }
+    } catch {
+      if (this.owns(scope))
+        this.update({
+          wakeupError:
+            "Couldn't confirm the check-in change. Check its status and try again.",
+        });
+    } finally {
+      if (this.owns(scope)) {
+        this.update({ acting: false });
+        await this.refresh(scope);
+      }
+    }
+  }
+
   async repair(): Promise<void> {
     const scope = this.scope;
     if (!scope || (!scope.attachment && !scope.requested)) return;
     scope.replay = true;
     void this.readImageCapability(scope);
+    scope.wakeupSettled = undefined;
+    void this.readWakeupCapability(scope);
     if (scope.summaryRequest?.failed) scope.summaryRequest = undefined;
     this.update({ error: null });
     try {
@@ -1685,6 +1864,7 @@ export class NativeChatController {
           }),
         });
         this.refreshTurnSummary(scope, attachment, next);
+        this.refreshWakeup(scope, attachment, next);
         void this.refreshQueue(scope, this.view.queue?.offset ?? 0);
         await Promise.all([
           this.refreshApprovals(scope, attachment, next),
@@ -1742,6 +1922,55 @@ export class NativeChatController {
         }
       });
     return scope.refreshing;
+  }
+
+  private refreshWakeup(
+    scope: Scope,
+    attachment: NativeChatAttachment,
+    observation: NativeChatObservation
+  ): void {
+    const read = this.bridge.scheduledWakeup;
+    if (!read || !this.view.wakeupsAvailable) return;
+    const { current, latest } = observation.snapshot;
+    const turn = current ?? latest;
+    const known =
+      this.view.scheduledWakeup?.turnId === turn?.turnId
+        ? this.view.scheduledWakeup
+        : null;
+    if (this.view.scheduledWakeup && !known)
+      this.update({ scheduledWakeup: null, wakeupError: null });
+    if (
+      !turn ||
+      (current?.disposition === "running" && !known) ||
+      (!current && scope.wakeupSettled === turn.turnId) ||
+      scope.wakeupRead?.observationId === observation.observationId
+    )
+      return;
+    const request = { observationId: observation.observationId };
+    scope.wakeupRead = request;
+    const owns = () =>
+      this.owns(scope) &&
+      scope.attachment === attachment &&
+      scope.wakeupRead === request &&
+      scope.observation?.observationId === request.observationId;
+    void read
+      .call(this.bridge, attachment.attachmentId, request.observationId)
+      .then((schedule) => {
+        if (!owns()) return;
+        if (schedule && schedule.turnId !== turn.turnId)
+          throw new Error("native_chat_wakeup_changed");
+        if (!current) scope.wakeupSettled = turn.turnId;
+        this.update({ scheduledWakeup: schedule, wakeupError: null });
+      })
+      .catch(() => {
+        if (owns())
+          this.update({
+            wakeupError: "Couldn't refresh the scheduled check-in.",
+          });
+      })
+      .finally(() => {
+        if (scope.wakeupRead === request) scope.wakeupRead = undefined;
+      });
   }
 
   private refreshTurnSummary(

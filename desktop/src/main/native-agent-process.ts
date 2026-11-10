@@ -5,6 +5,7 @@ import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentDeletion } from "./native-agent-deletion";
+import { NativeAgentWakeups } from "./native-agent-wakeups";
 import { NativeAgentCommands } from "./native-agent-commands";
 import {
   NativeAgentPermissions,
@@ -73,6 +74,7 @@ export class NativeAgentProcess {
   private nextId = 1;
   private ready = false;
   private imageInput = false;
+  private scheduledWakeups = false;
   private artifacts = false;
   private savedChatDeletion = false;
   private readonly commandCapabilities = new Set<string>();
@@ -131,6 +133,10 @@ export class NativeAgentProcess {
 
   get acceptsPng(): boolean {
     return this.connected && this.imageInput;
+  }
+
+  get acceptsWakeups(): boolean {
+    return this.connected && this.scheduledWakeups;
   }
 
   get acceptsArtifacts(): boolean {
@@ -256,6 +262,7 @@ export class NativeAgentProcess {
               _meta: {
                 ...capabilities,
                 ...NativeAgentCommands.capabilities,
+                ...NativeAgentWakeups.capabilities,
                 [NativeAgentArtifacts.capability]: 1,
                 ...(requestDeletion && { [NativeAgentDeletion.capability]: 1 }),
               },
@@ -278,6 +285,9 @@ export class NativeAgentProcess {
       }
       processOwner.imageInput =
         object(agentCapabilities?.promptCapabilities)?.image === true;
+      processOwner.scheduledWakeups = Object.keys(
+        NativeAgentWakeups.capabilities
+      ).every((key) => advertised?.[key] === 1);
       for (const key of Object.keys(NativeAgentCommands.capabilities)) {
         if (advertised?.[key] === 1) processOwner.commandCapabilities.add(key);
       }

@@ -89,6 +89,16 @@ export function NativeAgentPane({
     turn?.disposition === "running" && !turn.paused && !turn.cancelled;
   const canResume =
     turn?.disposition === "suspended" && turn.paused && !turn.cancelled;
+  const wakeup = state.scheduledWakeup;
+  const suspendedCheckIn =
+    !!wakeup &&
+    turn?.turnId === wakeup.turnId &&
+    turn.disposition === "suspended" &&
+    !turn.paused &&
+    !turn.cancelled &&
+    (wakeup.status === "waiting" || wakeup.status === "cancelled");
+  const canContinue = suspendedCheckIn && wakeup.status === "cancelled";
+  const waitingForCheckIn = suspendedCheckIn && wakeup.status === "waiting";
   const canStop = !!turn && !turn.cancelled;
   const goalTurn =
     !!turn && state.goal?.goal?.reservation?.turnId === turn.turnId;
@@ -117,7 +127,11 @@ export function NativeAgentPane({
           : turn?.paused
             ? "Pausing…"
             : turn?.disposition === "suspended"
-              ? "Waiting for input"
+              ? canContinue
+                ? "Check-in cancelled"
+                : waitingForCheckIn
+                  ? "Waiting for check-in"
+                  : "Waiting for input"
               : turn?.disposition === "interrupted"
                 ? "Interrupted"
                 : running
@@ -606,6 +620,61 @@ export function NativeAgentPane({
           />
         </div>
       )}
+      {(wakeup || state.wakeupError) && (
+        <div className="shrink-0 space-y-1 border-t px-3 py-2 text-xs">
+          {wakeup && (
+            <>
+              <p className="font-medium">
+                {wakeup.status === "cancelled"
+                  ? "Check-in cancelled"
+                  : wakeup.status === "stopped"
+                    ? "Check-in stopped"
+                    : wakeup.status === "delivered"
+                      ? "Check-in delivered"
+                      : wakeup.status === "paused"
+                        ? "Check-in paused"
+                        : "Scheduled check-in"}
+              </p>
+              <p className="wrap-anywhere whitespace-pre-wrap">
+                {wakeup.reason}
+              </p>
+              <time
+                className="block text-muted-foreground"
+                dateTime={new Date(wakeup.dueAtMs).toISOString()}
+              >
+                {new Date(wakeup.dueAtMs).toLocaleString()}
+              </time>
+              <div className="flex flex-wrap items-center gap-1">
+                {controller.canControlWakeup("cancel") && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => void controller.controlWakeup("cancel")}
+                  >
+                    Cancel check-in
+                  </Button>
+                )}
+                {controller.canControlWakeup("recover") && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={() => void controller.controlWakeup("recover")}
+                  >
+                    Restore schedule
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+          {state.wakeupError && (
+            <p role="alert" className="text-destructive">
+              {state.wakeupError}
+            </p>
+          )}
+        </div>
+      )}
       {bridge.goal && bridge.startGoal && (
         <NativeGoalPanel
           key={state.scope}
@@ -614,6 +683,20 @@ export function NativeAgentPane({
         />
       )}
       <div className="shrink-0 p-3">
+        {state.wakeupsAvailable &&
+          (controller.canAllowWakeup || state.allowWakeup) && (
+            <label className="mb-1 flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={state.allowWakeup}
+                disabled={state.acting}
+                onChange={(event) =>
+                  controller.setAllowWakeup(event.currentTarget.checked)
+                }
+              />
+              Allow one scheduled check-in
+            </label>
+          )}
         {state.reviewConfiguration && (
           <Button
             type="button"
@@ -740,7 +823,7 @@ export function NativeAgentPane({
                   <option value="plan">Plan</option>
                 </select>
               )}
-              {running && !goalTurn ? (
+              {(running || waitingForCheckIn) && !goalTurn ? (
                 <Button
                   type="button"
                   variant="ghost"
@@ -750,7 +833,8 @@ export function NativeAgentPane({
                 >
                   Pause
                 </Button>
-              ) : canResume && (!goalTurn || !state.goal?.goal?.paused) ? (
+              ) : (canResume && (!goalTurn || !state.goal?.goal?.paused)) ||
+                canContinue ? (
                 <Button
                   type="button"
                   variant="ghost"
@@ -758,7 +842,7 @@ export function NativeAgentPane({
                   disabled={state.acting}
                   onClick={() => void controller.control("resume")}
                 >
-                  Resume
+                  {canContinue ? "Continue" : "Resume"}
                 </Button>
               ) : null}
               {(controller.canSteer || state.steering) && (

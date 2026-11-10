@@ -10,6 +10,7 @@ import type {
   NativeChatTurn,
   NativeChatTurnSummary,
   NativeChatUpdate,
+  NativeChatWakeup,
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "./native-chat-controller";
 
@@ -133,6 +134,117 @@ it("replaces a retry wait when the same turn's new observation clears it", async
   const next = controller.read().observation?.snapshot;
   expect(next?.current?.turnId).toBe("turn-retry-chat");
   expect(next).not.toHaveProperty("retryNotBeforeMs");
+  controller.disconnect();
+});
+
+it("keeps check-in permission bound to the same Act send after a lost acknowledgement", async () => {
+  const { bridge, controller, waiting } = fixture();
+  const receipt = vi.spyOn(bridge, "inputReceipt");
+  const scheduled = vi.fn<NonNullable<DesktopNativeChat["submitWithWakeup"]>>(
+    async (id, inputId, text) => {
+      waiting.add(id);
+      return bridge.submit(id, inputId, text);
+    }
+  );
+  bridge.submitInRegime = (_action, id, inputId, text) =>
+    bridge.submit(id, inputId, text);
+  bridge.acceptsWakeups = async () => true;
+  bridge.submitWithWakeup = scheduled.mockRejectedValueOnce(
+    new Error("native_agent_acknowledgement_lost")
+  );
+  bridge.scheduledWakeup = async () => null;
+  bridge.controlWakeup = async () => {
+    throw new Error("fixture");
+  };
+  await controller.select("chat");
+  await vi.waitFor(() => expect(controller.canAllowWakeup).toBe(true));
+  controller.selectOperatingRegime("plan");
+  controller.setAllowWakeup(true);
+  expect(controller.read().allowWakeup).toBe(false);
+  controller.selectOperatingRegime("act");
+  controller.setAllowWakeup(true);
+  await expect(controller.submit("Check once")).rejects.toThrow(
+    "native_agent_acknowledgement_lost"
+  );
+  expect(receipt).not.toHaveBeenCalled();
+  controller.setAllowWakeup(false);
+  await expect(controller.submit("Check once")).rejects.toThrow(
+    "original check-in permission"
+  );
+  waiting.add("chat");
+  await controller.repair();
+  controller.setAllowWakeup(true);
+  expect(controller.read().allowWakeup).toBe(true);
+  await expect(controller.submit("Check something different")).rejects.toThrow(
+    "idle Act chat"
+  );
+  await controller.submit("Check once");
+  expect(scheduled.mock.calls[0]).toEqual(scheduled.mock.calls[1]);
+  expect(controller.read().allowWakeup).toBe(false);
+  controller.disconnect();
+});
+
+it("restores and cancels an observed check-in, then continues its exact task", async () => {
+  const { bridge, controller, waiting } = fixture();
+  waiting.add("chat");
+  let schedule: NativeChatWakeup = {
+    turnId: "turn-chat",
+    waitId: "wait",
+    dueAtMs: 1_800_000_000_000,
+    reason: "Check the export",
+    status: "waiting",
+    armed: false,
+  };
+  bridge.acceptsWakeups = async () => true;
+  bridge.submitWithWakeup = bridge.submit;
+  bridge.scheduledWakeup = async (id) => (id === "chat" ? schedule : null);
+  bridge.controlWakeup = vi.fn<NonNullable<DesktopNativeChat["controlWakeup"]>>(
+    async (_id, _observation, _wait, action) => {
+      schedule =
+        action === "recover"
+          ? { ...schedule, armed: true }
+          : { ...schedule, status: "cancelled", armed: false };
+      return schedule;
+    }
+  );
+  const control = vi.spyOn(bridge, "control");
+  await controller.select("chat");
+  await vi.waitFor(() =>
+    expect(controller.canControlWakeup("recover")).toBe(true)
+  );
+  await controller.controlWakeup("recover");
+  expect(controller.read().scheduledWakeup?.armed).toBe(true);
+  await controller.controlWakeup("cancel");
+  expect(controller.read().scheduledWakeup?.status).toBe("cancelled");
+  await controller.control("resume");
+  await controller.control("resume");
+  expect(control.mock.calls[0]).toEqual(control.mock.calls[1]);
+  expect(control.mock.calls[0]).toEqual([
+    "chat",
+    {
+      action: "resume",
+      observationId: "observation-chat",
+      requestId: expect.any(String),
+      cancelledWakeupId: "wait",
+    },
+  ]);
+  expect(bridge.controlWakeup).toHaveBeenNthCalledWith(
+    1,
+    "chat",
+    "observation-chat",
+    "wait",
+    "recover"
+  );
+  expect(bridge.controlWakeup).toHaveBeenNthCalledWith(
+    2,
+    "chat",
+    "observation-chat",
+    "wait",
+    "cancel"
+  );
+  await controller.select("other");
+  expect(controller.read().scheduledWakeup).toBeNull();
+  expect(controller.canControlWakeup("recover")).toBe(false);
   controller.disconnect();
 });
 
