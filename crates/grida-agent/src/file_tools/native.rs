@@ -1,6 +1,7 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — descriptor-relative native read operations.
 
 use super::*;
+use crate::host::MAX_IMAGE_BYTES;
 use crate::workspace::FileAccess;
 use rustix::fs::{self as unix, AtFlags, Dir, FileType, Mode, OFlags, Stat};
 use rustix::io::Errno;
@@ -60,6 +61,7 @@ impl FileTools {
                 }
                 text_outcome(decode(bytes)?, false, budget.output)
             }
+            Operation::View => self.view_image(directory, path, budget),
             Operation::List => self.list(directory, path, budget),
             Operation::Search => self.search(
                 directory,
@@ -74,6 +76,50 @@ impl FileTools {
         // Current authority must still permit delivery of the observed bytes.
         self.root(directory, budget)?;
         Ok(outcome)
+    }
+
+    fn view_image(
+        &self,
+        directory: Option<&BindingId>,
+        path: &Path,
+        budget: &Budget,
+    ) -> Result<ToolOutcome> {
+        let capture = self
+            .capture_image
+            .as_ref()
+            .ok_or_else(|| problem(ErrorKind::Unavailable, "image_view_unavailable"))?;
+        let mut file = self.open(directory, path, Kind::File, budget)?;
+        let before = unix::fstat(&file).map_err(open_error)?;
+        let (bytes, limited) = read(&mut file, MAX_IMAGE_BYTES, budget)?;
+        if limited {
+            return Err(problem(ErrorKind::LimitExceeded, "image_size_limit"));
+        }
+        // Check the addressed path, not just the open descriptor, after reading.
+        let current = self.open(directory, path, Kind::File, budget)?;
+        let after = unix::fstat(&current).map_err(open_error)?;
+        same_inode(&before, &after)?;
+        if before.st_size != after.st_size
+            || after.st_size != bytes.len() as i64
+            || before.st_mtime != after.st_mtime
+            || before.st_mtime_nsec != after.st_mtime_nsec
+            || before.st_ctime != after.st_ctime
+            || before.st_ctime_nsec != after.st_ctime_nsec
+        {
+            return Err(problem(ErrorKind::Conflict, "image_source_changed"));
+        }
+        budget.check()?;
+        let label = format!("Viewed PNG {} ({} bytes).", path.display(), bytes.len());
+        let image = capture(bytes)?;
+        bounded_outcome(
+            ToolOutcome {
+                status: OutcomeStatus::Succeeded,
+                content: vec![ResultContent::Text(label), ResultContent::Media(image)],
+                structured: None,
+                receipt: None,
+                truncated: false,
+            },
+            budget.output,
+        )
     }
 
     fn root(&self, directory: Option<&BindingId>, budget: &Budget) -> Result<Root> {
@@ -489,13 +535,19 @@ fn unavailable() -> Error {
 }
 
 fn text_outcome(text: String, truncated: bool, output: usize) -> Result<ToolOutcome> {
-    let outcome = ToolOutcome {
-        status: OutcomeStatus::Succeeded,
-        content: vec![ResultContent::Text(text)],
-        structured: None,
-        receipt: None,
-        truncated,
-    };
+    bounded_outcome(
+        ToolOutcome {
+            status: OutcomeStatus::Succeeded,
+            content: vec![ResultContent::Text(text)],
+            structured: None,
+            receipt: None,
+            truncated,
+        },
+        output,
+    )
+}
+
+fn bounded_outcome(outcome: ToolOutcome, output: usize) -> Result<ToolOutcome> {
     if serde_json::to_vec(&(&outcome.content, &outcome.structured))
         .is_ok_and(|encoded| encoded.len() <= output)
     {

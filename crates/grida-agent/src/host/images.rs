@@ -13,7 +13,7 @@ use std::path::Path;
 const MIME: &str = "image/png";
 pub(super) const NAME: &str = "image.png";
 const LOCATOR: &str = "retained-input:";
-pub(super) const MAX_IMAGE_BYTES: usize = 256 * 1024;
+pub(crate) const MAX_IMAGE_BYTES: usize = 256 * 1024;
 pub(super) const MAX_PIXELS: u64 = 4 * 1024 * 1024;
 pub(super) const MAX_DECODED_BYTES: usize = 8 * 1024 * 1024;
 /// Transient supplied PNG. Only the retained asset identity is serializable.
@@ -44,7 +44,7 @@ impl ImageUpload {
         Self::from_png(bytes)
     }
 
-    fn from_png(bytes: Vec<u8>) -> Result<Self> {
+    pub(super) fn from_png(bytes: Vec<u8>) -> Result<Self> {
         if bytes.len() > MAX_IMAGE_BYTES {
             return Err(image_too_large());
         }

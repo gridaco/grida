@@ -2,7 +2,7 @@
 
 use crate::workspace::{DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
 use agent_kit_core::inference::InputFormat;
-use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
+use agent_kit_core::messages::{MediaRef, OutcomeStatus, ResultContent, ToolArguments};
 use agent_kit_core::tools::{
     Invocation, InvocationContext, RecoveryKind, Tool, ToolDefinition, ToolOutcome,
 };
@@ -31,11 +31,14 @@ pub struct FileAuthority {
 
 pub type CurrentFileAuthority = dyn Fn() -> Result<FileAuthority> + Send + Sync;
 type InvocationAuthority = dyn Fn(&Invocation) -> Result<FileAuthority> + Send + Sync;
+pub(crate) type ImageCapture = dyn Fn(Vec<u8>) -> Result<MediaRef> + Send + Sync;
+pub(crate) const VIEW_IMAGE: &str = "view_image";
 
 /// Captures directory selection for one turn and checks live grants at use.
 pub struct FileTools {
     captured: Arc<WorkspaceSnapshot>,
     current: Arc<InvocationAuthority>,
+    capture_image: Option<Arc<ImageCapture>>,
     workers: Arc<Semaphore>,
 }
 
@@ -46,12 +49,13 @@ impl FileTools {
         captured: Arc<WorkspaceSnapshot>,
         current: Arc<CurrentFileAuthority>,
     ) -> Result<Self> {
-        Self::with_authority(captured, Arc::new(move |_| current()))
+        Self::with_authority(captured, Arc::new(move |_| current()), None)
     }
 
     pub(crate) fn with_authority(
         captured: Arc<WorkspaceSnapshot>,
         current: Arc<InvocationAuthority>,
+        capture_image: Option<Arc<ImageCapture>>,
     ) -> Result<Self> {
         if !cfg!(any(target_os = "macos", target_os = "linux")) {
             return Err(problem(
@@ -62,6 +66,7 @@ impl FileTools {
         Ok(Self {
             captured,
             current,
+            capture_image,
             workers: Arc::new(Semaphore::new(WORKERS)),
         })
     }
@@ -75,11 +80,22 @@ impl FileTools {
             Arc::new(FileTool::new(self.clone(), Operation::Search)?),
         ])
     }
+
+    pub(crate) fn view_adapter(self: &Arc<Self>) -> Result<Option<Arc<dyn Tool>>> {
+        self.capture_image
+            .as_ref()
+            .map(|_| {
+                FileTool::new(self.clone(), Operation::View)
+                    .map(|tool| Arc::new(tool) as Arc<dyn Tool>)
+            })
+            .transpose()
+    }
 }
 
 #[derive(Clone, Copy)]
 enum Operation {
     Read,
+    View,
     List,
     Search,
 }
@@ -103,6 +119,11 @@ impl FileTool {
             Operation::Read => (
                 "read_file",
                 "Read one bounded UTF-8 text file. Use a relative path and an optional directory ID. The turn's primary directory is the default. Symlinks and binary files are refused.",
+                vec!["path"],
+            ),
+            Operation::View => (
+                VIEW_IMAGE,
+                "See the pixels of one PNG in a readable workspace directory. Use a relative path and an optional directory ID. The primary directory is the default. The PNG must be at most 256 KiB. This tool leaves the source untouched.",
                 vec!["path"],
             ),
             Operation::List => (
@@ -222,6 +243,7 @@ pub(crate) struct Request {
 pub(crate) fn read_request(invocation: &Invocation) -> Result<Request> {
     let operation = match invocation.definition().id.as_str() {
         "read_file" => Operation::Read,
+        VIEW_IMAGE => Operation::View,
         "list_files" => Operation::List,
         "search_text" => Operation::Search,
         _ => return Err(problem(ErrorKind::Unsupported, "file_tool_unavailable")),
@@ -246,7 +268,7 @@ impl Operation {
             validate_path(path)?;
         }
         match (self, request.path.as_deref(), request.query.as_deref()) {
-            (Self::Read, Some(path), None) if !path.as_os_str().is_empty() => {}
+            (Self::Read | Self::View, Some(path), None) if !path.as_os_str().is_empty() => {}
             (Self::List, _, None) => {}
             (Self::Search, _, Some(query))
                 if !query.is_empty()
@@ -318,6 +340,7 @@ impl FileTools {
         let _ = (
             &self.captured,
             &self.current,
+            &self.capture_image,
             request.directory,
             &budget.invocation,
         );

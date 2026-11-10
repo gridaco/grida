@@ -3,7 +3,7 @@
 use crate::command::{
     AuthorizedCommand, CommandAccess, CommandArguments, CommandLimits, CommandTool, ReviewedCommand,
 };
-use crate::file_tools::{FileAuthority, FileTools, read_request};
+use crate::file_tools::{FileAuthority, FileTools, ImageCapture, VIEW_IMAGE, read_request};
 use crate::goal_verification::ReadVerification;
 use crate::workspace::{DirectoryBinding, DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
 use agent_kit_core::authority::{
@@ -575,6 +575,7 @@ impl TurnPermissions {
         self: &Arc<Self>,
         inventory: &mut Inventory,
         grants: &mut BTreeMap<ToolId, GrantSelection>,
+        capture_image: Option<Arc<ImageCapture>>,
     ) -> Result<()> {
         if self
             .profile
@@ -586,8 +587,9 @@ impl TurnPermissions {
             let files = Arc::new(FileTools::with_authority(
                 self.profile.workspace.clone(),
                 Arc::new(move |invocation| owner.file_authority(invocation)),
+                capture_image,
             )?);
-            for tool in files.adapters()? {
+            for tool in files.adapters()?.into_iter().chain(files.view_adapter()?) {
                 inventory.insert(tool.clone())?;
                 grants.insert(tool.definition().id.clone(), self.files.clone());
             }
@@ -600,7 +602,16 @@ impl TurnPermissions {
         inventory: &mut Inventory,
         grants: &mut BTreeMap<ToolId, GrantSelection>,
     ) -> Result<Option<Arc<CommandTool>>> {
-        self.insert_file_tools(inventory, grants)?;
+        self.insert_with_images(inventory, grants, None)
+    }
+
+    pub(crate) fn insert_with_images(
+        self: &Arc<Self>,
+        inventory: &mut Inventory,
+        grants: &mut BTreeMap<ToolId, GrantSelection>,
+        capture_image: Option<Arc<ImageCapture>>,
+    ) -> Result<Option<Arc<CommandTool>>> {
+        self.insert_file_tools(inventory, grants, capture_image)?;
         let model_commands = !self.profile.hooks_only
             && self.profile.directories.values().any(|rule| {
                 rule.command_read != AccessRule::Deny || rule.command_read_write != AccessRule::Deny
@@ -720,7 +731,9 @@ impl TurnPermissions {
                 let capture = process.capture_fingerprint()?;
                 (directory, effect, Some(capture), rule)
             }
-            "read_file" | "list_files" | "search_text" if admission.grants == self.files => {
+            "read_file" | "list_files" | "search_text" | VIEW_IMAGE
+                if admission.grants == self.files =>
+            {
                 let request = read_request(invocation)?;
                 let directory = self.captured_directory(request.directory.as_ref())?;
                 let rule = self

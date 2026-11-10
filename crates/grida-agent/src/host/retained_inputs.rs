@@ -1,18 +1,20 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — owner-scoped retained inputs and working copies.
 
 use super::{
-    images::{ImageUpload, MAX_IMAGE_BYTES, NAME, asset_ref, retained_unavailable},
+    images::{ImageUpload, MAX_IMAGE_BYTES, NAME, asset_ref, media, retained_unavailable},
     problem,
     retained_file::FileUpload,
 };
+use crate::file_tools::ImageCapture;
 use crate::scratch::{AssetRef, ScratchLimits, ScratchScope, WorkingCopyProof, WorkingCopyReceipt};
 use crate::workspace::ProtectedRoots;
 use agent_kit_core::messages::MediaRef;
 use agent_kit_core::{ArtifactId, ChangeId, ErrorKind, Fingerprint, Result, SessionId};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 const STORAGE: &str = "retained-inputs";
+pub(super) const WORKSPACE_VIEW: &str = "workspace-view/";
 const LIMITS: ScratchLimits = ScratchLimits {
     max_assets: 16,
     max_asset_bytes: MAX_IMAGE_BYTES as u64,
@@ -68,19 +70,40 @@ impl RetainedInputs {
         input: &ChangeId,
         upload: ImageUpload,
     ) -> Result<AssetRef> {
+        let identity = Fingerprint::of(&(input, upload.digest))?;
+        self.retain_png(session, cwd, "input/", identity, &upload.bytes)
+    }
+
+    pub(super) fn workspace_image_capture(
+        self: &Arc<Self>,
+        session: SessionId,
+        cwd: PathBuf,
+    ) -> Arc<ImageCapture> {
+        let storage = self.clone();
+        Arc::new(move |bytes| {
+            let image = ImageUpload::from_png(bytes)?;
+            let identity = Fingerprint::of(&image.digest)?;
+            let asset =
+                storage.retain_png(&session, &cwd, WORKSPACE_VIEW, identity, &image.bytes)?;
+            media(&asset)
+        })
+    }
+
+    fn retain_png(
+        &self,
+        session: &SessionId,
+        cwd: &Path,
+        namespace: &str,
+        identity: Fingerprint,
+        bytes: &[u8],
+    ) -> Result<AssetRef> {
+        let id = uuid::Uuid::from_bytes(
+            identity.bytes()[..16]
+                .try_into()
+                .expect("fingerprint prefix"),
+        );
         self.with_intake_scope(session, cwd, |scope| {
-            let identity = Fingerprint::of(&(input, upload.digest))?;
-            let id = uuid::Uuid::from_bytes(
-                identity.bytes()[..16]
-                    .try_into()
-                    .expect("fingerprint prefix"),
-            );
-            scope.retain(
-                ArtifactId::new(format!("input/{id}"))?,
-                1,
-                NAME,
-                upload.bytes.as_slice(),
-            )
+            scope.retain(ArtifactId::new(format!("{namespace}{id}"))?, 1, NAME, bytes)
         })
     }
 
@@ -133,7 +156,17 @@ impl RetainedInputs {
     }
 
     pub(super) fn resolve(&self, media: &MediaRef, maximum: usize) -> Result<Vec<u8>> {
-        let asset = asset_ref(media)?;
+        let unavailable = || {
+            if media.id.as_str().starts_with(WORKSPACE_VIEW) {
+                problem(
+                    ErrorKind::Unavailable,
+                    "retained_workspace_image_unavailable",
+                )
+            } else {
+                retained_unavailable()
+            }
+        };
+        let asset = asset_ref(media).map_err(|_| unavailable())?;
         let _access = self.access.lock().unwrap();
         let protected = ProtectedRoots::new(vec![])?;
         ScratchScope::read_existing_retained(
@@ -147,7 +180,7 @@ impl RetainedInputs {
             if error.kind == ErrorKind::LimitExceeded {
                 error
             } else {
-                retained_unavailable()
+                unavailable()
             }
         })
     }

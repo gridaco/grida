@@ -586,6 +586,20 @@ integrity metadata. The original and private working copy stay with the chat.
 Reopening preserves the same file or identifies which copy is unavailable.
 [Run with a selected file](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-locally)
 
+## View a workspace PNG headlessly
+
+On macOS and Linux, use a source-built host with the Responses `gpt-5.4`
+profile and a trusted workspace permission profile. Ask the agent to view
+a PNG of up to 256 KiB by its relative path. Include the directory ID if
+the file is outside the primary folder. A folder configured to ask still
+requires approval for that exact read.
+
+The selected provider receives the pixels for the current turn. Grida keeps
+the captured bytes in private chat storage so continuing that turn uses the
+same image even if the source changes. Later turns keep a short description.
+Ask to view the file again when you need its current pixels.
+[Work with selected folders](#work-with-selected-folders)
+
 ## Edit selected SVG text
 
 Open an SVG or a slide in a Desktop editor that offers native chat. Select one

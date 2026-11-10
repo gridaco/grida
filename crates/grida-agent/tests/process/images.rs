@@ -10,6 +10,247 @@ const IMAGE_MODEL: &str = "gpt-5.4";
 const ARTIFACTS: &str = "co.grida/session/artifacts";
 
 #[tokio::test]
+async fn workspace_view_retains_approved_pixels_without_reading_a_changed_or_denied_source() {
+    use std::fs;
+    use std::os::unix::fs::{PermissionsExt, symlink};
+
+    let root = TempDir::new().unwrap();
+    let base = root.path().canonicalize().unwrap();
+    fs::set_permissions(&base, fs::Permissions::from_mode(0o700)).unwrap();
+    let state = base.join("state");
+    let project = base.join("project");
+    let extra = base.join("extra");
+    fs::create_dir(&project).unwrap();
+    fs::create_dir(&extra).unwrap();
+    let source = project.join("poster.png");
+    let original = png([255, 0, 0]);
+    let changed = png([0, 255, 0]);
+    let private = png([0, 0, 255]);
+    fs::write(&source, &original).unwrap();
+    fs::write(extra.join("private.png"), &private).unwrap();
+    symlink(extra.join("private.png"), project.join("alias.png")).unwrap();
+    let profile = base.join("permissions.json");
+    fs::write(
+        &profile,
+        serde_json::to_vec(&json!({
+            "version": 1, "workspace": "project", "revision": "selected", "primary": "primary",
+            "directories": [
+                {"id":"primary","name":"Project","path":project,"generation":"first","read":"allow"},
+                {"id":"extra","name":"Extra","path":extra,"generation":"first","read":"ask"}
+            ]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    fs::set_permissions(&profile, fs::Permissions::from_mode(0o600)).unwrap();
+
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Responses,
+        vec![
+            Reply::Tool("view_image", r#"{"path":"poster.png"}"#),
+            Reply::Tool(
+                "view_image",
+                r#"{"directory":"extra","path":"private.png"}"#,
+            ),
+            Reply::Finished("Used the captured image."),
+            Reply::Tool("view_image", r#"{"path":"alias.png"}"#),
+            Reply::Finished("No other image was read."),
+            Reply::Finished("Text only."),
+        ],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let url = endpoint.url.clone();
+    let launch = |state: &Path, model: &str| {
+        StdioClient::from_child(
+            server(state, &url, model)
+                .arg("--permission-profile")
+                .arg(&profile)
+                .arg("--stdio")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap(),
+        )
+    };
+    let mut initialize = extension_initialize();
+    let meta = initialize["clientCapabilities"]["_meta"]
+        .as_object_mut()
+        .unwrap();
+    for key in [
+        "co.grida/session/approvals",
+        "co.grida/session/answer-approval",
+    ] {
+        meta.insert(key.into(), 1.into());
+    }
+    let mut client = launch(&state, IMAGE_MODEL);
+    client.request("initialize", initialize.clone()).await;
+    let workspace = json!({"cwd":project,"mcpServers":[]});
+    let created = client.request("session/new", workspace.clone()).await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let started = client
+        .request(
+            "_co.grida/session/submit",
+            super::lifecycle::prompt_request(session, "view", "Inspect the poster."),
+        )
+        .await;
+    let turn = started["result"]["turnId"].as_str().unwrap();
+    let first = endpoint.request().await;
+    assert!(
+        first["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["name"] == "view_image")
+    );
+    assert!(!first.to_string().contains("data:image"));
+
+    let original_url = format!("data:image/png;base64,{}", STANDARD.encode(&original));
+    let changed_data = STANDARD.encode(&changed);
+    let private_data = STANDARD.encode(&private);
+    let verify_pixels = |request: &Value| {
+        let input = request["input"].as_array().unwrap();
+        let output = input
+            .iter()
+            .find(|part| part["type"] == "function_call_output" && part["output"].is_array())
+            .unwrap();
+        assert!(input.iter().any(|part| {
+            part["type"] == "function_call"
+                && part["name"] == "view_image"
+                && part["call_id"] == output["call_id"]
+                && part["arguments"] == r#"{"path":"poster.png"}"#
+        }));
+        assert_eq!(
+            output["output"][2],
+            json!({"type":"input_image","image_url":original_url,"detail":"auto"})
+        );
+        let body = request.to_string();
+        assert_eq!(body.matches("data:image/png;base64,").count(), 1);
+        assert!(!body.contains(&changed_data));
+        assert!(!body.contains(&private_data));
+        assert!(
+            !request["input"]
+                .to_string()
+                .contains(project.to_str().unwrap())
+        );
+        assert_eq!(request["instructions"], first["instructions"]);
+        assert!(!body.contains("workspace-view/"));
+    };
+    verify_pixels(&endpoint.request().await);
+    let list = json!({"sessionId":session,"turnId":turn});
+    let pending = timeout(WAIT, async {
+        loop {
+            let reply = client
+                .request("_co.grida/session/approvals", list.clone())
+                .await;
+            if reply["result"]["approvals"][0].is_object() {
+                break reply["result"].clone();
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let approval = &pending["approvals"][0];
+    assert_eq!(approval["request"]["effect"]["tool"], "view_image");
+    assert_eq!(
+        approval["request"]["effect"]["relative_path"],
+        "private.png"
+    );
+    assert!(endpoint.requests.try_recv().is_err());
+    assert_eq!(fs::read(&source).unwrap(), original);
+    timeout(WAIT, async {
+        while snapshot(&mut client, session).await["current"]["disposition"] != "suspended" {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    client.close().await;
+
+    // Resume the same turn after replacement. The already viewed pixels must
+    // come from the retained result, and the extra read was never allowed.
+    fs::write(&source, &changed).unwrap();
+    let mut resumed = launch(&state, IMAGE_MODEL);
+    resumed.request("initialize", initialize).await;
+    let mut load = workspace.clone();
+    load["sessionId"] = session.into();
+    let loaded = resumed.request("session/load", load).await;
+    assert!(loaded["result"].is_object(), "{loaded}");
+    assert!(endpoint.requests.try_recv().is_err());
+    let view = snapshot(&mut resumed, session).await;
+    let observed = resumed.request("_co.grida/session/approvals", list).await;
+    assert_eq!(
+        observed["result"]["approvals"][0]["waitId"],
+        approval["waitId"]
+    );
+    let declined = resumed
+        .request(
+            "_co.grida/session/answer-approval",
+            json!({
+                "sessionId":session,"turnId":turn,"waitId":approval["waitId"],
+                "requestId":"decline-image","expectedSessionRevision":view["sessionRevision"],
+                "expectedControlRevision":observed["result"]["controlRevision"],"decision":"decline"
+            }),
+        )
+        .await;
+    assert!(declined["result"].is_object(), "{declined}");
+    let continued = endpoint.request().await;
+    verify_pixels(&continued);
+    assert_ne!(last_tool_result(continued)["status"], "succeeded");
+    let finished = settled(&mut resumed, session).await;
+    assert_eq!(finished["latest"]["turnId"], turn);
+    assert_eq!(finished["latest"]["status"], "succeeded");
+
+    let queued = resumed
+        .request(
+            "_co.grida/session/enqueue",
+            super::lifecycle::prompt_request(session, "alias", "Check another file."),
+        )
+        .await;
+    assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+    let next = endpoint.request().await;
+    assert!(next.to_string().contains("Viewed PNG poster.png"));
+    assert!(!next.to_string().contains("data:image"));
+    let refused = endpoint.request().await;
+    assert!(!refused.to_string().contains("data:image"));
+    assert_eq!(last_tool_result(refused)["status"], "failed");
+    let next_finished = settled(&mut resumed, session).await;
+    assert_ne!(next_finished["latest"]["turnId"], turn);
+    assert_eq!(next_finished["latest"]["status"], "succeeded");
+    assert_eq!(fs::read(&source).unwrap(), changed);
+    assert_eq!(fs::read(extra.join("private.png")).unwrap(), private);
+    assert_eq!(fs::read_dir(&project).unwrap().count(), 2);
+    resumed.close().await;
+
+    let mut text = launch(&base.join("text-state"), "fixture-text-only");
+    text.request("initialize", extension_initialize()).await;
+    let created = text.request("session/new", workspace).await;
+    let text_session = created["result"]["sessionId"].as_str().unwrap();
+    let started = text
+        .request(
+            "_co.grida/session/submit",
+            super::lifecycle::prompt_request(text_session, "text", "Read the project."),
+        )
+        .await;
+    assert!(started["result"]["turnId"].is_string(), "{started}");
+    assert!(
+        endpoint.request().await["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|tool| tool["name"] != "view_image")
+    );
+    assert_eq!(
+        settled(&mut text, text_session).await["latest"]["status"],
+        "succeeded"
+    );
+    text.close().await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
 async fn embedded_run_edits_an_explicit_png_without_a_project_and_reopens_its_result() {
     let root = TempDir::new().unwrap();
     let state = root.path().join("state");

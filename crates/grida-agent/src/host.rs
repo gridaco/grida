@@ -30,6 +30,8 @@ pub(crate) use history::RevisionTarget;
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub(crate) use image_tools::{CropArtifact, CropArtifacts};
 pub use images::ImageUpload;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub(crate) use images::MAX_IMAGE_BYTES;
 pub(crate) use images::is_retained_image;
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use permissions::{Approvals, PendingApproval};
@@ -147,6 +149,7 @@ struct Execution {
     questions: Arc<questions::QuestionAccess>,
     configuration_tools: Arc<ConfigurationAccess>,
     images: Option<Arc<retained_inputs::RetainedInputs>>,
+    workspace_vision: bool,
     retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
 }
 
@@ -1079,7 +1082,7 @@ impl Host {
             };
         let view = self.store.inspect(session.clone()).await?;
         self.check_execution(&view)?;
-        let subagent = session_configuration(&view)?.subagent;
+        let SessionConfiguration { cwd, subagent, .. } = session_configuration(&view)?;
         let (claim_request, input, acceptance, history) = match launch {
             Launch::Prompt {
                 id, parts, policy, ..
@@ -1336,12 +1339,22 @@ impl Host {
             .transpose()?;
         let mut authority = execution.authority.clone();
         let mut inventory = Inventory::new();
+        let capture_image = execution
+            .images
+            .as_ref()
+            .filter(|_| execution.workspace_vision && !prepared.subagent)
+            .map(|images| {
+                images.workspace_image_capture(claim.lease.binding().session.clone(), cwd)
+            });
         let command = match &permission_scope {
-            Some(permissions) if prepared.operating_regime.is_act() => {
-                permissions.insert(&mut inventory, &mut authority.tools)?
-            }
+            Some(permissions) if prepared.operating_regime.is_act() => permissions
+                .insert_with_images(&mut inventory, &mut authority.tools, capture_image)?,
             Some(permissions) => {
-                permissions.insert_file_tools(&mut inventory, &mut authority.tools)?;
+                permissions.insert_file_tools(
+                    &mut inventory,
+                    &mut authority.tools,
+                    capture_image,
+                )?;
                 None
             }
             None => None,
@@ -2505,6 +2518,7 @@ impl Execution {
         } else {
             None
         };
+        let workspace_vision = images.is_some() && options.protocol == ProviderProtocol::Responses;
         let image_resolver = images.as_ref().map(|images| {
             let images = images.clone();
             Arc::new(move |media: &agent_kit_core::messages::MediaRef, maximum| {
@@ -2581,6 +2595,7 @@ impl Execution {
             Credential::Http(transport),
         )?;
         execution.images = images;
+        execution.workspace_vision = workspace_vision;
         Ok(execution)
     }
 
@@ -2709,6 +2724,7 @@ impl Execution {
             questions,
             configuration_tools,
             images: None,
+            workspace_vision: false,
             retained_inputs: None,
         })
     }

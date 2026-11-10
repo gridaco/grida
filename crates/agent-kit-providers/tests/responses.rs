@@ -17,6 +17,7 @@ use agent_kit_providers::{
 };
 use serde_json::{Value, json};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 use support::{FixtureTransport, control, frame, limits, message, request, response, tool_request};
 
@@ -803,9 +804,15 @@ async fn api_counts_the_same_prepared_input_used_for_generation() {
 }
 
 #[tokio::test]
-async fn prepared_image_references_are_resolved_only_for_count_and_generation() {
+async fn user_and_tool_images_share_the_same_resolved_count_and_generation_input() {
     let measured = br#"{"object":"response.input_tokens","input_tokens":7}"#;
     let transport = FixtureTransport::new([
+        Ok(response(
+            [call(0, "fc_image", r#"{"value":"image"}"#), completed(None)]
+                .into_iter()
+                .map(frame),
+            false,
+        )),
         Ok(response([measured.to_vec()], false)),
         Ok(response(
             [answer("msg_image", "A fixture."), completed(None)]
@@ -815,7 +822,7 @@ async fn prepared_image_references_are_resolved_only_for_count_and_generation() 
         )),
     ]);
     let text = adapter(transport.clone(), ResponsesEndpoint::Api, "replay", "live");
-    let mut input = request();
+    let mut input = tool_request();
     let media = MediaRef {
         id: ArtifactId::new("fixture").unwrap(),
         media_type: "image/png".into(),
@@ -830,10 +837,43 @@ async fn prepared_image_references_are_resolved_only_for_count_and_generation() 
         text.prepare(input.clone()).unwrap_err().code,
         "unsupported_input_modality"
     );
+    input.messages[0].content.pop();
+    let earlier = run(&text, input.clone(), "image-call").await;
+    let call_id = first_call(&earlier).id.clone();
+    input.messages.extend(earlier.messages);
+    let view = MediaRef {
+        id: ArtifactId::new("view").unwrap(),
+        locator: "retained-view".into(),
+        ..media.clone()
+    };
+    let output = |reference| {
+        message(
+            "view-result",
+            Role::Tool,
+            vec![Content::ToolResult(ToolResult {
+                call: call_id.clone(),
+                status: OutcomeStatus::Succeeded,
+                content: vec![
+                    ResultContent::Text("Observed pixels".into()),
+                    ResultContent::Media(reference),
+                    ResultContent::Text("End of view".into()),
+                ],
+                structured: Some(json!({"width": 1, "height": 1})),
+                truncated: false,
+            })],
+        )
+    };
+    let mut unsupported = input.clone();
+    unsupported.messages.push(output(view.clone()));
+    assert_eq!(
+        text.prepare(unsupported).unwrap_err().code,
+        "unsupported_tool_media"
+    );
 
     let mut capabilities = text.capabilities(&input.model).unwrap();
     capabilities.input_modalities.insert(Modality::Image);
-    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let calls = Arc::new(AtomicUsize::new(0));
+    let oversized = Arc::new(AtomicBool::new(false));
     let provider = Responses::with_image_resolver(
         ProviderBinding {
             provider: ProviderId::new("responses").unwrap(),
@@ -850,7 +890,7 @@ async fn prepared_image_references_are_resolved_only_for_count_and_generation() 
             ResponsesProfile {
                 capabilities,
                 wire_model: ModelId::new("wire-model").unwrap(),
-                reasoning_effort: None,
+                reasoning_effort: Some(ReasoningEffort::XHigh),
             },
         )]
         .into(),
@@ -858,20 +898,45 @@ async fn prepared_image_references_are_resolved_only_for_count_and_generation() 
         limits(),
         Some(Arc::new({
             let calls = calls.clone();
+            let oversized = oversized.clone();
+            let view = view.clone();
+            let media = media.clone();
             move |reference, maximum| {
-                assert_eq!(reference, &media);
-                assert!(maximum >= 5);
-                calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                Ok(b"bytes".to_vec())
+                calls.fetch_add(1, Ordering::SeqCst);
+                let budget = limits().max_request_bytes / 4 * 3;
+                if reference == &media {
+                    assert_eq!(maximum, budget);
+                    Ok(b"bytes".to_vec())
+                } else {
+                    assert_eq!(reference, &view);
+                    assert_eq!(maximum, budget - b"bytes".len());
+                    if oversized.load(Ordering::SeqCst) {
+                        return Ok(vec![0; maximum + 1]);
+                    }
+                    Ok(b"pixels".to_vec())
+                }
             }
         })),
     )
     .unwrap();
+    input.messages[0].content.push(Content::Media(media));
+    let mut unsupported = input.clone();
+    unsupported.messages.push(output(MediaRef {
+        media_type: "image/jpeg".into(),
+        ..view.clone()
+    }));
+    assert_eq!(
+        provider.prepare(unsupported).unwrap_err().code,
+        "unsupported_tool_media"
+    );
+    input.messages.push(output(view));
     let prepared = provider.prepare(input).unwrap();
-    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
     let recorded = serde_json::to_string(&prepared).unwrap();
     assert!(recorded.contains("opaque-reference"));
+    assert!(recorded.contains("retained-view"));
     assert!(!recorded.contains("Ynl0ZXM="));
+    assert!(!recorded.contains("cGl4ZWxz"));
     assert_eq!(
         provider
             .measure_input_async(&prepared, control("image").request_control())
@@ -882,23 +947,23 @@ async fn prepared_image_references_are_resolved_only_for_count_and_generation() 
     );
     assert_eq!(
         provider
-            .start(prepared, control("image"))
+            .start(prepared.clone(), control("image"))
             .unwrap()
             .finish()
             .await
             .status,
         InferenceStatus::Completed
     );
-    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
     let count: Value = {
         let sent = transport.requests.lock().unwrap();
         assert_eq!(
-            sent[0].0.operation,
+            sent[1].0.operation,
             TransportOperation::OpenAiResponsesInputTokens
         );
-        serde_json::from_slice(&sent[0].0.body).unwrap()
+        serde_json::from_slice(&sent[1].0.body).unwrap()
     };
-    let generation = body(&transport, 1);
+    let generation = body(&transport, 2);
     assert_eq!(count["input"], generation["input"]);
     assert_eq!(
         count["input"][0]["content"][1],
@@ -906,6 +971,41 @@ async fn prepared_image_references_are_resolved_only_for_count_and_generation() 
             "type": "input_image", "image_url": "data:image/png;base64,Ynl0ZXM=", "detail": "auto"
         })
     );
+    let result = &count["input"][2];
+    assert_eq!(result["type"], "function_call_output");
+    assert_eq!(result["call_id"], "call_remote");
+    assert_eq!(
+        serde_json::from_str::<Value>(result["output"][0]["text"].as_str().unwrap()).unwrap(),
+        json!({"status": "succeeded", "structured": {"width": 1, "height": 1}, "truncated": false})
+    );
+    assert_eq!(
+        result["output"].as_array().unwrap()[1..],
+        [
+            json!({"type": "input_text", "text": "Observed pixels"}),
+            json!({"type": "input_image", "image_url": "data:image/png;base64,cGl4ZWxz", "detail": "auto"}),
+            json!({"type": "input_text", "text": "End of view"})
+        ]
+    );
+    assert!(!generation.to_string().contains("retained-view"));
+
+    oversized.store(true, Ordering::SeqCst);
+    assert_eq!(
+        provider
+            .measure_input_async(&prepared, control("image").request_control())
+            .await
+            .unwrap_err()
+            .code,
+        "request_byte_limit"
+    );
+    assert_eq!(
+        provider
+            .start(prepared, control("image"))
+            .err()
+            .unwrap()
+            .code,
+        "request_byte_limit"
+    );
+    assert_eq!(transport.requests.lock().unwrap().len(), 3);
 }
 
 #[tokio::test]

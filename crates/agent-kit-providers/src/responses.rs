@@ -14,7 +14,7 @@ use agent_kit_core::inference::{
     ProviderBinding, RequestControl,
 };
 use agent_kit_core::messages::{
-    Content, Message, MessagePhase, ProvenanceKind, ProviderState, Role,
+    Content, Message, MessagePhase, ProvenanceKind, ProviderState, ResultContent, Role, ToolResult,
 };
 use agent_kit_core::{
     BindingId, BoxFuture, Envelope, Error, ErrorKind, Fingerprint, ModelId, ProviderId, Result,
@@ -221,7 +221,12 @@ impl Responses {
                         input.push(json!({
                             "type": "function_call_output",
                             "call_id": call_id,
-                            "output": tool_result(result)?.to_string()
+                            "output": self.encode_tool_output(
+                                result,
+                                profile,
+                                resolve_images,
+                                &mut image_bytes,
+                            )?
                         }));
                     }
                 }
@@ -331,6 +336,45 @@ impl Responses {
             .collect::<Result<Vec<_>>>()?;
         input.push(json!({"type": "message", "role": "user", "content": content}));
         Ok(())
+    }
+
+    fn encode_tool_output(
+        &self,
+        result: &ToolResult,
+        profile: &ResponsesProfile,
+        resolve_images: bool,
+        remaining: &mut usize,
+    ) -> Result<Value> {
+        if result
+            .content
+            .iter()
+            .all(|part| matches!(part, ResultContent::Text(_)))
+        {
+            return Ok(Value::String(tool_result(result)?.to_string()));
+        }
+        let unsupported = || Error::new(ErrorKind::Unsupported, "unsupported_tool_media");
+        let resolver = self
+            .images
+            .as_deref()
+            .filter(|_| image_profile(&profile.capabilities))
+            .ok_or_else(unsupported)?;
+        let metadata = json!({
+            "status": result.status,
+            "structured": result.structured,
+            "truncated": result.truncated
+        });
+        let mut output = vec![json!({"type": "input_text", "text": metadata.to_string()})];
+        for part in &result.content {
+            output.push(match part {
+                ResultContent::Text(text) => json!({"type": "input_text", "text": text}),
+                ResultContent::Media(media) if media.media_type == "image/png" => {
+                    let url = image_data_url(media, resolve_images.then_some(resolver), remaining)?;
+                    json!({"type": "input_image", "image_url": url, "detail": "auto"})
+                }
+                ResultContent::Media(_) => return Err(unsupported()),
+            });
+        }
+        Ok(Value::Array(output))
     }
 
     fn prepared_model(&self, request: &PreparedRequest) -> Result<&ResponsesProfile> {

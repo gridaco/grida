@@ -2,6 +2,7 @@
 //! GRIDA-SEC-004 separates retained context from workspace and execution authority.
 
 use super::*;
+use agent_kit_core::messages::ResultContent;
 use agent_kit_store_sqlite::history::{
     HistoryBasis, HistoryRevised, HistoryRevision, HistorySeed, HistorySelection, ReplayCursor,
     ReplayWindow, RetainedHistory, SeededSession,
@@ -494,7 +495,20 @@ pub(super) fn context_material(
     Ok((
         records
             .into_iter()
-            .map(|HistoryRecord::Message(message)| message)
+            .map(|HistoryRecord::Message(mut message)| {
+                for part in &mut message.content {
+                    if let Content::ToolResult(result) = part {
+                        // Prior views keep their description. The current turn
+                        // can still replay its verified retained pixels.
+                        result.content.retain(|part| {
+                            !matches!(part, ResultContent::Media(media)
+                                if media.id.as_str().starts_with(retained_inputs::WORKSPACE_VIEW)
+                                    && images::is_retained_image(media))
+                        });
+                    }
+                }
+                message
+            })
             .collect(),
         omissions,
         compacted,
