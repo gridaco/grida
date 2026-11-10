@@ -36,6 +36,8 @@ pub struct InputSettings {
     pub questions: bool,
     #[serde(default)]
     pub allow_wakeups: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_start: Option<GoalRequest>,
     #[serde(default)]
     pub configuration_permission: crate::ConfigurationPermission,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -73,6 +75,10 @@ impl InputSettings {
                     max_output_tokens: stored.max_output_tokens,
                     questions: stored.questions,
                     allow_wakeups: stored.allow_wakeups,
+                    goal_start: match stored.goal {
+                        Some(goals::GoalInput::Start(goal)) => Some(goal),
+                        _ => None,
+                    },
                     configuration_permission: stored.configuration_permission,
                     skills: stored
                         .guidance
@@ -255,6 +261,18 @@ impl Host {
                 configuration_permission,
             } => {
                 validate_prompt_parts(&parts)?;
+                let original = self.store.input(session.clone(), input.clone()).await?;
+                if let Some(original) = original.as_ref()
+                    && original.disposition == InputDisposition::Queued
+                    && InputSettings::for_input(&original.input)?
+                        .goal_start
+                        .is_some()
+                {
+                    return Err(problem(
+                        ErrorKind::Conflict,
+                        "queued_goal_requires_withdrawal",
+                    ));
+                }
                 let replacement = if let Some(previous) = self
                     .store
                     .input(session.clone(), replacement.clone())

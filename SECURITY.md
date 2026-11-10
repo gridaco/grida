@@ -953,6 +953,9 @@ lazy reads, read-only mutation, and symlink escape refusal.
   the exact goal, driver, and session revisions behind a frame-scoped token.
   Goal inspection is read-only. Desktop starts work through explicit user
   acceptance of the objective and allowance.
+  A queued goal retains its start request across restart. The Host refuses
+  generic replacement while the goal is queued. Withdrawal uses the original
+  input identity and the observed queue revision.
 - The [Desktop approval coordinator](desktop/src/main/native-agent-permissions.ts)
   derives a read profile from main-owned workspace selection. An approval
   answer takes a review issued by the coordinator for the exact session,

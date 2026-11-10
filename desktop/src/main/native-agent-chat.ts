@@ -8,6 +8,7 @@ import type {
   NativeChatControlReceipt,
   NativeChatGoalControl,
   NativeChatGoalReceipt,
+  NativeChatGoalRequest,
   NativeChatMessage,
   NativeChatPage,
   NativeChatQuestion,
@@ -107,7 +108,11 @@ export type NativeQuestionReview = Readonly<
 
 // A retained basis can retry an identical control after the native child is
 // replaced. The replacement still requires a fresh attachment to that session.
-type QueuePosition = Readonly<{ inputId: string; inputPosition: number }>;
+type QueuePosition = Readonly<{
+  inputId: string;
+  inputPosition: number;
+  goalStart?: NativeChatGoalRequest;
+}>;
 const observed = new WeakMap<
   NativeChatSnapshot,
   { scope: string; queue: readonly QueuePosition[] }
@@ -303,17 +308,22 @@ export class NativeAgentChat {
     );
     this.requireAttached(session);
     if (result.sessionId !== sessionId) throw invalidResponse();
+    const queuedInputs = revision(result.queuedInputs);
+    const queue = queuePositions(result.queue, queuedInputs);
+    const pending = queue.filter((row) => row.goalStart);
+    if (pending.length > 1) throw invalidResponse();
     const snapshot = Object.freeze({
       sessionId,
       sessionRevision: revision(result.sessionRevision),
-      queuedInputs: revision(result.queuedInputs),
+      queuedInputs,
+      ...(pending[0] && { pendingGoalId: pending[0].inputId }),
       admissionPaused: flag(result.admissionPaused),
       current: result.current === null ? null : turn(result.current),
       latest: result.latest === null ? null : turn(result.latest),
     });
     observed.set(snapshot, {
       scope: this.scope,
-      queue: queuePositions(result.queue, snapshot.queuedInputs),
+      queue,
     });
     return snapshot;
   }
@@ -342,12 +352,16 @@ export class NativeAgentChat {
       this.requireAttached(session);
       if (input.receipt.disposition !== "queued")
         throw new Error("native_chat_queue_changed");
-      const text = input.text;
+      const text = row.goalStart?.objective ?? input.text;
       const preview =
         text && text.length > QUEUE_PREVIEW_LENGTH
           ? `${text.slice(0, QUEUE_PREVIEW_LENGTH)}…`
           : text;
-      items.push({ inputId: row.inputId, preview });
+      items.push({
+        inputId: row.inputId,
+        preview,
+        ...(row.goalStart && { goalStart: row.goalStart }),
+      });
     }
     return {
       items,
@@ -367,7 +381,8 @@ export class NativeAgentChat {
     const row = observed
       .get(snapshot)!
       .queue.find((item) => item.inputId === inputId);
-    if (!row) throw new Error("native_chat_queue_input_unavailable");
+    if (!row || row.goalStart)
+      throw new Error("native_chat_queue_input_unavailable");
     const input = await this.readQueueInput(sessionId, row);
     this.requireAttached(session);
     if (input.receipt.disposition !== "queued" || input.text === null)
@@ -401,6 +416,8 @@ export class NativeAgentChat {
       const index = queue.findIndex((item) => item.inputId === change.inputId);
       if (index < 0) throw new Error("native_chat_queue_input_unavailable");
       if (change.action === "replace") {
+        if (queue[index].goalStart)
+          throw new Error("queued_goal_requires_withdrawal");
         const prompt = textPrompt(change.text);
         const input = await this.readQueueInput(sessionId, queue[index]);
         this.requireAttached(session);
@@ -998,9 +1015,15 @@ function queuePositions(
     throw invalidResponse();
   const queue = value.map((entry: unknown) => {
     const row = object(entry);
+    const settings = object(row.settings);
     return {
       inputId: identity(row.inputId),
       inputPosition: revision(row.inputPosition),
+      ...(settings.goalStart === undefined
+        ? {}
+        : {
+            goalStart: NativeAgentGoals.readStoredRequest(settings.goalStart),
+          }),
     };
   });
   if (new Set(queue.map((row) => row.inputId)).size !== count)

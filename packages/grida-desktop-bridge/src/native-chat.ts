@@ -31,6 +31,7 @@ export type NativeChatSnapshot = Readonly<{
   sessionId: string;
   sessionRevision: number;
   queuedInputs: number;
+  pendingGoalId?: string;
   admissionPaused: boolean;
   current: NativeChatTurn | null;
   latest: NativeChatTurn | null;
@@ -65,6 +66,7 @@ export type NativeChatControl = Readonly<{
 export type NativeChatQueueItem = Readonly<{
   inputId: string;
   preview: string | null;
+  goalStart?: NativeChatGoalRequest;
 }>;
 
 export type NativeChatQueuePage = Readonly<{

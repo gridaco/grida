@@ -7,9 +7,11 @@ import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type { NativeChatGoalRequest } from "@grida/desktop-bridge";
 import { expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
+import { NativeAgentProcess } from "./native-agent-process";
 import { NativeChatIpc } from "./native-chat-ipc";
 
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
+const NATIVE_WORK_SLOTS = 8;
 const REQUEST: NativeChatGoalRequest = {
   objective: "Prepare the export",
   criteria: ["Inspect the export"],
@@ -17,7 +19,7 @@ const REQUEST: NativeChatGoalRequest = {
   automatic: false,
 };
 
-async function provider() {
+async function provider(holdCapacity = false) {
   const requests: string[] = [];
   const server = createServer((request, response) => {
     request.setEncoding("utf8");
@@ -28,7 +30,10 @@ async function provider() {
     request.on("end", () => {
       requests.push(body);
       const index = requests.length;
-      if (request.url !== "/v1/chat/completions" || index > 4) {
+      if (
+        request.url !== "/v1/chat/completions" ||
+        index > (holdCapacity ? NATIVE_WORK_SLOTS : 4)
+      ) {
         response.writeHead(400).end();
         return;
       }
@@ -38,7 +43,7 @@ async function provider() {
           choices: [{ index: 0, delta, finish_reason: finish }],
         })}\n\n`;
       response.writeHead(200, { "content-type": "text/event-stream" });
-      if (index <= 2) {
+      if (holdCapacity || index <= 2) {
         response.write(
           chunk({ role: "assistant", content: "Working on the export." })
         );
@@ -90,6 +95,151 @@ async function provider() {
     },
   };
 }
+
+it.runIf(Boolean(packaged))(
+  "retains an unclaimed goal through restart and requires withdrawal instead of text replacement",
+  async () => {
+    const root = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "grida-pending-goal-")
+    );
+    const cwd = path.join(root, "workspace");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const endpoint = await provider(true);
+    const launch = {
+      resourcesPath: packaged!,
+      stateDirectory: path.join(root, "state"),
+      provider: "openai-compatible",
+      endpoint: endpoint.endpoint,
+      model: "fixture",
+    } as const;
+    const wireGoal = {
+      objective: { description: REQUEST.objective, criteria: REQUEST.criteria },
+      allowance: { work_turns: 3, inference_steps: 256 },
+      automatic: false,
+    };
+    let child: NativeAgentProcess | undefined;
+    let chat: NativeAgentChat | undefined;
+    try {
+      child = await NativeAgentProcess.start({
+        ...launch,
+        capabilities: {
+          "co.grida/session/submit": 1,
+          "co.grida/session/snapshot": 1,
+          "co.grida/session/input": 1,
+          "co.grida/session/replace": 1,
+          "co.grida/goal/start": 1,
+        },
+      });
+      const newSession = async () =>
+        (await child!.request("session/new", { cwd, mcpServers: [] })) as {
+          sessionId: string;
+        };
+      for (let slot = 0; slot < NATIVE_WORK_SLOTS; slot++) {
+        const { sessionId } = await newSession();
+        await child.request("_co.grida/session/submit", {
+          sessionId,
+          inputId: `occupy-${slot}`,
+          prompt: [{ type: "text", text: "Hold this work slot." }],
+        });
+      }
+      await vi.waitFor(() =>
+        expect(endpoint.requests).toHaveLength(NATIVE_WORK_SLOTS)
+      );
+      const { sessionId } = await newSession();
+      const accepted = await child.request("_co.grida/goal/start", {
+        sessionId,
+        inputId: "pending-goal",
+        prompt: [{ type: "text", text: "Original prompt wording." }],
+        goal: wireGoal,
+      });
+      expect(accepted).toMatchObject({
+        inputId: "pending-goal",
+        disposition: "queued",
+      });
+      const snapshot = (await child.request("_co.grida/session/snapshot", {
+        sessionId,
+      })) as {
+        sessionRevision: number;
+      };
+      expect(snapshot).toMatchObject({
+        current: null,
+        queue: [{ inputId: "pending-goal", settings: { goalStart: wireGoal } }],
+      });
+      await expect(
+        child.request("_co.grida/session/replace", {
+          queue: {
+            sessionId,
+            requestId: "replace-goal",
+            expectedSessionRevision: snapshot.sessionRevision,
+          },
+          inputId: "pending-goal",
+          replacementInputId: "ordinary",
+          prompt: [
+            { type: "text", text: "Turn the goal into an ordinary prompt." },
+          ],
+        })
+      ).rejects.toThrow("queued_goal_requires_withdrawal");
+      expect(
+        await child.request("_co.grida/session/input", {
+          sessionId,
+          inputId: "pending-goal",
+        })
+      ).toMatchObject({
+        receipt: { disposition: "queued" },
+        settings: { goalStart: wireGoal },
+      });
+      expect(
+        await child.request("_co.grida/session/snapshot", { sessionId })
+      ).toEqual(snapshot);
+
+      await child.close();
+      child = undefined;
+      chat = await NativeAgentChat.start({ ...launch, cwd });
+      const session = await chat.load(sessionId);
+      const reopened = await chat.observe(session);
+      expect(reopened).toMatchObject({
+        current: null,
+        queuedInputs: 1,
+        pendingGoalId: "pending-goal",
+      });
+      expect((await chat.goal(session, reopened)).goal).toBeNull();
+      expect((await chat.queue(session, reopened, 0)).items).toEqual([
+        {
+          inputId: "pending-goal",
+          preview: REQUEST.objective,
+          goalStart: REQUEST,
+        },
+      ]);
+      await expect(
+        chat.queuedText(session, reopened, "pending-goal")
+      ).rejects.toThrow("native_chat_queue_input_unavailable");
+      const withdraw = {
+        action: "withdraw",
+        inputId: "pending-goal",
+        observationId: "fixture-reopened",
+        requestId: "withdraw-goal",
+      } as const;
+      const receipt = await chat.editQueue(session, reopened, withdraw);
+      await expect(
+        chat.editQueue(session, reopened, withdraw)
+      ).resolves.toEqual(receipt);
+      expect(
+        (await chat.inputReceipt(session, "pending-goal")).disposition
+      ).toBe("withdrawn");
+      expect((await chat.observe(session)).pendingGoalId).toBeUndefined();
+      expect(endpoint.requests).toHaveLength(NATIVE_WORK_SLOTS);
+    } finally {
+      try {
+        await child?.close();
+        await chat?.close();
+      } finally {
+        await endpoint.close();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  },
+  20_000
+);
 
 it.runIf(Boolean(packaged))(
   "starts an explicit goal, retains a pause across restart, and reports unverified work truthfully",

@@ -350,7 +350,9 @@ can inspect the retained attempt after reconnecting.
 In the native Desktop workspace pane, **Add goal** opens the goal form.
 **Start goal** accepts the work and the allowance you entered. Automatic
 continuation is off until you select it. An accepted goal waits in the
-retained queue until its first work turn is reserved.
+retained queue until its first work turn is reserved. It appears as a goal
+after restart. To change it before work starts, remove it from the queue and
+start a new goal with the revised objective or allowance.
 
 Start a goal in an idle chat with an empty queue. Supply an objective, its
 success criteria, and separate allowances for work turns and inference steps.

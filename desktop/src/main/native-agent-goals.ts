@@ -57,6 +57,17 @@ export class NativeAgentGoals {
     };
   }
 
+  static readStoredRequest(value: unknown): NativeChatGoalRequest {
+    const row = object(value);
+    const objective = object(row.objective);
+    return Object.freeze({
+      objective: text(objective.description, OBJECTIVE_LIMIT),
+      criteria: Object.freeze(criteria(objective.criteria)),
+      allowance: usage(row.allowance, 1),
+      automatic: flag(row.automatic),
+    });
+  }
+
   start(
     sessionId: string,
     inputId: string,
@@ -106,7 +117,6 @@ export class NativeAgentGoals {
       goal: identity(rawBasis.goal),
       revision: number(rawBasis.revision, 1),
     });
-    const objective = object(row.objective);
     const rawReservation =
       row.reservation === null ? null : object(row.reservation);
     const uncertainSteps =
@@ -121,11 +131,8 @@ export class NativeAgentGoals {
         uncertain: uncertainSteps !== null,
       });
     const goal: NativeChatGoal = Object.freeze({
+      ...NativeAgentGoals.readStoredRequest(row),
       goalId: basis.goal,
-      objective: text(objective.description, OBJECTIVE_LIMIT),
-      criteria: Object.freeze(criteria(objective.criteria)),
-      allowance: usage(row.allowance, 1),
-      automatic: flag(row.automatic),
       state: state(row.status),
       paused: flag(row.paused),
       progress:

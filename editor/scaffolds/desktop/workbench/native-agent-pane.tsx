@@ -229,7 +229,9 @@ export function NativeAgentPane({
             plain
             queued={queue.items.map((item) => ({
               id: item.inputId,
-              text: item.preview ?? "Queued input with other content",
+              text: item.goalStart
+                ? `Goal: ${item.preview ?? item.goalStart.objective}`
+                : (item.preview ?? "Queued input with other content"),
             }))}
             actions={(inputId, index) => {
               const position = queue.offset + index;
@@ -240,7 +242,7 @@ export function NativeAgentPane({
                     disabled={
                       queueDisabled ||
                       !!state.queueDraft ||
-                      state.goalPending === inputId ||
+                      !!queue.items[index].goalStart ||
                       !bridge.queuedText ||
                       !bridge.editQueue ||
                       queue.items[index].preview === null

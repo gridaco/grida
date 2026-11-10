@@ -327,6 +327,10 @@ original authority and selected settings and carries no new user message.
 Start requires idle work and an empty queue. Automatic follow-ups wait behind
 queued user prompts. Their acceptance, exact claim, and resource reservation
 commit together. Repeating the same start or control preserves its receipt.
+Before the first claim, queue and input inspection return the captured goal
+under `settings.goalStart`. Use the exact queue withdrawal to remove it.
+Replacing a queued goal with a generic prompt returns
+`queued_goal_requires_withdrawal`.
 Pause and Resume can reacquire the same suspended turn. Revising or clearing
 an active goal cancels its reserved turn without discarding its uncertainty.
 Clear an active or blocked goal before replacing an earlier message in the

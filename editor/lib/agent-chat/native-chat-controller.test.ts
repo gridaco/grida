@@ -440,8 +440,61 @@ it("starts a goal only on explicit acceptance and reuses its exact input on retr
   expect(await controller.startGoal(request)).toBe(true);
   expect(start.mock.calls[1]).toEqual(start.mock.calls[0]);
   expect(controller.read().goal?.goal?.state).toEqual({ status: "active" });
-  expect(controller.read().goalPending).toBeNull();
+  expect(controller.read().observation?.snapshot.pendingGoalId).toBeUndefined();
   expect(controller.canStartGoal).toBe(false);
+  controller.disconnect();
+});
+
+it("reads the pending goal from a reopened chat and withholds text replacement", async () => {
+  const { bridge, controller } = fixture();
+  const goalStart = {
+    objective: "Prepare the export",
+    criteria: ["Verify the output"],
+    allowance: { workTurns: 3, inferenceSteps: 32 },
+    automatic: false,
+  };
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const observation = await observe(id);
+    return {
+      ...observation,
+      snapshot: {
+        ...observation.snapshot,
+        queuedInputs: 1,
+        pendingGoalId: "saved-goal",
+      },
+    };
+  };
+  bridge.goal = async () => ({ observationId: null, goal: null });
+  bridge.queue = async () => ({
+    items: [{ inputId: "saved-goal", preview: goalStart.objective, goalStart }],
+    offset: 0,
+    previousOffset: null,
+    nextOffset: null,
+  });
+  const queuedText = vi.fn<NonNullable<DesktopNativeChat["queuedText"]>>();
+  const edit = vi.fn<NonNullable<DesktopNativeChat["editQueue"]>>();
+  const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
+  bridge.queuedText = queuedText;
+  bridge.editQueue = edit;
+  bridge.startGoal = start;
+  await controller.select("chat-a");
+  expect(controller.read().observation?.snapshot.pendingGoalId).toBe(
+    "saved-goal"
+  );
+  await vi.waitFor(() =>
+    expect(controller.read().queue?.items[0]?.goalStart).toEqual(goalStart)
+  );
+  expect(controller.canStartGoal).toBe(false);
+  await controller.editQueuedText("saved-goal");
+  await controller.editQueue({
+    action: "replace",
+    inputId: "saved-goal",
+    text: "Unrelated.",
+  });
+  expect(queuedText).not.toHaveBeenCalled();
+  expect(edit).not.toHaveBeenCalled();
+  expect(start).not.toHaveBeenCalled();
   controller.disconnect();
 });
 

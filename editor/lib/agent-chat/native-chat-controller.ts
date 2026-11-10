@@ -48,7 +48,6 @@ export type NativeChatView = Readonly<{
   steering: boolean;
   goal: NativeChatGoalObservation | null;
   goalReady: boolean;
-  goalPending: string | null;
   loading: boolean;
   acting: boolean;
   repairing: boolean;
@@ -104,7 +103,6 @@ const EMPTY: NativeChatView = Object.freeze({
   steering: false,
   goal: null,
   goalReady: false,
-  goalPending: null,
   loading: false,
   acting: false,
   repairing: false,
@@ -258,7 +256,6 @@ export class NativeChatController {
       steering: false,
       goal: null,
       goalReady: false,
-      goalPending: null,
       loading: sessionId !== null,
       acting: false,
       repairing: false,
@@ -312,7 +309,7 @@ export class NativeChatController {
       !!this.bridge.startGoal &&
       !this.view.loading &&
       !this.view.acting &&
-      !this.view.goalPending &&
+      !scope.awaitingGoalId &&
       (!scope.attachment || this.view.goalReady) &&
       !snapshot?.current &&
       !snapshot?.queuedInputs &&
@@ -397,7 +394,6 @@ export class NativeChatController {
           ? undefined
           : receipt.inputId;
       scope.replay = true;
-      this.update({ goalPending: scope.awaitingGoalId ?? null });
       await this.refresh(scope);
       return true;
     } catch {
@@ -590,7 +586,7 @@ export class NativeChatController {
       !this.bridge.queuedText ||
       this.view.acting ||
       this.view.queueDraft ||
-      this.view.goalPending === inputId
+      scope.observation?.snapshot.pendingGoalId === inputId
     )
       return;
     this.update({ acting: true, error: null });
@@ -640,7 +636,8 @@ export class NativeChatController {
       !scope.observation ||
       !this.bridge.editQueue ||
       this.view.acting ||
-      (action.action === "replace" && this.view.goalPending === action.inputId)
+      (action.action === "replace" &&
+        scope.observation.snapshot.pendingGoalId === action.inputId)
     )
       return;
     const observationId =
@@ -1005,7 +1002,6 @@ export class NativeChatController {
       this.update({
         goal,
         goalReady: true,
-        goalPending: scope.awaitingGoalId ?? null,
       });
     } catch (error) {
       if (!this.owns(scope)) return;

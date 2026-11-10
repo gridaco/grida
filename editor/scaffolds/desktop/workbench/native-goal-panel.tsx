@@ -27,6 +27,7 @@ export function NativeGoalPanel({
 }) {
   const [adding, setAdding] = useState(false);
   const goal = view.goal?.goal;
+  const pending = view.observation?.snapshot.pendingGoalId;
   const goalTurn =
     !!goal?.reservation &&
     goal.reservation.turnId === view.observation?.snapshot.current?.turnId;
@@ -53,17 +54,15 @@ export function NativeGoalPanel({
       });
   };
 
-  if (!goal && !adding && !canStart && !view.goalPending) return null;
+  if (!goal && !adding && !canStart && !pending) return null;
   return (
     <section
       aria-label="Goal"
       data-testid="workspace-goal"
       className="max-h-[45vh] shrink-0 space-y-2 overflow-y-auto border-t px-3 py-2 text-xs"
     >
-      {view.goalPending && (
-        <p role="status">Goal accepted · waiting to start</p>
-      )}
-      {goal && !view.goalPending && (
+      {pending && <p role="status">Goal accepted · waiting to start</p>}
+      {goal && !pending && (
         <>
           <div className="flex items-center justify-between gap-2">
             <strong>Goal</strong>
