@@ -10,7 +10,7 @@ use agent_kit_runtime::{
     CompletionDraft, FinishOutcome, OpenedTurn, OperationKey, SuspendOutcome, SuspensionDraft,
 };
 use agent_kit_store_sqlite::context::{ContextInstall, UnpromptedClaim};
-use agent_kit_store_sqlite::history::{HistoryBasis, HistorySeed};
+use agent_kit_store_sqlite::history::{HistoryBasis, HistorySeed, RetainedHistory};
 use grida_agent_master::compaction::{
     CompactionAccount, CompactionFailure, Coverage, SummaryRequest, summary_request,
 };
@@ -18,6 +18,8 @@ use grida_agent_master::usage::InferenceUsage;
 
 const PLAN_SCHEMA: &str = "grida.agent.native.compaction.plan";
 const MAX_PRE_DISPATCH_IDENTITIES: usize = 4;
+const AUTOMATIC_TURN_PREFIX: &str = "automatic-compact/";
+const AUTOMATIC_SOURCE_BYTES: usize = 96 * 1024;
 
 #[derive(Clone)]
 pub struct CompactRequest {
@@ -71,6 +73,12 @@ pub(super) struct CompactionPlan {
     coverage: Coverage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     covered_through: Option<TurnId>,
+}
+
+pub(super) struct AutomaticCompaction {
+    head: ChangeId,
+    expected_revision: SessionRevision,
+    plan: CompactionPlan,
 }
 
 impl Host {
@@ -239,50 +247,20 @@ impl Host {
         if !view.queued.is_empty() {
             return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
         }
-        let mut context = self
+        let context = self
             .store
             .context_history_with(session.clone(), None, grida_agent_master::history::project)
             .await?;
         let expected_revision = context.session_revision;
-        let source = context.basis.clone();
-        let records = std::mem::take(&mut context.records);
-        let (seed, omissions, compacted) = super::history::context_material(context)?;
-        if compacted && records.is_empty() {
-            return Err(problem(ErrorKind::InvalidInput, "compaction_nothing_to_do"));
-        }
-        let mut turns: Vec<(TurnId, Vec<Message>)> = Vec::new();
-        for entry in records {
-            let HistoryRecord::Message(message) = entry.record;
-            match turns.last_mut() {
-                Some((turn, messages)) if *turn == entry.turn => messages.push(message),
-                _ => turns.push((entry.turn, vec![message])),
-            }
-        }
-        let Some(SummaryRequest {
-            inference,
-            coverage,
-            covered_through,
-        }) = summary_request(
-            execution.config.model.clone(),
-            execution.config.max_output_tokens,
-            seed,
-            turns,
-            omissions,
-        )?
-        else {
-            return Err(problem(ErrorKind::InvalidInput, "compaction_nothing_to_do"));
-        };
         let defaults = self.with_configuration(Configuration::snapshot).await?;
-        let mut prepared = execution.provider.prepare(inference)?;
-        if let Some(limit) = defaults.defaults.context.max_input_tokens {
-            prepared = prepared.with_input_limit(limit)?;
-        }
-        let plan = CompactionPlan {
-            source: source.clone(),
-            request: prepared,
-            coverage,
-            covered_through,
-        };
+        let plan = compaction_plan_for(
+            execution,
+            &execution.config,
+            defaults.defaults.context.max_input_tokens,
+            context,
+            false,
+        )?
+        .ok_or_else(|| problem(ErrorKind::InvalidInput, "compaction_nothing_to_do"))?;
         let claim = self
             .store
             .claim_unprompted(UnpromptedClaim {
@@ -290,11 +268,177 @@ impl Host {
                 turn: turn.clone(),
                 request,
                 expected_revision,
-                expected_context: source,
+                expected_context: plan.source.clone(),
                 checkpoint: encode(PLAN_SCHEMA, 1, &plan)?,
             })
             .await?;
         self.open_compaction(session, turn, claim, plan).await
+    }
+
+    pub(super) async fn select_queued_compaction(
+        &self,
+        session: &SessionId,
+        reserved: &TurnId,
+    ) -> Option<(TurnId, AutomaticCompaction)> {
+        let view = self.store.inspect(session.clone()).await.ok()?;
+        if view.current.is_some() || view.admission_paused {
+            return None;
+        }
+        let (turn, plan) = self.prepare_automatic_compaction(&view).await.ok()??;
+        let mut work = self.work.lock().await;
+        if work.closed {
+            return None;
+        }
+        let active = work.active.get_mut(session)?;
+        if active.admitted || &active.turn != reserved {
+            return None;
+        }
+        // The ordinary queue slot is already owned, but has no journal yet.
+        active.turn = turn.clone();
+        Some((turn, plan))
+    }
+
+    async fn prepare_automatic_compaction(
+        &self,
+        view: &SessionView,
+    ) -> Result<Option<(TurnId, AutomaticCompaction)>> {
+        let Some(head) = view.queued.first().map(|entry| &entry.input) else {
+            return Ok(None);
+        };
+        if self.side_context.is_some()
+            || session_configuration(view)?.subagent.is_some()
+            || head.payload.schema().as_str() != INPUT_SCHEMA
+            || head.payload.version() != 2
+            || view.latest.as_ref().is_some_and(|latest| {
+                latest
+                    .binding
+                    .turn
+                    .as_str()
+                    .starts_with(AUTOMATIC_TURN_PREFIX)
+            })
+        {
+            return Ok(None);
+        }
+        let stored: StoredPrompt = decode_input(head)?;
+        if !stored.operating_regime.is_act()
+            || stored.goal.is_some()
+            || stored.effort.is_some()
+            || stored.configuration_permission == crate::ConfigurationPermission::Change
+            || !stored
+                .parts
+                .iter()
+                .all(|part| matches!(part, PromptPart::Text { .. }))
+        {
+            return Ok(None);
+        }
+        let fingerprint = Fingerprint::of(&(&view.session, &head.id, 1_u8))?;
+        let turn = TurnId::new(format!(
+            "{AUTOMATIC_TURN_PREFIX}{:x}",
+            uuid::Uuid::from_bytes(
+                fingerprint.bytes()[..16]
+                    .try_into()
+                    .expect("fingerprint prefix")
+            )
+        ))?;
+        match self
+            .store
+            .inspect_turn(view.session.clone(), turn.clone())
+            .await
+        {
+            Ok(_) => return Ok(None),
+            Err(error) if error.code == "turn_missing" => {}
+            Err(error) => return Err(error),
+        }
+        let execution = self.execution()?;
+        self.check_execution(view)?;
+        let input = self.prepare_input(
+            execution,
+            &view.session,
+            head,
+            None,
+            InputAuthority::RequireCaptured,
+        )?;
+        let context = self
+            .store
+            .context_history_with(
+                view.session.clone(),
+                None,
+                grida_agent_master::history::project,
+            )
+            .await?;
+        if context.session_revision != view.revision {
+            return Ok(None);
+        }
+        let Some(plan) = compaction_plan_for(execution, &input.config, input.limit, context, true)?
+        else {
+            return Ok(None);
+        };
+        Ok(Some((
+            turn,
+            AutomaticCompaction {
+                head: head.id.clone(),
+                expected_revision: view.revision,
+                plan,
+            },
+        )))
+    }
+
+    pub(super) async fn admit_automatic_compaction(
+        &self,
+        session: &SessionId,
+        turn: &TurnId,
+        automatic: AutomaticCompaction,
+    ) -> Result<Option<Admitted>> {
+        let _admission = self.configuration_admission.lock().await;
+        let AutomaticCompaction {
+            head,
+            expected_revision,
+            plan,
+        } = automatic;
+        let claim = self
+            .store
+            .claim_unprompted_before_input(
+                UnpromptedClaim {
+                    session: session.clone(),
+                    turn: turn.clone(),
+                    request: ChangeId::new(turn.as_str())?,
+                    expected_revision,
+                    expected_context: plan.source.clone(),
+                    checkpoint: encode(PLAN_SCHEMA, 1, &plan)?,
+                },
+                head,
+            )
+            .await?;
+        self.open_compaction(session, turn, claim, plan).await
+    }
+
+    pub(super) async fn install_pending_automatic_compaction(
+        &self,
+        view: &SessionView,
+    ) -> Result<()> {
+        let Some(latest) = &view.latest else {
+            return Ok(());
+        };
+        let turn = &latest.binding.turn;
+        if !turn.as_str().starts_with(AUTOMATIC_TURN_PREFIX) {
+            return Ok(());
+        }
+        let Some(outcome) = latest
+            .outcome
+            .as_ref()
+            .filter(|outcome| outcome.status == OutcomeStatus::Succeeded)
+        else {
+            return Ok(());
+        };
+        let Some(plan) = self
+            .compaction_plan(view.session.clone(), turn.clone())
+            .await?
+        else {
+            return Err(problem(ErrorKind::InvalidState, "compaction_plan_missing"));
+        };
+        self.report_compaction(&view.session, turn, &plan, outcome)
+            .await?;
+        Ok(())
     }
 
     pub(super) async fn admit_retained_compaction(
@@ -558,6 +702,70 @@ impl Host {
             inference_usage: Some(account.inference_usage),
         })
     }
+}
+
+fn compaction_plan_for(
+    execution: &Execution,
+    configuration: &MasterConfig,
+    limit: Option<NonZeroU64>,
+    mut context: RetainedHistory,
+    automatic: bool,
+) -> Result<Option<CompactionPlan>> {
+    let source = context.basis.clone();
+    let records = std::mem::take(&mut context.records);
+    let (seed, omissions, compacted) = super::history::context_material(context)?;
+    if compacted && records.is_empty() {
+        return Ok(None);
+    }
+    let mut turns: Vec<(TurnId, Vec<Message>)> = Vec::new();
+    for entry in records {
+        let HistoryRecord::Message(message) = entry.record;
+        match turns.last_mut() {
+            Some((turn, messages)) if *turn == entry.turn => messages.push(message),
+            _ => turns.push((entry.turn, vec![message])),
+        }
+    }
+    let prefix_end = if automatic {
+        // Keep the most recent complete conversational turn unchanged.
+        turns.pop();
+        let Some((last, _)) = turns.last() else {
+            return Ok(None);
+        };
+        Some(last.clone())
+    } else {
+        None
+    };
+    let Some(SummaryRequest {
+        inference,
+        coverage,
+        covered_through,
+    }) = summary_request(
+        configuration.model.clone(),
+        configuration.max_output_tokens,
+        seed,
+        turns,
+        omissions,
+    )?
+    else {
+        return Ok(None);
+    };
+    if automatic
+        && (coverage.input_bytes < AUTOMATIC_SOURCE_BYTES
+            || coverage.omissions.media != 0
+            || coverage.omissions.tool_results_with_media != 0)
+    {
+        return Ok(None);
+    }
+    let mut request = execution.provider.prepare(inference)?;
+    if let Some(limit) = limit {
+        request = request.with_input_limit(limit)?;
+    }
+    Ok(Some(CompactionPlan {
+        source,
+        request,
+        coverage,
+        covered_through: covered_through.or(prefix_end),
+    }))
 }
 
 fn attempted_summary(state: &TurnState) -> Result<Option<&InferenceOutcome>> {

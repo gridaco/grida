@@ -1,5 +1,6 @@
 use super::lifecycle::{
-    prompt_request, session_snapshot, task_basis, terminate_shared_server, wait_for_snapshot,
+    prompt_request, queue_basis, session_snapshot, task_basis, terminate_shared_server,
+    wait_for_snapshot,
 };
 use super::*;
 use futures_util::{SinkExt, StreamExt};
@@ -89,6 +90,233 @@ async fn prompt(socket: &mut SharedSocket, id: u64, session: &str, text: &str) -
 
 fn compact(session: &str, id: &str) -> Value {
     json!({"sessionId":session,"requestId":id})
+}
+
+async fn prime_automatic_history(
+    endpoint: &mut Endpoint,
+    socket: &mut SharedSocket,
+    session: &str,
+) -> String {
+    let older = format!("Earlier requirements {}", "a".repeat(105_000));
+    for (id, text) in [(3, older.as_str()), (4, "Keep this recent turn verbatim.")] {
+        let result = prompt(socket, id, session, text).await;
+        assert_eq!(result["result"]["stopReason"], "end_turn", "{result}");
+        endpoint.request().await;
+    }
+    older
+}
+
+#[tokio::test]
+async fn automatic_compaction_keeps_queue_inputs_and_the_recent_context_exact() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let (release, held) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("First original answer."),
+        Reply::Finished("Recent original answer."),
+        Reply::Release("Earlier work and unresolved decisions.", held),
+        Reply::Finished("First queued answer."),
+        Reply::Finished("Second queued answer."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+    let older = prime_automatic_history(&mut endpoint, &mut socket, &session).await;
+    let head = prompt_request(&session, "queue-head", "First new queued input.");
+    let result = ws_rpc(&mut socket, 5, "_co.grida/session/enqueue", head.clone()).await;
+    assert_eq!(result["result"]["disposition"], "queued", "{result}");
+    let request = endpoint.request().await;
+    assert!(request.get("tools").is_none(), "{request}");
+    let source = request["messages"].to_string();
+    assert!(source.contains(&older));
+    assert!(!source.contains("Keep this recent turn"));
+    assert!(!source.contains("First new queued input"));
+    let retry = ws_rpc(&mut socket, 6, "_co.grida/session/enqueue", head).await;
+    assert_eq!(
+        retry,
+        json!({"jsonrpc":"2.0", "id":6, "result":result["result"]})
+    );
+    let tail = ws_rpc(
+        &mut socket,
+        7,
+        "_co.grida/session/enqueue",
+        prompt_request(&session, "queue-tail", "Second new queued input."),
+    )
+    .await;
+    assert_eq!(tail["result"]["disposition"], "queued", "{tail}");
+    assert!(endpoint.requests.try_recv().is_err());
+    release.send(()).unwrap();
+    let next = endpoint.request().await["messages"].to_string();
+    assert!(next.contains("Earlier work and unresolved decisions."));
+    assert!(next.contains("Keep this recent turn verbatim."));
+    assert!(next.contains("Recent original answer."));
+    assert!(next.contains("First new queued input."));
+    assert!(!next.contains("Earlier requirements"));
+    assert!(!next.contains("Second new queued input."));
+    let following = endpoint.request().await;
+    assert_eq!(
+        following["messages"].as_array().unwrap().last().unwrap()["content"],
+        "Second new queued input."
+    );
+    wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    let transcript = load(&mut socket, &session, workspace.path()).await.join("");
+    assert!(transcript.contains(&older));
+    assert!(!transcript.contains("Earlier work and unresolved decisions."));
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn automatic_compaction_fails_once_and_uses_the_previous_context() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("First original answer."),
+        Reply::Finished("Recent original answer."),
+        Reply::Stop("length"),
+        Reply::Finished("Handled the original input."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+    let older = prime_automatic_history(&mut endpoint, &mut socket, &session).await;
+    let queued = ws_rpc(
+        &mut socket,
+        5,
+        "_co.grida/session/enqueue",
+        prompt_request(
+            &session,
+            "input-after-failure",
+            "Continue using the retained history.",
+        ),
+    )
+    .await;
+    assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+    assert!(
+        endpoint.request().await["messages"]
+            .to_string()
+            .contains(&older)
+    );
+    let next = endpoint.request().await;
+    assert!(next["messages"].to_string().contains(&older));
+    assert_eq!(
+        next["messages"].as_array().unwrap().last().unwrap()["content"],
+        "Continue using the retained history."
+    );
+    wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn automatic_compaction_pause_and_restart_keep_the_exact_queue_until_stop_released() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("First original answer."),
+        Reply::Finished("Recent original answer."),
+        Reply::Hold("Partial maintenance candidate."),
+        Reply::Finished("Continued after explicit queue release."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+    let older = prime_automatic_history(&mut endpoint, &mut socket, &session).await;
+    let queued = ws_rpc(
+        &mut socket,
+        5,
+        "_co.grida/session/enqueue",
+        prompt_request(
+            &session,
+            "held-input",
+            "Preserve the accepted queued input.",
+        ),
+    )
+    .await;
+    assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+    endpoint.request().await;
+    let active = session_snapshot(&mut socket, &session).await;
+    let turn = active["current"]["turnId"].as_str().unwrap().to_owned();
+    let pause = ws_rpc(
+        &mut socket,
+        6,
+        "_co.grida/session/pause",
+        task_basis(&active, &session, "pause-automatic"),
+    )
+    .await;
+    assert!(pause.get("result").is_some(), "{pause}");
+    wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"]["disposition"] == "suspended"
+    })
+    .await;
+    drop(socket);
+    terminate_shared_server(host).await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let transcript = load(&mut socket, &session, workspace.path()).await.join("");
+    assert!(transcript.contains(&older));
+    assert!(!transcript.contains("Partial maintenance candidate."));
+    let paused = session_snapshot(&mut socket, &session).await;
+    assert_eq!(paused["current"]["turnId"], turn);
+    assert_eq!(paused["current"]["disposition"], "suspended");
+    let stop = ws_rpc(
+        &mut socket,
+        7,
+        "_co.grida/session/stop",
+        task_basis(&paused, &session, "stop-automatic"),
+    )
+    .await;
+    assert!(stop.get("result").is_some(), "{stop}");
+    let stopped = wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    assert_eq!(stopped["admissionPaused"], true);
+    let retained = ws_rpc(
+        &mut socket,
+        8,
+        "_co.grida/session/input",
+        json!({"sessionId":session,"inputId":"held-input"}),
+    )
+    .await;
+    assert_eq!(retained["result"]["receipt"], queued["result"]);
+    assert!(endpoint.requests.try_recv().is_err());
+    let released = ws_rpc(
+        &mut socket,
+        9,
+        "_co.grida/session/resume-queue",
+        queue_basis(&stopped, &session, "release-after-stop"),
+    )
+    .await;
+    assert!(released.get("result").is_some(), "{released}");
+    let next = endpoint.request().await;
+    assert!(next["messages"].to_string().contains(&older));
+    assert_eq!(
+        next["messages"].as_array().unwrap().last().unwrap()["content"],
+        "Preserve the accepted queued input."
+    );
+    wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
 }
 
 #[tokio::test]

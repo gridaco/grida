@@ -354,6 +354,7 @@ enum Launch {
     Queued,
     Sponsored(Box<OperationClaim>),
     Compact(ChangeId),
+    AutomaticCompact(Box<compaction::AutomaticCompaction>),
     RecoverCompaction(RecoveryRequest),
     Resume(ClaimRequest),
     ResumeSponsored(sponsorship::SponsoredWake),
@@ -776,6 +777,17 @@ impl Host {
         let task = async move {
             // The worker checks the same lock used for registration before
             // any durable claim, even when its requesting client disappears.
+            let (worker_turn, launch) = if matches!(&launch, Launch::Queued) {
+                match host
+                    .select_queued_compaction(&worker_session, &worker_turn)
+                    .await
+                {
+                    Some((turn, plan)) => (turn, Launch::AutomaticCompact(Box::new(plan))),
+                    None => (worker_turn, launch),
+                }
+            } else {
+                (worker_turn, launch)
+            };
             let answered = match &launch {
                 Launch::ResumeAnswered(position) => Some((&worker_turn, *position)),
                 _ => None,
@@ -796,6 +808,7 @@ impl Host {
                 _ => true,
             }
             .then(|| host.live_text.clone());
+            let automatic_compaction = matches!(&launch, Launch::AutomaticCompact(_));
             let result = host.admit(&worker_session, &worker_turn, launch).await;
             let admitted = match result {
                 Ok(Some(run)) => run,
@@ -804,6 +817,9 @@ impl Host {
                         .await;
                     let _ = admission_tx.send(Ok(None));
                     host.wake_ready().await;
+                    if automatic_compaction {
+                        host.kick_queue(worker_session).await;
+                    }
                     return;
                 }
                 Err(error) => {
@@ -812,6 +828,9 @@ impl Host {
                         error.code.as_str(),
                         "stale_session_revision" | "suspension_mismatch"
                     );
+                    let retry_queue = queue_waiting
+                        || (automatic_compaction
+                            && (basis_changed || error.code == "history_basis_changed"));
                     host.finish_work(
                         &worker_session,
                         error.kind == ErrorKind::Uncertain,
@@ -821,7 +840,7 @@ impl Host {
                     .await;
                     let _ = admission_tx.send(Err(error));
                     host.wake_ready().await;
-                    if queue_waiting {
+                    if retry_queue {
                         host.kick_queue(worker_session).await;
                     }
                     return;
@@ -933,6 +952,11 @@ impl Host {
         }
         let launch = match launch {
             Launch::Sponsored(request) => return self.admit_sponsored(*request).await,
+            Launch::AutomaticCompact(candidate) => {
+                return self
+                    .admit_automatic_compaction(session, turn, *candidate)
+                    .await;
+            }
             other => other,
         };
         let maintenance_claim = match &launch {
@@ -991,6 +1015,7 @@ impl Host {
             }
             Launch::Queued => {
                 require_idle(&view)?;
+                self.install_pending_automatic_compaction(&view).await?;
                 let next = match subagents::queued_work(&view) {
                     Some(next) => next.clone(),
                     None => {
@@ -1054,7 +1079,7 @@ impl Host {
                     .await?;
                 (WorkerClaim::Recover(request), None, None, history)
             }
-            Launch::Compact(_) | Launch::RecoverCompaction(_) => {
+            Launch::Compact(_) | Launch::RecoverCompaction(_) | Launch::AutomaticCompact(_) => {
                 return Err(problem(ErrorKind::InvalidState, "compaction_plan_missing"));
             }
             Launch::Sponsored(_) => unreachable!("sponsored launch handled before session lookup"),

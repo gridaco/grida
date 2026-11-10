@@ -69,13 +69,33 @@ impl SqliteStore {
     /// Claim an idle session with an empty queue. The checkpoint and lease
     /// are recorded together, and retries of an accepted claim are observational.
     pub async fn claim_unprompted(&self, request: UnpromptedClaim) -> Result<ClaimOutcome> {
+        self.claim_unprompted_for(request, None).await
+    }
+
+    /// Claim maintenance ahead of the exact queue head without selecting it.
+    pub async fn claim_unprompted_before_input(
+        &self,
+        request: UnpromptedClaim,
+        head: ChangeId,
+    ) -> Result<ClaimOutcome> {
+        self.claim_unprompted_for(request, Some(head)).await
+    }
+
+    async fn claim_unprompted_for(
+        &self,
+        request: UnpromptedClaim,
+        head: Option<ChangeId>,
+    ) -> Result<ClaimOutcome> {
         let inner = Arc::clone(&self.inner);
         let prepared = execute(Arc::clone(&inner), move |inner, connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
             let id = &request.session;
-            let fingerprint = Fingerprint::of(&request)?;
+            let fingerprint = match &head {
+                Some(head) => Fingerprint::of(&(&request, head))?,
+                None => Fingerprint::of(&request)?,
+            };
             if let Some(receipt) = lookup_request::<ClaimRecord>(
                 &transaction, id, "unprompted-claim", &request.request, fingerprint,
             )? {
@@ -91,11 +111,11 @@ impl SqliteStore {
             if session.active_turn.is_some() {
                 return Err(error(ErrorKind::Conflict, "session_turn_active"));
             }
-            let queued: bool = transaction.query_row(
-                "SELECT EXISTS(SELECT 1 FROM submissions WHERE session=?1 AND queue_order IS NOT NULL)",
+            let queued: Option<String> = transaction.query_row(
+                "SELECT id FROM submissions WHERE session=?1 AND queue_order IS NOT NULL ORDER BY queue_order LIMIT 1",
                 [id.as_str()], |row| row.get(0),
-            ).map_err(database_error)?;
-            if queued {
+            ).optional().map_err(database_error)?;
+            if queued.as_deref() != head.as_ref().map(ChangeId::as_str) {
                 return Err(error(ErrorKind::Conflict, "session_queue_waiting"));
             }
             let history = read_context(&transaction, id, session.revision, None, &|_| Vec::new())?;

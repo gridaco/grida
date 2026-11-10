@@ -2176,6 +2176,63 @@ async fn malformed_seed_creates_neither_a_session_nor_a_receipt() {
 }
 
 #[tokio::test]
+async fn unprompted_maintenance_admits_only_before_the_exact_queue_head() {
+    use agent_kit_store_sqlite::context::UnpromptedClaim;
+
+    let (_directory, store) = store().await;
+    let first = submission("first-queued", "First immutable input");
+    let second = submission("second-queued", "Second immutable input");
+    store.submit(session(), first.clone()).await.unwrap();
+    store.submit(session(), second.clone()).await.unwrap();
+    let before = store.inspect(session()).await.unwrap();
+    let history = store
+        .context_history_with(session(), None, |_| vec![])
+        .await
+        .unwrap();
+    let request = UnpromptedClaim {
+        session: session(),
+        turn: TurnId::new("maintenance").unwrap(),
+        request: change("maintenance-claim"),
+        expected_revision: history.session_revision,
+        expected_context: history.basis,
+        checkpoint: payload("Captured summary request"),
+    };
+    assert_error(
+        store
+            .claim_unprompted_before_input(request.clone(), second.id.clone())
+            .await,
+        ErrorKind::Conflict,
+        "session_queue_waiting",
+    );
+    assert_eq!(store.inspect(session()).await.unwrap(), before);
+    let ClaimOutcome::Acquired(claim) = store
+        .claim_unprompted_before_input(request.clone(), first.id.clone())
+        .await
+        .unwrap()
+    else {
+        panic!("expected maintenance lease")
+    };
+    assert!(claim.inputs.is_empty());
+    let after = store.inspect(session()).await.unwrap();
+    assert_eq!(after.queued, before.queued);
+    assert_eq!(after.current.unwrap().binding.turn, request.turn);
+    assert!(matches!(
+        store
+            .claim_unprompted_before_input(request.clone(), first.id)
+            .await
+            .unwrap(),
+        ClaimOutcome::Existing(_)
+    ));
+    assert_error(
+        store
+            .claim_unprompted_before_input(request, second.id)
+            .await,
+        ErrorKind::Conflict,
+        "request_identity_reused",
+    );
+}
+
+#[tokio::test]
 async fn context_prefix_replacement_retains_suffix_transcript_and_queued_input() {
     use agent_kit_store_sqlite::context::{ContextInstall, UnpromptedClaim};
 

@@ -688,6 +688,12 @@ prompt or call the identified compaction operation. Start from an idle chat
 with an open, empty queue. The summary uses the selected model. New prompts
 can enter the queue while it runs.
 
+For ordinary queued text messages in **Act**, the native host can also
+summarize a large earlier part of the conversation before starting the next
+message. It keeps the most recent turn verbatim and preserves the accepted
+messages and their queue order. If the summary attempt fails, queued work
+can continue with the previous context and the same input settings.
+
 After a successful compaction, future model requests use the summary and any
 turns it did not cover. If the history is too large for one summary request,
 the host summarizes complete early turns and keeps the later turns verbatim.
