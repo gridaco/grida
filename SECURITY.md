@@ -1428,11 +1428,12 @@ Today:
   binds the exact objective basis, revisions and reserved turn to an account-only
   receipt. A stale inspection or unverified outcome cannot release held steps.
 - The optional [Goal file verifier](crates/grida-agent/src/goal_verification.rs)
-  matches one criterion from the trusted launch profile to a complete native
-  read under the exact recorded turn grant. The [Master](crates/grida-agent-master/src/goals/settlement.rs)
-  gives the model a bounded reference to the verified operation and independently
-  checks that same evidence at settlement. [Built fixtures](crates/grida-agent/tests/process/goals/verification.rs)
-  cover mismatched criteria, paths and bytes, and a retained observation after restart.
+  matches each configured criterion to its complete native read under the
+  exact recorded turn grant. The launch profile bounds and binds the rules to
+  the captured authority. The [Master](crates/grida-agent-master/src/goals/settlement.rs)
+  gives the model bounded references to verified operations and independently
+  checks the cited evidence at settlement. [Built fixtures](crates/grida-agent/tests/process/goals/verification.rs)
+  cover mismatched criteria, paths and bytes, and retained observations after restart.
 - The native [wake-up ACP extension](crates/grida-agent/src/acp/extensions/wakeups.rs) requires private stdio, a negotiated capability, and an attached session. The [timer host](crates/grida-agent/src/host/wakeups.rs) binds an explicit opt-in to its admitted turn, resolves the exact wait, and uses ordinary continuation authority. Restart recovery requires a separate identified request. [Process tests](crates/grida-agent/tests/process/wakeups.rs) cover private scope, ownership, cancellation, and restart.
 - Private [Goal Start](crates/grida-agent/src/acp/extensions/goals.rs) can opt
   into one check-in for its first Standard Act reservation. The

@@ -37,6 +37,7 @@ struct ProfileFile {
     before_completion: Option<BeforeCompletion>,
     automatic_read_review: Option<ReadProfile>,
     goal_read_verification: Option<ReadVerification>,
+    goal_read_verifications: Option<Vec<ReadVerification>>,
 }
 
 #[derive(Deserialize)]
@@ -141,6 +142,14 @@ pub fn load_permission_profile(
     if profile.version != 1 || profile.directories.is_empty() || profile.directories.len() > 32 {
         return Err(invalid());
     }
+    let goal_read_verifications = match (
+        profile.goal_read_verification,
+        profile.goal_read_verifications,
+    ) {
+        (Some(verification), None) => vec![verification],
+        (None, verifications) => verifications.unwrap_or_default(),
+        (Some(_), Some(_)) => return Err(invalid()),
+    };
 
     let mut read_write = profile.protected_paths;
     read_write.extend([profile_file.to_owned(), state_directory.to_owned()]);
@@ -229,7 +238,6 @@ pub fn load_permission_profile(
         &protected,
     )?;
     let selected_review = profile.automatic_read_review;
-    let goal_read_verification = profile.goal_read_verification;
     let profile = PermissionProfile::with_denials(
         profile.revision,
         Arc::new(workspace),
@@ -245,10 +253,9 @@ pub fn load_permission_profile(
         Some(review) => profile.with_automatic_read_review(review)?,
         None => profile,
     };
-    Ok(Arc::new(match goal_read_verification {
-        Some(verification) => profile.with_goal_read_verification(verification)?,
-        None => profile,
-    }))
+    Ok(Arc::new(
+        profile.with_goal_read_verifications(goal_read_verifications)?,
+    ))
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -394,6 +401,72 @@ mod tests {
         assert!(profile.matches_primary(&fixture.directory));
         assert!(!profile.matches_primary(&fixture.state));
         assert!(!profile.matches_primary(&fixture.directory.join("nested")));
+    }
+
+    #[test]
+    fn goal_verification_profile_is_bounded_and_preserves_capture_identity() {
+        use agent_kit_core::ScopeId;
+        use serde_json::{Value, json};
+
+        let fixture = Fixture::new();
+        fixture.write(&fixture.directory);
+        let base: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+        let rule =
+            json!({"directory":"project","relativePath":"manifest.txt","sha256":vec![0; 32]});
+        let load = |singular, plural| {
+            let mut profile = base.clone();
+            profile["goalReadVerification"] = singular;
+            profile["goalReadVerifications"] = plural;
+            fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+            fixture.load()
+        };
+        let scope = ScopeId::new("goal").unwrap();
+        let single = load(rule.clone(), Value::Null).unwrap();
+        let list = load(Value::Null, json!([rule.clone()])).unwrap();
+        assert_eq!(single.capture(scope.clone()), list.capture(scope.clone()));
+
+        let mut other = rule.clone();
+        other["relativePath"] = json!("another.txt");
+        let pair = load(Value::Null, json!([rule.clone(), other.clone()])).unwrap();
+        let reordered = load(Value::Null, json!([other.clone(), rule.clone()])).unwrap();
+        assert_eq!(
+            pair.capture(scope.clone()),
+            reordered.capture(scope.clone())
+        );
+        other["sha256"] = json!(vec![1; 32]);
+        let changed = load(Value::Null, json!([other, rule.clone()])).unwrap();
+        assert!(changed.validate_capture(&pair.capture(scope)).is_err());
+
+        assert_eq!(
+            load(rule.clone(), json!([rule.clone()]))
+                .err()
+                .unwrap()
+                .code,
+            "permission_profile_invalid"
+        );
+        assert_eq!(
+            load(Value::Null, json!([rule.clone(), rule.clone()]))
+                .err()
+                .unwrap()
+                .code,
+            "duplicate_goal_read_verification"
+        );
+        assert_eq!(
+            load(Value::Null, json!(vec![rule.clone(); 17]))
+                .err()
+                .unwrap()
+                .code,
+            "goal_read_verification_limit"
+        );
+        let mut unknown_directory = rule;
+        unknown_directory["directory"] = json!("unknown");
+        assert_eq!(
+            load(Value::Null, json!([unknown_directory]))
+                .err()
+                .unwrap()
+                .code,
+            "goal_read_verification_requires_read_authority"
+        );
     }
 
     #[test]

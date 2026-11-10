@@ -35,6 +35,7 @@ const REQUEST: &str = "grida.agent.approval";
 const ANSWER: &str = "grida.agent.approval.answer";
 const MAX_APPROVAL_BYTES: usize = 128 * 1024;
 const MAX_ACTIONS: usize = 32;
+const MAX_GOAL_READ_VERIFICATIONS: usize = 16;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -80,7 +81,7 @@ pub struct PermissionProfile {
     hooks_only: bool,
     completion_hook: Option<CompletionHook>,
     automatic_read_review: Option<ReadProfile>,
-    goal_read_verification: Option<ReadVerification>,
+    goal_read_verifications: Vec<ReadVerification>,
     revision: BindingId,
     identity: Fingerprint,
     context: String,
@@ -200,7 +201,7 @@ impl PermissionProfile {
             hooks_only: false,
             completion_hook: None,
             automatic_read_review: None,
-            goal_read_verification: None,
+            goal_read_verifications: Vec::new(),
             revision,
             identity,
             context,
@@ -264,23 +265,49 @@ impl PermissionProfile {
         self.automatic_read_review.as_ref()
     }
 
-    pub(crate) fn with_goal_read_verification(
+    pub(crate) fn with_goal_read_verifications(
         mut self,
-        verification: ReadVerification,
+        verifications: Vec<ReadVerification>,
     ) -> Result<Self> {
-        verification.validate()?;
-        if self
-            .directories
-            .get(&verification.directory)
-            .is_none_or(|rules| rules.read == AccessRule::Deny)
-        {
+        if verifications.len() > MAX_GOAL_READ_VERIFICATIONS {
             return Err(problem(
                 ErrorKind::InvalidInput,
-                "goal_read_verification_requires_read_authority",
+                "goal_read_verification_limit",
             ));
         }
-        self.identity = Fingerprint::of(&(self.identity, "goal-read-verification", &verification))?;
-        self.goal_read_verification = Some(verification);
+        let mut criteria = BTreeMap::new();
+        for verification in verifications {
+            verification.validate()?;
+            if self
+                .directories
+                .get(&verification.directory)
+                .is_none_or(|rules| rules.read == AccessRule::Deny)
+            {
+                return Err(problem(
+                    ErrorKind::InvalidInput,
+                    "goal_read_verification_requires_read_authority",
+                ));
+            }
+            if criteria
+                .insert(verification.criterion(), verification)
+                .is_some()
+            {
+                return Err(problem(
+                    ErrorKind::InvalidInput,
+                    "duplicate_goal_read_verification",
+                ));
+            }
+        }
+        let verifications = criteria.into_values().collect::<Vec<_>>();
+        self.identity = match verifications.as_slice() {
+            [] => self.identity,
+            // Preserve the capture identity of existing single-rule profiles.
+            [verification] => {
+                Fingerprint::of(&(self.identity, "goal-read-verification", verification))?
+            }
+            _ => Fingerprint::of(&(self.identity, "goal-read-verifications", &verifications))?,
+        };
+        self.goal_read_verifications = verifications;
         Ok(self)
     }
 
@@ -563,12 +590,22 @@ impl TurnPermissions {
     pub(crate) fn goal_read_verifier(
         &self,
     ) -> Option<impl Fn(&str, &OperationState) -> bool + use<>> {
-        Some(
-            self.profile
-                .goal_read_verification
-                .clone()?
-                .verifier(self.files.clone()),
-        )
+        if self.profile.goal_read_verifications.is_empty() {
+            return None;
+        }
+        let grant = self.files.clone();
+        let verifiers = self
+            .profile
+            .goal_read_verifications
+            .iter()
+            .cloned()
+            .map(ReadVerification::verifier)
+            .collect::<Vec<_>>();
+        Some(move |criterion: &str, operation: &OperationState| {
+            verifiers
+                .iter()
+                .any(|verify| verify(criterion, operation, &grant))
+        })
     }
 
     pub(crate) fn insert_file_tools(

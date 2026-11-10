@@ -821,9 +821,9 @@ allowance. You can confirm after the work settles even if no allowance
 remains. The agent's proposal stays tied to the work it came from, including
 after reopening the chat.
 
-A trusted headless launch can independently verify one selected file criterion
+A trusted headless launch can independently verify configured file criteria
 from the complete bytes recorded by `read_file`. The goal retains the exact
-verification from that turn. [Configure an observed-file criterion](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#verify-a-goals-observed-file-bytes)
+verification from that turn. [Configure observed-file criteria](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#verify-a-goals-observed-file-bytes)
 
 A reviewed native Desktop Gateway connection or private ACP client can select
 **Ultra** for a goal. One independent review shares its inference allowance.

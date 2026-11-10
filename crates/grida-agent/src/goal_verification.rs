@@ -1,4 +1,4 @@
-//! GRIDA-SEC-004 — Goal evidence from one trusted file observation.
+//! GRIDA-SEC-004 — Goal evidence from trusted file observations.
 
 use crate::file_tools::{read_request, validate_path};
 use agent_kit_core::authority::GrantSelection;
@@ -35,7 +35,7 @@ impl ReadVerification {
         validate_path(Path::new(&self.relative_path))
     }
 
-    fn criterion(&self) -> String {
+    pub(crate) fn criterion(&self) -> String {
         let digest = self
             .sha256
             .iter()
@@ -48,11 +48,11 @@ impl ReadVerification {
         )
     }
 
-    pub(crate) fn verifier(self, grant: GrantSelection) -> impl Fn(&str, &OperationState) -> bool {
+    pub(crate) fn verifier(self) -> impl Fn(&str, &OperationState, &GrantSelection) -> bool {
         let criterion = self.criterion();
-        move |selected, operation| {
+        move |selected, operation, grant| {
             if selected != criterion
-                || operation.record.grants != grant
+                || &operation.record.grants != grant
                 || operation.record.origin.is_none()
                 || operation.record.source_call.is_none()
                 || operation.rejection.is_some()

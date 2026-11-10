@@ -578,8 +578,8 @@ selected wake-up after restart. Inspecting or loading a chat leaves it idle.
 
 ### Verify a goal's observed file bytes
 
-A trusted `--permission-profile` can select one file and its expected SHA-256
-digest. This example expects the exact UTF-8 bytes `approved` followed by a
+A trusted `--permission-profile` can select files and their expected SHA-256
+digests. This example expects the exact UTF-8 bytes `approved` followed by a
 newline in `manifest.txt` under the existing `reference` directory ID.
 
 ```json
@@ -595,17 +595,21 @@ newline in `manifest.txt` under the existing `reference` directory ID.
 }
 ```
 
-Use this exact criterion for that example:
+Use the following exact criterion for that example.
 
 ```text
 Observe SHA-256 7f8518f7db5e9a55049f49c4ea6d6e8f509695231e60cbd607bcb36c88a75a14 for directory "reference", path "manifest.txt".
 ```
 
-The Goal turn must read the file using `read_file` with the explicit directory
-ID and relative path, then cite its retained call in `goal_report`. The host
-checks the complete, recorded bytes independently at settlement. The existing
-permission rules apply to the read. The verification describes the bytes
-observed in that turn, and reopening the chat preserves that evidence.
+For multiple criteria, use `goalReadVerifications` in place of
+`goalReadVerification`. Supply an array of up to 16 distinct rules with the
+same fields, and give the Goal one exact criterion per rule.
+
+The Goal turn reads each file using `read_file` with the explicit directory ID
+and relative path, then cites its retained call for that criterion in
+`goal_report`. The host independently checks the complete recorded bytes at
+settlement. The profile's read permissions still apply. Reopening the chat
+preserves the verification for the bytes observed in that turn.
 
 ## Use headless presentation
 

@@ -62,20 +62,28 @@ async fn configured_goal_checks_the_exact_observed_bytes_before_completing() {
             let call: String = if complete {
                 // The provider's history has a wire alias. The model can only
                 // cite the retained ID when it gets the independent data hint.
-                let wire = request["messages"].as_array().unwrap().iter().find(|m| m["role"] == "tool").unwrap();
+                let wire = request["messages"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|m| m["role"] == "tool")
+                    .unwrap();
                 let alias = wire["tool_call_id"].as_str().unwrap();
                 let hint = evidence_hint(request).unwrap();
                 let retained = hint[0]["call"].as_str().unwrap();
                 assert_ne!(retained, alias);
                 retained.into()
             } else {
-                assert!(evidence_hint(request).is_none(), "{label}: unsolicited evidence hint");
+                assert!(
+                    evidence_hint(request).is_none(),
+                    "{label}: unsolicited evidence hint"
+                );
                 "fixture-call".into()
             };
-            let args = json!({"report":{"kind":"completion","summary":"The manifest was verified.","evidence":[{"criterion":1,"call":call}]}});
-            let body = fixture_tool_body("goal_report", &args.to_string())
-                .replacen("\"id\":\"fixture-call\"", "\"id\":\"fixture-report\"", 1);
-            Reply::RawHttp(format!("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()))
+            completion_reply(
+                "The manifest was verified.",
+                json!([{"criterion":1,"call":call}]),
+            )
         })));
         replies.push(Reply::Finished("Finished checking the release manifest."));
         let mut endpoint = Endpoint::start(replies).await;
@@ -195,6 +203,118 @@ async fn configured_goal_checks_the_exact_observed_bytes_before_completing() {
         assert!(endpoint.requests.try_recv().is_err());
         endpoint.done().await;
     }
+}
+
+#[tokio::test]
+async fn a_multi_file_goal_requires_the_matching_call_for_every_criterion() {
+    for swapped in [false, true] {
+        let fixture = Fixture::new(false);
+        let digest: [u8; 32] = Sha256::digest(EXPECTED).into();
+        let digest_hex = digest
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let paths = ["manifest.txt", "another.txt"];
+        let mut profile: Value =
+            serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+        profile["goalReadVerifications"] = json!(paths.map(|path| json!({
+            "directory":"primary","relativePath":path,"sha256":digest
+        })));
+        fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+        for path in paths {
+            fs::write(fixture.primary.join(path), EXPECTED).unwrap();
+        }
+        let criteria = paths.map(|path| {
+            format!("Observe SHA-256 {digest_hex} for directory \"primary\", path \"{path}\".")
+        });
+        let mut endpoint = Endpoint::start(vec![
+            Reply::Tool("read_file", READ),
+            Reply::Tool("read_file", OTHER_FILE),
+            Reply::Choose(Box::new(move |request| {
+                let mut evidence = evidence_hint(request).unwrap();
+                assert_eq!(evidence.as_array().unwrap().len(), 2);
+                assert_eq!(evidence[0]["criterion"], 1);
+                assert_eq!(evidence[1]["criterion"], 2);
+                assert_ne!(evidence[0]["call"], evidence[1]["call"]);
+                if swapped {
+                    let first = evidence[0]["call"].clone();
+                    evidence[0]["call"] = evidence[1]["call"].clone();
+                    evidence[1]["call"] = first;
+                }
+                completion_reply("Checked both files.", evidence)
+            })),
+            Reply::Finished("Finished checking both files."),
+        ])
+        .await;
+        let mut client = open(&fixture, &endpoint.url).await;
+        let created = client
+            .request(
+                "session/new",
+                json!({"cwd":fixture.primary,"mcpServers":[]}),
+            )
+            .await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        let submitted = client
+            .request(
+                "_co.grida/goal/start",
+                json!({
+                    "sessionId":session,"inputId":"release-goal",
+                    "prompt":[{"type":"text","text":"Check both release files."}],
+                    "goal":{
+                        "objective":{"description":"Verify the release files","criteria":criteria},
+                        "allowance":{"work_turns":2,"inference_steps":5}
+                    }
+                }),
+            )
+            .await;
+        assert_eq!(
+            submitted["result"]["inputId"], "release-goal",
+            "{submitted}"
+        );
+        for _ in 0..4 {
+            endpoint.request().await;
+        }
+        timeout(WAIT, async {
+            loop {
+                let snapshot = client
+                    .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+                    .await;
+                if snapshot["result"]["current"].is_null()
+                    && snapshot["result"]["latest"].is_object()
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        let goal = client
+            .request("_co.grida/goal/inspect", json!({"sessionId":session}))
+            .await;
+        let expected = if swapped {
+            json!({"status":"blocked","reason":"unverified_completion"})
+        } else {
+            json!({"status":"complete"})
+        };
+        assert_eq!(goal["result"]["goal"]["status"], expected, "{goal}");
+        client.close().await;
+        assert!(endpoint.requests.try_recv().is_err());
+        endpoint.done().await;
+    }
+}
+
+fn completion_reply(summary: &str, evidence: Value) -> Reply {
+    let args = json!({"report":{"kind":"completion","summary":summary,"evidence":evidence}});
+    let body = fixture_tool_body("goal_report", &args.to_string()).replacen(
+        "\"id\":\"fixture-call\"",
+        "\"id\":\"fixture-report\"",
+        1,
+    );
+    Reply::RawHttp(format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    ))
 }
 
 fn evidence_hint(request: &Value) -> Option<Value> {
