@@ -36,6 +36,7 @@ import { NativeSideChatPanel } from "./native-side-chat-panel";
 import { NativeTurnSummary } from "./native-turn-summary";
 import { NativeContextLimitPanel } from "./native-context-limit-panel";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
+import { NativeSubagentsPanel } from "./native-subagents-panel";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
 const COMMAND_DESCRIPTIONS = {
@@ -704,6 +705,9 @@ export function NativeAgentPane({
           controller={controller}
           view={state}
         />
+      )}
+      {state.subagents && (
+        <NativeSubagentsPanel key={state.scope} controller={state.subagents} />
       )}
       <div className="shrink-0 p-3">
         {state.wakeupsAvailable &&

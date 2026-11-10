@@ -32,8 +32,10 @@ import type {
   NativeChatWakeup,
   NativeChatWakeupAction,
   NativeContextLimit,
+  NativeSubagentClient,
 } from "@grida/desktop-bridge";
 import { NativeSideChatController } from "./native-side-chat-controller";
+import { NativeSubagentController } from "./native-subagent-controller";
 
 const POLL_MS = 500;
 const RECENTS_LIMIT = 12;
@@ -66,6 +68,7 @@ export type NativeChatView = Readonly<{
   }> | null;
   messages: readonly NativeChatMessage[];
   sideChat: NativeSideChatController | null;
+  subagents: NativeSubagentController | null;
   imageInput: boolean;
   imageReading: boolean;
   imageDraft: Readonly<{ name: string; size: number }> | null;
@@ -104,6 +107,7 @@ type Scope = {
   requested: string | null;
   attachment?: NativeChatAttachment;
   sideChat?: NativeSideChatController;
+  subagents?: NativeSubagentController;
   image?: ArrayBuffer;
   imageRead?: object;
   wakeupRead?: { observationId: string };
@@ -165,6 +169,7 @@ const EMPTY: NativeChatView = Object.freeze({
   catalogDraft: null,
   messages: [],
   sideChat: null,
+  subagents: null,
   imageInput: false,
   imageReading: false,
   imageDraft: null,
@@ -361,6 +366,7 @@ export class NativeChatController {
       catalogDraft: null,
       messages: [],
       sideChat: null,
+      subagents: null,
       imageInput: false,
       imageReading: false,
       imageDraft: null,
@@ -1893,6 +1899,7 @@ export class NativeChatController {
     if (!scope) return;
     clearTimeout(scope.timer);
     void scope.sideChat?.close().catch(() => {});
+    scope.subagents?.dispose();
     this.attachments = this.attachments.then(async () => {
       // Detach removes the subscription. It does not stop accepted work.
       if (scope.attachment)
@@ -2015,6 +2022,19 @@ export class NativeChatController {
             historyPosition(scope.observation) !== historyPosition(next));
         scope.observation = next;
         if (
+          next.snapshot.subagentsAvailable &&
+          supportsSubagents(this.bridge)
+        ) {
+          scope.subagents ??= new NativeSubagentController(
+            this.bridge,
+            attachment.attachmentId,
+            () => scope.observation
+          );
+        } else {
+          scope.subagents?.dispose();
+          scope.subagents = undefined;
+        }
+        if (
           scope.awaitingTurn &&
           (next.snapshot.current?.turnId === scope.awaitingTurn ||
             next.snapshot.latest?.turnId === scope.awaitingTurn)
@@ -2022,6 +2042,7 @@ export class NativeChatController {
           scope.awaitingTurn = undefined;
         this.update({
           observation: next,
+          subagents: scope.subagents ?? null,
           ...(turnChanged && {
             questions: [],
             questionReady: false,
@@ -2063,7 +2084,10 @@ export class NativeChatController {
           this.forgetDeletedChat(scope);
           return;
         }
+        scope.subagents?.dispose();
+        scope.subagents = undefined;
         this.update({
+          subagents: null,
           error: describe(error, "Couldn't refresh this chat. Try Refresh."),
         });
       })
@@ -2685,6 +2709,18 @@ function describe(error: unknown, fallback: string): string {
   if (error.message.includes("native_context_limit_unavailable"))
     return "This workspace cannot apply a hard context input limit with the selected provider.";
   return fallback;
+}
+
+function supportsSubagents(
+  bridge: DesktopNativeChat
+): bridge is DesktopNativeChat & NativeSubagentClient {
+  return (
+    typeof bridge.listSubagents === "function" &&
+    typeof bridge.inspectSubagent === "function" &&
+    typeof bridge.createSubagent === "function" &&
+    typeof bridge.assignSubagent === "function" &&
+    typeof bridge.stopSubagent === "function"
+  );
 }
 
 function revisionChanged(error: unknown): boolean {

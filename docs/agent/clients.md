@@ -350,6 +350,8 @@ repeat the effect.
 
 ## Assign work to a named subagent
 
+For the Desktop workflow, see [Work with subagents](./subagents.md).
+
 Start the source-built host with a direct provider and private stdio.
 
 ```sh
