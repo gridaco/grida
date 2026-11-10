@@ -24,12 +24,18 @@ use grida_agent::acp::external::{ExternalAcpDriver, ExternalAcpLaunch};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::os::unix::fs::DirBuilderExt;
+use std::io::Write as _;
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 const PEER: &str = r#"
+BEGIN {
+    if ("OPENAI_API_KEY" in ENVIRON || "ANTHROPIC_API_KEY" in ENVIRON || "HTTP_PROXY" in ENVIRON) exit 18
+}
 function send(body) {
     print "{\"jsonrpc\":\"2.0\"," body "}"
     fflush()
@@ -111,6 +117,7 @@ struct Fixture {
     workspace: PathBuf,
     temporary: PathBuf,
     sandbox: Arc<Sandbox>,
+    installation: Installation,
     authority: Arc<Authority>,
 }
 
@@ -118,6 +125,7 @@ impl Fixture {
     fn new(refuse_prompt: bool) -> Self {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path().canonicalize().unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
         let workspace = root.join("workspace");
         let temporary = root.join("temporary");
         for path in [&workspace, &temporary] {
@@ -133,11 +141,13 @@ impl Fixture {
         let bubblewrap = Some(trusted(std::env::var_os("AGENT_KIT_TEST_BWRAP").expect(
             "set AGENT_KIT_TEST_BWRAP to the trusted non-setuid bubblewrap executable",
         )));
+        let installation = Installation { helper, bubblewrap };
         Self {
             directory,
             workspace,
             temporary,
-            sandbox: Arc::new(Sandbox::new(Installation { helper, bubblewrap }).unwrap()),
+            sandbox: Arc::new(Sandbox::new(installation.clone()).unwrap()),
+            installation,
             authority: Arc::new(Authority {
                 refuse_prompt,
                 ..Authority::default()
@@ -146,30 +156,7 @@ impl Fixture {
     }
 
     fn driver(&self, mode: &str) -> Arc<ExternalAcpDriver> {
-        let executable = trusted("/usr/bin/awk");
-        let mut arguments = vec![];
-        if executable
-            .path
-            .file_name()
-            .is_some_and(|name| name == "mawk")
-        {
-            // Mawk otherwise waits for a full block on pipe input.
-            arguments.extend(["-W".into(), "interactive".into()]);
-        }
-        arguments.extend(["-v".into(), format!("mode={mode}"), PEER.into()]);
-        let runtime = [
-            "/bin",
-            "/usr/bin",
-            "/usr/lib",
-            "/usr/lib64",
-            "/lib",
-            "/lib64",
-            "/System/Library",
-        ]
-        .into_iter()
-        .map(PathBuf::from)
-        .filter(|path| path.is_dir())
-        .collect();
+        let (executable, arguments) = reviewed_peer(mode);
         Arc::new(
             ExternalAcpDriver::new(
                 self.sandbox.clone(),
@@ -190,7 +177,7 @@ impl Fixture {
                         valid_until: Instant::now() + Duration::from_secs(30),
                         read: vec![self.workspace.clone()],
                         write: vec![],
-                        runtime,
+                        runtime: runtime_paths(),
                         protected: vec![ProtectedPath {
                             path: self.directory.path().join("state"),
                             access: DeniedAccess::ReadWrite,
@@ -207,11 +194,63 @@ impl Fixture {
     }
 
     fn open(&self) -> Arc<SqliteStore> {
-        let state = self.directory.path().join("state");
+        Arc::new(SqliteStore::open(self.state().join("turns.sqlite")).unwrap())
+    }
+
+    fn state(&self) -> PathBuf {
+        let state = self.directory.path().canonicalize().unwrap().join("state");
         if !state.exists() {
             fs::DirBuilder::new().mode(0o700).create(&state).unwrap();
         }
-        Arc::new(SqliteStore::open(state.join("turns.sqlite")).unwrap())
+        state
+    }
+
+    fn write_profile(&self, mode: &str) -> PathBuf {
+        let path = self
+            .directory
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join("profile.json");
+        let (executable, arguments) = reviewed_peer(mode);
+        let pin = |entry: &TrustedExecutable| json!({ "path": entry.path, "sha256": entry.sha256 });
+        let profile = json!({
+            "version": 1,
+            "cwd": self.workspace,
+            "executable": pin(&executable),
+            "arguments": arguments,
+            "helper": pin(&self.installation.helper),
+            "bubblewrap": self.installation.bubblewrap.as_ref().map(pin),
+            "runtimePaths": runtime_paths(),
+            "temporaryParent": self.temporary,
+        });
+        fs::OpenOptions::new()
+            .write(true)
+            .mode(0o600)
+            .create_new(true)
+            .open(&path)
+            .unwrap()
+            .write_all(&serde_json::to_vec(&profile).unwrap())
+            .unwrap();
+        path
+    }
+
+    fn command(&self, profile: &Path) -> tokio::process::Command {
+        let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_grida-agent"));
+        command
+            .arg("run-external")
+            .arg("--profile")
+            .arg(profile)
+            .arg("--state-dir")
+            .arg(self.state())
+            .args(["--deadline-ms", "8000"])
+            .env("HOME", self.directory.path())
+            .env_remove("GRIDA_HOME")
+            .env("OPENAI_API_KEY", "fixture-ambient")
+            .env("ANTHROPIC_API_KEY", "fixture-ambient")
+            .env("HTTP_PROXY", "fixture-ambient")
+            .kill_on_drop(true);
+        command
     }
 
     async fn admit(&self, store: &SqliteStore, driver: &ExternalAcpDriver) -> ClaimRequest {
@@ -234,6 +273,37 @@ impl Fixture {
             },
         }
     }
+}
+
+fn reviewed_peer(mode: &str) -> (TrustedExecutable, Vec<String>) {
+    let executable = trusted("/usr/bin/awk");
+    let mut arguments = vec![];
+    if executable
+        .path
+        .file_name()
+        .is_some_and(|name| name == "mawk")
+    {
+        // Mawk otherwise waits for a full block on pipe input.
+        arguments.extend(["-W".into(), "interactive".into()]);
+    }
+    arguments.extend(["-v".into(), format!("mode={mode}"), PEER.into()]);
+    (executable, arguments)
+}
+
+fn runtime_paths() -> Vec<PathBuf> {
+    [
+        "/bin",
+        "/usr/bin",
+        "/usr/lib",
+        "/usr/lib64",
+        "/lib",
+        "/lib64",
+        "/System/Library",
+    ]
+    .into_iter()
+    .map(PathBuf::from)
+    .filter(|path| path.is_dir())
+    .collect()
 }
 
 fn trusted(path: impl AsRef<Path>) -> TrustedExecutable {
@@ -403,20 +473,7 @@ async fn caller_drop_retains_lease_until_external_cancel_and_cleanup() {
     let request = fixture.admit(&store, &driver).await;
     let sessions = Sessions::new(store.clone(), driver);
     let owner = tokio::spawn(async move { sessions.run_selected(request).await });
-    tokio::time::timeout(Duration::from_secs(4), async {
-        loop {
-            if fs::read_dir(&fixture.temporary)
-                .unwrap()
-                .flatten()
-                .any(|entry| entry.path().join("prompt-received").is_file())
-            {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(5)).await;
-        }
-    })
-    .await
-    .unwrap();
+    wait_for_prompt(&fixture).await;
     owner.abort();
     let _ = owner.await;
     let view = store.inspect(session()).await.unwrap();
@@ -543,4 +600,153 @@ async fn reopened_sqlite_reconciles_unconfirmed_dispatch_without_replay() {
     assert!(receipt.record.binding.epoch > epoch);
     assert!(fixture.authority.requests.lock().unwrap().is_empty());
     assert!(fs::read_dir(&fixture.temporary).unwrap().next().is_none());
+}
+
+fn records(stdout: &[u8]) -> Vec<Value> {
+    std::str::from_utf8(stdout)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect()
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and a built helper"]
+async fn headless_external_run_publishes_the_exact_retained_turn() {
+    let fixture = Fixture::new(false);
+    let profile = fixture.write_profile("complete");
+    let mut child = fixture
+        .command(&profile)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"reviewed prompt")
+        .await
+        .unwrap();
+    let output = child.wait_with_output().await.unwrap();
+    assert!(
+        output.status.success(),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    let records = records(&output.stdout);
+    let [accepted, finished] = records.as_slice() else {
+        panic!("expected accepted and finished, got {records:?}");
+    };
+    assert_eq!(accepted["kind"], "accepted");
+    assert_eq!(finished["kind"], "finished");
+    for key in ["session_id", "turn_id", "input_id", "schema_version"] {
+        assert_eq!(accepted[key], finished[key], "{key}");
+    }
+    assert_eq!(finished["disposition"], "succeeded");
+    assert_eq!(finished["account"]["text"], "partial and completed");
+    assert_eq!(finished["account"]["peer_session"], "foreign-session");
+
+    let inspected = tokio::process::Command::new(env!("CARGO_BIN_EXE_grida-agent"))
+        .arg("inspect")
+        .arg("--state-dir")
+        .arg(fixture.state())
+        .arg(accepted["session_id"].as_str().unwrap())
+        .output()
+        .await
+        .unwrap();
+    assert!(
+        inspected.status.success(),
+        "{}",
+        String::from_utf8_lossy(&inspected.stderr)
+    );
+    let inspection: Value = serde_json::from_slice(&inspected.stdout).unwrap();
+    assert_eq!(inspection["latest"]["binding"]["turn"], accepted["turn_id"]);
+    assert_eq!(inspection["latest"]["outcome"]["status"], "succeeded");
+    assert!(fs::read_dir(&fixture.temporary).unwrap().next().is_none());
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and a built helper"]
+async fn headless_external_stop_settles_the_admitted_peer() {
+    let fixture = Fixture::new(false);
+    let profile = fixture.write_profile("cancel");
+    let mut child = fixture
+        .command(&profile)
+        .args(["--prompt", "reviewed prompt"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stdout = BufReader::new(child.stdout.take().unwrap()).lines();
+    let accepted: Value = serde_json::from_str(
+        &tokio::time::timeout(Duration::from_secs(5), stdout.next_line())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(accepted["kind"], "accepted");
+    wait_for_prompt(&fixture).await;
+    rustix::process::kill_process(
+        rustix::process::Pid::from_raw(child.id().unwrap() as i32).unwrap(),
+        rustix::process::Signal::TERM,
+    )
+    .unwrap();
+    let finished: Value = serde_json::from_str(
+        &tokio::time::timeout(Duration::from_secs(9), stdout.next_line())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    let output = child.wait_with_output().await.unwrap();
+    assert_eq!(output.status.code(), Some(130), "{finished:?}");
+    assert_eq!(finished["kind"], "finished");
+    assert_eq!(finished["turn_id"], accepted["turn_id"]);
+    assert_eq!(finished["disposition"], "cancelled");
+    assert_eq!(finished["account"]["peer_stop"], "cancelled");
+    assert_eq!(finished["account"]["cleanup_verified"], true);
+    assert!(fs::read_dir(&fixture.temporary).unwrap().next().is_none());
+}
+
+#[tokio::test]
+#[ignore = "requires a built helper and a local native launch profile"]
+async fn headless_external_refuses_an_untrusted_profile_before_admission() {
+    let fixture = Fixture::new(false);
+    let profile = fixture.write_profile("complete");
+    fs::set_permissions(&profile, fs::Permissions::from_mode(0o644)).unwrap();
+    let output = fixture
+        .command(&profile)
+        .args(["--prompt", "reviewed prompt"])
+        .output()
+        .await
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("permission_profile_invalid"));
+    assert!(!fixture.state().join("runtime.sqlite").exists());
+    assert!(fs::read_dir(&fixture.temporary).unwrap().next().is_none());
+}
+
+async fn wait_for_prompt(fixture: &Fixture) {
+    tokio::time::timeout(Duration::from_secs(4), async {
+        loop {
+            if fs::read_dir(&fixture.temporary)
+                .unwrap()
+                .flatten()
+                .any(|entry| entry.path().join("prompt-received").is_file())
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
 }

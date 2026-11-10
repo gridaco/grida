@@ -1283,6 +1283,11 @@ Today:
   The owned worker retains the turn lease through process cleanup. A retained
   handoff without a receipt cannot cause automatic replay. [Native peer and
   SQLite fixtures](crates/grida-agent/tests/external_acp.rs) exercise this boundary.
+  The [headless launcher](crates/grida-agent/src/process/external.rs) selects
+  an owner-private profile and pins one read-only workspace. The state,
+  profile, and private Grida roots are outside the peer grant. It claims the
+  turn before publishing acceptance and verifies settlement against that
+  same SQLite store. The native fixture also exercises this built entrypoint.
 - The native [permission owner](crates/grida-agent/src/permissions.rs) resolves an explicit host profile, binds a durable decision to one action and its captured scope, and fences revocation at command spawn. [Sandbox preparation](crates/agent-kit-sandbox/src/native.rs) checks the exact opened directory and captures executable and scope identity. [Native permission tests](crates/grida-agent/tests/permissions.rs) cover decline, restart, identity changes and revocation.
 - The native [approval extension](crates/grida-agent/src/acp/extensions/approvals.rs) requires the private supervising stdio client for answers. Attached shared clients can read pending approvals. The [host](crates/grida-agent/src/host/permissions.rs) checks the retained action and revisions and holds the execution slot while command cleanup is pending. Unverified cleanup stops automatic queue advancement. [Process tests](crates/grida-agent/tests/process/approvals.rs) cover private review, restart, exact retries, cancellation, and confined command dispatch.
 - The [native ACP confinement fixtures](crates/grida-agent/tests/process/approvals/confinement.rs) retarget a folder alias into a protected root during approval and verify both direct and aliased reads and writes are refused under Seatbelt or bubblewrap. The Linux cases probe socket denial inside the command namespace and verify detached work stops, retaining explicit uncertainty when native cleanup cannot be confirmed.

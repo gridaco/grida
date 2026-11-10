@@ -177,7 +177,32 @@ fn command() -> Command {
                 .arg(Arg::new("session").value_name("SESSION_ID").required(true)),
         );
     #[cfg(any(target_os = "macos", target_os = "linux"))]
-    let command = command.subcommand(Command::new("workspace-file").hide(true));
+    let command = command
+        .subcommand(Command::new("workspace-file").hide(true))
+        .subcommand(
+            Command::new("run-external")
+                .about("Run one text turn through a reviewed, confined ACP peer")
+                .arg(state_dir())
+                .arg(
+                    Arg::new("profile")
+                        .long("profile")
+                        .value_name("PRIVATE_PROFILE_FILE")
+                        .value_parser(value_parser!(PathBuf))
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("prompt")
+                        .long("prompt")
+                        .value_name("TEXT")
+                        .help("Prompt text. Reads bounded UTF-8 from stdin when omitted."),
+                )
+                .arg(
+                    Arg::new("deadline-ms")
+                        .long("deadline-ms")
+                        .value_parser(value_parser!(u64).range(1..=MAX_RUN_TIMEOUT_MS))
+                        .default_value("120000"),
+                ),
+        );
     command
 }
 
@@ -315,6 +340,26 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let state_dir = args
         .get_one::<PathBuf>("state-dir")
         .expect("required state dir");
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    if name == "run-external" {
+        return process::external::run(
+            process::external::RunOptions {
+                state_directory: state_dir.clone(),
+                profile: args
+                    .get_one::<PathBuf>("profile")
+                    .expect("required external ACP profile")
+                    .clone(),
+                prompt: args.get_one::<String>("prompt").cloned(),
+                timeout: Duration::from_millis(
+                    *args
+                        .get_one::<u64>("deadline-ms")
+                        .expect("deadline default"),
+                ),
+            },
+            process::shutdown_signal(),
+        )
+        .await;
+    }
     if name == "inspect" {
         let host = Host::open(state_dir, None)?;
         let id = SessionId::new(args.get_one::<String>("session").expect("required session"))?;

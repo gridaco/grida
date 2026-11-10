@@ -464,6 +464,46 @@ and server-initiated input. It projects text and structured output and
 leaves resource links unopened. Embedded callers can compose the same adapter
 with `mcp_client::McpClient::connect` and `Host::with_mcp_client`.
 
+## Run a confined external ACP peer
+
+On macOS and Linux, a trusted launcher can select one reviewed local ACP
+peer in the source-built executable. Supply an existing private state
+directory and an absolute, private profile file. The profile and state
+directory must be outside the peer's readable roots.
+
+```sh
+printf '%s' 'Summarize the selected workspace.' | target/debug/grida-agent run-external \
+  --profile /absolute/private/external-acp.json \
+  --state-dir /absolute/private/external-state
+```
+
+The profile is JSON. Store it with mode `0600` in a private directory.
+The state and temporary directories use mode `0700`.
+
+```text
+version          1
+cwd              absolute canonical workspace directory
+executable       { path, sha256 } for the reviewed system executable
+arguments        optional literal argument strings
+helper           { path, sha256 } for the matching sandbox helper
+bubblewrap       { path, sha256 } for non-setuid bubblewrap on Linux, omitted on macOS
+runtimePaths     absolute paths required to run the selected executable
+temporaryParent  absolute private directory for sandbox scratch
+protectedPaths   optional additional paths to deny
+```
+
+Each digest contains 32 byte values. The workspace is read-only, and the
+peer receives no inherited credentials, Grida tool grants, or network access.
+The prompt is UTF-8 and limited to 64 KiB. Use `--prompt` or stdin, and
+`--deadline-ms` to set the run deadline.
+
+The launcher writes the usual `accepted` and `finished` JSON Lines with the
+same session, turn, and input IDs. The external account includes bounded
+peer text and observed cleanup. A process signal requests Stop for the
+admitted turn. An unconfirmed handoff reports `uncertain` and is not replayed.
+Use `inspect --state-dir DIRECTORY SESSION_ID` to check its retained receipt.
+Each new invocation opens an independent turn and peer process.
+
 ## Embed a confined ACP peer
 
 A trusted Rust embedding running on Tokio on macOS or Linux can use

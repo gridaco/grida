@@ -1,5 +1,8 @@
 //! Bounded process adapters for the embedded and ACP host modes.
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub mod external;
+
 use crate::acp::{self, ListenOptions};
 use crate::host::{
     AcceptedRun, Host, PromptPart, PromptRequest, RunResult, change_id, validate_prompt_parts,
@@ -141,12 +144,7 @@ async fn run_once(
     .map_err(|_| problem(ErrorKind::Uncertain, "run_worker_disconnected"))?;
     let (disposition, account, code, interactions, reason) = match result {
         Ok(RunResult::Settled(outcome)) => {
-            let (disposition, code) = match outcome.status {
-                OutcomeStatus::Succeeded => ("succeeded", 0),
-                OutcomeStatus::Failed => ("failed", 1),
-                OutcomeStatus::Cancelled => ("cancelled", 130),
-                OutcomeStatus::Uncertain => ("uncertain", 5),
-            };
+            let (disposition, code) = settled_status(outcome.status);
             let account = outcome.account.as_ref().map(read_account).transpose()?;
             (disposition, account, code, None, None)
         }
@@ -179,6 +177,15 @@ async fn run_once(
     }
     write_record(&finished).await?;
     Ok(code)
+}
+
+fn settled_status(status: OutcomeStatus) -> (&'static str, u8) {
+    match status {
+        OutcomeStatus::Succeeded => ("succeeded", 0),
+        OutcomeStatus::Failed => ("failed", 1),
+        OutcomeStatus::Cancelled => ("cancelled", 130),
+        OutcomeStatus::Uncertain => ("uncertain", 5),
+    }
 }
 
 async fn admit_run(host: &Host, options: RunOptions) -> Result<AcceptedRun> {

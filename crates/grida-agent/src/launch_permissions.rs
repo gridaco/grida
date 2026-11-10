@@ -64,7 +64,7 @@ struct Command {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Executable {
+pub(crate) struct Executable {
     path: PathBuf,
     sha256: [u8; 32],
 }
@@ -256,7 +256,7 @@ fn validate_command_paths(_: &Command) -> Result<()> {
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-fn read_profile(path: &Path) -> Result<Vec<u8>> {
+pub(crate) fn read_profile(path: &Path) -> Result<Vec<u8>> {
     use rustix::fs::{Mode, OFlags, open};
     use std::fs::{self, File, Metadata};
     use std::io::Read;

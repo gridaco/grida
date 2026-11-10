@@ -21,7 +21,7 @@ use agent_kit_core::turn::{
 };
 use agent_kit_core::{
     BoxFuture, CancellationToken, ChangeId, Envelope, Error, ErrorKind, Fingerprint, MessageId,
-    OperationId, Result, SchemaId,
+    OperationId, Result, SchemaId, SessionId, TurnId,
 };
 use agent_kit_sandbox::{
     Completion, Descendants, ExecutionScope, PreparedProcess, ProcessEvidence, ProcessSpec,
@@ -85,13 +85,35 @@ impl ExternalAcpDriver {
         launch: ExternalAcpLaunch,
         authority: Arc<dyn AuthorityValidator>,
     ) -> Result<Self> {
+        Self::compose(sandbox, launch, authority, None)
+    }
+
+    pub(crate) fn for_directory(
+        sandbox: Arc<Sandbox>,
+        launch: ExternalAcpLaunch,
+        authority: Arc<dyn AuthorityValidator>,
+        directory: &std::fs::File,
+    ) -> Result<Self> {
+        Self::compose(sandbox, launch, authority, Some(directory))
+    }
+
+    fn compose(
+        sandbox: Arc<Sandbox>,
+        launch: ExternalAcpLaunch,
+        authority: Arc<dyn AuthorityValidator>,
+        directory: Option<&std::fs::File>,
+    ) -> Result<Self> {
         if !launch.scope.write.is_empty() {
             return Err(problem(
                 ErrorKind::InvalidInput,
                 "external_acp_read_only_required",
             ));
         }
-        let configuration = profile(&prepare(&sandbox, &launch)?, &launch)?;
+        let prepared = prepare(&sandbox, &launch)?;
+        if let Some(directory) = directory {
+            prepared.validate_working_root(directory)?;
+        }
+        let configuration = profile(&prepared, &launch)?;
         Ok(Self(Arc::new(Driver {
             sandbox,
             launch,
@@ -111,6 +133,16 @@ impl ExternalAcpDriver {
             id,
             payload: encode(INPUT, &prompt)?,
         })
+    }
+
+    pub(crate) fn authority_request(
+        &self,
+        session: &SessionId,
+        turn: &TurnId,
+        input: &Submission,
+    ) -> Result<AuthorityRequest> {
+        self.0
+            .request(turn, action(&self.0.configuration, session, turn, input)?)
     }
 }
 
@@ -135,6 +167,14 @@ impl TurnDriver for ExternalAcpDriver {
 }
 
 impl Driver {
+    fn request(&self, turn: &TurnId, action: Fingerprint) -> Result<AuthorityRequest> {
+        Ok(AuthorityRequest {
+            operation: OperationId::new(turn.as_str())?,
+            action,
+            selection: self.launch.scope.grants.clone(),
+        })
+    }
+
     async fn run(&self, claim: ClaimedTurn) -> Result<DriverOutcome> {
         let [input] = claim.inputs.as_slice() else {
             return Err(problem(
@@ -146,14 +186,7 @@ impl Driver {
         validate_prompt(&prompt)?;
         let lease = claim.lease;
         let binding = lease.binding();
-        let configuration: Fingerprint = decode(PROFILE, &claim.configuration)?;
-        let action = Fingerprint::of(&(
-            configuration,
-            &binding.session,
-            &binding.turn,
-            &input.id,
-            &input.payload,
-        ))?;
+        let action = action(&claim.configuration, &binding.session, &binding.turn, input)?;
         let state = lease.journal().load().await?;
         if let Some(checkpoint) = state.checkpoint() {
             let started: Dispatch = decode(DISPATCH, checkpoint)?;
@@ -182,11 +215,7 @@ impl Driver {
         if profile(&prepared, &self.launch)? != self.configuration {
             return Err(problem(ErrorKind::Conflict, "external_acp_profile_changed"));
         }
-        let request = AuthorityRequest {
-            operation: OperationId::new(binding.turn.as_str())?,
-            action,
-            selection: self.launch.scope.grants.clone(),
-        };
+        let request = self.request(&binding.turn, action)?;
         let deadline = (Instant::now() + self.launch.timeout).min(self.launch.scope.valid_until);
         let initial_control = state.controls().revision;
         tokio::select! {
@@ -296,6 +325,20 @@ impl Driver {
         let (status, code) = disposition(&transcript, verified, valid_wire);
         settle(&lease, status, code, &transcript, verified).await
     }
+}
+
+fn action(
+    configuration: &Envelope,
+    session: &SessionId,
+    turn: &TurnId,
+    input: &Submission,
+) -> Result<Fingerprint> {
+    let configuration: Fingerprint = decode(PROFILE, configuration)?;
+    Fingerprint::of(&(configuration, session, turn, &input.id, &input.payload))
+}
+
+pub(crate) fn read_account(envelope: &Envelope) -> Result<serde_json::Value> {
+    decode(ACCOUNT, envelope)
 }
 
 #[derive(Default)]
