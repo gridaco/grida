@@ -20,6 +20,7 @@ import type {
   NativeChatSideAnswer,
   NativeChatSideContext,
   NativeChatSnapshot,
+  NativeChatTurnSummary,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
 import { IPC_CHANNELS } from "../bridge/contract";
@@ -56,6 +57,7 @@ export type ActiveNativeChat = Readonly<{
     | "enqueue"
     | "inputReceipt"
     | "observe"
+    | "turnSummary"
     | "queue"
     | "queuedText"
     | "editQueue"
@@ -78,6 +80,7 @@ export type ActiveNativeChat = Readonly<{
 type Attachment = {
   id: string;
   session: NativeChatSession;
+  latestObservation?: NativeChatSnapshot;
   observations: Map<string, NativeChatSnapshot>;
   approvals: Map<string, NativeApprovalReview>;
   questions: Map<string, NativeQuestionReview>;
@@ -365,6 +368,11 @@ export class NativeChatIpc {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const snapshot = await owner.active.chat.observe(attachment.session);
     this.revalidate(owner, attachment);
+    if (
+      !attachment.latestObservation ||
+      snapshot.sessionRevision >= attachment.latestObservation.sessionRevision
+    )
+      attachment.latestObservation = snapshot;
     for (const [id, observed] of attachment.observations) {
       if (sameBasis(snapshot, observed)) return { observationId: id, snapshot };
     }
@@ -374,6 +382,30 @@ export class NativeChatIpc {
     const observationId = randomUUID();
     attachment.observations.set(observationId, snapshot);
     return { observationId, snapshot };
+  }
+
+  async turnSummary(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string
+  ): Promise<NativeChatTurnSummary> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = requireObservation(attachment, observationId);
+    const latest = snapshot.latest;
+    if (
+      latest?.disposition !== "settled" ||
+      latest.status === null ||
+      attachment.latestObservation?.latest?.turnId !== latest.turnId
+    )
+      throw new Error("native_chat_turn_summary_unavailable");
+    const summary = await owner.active.chat.turnSummary(
+      attachment.session,
+      snapshot
+    );
+    this.revalidate(owner, attachment);
+    if (attachment.latestObservation?.latest?.turnId !== latest.turnId)
+      throw new Error("native_chat_turn_summary_unavailable");
+    return summary;
   }
 
   async transcript(event: IpcMainInvokeEvent, attachmentId: string) {
@@ -989,7 +1021,10 @@ function sameBasis(
     left.current?.turnId === right.current?.turnId &&
     left.current?.epoch === right.current?.epoch &&
     left.current?.journalPosition === right.current?.journalPosition &&
-    left.current?.controlRevision === right.current?.controlRevision
+    left.current?.controlRevision === right.current?.controlRevision &&
+    left.latest?.turnId === right.latest?.turnId &&
+    left.latest?.disposition === right.latest?.disposition &&
+    left.latest?.status === right.latest?.status
   );
 }
 

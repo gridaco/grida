@@ -58,6 +58,32 @@ export type NativeChatObservation = Readonly<{
   snapshot: NativeChatSnapshot;
 }>;
 
+export type NativeChatTurnSummary = Readonly<{
+  turnId: string;
+  status: NonNullable<NativeChatTurn["status"]>;
+  text: string;
+  textTruncated: boolean;
+  steps: number | null;
+  unresolvedOperations: number | null;
+  toolActivity: Readonly<{
+    succeeded: number;
+    failed: number;
+    cancelled: number;
+    unresolved: number;
+  }> | null;
+  checks: readonly (
+    | "allowed"
+    | "denied"
+    | "failed"
+    | "cancelled"
+    | "uncertain"
+    | "invalid_reply"
+    | "unavailable"
+    | "deferred"
+    | "skipped"
+  )[];
+}>;
+
 export type NativeChatMessage = Readonly<{
   messageId: string;
   role: "user" | "assistant";
@@ -276,6 +302,10 @@ export type DesktopNativeChat = {
     inputId: string
   ): Promise<NativeChatAcceptance>;
   observe(attachmentId: string): Promise<NativeChatObservation>;
+  turnSummary?(
+    attachmentId: string,
+    observationId: string
+  ): Promise<NativeChatTurnSummary>;
   queue?(
     attachmentId: string,
     observationId: string,

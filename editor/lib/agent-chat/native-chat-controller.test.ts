@@ -3,6 +3,8 @@ import type {
   DesktopNativeChat,
   NativeChatMessage,
   NativeChatObservation,
+  NativeChatTurn,
+  NativeChatTurnSummary,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "./native-chat-controller";
@@ -676,6 +678,67 @@ it("stages only a selected current side answer and leaves parent actions untouch
   expect(append).toHaveBeenCalledTimes(1);
   expect(submit).not.toHaveBeenCalled();
   expect(steer).not.toHaveBeenCalled();
+  controller.disconnect();
+});
+
+it("reads one summary per observed terminal turn and drops replies after switching chats", async () => {
+  const { bridge, controller } = fixture();
+  const summaries = new Map<string, NativeChatTurn>();
+  const observe = bridge.observe;
+  vi.spyOn(bridge, "observe").mockImplementation(async (id) => {
+    const observation = await observe(id);
+    return {
+      observationId: `basis-${id}-${summaries.get(id)?.turnId ?? "idle"}`,
+      snapshot: { ...observation.snapshot, latest: summaries.get(id) ?? null },
+    };
+  });
+  const read = vi.fn<NonNullable<DesktopNativeChat["turnSummary"]>>();
+  bridge.turnSummary = read;
+  await controller.select("chat-a");
+  expect(read).not.toHaveBeenCalled();
+
+  const latest = {
+    turnId: "finished-one",
+    epoch: 1,
+    journalPosition: 8,
+    historyPosition: 2,
+    controlRevision: 1,
+    paused: false,
+    cancelled: false,
+    disposition: "settled",
+    status: "succeeded",
+  } as const;
+  const account = {
+    turnId: latest.turnId,
+    status: latest.status,
+    text: "Completed result.",
+    textTruncated: false,
+    steps: 2,
+    unresolvedOperations: 0,
+    toolActivity: { succeeded: 1, failed: 0, cancelled: 0, unresolved: 0 },
+    checks: ["allowed"],
+  } satisfies NativeChatTurnSummary;
+  read.mockResolvedValueOnce(account);
+  summaries.set("chat-a", latest);
+  await controller.repair();
+  expect(controller.read().turnSummary).toEqual(account);
+  await controller.repair();
+  expect(read).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    "basis-chat-a-finished-one"
+  );
+
+  const late = Promise.withResolvers<NativeChatTurnSummary>();
+  read.mockReturnValueOnce(late.promise);
+  summaries.set("chat-a", { ...latest, turnId: "finished-two" });
+  await controller.repair();
+  expect(controller.read().turnSummary).toBeNull();
+  expect(read).toHaveBeenLastCalledWith("chat-a", "basis-chat-a-finished-two");
+  await controller.select("chat-b");
+  late.resolve({ ...account, turnId: "finished-two" });
+  await late.promise;
+  expect(controller.read().turnSummary).toBeNull();
+  expect(read).toHaveBeenCalledTimes(2);
   controller.disconnect();
 });
 

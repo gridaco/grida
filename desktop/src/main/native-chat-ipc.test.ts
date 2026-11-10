@@ -136,6 +136,18 @@ function setup() {
     async observe(session) {
       return snapshot(session.id);
     },
+    async turnSummary(_session, observed) {
+      return {
+        turnId: observed.latest!.turnId,
+        status: observed.latest!.status!,
+        text: "Retained result",
+        textTruncated: false,
+        steps: 2,
+        unresolvedOperations: 1,
+        toolActivity: null,
+        checks: [],
+      };
+    },
     async queue(_session, _snapshot, offset) {
       return { items: [], offset, previousOffset: null, nextOffset: null };
     },
@@ -244,6 +256,62 @@ function setup() {
 }
 
 describe("native chat IPC", () => {
+  it("reads only the current attached terminal basis and drops a superseded reply", async () => {
+    const { ipc, first, second, chat } = setup();
+    const parent = await ipc.create(first.event);
+    const another = await ipc.load(second.event, parent.sessionId);
+    const running = await ipc.observe(first.event, parent.attachmentId);
+    const summary = vi.spyOn(chat, "turnSummary");
+    await expect(
+      ipc.turnSummary(first.event, parent.attachmentId, running.observationId)
+    ).rejects.toThrow("native_chat_turn_summary_unavailable");
+    expect(summary).not.toHaveBeenCalled();
+    const latest = {
+      ...running.snapshot.current!,
+      disposition: "settled",
+      status: "succeeded",
+    } as const;
+    const observe = vi.spyOn(chat, "observe").mockResolvedValue({
+      ...running.snapshot,
+      current: null,
+      latest,
+    });
+    const settled = await ipc.observe(first.event, parent.attachmentId);
+    await expect(
+      ipc.turnSummary(second.event, another.attachmentId, settled.observationId)
+    ).rejects.toThrow("native_chat_observation_unavailable");
+    const record = await ipc.turnSummary(
+      first.event,
+      parent.attachmentId,
+      settled.observationId
+    );
+    expect(record.turnId).toBe(latest.turnId);
+    const late = Promise.withResolvers<typeof record>();
+    summary.mockReturnValueOnce(late.promise);
+    const pending = ipc.turnSummary(
+      first.event,
+      parent.attachmentId,
+      settled.observationId
+    );
+    observe.mockResolvedValue({
+      ...settled.snapshot,
+      sessionRevision: settled.snapshot.sessionRevision + 1,
+      latest: { ...latest, turnId: "newer-turn" },
+    });
+    const next = await ipc.observe(first.event, parent.attachmentId);
+    late.resolve(record);
+    await expect(pending).rejects.toThrow(
+      "native_chat_turn_summary_unavailable"
+    );
+    await expect(
+      ipc.turnSummary(first.event, parent.attachmentId, next.observationId)
+    ).resolves.toMatchObject({ turnId: "newer-turn" });
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    await expect(
+      ipc.turnSummary(first.event, parent.attachmentId, next.observationId)
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+  });
+
   it("scopes temporary side chats to each parent attachment and endpoint generation", async () => {
     const { ipc, first, second, chat, scopes } = setup();
     const one = await ipc.create(first.event);

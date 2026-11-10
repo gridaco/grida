@@ -20,6 +20,7 @@ import type {
   NativeChatSteer,
   NativeChatReadiness,
   NativeChatTextUpdate,
+  NativeChatTurnSummary,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
 import { NativeSideChatController } from "./native-side-chat-controller";
@@ -40,6 +41,7 @@ export type NativeChatView = Readonly<{
   messages: readonly NativeChatMessage[];
   sideChat: NativeSideChatController | null;
   observation: NativeChatObservation | null;
+  turnSummary: NativeChatTurnSummary | null;
   approvals: readonly NativeChatApproval[];
   approvalError: string | null;
   questions: readonly NativeChatQuestion[];
@@ -70,6 +72,7 @@ type Scope = {
   live: Map<string, NativeChatMessage & { turnId: string; bytes: number }>;
   gaps: Set<string>;
   observation: NativeChatObservation | null;
+  summaryRequest?: { turnId: string; failed?: boolean };
   approvalBasis?: string;
   questionBasis?: string;
   queueBasis?: { revision: number; offset: number; observationId: string };
@@ -103,6 +106,7 @@ const EMPTY: NativeChatView = Object.freeze({
   messages: [],
   sideChat: null,
   observation: null,
+  turnSummary: null,
   approvals: [],
   approvalError: null,
   questions: [],
@@ -258,6 +262,7 @@ export class NativeChatController {
       messages: [],
       sideChat: null,
       observation: null,
+      turnSummary: null,
       approvals: [],
       approvalError: null,
       questions: [],
@@ -809,6 +814,7 @@ export class NativeChatController {
     const scope = this.scope;
     if (!scope || (!scope.attachment && !scope.requested)) return;
     scope.replay = true;
+    if (scope.summaryRequest?.failed) scope.summaryRequest = undefined;
     this.update({ error: null });
     try {
       await this.open(scope);
@@ -975,6 +981,7 @@ export class NativeChatController {
             questionError: null,
           }),
         });
+        this.refreshTurnSummary(scope, attachment, next);
         void this.refreshQueue(scope, this.view.queue?.offset ?? 0);
         await Promise.all([
           this.refreshApprovals(scope, attachment, next),
@@ -1027,6 +1034,44 @@ export class NativeChatController {
         }
       });
     return scope.refreshing;
+  }
+
+  private refreshTurnSummary(
+    scope: Scope,
+    attachment: NativeChatAttachment,
+    observation: NativeChatObservation
+  ): void {
+    const latest = observation.snapshot.latest;
+    if (!this.bridge.turnSummary) return;
+    if (latest?.disposition !== "settled" || !latest.status) {
+      if (scope.summaryRequest) {
+        scope.summaryRequest = undefined;
+        this.update({ turnSummary: null });
+      }
+      return;
+    }
+    if (scope.summaryRequest?.turnId === latest.turnId) return;
+    const request: NonNullable<Scope["summaryRequest"]> = {
+      turnId: latest.turnId,
+    };
+    scope.summaryRequest = request;
+    this.update({ turnSummary: null });
+    void this.bridge
+      .turnSummary(attachment.attachmentId, observation.observationId)
+      .then((turnSummary) => {
+        if (!this.owns(scope) || scope.summaryRequest !== request) return;
+        if (
+          turnSummary.turnId !== latest.turnId ||
+          turnSummary.status !== latest.status
+        ) {
+          request.failed = true;
+          return;
+        }
+        this.update({ turnSummary });
+      })
+      .catch(() => {
+        request.failed = true;
+      });
   }
 
   private async refreshApprovals(

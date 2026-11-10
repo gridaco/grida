@@ -249,6 +249,9 @@ it.runIf(Boolean(packaged))(
       await expect(
         client.resume(session, running, "unverified")
       ).rejects.toThrow("native_chat_verified_pause_required");
+      await expect(client.turnSummary(session, running)).rejects.toThrow(
+        "native_chat_turn_summary_unavailable"
+      );
       const pause = await client.pause(session, running, "pause-fixture");
       expect(await client.pause(session, running, "pause-fixture")).toEqual(
         pause
@@ -312,9 +315,10 @@ it.runIf(Boolean(packaged))(
       expect(
         await client.stop(reattached, resumedRunning, "stop-fixture")
       ).toEqual(stopped);
-      await vi.waitFor(
+      const settled = await vi.waitFor(
         async () => {
-          expect(await client!.observe(reattached)).toEqual(
+          const snapshot = await client!.observe(reattached);
+          expect(snapshot).toEqual(
             expect.objectContaining({
               current: null,
               admissionPaused: true,
@@ -325,9 +329,22 @@ it.runIf(Boolean(packaged))(
               }),
             })
           );
+          return snapshot;
         },
         { timeout: 5000 }
       );
+      const summary = await client.turnSummary(reattached, settled);
+      expect(summary).toMatchObject({
+        turnId: accepted.turnId,
+        status: "cancelled",
+        text: expect.any(String),
+        textTruncated: false,
+        toolActivity: { succeeded: 0, failed: 0, cancelled: 0, unresolved: 0 },
+        checks: [],
+      });
+      await expect(
+        client.turnSummary(reattached, { ...settled })
+      ).rejects.toThrow("native_chat_turn_observation_required");
       expect(provider.prompts).toHaveLength(2);
       expect(await client.inputReceipt(reattached, "fixture-input")).toEqual(
         expect.objectContaining({
@@ -337,6 +354,12 @@ it.runIf(Boolean(packaged))(
           disposition: "completed",
         })
       );
+      await client.close();
+      client = await NativeAgentChat.start(launch);
+      const reopened = await client.load(session.id);
+      expect(
+        await client.turnSummary(reopened, await client.observe(reopened))
+      ).toEqual(summary);
       await client.close();
       client = await NativeAgentChat.start({ ...launch, cwd: test.root });
       await expect(client.load(session.id)).rejects.toThrow(

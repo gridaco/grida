@@ -432,6 +432,12 @@ const bridge: DesktopBridge = {
       ),
     observe: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
+    turnSummary: (attachmentId, observationId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,
+        attachmentId,
+        observationId
+      ),
     queue: (attachmentId, observationId, offset) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_QUEUE,

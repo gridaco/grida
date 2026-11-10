@@ -22,6 +22,7 @@ import type {
   NativeChatSteer,
   NativeChatStreamUpdate,
   NativeChatTurn,
+  NativeChatTurnSummary,
 } from "@grida/desktop-bridge";
 import type { NativeApprovalReview } from "./native-agent-permissions";
 import {
@@ -48,6 +49,7 @@ const CAPABILITIES = {
   "co.grida/session/steer": 1,
   "co.grida/session/input": 1,
   "co.grida/session/snapshot": 1,
+  "co.grida/session/turn-summary": 1,
   "co.grida/session/stop": 1,
   "co.grida/session/pause": 1,
   "co.grida/session/resume": 1,
@@ -73,6 +75,17 @@ const TURN_STATUSES = [
   "cancelled",
   "uncertain",
 ] as const;
+const CHECK_STATUSES = [
+  "allowed",
+  "denied",
+  "failed",
+  "cancelled",
+  "uncertain",
+  "invalid_reply",
+  "unavailable",
+  "deferred",
+  "skipped",
+] as const;
 const INPUT_DISPOSITIONS = [
   "queued",
   "claimed",
@@ -82,6 +95,8 @@ const INPUT_DISPOSITIONS = [
 ] as const;
 const MAX_TEXT_BYTES = 512 * 1024;
 const MAX_UPDATE_BYTES = 8 * 1024;
+const MAX_SUMMARY_BYTES = 8 * 1024;
+const MAX_SUMMARY_CHECKS = 8;
 const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 const MAX_TRANSCRIPT_MESSAGES = 1024;
 const MAX_CATALOG_SESSIONS = 32;
@@ -379,6 +394,56 @@ export class NativeAgentChat {
       queue,
     });
     return snapshot;
+  }
+
+  async turnSummary(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot
+  ): Promise<NativeChatTurnSummary> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const latest = snapshot.latest;
+    if (latest?.disposition !== "settled" || latest.status === null)
+      throw new Error("native_chat_turn_summary_unavailable");
+    const result = object(
+      await this.process.request("_co.grida/session/turn-summary", {
+        sessionId,
+        turnId: latest.turnId,
+      })
+    );
+    this.requireAttached(session);
+    if (
+      result.turnId !== latest.turnId ||
+      result.status !== latest.status ||
+      typeof result.text !== "string" ||
+      Buffer.byteLength(result.text) > MAX_SUMMARY_BYTES ||
+      !Array.isArray(result.checks) ||
+      result.checks.length > MAX_SUMMARY_CHECKS
+    )
+      throw invalidResponse();
+    const tools =
+      result.toolActivity === null ? null : object(result.toolActivity);
+    return Object.freeze({
+      turnId: latest.turnId,
+      status: latest.status,
+      text: result.text,
+      textTruncated: flag(result.textTruncated),
+      steps: result.steps === null ? null : revision(result.steps),
+      unresolvedOperations:
+        result.unresolvedOperations === null
+          ? null
+          : revision(result.unresolvedOperations),
+      toolActivity:
+        tools &&
+        Object.freeze({
+          succeeded: revision(tools.succeeded),
+          failed: revision(tools.failed),
+          cancelled: revision(tools.cancelled),
+          unresolved: revision(tools.unresolved),
+        }),
+      checks: Object.freeze(
+        result.checks.map((check: unknown) => choice(check, CHECK_STATUSES))
+      ),
+    });
   }
 
   async queue(

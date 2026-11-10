@@ -23,6 +23,7 @@ import { AgentComposerInput } from "../shared/agent-composer-input";
 import { QueuedMessageRows } from "../shared/queued-messages";
 import { NativeGoalPanel } from "./native-goal-panel";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
+import { NativeTurnSummary } from "./native-turn-summary";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
 const MAX_DRAFT_BYTES = 512 * 1024;
@@ -207,6 +208,17 @@ export function NativeAgentPane({
           {running && state.messages.at(-1)?.role !== "assistant" && (
             <PendingTurnIndicator />
           )}
+          {!turn &&
+            !state.loading &&
+            !state.repairing &&
+            state.turnSummary &&
+            state.turnSummary.turnId === snapshot?.latest?.turnId && (
+              <NativeTurnSummary
+                key={state.turnSummary.turnId}
+                summary={state.turnSummary}
+                messages={state.messages}
+              />
+            )}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>

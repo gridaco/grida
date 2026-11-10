@@ -311,6 +311,13 @@ Open supplies the parent session and a request ID. Ask supplies the returned sid
 chat ID, a request ID, and text, and returns a completion account. Close supplies
 the side chat ID. These IDs work only on the connection that opened the chat.
 
+## Read a turn summary
+
+In the native Desktop workspace pane, open **Turn summary** below the latest
+finished turn when it has additional details. It can show recorded tool
+outcomes, completion checks, and unresolved work. A simple reply serves as
+its own summary. Reopening the chat restores the latest recorded summary.
+
 ## Use durable client operations
 
 A capable client can opt in to individual version-1 operations through

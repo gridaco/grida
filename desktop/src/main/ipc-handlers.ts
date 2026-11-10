@@ -217,6 +217,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     nativeChat.observe(event, id)
   );
   guarded(
+    IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,
+    (event, id: string, observation: string) =>
+      nativeChat.turnSummary(event, id, observation)
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_QUEUE,
     (event, id: string, observation: string, offset: number) =>
       nativeChat.queue(event, id, observation, offset)
