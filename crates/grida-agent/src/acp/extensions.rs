@@ -93,6 +93,7 @@ fn capability_keys(
         .chain([compaction::COMPACT])
         .chain([skills::CATALOG])
         .chain([summaries::SUMMARY])
+        .chain(summaries::artifact_capability(reviewer))
         .chain([catalog::ORGANIZE])
         .chain(delete_chat.then_some(deletion::DELETE))
         .chain(goals::CAPABILITIES)

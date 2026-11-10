@@ -141,6 +141,19 @@ dispositions, unresolved count, and check statuses come from the retained
 account. Earlier accounts may omit tool counts. A missing summary uses the
 recorded terminal status as a fallback.
 
+Private stdio clients on macOS or Linux can also negotiate
+`co.grida/session/artifacts` version 1. A settled turn summary then includes
+`artifacts`, a list of up to eight recorded PNG crop results in operation ID
+order. Each entry contains `id`, `kind` (`image`), `mimeType` (`image/png`),
+`label`, `width`, `height`, and `bytes`. An entry describes a saved result. It
+does not imply the bytes are still available.
+
+`_co.grida/session/read-artifact` takes the attached `sessionId`, exact `turnId`,
+and `artifactId`. It returns `artifactId`, `mimeType`, and standard base64
+`data` for up to 256 KiB of exact PNG bytes. Missing or replaced bytes return
+`artifact_unavailable`. The operation reads existing state and never starts
+inference or runs a tool.
+
 A queue basis contains `sessionId`, `requestId`, and
 `expectedSessionRevision`. A task basis adds `turnId` and
 `expectedControlRevision`. Snapshot returns the ordered queue and turn

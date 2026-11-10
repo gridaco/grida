@@ -1,7 +1,7 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — retain supplied bytes and resolve only exact originals.
 
 use super::{PromptPart, problem};
-use crate::scratch::{AssetRef, ScratchLimits, ScratchScope};
+use crate::scratch::{AssetRef, ScratchLimits, ScratchScope, WorkingCopyProof};
 use crate::workspace::ProtectedRoots;
 use agent_kit_core::messages::{MediaRef, Retention};
 use agent_kit_core::{ArtifactId, BindingId, ChangeId, ErrorKind, Fingerprint, Result, SessionId};
@@ -16,7 +16,7 @@ const MIME: &str = "image/png";
 const NAME: &str = "image.png";
 const LOCATOR: &str = "retained-input:";
 pub(super) const MAX_IMAGE_BYTES: usize = 256 * 1024;
-const MAX_PIXELS: u64 = 4 * 1024 * 1024;
+pub(super) const MAX_PIXELS: u64 = 4 * 1024 * 1024;
 pub(super) const MAX_DECODED_BYTES: usize = 8 * 1024 * 1024;
 const LIMITS: ScratchLimits = ScratchLimits {
     max_assets: 16,
@@ -140,6 +140,16 @@ impl Images {
         self.with_scope(asset.owner(), |scope| {
             scope.read_retained(&asset, maximum.min(MAX_IMAGE_BYTES))
         })
+    }
+
+    pub(super) fn read_working(
+        &self,
+        owner: SessionId,
+        proof: &WorkingCopyProof,
+    ) -> Result<Vec<u8>> {
+        let _access = self.access.lock().unwrap();
+        let protected = ProtectedRoots::new(vec![])?;
+        ScratchScope::read_working(&self.base, owner, LIMITS, &protected, proof)
     }
 
     pub(super) fn with_scope<T>(

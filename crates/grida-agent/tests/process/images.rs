@@ -7,6 +7,14 @@ use agent_kit_core::{ChangeId, SessionId};
 use base64::{Engine, engine::general_purpose::STANDARD};
 
 const IMAGE_MODEL: &str = "gpt-5.4";
+const ARTIFACTS: &str = "co.grida/session/artifacts";
+
+fn artifact_initialize() -> Value {
+    let mut request = extension_initialize();
+    request["clientCapabilities"]["_meta"][ARTIFACTS] = 1.into();
+    request["clientCapabilities"]["_meta"]["co.grida/session/turn-summary"] = 1.into();
+    request
+}
 
 fn png(pixel: [u8; 3]) -> Vec<u8> {
     encode_png(1, 1, &pixel)
@@ -223,11 +231,12 @@ async fn shared_clients_cannot_import_image_bytes_even_with_the_image_profile() 
     let mut client = connect_shared(&url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
-    let ready = ws_rpc(&mut client, 1, "initialize", extension_initialize()).await;
+    let ready = ws_rpc(&mut client, 1, "initialize", artifact_initialize()).await;
     assert_eq!(
         ready["result"]["agentCapabilities"]["promptCapabilities"]["image"],
         false
     );
+    assert!(ready["result"]["agentCapabilities"]["_meta"][ARTIFACTS].is_null());
     let created = ws_rpc(
         &mut client,
         2,
@@ -247,6 +256,14 @@ async fn shared_clients_cannot_import_image_bytes_even_with_the_image_profile() 
         attempted["error"]["data"], "image_input_unavailable",
         "{attempted}"
     );
+    let artifact = ws_rpc(
+        &mut client,
+        4,
+        "_co.grida/session/read-artifact",
+        json!({"sessionId":session,"turnId":"any-turn","artifactId":"any-artifact"}),
+    )
+    .await;
+    assert_eq!(artifact["error"]["code"], -32601, "{artifact}");
     assert!(endpoint.requests.try_recv().is_err());
     assert!(!state.join("retained-inputs").exists());
     drop(client);
@@ -323,6 +340,8 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
             Reply::Finished("Saved the crop."),
             Reply::Finished("The chat still has its attachment."),
             Reply::Tool(TOOL, r#"{"x":0,"y":0,"width":1,"height":2}"#),
+            Reply::Finished("Saved a different crop."),
+            Reply::Tool(TOOL, r#"{"x":0,"y":0,"width":1,"height":2}"#),
             Reply::Finished("The earlier working copy is unavailable."),
             Reply::Finished("This chat has no image."),
         ],
@@ -330,7 +349,8 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
     )
     .await;
     let mut client = stdio(&state, &endpoint.url, IMAGE_MODEL);
-    client.request("initialize", extension_initialize()).await;
+    let ready = client.request("initialize", artifact_initialize()).await;
+    assert_eq!(ready["result"]["agentCapabilities"]["_meta"][ARTIFACTS], 1);
     let created = client
         .request(
             "session/new",
@@ -360,6 +380,23 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
     assert_eq!(receipt["height"], 2);
     assert_eq!(receipt["sourceSha256"], digest(&original));
     assert!(!receipt.to_string().contains(state.to_str().unwrap()));
+    let snapshot = settled(&mut client, session).await;
+    let turn = snapshot["latest"]["turnId"].as_str().unwrap();
+    let summary = crop_summary(&mut client, session, turn).await;
+    let artifacts = summary["result"]["artifacts"].as_array().unwrap();
+    let [artifact] = artifacts.as_slice() else {
+        panic!("expected exactly one result in {summary}");
+    };
+    let id = artifact["id"].as_str().unwrap();
+    assert_eq!(
+        *artifact,
+        json!({
+            "id": id, "kind": "image", "mimeType": "image/png", "label": "Cropped PNG",
+            "width": 1, "height": 2, "bytes": receipt["bytes"]
+        })
+    );
+    let opened = read_crop(&mut client, session, turn, id).await;
+    assert!(endpoint.requests.try_recv().is_err());
     client.close().await;
 
     let scope = fs::read_dir(state.join("retained-inputs"))
@@ -386,6 +423,10 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
     let edited = fs::read(&work).unwrap();
     assert_eq!(receipt["sha256"], digest(&edited));
     assert_eq!(
+        opened["result"],
+        json!({"artifactId":id,"mimeType":"image/png","data":STANDARD.encode(&edited)})
+    );
+    assert_eq!(
         receipt["workingCopyId"],
         format!("working/{}", work.file_stem().unwrap().to_str().unwrap())
     );
@@ -398,9 +439,10 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
     assert_eq!(pixels, [0, 255, 0, 255, 255, 0]);
 
     let mut restarted = stdio(&state, &endpoint.url, IMAGE_MODEL);
-    restarted
-        .request("initialize", extension_initialize())
-        .await;
+    restarted.request("initialize", artifact_initialize()).await;
+    let detached = read_crop(&mut restarted, session, turn, id).await;
+    assert!(detached["error"].is_object(), "{detached}");
+    assert!(detached["result"].is_null());
     let load = restarted
         .request(
             "session/load",
@@ -408,6 +450,30 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
         )
         .await;
     assert!(load["result"].is_object(), "{load}");
+    assert_eq!(
+        crop_summary(&mut restarted, session, turn).await["result"],
+        summary["result"]
+    );
+    assert_eq!(
+        read_crop(&mut restarted, session, turn, id).await["result"],
+        opened["result"]
+    );
+    let lock = scope.join("owner.lock");
+    let moved_lock = scope.join("owner.lock-fixture");
+    fs::rename(&lock, &moved_lock).unwrap();
+    let no_lock = read_crop(&mut restarted, session, turn, id).await;
+    assert_eq!(
+        no_lock["error"]["data"], "artifact_unavailable",
+        "{no_lock}"
+    );
+    assert!(!lock.exists());
+    fs::rename(&moved_lock, &lock).unwrap();
+    let invented = read_crop(&mut restarted, session, turn, "invented-artifact").await;
+    assert_eq!(
+        invented["error"]["data"], "artifact_unavailable",
+        "{invented}"
+    );
+    assert!(endpoint.requests.try_recv().is_err());
     let resumed = restarted
         .request(
             "session/prompt",
@@ -423,7 +489,39 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
             .contains(&format!("data:image/png;base64,{data}"))
     );
     assert_eq!(fs::read(&work).unwrap(), edited);
+    let replaced = restarted
+        .request(
+            "session/prompt",
+            json!({"sessionId":session,"prompt":[{"type":"text","text":"Crop the left half."}]}),
+        )
+        .await;
+    assert_eq!(replaced["result"]["stopReason"], "end_turn", "{replaced}");
+    endpoint.request().await;
+    let replacement = last_tool_result(endpoint.request().await);
+    assert_eq!(replacement["status"], "succeeded", "{replacement}");
+    assert_eq!(
+        replacement["structured"]["workingCopyId"],
+        receipt["workingCopyId"]
+    );
+    assert_ne!(replacement["structured"]["sha256"], receipt["sha256"]);
+    let different = read_crop(&mut restarted, session, turn, id).await;
+    assert_eq!(
+        different["error"]["data"], "artifact_unavailable",
+        "{different}"
+    );
+    let snapshot = settled(&mut restarted, session).await;
+    let replacement_turn = snapshot["latest"]["turnId"].as_str().unwrap();
+    let summary = crop_summary(&mut restarted, session, replacement_turn).await;
+    let replacement_id = summary["result"]["artifacts"][0]["id"].as_str().unwrap();
+    assert_ne!(replacement_id, id);
     fs::remove_file(&work).unwrap();
+    let missing = read_crop(&mut restarted, session, replacement_turn, replacement_id).await;
+    assert_eq!(
+        missing["error"]["data"], "artifact_unavailable",
+        "{missing}"
+    );
+    assert!(!work.exists());
+    assert!(endpoint.requests.try_recv().is_err());
     let lost = restarted
         .request(
             "session/prompt",
@@ -448,6 +546,11 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
         )
         .await;
     let other = created["result"]["sessionId"].as_str().unwrap();
+    let foreign = read_crop(&mut restarted, other, turn, id).await;
+    assert_eq!(
+        foreign["error"]["data"], "artifact_unavailable",
+        "{foreign}"
+    );
     let other_chat = restarted
         .request(
             "session/prompt",
@@ -467,6 +570,24 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
     );
     assert_eq!(fs::read_dir(workspace.path()).unwrap().count(), 1);
     endpoint.done().await;
+}
+
+async fn crop_summary(client: &mut StdioClient, session: &str, turn: &str) -> Value {
+    client
+        .request(
+            "_co.grida/session/turn-summary",
+            json!({"sessionId":session,"turnId":turn}),
+        )
+        .await
+}
+
+async fn read_crop(client: &mut StdioClient, session: &str, turn: &str, id: &str) -> Value {
+    client
+        .request(
+            "_co.grida/session/read-artifact",
+            json!({"sessionId":session,"turnId":turn,"artifactId":id}),
+        )
+        .await
 }
 
 fn last_tool_result(request: Value) -> Value {

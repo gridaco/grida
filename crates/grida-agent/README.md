@@ -293,6 +293,12 @@ copy is retained with the chat state, and an interrupted write with uncertain
 publication requires inspection before a new edit. Publication to a project or
 another destination is a separate operation.
 
+An attached private stdio client can ask for a retained crop from a settled
+turn on macOS or Linux. The read verifies the working copy against the saved
+receipt and returns bounded PNG bytes. A later crop can replace that working
+copy. The earlier result stays recorded and its preview is unavailable if the
+bytes are missing or have changed. Reopening a result never starts new work.
+
 The native library also provides the read-only `read_file`, `list_files`, and
 `search_text` adapters for macOS and Linux. They use the turn's selected
 directory and recheck current grants and protected roots before opening a

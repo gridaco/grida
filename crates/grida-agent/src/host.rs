@@ -22,6 +22,7 @@ pub(crate) use catalog::is_archived;
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use goals::{GoalAction, GoalControl, GoalInspection, GoalRequest, GoalView};
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
+pub(crate) use image_tools::CropArtifact;
 pub use images::ImageUpload;
 pub(crate) use images::is_retained_image;
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
@@ -48,7 +49,7 @@ use agent_kit_core::turn::{
 };
 use agent_kit_core::{
     BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, MessageId, ModelId,
-    PrincipalId, Result, SchemaId, ScopeId, SessionId, TurnId,
+    OperationId, PrincipalId, Result, SchemaId, ScopeId, SessionId, TurnId,
 };
 use agent_kit_providers::{
     Anthropic, Gemini, GeminiProfile, ModelProfile, OpenAiCompatible, OutputLimitField, Responses,
@@ -612,16 +613,55 @@ impl Host {
         self.store.inspect(id).await
     }
 
-    pub(crate) async fn settled_outcome(
+    pub(crate) async fn settled_summary(
         &self,
         session: SessionId,
         turn: TurnId,
-    ) -> Result<TurnOutcome> {
+        include_artifacts: bool,
+    ) -> Result<(TurnOutcome, Option<Vec<CropArtifact>>)> {
         self.store
-            .inspect_turn(session, turn)
-            .await?
-            .outcome
-            .ok_or_else(|| problem(ErrorKind::Unavailable, "turn_summary_unavailable"))
+            .inspect_turn_with(session, turn, move |state| {
+                let outcome = state
+                    .outcome()
+                    .cloned()
+                    .ok_or_else(|| problem(ErrorKind::Unavailable, "turn_summary_unavailable"))?;
+                Ok((
+                    outcome,
+                    include_artifacts.then(|| image_tools::artifacts(state)),
+                ))
+            })
+            .await
+    }
+
+    pub(crate) async fn read_crop_artifact(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+        id: OperationId,
+    ) -> Result<Vec<u8>> {
+        let unavailable = || problem(ErrorKind::Unavailable, "artifact_unavailable");
+        let proof = self
+            .store
+            .inspect_turn_with(session.clone(), turn, move |state| {
+                image_tools::artifact_proof(state, &id).ok_or_else(unavailable)
+            })
+            .await
+            .map_err(|_| unavailable())?;
+        let state_dir = self.state_dir.clone().ok_or_else(unavailable)?;
+        let images = self
+            .execution
+            .as_ref()
+            .and_then(|execution| execution.images.clone());
+        tokio::task::spawn_blocking(move || {
+            let images = match images {
+                Some(images) => images,
+                None => Arc::new(images::Images::open(&state_dir)?),
+            };
+            images.read_working(session, &proof)
+        })
+        .await
+        .map_err(|_| unavailable())?
+        .map_err(|_| unavailable())
     }
 
     pub async fn start_prompt(&self, request: PromptRequest) -> Result<AcceptedRun> {

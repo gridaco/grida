@@ -63,6 +63,16 @@ pub struct WorkingCopyReceipt {
     id: ArtifactId,
 }
 
+#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
+pub(crate) struct WorkingCopyProof {
+    pub source_id: ArtifactId,
+    pub source_version: u32,
+    pub source_digest: [u8; 32],
+    pub id: ArtifactId,
+    pub size: usize,
+    pub digest: [u8; 32],
+}
+
 impl WorkingCopyReceipt {
     pub fn asset(&self) -> &AssetRef {
         &self.asset
@@ -119,11 +129,29 @@ impl ScratchScope {
     ) -> Result<Self> {
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         return Ok(Self {
-            inner: native::Scope::open(base, owner, limits, protected)?,
+            inner: native::Scope::open(base, owner, limits, protected, false)?,
         });
         #[cfg(not(any(target_os = "macos", target_os = "linux")))]
         {
             let _ = (base, owner, limits, protected);
+            Err(unsupported())
+        }
+    }
+
+    /// Inspect an existing copy under the owner lock without creating or
+    /// repairing the scope, and return only bytes matching the saved proof.
+    pub(crate) fn read_working(
+        base: &Path,
+        owner: SessionId,
+        limits: ScratchLimits,
+        protected: &ProtectedRoots,
+        proof: &WorkingCopyProof,
+    ) -> Result<Vec<u8>> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return native::Scope::open(base, owner, limits, protected, true)?.read_working(proof);
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (base, owner, limits, protected, proof);
             Err(unsupported())
         }
     }
@@ -256,6 +284,7 @@ mod native {
             owner: SessionId,
             limits: ScratchLimits,
             protected: &ProtectedRoots,
+            existing_only: bool,
         ) -> Result<Self> {
             if limits.max_assets == 0
                 || limits.max_assets > MAX_ASSETS
@@ -272,10 +301,10 @@ mod native {
             protected.check(base)?;
             check_base(base)?;
             let base = Directory::open(base)?;
-            let scope = base.child(&key(&owner)?)?;
-            let lock = scope.lock()?;
-            let sources = scope.child("sources")?;
-            let work = scope.child("work")?;
+            let scope = base.child(&key(&owner)?, existing_only)?;
+            let lock = scope.lock(existing_only)?;
+            let sources = scope.child("sources", existing_only)?;
+            let work = scope.child("work", existing_only)?;
             let scope = Self {
                 owner,
                 limits,
@@ -287,9 +316,11 @@ mod native {
                 lock,
             };
             scope.validate()?;
-            scope.sources.remove_staging()?;
-            scope.work.remove_staging()?;
-            scope.occupancy()?;
+            if !existing_only {
+                scope.sources.remove_staging()?;
+                scope.work.remove_staging()?;
+                scope.occupancy()?;
+            }
             Ok(scope)
         }
 
@@ -360,6 +391,45 @@ mod native {
             let (_, mut source) = self.open_asset(asset)?;
             let mut bytes = Vec::with_capacity(size);
             verify(&mut source, asset, &mut bytes)?;
+            self.validate()?;
+            Ok(bytes)
+        }
+
+        pub(super) fn read_working(&self, proof: &WorkingCopyProof) -> Result<Vec<u8>> {
+            if proof.size == 0 || proof.size as u64 > self.limits.max_asset_bytes {
+                return Err(limit());
+            }
+            let key = self.asset_key(&proof.source_id, proof.source_version)?;
+            if proof.id.as_str() != format!("working/{key}") {
+                return Err(working_unavailable());
+            }
+            let mut source = self
+                .sources
+                .read(&format!("{key}.asset"))?
+                .ok_or_else(source_unavailable)?;
+            let asset = self.read_asset(&mut source, &key)?;
+            if asset.id != proof.source_id
+                || asset.version != proof.source_version
+                || asset.digest != proof.source_digest
+            {
+                return Err(working_unavailable());
+            }
+            verify(&mut source, &asset, &mut io::sink())?;
+            let marker = self
+                .sources
+                .read(&format!("{key}.working"))?
+                .ok_or_else(working_unavailable)?;
+            if marker.metadata().map_err(io_failure)?.len() != 0 {
+                return Err(invalid_storage());
+            }
+            let name = working_name(&key, &asset.name);
+            let mut work = self.work.read(&name)?.ok_or_else(working_unavailable)?;
+            let mut bytes = Vec::with_capacity(proof.size);
+            let (size, digest) = transfer(&mut work, &mut bytes, proof.size as u64)?;
+            if size != proof.size as u64 || digest != proof.digest {
+                return Err(working_unavailable());
+            }
+            self.work.check_file(&name, &work)?;
             self.validate()?;
             Ok(bytes)
         }
@@ -536,11 +606,13 @@ mod native {
             Ok(directory)
         }
 
-        fn child(&self, name: &str) -> Result<Self> {
-            match unix::mkdirat(&self.file, name, Mode::from_bits_truncate(0o700)) {
-                Ok(()) => unix::fsync(&self.file).map_err(io_failure)?,
-                Err(Errno::EXIST) => {}
-                Err(error) => return Err(io_failure(error)),
+        fn child(&self, name: &str, existing_only: bool) -> Result<Self> {
+            if !existing_only {
+                match unix::mkdirat(&self.file, name, Mode::from_bits_truncate(0o700)) {
+                    Ok(()) => unix::fsync(&self.file).map_err(io_failure)?,
+                    Err(Errno::EXIST) => {}
+                    Err(error) => return Err(io_failure(error)),
+                }
             }
             let file = unix::openat(&self.file, name, directory_flags(), Mode::empty())
                 .map_err(io_failure)?
@@ -563,22 +635,30 @@ mod native {
             check_acl(&self.path)
         }
 
-        fn lock(&self) -> Result<File> {
+        fn lock(&self, existing_only: bool) -> Result<File> {
             let flags = OFlags::RDWR | file_flags();
-            let file: File = match unix::openat(
-                &self.file,
-                "owner.lock",
-                flags | OFlags::CREATE | OFlags::EXCL,
-                Mode::from_bits_truncate(0o600),
-            ) {
-                Ok(fd) => {
-                    unix::fsync(&self.file).map_err(io_failure)?;
-                    fd.into()
-                }
-                Err(Errno::EXIST) => unix::openat(&self.file, "owner.lock", flags, Mode::empty())
+            let file: File = if existing_only {
+                unix::openat(&self.file, "owner.lock", flags, Mode::empty())
                     .map_err(io_failure)?
-                    .into(),
-                Err(error) => return Err(io_failure(error)),
+                    .into()
+            } else {
+                match unix::openat(
+                    &self.file,
+                    "owner.lock",
+                    flags | OFlags::CREATE | OFlags::EXCL,
+                    Mode::from_bits_truncate(0o600),
+                ) {
+                    Ok(fd) => {
+                        unix::fsync(&self.file).map_err(io_failure)?;
+                        fd.into()
+                    }
+                    Err(Errno::EXIST) => {
+                        unix::openat(&self.file, "owner.lock", flags, Mode::empty())
+                            .map_err(io_failure)?
+                            .into()
+                    }
+                    Err(error) => return Err(io_failure(error)),
+                }
             };
             self.check_file("owner.lock", &file)?;
             file.try_lock().map_err(|error| match error {
