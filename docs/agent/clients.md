@@ -141,11 +141,11 @@ requires an Act launch.
 
 ### Choose how much effort a task gets
 
-In a supported Desktop chat, choose **Standard** or **Ultra** beside **Plan**
-and **Act**. The Effort choice applies to the next message you send or queue.
-Steering keeps the current turn's effort. Editing a queued or earlier
-message keeps the original choice. Revising an earlier Ultra message
-requires a connection that supports Ultra.
+In a supported Gateway chat in Desktop, choose **Standard** or **Ultra** in
+**Effort for next message**. You can use either with **Plan** or **Act**. The
+choice applies when you send or queue a message. Steering keeps the current
+turn's effort. Editing a queued or earlier message keeps its original effort.
+Resubmitting an earlier Ultra message requires a connection that supports Ultra.
 
 `run --effort standard` uses the ordinary task allowance and is the default.
 Use `run --effort ultra` when an independent review could help. Ultra gives
