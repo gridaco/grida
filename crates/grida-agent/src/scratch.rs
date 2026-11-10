@@ -156,6 +156,25 @@ impl ScratchScope {
         }
     }
 
+    /// Resolve an accepted original under its existing owner lock. Working
+    /// storage is independent, and this read creates no files or directories.
+    pub(crate) fn read_existing_retained(
+        base: &Path,
+        limits: ScratchLimits,
+        protected: &ProtectedRoots,
+        asset: &AssetRef,
+        maximum: usize,
+    ) -> Result<Vec<u8>> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return native::Sources::open(base, asset.owner.clone(), limits, protected, true)?
+            .read_retained(asset, maximum);
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = (base, limits, protected, asset, maximum);
+            Err(unsupported())
+        }
+    }
+
     pub fn retain(
         &mut self,
         id: ArtifactId,
@@ -238,13 +257,17 @@ mod native {
     const MAGIC: &[u8; 8] = b"GRSRC001";
 
     pub(super) struct Scope {
+        sources: Sources,
+        work: Directory,
+    }
+
+    pub(super) struct Sources {
         owner: SessionId,
         limits: ScratchLimits,
         protected: ProtectedRoots,
         base: Directory,
         scope: Directory,
-        sources: Directory,
-        work: Directory,
+        files: Directory,
         lock: File,
     }
 
@@ -286,38 +309,12 @@ mod native {
             protected: &ProtectedRoots,
             existing_only: bool,
         ) -> Result<Self> {
-            if limits.max_assets == 0
-                || limits.max_assets > MAX_ASSETS
-                || limits.max_asset_bytes == 0
-                || limits.max_asset_bytes > limits.max_source_bytes
-                || limits.max_work_bytes == 0
-            {
-                return Err(Error::new(
-                    ErrorKind::InvalidInput,
-                    "scratch_limits_invalid",
-                ));
-            }
-            validate_absolute(base)?;
-            protected.check(base)?;
-            check_base(base)?;
-            let base = Directory::open(base)?;
-            let scope = base.child(&key(&owner)?, existing_only)?;
-            let lock = scope.lock(existing_only)?;
-            let sources = scope.child("sources", existing_only)?;
-            let work = scope.child("work", existing_only)?;
-            let scope = Self {
-                owner,
-                limits,
-                protected: protected.clone(),
-                base,
-                scope,
-                sources,
-                work,
-                lock,
-            };
+            let sources = Sources::open(base, owner, limits, protected, existing_only)?;
+            let work = sources.scope.child("work", existing_only)?;
+            let scope = Self { sources, work };
             scope.validate()?;
             if !existing_only {
-                scope.sources.remove_staging()?;
+                scope.sources.files.remove_staging()?;
                 scope.work.remove_staging()?;
                 scope.occupancy()?;
             }
@@ -334,10 +331,10 @@ mod native {
             validate_asset(version, name)?;
             self.validate()?;
             let (sources, _) = self.occupancy()?;
-            let key = self.asset_key(&id, version)?;
+            let key = self.sources.asset_key(&id, version)?;
             let source_name = format!("{key}.asset");
-            if let Some(mut source) = self.sources.read(&source_name)? {
-                let asset = self.read_asset(&mut source, &key)?;
+            if let Some(mut source) = self.sources.files.read(&source_name)? {
+                let asset = self.sources.read_asset(&mut source, &key)?;
                 if asset.name != name {
                     return Err(conflict());
                 }
@@ -353,23 +350,28 @@ mod native {
                 if size != asset.size || digest != asset.digest {
                     return Err(conflict());
                 }
-                self.sources.sync()?;
+                self.sources.files.sync()?;
                 self.validate()?;
                 return Ok(asset);
             }
-            if self.sources.read(&format!("{key}.working"))?.is_some() {
+            if self
+                .sources
+                .files
+                .read(&format!("{key}.working"))?
+                .is_some()
+            {
                 return Err(source_unavailable());
             }
-            if sources.files >= self.limits.max_assets {
+            if sources.files >= self.sources.limits.max_assets {
                 return Err(limit());
             }
-            let allowed =
-                (self.limits.max_source_bytes - sources.bytes).min(self.limits.max_asset_bytes);
-            let asset = self.sources.publish(&source_name, |file| {
+            let allowed = (self.sources.limits.max_source_bytes - sources.bytes)
+                .min(self.sources.limits.max_asset_bytes);
+            let asset = self.sources.files.publish(&source_name, |file| {
                 file.write_all(&[0; HEADER_BYTES]).map_err(io_failure)?;
                 let (size, digest) = transfer(&mut input, file, allowed)?;
                 let asset = AssetRef {
-                    owner: self.owner.clone(),
+                    owner: self.sources.owner.clone(),
                     id,
                     version,
                     name: name.to_owned(),
@@ -384,30 +386,25 @@ mod native {
         }
 
         pub(super) fn read_retained(&self, asset: &AssetRef, maximum: usize) -> Result<Vec<u8>> {
-            let size = usize::try_from(asset.size).map_err(|_| limit())?;
-            if size > maximum || asset.size > self.limits.max_asset_bytes {
-                return Err(limit());
-            }
-            let (_, mut source) = self.open_asset(asset)?;
-            let mut bytes = Vec::with_capacity(size);
-            verify(&mut source, asset, &mut bytes)?;
-            self.validate()?;
-            Ok(bytes)
+            self.sources.read_retained(asset, maximum)
         }
 
         pub(super) fn read_working(&self, proof: &WorkingCopyProof) -> Result<Vec<u8>> {
-            if proof.size == 0 || proof.size as u64 > self.limits.max_asset_bytes {
+            if proof.size == 0 || proof.size as u64 > self.sources.limits.max_asset_bytes {
                 return Err(limit());
             }
-            let key = self.asset_key(&proof.source_id, proof.source_version)?;
+            let key = self
+                .sources
+                .asset_key(&proof.source_id, proof.source_version)?;
             if proof.id.as_str() != format!("working/{key}") {
                 return Err(working_unavailable());
             }
             let mut source = self
                 .sources
+                .files
                 .read(&format!("{key}.asset"))?
                 .ok_or_else(source_unavailable)?;
-            let asset = self.read_asset(&mut source, &key)?;
+            let asset = self.sources.read_asset(&mut source, &key)?;
             if asset.id != proof.source_id
                 || asset.version != proof.source_version
                 || asset.digest != proof.source_digest
@@ -417,6 +414,7 @@ mod native {
             verify(&mut source, &asset, &mut io::sink())?;
             let marker = self
                 .sources
+                .files
                 .read(&format!("{key}.working"))?
                 .ok_or_else(working_unavailable)?;
             if marker.metadata().map_err(io_failure)?.len() != 0 {
@@ -435,20 +433,8 @@ mod native {
         }
 
         fn open_asset(&self, asset: &AssetRef) -> Result<(String, File)> {
-            validate_asset(asset.version, &asset.name)?;
-            if asset.owner != self.owner {
-                return Err(source_unavailable());
-            }
-            self.validate()?;
-            let key = self.asset_key(&asset.id, asset.version)?;
-            let mut source = self
-                .sources
-                .read(&format!("{key}.asset"))?
-                .ok_or_else(source_unavailable)?;
-            if self.read_asset(&mut source, &key)? != *asset {
-                return Err(conflict());
-            }
-            Ok((key, source))
+            self.work.validate()?;
+            self.sources.open_asset(asset)
         }
 
         pub(super) fn materialize(&mut self, asset: &AssetRef) -> Result<WorkingCopy> {
@@ -456,7 +442,7 @@ mod native {
             let (_, work) = self.occupancy()?;
             let work_name = working_name(&key, &asset.name);
             let marker_name = format!("{key}.working");
-            let marker = self.sources.read(&marker_name)?;
+            let marker = self.sources.files.read(&marker_name)?;
             let existing = self.work.read(&work_name)?;
             match (marker, existing) {
                 (Some(marker), Some(_)) => {
@@ -465,7 +451,7 @@ mod native {
                     }
                     verify(&mut source, asset, &mut io::sink())?;
                     self.work.sync()?;
-                    self.sources.sync()?;
+                    self.sources.files.sync()?;
                 }
                 (Some(_), None) => return Err(working_unavailable()),
                 (None, Some(mut existing)) => {
@@ -475,17 +461,17 @@ mod native {
                     verify(&mut existing, asset, &mut io::sink())?;
                     existing.sync_all().map_err(io_failure)?;
                     self.work.sync()?;
-                    self.sources.publish(&marker_name, |_| Ok(()))?;
+                    self.sources.files.publish(&marker_name, |_| Ok(()))?;
                 }
                 (None, None) => {
-                    if work.files >= self.limits.max_assets
-                        || asset.size > self.limits.max_work_bytes - work.bytes
+                    if work.files >= self.sources.limits.max_assets
+                        || asset.size > self.sources.limits.max_work_bytes - work.bytes
                     {
                         return Err(limit());
                     }
                     self.work
                         .publish(&work_name, |file| verify(&mut source, asset, file))?;
-                    self.sources.publish(&marker_name, |_| Ok(()))?;
+                    self.sources.files.publish(&marker_name, |_| Ok(()))?;
                 }
             }
             self.validate()?;
@@ -513,6 +499,7 @@ mod native {
             }
             let marker = self
                 .sources
+                .files
                 .read(&format!("{key}.working"))?
                 .ok_or_else(working_unavailable)?;
             if marker.metadata().map_err(io_failure)?.len() != 0 {
@@ -527,7 +514,7 @@ mod native {
                 .bytes
                 .checked_sub(current_size)
                 .ok_or_else(invalid_storage)?;
-            if bytes.len() as u64 > self.limits.max_work_bytes - other_bytes {
+            if bytes.len() as u64 > self.sources.limits.max_work_bytes - other_bytes {
                 return Err(limit());
             }
             self.work.stage(
@@ -543,12 +530,89 @@ mod native {
         }
 
         fn validate(&self) -> Result<()> {
+            self.sources.validate()?;
+            self.work.validate()
+        }
+
+        fn occupancy(&self) -> Result<(Occupancy, Occupancy)> {
+            let source = self.sources.files.occupancy(self.sources.limits, true)?;
+            let work = self.work.occupancy(self.sources.limits, false)?;
+            Ok((source, work))
+        }
+    }
+
+    impl Sources {
+        pub(super) fn open(
+            base: &Path,
+            owner: SessionId,
+            limits: ScratchLimits,
+            protected: &ProtectedRoots,
+            existing_only: bool,
+        ) -> Result<Self> {
+            if limits.max_assets == 0
+                || limits.max_assets > MAX_ASSETS
+                || limits.max_asset_bytes == 0
+                || limits.max_asset_bytes > limits.max_source_bytes
+                || limits.max_work_bytes == 0
+            {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "scratch_limits_invalid",
+                ));
+            }
+            validate_absolute(base)?;
+            protected.check(base)?;
+            check_base(base)?;
+            let base = Directory::open(base)?;
+            let scope = base.child(&key(&owner)?, existing_only)?;
+            let lock = scope.lock(existing_only)?;
+            let files = scope.child("sources", existing_only)?;
+            Ok(Self {
+                owner,
+                limits,
+                protected: protected.clone(),
+                base,
+                scope,
+                files,
+                lock,
+            })
+        }
+
+        pub(super) fn read_retained(&self, asset: &AssetRef, maximum: usize) -> Result<Vec<u8>> {
+            let size = usize::try_from(asset.size).map_err(|_| limit())?;
+            if size > maximum || asset.size > self.limits.max_asset_bytes {
+                return Err(limit());
+            }
+            let (_, mut source) = self.open_asset(asset)?;
+            let mut bytes = Vec::with_capacity(size);
+            verify(&mut source, asset, &mut bytes)?;
+            self.validate()?;
+            Ok(bytes)
+        }
+
+        fn open_asset(&self, asset: &AssetRef) -> Result<(String, File)> {
+            validate_asset(asset.version, &asset.name)?;
+            if asset.owner != self.owner {
+                return Err(source_unavailable());
+            }
+            self.validate()?;
+            let key = self.asset_key(&asset.id, asset.version)?;
+            let mut source = self
+                .files
+                .read(&format!("{key}.asset"))?
+                .ok_or_else(source_unavailable)?;
+            if self.read_asset(&mut source, &key)? != *asset {
+                return Err(conflict());
+            }
+            Ok((key, source))
+        }
+
+        fn validate(&self) -> Result<()> {
             self.protected.check(&self.base.path)?;
             check_base(&self.base.path)?;
             self.base.validate()?;
             self.scope.validate()?;
-            self.sources.validate()?;
-            self.work.validate()?;
+            self.files.validate()?;
             let current = self.scope.read("owner.lock")?.ok_or_else(invalid_storage)?;
             if !same(
                 &current.metadata().map_err(io_failure)?,
@@ -557,12 +621,6 @@ mod native {
                 return Err(invalid_storage());
             }
             Ok(())
-        }
-
-        fn occupancy(&self) -> Result<(Occupancy, Occupancy)> {
-            let source = self.sources.occupancy(self.limits, true)?;
-            let work = self.work.occupancy(self.limits, false)?;
-            Ok((source, work))
         }
 
         fn asset_key(&self, id: &ArtifactId, version: u32) -> Result<String> {

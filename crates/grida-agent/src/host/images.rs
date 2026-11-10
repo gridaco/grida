@@ -137,8 +137,21 @@ impl Images {
 
     pub(super) fn resolve(&self, media: &MediaRef, maximum: usize) -> Result<Vec<u8>> {
         let asset = asset_ref(media)?;
-        self.with_scope(asset.owner(), |scope| {
-            scope.read_retained(&asset, maximum.min(MAX_IMAGE_BYTES))
+        let _access = self.access.lock().unwrap();
+        let protected = ProtectedRoots::new(vec![])?;
+        ScratchScope::read_existing_retained(
+            &self.base,
+            LIMITS,
+            &protected,
+            &asset,
+            maximum.min(MAX_IMAGE_BYTES),
+        )
+        .map_err(|error| {
+            if error.kind == ErrorKind::LimitExceeded {
+                error
+            } else {
+                retained_unavailable()
+            }
         })
     }
 
@@ -170,20 +183,20 @@ pub(super) fn asset_ref(media: &MediaRef) -> Result<AssetRef> {
         .strip_prefix(LOCATOR)
         .filter(|value| value.len() <= 1024)
         .and_then(|value| serde_json::from_str(value).ok())
-        .ok_or_else(invalid_reference)?;
+        .ok_or_else(retained_unavailable)?;
     if !is_retained_image(media)
         || media.id != *asset.id()
         || media.access_scope != scope_id(asset.owner())?
         || asset.name() != NAME
         || asset.version() != 1
     {
-        return Err(invalid_reference());
+        return Err(retained_unavailable());
     }
     Ok(asset)
 }
 
 pub(super) fn media(asset: &AssetRef) -> Result<MediaRef> {
-    let locator = serde_json::to_string(asset).map_err(|_| invalid_reference())?;
+    let locator = serde_json::to_string(asset).map_err(|_| retained_unavailable())?;
     Ok(MediaRef {
         id: asset.id().clone(),
         media_type: MIME.into(),
@@ -263,7 +276,7 @@ fn image_too_large() -> agent_kit_core::Error {
     problem(ErrorKind::LimitExceeded, "image_size_limit")
 }
 
-fn invalid_reference() -> agent_kit_core::Error {
+fn retained_unavailable() -> agent_kit_core::Error {
     problem(ErrorKind::Unavailable, "retained_image_unavailable")
 }
 

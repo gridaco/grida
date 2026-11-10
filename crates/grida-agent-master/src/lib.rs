@@ -1161,6 +1161,9 @@ fn inference_failure_text(inference: &InferenceOutcome) -> &'static str {
         return "The model request failed.";
     };
     match (failure.kind, failure.code.as_str()) {
+        (FailureKind::Configuration, "retained_image_unavailable") => {
+            "The retained PNG is unavailable. Start a new chat and attach the original PNG again."
+        }
         (FailureKind::ContextLimit, "input_token_limit") => {
             "The request exceeds the configured input limit. Shorten the input or change the limit in settings."
         }

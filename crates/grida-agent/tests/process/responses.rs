@@ -11,7 +11,7 @@ fn run(state: &Path, workspace: &Path, endpoint: &str, prompt: &str) -> Command 
     command
 }
 
-fn input_limit(state: &Path, tokens: u64) {
+pub(super) fn input_limit(state: &Path, tokens: u64) {
     std::fs::create_dir_all(state).unwrap();
     let path = state.join("config.toml");
     std::fs::write(

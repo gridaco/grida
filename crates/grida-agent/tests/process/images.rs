@@ -177,6 +177,15 @@ async fn private_image_bytes_survive_waiting_input_restart_and_reach_responses()
     assert!(!payload.contains(&data));
     assert!(!payload.contains(state.to_str().unwrap()));
     drop(store);
+    // The original is independent of materialized working storage.
+    let scope = std::fs::read_dir(state.join("retained-inputs"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let work = scope.join("work");
+    std::fs::remove_dir(&work).unwrap();
 
     let mut resumed = stdio(&state, &endpoint.url, IMAGE_MODEL);
     resumed.request("initialize", extension_initialize()).await;
@@ -207,8 +216,157 @@ async fn private_image_bytes_survive_waiting_input_restart_and_reach_responses()
         settled(&mut resumed, session).await["latest"]["status"],
         "succeeded"
     );
+    assert!(!work.exists());
     resumed.close().await;
     endpoint.done().await;
+}
+
+#[tokio::test]
+async fn missing_retained_png_after_restart_fails_before_provider_requests() {
+    use agent_kit_sessions::InputDisposition;
+    use std::fs;
+
+    for count in [false, true] {
+        let directory = TempDir::new().unwrap();
+        let state = directory.path().join("state");
+        let workspace = TempDir::new().unwrap();
+        let mut replies = vec![];
+        if count {
+            super::responses::input_limit(&state, 1024);
+            replies.push(Reply::InputCount(16));
+        }
+        replies.push(Reply::Hold("Earlier work."));
+        // Keep the listener open so an unexpected attempt cannot hide behind
+        // connection refusal. Both paths must stop before their next request.
+        replies.push(if count {
+            Reply::InputCount(16)
+        } else {
+            Reply::Finished("The missing image must never reach the provider.")
+        });
+        let mut endpoint =
+            Endpoint::start_protocol(ProviderProtocol::Responses, replies, Some(TEST_CREDENTIAL))
+                .await;
+        let mut first = stdio(&state, &endpoint.url, IMAGE_MODEL);
+        first.request("initialize", artifact_initialize()).await;
+        let created = first
+            .request(
+                "session/new",
+                json!({"cwd":workspace.path(),"mcpServers":[]}),
+            )
+            .await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        let earlier = first
+            .request(
+                "_co.grida/session/submit",
+                super::lifecycle::prompt_request(session, "earlier", "Earlier work"),
+            )
+            .await;
+        assert_eq!(earlier["result"]["disposition"], "claimed", "{earlier}");
+        if count {
+            endpoint.request().await;
+        }
+        endpoint.request().await;
+        let data = STANDARD.encode(png([15, 255, 0]));
+        let accepted = first
+            .request(
+                "_co.grida/session/enqueue",
+                upload(session, "missing-png", &data),
+            )
+            .await;
+        assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
+        let active = snapshot(&mut first, session).await;
+        let stopped = first
+            .request(
+                "_co.grida/session/stop",
+                task_basis(&active, session, "stop-earlier"),
+            )
+            .await;
+        assert!(stopped["result"].is_object(), "{stopped}");
+        let paused = settled(&mut first, session).await;
+        assert_eq!(paused["admissionPaused"], true);
+        let earlier_turn = paused["latest"]["turnId"].as_str().unwrap();
+        first.close().await;
+
+        let owner = fs::read_dir(state.join("retained-inputs"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        fs::rename(&owner, directory.path().join("unavailable-scope")).unwrap();
+        let mut resumed = stdio(&state, &endpoint.url, IMAGE_MODEL);
+        resumed.request("initialize", artifact_initialize()).await;
+        let loaded = resumed
+            .request(
+                "session/load",
+                json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+            )
+            .await;
+        assert!(loaded["result"].is_object(), "{loaded}");
+        let waiting = snapshot(&mut resumed, session).await;
+        assert_eq!(waiting["queue"][0]["inputId"], "missing-png");
+        let release = resumed
+            .request(
+                "_co.grida/session/resume-queue",
+                queue_basis(&waiting, session, "release-missing-png"),
+            )
+            .await;
+        assert!(release["result"].is_object(), "{release}");
+        let failed = timeout(WAIT, async {
+            loop {
+                let view = settled(&mut resumed, session).await;
+                if view["latest"]["turnId"] != earlier_turn {
+                    break view;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(failed["latest"]["status"], "failed", "{failed}");
+        let turn = failed["latest"]["turnId"].as_str().unwrap();
+        let summary = crop_summary(&mut resumed, session, turn).await;
+        assert_eq!(summary["result"]["status"], "failed", "{summary}");
+        assert_eq!(summary["result"]["unresolvedOperations"], 0, "{summary}");
+        assert_eq!(
+            summary["result"]["text"],
+            "The retained PNG is unavailable. Start a new chat and attach the original PNG again."
+        );
+        let inspected = resumed
+            .request(
+                "_co.grida/session/input",
+                json!({"sessionId":session,"inputId":"missing-png"}),
+            )
+            .await;
+        assert_eq!(
+            inspected["result"]["prompt"][1]["text"],
+            "[Retained PNG image]"
+        );
+        assert!(!inspected.to_string().contains(&data));
+        resumed.close().await;
+        assert!(matches!(
+            endpoint.requests.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        ));
+        endpoint.task.abort();
+        assert!(endpoint.task.await.unwrap_err().is_cancelled());
+        assert!(!owner.exists());
+
+        let store =
+            agent_kit_store_sqlite::SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+        let input = store
+            .input(
+                SessionId::new(session).unwrap(),
+                ChangeId::new("missing-png").unwrap(),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(matches!(
+            input.disposition,
+            InputDisposition::Completed { turn: retained } if retained.as_str() == turn
+        ));
+    }
 }
 
 #[tokio::test]
