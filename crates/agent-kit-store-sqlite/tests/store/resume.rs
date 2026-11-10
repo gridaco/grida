@@ -331,6 +331,79 @@ async fn competing_related_control_serializes_with_paused_source_claim() {
 }
 
 #[tokio::test]
+async fn exact_related_readiness_can_reclaim_once_after_the_source_is_interrupted() {
+    let (directory, store) = store().await;
+    let (operation, request, child) = paused_source_pair(&store).await;
+    let binding = child.lease.binding().clone();
+    commit(&child, "suspend-child", vec![JournalAction::Suspend]).await;
+    drop(child);
+    let companion = related_resume(&store, &operation, &binding).await;
+    let result = store.resume_with(request.clone(), companion).await.unwrap();
+    let ClaimOutcome::Acquired(parent) = result.claim else {
+        panic!("expected the source lease");
+    };
+    let parent_binding = parent.lease.binding().clone();
+    drop(parent);
+    drop(store);
+
+    let store = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    let receipt = store.resume_receipt(request).await.unwrap().unwrap();
+    assert_eq!(receipt.turn.disposition, TurnDisposition::Interrupted);
+    assert_eq!(receipt.turn.binding, parent_binding);
+    let related = receipt.related.unwrap();
+    let basis = related.turn.unwrap();
+    let recorded = basis.record();
+    assert_eq!(recorded.binding, binding);
+    let wake = ClaimRequest {
+        id: change("resume-from-related-receipt"),
+        session: related.session,
+        expected_revision: related.revision,
+        selection: TurnSelection::Resume {
+            turn: recorded.binding.turn.clone(),
+            epoch: recorded.binding.epoch,
+            position: recorded.position,
+        },
+    };
+    let (left, right) = tokio::join!(store.claim(wake.clone()), store.claim(wake));
+    let child = match (left.unwrap(), right.unwrap()) {
+        (ClaimOutcome::Acquired(child), ClaimOutcome::Existing(observed))
+        | (ClaimOutcome::Existing(observed), ClaimOutcome::Acquired(child)) => {
+            assert_eq!(&observed.binding, child.lease.binding());
+            child
+        }
+        _ => panic!("the exact wake must acquire only one owner"),
+    };
+    assert_eq!(child.lease.binding().epoch, binding.epoch + 1);
+    assert_eq!(
+        store.inspect_turn(session(), turn()).await.unwrap(),
+        receipt.turn
+    );
+    store
+        .control_operation_pair(OperationPairControl {
+            source: turn_control(
+                &store,
+                &parent_binding,
+                "pause-source-again",
+                ControlDirective::Pause,
+            )
+            .await,
+            related: OperationRelatedControl::Apply {
+                operation: operation.operation,
+                request: turn_control(
+                    &store,
+                    child.lease.binding(),
+                    "pause-child-again",
+                    ControlDirective::Pause,
+                )
+                .await,
+            },
+        })
+        .await
+        .unwrap();
+    assert!(child.lease.controls().read().await.unwrap().paused);
+}
+
+#[tokio::test]
 async fn absent_companion_fences_old_epoch_and_cannot_join_an_ordinary_receipt() {
     let (_directory, store) = store().await;
     let (parent, operation) = owning_operation(&store).await;
