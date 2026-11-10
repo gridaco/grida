@@ -40,6 +40,7 @@ export namespace NativeFirstProfile {
       supported: boolean;
       allowBirth: boolean;
       legacyPredecessor?: boolean;
+      hasLegacyInstall?: () => boolean;
     }>
   ): Paths | undefined {
     if (!path.isAbsolute(appData)) throw invalid();
@@ -50,8 +51,7 @@ export namespace NativeFirstProfile {
     if (
       !policy.supported ||
       !uid ||
-      fs.realpathSync.native(appData) !== appData ||
-      legacy().overlaps(root)
+      fs.realpathSync.native(appData) !== appData
     )
       throw invalid();
     const parent = fs.lstatSync(appData, { bigint: true });
@@ -61,6 +61,8 @@ export namespace NativeFirstProfile {
       (parent.mode & 0o022n) !== 0n
     )
       throw invalid();
+    if (!existing && policy.hasLegacyInstall?.()) return undefined;
+    if (legacy().overlaps(root)) throw invalid();
 
     const paths = {
       root,

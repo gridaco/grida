@@ -166,8 +166,11 @@ Standard Desktop startup keeps its existing composition for unenrolled profiles.
 
 An approved managed macOS arm64 Stable build can enroll a fresh native profile.
 The build-time setting `GRIDA_MANAGED_NATIVE_FIRST=1` authorizes creating
-`Grida Native` under Electron's application-data directory. A private receipt
-binds its browser, agent, media, project and temporary directories. Subsequent
+`Grida Native` under Electron's application-data directory. Creation requires
+the known legacy Desktop profiles, Grida home directories, and scratch paths
+to be absent. If any are present, startup keeps using the ordinary profile.
+A private receipt binds its browser, agent, media, project and temporary
+directories. Subsequent
 Stable builds that support the receipt open the same profile through normal
 startup and updates. Managed deployment must keep installed versions at or above
 the first version that understands the receipt. An invalid or incomplete profile

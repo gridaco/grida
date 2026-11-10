@@ -78,6 +78,14 @@ it.skipIf(!process.geteuid?.())(
     const paths = NativeFirstProfile.open(appData, legacy, provisioning)!;
     fs.writeFileSync(path.join(paths.browser, "retained"), "native state");
     expect(NativeFirstProfile.open(appData, legacy, ordinary)).toEqual(paths);
+    const hasLegacyInstall = vi.fn<() => boolean>(() => true);
+    expect(
+      NativeFirstProfile.open(appData, legacy, {
+        ...provisioning,
+        hasLegacyInstall,
+      })
+    ).toEqual(paths);
+    expect(hasLegacyInstall).not.toHaveBeenCalled();
     expect(fs.readFileSync(path.join(paths.browser, "retained"), "utf8")).toBe(
       "native state"
     );

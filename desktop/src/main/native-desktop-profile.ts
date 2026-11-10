@@ -1,5 +1,5 @@
 // GRIDA-SEC-004 / GRIDA-SEC-005 — isolated Desktop profiles for native chat.
-import { realpathSync } from "node:fs";
+import { lstatSync, realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { App } from "electron";
@@ -48,17 +48,22 @@ export namespace NativeDesktopProfile {
           arg.startsWith("--user-data-dir=")
       );
     let protectedLegacy: ProtectedRoots | undefined;
+    let locations: string[] | undefined;
+    const legacyLocations = () =>
+      (locations ??= legacyCandidates(
+        app,
+        realpathSync.native(app.getPath("temp"))
+      ));
     const scope = NativeFirstProfile.open(
       app.getPath("appData"),
-      () =>
-        (protectedLegacy ??= captureLegacyRoots(
-          app,
-          realpathSync.native(app.getPath("temp"))
-        )),
+      () => (protectedLegacy ??= new ProtectedRoots(legacyLocations())),
       {
         supported,
         allowBirth: !mediaOnly && (allowBirth || legacyPredecessor),
         legacyPredecessor,
+        hasLegacyInstall: legacyPredecessor
+          ? undefined
+          : () => legacyLocations().some(presentOrUnverified),
       }
     );
     if (!scope || !protectedLegacy) return;
@@ -186,7 +191,9 @@ export namespace NativeDesktopProfile {
       reserved.has(path.basename(browserData).toLowerCase())
     )
       throw invalidProfile();
-    const protectedLegacy = captureLegacyRoots(app, systemTemp);
+    const protectedLegacy = new ProtectedRoots(
+      legacyCandidates(app, systemTemp)
+    );
     if (protectedLegacy.overlaps(root)) throw invalidProfile();
     await checkDirectory(root);
     const browser = await checkDirectory(browserData);
@@ -244,10 +251,10 @@ export namespace NativeDesktopProfile {
     return value;
   }
 
-  function captureLegacyRoots(
+  function legacyCandidates(
     app: Pick<App, "getPath">,
     systemTemp: string
-  ): ProtectedRoots {
+  ): string[] {
     const userHome = app.getPath("home");
     const appData = app.getPath("appData");
     const gridaHomes = [
@@ -271,7 +278,16 @@ export namespace NativeDesktopProfile {
           : path.join(userHome, ".local", "share");
       roots.push(path.join(data, "grida"), path.join(data, "grida-insiders"));
     }
-    return new ProtectedRoots(roots);
+    return roots;
+  }
+
+  function presentOrUnverified(location: string): boolean {
+    try {
+      lstatSync(location);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code !== "ENOENT";
+    }
   }
 
   async function checkDirectory(directory: string) {

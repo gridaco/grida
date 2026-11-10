@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
 import type { App } from "electron";
+import { defaultScratchBase } from "@grida/agent/sandbox";
 import { ProtectedRoots } from "@grida/daemon/server";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { NativeFirstProfile } from "./native-first-profile";
@@ -132,6 +133,71 @@ it.skipIf(process.platform === "win32")(
       process.argv = argv;
       vi.unstubAllEnvs();
       vi.unstubAllGlobals();
+      await fs.rm(fixture, { recursive: true, force: true });
+    }
+  }
+);
+
+it.runIf(process.platform === "darwin" && process.arch === "arm64")(
+  "enrolls only when known legacy Desktop, Grida home, and scratch paths are absent",
+  async () => {
+    const fixture = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-native-first-install-")
+    );
+    const home = path.join(fixture, "home");
+    const appData = path.join(home, "Library", "Application Support");
+    const gridaHome = path.join(home, ".grida");
+    const ordinary = path.join(appData, "Grida");
+    const configured = path.join(fixture, "configured-grida");
+    const setPath = vi.fn<App["setPath"]>();
+    const app = {
+      commandLine: { getSwitchValue: () => "" },
+      getPath: (name: Parameters<App["getPath"]>[0]) =>
+        name === "appData" ? appData : name === "home" ? home : fixture,
+      setPath,
+    };
+    try {
+      vi.resetModules();
+      const { NativeDesktopProfile: profile } =
+        await import("./native-desktop-profile");
+      vi.stubEnv("GRIDA_HOME", configured);
+      vi.stubEnv("GRIDA_AGENT_USER_DATA", undefined);
+      await fs.mkdir(appData, { recursive: true, mode: 0o700 });
+
+      for (const location of [
+        ordinary,
+        path.join(appData, "Grida Insiders"),
+        gridaHome,
+        configured,
+        defaultScratchBase(path.join(gridaHome, "agent"), fixture),
+      ]) {
+        await fs.mkdir(location, { mode: 0o700 });
+        const data = path.join(location, "retained");
+        await fs.writeFile(data, "legacy material");
+        profile.prepareFirst(app, true);
+        expect(profile.firstSelected()).toBe(false);
+        expect(setPath).not.toHaveBeenCalled();
+        expect(await fs.readFile(data, "utf8")).toBe("legacy material");
+        await expect(
+          fs.lstat(path.join(appData, "Grida Native"))
+        ).rejects.toMatchObject({ code: "ENOENT" });
+        await fs.rm(location, { recursive: true });
+      }
+
+      await fs.symlink(path.join(fixture, "missing"), configured);
+      profile.prepareFirst(app, true);
+      expect(profile.firstSelected()).toBe(false);
+      expect(await fs.readlink(configured)).toBe(path.join(fixture, "missing"));
+      await fs.unlink(configured);
+
+      profile.prepareFirst(app, true);
+      expect(profile.firstSelected()).toBe(true);
+      expect(setPath).toHaveBeenCalledWith(
+        "userData",
+        path.join(appData, "Grida Native", "browser")
+      );
+    } finally {
+      vi.unstubAllEnvs();
       await fs.rm(fixture, { recursive: true, force: true });
     }
   }

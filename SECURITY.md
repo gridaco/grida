@@ -1344,7 +1344,10 @@ Today:
   files in this profile. The exclusions use known launch paths.
 - The [managed first profile](desktop/src/main/native-first-profile.ts) is an
   owner-only directory with an exact receipt for its isolated data roots. Only
-  an explicitly enabled Stable build can create it. Selector-aware Stable
+  an explicitly enabled Stable build can create it. First-time native enrollment
+  probes the [known legacy locations](desktop/src/main/native-desktop-profile.ts)
+  before creating any directories. Existing or inaccessible locations leave
+  ordinary startup in place. Selector-aware Stable
   startup verifies the receipt and sets both Electron storage paths before
   readiness or sidecar ownership. Unverified enrollment terminates before
   readiness. Managed deployment enforces a selector-aware minimum version.
