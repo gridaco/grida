@@ -27,6 +27,8 @@ Each chat keeps its original model connection. **Saved chats by model** reopens
 the chat list for that connection, and **Default connection** returns to the default
 list. Switching lists leaves existing work and pending questions in their
 original chats. All connections in the workspace share its context-limit setting.
+Send or remove any pending attachment before choosing a different model
+connection. The draft stays in its current chat until then.
 Removing a key, changing an endpoint, or losing access to the original Gateway
 organization can make its saved chats unavailable. A Gateway model must also
 remain available for chat. Restore access to the original connection to reopen

@@ -2405,6 +2405,55 @@ function message(id: string, content: string): NativeChatMessage {
 }
 
 describe("Native workspace chat controller", () => {
+  it("preserves the selected PNG when a different model is chosen", async () => {
+    const { bridge, controller } = fixture();
+    const id = "b".repeat(64);
+    const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+      async () => {}
+    );
+    bridge.selectProfile = choose;
+    bridge.acceptsPng = async () => true;
+    const send = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>(
+      async (sessionId, input) =>
+        bridge.submit(sessionId, input.inputId, input.text)
+    );
+    bridge.submitImage = send;
+    const read = Promise.withResolvers<ArrayBuffer>();
+    const png = new Uint8Array([137, 1]).buffer;
+    try {
+      controller.connect("chat-a");
+      await vi.waitFor(() => expect(controller.read().imageInput).toBe(true));
+      const scope = controller.read().scope;
+      const picking = controller.pickAttachment(scope, "png", {
+        name: "selected.png",
+        size: png.byteLength,
+        arrayBuffer: () => read.promise,
+      });
+      await controller.selectProfile({ kind: "new", id });
+      expect(choose).not.toHaveBeenCalled();
+      expect(controller.read().profileError).toContain("Send or remove");
+      read.resolve(png);
+      await picking;
+      await controller.selectProfile({ kind: "new", id });
+      expect(choose).not.toHaveBeenCalled();
+      expect(controller.read().scope).toBe(scope);
+      expect(controller.read().attachmentDraft).toMatchObject({
+        name: "selected.png",
+      });
+      await controller.submit("Describe the selected image.", scope);
+      expect(send).toHaveBeenCalledExactlyOnceWith(
+        "chat-a",
+        expect.objectContaining({ png })
+      );
+      await controller.selectProfile({ kind: "new", id });
+      expect(choose).toHaveBeenCalledExactlyOnceWith({ kind: "new", id });
+      expect(controller.read().profileError).toBeNull();
+    } finally {
+      read.resolve(png);
+      controller.disconnect();
+    }
+  });
+
   it("keeps saved chats and renderer observations scoped to the selected model owner", async () => {
     const { bridge, running, updates, controller } = fixture();
     let profile: string | null = null;

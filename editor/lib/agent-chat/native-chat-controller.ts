@@ -474,6 +474,13 @@ export class NativeChatController {
     )
       return;
     this.profileRead = undefined;
+    if (this.view.attachmentDraft || this.view.attachmentReading) {
+      this.update({
+        profileError:
+          "Send or remove the attachment before changing the model connection.",
+      });
+      return;
+    }
     this.update({ profileBusy: true, profileError: null });
     try {
       await this.bridge.selectProfile(selection);
