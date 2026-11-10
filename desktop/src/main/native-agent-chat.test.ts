@@ -115,6 +115,181 @@ it("rejects a chat launch outside the main-selected workspace", async () => {
   }
 });
 
+it("projects the exact negotiated Library wait and sends only a bounded choice", async () => {
+  const test = fixture();
+  const sessionId = "fixture-session";
+  const turnId = "fixture-turn";
+  const waitId = "library-selection/fixture";
+  let controlRevision = 3;
+  const request = vi.fn<
+    (method: string, params?: Record<string, unknown>) => Promise<unknown>
+  >(async (method: string, params?: Record<string, unknown>) => {
+    switch (method) {
+      case "session/new":
+        return { sessionId };
+      case "_co.grida/session/submit":
+        return {
+          sessionId,
+          turnId,
+          inputId: params?.inputId,
+          inputPosition: 1,
+          disposition: "claimed",
+        };
+      case "_co.grida/session/snapshot":
+        return {
+          sessionId,
+          sessionRevision: 5,
+          queuedInputs: 0,
+          queue: [],
+          admissionPaused: false,
+          current: {
+            turnId,
+            epoch: 1,
+            journalPosition: 4,
+            historyPosition: 2,
+            controlRevision: 3,
+            disposition: "suspended",
+            status: null,
+            paused: false,
+            cancelled: false,
+          },
+          latest: null,
+        };
+      case "_co.grida/session/library-selections":
+        return {
+          sessionId,
+          turnId,
+          controlRevision,
+          selections: [{ waitId, initialSearchQuery: "geometric print" }],
+        };
+      case "_co.grida/session/answer-library-selection":
+        return {
+          sessionId,
+          turnId,
+          requestId: params?.requestId,
+          sessionRevision: 6,
+          journalPosition: 5,
+        };
+      default:
+        throw new Error("unexpected_request");
+    }
+  });
+  const process = {
+    connected: true,
+    acceptsLibrarySelection: false,
+    request,
+    close: async () => {},
+  };
+  const start = vi
+    .spyOn(NativeAgentProcess, "start")
+    .mockResolvedValueOnce(process as unknown as NativeAgentProcess);
+  let client: NativeAgentChat | undefined;
+  try {
+    client = await NativeAgentChat.start({
+      resourcesPath: test.root,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "responses",
+      model: "gpt-5.4",
+    });
+    const session = await client.create();
+    await expect(
+      client.submitWithLibrarySelection(
+        session,
+        "unavailable",
+        "Find a reference."
+      )
+    ).rejects.toThrow("native_chat_library_selection_unavailable");
+    process.acceptsLibrarySelection = true;
+    await client.submit(session, "ordinary", "Continue.");
+    expect(request.mock.lastCall?.[1]).not.toHaveProperty(
+      "allowLibrarySelection"
+    );
+    await client.submitWithLibrarySelection(
+      session,
+      "library",
+      "Find a reference.",
+      "plan"
+    );
+    expect(request).toHaveBeenLastCalledWith("_co.grida/session/submit", {
+      sessionId,
+      inputId: "library",
+      prompt: [{ type: "text", text: "Find a reference." }],
+      operatingRegime: "plan",
+      allowLibrarySelection: true,
+    });
+    const basis = await client.observe(session);
+    controlRevision += 1;
+    await expect(client.librarySelections(session, basis)).rejects.toThrow(
+      "native_chat_library_selection_changed"
+    );
+    controlRevision -= 1;
+    const [review] = await client.librarySelections(session, basis);
+    expect(review.initialSearchQuery).toBe("geometric print");
+    const id = "2869F043-E4EE-41BD-8965-1D5B739E0542";
+    const source = Uint8Array.from([
+      99, 137, 80, 78, 71, 13, 10, 26, 10, 42, 88,
+    ]);
+    const png = source.subarray(1, 10);
+    const answer = { kind: "selected", id, png };
+    await expect(
+      client.answerLibrarySelection(session, { ...review }, answer)
+    ).rejects.toThrow("native_chat_library_selection_unavailable");
+    await expect(
+      client.answerLibrarySelection(session, review, {
+        ...answer,
+        url: "https://fixture.invalid",
+      })
+    ).rejects.toThrow("native_chat_library_selection_answer_invalid");
+    await expect(
+      client.answerLibrarySelection(session, review, {
+        ...answer,
+        png: new Uint8Array(256 * 1024 + 1),
+      })
+    ).rejects.toThrow("image_size_limit");
+    await expect(
+      client.answerLibrarySelection(session, review, {
+        ...answer,
+        png: new Uint8Array(8),
+      })
+    ).rejects.toThrow("invalid_png_image");
+    expect(
+      request.mock.calls.filter(
+        ([method]) => method === "_co.grida/session/answer-library-selection"
+      )
+    ).toHaveLength(0);
+    const accepted = await client.answerLibrarySelection(
+      session,
+      review,
+      answer
+    );
+    expect(
+      await client.answerLibrarySelection(session, review, answer)
+    ).toEqual(accepted);
+    expect(request).toHaveBeenLastCalledWith(
+      "_co.grida/session/answer-library-selection",
+      {
+        sessionId,
+        turnId,
+        waitId,
+        requestId: accepted.requestId,
+        expectedSessionRevision: 5,
+        expectedControlRevision: 3,
+        answer: {
+          kind: "selected",
+          id: id.toLowerCase(),
+          data: Buffer.from(png).toString("base64"),
+        },
+      }
+    );
+  } finally {
+    await client?.close();
+    start.mockRestore();
+    test.close();
+  }
+});
+
 it("projects only a valid retry wait for the currently running turn", async () => {
   const test = fixture();
   const running = {

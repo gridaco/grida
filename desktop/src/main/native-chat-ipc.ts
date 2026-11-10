@@ -24,6 +24,7 @@ import type {
   NativeChatGoalObservation,
   NativeChatGoalReceipt,
   NativeChatImageArtifact,
+  NativeChatLibrarySelection,
   NativeChatArtifactSaveResult,
   NativeChatControlResult,
   NativeChatObservation,
@@ -53,6 +54,7 @@ import { ipc_sender } from "./ipc-sender";
 import type {
   NativeAgentChat,
   NativeChatSession,
+  NativeLibrarySelectionReview,
   NativeQuestionReview,
 } from "./native-agent-chat";
 import type { NativeApprovalReview } from "./native-agent-permissions";
@@ -144,6 +146,10 @@ export type ActiveNativeChat = Readonly<{
         | "controlSubagentChild"
         | "readArtifact"
         | "acceptsWakeups"
+        | "acceptsLibrarySelection"
+        | "submitWithLibrarySelection"
+        | "librarySelections"
+        | "answerLibrarySelection"
         | "acceptsEffort"
         | "acceptsGoalEffort"
         | "submitWithWakeup"
@@ -161,6 +167,7 @@ type Attachment = {
   observations: Map<string, NativeChatSnapshot>;
   approvals: Map<string, NativeApprovalReview>;
   questions: Map<string, NativeQuestionReview>;
+  librarySelections: Map<string, NativeLibrarySelectionReview>;
   goals: Map<string, NativeGoalInspection>;
   artifacts?: { turnId: string; items: readonly NativeChatImageArtifact[] };
   readingArtifact?: boolean;
@@ -1422,6 +1429,37 @@ export class NativeChatIpc {
     return result;
   }
 
+  acceptsLibrarySelection(event: IpcMainInvokeEvent): boolean {
+    const { chat } = this.owner(event).active;
+    return chat.acceptsLibrarySelection === true;
+  }
+
+  async submitWithLibrarySelection(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    inputId: string,
+    text: string,
+    regime?: unknown,
+    effort?: unknown
+  ): Promise<NativeChatAcceptance> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const { chat } = owner.active;
+    if (!chat.acceptsLibrarySelection || !chat.submitWithLibrarySelection)
+      throw new Error("native_chat_library_selection_unavailable");
+    const mode = operatingRegime(regime);
+    const surfaces =
+      mode === "act" ? attachment.editorSurfaces?.selection() : undefined;
+    const result = await chat.submitWithLibrarySelection(
+      attachment.session,
+      inputId,
+      text,
+      mode,
+      ...submitSelections(surfaces, agentEffort(effort))
+    );
+    this.revalidate(owner, attachment);
+    return result;
+  }
+
   acceptsWakeups(event: IpcMainInvokeEvent): boolean {
     return this.owner(event).active.chat.acceptsWakeups === true;
   }
@@ -2108,6 +2146,56 @@ export class NativeChatIpc {
     return receipt;
   }
 
+  async librarySelections(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string
+  ): Promise<readonly NativeChatLibrarySelection[]> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const { chat } = owner.active;
+    if (!chat.acceptsLibrarySelection || !chat.librarySelections) return [];
+    const snapshot = requireObservation(attachment, observationId);
+    const reviews = await chat.librarySelections(attachment.session, snapshot);
+    this.revalidate(owner, attachment);
+    return reviews.slice(0, MAX_REVIEWS).map((review) => ({
+      selectionId: JSON.stringify([review.task.turnId, review.waitId]),
+      reviewId: retainReview(
+        attachment.librarySelections,
+        review,
+        (left, right) =>
+          left.task.requestId === right.task.requestId &&
+          left.initialSearchQuery === right.initialSearchQuery
+      ),
+      initialSearchQuery: review.initialSearchQuery,
+    }));
+  }
+
+  async answerLibrarySelection(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    reviewId: string,
+    answer: unknown
+  ): Promise<NativeChatControlReceipt> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const { chat } = owner.active;
+    const review = token(reviewId)
+      ? attachment.librarySelections.get(reviewId)
+      : undefined;
+    if (
+      !review ||
+      !chat.acceptsLibrarySelection ||
+      !chat.answerLibrarySelection
+    )
+      throw new Error("native_chat_library_selection_unavailable");
+    const receipt = await chat.answerLibrarySelection(
+      attachment.session,
+      review,
+      answer
+    );
+    this.revalidate(owner, attachment);
+    return receipt;
+  }
+
   async answerApproval(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -2308,6 +2396,7 @@ export class NativeChatIpc {
         observations: new Map(),
         approvals: new Map(),
         questions: new Map(),
+        librarySelections: new Map(),
         goals: new Map(),
       };
       owner.attachments.set(attachment.id, attachment);

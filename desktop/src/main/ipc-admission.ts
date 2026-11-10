@@ -40,6 +40,13 @@ const PROJECT_CONFIGURATION_CHANNELS = new Set<IpcChannel>([
   IPC_CHANNELS.NATIVE_CHAT_SUBMIT_CONFIGURATION,
 ]);
 
+const WORKBENCH_LIBRARY_CHANNELS = new Set<IpcChannel>([
+  IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION,
+  IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
+  IPC_CHANNELS.NATIVE_CHAT_LIBRARY_SELECTIONS,
+  IPC_CHANNELS.NATIVE_CHAT_ANSWER_LIBRARY_SELECTION,
+]);
+
 /**
  * Closed IPC allowlist for non-main entry roles.
  *
@@ -76,6 +83,9 @@ export namespace ipc_admission {
         }
         if (TOOLS_ONLY_CHANNELS.has(channel)) {
           return pathname === "/desktop/tools";
+        }
+        if (WORKBENCH_LIBRARY_CHANNELS.has(channel)) {
+          return pathname === "/desktop/workspace";
         }
         if (
           channel === IPC_CHANNELS.DOCUMENT_READ ||

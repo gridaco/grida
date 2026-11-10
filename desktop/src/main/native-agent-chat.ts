@@ -154,6 +154,7 @@ const QUEUE_PAGE_SIZE = 8;
 const QUEUE_PREVIEW_LENGTH = 2048;
 const CATALOG_CURSOR = /^[!-~]{1,512}$/;
 const IDENTITY = /^[A-Za-z0-9_.:@/-]{1,256}$/;
+const LIBRARY_OBJECT_ID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 
 export type NativeAgentChatLaunch = Omit<
   NativeAgentLaunch,
@@ -187,6 +188,12 @@ export type NativeQuestionReview = Readonly<
     expectedHistoryPosition: number;
   }
 >;
+
+export type NativeLibrarySelectionReview = Readonly<{
+  task: TaskBasis;
+  waitId: string;
+  initialSearchQuery: string;
+}>;
 
 // A retained basis can retry an identical control after the native child is
 // replaced. The replacement still requires a fresh attachment to that session.
@@ -238,6 +245,8 @@ export class NativeAgentChat {
   private readonly transcripts = new Map<string, TranscriptCapture>();
   private readonly unverifiedTranscripts = new Set<string>();
   private readonly questionReviews = new WeakSet<NativeQuestionReview>();
+  private readonly librarySelectionReviews =
+    new WeakSet<NativeLibrarySelectionReview>();
   private readonly listeners = new Map<
     string,
     Set<(update: NativeChatStreamUpdate) => void>
@@ -250,6 +259,10 @@ export class NativeAgentChat {
 
   get acceptsPng(): boolean {
     return this.connected && this.process.acceptsPng;
+  }
+
+  get acceptsLibrarySelection(): boolean {
+    return this.connected && this.process.acceptsLibrarySelection;
   }
 
   get acceptsFile(): boolean {
@@ -750,6 +763,25 @@ export class NativeAgentChat {
     });
   }
 
+  submitWithLibrarySelection(
+    session: NativeChatSession,
+    inputId: string,
+    text: string,
+    operatingRegime?: NativeChatOperatingRegime,
+    editorSurfaces?: NativeEditorSurfaceSelection,
+    effort?: NativeChatEffort
+  ): Promise<NativeChatAcceptance> {
+    if (!this.acceptsLibrarySelection)
+      return Promise.reject(
+        new Error("native_chat_library_selection_unavailable")
+      );
+    return this.send("submit", session, inputId, text, operatingRegime, {
+      allowLibrarySelection: true,
+      editorSurfaces,
+      effort,
+    });
+  }
+
   submitWithWakeup(
     session: NativeChatSession,
     inputId: string,
@@ -867,6 +899,7 @@ export class NativeAgentChat {
       file?: ReturnType<typeof selectedFile>;
       allowConfigurationChanges?: true;
       allowWakeups?: true;
+      allowLibrarySelection?: true;
       editorSurfaces?: NativeEditorSurfaceSelection;
       effort?: NativeChatEffort;
     } = {}
@@ -878,6 +911,7 @@ export class NativeAgentChat {
       file,
       allowConfigurationChanges,
       allowWakeups,
+      allowLibrarySelection,
       editorSurfaces,
       effort,
     } = options;
@@ -893,6 +927,7 @@ export class NativeAgentChat {
         ...(effort && { effort }),
         ...(allowConfigurationChanges && { allowConfigurationChanges }),
         ...(allowWakeups && { allowWakeups }),
+        ...(allowLibrarySelection && { allowLibrarySelection }),
         ...(mode === "submit" &&
           operatingRegime === "act" &&
           !image &&
@@ -1527,6 +1562,82 @@ export class NativeAgentChat {
     return controlReceipt(result, review.task);
   }
 
+  async librarySelections(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot
+  ): Promise<readonly NativeLibrarySelectionReview[]> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const current = snapshot.current;
+    if (
+      !this.acceptsLibrarySelection ||
+      current?.disposition !== "suspended" ||
+      current.cancelled
+    )
+      return [];
+    const result = object(
+      await this.process.request("_co.grida/session/library-selections", {
+        sessionId,
+        turnId: current.turnId,
+      })
+    );
+    this.requireAttached(session);
+    if (
+      result.sessionId !== sessionId ||
+      result.turnId !== current.turnId ||
+      result.controlRevision !== current.controlRevision
+    )
+      throw new Error("native_chat_library_selection_changed");
+    if (!Array.isArray(result.selections)) throw invalidResponse();
+    const reviews = result.selections.map((value: unknown) => {
+      const entry = object(value);
+      const waitId = identity(entry.waitId);
+      const initialSearchQuery = boundedText(entry.initialSearchQuery, 2048);
+      const requestId = `desktop-library-selection-${createHash("sha256")
+        .update(
+          JSON.stringify([
+            sessionId,
+            current.turnId,
+            waitId,
+            snapshot.sessionRevision,
+            current.controlRevision,
+          ])
+        )
+        .digest("hex")}`;
+      const { task } = this.task(session, snapshot, requestId);
+      return Object.freeze({
+        task: Object.freeze(task),
+        waitId,
+        initialSearchQuery,
+      });
+    });
+    if (new Set(reviews.map(({ waitId }) => waitId)).size !== reviews.length)
+      throw invalidResponse();
+    for (const review of reviews) this.librarySelectionReviews.add(review);
+    return reviews;
+  }
+
+  async answerLibrarySelection(
+    session: NativeChatSession,
+    review: NativeLibrarySelectionReview,
+    input: unknown
+  ): Promise<NativeChatControlReceipt> {
+    if (
+      review.task.sessionId !== this.requireAttached(session) ||
+      !this.acceptsLibrarySelection ||
+      !this.librarySelectionReviews.has(review)
+    )
+      throw new Error("native_chat_library_selection_unavailable");
+    const result = await this.process.request(
+      "_co.grida/session/answer-library-selection",
+      {
+        ...review.task,
+        waitId: review.waitId,
+        answer: librarySelectionAnswer(input),
+      }
+    );
+    return controlReceipt(result, review.task);
+  }
+
   pause(
     session: NativeChatSession,
     snapshot: NativeChatSnapshot,
@@ -1932,13 +2043,39 @@ function pngPrompt(value: unknown) {
     value.byteLength > MAX_ATTACHMENT_BYTES
   )
     throw new Error("image_size_limit");
-  const bytes = Buffer.from(value);
-  if (!bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE))
-    throw new Error("invalid_png_image");
   return {
     type: "image",
     mimeType: "image/png",
-    data: bytes.toString("base64"),
+    data: pngData(Buffer.from(value)),
+  };
+}
+
+function pngData(bytes: Buffer): string {
+  if (!bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE))
+    throw new Error("invalid_png_image");
+  return bytes.toString("base64");
+}
+
+function librarySelectionAnswer(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error("native_chat_library_selection_answer_invalid");
+  const answer = object(value);
+  const fields = Object.keys(answer).length;
+  if (answer.kind === "skipped" && fields === 1) return { kind: "skipped" };
+  if (
+    answer.kind !== "selected" ||
+    fields !== 3 ||
+    typeof answer.id !== "string" ||
+    !LIBRARY_OBJECT_ID.test(answer.id) ||
+    !(answer.png instanceof Uint8Array)
+  )
+    throw new Error("native_chat_library_selection_answer_invalid");
+  if (answer.png.byteLength > MAX_ATTACHMENT_BYTES)
+    throw new Error("image_size_limit");
+  return {
+    kind: "selected",
+    id: answer.id.toLowerCase(),
+    data: pngData(Buffer.from(answer.png)),
   };
 }
 

@@ -512,6 +512,28 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG, (event) =>
     nativeChat.acceptsPng(event)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION, (event) =>
+    nativeChat.acceptsLibrarySelection(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
+    (
+      event,
+      id: string,
+      input: string,
+      text: string,
+      regime?: unknown,
+      effort?: unknown
+    ) =>
+      nativeChat.submitWithLibrarySelection(
+        event,
+        id,
+        input,
+        text,
+        regime,
+        effort
+      )
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE, (event) =>
     nativeChat.acceptsFile(event)
   );
@@ -631,6 +653,16 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_ANSWER_QUESTION,
     (event, id: string, review: string, answer: unknown) =>
       nativeChat.answerQuestion(event, id, review, answer)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_LIBRARY_SELECTIONS,
+    (event, id: string, observation: string) =>
+      nativeChat.librarySelections(event, id, observation)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ANSWER_LIBRARY_SELECTION,
+    (event, id: string, review: string, answer: unknown) =>
+      nativeChat.answerLibrarySelection(event, id, review, answer)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, (event, id: string) =>
     nativeChat.transcript(event, id)

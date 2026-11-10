@@ -31,6 +31,10 @@ const START_TIMEOUT_MS = 10_000;
 const SHUTDOWN_TIMEOUT_MS = 12_000;
 const KILL_TIMEOUT_MS = 2_000;
 const SESSION_EFFORT = "co.grida/session/effort";
+const LIBRARY_SELECTION_CAPABILITIES = {
+  "co.grida/session/library-selections": 1,
+  "co.grida/session/answer-library-selection": 1,
+} as const;
 export const TRANSCRIPT_WINDOW = "co.grida/session/transcript-window";
 const SUBAGENT_CAPABILITIES = {
   "co.grida/subagent/list": 1,
@@ -109,6 +113,7 @@ export class NativeAgentProcess {
   private nextId = 1;
   private ready = false;
   private imageInput = false;
+  private librarySelection = false;
   private fileInput = false;
   private agentEffort = false;
   private scheduledWakeups = false;
@@ -182,6 +187,10 @@ export class NativeAgentProcess {
 
   get acceptsPng(): boolean {
     return this.connected && this.imageInput;
+  }
+
+  get acceptsLibrarySelection(): boolean {
+    return this.connected && this.librarySelection;
   }
 
   get acceptsTranscriptWindow(): boolean {
@@ -445,6 +454,7 @@ export class NativeAgentProcess {
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
+                ...(options.workspace && LIBRARY_SELECTION_CAPABILITIES),
                 "co.grida/session/selected-file": 1,
                 [TRANSCRIPT_WINDOW]: 1,
                 ...(requestDeletion && {
@@ -472,6 +482,12 @@ export class NativeAgentProcess {
       }
       processOwner.imageInput =
         object(agentCapabilities?.promptCapabilities)?.image === true;
+      processOwner.librarySelection =
+        options.workspace !== undefined &&
+        processOwner.imageInput &&
+        Object.keys(LIBRARY_SELECTION_CAPABILITIES).every(
+          (key) => advertised?.[key] === 1
+        );
       processOwner.fileInput =
         advertised?.["co.grida/session/selected-file"] === 1;
       processOwner.agentEffort =

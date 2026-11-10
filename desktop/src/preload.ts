@@ -744,6 +744,23 @@ const bridge: DesktopBridge = {
     acceptsGoalEffort: () =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_GOAL_EFFORT),
     acceptsPng: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
+    acceptsLibrarySelection: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION),
+    submitWithLibrarySelection: (
+      attachmentId,
+      inputId,
+      text,
+      operatingRegime,
+      effort
+    ) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
+        attachmentId,
+        inputId,
+        text,
+        operatingRegime,
+        effort
+      ),
     acceptsFile: () =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE),
     acceptsWakeups: () =>
@@ -881,6 +898,19 @@ const bridge: DesktopBridge = {
     answerQuestion: (attachmentId, reviewId, answer) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_ANSWER_QUESTION,
+        attachmentId,
+        reviewId,
+        answer
+      ),
+    librarySelections: (attachmentId, observationId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_LIBRARY_SELECTIONS,
+        attachmentId,
+        observationId
+      ),
+    answerLibrarySelection: (attachmentId, reviewId, answer) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ANSWER_LIBRARY_SELECTION,
         attachmentId,
         reviewId,
         answer

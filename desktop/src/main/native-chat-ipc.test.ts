@@ -34,6 +34,114 @@ const UPDATE = {
   replace: true,
 } as const;
 
+it("binds requested Library selection and its answer to the observed chat frame", async () => {
+  const { ipc, chat, first, second } = setup();
+  expect(ipc.acceptsLibrarySelection(first.event)).toBe(false);
+  Object.assign(chat, { acceptsLibrarySelection: true });
+  chat.submitWithLibrarySelection = vi.fn<
+    NonNullable<typeof chat.submitWithLibrarySelection>
+  >(async (session, inputId) => chat.submit(session, inputId, "Fixture"));
+  chat.librarySelections = vi.fn<NonNullable<typeof chat.librarySelections>>(
+    async (session, observed) => [
+      {
+        initialSearchQuery: "geometric print",
+        waitId: "library-selection/fixture",
+        task: {
+          sessionId: session.id,
+          turnId: observed.current!.turnId,
+          requestId: "desktop-library-selection-fixture",
+          expectedSessionRevision: observed.sessionRevision,
+          expectedControlRevision: observed.current!.controlRevision,
+        },
+      },
+    ]
+  );
+  const answer = vi.fn<NonNullable<typeof chat.answerLibrarySelection>>();
+  chat.answerLibrarySelection = answer;
+  const attached = await ipc.create(first.event);
+  const other = await ipc.create(second.event);
+  expect(ipc.acceptsLibrarySelection(first.event)).toBe(true);
+  await expect(
+    ipc.submitWithLibrarySelection(
+      second.event,
+      attached.attachmentId,
+      "foreign",
+      "Find a reference."
+    )
+  ).rejects.toThrow("native_chat_attachment_unavailable");
+  await expect(
+    ipc.submitWithLibrarySelection(
+      first.event,
+      attached.attachmentId,
+      "own",
+      "Find a reference.",
+      "act",
+      "standard"
+    )
+  ).resolves.toMatchObject({ inputId: "own" });
+  expect(chat.submitWithLibrarySelection).toHaveBeenCalledOnce();
+  const { observationId } = await ipc.observe(
+    first.event,
+    attached.attachmentId
+  );
+  const [selection] = await ipc.librarySelections(
+    first.event,
+    attached.attachmentId,
+    observationId
+  );
+  expect(selection).toEqual({
+    selectionId: JSON.stringify(["turn", "library-selection/fixture"]),
+    reviewId: expect.any(String),
+    initialSearchQuery: "geometric print",
+  });
+  expect(
+    await ipc.librarySelections(
+      first.event,
+      attached.attachmentId,
+      observationId
+    )
+  ).toEqual([selection]);
+  await expect(
+    ipc.librarySelections(second.event, other.attachmentId, observationId)
+  ).rejects.toThrow("native_chat_observation_unavailable");
+  await expect(
+    ipc.answerLibrarySelection(
+      second.event,
+      other.attachmentId,
+      selection.reviewId,
+      { kind: "skipped" }
+    )
+  ).rejects.toThrow("native_chat_library_selection_unavailable");
+  expect(answer).not.toHaveBeenCalled();
+  answer.mockImplementationOnce(async (session, review) => {
+    first.frame.url = `${ORIGIN}/desktop/welcome`;
+    return {
+      sessionId: session.id,
+      turnId: review.task.turnId,
+      requestId: review.task.requestId,
+      sessionRevision: 2,
+      journalPosition: 2,
+    };
+  });
+  await expect(
+    ipc.answerLibrarySelection(
+      first.event,
+      attached.attachmentId,
+      selection.reviewId,
+      { kind: "skipped" }
+    )
+  ).rejects.toThrow("native_chat_scope_changed");
+  expect(answer).toHaveBeenCalledOnce();
+  await expect(
+    ipc.answerLibrarySelection(
+      first.event,
+      attached.attachmentId,
+      selection.reviewId,
+      { kind: "skipped" }
+    )
+  ).rejects.toThrow("native_chat_attachment_unavailable");
+});
+
 it("binds editor observations only to an exact Act text attachment", async () => {
   const { ipc, chat, first, second } = setup();
   const endpoints = new NativeEditorSurfaceEndpoints();

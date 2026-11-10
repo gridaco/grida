@@ -91,6 +91,10 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_ACCEPTS_EFFORT: "grida:native-chat:accepts-effort",
   NATIVE_CHAT_ACCEPTS_GOAL_EFFORT: "grida:native-chat:accepts-goal-effort",
   NATIVE_CHAT_ACCEPTS_PNG: "grida:native-chat:accepts-png",
+  NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION:
+    "grida:native-chat:accepts-library-selection",
+  NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION:
+    "grida:native-chat:submit-library-selection",
   NATIVE_CHAT_ACCEPTS_FILE: "grida:native-chat:accepts-file",
   NATIVE_CHAT_ACCEPTS_WAKEUPS: "grida:native-chat:accepts-wakeups",
   NATIVE_CHAT_SUBMIT_WAKEUP: "grida:native-chat:submit-wakeup",
@@ -117,6 +121,9 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_ANSWER_APPROVAL: "grida:native-chat:answer-approval",
   NATIVE_CHAT_QUESTIONS: "grida:native-chat:questions",
   NATIVE_CHAT_ANSWER_QUESTION: "grida:native-chat:answer-question",
+  NATIVE_CHAT_LIBRARY_SELECTIONS: "grida:native-chat:library-selections",
+  NATIVE_CHAT_ANSWER_LIBRARY_SELECTION:
+    "grida:native-chat:answer-library-selection",
   NATIVE_CHAT_TRANSCRIPT: "grida:native-chat:transcript",
   NATIVE_CHAT_TRANSCRIPT_PAGE: "grida:native-chat:transcript-page",
   NATIVE_CHAT_CONTROL: "grida:native-chat:control",

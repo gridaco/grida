@@ -330,8 +330,10 @@ For the compatible connection, the provider adapter sends every tool reply
 before adding labeled PNG input correlated to the originating tool reply.
 If interruption occurs after the bytes are retained and before the choice is
 committed, the unused copy stays subject to the chat's storage and deletion policy.
-The host receives no Library URL or access grant. Desktop picker integration
-has its own availability gate.
+The host receives no Library URL or access grant. The Desktop workbench
+selects and normalizes one image with its existing Library attachment owner.
+Main keeps the ACP wait and revision basis behind an opaque review ID tied to
+the attached workbench frame.
 
 Private stdio clients may negotiate `co.grida/session/selected-file` version 1
 when the host has retained input storage. Identified Submit and Enqueue then

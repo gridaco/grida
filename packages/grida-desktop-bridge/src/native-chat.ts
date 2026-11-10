@@ -426,6 +426,16 @@ export type NativeChatQuestionAnswer =
   | { kind: "text"; text: string }
   | { kind: "skipped" };
 
+export type NativeChatLibrarySelection = Readonly<{
+  selectionId: string;
+  reviewId: string;
+  initialSearchQuery: string;
+}>;
+
+export type NativeChatLibrarySelectionAnswer =
+  | Readonly<{ kind: "selected"; id: string; png: Uint8Array }>
+  | Readonly<{ kind: "skipped" }>;
+
 export type NativeChatControlResult =
   | { action: "pause" | "stop"; receipt: NativeChatControlReceipt }
   | { action: "resume"; turn: NativeChatTurn };
@@ -546,6 +556,14 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   acceptsEffort?(): Promise<boolean>;
   acceptsGoalEffort?(): Promise<boolean>;
   acceptsPng?(): Promise<boolean>;
+  acceptsLibrarySelection?(): Promise<boolean>;
+  submitWithLibrarySelection?(
+    attachmentId: string,
+    inputId: string,
+    text: string,
+    operatingRegime?: NativeChatOperatingRegime,
+    effort?: NativeChatEffort
+  ): Promise<NativeChatAcceptance>;
   acceptsFile?(): Promise<boolean>;
   acceptsWakeups?(): Promise<boolean>;
   submitWithWakeup?(
@@ -648,6 +666,15 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     reviewId: string,
     answer: NativeChatQuestionAnswer
+  ): Promise<NativeChatControlReceipt>;
+  librarySelections?(
+    attachmentId: string,
+    observationId: string
+  ): Promise<readonly NativeChatLibrarySelection[]>;
+  answerLibrarySelection?(
+    attachmentId: string,
+    reviewId: string,
+    answer: NativeChatLibrarySelectionAnswer
   ): Promise<NativeChatControlReceipt>;
   transcript(attachmentId: string): Promise<readonly NativeChatMessage[]>;
   transcriptPage?(

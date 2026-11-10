@@ -133,6 +133,24 @@ describe("ipc_admission", () => {
     }
   });
 
+  it("admits requested Library selection only in the main workspace", () => {
+    for (const channel of [
+      IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_LIBRARY_SELECTION,
+      IPC_CHANNELS.NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION,
+      IPC_CHANNELS.NATIVE_CHAT_LIBRARY_SELECTIONS,
+      IPC_CHANNELS.NATIVE_CHAT_ANSWER_LIBRARY_SELECTION,
+    ]) {
+      expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+      expect(allowedFor("main", "/desktop/file")).not.toContain(channel);
+      expect(allowedFor("main", "/desktop/workspace/extra")).not.toContain(
+        channel
+      );
+      expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+        channel
+      );
+    }
+  });
+
   it("admits nested deck text edits within the file chat scope", () => {
     const deck = allChannels.filter((channel) =>
       ipc_admission.allows({
