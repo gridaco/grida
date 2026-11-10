@@ -1,6 +1,6 @@
 use crate::StreamLimits;
 use crate::wire::short_identity;
-use crate::wire::{Incoming, WireError, WireStream, classify_error};
+use crate::wire::{Incoming, RateRejectionEvidence, WireError, WireStream, classify_error};
 use crate::{StreamingTransport, TransportRequest};
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
@@ -23,10 +23,12 @@ pub(super) fn events(
     limits: StreamLimits,
     names: BTreeMap<String, ToolId>,
     message_id: MessageId,
+    rate_rejection_evidence: RateRejectionEvidence,
 ) -> BoxStream<'static, ProviderEvent> {
     let source = request.binding.provider.to_string();
     let state = ResponseStream {
-        wire: WireStream::new(transport, request, control.clone(), limits),
+        wire: WireStream::new(transport, request, control.clone(), limits)
+            .with_rate_rejection_evidence(rate_rejection_evidence),
         control,
         limits,
         names,

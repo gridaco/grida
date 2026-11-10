@@ -26,7 +26,10 @@ vi.mock("@/lib/ai/openai-compat/hosted-models", () => ({
 }));
 
 vi.mock("@/lib/ai/openai-compat/limits", () => ({
-  allowAiRequest: async () => ({ success: true }),
+  allowAiRequest: async () =>
+    h.retryAfter === null
+      ? { success: true }
+      : { success: false, retryAfterSeconds: h.retryAfter },
 }));
 
 import { SignJWT } from "jose";
@@ -46,6 +49,8 @@ const h = vi.hoisted(() => ({
   parts: [] as unknown[],
   lastCallOptions: null as unknown,
   denied: false,
+  retryAfter: null as number | null,
+  downstreamLimit: false,
 }));
 
 vi.mock("@/lib/platform/product-consumer", () => ({
@@ -89,6 +94,8 @@ vi.mock("@/lib/ai/gateway-product", async (orig) => {
     doStream: async (options: unknown) => {
       if (h.denied) throw new ProductBillingError("blocked");
       h.lastCallOptions = options;
+      if (h.downstreamLimit)
+        throw new real.GatewayProductError(429, "fixture_rate_limit");
       const parts = h.parts as never[];
       return {
         stream: new ReadableStream({
@@ -164,6 +171,8 @@ beforeEach(() => {
   h.parts = [];
   h.lastCallOptions = null;
   h.denied = false;
+  h.retryAfter = null;
+  h.downstreamLimit = false;
   mockedAdmission.mockReset();
   mockedCompletion.mockReset();
   mockedAdmission.mockImplementation(async (context) => ({
@@ -216,6 +225,46 @@ const TOOLS: LanguageModelV3CallOptions["tools"] = [
 ];
 
 describe("POST /api/v1/ai/chat/completions (contract)", () => {
+  it("separates the pre-dispatch throttle from a downstream 429", async () => {
+    const token = await mintedToken();
+    const request = (body: string) =>
+      POST(
+        new Request("http://grida.test/api/v1/ai/chat/completions", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+          },
+          body,
+        })
+      );
+    h.retryAfter = 2;
+    const early = await request("unparsed");
+    expect(early.status).toBe(429);
+    expect(early.headers.get("retry-after")).toBe("2");
+    expect(await early.json()).toMatchObject({
+      error: { code: "rate_limit_exceeded", type: "rate_limit_error" },
+    });
+    expect(h.lastCallOptions).toBeNull();
+    expect(mockedAdmission).not.toHaveBeenCalled();
+
+    h.retryAfter = null;
+    h.downstreamLimit = true;
+    const downstream = await request(
+      JSON.stringify({
+        model: MODEL,
+        stream: true,
+        messages: [{ role: "user", content: "Hello." }],
+      })
+    );
+    expect(downstream.status).toBe(429);
+    expect(downstream.headers.get("retry-after")).toBeNull();
+    expect(await downstream.json()).toMatchObject({
+      error: { code: "rate_limit_exceeded", type: "server_error" },
+    });
+    expect(h.lastCallOptions).not.toBeNull();
+  });
+
   it("non-stream: roundtrips the prompt, returns content + usage, does not issue a native receipt", async () => {
     h.generate = {
       content: [{ type: "text", text: "It is sunny." }],

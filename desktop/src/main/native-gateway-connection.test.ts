@@ -137,6 +137,112 @@ it("does not dispatch after a scope change, a cancelled request, or close during
 });
 
 const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
+it.skipIf(!resourcesPath)(
+  "retries the first-party admission throttle once and preserves downstream uncertainty",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-gateway-retry-")
+    );
+    const cwd = path.join(root, "workspace");
+    await fs.mkdir(cwd, { mode: 0o700 });
+    const owner = fixture();
+    const connection = await NativeGatewayConnection.open(owner.options);
+    const times: number[] = [];
+    const rateLimit = (type: string, retryAfter: string) =>
+      Response.json(
+        { error: { code: "rate_limit_exceeded", type } },
+        { status: 429, headers: { "retry-after": retryAfter } }
+      );
+    owner.dispatch.mockImplementation(async () => {
+      times.push(performance.now());
+      switch (times.length) {
+        case 1:
+          return rateLimit("rate_limit_error", "1");
+        case 2:
+          return new Response(
+            'data: {"id":"retry","choices":[{"index":0,"delta":{"content":"Recovered reply."},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+            { headers: { "content-type": "text/event-stream" } }
+          );
+        case 3:
+          return rateLimit("server_error", "1");
+        case 4:
+          return rateLimit("rate_limit_error", "5");
+        default:
+          throw new Error("unexpected provider request");
+      }
+    });
+    let chat: NativeAgentChat | undefined;
+    try {
+      const active = (chat = await NativeAgentChat.start({
+        ...connection.launch("fixture"),
+        resourcesPath: resourcesPath!,
+        stateDirectory: path.join(root, "state"),
+        cwd,
+      }));
+      const session = await active.create();
+      const first = await active.submit(
+        session,
+        "first",
+        "Wait for admission."
+      );
+      await vi.waitFor(
+        async () =>
+          expect((await active.observe(session)).latest).toMatchObject({
+            turnId: first.turnId,
+            status: "succeeded",
+          }),
+        { timeout: 5000 }
+      );
+      expect(times).toHaveLength(2);
+      expect(times[1] - times[0]).toBeGreaterThanOrEqual(900);
+      expect(owner.dispatch.mock.calls[0][0]).toEqual(
+        owner.dispatch.mock.calls[1][0]
+      );
+
+      const second = await active.submit(
+        session,
+        "second",
+        "Check a downstream failure."
+      );
+      await vi.waitFor(async () => {
+        const snapshot = await active.observe(session);
+        expect(snapshot.latest).toMatchObject({
+          turnId: second.turnId,
+          status: "uncertain",
+        });
+        expect(snapshot.retryNotBeforeMs).toBeUndefined();
+      });
+      expect(times).toHaveLength(3);
+
+      const third = await active.submit(session, "third", "Stop the retry.");
+      await vi.waitFor(async () =>
+        expect((await active.observe(session)).retryNotBeforeMs).toBeTypeOf(
+          "number"
+        )
+      );
+      await active.stop(session, await active.observe(session), "stop-retry");
+      await vi.waitFor(async () =>
+        expect((await active.observe(session)).latest).toMatchObject({
+          turnId: third.turnId,
+          status: "cancelled",
+        })
+      );
+      expect(times).toHaveLength(4);
+      for (const [url, headers] of owner.prepare.mock.calls) {
+        expect(url).toBe(target);
+        expect(headers.get("authorization")).toBe(
+          `Bearer ${owner.grant.token}`
+        );
+      }
+    } finally {
+      connection.close();
+      await chat?.close();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  },
+  20_000
+);
+
 it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
   "retains an unconfirmed presentation without repeating the send or stopping artifact work",
   async () => {

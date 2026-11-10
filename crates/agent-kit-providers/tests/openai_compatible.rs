@@ -1,8 +1,8 @@
 mod support;
 use agent_kit_core::authority::AuthorityBinding;
 use agent_kit_core::inference::{
-    FailureKind, InferenceRequest, InferenceStatus, InferenceUpdate, InputFormat, Modality,
-    ModelCapabilities, Provider, ProviderBinding,
+    DispatchEvidence, FailureKind, InferenceRequest, InferenceStatus, InferenceUpdate, InputFormat,
+    Modality, ModelCapabilities, Provider, ProviderBinding,
 };
 use agent_kit_core::messages::{
     Content, MediaRef, OutcomeStatus, ResultContent, Retention, Role, ToolArguments, ToolResult,
@@ -662,6 +662,68 @@ async fn http_errors_are_bounded_and_use_fixed_safe_codes() {
     assert_eq!(failure.code, "quota_exhausted");
     assert_eq!(failure.retry_after_ms, Some(400));
     assert_eq!(transport.requests.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn only_a_trusted_complete_code_and_type_prove_compatible_admission_rejection() {
+    for (opt_in, kind, body_interrupted, status, evidence) in [
+        (
+            true,
+            "rate_limit_error",
+            false,
+            InferenceStatus::Failed,
+            Some(DispatchEvidence::RejectedBeforeExecution),
+        ),
+        (
+            false,
+            "rate_limit_error",
+            false,
+            InferenceStatus::Failed,
+            None,
+        ),
+        (
+            true,
+            "server_error",
+            false,
+            InferenceStatus::Interrupted,
+            None,
+        ),
+        (
+            true,
+            "rate_limit_error",
+            true,
+            InferenceStatus::Interrupted,
+            None,
+        ),
+    ] {
+        let body = serde_json::to_vec(
+            &json!({ "error": { "code": "rate_limit_exceeded", "type": kind } }),
+        )
+        .unwrap();
+        let mut reply = response([body.clone()], false);
+        reply.status = 429;
+        reply.retry_after_ms = Some(1000);
+        if body_interrupted {
+            reply.body = Box::pin(futures_util::stream::iter([
+                Ok(body),
+                Err(TransportFailure::Interrupted),
+            ]));
+        }
+        let transport = FixtureTransport::new([Ok(reply)]);
+        let mut provider = adapter(transport.clone());
+        if opt_in {
+            provider = provider.with_admission_rate_limit_evidence();
+        }
+        let result = execute(&provider, request(), "rate").await;
+        assert_eq!(result.status, status);
+        let failure = result.failure.unwrap();
+        assert_eq!(failure.kind, FailureKind::RateLimit);
+        assert_eq!(failure.retry_after_ms, Some(1000));
+        assert_eq!(failure.dispatch, evidence);
+        assert!(result.messages.is_empty());
+        assert!(result.usage.is_empty());
+        assert_eq!(transport.requests.lock().unwrap().len(), 1);
+    }
 }
 
 #[tokio::test]

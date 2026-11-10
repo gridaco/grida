@@ -1,7 +1,8 @@
 mod stream;
 
 use crate::wire::{
-    function_name, image_data_url, image_profile, short_identity, text_profile, tool_result,
+    RateRejectionEvidence, function_name, image_data_url, image_profile, short_identity,
+    text_profile, tool_result,
 };
 use crate::{
     InputImageResolver, StreamLimits, StreamingTransport, TransportOperation, TransportRequest,
@@ -36,6 +37,7 @@ pub struct OpenAiCompatible {
     transport: Arc<dyn StreamingTransport>,
     limits: StreamLimits,
     images: Option<Arc<InputImageResolver>>,
+    rate_rejection_evidence: RateRejectionEvidence,
 }
 
 impl OpenAiCompatible {
@@ -74,7 +76,16 @@ impl OpenAiCompatible {
             transport,
             limits,
             images,
+            rate_rejection_evidence: RateRejectionEvidence::None,
         })
+    }
+
+    /// Enable admission evidence for a trusted endpoint that guarantees a
+    /// complete HTTP 429 with code `rate_limit_exceeded` and type
+    /// `rate_limit_error` precedes execution. The caller decides whether to retry.
+    pub fn with_admission_rate_limit_evidence(mut self) -> Self {
+        self.rate_rejection_evidence = RateRejectionEvidence::CodeAndType;
+        self
     }
 
     fn model(&self, model: &ModelId) -> Result<&ModelProfile> {
@@ -180,6 +191,7 @@ impl Provider for OpenAiCompatible {
         let encoded = self.encode(request.request(), profile, true)?;
         let transport = Arc::clone(&self.transport);
         let limits = self.limits;
+        let evidence = self.rate_rejection_evidence;
         let request = TransportRequest {
             binding: self.binding.clone(),
             operation: TransportOperation::ChatCompletions,
@@ -196,6 +208,7 @@ impl Provider for OpenAiCompatible {
                 limits,
                 encoded.names,
                 message_id,
+                evidence,
             )
         }))
     }

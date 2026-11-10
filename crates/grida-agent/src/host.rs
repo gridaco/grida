@@ -2589,7 +2589,7 @@ impl Execution {
         credential: Credential,
     ) -> Result<Self> {
         let configuration = Fingerprint::of(&("gg-chat-selection-v1", scope, &options.model))?;
-        let provider = Arc::new(OpenAiCompatible::new(
+        let provider = OpenAiCompatible::new(
             binding.clone(),
             BTreeMap::from([(
                 options.model.clone(),
@@ -2601,13 +2601,16 @@ impl Execution {
             )]),
             transport,
             PROVIDER_LIMITS,
-        )?);
+        )?
+        // The first-party chat route uses this typed rejection only for
+        // its pre-dispatch throttle. Downstream 429s have a different type.
+        .with_admission_rate_limit_evidence();
         Self::compose(
             configuration,
             configuration,
             options.model,
             Some(options.max_output_tokens),
-            provider,
+            Arc::new(provider),
             binding,
             credential,
         )

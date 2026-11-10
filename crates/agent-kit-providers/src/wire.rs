@@ -26,6 +26,13 @@ pub(crate) enum Incoming {
     Failure(InferenceStatus, InferenceFailure),
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum RateRejectionEvidence {
+    None,
+    Code,
+    CodeAndType,
+}
+
 pub(crate) struct WireStream {
     transport: Arc<dyn StreamingTransport>,
     request: Option<TransportRequest>,
@@ -35,7 +42,7 @@ pub(crate) struct WireStream {
     decoder: Decoder,
     bytes_received: usize,
     pending_limit: Option<&'static str>,
-    rate_rejection_evidence: bool,
+    rate_rejection_evidence: RateRejectionEvidence,
 }
 
 impl WireStream {
@@ -47,7 +54,7 @@ impl WireStream {
     ) -> Self {
         Self {
             transport,
-            rate_rejection_evidence: false,
+            rate_rejection_evidence: RateRejectionEvidence::None,
             request: Some(request),
             response: None,
             control,
@@ -58,8 +65,8 @@ impl WireStream {
         }
     }
 
-    pub(crate) fn with_rate_rejection_evidence(mut self, supported: bool) -> Self {
-        self.rate_rejection_evidence = supported;
+    pub(crate) fn with_rate_rejection_evidence(mut self, evidence: RateRejectionEvidence) -> Self {
+        self.rate_rejection_evidence = evidence;
         self
     }
 
@@ -114,14 +121,23 @@ impl WireStream {
                     .take()
                     .expect("non-success response is present");
                 let status = response.status;
-                let (mut error, complete_rate_rejection) =
-                    read_http_failure(response, self.limits.max_event_bytes).await;
-                if self.rate_rejection_evidence && complete_rate_rejection {
-                    error.dispatch = Some(DispatchEvidence::RejectedBeforeExecution);
-                }
+                let error = read_http_failure(
+                    response,
+                    self.limits.max_event_bytes,
+                    self.rate_rejection_evidence,
+                )
+                .await;
                 let disposition = match status {
                     // An upstream or intermediary failure can follow dispatch.
                     408 | 500..=599 => InferenceStatus::Interrupted,
+                    429 if matches!(
+                        self.rate_rejection_evidence,
+                        RateRejectionEvidence::CodeAndType
+                    ) && error.kind == FailureKind::RateLimit
+                        && error.dispatch.is_none() =>
+                    {
+                        InferenceStatus::Interrupted
+                    }
                     _ if error.kind == FailureKind::ContextLimit => InferenceStatus::Limited,
                     _ => InferenceStatus::Failed,
                 };
@@ -204,6 +220,17 @@ impl WireError {
             .or_else(|| self.kind.as_ref().and_then(Value::as_str))
             .or_else(|| self.status.as_ref().and_then(Value::as_str))
     }
+
+    fn proves_rate_rejection(&self, evidence: RateRejectionEvidence) -> bool {
+        self.code.as_ref().and_then(Value::as_str) == Some("rate_limit_exceeded")
+            && match evidence {
+                RateRejectionEvidence::None => false,
+                RateRejectionEvidence::Code => true,
+                RateRejectionEvidence::CodeAndType => {
+                    self.kind.as_ref().and_then(Value::as_str) == Some("rate_limit_error")
+                }
+            }
+    }
 }
 
 fn receipt(id: String) -> Option<Envelope> {
@@ -227,18 +254,16 @@ pub(crate) async fn read_http_error(
     response: TransportResponse,
     maximum: usize,
 ) -> InferenceFailure {
-    read_http_failure(response, maximum).await.0
+    read_http_failure(response, maximum, RateRejectionEvidence::None).await
 }
 
 async fn read_http_failure(
     mut response: TransportResponse,
     maximum: usize,
-) -> (InferenceFailure, bool) {
+    rate_rejection_evidence: RateRejectionEvidence,
+) -> InferenceFailure {
     if matches!(response.status, 401 | 402) {
-        return (
-            classify_error(response.status, None, response.retry_after_ms),
-            false,
-        );
+        return classify_error(response.status, None, response.retry_after_ms);
     }
     let mut bytes = Vec::new();
     let complete = loop {
@@ -257,17 +282,16 @@ async fn read_http_failure(
     };
     let parsed: Option<ErrorBody> = serde_json::from_slice(&bytes).ok();
     let code = parsed.as_ref().and_then(|parsed| parsed.error.code());
-    let complete_rate_rejection = complete
+    let mut failure = classify_error(response.status, code, response.retry_after_ms);
+    if complete
         && response.status == 429
         && parsed
             .as_ref()
-            .and_then(|parsed| parsed.error.code.as_ref())
-            .and_then(Value::as_str)
-            == Some("rate_limit_exceeded");
-    (
-        classify_error(response.status, code, response.retry_after_ms),
-        complete_rate_rejection,
-    )
+            .is_some_and(|body| body.error.proves_rate_rejection(rate_rejection_evidence))
+    {
+        failure.dispatch = Some(DispatchEvidence::RejectedBeforeExecution);
+    }
+    failure
 }
 
 pub(crate) fn classify_error(

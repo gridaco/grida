@@ -40,9 +40,12 @@ issues a single transport request per inference attempt.
 
 The Responses API profile records an admission rejection when generation
 returns a complete HTTP 429 body with the explicit `rate_limit_exceeded`
-error code. An incomplete error body, an error inside a stream, or a response
-from the subscription profile provides no such evidence. The master decides
-whether to make another attempt.
+error code. An OpenAI-compatible endpoint can supply the same evidence when
+the host opts in to a reviewed contract that guarantees both the error code
+and the `rate_limit_error` type precede execution. Other rate-limit responses
+on that opt-in endpoint retain uncertainty. The evidence applies only to
+complete HTTP rejection bodies from the reviewed generation route. The master
+decides whether to make another attempt.
 
 ## Model requests and streams
 

@@ -1,5 +1,7 @@
 use super::{ItemStatus, ReplayScope, Summary, WireContent, WireItem};
-use crate::wire::{Incoming, Usage, WireError, WireStream, classify_error, short_identity};
+use crate::wire::{
+    Incoming, RateRejectionEvidence, Usage, WireError, WireStream, classify_error, short_identity,
+};
 use crate::{StreamLimits, StreamingTransport, TransportRequest};
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
@@ -25,9 +27,14 @@ pub(super) fn events(
     names: BTreeMap<String, ToolId>,
     rate_rejection_evidence: bool,
 ) -> BoxStream<'static, ProviderEvent> {
+    let evidence = if rate_rejection_evidence {
+        RateRejectionEvidence::Code
+    } else {
+        RateRejectionEvidence::None
+    };
     let state = Response {
         wire: WireStream::new(transport, request, control.clone(), limits)
-            .with_rate_rejection_evidence(rate_rejection_evidence),
+            .with_rate_rejection_evidence(evidence),
         attempt: control.attempt,
         limits,
         scope,
