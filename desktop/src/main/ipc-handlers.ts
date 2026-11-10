@@ -98,6 +98,7 @@ type RegisterIpcHandlersOptions = {
   ) => ActiveNativeChat | null;
   /** Present when this main process has selected native chat mode. */
   ensure_native_chat?: (workspaceId: string) => Promise<void>;
+  forget_native_workspace?: (workspaceId: string) => Promise<void>;
   resolve_native_deck?: (workspaceId: string) => Promise<WorkspaceMediaGrant>;
   native_external_agent?: NativeExternalRuns;
   native_chat_profiles?: import("./native-chat-ipc").NativeChatProfileOwner;
@@ -675,9 +676,15 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(IPC_CHANNELS.WORKSPACE_FORGET, async (_event, id: unknown) => {
     if (!workspaceIdValue(id)) throw new Error("workspace_id_invalid");
-    nativeChat.revokeDeck(id);
-    await agentSidecarClient.forgetWorkspace(id);
-    nativeChat.revokeDeck(id);
+    const forget =
+      options.forget_native_workspace ?? agentSidecarClient.forgetWorkspace;
+    const forgotten = forget(id);
+    nativeChat.revokeWorkspace(id);
+    try {
+      await forgotten;
+    } finally {
+      nativeChat.revokeWorkspace(id);
+    }
   });
   guarded(
     IPC_CHANNELS.WORKSPACE_READ,

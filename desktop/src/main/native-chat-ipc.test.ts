@@ -603,7 +603,7 @@ describe("native chat IPC", () => {
     );
 
     grant = { ...grant, identity };
-    ipc.revokeDeck(workspaceId);
+    ipc.revokeWorkspace(workspaceId);
     const newer = await inDeck(() => ipc.create(first.event));
     first.frame.url = `${ORIGIN}/desktop/workspace?id=${workspaceId}`;
     await expect(
@@ -620,6 +620,61 @@ describe("native chat IPC", () => {
     await expect(
       legacy.deckRequest(first.event, () => legacy.status(first.event, true))
     ).resolves.toBe("legacy");
+  });
+
+  it("withdraws matching workbench attachments and pending startup on Forget", async () => {
+    const { chat, emit, first, listeners } = setup();
+    const other = windowAt(`${ORIGIN}/desktop/workspace?id=other`);
+    const waiting = windowAt();
+    const started = Promise.withResolvers<void>();
+    const complete = Promise.withResolvers<void>();
+    let visible = true;
+    let waitingReady = false;
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      (sender, workspaceId) =>
+        workspaceId === "other" ||
+        (visible && (sender !== waiting.sender || waitingReady))
+          ? { workspaceId, chat }
+          : null,
+      {
+        admits: () => true,
+        ensure: async () => {
+          started.resolve();
+          await complete.promise;
+        },
+      }
+    );
+    const attachment = await ipc.create(first.event);
+    const retained = await ipc.create(other.event);
+    await ipc.subscribe(first.event, attachment.attachmentId, randomUUID());
+    const pending = ipc
+      .status(waiting.event, true)
+      .catch((error: unknown) => error);
+    await started.promise;
+
+    visible = false;
+    ipc.revokeWorkspace(WORKSPACE);
+    await expect(
+      ipc.submit(first.event, attachment.attachmentId, "stale", "Stale work")
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    emit(attachment.sessionId, UPDATE);
+    expect(first.frame.send).not.toHaveBeenCalled();
+    expect(listeners.get(attachment.sessionId)?.size).toBe(0);
+    await expect(
+      ipc.submit(other.event, retained.attachmentId, "other-input", "Continue")
+    ).resolves.toMatchObject({ sessionId: retained.sessionId });
+
+    // The registered ID can be used again, but it cannot revive the older frame observation.
+    visible = true;
+    waitingReady = true;
+    complete.resolve();
+    expect(await pending).toMatchObject({
+      message: "native_chat_scope_changed",
+    });
+    await expect(ipc.create(waiting.event)).resolves.toMatchObject({
+      sessionId: expect.any(String),
+    });
   });
 
   it("switches only the admitted frame between exact chat owners", async () => {

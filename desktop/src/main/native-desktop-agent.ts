@@ -34,6 +34,14 @@ type Subscription = Readonly<{
   oauth: ChatGptOAuthCoordinator;
 }>;
 type SubscriptionSignOut = ReturnType<ChatGptOAuthCoordinator["signOut"]>;
+type SelectedWorkspace = Pick<Workspace, "id" | "root"> & {
+  identity?: WorkspaceDirectoryIdentity;
+};
+type WorkspaceActivity = {
+  captures: number;
+  retired: boolean;
+  forgetting?: Promise<void>;
+};
 type LaunchOptions = Readonly<{
   provider: NativeDesktopProfile.Provider;
   openExternal: (url: string) => Promise<void>;
@@ -58,6 +66,7 @@ export class NativeDesktopAgent {
   private transitions = 0;
   private closed = false;
   private readonly configurationEpoch = randomUUID();
+  private readonly workspaceActivity = new Map<string, WorkspaceActivity>();
   private profileWrites = Promise.resolve();
 
   private constructor(
@@ -172,35 +181,66 @@ export class NativeDesktopAgent {
   }
 
   current(workspaceId: string, profileId?: string) {
+    if (this.workspaceActivity.get(workspaceId)?.retired) return null;
     return this.owners?.current(workspaceId, profileId) ?? null;
   }
 
   async ensure(workspaceId: string): Promise<void> {
-    const { workspace } = await this.workspace(workspaceId);
-    const owners = (this.owners ??= this.newOwners());
-    await owners.open(workspace);
+    await this.withWorkspace(workspaceId, async (workspace, requireCurrent) => {
+      const owners = (this.owners ??= this.newOwners());
+      await owners.open(workspace);
+      requireCurrent();
+    });
+  }
+
+  forgetWorkspace(workspaceId: string): Promise<void> {
+    const activity: WorkspaceActivity = this.workspaceActivity.get(
+      workspaceId
+    ) ?? {
+      captures: 0,
+      retired: false,
+    };
+    if (activity.forgetting) return activity.forgetting;
+    // Invalidate captures before any asynchronous drain or catalog mutation.
+    activity.retired = true;
+    this.workspaceActivity.set(workspaceId, activity);
+    const owners = this.owners;
+    activity.forgetting = Promise.resolve()
+      .then(async () => {
+        await owners?.closeWorkspace(workspaceId);
+        await agentSidecarClient.forgetWorkspace(workspaceId);
+      })
+      .finally(() => {
+        if (this.workspaceActivity.get(workspaceId) === activity)
+          this.workspaceActivity.delete(workspaceId);
+      });
+    return activity.forgetting;
   }
 
   async profiles(workspaceId: string) {
     this.requireProfiles();
-    const { workspace, requireCurrent } = await this.workspace(workspaceId);
-    const directory = await this.cutover.workspaceDirectory(
-      workspace.id,
-      workspace.root
+    return await this.withWorkspace(
+      workspaceId,
+      async (workspace, requireCurrent) => {
+        const directory = await this.cutover.workspaceDirectory(
+          workspace.id,
+          workspace.root
+        );
+        const [choices, saved] = await Promise.all([
+          this.availableProfiles(),
+          NativeChatProfiles.read(directory),
+        ]);
+        requireCurrent();
+        const available = new Set(choices.map(({ id }) => id));
+        return {
+          choices: choices.map(publicProfile),
+          saved: saved.map((profile) => ({
+            ...publicProfile(profile),
+            available: available.has(profile.id),
+          })),
+        };
+      }
     );
-    const [choices, saved] = await Promise.all([
-      this.availableProfiles(),
-      NativeChatProfiles.read(directory),
-    ]);
-    requireCurrent();
-    const available = new Set(choices.map(({ id }) => id));
-    return {
-      choices: choices.map(publicProfile),
-      saved: saved.map((profile) => ({
-        ...publicProfile(profile),
-        available: available.has(profile.id),
-      })),
-    };
   }
 
   async selectProfile(
@@ -214,11 +254,19 @@ export class NativeDesktopAgent {
       await this.ensure(workspaceId);
       return;
     }
-    const { workspace, requireCurrent } = await this.workspace(workspaceId);
-    const check = () => {
-      requireCurrent();
-      requireFrame();
-    };
+    await this.withWorkspace(workspaceId, (workspace, requireCurrent) =>
+      this.openProviderProfile(workspace, selection, () => {
+        requireCurrent();
+        requireFrame();
+      })
+    );
+  }
+
+  private async openProviderProfile(
+    workspace: SelectedWorkspace,
+    selection: Exclude<NativeChatProfileSelection, { kind: "default" }>,
+    check: () => void
+  ): Promise<void> {
     check();
     const directory = await this.cutover.workspaceDirectory(
       workspace.id,
@@ -270,6 +318,7 @@ export class NativeDesktopAgent {
         };
       },
     });
+    check();
   }
 
   private requireProfiles(): void {
@@ -292,21 +341,51 @@ export class NativeDesktopAgent {
     return [...builtIn, ...configured];
   }
 
-  private async workspace(workspaceId: string) {
+  private async withWorkspace<T>(
+    workspaceId: string,
+    use: (
+      workspace: SelectedWorkspace,
+      requireCurrent: () => void
+    ) => Promise<T>
+  ): Promise<T> {
+    const activity: WorkspaceActivity = this.workspaceActivity.get(
+      workspaceId
+    ) ?? {
+      captures: 0,
+      retired: false,
+    };
     const generation = this.accountGeneration;
     const requireCurrent = () => {
-      if (this.closed || generation !== this.accountGeneration)
+      if (
+        activity.retired ||
+        this.closed ||
+        generation !== this.accountGeneration
+      )
         throw new Error("native_workspace_closing");
     };
-    if (this.accountDrain) await this.accountDrain;
     requireCurrent();
-    const grant = await this.workspaceGrant?.(workspaceId);
-    const workspace = grant
-      ? { id: grant.workspaceId, root: grant.root, identity: grant.identity }
-      : await agentSidecarClient.findWorkspace(workspaceId);
-    requireCurrent();
-    if (!workspace) throw new Error("native_workspace_not_registered");
-    return { workspace, requireCurrent };
+    this.workspaceActivity.set(workspaceId, activity);
+    activity.captures++;
+    try {
+      if (this.accountDrain) await this.accountDrain;
+      requireCurrent();
+      const grant = await this.workspaceGrant?.(workspaceId);
+      const workspace = grant
+        ? { id: grant.workspaceId, root: grant.root, identity: grant.identity }
+        : await agentSidecarClient.findWorkspace(workspaceId);
+      requireCurrent();
+      if (workspace?.id !== workspaceId)
+        throw new Error("native_workspace_not_registered");
+      return await use(workspace, requireCurrent);
+    } finally {
+      activity.captures--;
+      if (
+        !activity.captures &&
+        !activity.forgetting &&
+        this.workspaceActivity.get(workspaceId) === activity
+      )
+        this.workspaceActivity.delete(workspaceId);
+    }
   }
 
   clearAccount(): Promise<void> {
@@ -379,13 +458,7 @@ export class NativeDesktopAgent {
   }
 
   private async workspaceLaunch(
-    {
-      id,
-      root,
-      identity,
-    }: Pick<Workspace, "id" | "root"> & {
-      identity?: WorkspaceDirectoryIdentity;
-    },
+    { id, root, identity }: SelectedWorkspace,
     provider: Awaited<
       ReturnType<NativeDesktopAgent["prepareProvider"]>
     >["provider"]

@@ -932,7 +932,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
 - [Native Desktop composition](desktop/src/main/native-desktop-agent.ts) looks
   up the selected workspace in the retained sidecar registry before launch.
   It binds the main-owned Gateway connection and scoped read profile, withdraws
-  workspace ownership on account sign-out, and drains it on app quit. The
+  workspace ownership on account sign-out, and drains it on app quit. Forget
+  fences pending admissions and drains the workspace's default and saved-profile
+  workers before the catalog removes the entry. A worker without observed exit
+  remains unavailable to replacement. The
   [development profile](desktop/src/main/native-desktop-profile.ts) requires
   separate canonical browser and agent directories under an owner-only
   temporary root. Existing legacy chat data or scratch refuses that launch.
@@ -947,8 +950,8 @@ lazy reads, read-only mutation, and symlink escape refusal.
   and external-agent commands remain scoped to the workbench route.
   Attachments and observed control revisions are issued in Main. A copied
   handle or workspace URL alone confers no access. Navigation invalidates
-  the frame's attachments and observation delivery. Forget also revokes the
-  deck binding. The
+  the frame's attachments and observation delivery. Forget withdraws matching
+  workspace and deck attachments and startup observations. The
   [preload](desktop/src/preload.ts) forwards bounded text and resync payloads
   through the [typed bridge](packages/grida-desktop-bridge/src/native-chat.ts).
   [IPC fixtures](desktop/src/main/native-chat-ipc.test.ts) exercise frame and

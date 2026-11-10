@@ -29,7 +29,9 @@ type Slot = {
   workspace: Project;
   opened: Promise<Owner>;
   visible: Promise<ActiveNativeChat>;
+  stopping: AbortController;
   owner?: Owner;
+  retirement?: Promise<void>;
 };
 
 export class NativeWorkspaceAgents {
@@ -47,8 +49,9 @@ export class NativeWorkspaceAgents {
 
   current(workspaceId: string, profileId?: string): ActiveNativeChat | null {
     if (this.stopping.signal.aborted) return null;
-    const active = this.slots.get(slotKey(workspaceId, profileId))?.owner
-      ?.active;
+    const slot = this.slots.get(slotKey(workspaceId, profileId));
+    if (!slot || slot.stopping.signal.aborted) return null;
+    const active = slot.owner?.active;
     return active?.chat.connected ? active : null;
   }
 
@@ -58,6 +61,12 @@ export class NativeWorkspaceAgents {
   ): Promise<ActiveNativeChat> {
     if (this.stopping.signal.aborted) throw closing();
     const { id } = workspace;
+    if (
+      [...this.slots.values()].some(
+        (slot) => slot.workspace.id === id && slot.stopping.signal.aborted
+      )
+    )
+      throw closing();
     const key = slotKey(id, profile?.id);
     const existing = this.slots.get(key);
     if (existing) {
@@ -76,6 +85,8 @@ export class NativeWorkspaceAgents {
       throw new Error("native_workspace_capacity_reached");
     }
 
+    const stopping = new AbortController();
+    const signal = AbortSignal.any([this.stopping.signal, stopping.signal]);
     const opened = Promise.resolve().then(async () => {
       if (existing?.owner) {
         // Exit was observed by the process owner. The store will reconcile
@@ -88,14 +99,14 @@ export class NativeWorkspaceAgents {
           existing.owner.release?.();
         }
       }
-      return await this.start(workspace, profile);
+      return await this.start(workspace, signal, profile);
     });
     const visible = opened.then((owner) => {
-      if (this.stopping.signal.aborted) throw closing();
+      if (signal.aborted) throw closing();
       slot.owner = owner;
       return owner.active;
     });
-    const slot: Slot = { workspace, opened, visible };
+    const slot: Slot = { workspace, opened, visible, stopping };
     this.slots.set(key, slot);
     void opened.catch((error: unknown) => this.retireSlot(key, slot, error));
     return visible;
@@ -103,21 +114,28 @@ export class NativeWorkspaceAgents {
 
   close(): Promise<void> {
     if (this.closed) return this.closed;
-    this.closed = Promise.resolve().then(() => this.drain());
+    this.closed = Promise.resolve().then(() => this.drain(this.slots));
     this.stopping.abort();
     return this.closed;
   }
 
+  closeWorkspace(workspaceId: string): Promise<void> {
+    return this.drain(
+      [...this.slots].filter(([, slot]) => slot.workspace.id === workspaceId)
+    );
+  }
+
   private async start(
     workspace: Project,
+    signal: AbortSignal,
     profile?: ChatProfile
   ): Promise<Owner> {
-    if (this.stopping.signal.aborted) throw closing();
+    if (signal.aborted) throw closing();
     const candidate = await (profile
-      ? profile.prepare(this.stopping.signal)
-      : this.prepare(workspace, this.stopping.signal));
+      ? profile.prepare(signal)
+      : this.prepare(workspace, signal));
     try {
-      if (this.stopping.signal.aborted) throw closing();
+      if (signal.aborted) throw closing();
       const launch = { ...candidate.launch, cwd: workspace.root };
       const { chat } = profile
         ? await this.cutover.startWorkspace(workspace.id, launch, profile.id)
@@ -142,18 +160,19 @@ export class NativeWorkspaceAgents {
     }
   }
 
-  private async drain(): Promise<void> {
+  private async drain(slots: Iterable<[string, Slot]>): Promise<void> {
     const closed = await Promise.allSettled(
-      [...this.slots].map(async ([id, slot]) => {
-        const owner = await slot.opened.catch((error: unknown) => {
-          if (
-            error instanceof NativeAgentTerminationPending &&
-            !error.hasExited
-          )
-            throw error;
-          return undefined;
-        });
-        if (!owner) return;
+      [...slots].map(([id, slot]) => this.drainSlot(id, slot))
+    );
+    if (closed.some((result) => result.status === "rejected"))
+      throw new Error("native_workspace_shutdown_unverified");
+  }
+
+  private drainSlot(id: string, slot: Slot): Promise<void> {
+    if (slot.retirement) return slot.retirement;
+    slot.stopping.abort();
+    slot.retirement = slot.opened.then(
+      async (owner) => {
         try {
           await owner.active.chat.close();
           this.retireSlot(id, slot);
@@ -163,10 +182,13 @@ export class NativeWorkspaceAgents {
         } finally {
           owner.release?.();
         }
-      })
+      },
+      (error: unknown) => {
+        if (error instanceof NativeAgentTerminationPending && !error.hasExited)
+          throw error;
+      }
     );
-    if (closed.some((result) => result.status === "rejected"))
-      throw new Error("native_workspace_shutdown_unverified");
+    return slot.retirement;
   }
 
   private retireSlot(id: string, slot: Slot, error?: unknown): void {

@@ -216,6 +216,7 @@ export type ConfigurationReview =
 type Startup = {
   frame: WebFrameMain;
   href: string;
+  workspaceId: string;
   result: Promise<NativeChatReadiness>;
   release(): void;
 };
@@ -248,7 +249,7 @@ type DeckFrame = {
 export class NativeChatIpc {
   private readonly owners = new Map<WebContents, Owner>();
   private readonly deckFrames = new Map<WebContents, DeckFrame>();
-  private readonly startups = new WeakMap<WebContents, Startup>();
+  private readonly startups = new Map<WebContents, Startup>();
   private readonly deleting = new WeakSet<NativeChatSession>();
   private readonly savingArtifact = new WeakSet<WebContents>();
   private readonly selectedProfiles = new WeakMap<
@@ -332,9 +333,15 @@ export class NativeChatIpc {
     return result;
   }
 
-  revokeDeck(workspaceId: string): void {
+  revokeWorkspace(workspaceId: string): void {
     for (const binding of this.deckFrames.values()) {
       if (binding.workspaceId === workspaceId) binding.release();
+    }
+    for (const owner of this.owners.values()) {
+      if (owner.active.workspaceId === workspaceId) owner.release();
+    }
+    for (const startup of this.startups.values()) {
+      if (startup.workspaceId === workspaceId) startup.release();
     }
   }
 
@@ -414,6 +421,7 @@ export class NativeChatIpc {
     const pending: Startup = {
       frame,
       href,
+      workspaceId,
       release,
       result: Promise.resolve()
         .then(async () => {

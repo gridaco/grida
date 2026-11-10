@@ -137,6 +137,115 @@ it("keeps a live native worker bound to its selected directory generation", asyn
   }
 });
 
+it("drains a forgotten workspace's default and saved workers without touching other workspaces", async () => {
+  const { launch, workspace, owners } = fixture();
+  const ordinary = child(1);
+  const saved = child(1, { closeOnEof: true });
+  const otherChild = child(1, { closeOnEof: true });
+  const replacement = child(1, { closeOnEof: true });
+  spawn
+    .mockReturnValueOnce(ordinary.handle)
+    .mockReturnValueOnce(saved.handle)
+    .mockReturnValueOnce(otherChild.handle)
+    .mockReturnValueOnce(replacement.handle);
+  const other = { ...workspace, id: "other" };
+  const profile = { id: "saved", prepare: async () => ({ launch }) };
+  try {
+    const original = await owners.open(workspace);
+    await owners.open(workspace, profile);
+    const retained = await owners.open(other);
+    const forgotten = owners.closeWorkspace(workspace.id);
+    expect(owners.current(workspace.id)).toBeNull();
+    expect(owners.current(workspace.id, profile.id)).toBeNull();
+    expect(owners.current(other.id)).toBe(retained);
+    await ordinary.eof;
+    await saved.eof;
+    await expect(owners.open(workspace)).rejects.toThrow(
+      "native_workspace_closing"
+    );
+    expect(spawn).toHaveBeenCalledTimes(3);
+    ordinary.close();
+    await forgotten;
+    const reopened = await owners.open(workspace);
+    expect(reopened).not.toBe(original);
+    expect(owners.current(workspace.id)).toBe(reopened);
+    expect(owners.current(other.id)).toBe(retained);
+  } finally {
+    ordinary.close();
+    await owners.close();
+  }
+});
+
+it("invalidates a captured launch before it can spawn after Forget", async () => {
+  const { launch, workspace, owners, release } = fixture();
+  const preparing = Promise.withResolvers<AbortSignal>();
+  const prepared = Promise.withResolvers<{
+    launch: typeof launch;
+    release: typeof release;
+  }>();
+  const opening = owners
+    .open(workspace, {
+      id: "saved",
+      prepare: (signal) => {
+        preparing.resolve(signal);
+        return prepared.promise;
+      },
+    })
+    .catch((error: unknown) => error);
+  const signal = await preparing.promise;
+  const forgotten = owners.closeWorkspace(workspace.id);
+  expect(signal.aborted).toBe(true);
+  prepared.resolve({ launch, release });
+  expect(await opening).toMatchObject({ message: "native_workspace_closing" });
+  await forgotten;
+  expect(release).toHaveBeenCalledOnce();
+  expect(spawn).not.toHaveBeenCalled();
+  await owners.close();
+});
+
+it("keeps a forgotten worker quarantined until its exact exit is observed", async () => {
+  const { launch, workspace, owners } = fixture();
+  const running = child(1);
+  const replacement = child(1, { closeOnEof: true });
+  spawn
+    .mockReturnValueOnce(running.handle)
+    .mockReturnValueOnce(replacement.handle);
+  try {
+    await owners.open(workspace);
+    const forgotten = owners
+      .closeWorkspace(workspace.id)
+      .catch((error: unknown) => error);
+    await running.eof;
+    await vi.advanceTimersByTimeAsync(14_000);
+    expect(await forgotten).toMatchObject({
+      message: "native_workspace_shutdown_unverified",
+    });
+    expect(owners.current(workspace.id)).toBeNull();
+    await expect(owners.open(workspace)).rejects.toThrow(
+      "native_workspace_closing"
+    );
+    await expect(
+      owners.open(workspace, {
+        id: "another-profile",
+        prepare: async () => ({ launch }),
+      })
+    ).rejects.toThrow("native_workspace_closing");
+    expect(spawn).toHaveBeenCalledTimes(1);
+    running.close("SIGKILL");
+    await vi.waitFor(
+      async () =>
+        await expect(
+          owners.closeWorkspace(workspace.id)
+        ).resolves.toBeUndefined()
+    );
+    await owners.open(workspace);
+    expect(spawn).toHaveBeenCalledTimes(2);
+  } finally {
+    running.close();
+    await owners.close();
+  }
+});
+
 it("quarantines a failed launch until its exact child and pipes close", async () => {
   const { workspace, owners, release } = fixture();
   const stale = child(2);

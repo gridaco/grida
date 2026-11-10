@@ -28,6 +28,10 @@ const sidecar = vi.hoisted(() => ({
     vi.fn<
       typeof import("./agent-sidecar-client").agentSidecarClient.findWorkspace
     >(),
+  forgetWorkspace:
+    vi.fn<
+      typeof import("./agent-sidecar-client").agentSidecarClient.forgetWorkspace
+    >(),
   listProviderEndpoints:
     vi.fn<
       typeof import("./agent-sidecar-client").agentSidecarClient.listProviderEndpoints
@@ -562,6 +566,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       });
       const workspace = await workspaces.openSelected(root);
       sidecar.findWorkspace.mockImplementation((id) => workspaces.find(id));
+      sidecar.forgetWorkspace.mockImplementation((id) => workspaces.forget(id));
       const launch = async () => {
         const { NativeDesktopAgent } = await import("./native-desktop-agent");
         return NativeDesktopAgent.prepareFresh(
@@ -678,6 +683,57 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       ).rejects.toThrow("native_provider_byok_key_missing");
       expect(reopened.current(workspace.id)).toBeNull();
       expect(reopened.current(workspace.id, vercel.profileId)).toBeNull();
+      expect(requested).toHaveLength(3);
+
+      await reopened.ensure(workspace.id);
+      const defaultChat = reopened.current(workspace.id)!.chat;
+      const captured = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      sidecar.findWorkspace.mockImplementationOnce(async (id) => {
+        const old = await workspaces.find(id);
+        captured.resolve();
+        await release.promise;
+        return old;
+      });
+      const stale = reopened
+        .ensure(workspace.id)
+        .catch((error: unknown) => error);
+      await captured.promise;
+      try {
+        const forgotten = reopened.forgetWorkspace(workspace.id);
+        expect(reopened.current(workspace.id)).toBeNull();
+        expect(reopened.current(workspace.id, openrouter.profileId)).toBeNull();
+        await forgotten;
+        await expect(defaultChat.create()).rejects.toThrow(
+          "native_chat_closed"
+        );
+        await expect(restored.create()).rejects.toThrow("native_chat_closed");
+        expect(await workspaces.find(workspace.id)).toBeNull();
+        await expect(reopened.ensure(workspace.id)).rejects.toThrow(
+          "native_workspace_not_registered"
+        );
+        const registered = await workspaces.openSelected(root);
+        expect(registered.id).toBe(workspace.id);
+      } finally {
+        release.resolve();
+      }
+      expect(await stale).toMatchObject({
+        message: "native_workspace_closing",
+      });
+      expect(reopened.current(workspace.id)).toBeNull();
+      await reopened.selectProfile(
+        workspace.id,
+        { kind: "saved", id: openrouter.profileId },
+        () => {}
+      );
+      const reopenedProfile = reopened.current(
+        workspace.id,
+        openrouter.profileId
+      )!.chat;
+      expect(reopenedProfile).not.toBe(restored);
+      expect((await reopenedProfile.list()).sessionIds).toEqual([
+        openrouter.sessionId,
+      ]);
       expect(requested).toHaveLength(3);
     } finally {
       await agent?.close();

@@ -801,6 +801,8 @@ app.on("ready", async () => {
       resolve_native_chat: (_window, workspaceId, profileId) =>
         native.current(workspaceId, profileId),
       ensure_native_chat: (workspaceId) => native.ensure(workspaceId),
+      forget_native_workspace: (workspaceId) =>
+        native.forgetWorkspace(workspaceId),
       resolve_native_deck: workspaceCatalog?.rootDeck.bind(workspaceCatalog),
       native_chat_profiles: native.selectableProfiles
         ? {
