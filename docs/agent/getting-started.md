@@ -14,9 +14,10 @@ want the agent to use, or select the relevant material in an attached
 editor. Use **Plan** to investigate and **Act** to carry out changes with
 the tools and access available to the chat. [Understand agent permissions](./permissions.md)
 
-On a Desktop build with native deck chat, open the `.canvas` bundle itself to
-start or reopen a chat for that deck. The chat uses the bundle's registered
-workspace. Ask about its files by name while you work in the slide editor.
+On a Desktop build with native deck chat, open a `.canvas` bundle in its file
+window to start or reopen its chat. Ask about files inside the bundle by name
+while you work in the slide editor. A bundle opened from inside a project has
+its own saved chats and access to files within that bundle.
 
 ## Attach an image
 

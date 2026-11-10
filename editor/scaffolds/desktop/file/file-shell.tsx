@@ -11,8 +11,8 @@
  *   - **the editor** — the SVG canvas vs the slides deck.
  * The chrome (title bar + chat-left AI sidebar) is shared.
  *
- * A root deck can use its registered workspace's native chat. A standalone
- * SVG can use its own saved chats and share the selected text with the agent.
+ * A deck can use native chat scoped to the bundle. A standalone SVG can use
+ * its own saved chats and share the selected text with the agent.
  */
 
 "use client";
@@ -67,6 +67,18 @@ export function DesktopFileShell({
       ? "deck"
       : "empty";
   const bridge = useDesktopBridge();
+  const nativeChat = useMemo(() => {
+    const chat = bridge?.nativeChat;
+    if (!chat || mode !== "deck" || !basePath) return chat;
+    return {
+      ...chat,
+      profiles: undefined,
+      selectProfile: undefined,
+      contextLimit: undefined,
+      saveContextLimit: undefined,
+      submitWithConfigurationReview: undefined,
+    };
+  }, [bridge, mode, basePath]);
 
   const { fs, setActiveEditor: bindLegacyEditor } = useActiveEditorAgentFs();
   const documentSurface = useMemo(
@@ -128,10 +140,14 @@ export function DesktopFileShell({
     ) : (
       <AISidebarChat fs={fs} surfaceHost={surfaceHost} />
     );
-  const nativeChat = bridge?.nativeChat;
-  // See test/desktop-agent-chat-standalone-svg.md.
+  // See test/desktop-agent-chat-standalone-svg.md and
+  // test/desktop-agent-chat-nested-deck.md.
   const fileChatAvailable =
-    mode === "doc" ? nativeChat?.document : !basePath && nativeChat?.deck;
+    mode === "doc"
+      ? nativeChat?.document
+      : basePath
+        ? nativeChat?.nestedDeck
+        : nativeChat?.deck;
   return (
     <div className="flex h-svh w-full flex-col bg-background">
       <TitleBar>
@@ -149,7 +165,9 @@ export function DesktopFileShell({
             {nativeChat && fileChatAvailable ? (
               <NativeAgentPaneGate
                 bridge={nativeChat}
-                selectionKey={mode === "deck" ? workspaceId : undefined}
+                selectionKey={
+                  mode === "deck" && !basePath ? workspaceId : undefined
+                }
                 initialSession={null}
                 editorSurfaces={documentSurface}
                 legacy={legacyChat}

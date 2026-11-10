@@ -40,6 +40,7 @@ import type {
   NativeEditorSvgText,
   NativeSubagentClient,
 } from "@grida/desktop-bridge";
+import { isSupportedImageType } from "./image-attachment";
 import { NativeSideChatController } from "./native-side-chat-controller";
 import { NativeSubagentController } from "./native-subagent-controller";
 
@@ -59,6 +60,10 @@ const MAX_LIVE_BYTES = 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 256 * 1024;
 
 type AttachmentKind = "png" | "file";
+type BrowserAttachment = Pick<File, "name" | "size" | "arrayBuffer">;
+type TransferredAttachment =
+  | { kind: "file"; file: BrowserAttachment & Pick<File, "type"> }
+  | { kind: "directory" };
 type SelectedAttachment = Readonly<{
   kind: AttachmentKind;
   name: string;
@@ -109,6 +114,7 @@ export type NativeChatView = Readonly<{
   imageInput: boolean;
   fileInput: boolean;
   attachmentReading: boolean;
+  attachmentNotice: string | null;
   attachmentDraft: Readonly<{
     kind: AttachmentKind;
     name: string;
@@ -236,6 +242,7 @@ const EMPTY: NativeChatView = Object.freeze({
   imageInput: false,
   fileInput: false,
   attachmentReading: false,
+  attachmentNotice: null,
   attachmentDraft: null,
   wakeupsAvailable: false,
   allowWakeup: false,
@@ -525,6 +532,7 @@ export class NativeChatController {
       imageInput: false,
       fileInput: false,
       attachmentReading: false,
+      attachmentNotice: null,
       attachmentDraft: null,
       wakeupsAvailable: false,
       allowWakeup: false,
@@ -621,17 +629,59 @@ export class NativeChatController {
     return kind === "png" ? this.view.imageInput : this.view.fileInput;
   }
 
+  async pickTransferredAttachment(
+    scopeId: number,
+    resources: readonly TransferredAttachment[]
+  ): Promise<void> {
+    if (this.scope?.id !== scopeId || resources.length === 0) return;
+    if (resources.length !== 1) {
+      this.update({ attachmentNotice: "Attach one file at a time." });
+      return;
+    }
+    const resource = resources[0];
+    if (resource.kind === "directory") {
+      this.update({ attachmentNotice: "Choose a file instead of a folder." });
+      return;
+    }
+    const { file } = resource;
+    const png =
+      file.type === "image/png" || (!file.type && /\.png$/i.test(file.name));
+    if (!png && isSupportedImageType(file.type)) {
+      this.update({
+        attachmentNotice: "Use a PNG to send an image to this chat.",
+      });
+      return;
+    }
+    const kind = png ? "png" : "file";
+    if (!this.canAttach(kind)) {
+      this.update({
+        attachmentNotice:
+          this.view.loading || this.acceptsAttachment(kind)
+            ? "Wait until the chat is ready to attach a file."
+            : kind === "png"
+              ? "This connection cannot use a PNG attachment."
+              : "This chat cannot inspect a file attachment.",
+      });
+      return;
+    }
+    await this.pickAttachment(scopeId, kind, file);
+  }
+
   async pickAttachment(
     scopeId: number,
     kind: AttachmentKind,
-    file: Pick<File, "name" | "size" | "arrayBuffer">
+    file: BrowserAttachment
   ): Promise<void> {
     const scope = this.scope;
     if (!scope || scope.id !== scopeId || !this.canAttach(kind)) return;
     const read = {};
     scope.attachmentRead = read;
     const draft = { kind, name: file.name.slice(0, 256), size: file.size };
-    this.update({ attachmentReading: true, error: null });
+    this.update({
+      attachmentReading: true,
+      attachmentNotice: null,
+      error: null,
+    });
     const ownsRead = () => this.owns(scope) && scope.attachmentRead === read;
     try {
       if (
@@ -691,6 +741,7 @@ export class NativeChatController {
     this.update({
       attachmentDraft: null,
       attachmentReading: false,
+      attachmentNotice: null,
       error: null,
     });
   }
@@ -1566,7 +1617,7 @@ export class NativeChatController {
           scope.selectedAttachment === pending.attachment
         ) {
           scope.selectedAttachment = undefined;
-          this.update({ attachmentDraft: null });
+          this.update({ attachmentDraft: null, attachmentNotice: null });
         }
         scope.awaitingTurn = accepted.turnId ?? undefined;
         scope.replay = true;

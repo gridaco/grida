@@ -142,12 +142,14 @@ export type AgentComposerInputProps = {
    */
   operableFiles?: boolean;
   /**
-   * Whether this surface accepts attachments and shows the "+" attach menu.
+   * Whether this surface uses the built-in attachments and "+" menu.
    * Default `true`. A start surface whose submit ignores attachments (the
    * welcome screen, which uses a separate reference tray) passes `false`, so
    * paste/drop cannot stage content that would be silently discarded.
    */
   attach?: boolean;
+  /** Send dropped or pasted items to the surface's own attachment intake. */
+  onAttachmentTransfer?: (event: ComposerTransfer.Event) => void;
   /**
    * Ordered attachment/reference preferences. Feasibility still comes from the
    * active model, scratch binding, and trusted host adapters. Defaults to the
@@ -217,6 +219,7 @@ function AgentComposerInner({
   providerUrlFileMimes = NO_PROVIDER_FILE_MIMES,
   operableFiles = true,
   attach = true,
+  onAttachmentTransfer,
   resourcePolicy = InputResourcePolicy.CURRENT,
   scratchReservation = ScratchSeedBudget.NONE,
   allowEmptySubmit = false,
@@ -676,7 +679,7 @@ function AgentComposerInner({
       <ComposerContent
         autofocus={autofocus}
         onSubmitRequest={submit}
-        onTransfer={attach ? onTransfer : undefined}
+        onTransfer={onAttachmentTransfer ?? (attach ? onTransfer : undefined)}
         placeholder={placeholder}
         className="px-3 pt-2"
         editorClassName="min-h-9 max-h-48 overflow-y-auto text-sm"

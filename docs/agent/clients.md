@@ -530,9 +530,9 @@ withdraw it and review a new send.
 
 ## Attach a PNG to a message
 
-When the native Desktop chat advertises image input, choose **Add PNG**,
-select one PNG up to 256 KiB, and write a message before sending. The text
-and image enter the chat together, including when the message joins the
+When the native Desktop chat advertises image input, choose **Add PNG** or
+drop or paste one PNG up to 256 KiB into the composer. Write a message before
+sending. The text and image enter the chat together, including when the message joins the
 queue. A replacement uses the selected file even when its name matches. If
 the file cannot be read or the connection cannot use PNG input, Grida keeps
 your draft and blocks the send. Replace or remove the PNG, or use a compatible
@@ -553,15 +553,16 @@ text input. The provider receives the retained PNG when the conversation uses it
 
 ## Attach a file for inspection
 
-In a native workspace chat, choose **Attach file**, select one file up to
-256 KiB, and send a message with it. The agent can verify the file’s size and
-digest and request a short text excerpt. Binary files provide integrity
-metadata. The chat keeps a private copy. The provider receives the display
-name and any requested excerpt.
+In a native workspace chat, choose **Attach file** or drop or paste one file
+up to 256 KiB into the composer. Send a message with it. The agent can verify
+the file’s size and digest and request a short text excerpt. Binary files
+provide integrity metadata. The chat keeps a private copy. The provider
+receives the display name and any requested excerpt.
 
-A queued message keeps the same file. To change the attachment after queuing,
-remove the queued message and send a new one. Use **Add PNG** for image
-understanding and cropping on compatible connections.
+Dropping a folder or several files shows a message and keeps the current
+attachment and draft. A queued message keeps the same file. To change the
+attachment after queuing, remove the queued message and send a new one. Use
+**Add PNG** for image understanding and cropping on compatible connections.
 
 ## Inspect a local file headlessly
 

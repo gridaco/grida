@@ -1010,6 +1010,11 @@ export function NativeAgentPane({
                   : "This chat cannot inspect the attached file. Remove it to send the message by itself.")}
             </p>
           )}
+        {state.attachmentNotice && (
+          <p role="status" className="text-muted-foreground px-1 pb-1 text-xs">
+            {state.attachmentNotice}
+          </p>
+        )}
         {(state.commandRunning || state.commandNotice) && (
           <div className="flex items-center gap-2 px-1 pb-1 text-xs">
             <span role="status">
@@ -1044,6 +1049,9 @@ export function NativeAgentPane({
             })
           )}
           attach={false}
+          onAttachmentTransfer={({ resources }) =>
+            void controller.pickTransferredAttachment(state.scope, resources)
+          }
           operableFiles={false}
           awaitSubmission
           canSubmit={controller.canSubmit}

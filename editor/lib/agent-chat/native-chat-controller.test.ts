@@ -1759,11 +1759,17 @@ it("keeps an attached file and its input identity through an unconfirmed queued 
   const scope = controller.read().scope;
   const bytes = new Uint8Array([1, 3, 7]).buffer;
   const pick = () =>
-    controller.pickAttachment(scope, "file", {
-      name: "record.bin",
-      size: bytes.byteLength,
-      arrayBuffer: async () => bytes.slice(0),
-    });
+    controller.pickTransferredAttachment(scope, [
+      {
+        kind: "file",
+        file: {
+          name: "record.bin",
+          type: "application/octet-stream",
+          size: bytes.byteLength,
+          arrayBuffer: async () => bytes.slice(0),
+        },
+      },
+    ]);
   await pick();
   sendFile.mockRejectedValueOnce(new Error("lost selected-file reply"));
   await expect(controller.submit("Inspect this file.")).rejects.toThrow(
@@ -1793,6 +1799,68 @@ it("keeps an attached file and its input identity through an unconfirmed queued 
     },
   ]);
   expect(sendText).not.toHaveBeenCalled();
+  expect(controller.read().attachmentDraft).toBeNull();
+  controller.disconnect();
+});
+
+it("keeps one selected file when a transfer is rejected and replaces it with a PNG explicitly", async () => {
+  const { bridge, controller } = fixture();
+  bridge.acceptsFile = async () => true;
+  bridge.acceptsPng = async () => true;
+  const sendFile = vi.fn<NonNullable<DesktopNativeChat["submitFile"]>>(
+    (sessionId, input) => bridge.submit(sessionId, input.inputId, input.text)
+  );
+  const sendImage = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>(
+    (sessionId, input) => bridge.submit(sessionId, input.inputId, input.text)
+  );
+  bridge.submitFile = sendFile;
+  bridge.submitImage = sendImage;
+  await controller.select("chat-a");
+  const scope = controller.read().scope;
+  const file = (name: string, type: string) => ({
+    kind: "file" as const,
+    file: {
+      name,
+      type,
+      size: 8,
+      arrayBuffer: vi.fn<() => Promise<ArrayBuffer>>(
+        async () => new Uint8Array(8).buffer
+      ),
+    },
+  });
+  const svg = file("drawing.svg", "image/svg+xml");
+  const jpeg = file("reference.jpg", "image/jpeg");
+  await controller.pickTransferredAttachment(scope, [svg]);
+  expect(controller.read().attachmentDraft).toMatchObject({
+    kind: "file",
+    name: "drawing.svg",
+  });
+  await controller.pickTransferredAttachment(scope, [svg, jpeg]);
+  expect(controller.read().attachmentNotice).toBe("Attach one file at a time.");
+  await controller.pickTransferredAttachment(scope, [{ kind: "directory" }]);
+  expect(controller.read().attachmentNotice).toBe(
+    "Choose a file instead of a folder."
+  );
+  await controller.pickTransferredAttachment(scope, [jpeg]);
+  expect(controller.read()).toMatchObject({
+    attachmentNotice: "Use a PNG to send an image to this chat.",
+    attachmentDraft: { kind: "file", name: "drawing.svg" },
+  });
+  expect(jpeg.file.arrayBuffer).not.toHaveBeenCalled();
+  expect(svg.file.arrayBuffer).toHaveBeenCalledTimes(1);
+
+  const png = file("Clipboard image", "image/png");
+  await controller.pickTransferredAttachment(scope, [png]);
+  expect(controller.read()).toMatchObject({
+    attachmentNotice: null,
+    attachmentDraft: { kind: "png", name: "Clipboard image" },
+  });
+  await controller.submit("Describe the selected image.");
+  expect(sendImage.mock.calls[0]?.[1]).toMatchObject({
+    text: "Describe the selected image.",
+    png: await png.file.arrayBuffer.mock.results[0].value,
+  });
+  expect(sendFile).not.toHaveBeenCalled();
   expect(controller.read().attachmentDraft).toBeNull();
   controller.disconnect();
 });
