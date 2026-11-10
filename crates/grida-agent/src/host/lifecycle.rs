@@ -261,11 +261,11 @@ impl Host {
             } => {
                 validate_prompt_parts(&parts)?;
                 let original = self.store.input(session.clone(), input.clone()).await?;
-                let original_settings = original
+                let original = original
                     .as_ref()
                     .filter(|input| input.disposition == InputDisposition::Queued)
-                    .map(|input| InputSettings::for_input(&input.input))
-                    .transpose()?;
+                    .map(|input| &input.input);
+                let original_settings = original.map(InputSettings::for_input).transpose()?;
                 if original_settings
                     .as_ref()
                     .is_some_and(|settings| settings.goal_start.is_some())
@@ -291,6 +291,14 @@ impl Host {
                         original_settings
                             .map_or(self.operating_regime, |settings| settings.operating_regime)
                     };
+                    let capture = original
+                        .filter(|input| input.payload.version() == 2)
+                        .map(decode_input::<StoredPrompt>)
+                        .transpose()?
+                        .and_then(|stored| stored.mcp_capture);
+                    if let Some(capture) = &capture {
+                        self.retained_mcp(capture)?;
+                    }
                     self.capture_input(
                         &view,
                         replacement,
@@ -299,6 +307,7 @@ impl Host {
                             questions,
                             configuration_permission,
                             allow_wakeups: false,
+                            allow_mcp: capture.is_some(),
                             operating_regime,
                         },
                     )

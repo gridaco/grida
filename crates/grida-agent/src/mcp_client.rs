@@ -102,14 +102,23 @@ impl McpClient {
 
     /// Issues an ordinary tool-host grant for one selected remote tool name.
     pub fn grant(&self, name: &str) -> Result<CapabilityGrant> {
-        if self.endpoint.closed.is_cancelled() {
-            return Err(endpoint_closed());
-        }
+        self.ensure_open()?;
         self.host.grant(
             self.selected
                 .get(name)
                 .ok_or_else(|| Error::new(ErrorKind::Unavailable, "mcp_tool_not_selected"))?,
         )
+    }
+
+    pub(crate) fn selected_grants(&self) -> Result<Vec<CapabilityGrant>> {
+        self.selected.keys().map(|name| self.grant(name)).collect()
+    }
+
+    pub(crate) fn ensure_open(&self) -> Result<()> {
+        if self.endpoint.closed.is_cancelled() {
+            return Err(endpoint_closed());
+        }
+        Ok(())
     }
 
     pub fn close(&self) {

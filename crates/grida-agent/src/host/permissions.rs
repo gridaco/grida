@@ -31,6 +31,7 @@ pub(super) struct ToolAuthority {
     image: Option<Arc<image_tools::TurnImage>>,
     wakeups: Option<Arc<wakeups::WakeupAccess>>,
     completion: Option<Arc<completion_checks::CompletionAccess>>,
+    mcp: Option<Arc<mcp_tools::TurnTools>>,
 }
 
 impl ToolAuthority {
@@ -40,8 +41,14 @@ impl ToolAuthority {
         image: Option<Arc<image_tools::TurnImage>>,
         wakeups: Option<Arc<wakeups::WakeupAccess>>,
         completion: Option<Arc<completion_checks::CompletionAccess>>,
+        mcp: Option<Arc<mcp_tools::TurnTools>>,
     ) -> Option<Arc<Self>> {
-        if permissions.is_none() && image.is_none() && wakeups.is_none() && completion.is_none() {
+        if permissions.is_none()
+            && image.is_none()
+            && wakeups.is_none()
+            && completion.is_none()
+            && mcp.is_none()
+        {
             return None;
         }
         Some(Arc::new(Self {
@@ -50,6 +57,7 @@ impl ToolAuthority {
             image,
             wakeups,
             completion,
+            mcp,
         }))
     }
 }
@@ -83,6 +91,13 @@ impl AuthorityValidator for ToolAuthority {
             .filter(|scope| scope.handles(&request.selection))
         {
             return permissions.validate(request);
+        }
+        if let Some(mcp) = self
+            .mcp
+            .as_ref()
+            .filter(|scope| scope.handles(&request.selection))
+        {
+            return mcp.validate(request);
         }
         self.base.validate(request)
     }
@@ -121,6 +136,13 @@ impl ToolGate for ToolAuthority {
             .filter(|scope| scope.handles(&admission.grants))
         {
             return permissions.decide(admission, context);
+        }
+        if let Some(mcp) = self
+            .mcp
+            .as_ref()
+            .filter(|scope| scope.handles(&admission.grants))
+        {
+            return mcp.decide(admission, context);
         }
         self.base.decide(admission, context)
     }

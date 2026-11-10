@@ -1004,8 +1004,15 @@ lazy reads, read-only mutation, and symlink escape refusal.
   responses. The caller owns trust in the local peer and grants the
   captured lease before model use. Server annotations cannot grant access
   or authorize replay. Loss of a correlated result leaves the call
-  uncertain. The [fixtures](crates/grida-agent/tests/mcp_client.rs) exercise
-  the native server and an independent peer.
+  uncertain. The [native launch](crates/grida-agent/src/main.rs) selects the
+  peer and a separate environment credential before admitting work.
+  [Turn authority](crates/grida-agent/src/host/mcp_tools.rs) binds the
+  selected definitions to the accepted lease and excludes Plan. A
+  replacement connection cannot resume retained tool authority. Shutdown
+  closes the lease before draining owned turns. The
+  [transport fixtures](crates/grida-agent/tests/mcp_client.rs) and
+  [launch fixtures](crates/grida-agent/tests/process/outbound_mcp.rs)
+  exercise the native server and an independent peer.
 
 - Portable Rust provider contracts: [crates/grida-ai/src/catalogue.rs](crates/grida-ai/src/catalogue.rs),
   [crates/grida-ai/src/discovery.rs](crates/grida-ai/src/discovery.rs),

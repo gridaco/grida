@@ -359,21 +359,35 @@ continuation. Closing the host releases its timers while preserving their
 recorded due times and delivery state. A private client explicitly recovers the
 selected wake-up after restart. Inspecting or loading a chat leaves it idle.
 
-## Embed an outbound MCP client
+## Use a trusted local MCP tool
 
-The library can capture MCP tools from an explicitly trusted local server
-through `mcp_client::McpClient::connect`. Supply the exact numeric loopback
-HTTP endpoint, a bearer credential, and a stable source name with the
-allowlisted tools for that source. The client uses the stateless
-2026-07-28 Streamable HTTP profile and accepts bounded JSON and SSE replies.
-This is an embedded host API. The built-in run and ACP launch paths do not
-load outbound MCP configuration.
+Add the four MCP flags to a configured `run` or unsupervised `serve --stdio`
+launch. Supply the peer's exact numeric loopback HTTP endpoint and a separate
+environment variable for its bearer credential. Use a lowercase alphanumeric
+source ID. Repeat `--mcp-tool` for each exact tool name you want to authorize.
+The model sees the selected names with an `mcp_<source>_` prefix.
 
-Use the returned grants as ordinary tools and retain the client while their
-lease is in use. A new connection requires fresh host authorization. The
-client captures the schema descriptor and checks for bounded object input.
-The server owns semantic validation and the effects of its tools. The
-embedded profile excludes tools requiring parameter headers, remote schema
-references, and server-initiated input. It projects text and structured
-output and leaves resource links unopened. An interrupted effect is
-uncertain and is never retried by the client.
+```sh
+target/debug/grida-agent run --state-dir "$GRIDA_AGENT_STATE" --cwd "$PWD" \
+  --endpoint "$GRIDA_AGENT_ENDPOINT" --model "$GRIDA_AGENT_MODEL" \
+  --credential-env OPENAI_API_KEY \
+  --mcp-endpoint http://127.0.0.1:8766/mcp --mcp-source grida \
+  --mcp-token-env GRIDA_MCP_SERVER_TOKEN --mcp-tool surface_open
+```
+
+Choose a peer you trust with the tool arguments and any effects it can cause.
+Act prompts can use the explicitly selected tools. Plan, side chats, and
+goals omit them. A launch in Plan mode skips MCP discovery. A suspended input
+can continue with its original lease while the host still owns it. Restart
+the host after a connection loss to capture a new lease. Stop retained work
+or withdraw queued input before submitting a fresh request. A queue edit
+cannot change its MCP lease. An interrupted effect is uncertain. The client
+never retries it.
+
+The profile supports stateless 2026-07-28 Streamable HTTP with bounded JSON
+and SSE replies. The server validates the schema and owns tool effects.
+The client checks for bounded object input and captures the schema descriptor.
+It excludes tools requiring parameter headers, external schema references,
+and server-initiated input. It projects text and structured output and
+leaves resource links unopened. Embedded callers can compose the same adapter
+with `mcp_client::McpClient::connect` and `Host::with_mcp_client`.

@@ -65,6 +65,7 @@ impl Host {
             gg_connection: None,
             configuration: self.configuration.clone(),
             permissions: None,
+            mcp_tools: None,
             operating_regime: OperatingRegime::Act,
             require_completion_text: false,
             side_context: Some(context.clone()),

@@ -1,6 +1,7 @@
 use agent_kit_core::{Error, ErrorKind, ModelId, Result, SessionId};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
 use grida_agent::host::{GgOptions, Host};
+use grida_agent::mcp_client::McpClient;
 use grida_agent::process::{self, RunOptions};
 use grida_agent::{
     CompatibleOutputLimitField, OperatingRegime, ProviderOptions, ProviderProtocol, acp, mcp,
@@ -10,6 +11,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
+use zeroize::Zeroizing;
 
 const DEFAULT_RUN_TIMEOUT_MS: u64 = 120_000;
 const MAX_RUN_TIMEOUT_MS: u64 = 600_000;
@@ -96,6 +98,7 @@ fn command() -> Command {
                     Arg::new("supervised-provider")
                         .long("supervised-provider")
                         .requires("stdio")
+                        .conflicts_with("mcp-endpoint")
                         .action(ArgAction::SetTrue),
                 )
                 .arg(
@@ -128,7 +131,8 @@ fn command() -> Command {
                     Arg::new("listen")
                         .long("listen")
                         .value_name("LOOPBACK_WS_URL")
-                        .requires("server-token-env"),
+                        .requires("server-token-env")
+                        .conflicts_with("mcp-endpoint"),
                 )
                 .arg(
                     Arg::new("server-token-env")
@@ -199,6 +203,35 @@ fn launch(command: Command) -> Command {
                 .value_name("PRIVATE_JSON")
                 .value_parser(value_parser!(PathBuf))
                 .help("Trusted launch profile for explicitly selected workspace roots"),
+        )
+        .arg(
+            Arg::new("mcp-endpoint")
+                .long("mcp-endpoint")
+                .value_name("LOOPBACK_MCP_URL")
+                .requires_all(["mcp-token-env", "mcp-source", "mcp-tool"])
+                .help("Opt into a trusted numeric-loopback MCP peer for Act prompts"),
+        )
+        .arg(
+            Arg::new("mcp-token-env")
+                .long("mcp-token-env")
+                .value_name("ENVIRONMENT_VARIABLE")
+                .requires("mcp-endpoint")
+                .help("Read the outbound MCP bearer from the host environment"),
+        )
+        .arg(
+            Arg::new("mcp-source")
+                .long("mcp-source")
+                .value_name("ID")
+                .requires("mcp-endpoint")
+                .help("Set the trusted MCP source namespace"),
+        )
+        .arg(
+            Arg::new("mcp-tool")
+                .long("mcp-tool")
+                .value_name("NAME")
+                .requires("mcp-endpoint")
+                .action(ArgAction::Append)
+                .help("Allow one exact MCP tool name. Repeat for additional tools."),
         )
         .arg(
             Arg::new("provider")
@@ -347,6 +380,15 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     } else {
         None
     };
+    let regime = if args
+        .get_one::<String>("mode")
+        .is_some_and(|mode| mode == "plan")
+    {
+        OperatingRegime::Plan
+    } else {
+        OperatingRegime::Act
+    };
+    let mcp_client = outbound_mcp(args, regime, provider.credential_env.as_deref()).await?;
     let host = match (&supervisor, gateway_scope, chatgpt_scope) {
         (Some(supervisor), _, Some(scope)) => {
             if provider.protocol != ProviderProtocol::Responses {
@@ -383,15 +425,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         }
         (None, _, _) => Host::open(state_dir, Some(provider))?,
     };
-    let regime = if args
-        .get_one::<String>("mode")
-        .is_some_and(|mode| mode == "plan")
-    {
-        OperatingRegime::Plan
-    } else {
-        OperatingRegime::Act
-    };
     let host = host.with_operating_regime(regime);
+    let host = match mcp_client {
+        Some(client) => host.with_mcp_client(client)?,
+        None => host,
+    };
     let host = match permissions {
         Some(profile) => host.with_permission_profile(profile),
         None => host,
@@ -436,6 +474,54 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         process::shutdown_signal(),
     )
     .await
+}
+
+// GRIDA-SEC-004 — only the trusted launch can choose a peer or credential source.
+async fn outbound_mcp(
+    args: &ArgMatches,
+    regime: OperatingRegime,
+    provider_env: Option<&str>,
+) -> Result<Option<McpClient>> {
+    let Some(endpoint) = args
+        .get_one::<String>("mcp-endpoint")
+        .filter(|_| regime.is_act())
+    else {
+        return Ok(None);
+    };
+    let token_env = args
+        .get_one::<String>("mcp-token-env")
+        .expect("required by the outbound MCP endpoint");
+    if token_env.is_empty()
+        || token_env.len() > 128
+        || !token_env
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+    {
+        return Err(problem(
+            ErrorKind::InvalidInput,
+            "invalid_mcp_token_environment_name",
+        ));
+    }
+    if provider_env.is_some_and(|name| name.eq_ignore_ascii_case(token_env)) {
+        return Err(problem(
+            ErrorKind::InvalidInput,
+            "mcp_token_requires_separate_environment",
+        ));
+    }
+    let token = std::env::var(token_env)
+        .map(Zeroizing::new)
+        .map_err(|_| problem(ErrorKind::Unavailable, "mcp_token_unavailable"))?;
+    let source = args
+        .get_one::<String>("mcp-source")
+        .expect("required by the outbound MCP endpoint");
+    let tools = args
+        .get_many::<String>("mcp-tool")
+        .expect("required by the outbound MCP endpoint")
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    Ok(Some(
+        McpClient::connect(source, endpoint, &token, &tools).await?,
+    ))
 }
 
 fn problem(kind: ErrorKind, code: &'static str) -> Error {
