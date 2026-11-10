@@ -12,8 +12,7 @@
  *      (Win/Linux).
  *   2. Main process calls `agentSidecarClient.registerPath(path)` → agent server
  *      returns a `docId`.
- *   3. Main process calls `agentSidecarClient.touchRecent(path)` → agent server
- *      prepends it to `recent.json`.
+ *   3. Main records the path through its selected recent-file owner.
  *   4. Main process spawns a BrowserWindow loading
  *      `${EDITOR_BASE_URL}/desktop/file?docId=${docId}` (or similar).
  *   5. The renderer reads the docId from the URL and calls
@@ -73,13 +72,13 @@ export namespace agentSidecarClient {
     return data.doc_id;
   }
 
-  /**
-   * Prepends `path` to `recent.json` with the current timestamp. Safe
-   * to call on every open — the agent server dedupes by path.
-   */
-  export async function touchRecent(filePath: string): Promise<void> {
-    await client().recent.touch(filePath);
-  }
+  export const recent = {
+    list: () => client().recent.list(),
+    touch: (filePath: string) => client().recent.touch(filePath),
+    pin: (filePath: string, pinned: boolean) =>
+      client().recent.pin(filePath, pinned),
+    forget: (filePath: string) => client().recent.forget(filePath),
+  };
 
   /**
    * Register an opened directory as a workspace. Used by the "Open

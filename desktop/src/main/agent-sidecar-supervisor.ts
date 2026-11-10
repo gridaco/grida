@@ -435,6 +435,8 @@ export class AgentSidecarSupervisor {
       await sweepAgentCommandTemps(this.scratchBase);
     }
     if (!isSupportedPlatform()) {
+      if (this.coldStartSource)
+        throw new Error("native_retained_sidecar_sandbox_unavailable");
       // Windows or another unsupported platform. Log loudly and let
       // the spawn proceed unwrapped — the alternative is refusing
       // to start at all, which would brick the app on Windows.
@@ -465,6 +467,7 @@ export class AgentSidecarSupervisor {
       userData: this.user_data_path,
       providerRoot: path.join(this.provider_home, "providers"),
       mediaRoot: this.media_root,
+      desktopStateRoot: (await this.coldStartSource)?.desktopUserDataPath,
       home: app.getPath("home"),
       ggHost: new URL(EDITOR_BASE_URL).hostname,
     });

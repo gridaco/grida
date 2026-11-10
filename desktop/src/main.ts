@@ -3,6 +3,7 @@ import { app, shell, BrowserWindow, Menu, dialog, session } from "electron";
 import path from "node:path";
 import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
+import { RecentStore } from "@grida/daemon/server";
 import create_menu, {
   focus_or_open_canvas_window,
   rebuild_application_menu,
@@ -114,6 +115,7 @@ registerWorkspaceMediaScheme();
 // registered through this controller only after it reaches `main`.
 let entryWindow: DesktopEntryWindow | null = null;
 let nativeDesktopAgent: NativeDesktopAgent | undefined;
+let recentFiles = agentSidecarClient.recent;
 let nativeQuitDrain: Promise<void> | undefined;
 let nativeQuitReady = false;
 const windowAdmission = {
@@ -342,11 +344,11 @@ async function openDocumentWindowForPath(filePath: string) {
   // no-ops on non-darwin.
   window.setRepresentedFilename(filePath);
 
-  // Recent — both OS (Dock right-click / jump list) and the agent server's
-  // persistent recent.json. Fire-and-forget; failures are non-fatal.
+  // Recent — both OS (Dock right-click / jump list) and the selected
+  // persistent recent-file owner.
   app.addRecentDocument(filePath);
-  agentSidecarClient.touchRecent(filePath).catch((err) => {
-    console.warn("[grida] /recent/touch failed:", err);
+  recentFiles.touch(filePath).catch(() => {
+    console.warn("[grida] recent file could not be recorded");
   });
 }
 
@@ -583,6 +585,9 @@ app.on("ready", async () => {
         process.resourcesPath,
         { provider, openExternal: (url) => shell.openExternal(url) }
       );
+      recentFiles = new RecentStore(app.getPath("userData"), {
+        privateFile: true,
+      });
     } catch {
       dialog.showErrorBox(
         "Native chat could not start",
@@ -642,6 +647,7 @@ app.on("ready", async () => {
   const native = nativeDesktopAgent;
   registerIpcHandlers({
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
+    recent_files: recentFiles,
     ...(native && {
       resolve_native_chat: (_window, workspaceId) =>
         native.current(workspaceId),

@@ -76,6 +76,20 @@ describe("Desktop preload agent seam", () => {
     expect(preloadSource).not.toContain("agentClient.media");
   });
 
+  it("routes the existing recents bridge through Main", () => {
+    for (const channel of [
+      "RECENT_LIST",
+      "RECENT_TOUCH",
+      "RECENT_PIN",
+      "RECENT_FORGET",
+    ]) {
+      expect(preloadSource).toMatch(
+        new RegExp(`ipcRenderer\\.invoke\\(\\s*IPC_CHANNELS\\.${channel}`)
+      );
+    }
+    expect(preloadSource).not.toContain("agentClient.recent");
+  });
+
   it("delivers native chat updates only to the matching preload subscription", () => {
     expect(preloadSource).toContain(
       "nativeChatHandlers.get(payload.subscriptionId)"

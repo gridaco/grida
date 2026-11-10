@@ -175,7 +175,12 @@ ipcRenderer.on(
 );
 
 async function handshake(): Promise<HandshakeResponse> {
-  return await agentClient.handshake();
+  const response = await agentClient.handshake();
+  // The ready Desktop bridge exposes recents through Main in either mode.
+  return {
+    ...response,
+    capabilities: { ...response.capabilities, recent: true },
+  };
 }
 
 /**
@@ -828,16 +833,13 @@ const bridge: DesktopBridge = {
   },
 
   recent: {
-    list: () => agentClient.recent.list(),
-    touch: async (filePath) => {
-      await agentClient.recent.touch(filePath);
-    },
-    pin: async (filePath, pinned) => {
-      await agentClient.recent.pin(filePath, pinned);
-    },
-    forget: async (filePath) => {
-      await agentClient.recent.forget(filePath);
-    },
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.RECENT_LIST),
+    touch: (filePath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RECENT_TOUCH, filePath),
+    pin: (filePath, pinned) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RECENT_PIN, filePath, pinned),
+    forget: (filePath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.RECENT_FORGET, filePath),
   },
 
   // GRIDA-SEC-004 — app-managed media stays behind purpose-scoped native IPC.

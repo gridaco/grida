@@ -54,9 +54,12 @@ export namespace DesktopDaemon {
           ? {
               ...shared,
               endpoint_settings: true,
-              capabilities: opts.retained_media_scope
-                ? { files: false, recent: false, workspaces: false }
-                : undefined,
+              capabilities: {
+                recent: false,
+                ...(opts.retained_media_scope
+                  ? { files: false, workspaces: false }
+                  : undefined),
+              },
             }
           : shared
       );

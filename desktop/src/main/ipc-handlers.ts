@@ -9,6 +9,7 @@ import {
 } from "electron";
 import path from "node:path";
 import { URL } from "node:url";
+import type { RecentStore } from "@grida/daemon/server";
 import {
   IPC_CHANNELS,
   type ConfirmOptions,
@@ -91,6 +92,7 @@ const mediaHost = new DesktopMediaHost({
 
 type RegisterIpcHandlersOptions = {
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
+  recent_files?: Pick<RecentStore, "list" | "touch" | "pin" | "forget">;
   resolve_native_chat?: (
     window: BrowserWindow,
     workspaceId: string
@@ -111,6 +113,7 @@ type RegisterIpcHandlersOptions = {
 };
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
+  const recentFiles = options.recent_files ?? agentSidecarClient.recent;
   const admittedWindow = (sender: WebContents) => {
     const window = BrowserWindow.fromWebContents(sender);
     return window && options.resolve_ipc_role(window) === "main"
@@ -698,6 +701,69 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       // the OS silently opens the parent or no-ops.
       shell.showItemInFolder(path.resolve(filePath));
     }
+  );
+
+  // GRIDA-SEC-004 — recents stores path metadata. Opening a file has its
+  // own trusted native admission.
+  function guardedRecent<A extends unknown[], R>(
+    channel: IpcChannel,
+    operation: (...args: A) => Promise<R>
+  ): void {
+    guarded(channel, async ({ sender, senderFrame: frame }, ...args: A) => {
+      const url = frame?.url;
+      let revoked = false;
+      const requireCurrent = () => {
+        if (
+          revoked ||
+          !frame ||
+          sender.isDestroyed() ||
+          frame !== sender.mainFrame ||
+          frame.url !== url ||
+          !admittedWindow(sender)
+        ) {
+          throw new Error("recent_files_unavailable");
+        }
+      };
+      requireCurrent();
+      const unwatch = ipc_sender.watchNavigation(sender, () => {
+        revoked = true;
+      });
+      try {
+        const result = await operation(...args);
+        requireCurrent();
+        return result;
+      } catch {
+        throw new Error("recent_files_unavailable");
+      } finally {
+        unwatch();
+      }
+    });
+  }
+  function recentPath(value: unknown): string {
+    if (
+      typeof value !== "string" ||
+      !path.isAbsolute(value) ||
+      value.includes("\0") ||
+      Buffer.byteLength(value, "utf8") > 4096
+    ) {
+      throw new Error("recent_file_path_invalid");
+    }
+    return value;
+  }
+  guardedRecent(IPC_CHANNELS.RECENT_LIST, () => recentFiles.list());
+  guardedRecent(IPC_CHANNELS.RECENT_TOUCH, (filePath: unknown) =>
+    recentFiles.touch(recentPath(filePath))
+  );
+  guardedRecent(
+    IPC_CHANNELS.RECENT_PIN,
+    (filePath: unknown, pinned: unknown) => {
+      if (typeof pinned !== "boolean")
+        throw new Error("recent_file_pin_invalid");
+      return recentFiles.pin(recentPath(filePath), pinned);
+    }
+  );
+  guardedRecent(IPC_CHANNELS.RECENT_FORGET, (filePath: unknown) =>
+    recentFiles.forget(recentPath(filePath))
   );
 
   // GRIDA-SEC-004 — durable media operations are path-free and admitted only

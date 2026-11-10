@@ -92,6 +92,17 @@ describe("Desktop daemon composition", () => {
     );
   });
 
+  it("leaves recents to Main only when native chat owns the profile", async () => {
+    await DesktopDaemon.create({ ...common, agent: "native-chat" });
+    expect(mocks.media).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capabilities: { recent: false },
+        endpoint_settings: true,
+      })
+    );
+    expect(mocks.agent).not.toHaveBeenCalled();
+  });
+
   it("withholds finite-command authority without the host sandbox attestation", async () => {
     await DesktopDaemon.create({
       ...common,

@@ -97,6 +97,24 @@ describe("ipc_admission", () => {
     expect(allowedFor("main", "/desktop/auth/future")).toEqual([]);
     expect(allowedFor("main", "/desktop/onboarding")).toEqual([]);
   });
+
+  it("keeps recent file metadata within the authenticated main role", () => {
+    const recent = [
+      IPC_CHANNELS.RECENT_LIST,
+      IPC_CHANNELS.RECENT_TOUCH,
+      IPC_CHANNELS.RECENT_PIN,
+      IPC_CHANNELS.RECENT_FORGET,
+    ];
+    for (const channel of recent) {
+      expect(allowedFor("main", "/desktop/welcome")).toContain(channel);
+      expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+        channel
+      );
+      expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+        channel
+      );
+    }
+  });
 });
 
 function allowedFor(

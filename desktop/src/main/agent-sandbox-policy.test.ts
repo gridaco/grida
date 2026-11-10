@@ -25,4 +25,18 @@ describe("DesktopAgentSandboxPolicy", () => {
       "/Users/test/Library/Application Support/Grida/Media"
     );
   });
+
+  it("keeps the native browser profile outside retained sidecar custody", () => {
+    const desktopStateRoot = "/isolated-grida/browser";
+    const policy = DesktopAgentSandboxPolicy.build({
+      userData: "/isolated-grida/agent",
+      mediaRoot: "/isolated-grida/media",
+      desktopStateRoot,
+      home: "/Users/test",
+      ggHost: "grida.co",
+    });
+    expect(policy.filesystem.deny_read).toContain(desktopStateRoot);
+    expect(policy.filesystem.deny_write).toContain(desktopStateRoot);
+    expect(policy.filesystem.allow_write).not.toContain(desktopStateRoot);
+  });
 });

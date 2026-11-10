@@ -1256,6 +1256,13 @@ Today:
   routes under that launch scope. Packaged fixtures verify provider mediation,
   accepted-socket transfer, scope denials, and clean drain. Desktop's existing
   compatibility launch retains its SRT boundary.
+- The isolated native Desktop profile gives Main sole ownership of
+  `recent.json` in its private browser directory. Its recents IPC uses the
+  current authenticated top-level frame. Paths are remembered metadata and
+  document admission remains separate. The retained sidecar withholds its
+  recents routes and denies file contents and mutation under the browser
+  directory. Compatibility launches retain the daemon store. Native startup
+  leaves the legacy store in its original location.
 - The [native workspace span reader](crates/grida-agent/src/workspace_file.rs)
   binds metadata and output to one descriptor. Its [private process](crates/grida-agent/src/workspace_file/stdio.rs)
   requires the registered directory identity and protected roots before

@@ -24,6 +24,7 @@
  * publication. Hosts sharing a data directory must share one store owner.
  */
 
+import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { atomicWrite } from "../storage/atomic-write";
@@ -36,6 +37,7 @@ export type RecentEntry = {
 
 const MAX_ENTRIES = 50;
 const FILE_NAME = "recent.json";
+const MAX_PRIVATE_FILE_BYTES = 2 * 1024 * 1024;
 
 export class RecentStore {
   private entries: RecentEntry[] = [];
@@ -43,7 +45,10 @@ export class RecentStore {
   private tail = Promise.resolve();
   private readonly file_path: string;
 
-  constructor(userDataPath: string) {
+  constructor(
+    userDataPath: string,
+    private readonly options: { privateFile?: true } = {}
+  ) {
     this.file_path = path.join(userDataPath, FILE_NAME);
   }
 
@@ -56,29 +61,55 @@ export class RecentStore {
    */
   private async ensureLoaded(): Promise<void> {
     if (this.loaded) return;
-    const raw = await fs
-      .readFile(this.file_path, "utf8")
-      .catch((error: unknown) => {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-        throw error;
-      });
+    const raw = await this.read().catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    });
     try {
       const parsed: unknown = raw === null ? null : JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        this.entries = parsed.filter(
-          (e): e is RecentEntry =>
-            e !== null &&
-            typeof e === "object" &&
-            typeof e.path === "string" &&
-            typeof e.pinned === "boolean" &&
-            typeof e.opened_at === "number"
-        );
+        this.entries = parsed
+          .filter(
+            (e): e is RecentEntry =>
+              e !== null &&
+              typeof e === "object" &&
+              typeof e.path === "string" &&
+              typeof e.pinned === "boolean" &&
+              typeof e.opened_at === "number"
+          )
+          .map(({ path, pinned, opened_at }) => ({ path, pinned, opened_at }));
       }
     } catch {
       // A malformed recent list starts empty.
       this.entries = [];
     }
     this.loaded = true;
+  }
+
+  private async read(): Promise<string> {
+    if (!this.options.privateFile) return fs.readFile(this.file_path, "utf8");
+    const file = await fs.open(
+      this.file_path,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
+    );
+    try {
+      const stat = await file.stat();
+      if (
+        !stat.isFile() ||
+        stat.uid !== process.geteuid?.() ||
+        stat.nlink !== 1 ||
+        (stat.mode & 0o7777) !== 0o600 ||
+        stat.size > MAX_PRIVATE_FILE_BYTES
+      ) {
+        throw new Error("recent_file_unavailable");
+      }
+      const bytes = Buffer.alloc(stat.size + 1);
+      const { bytesRead } = await file.read(bytes);
+      if (bytesRead !== stat.size) throw new Error("recent_file_unavailable");
+      return bytes.toString("utf8", 0, bytesRead);
+    } finally {
+      await file.close();
+    }
   }
 
   private async persist(entries: RecentEntry[]): Promise<void> {

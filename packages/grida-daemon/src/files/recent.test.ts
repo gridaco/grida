@@ -57,4 +57,24 @@ describe("RecentStore", () => {
       prior[1],
     ]);
   });
+
+  it.skipIf(!process.geteuid)(
+    "refuses linked files in a private profile",
+    async () => {
+      const retained = path.join(root, "prior.json");
+      await fs.rename(file, retained);
+      const open = () => new RecentStore(root, { privateFile: true });
+      await fs.symlink(retained, file);
+      await expect(open().list()).rejects.toMatchObject({ code: "ELOOP" });
+      await fs.unlink(file);
+      await fs.link(retained, file);
+      await expect(open().touch("/new.svg")).rejects.toThrow(
+        "recent_file_unavailable"
+      );
+      expect(JSON.parse(await fs.readFile(retained, "utf8"))).toEqual(prior);
+      await fs.unlink(file);
+      await fs.rename(retained, file);
+      await expect(open().list()).resolves.toEqual(prior);
+    }
+  );
 });

@@ -11,6 +11,7 @@ export namespace DesktopAgentSandboxPolicy {
     userData: string;
     providerRoot?: string;
     mediaRoot: string;
+    desktopStateRoot?: string;
     home: string;
     ggHost: string;
   }) {
@@ -32,10 +33,15 @@ export namespace DesktopAgentSandboxPolicy {
     const providerRoot = path.resolve(
       input.providerRoot ?? path.join(input.userData, "providers")
     );
+    const mainOnly = input.desktopStateRoot ? [input.desktopStateRoot] : [];
     return {
       ...policy,
       filesystem: {
         ...policy.filesystem,
+        // The native profile's browser state, including Main-owned recents,
+        // is outside the retained sidecar's file and workspace authority.
+        deny_read: uniquePaths([...policy.filesystem.deny_read, ...mainOnly]),
+        deny_write: uniquePaths([...policy.filesystem.deny_write, ...mainOnly]),
         // The long-lived sidecar owns durable media writes. The root remains
         // outside the agent secret directory and is denied again in every
         // finite-command profile by AgentCommandHost.

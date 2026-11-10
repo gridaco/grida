@@ -586,11 +586,13 @@ describe("built Desktop media startup", () => {
       const retained = await active.post("/handshake");
       expect(retained.status).toBe(200);
       expect((await retained.json()).capabilities).toMatchObject({
+        recent: false,
         agent: false,
         sessions: false,
         providers: true,
         shell: false,
       });
+      expect((await active.post("/recent/list")).status).toBe(404);
       await fs.writeFile(path.join(root, "allow-custody"), "enabled", {
         mode: 0o600,
       });
