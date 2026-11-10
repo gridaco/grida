@@ -212,6 +212,7 @@ async fn serve_connection(
                     advertised.insert(capability.into(), 1.into());
                     let capability = crate::editor_surfaces::CAPABILITY;
                     if reviewer
+                        && initialized_host.supports_editor_tools()
                         && request
                             .client_capabilities
                             .meta

@@ -596,6 +596,10 @@ impl Host {
         self
     }
 
+    pub(crate) fn supports_editor_tools(&self) -> bool {
+        self.operating_regime.is_act() && self.host_tools.is_none() && self.side_context.is_none()
+    }
+
     pub async fn new_session(&self, cwd: PathBuf) -> Result<SessionId> {
         if self.work.lock().await.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
@@ -1976,8 +1980,7 @@ impl Host {
         }
         if editor_endpoint.is_some()
             && (!policy.operating_regime.is_act()
-                || self.side_context.is_some()
-                || self.host_tools.is_some()
+                || !self.supports_editor_tools()
                 || policy.configuration_permission == crate::ConfigurationPermission::Change
                 || !request
                     .parts

@@ -220,6 +220,8 @@ an explicit port and the stateless MCP 2026-07-28 profile. Main binds the
 selection to that folder identity and its first authenticated Gateway account,
 organization and origin for this launch. Discovery runs when that workspace's
 native process starts. Plan prompts cannot use the discovered tools.
+The selected workspace uses the local peer's tools in Act. Other eligible
+workspaces can use the live editor tools.
 
 To export a live workspace view to another local agent, place a separate
 64-character hexadecimal bearer in `native-mcp-export.bearer` under

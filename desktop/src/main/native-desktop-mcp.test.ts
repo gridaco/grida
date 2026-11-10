@@ -1,12 +1,15 @@
 // GRIDA-SEC-004 — Main's scoped MCP launch against the actual native process.
 import fs from "node:fs/promises";
+import { EventEmitter } from "node:events";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
+import type { IpcMainInvokeEvent } from "electron";
 import { DesktopAccountSession } from "./account-session";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import { NativeMcpLaunch } from "./native-mcp-launch";
+import { NativeChatIpc } from "./native-chat-ipc";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 
 const sidecar = vi.hoisted(() => ({
@@ -213,18 +216,36 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       const desktop = agent;
       async function send(workspaceId: string, mode: "act" | "plan") {
         await desktop.ensure(workspaceId);
-        const chat = desktop.current(workspaceId)!.chat;
-        const session = await chat.create();
-        await chat.submit(
-          session,
+        const active = desktop.current(workspaceId)!;
+        const frame = { url: `${origin}/desktop/workspace?id=${workspaceId}` };
+        const sender = Object.assign(new EventEmitter(), {
+          mainFrame: frame,
+          isDestroyed: () => false,
+          isLoadingMainFrame: () => false,
+        });
+        const event = {
+          sender,
+          senderFrame: frame,
+        } as unknown as IpcMainInvokeEvent;
+        const ipc = new NativeChatIpc(origin, () => active);
+        const session = await ipc.create(event);
+        ipc.publishEditorSurfaces(
+          event,
+          session.attachmentId,
+          { active: "/poster.svg", open: ["/poster.svg"], truncated: false },
+          1
+        );
+        await ipc.submit(
+          event,
+          session.attachmentId,
           `test-${mode}`,
           "A harmless local lookup",
           mode
         );
         await vi.waitFor(
           async () => {
-            const observation = await chat.observe(session);
-            expect(observation.latest?.status).toBe("succeeded");
+            const { snapshot } = await ipc.observe(event, session.attachmentId);
+            expect(snapshot.latest?.status).toBe("succeeded");
           },
           { timeout: 5000 }
         );
@@ -245,6 +266,13 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(
         offers.map((names) => names.filter((name) => name.startsWith("mcp_")))
       ).toEqual([[], [], [toolName], [toolName]]);
+      expect(
+        offers.map((names) =>
+          names.filter(
+            (name) => name.startsWith("surface_") || name.startsWith("svg_")
+          )
+        )
+      ).toEqual([["surface_list_open", "surface_open"], [], [], []]);
       expect(bodies.at(-1)).toContain("Exact local result");
       expect(bodies.join("")).not.toContain(token);
       await desktop.clearAccount();
