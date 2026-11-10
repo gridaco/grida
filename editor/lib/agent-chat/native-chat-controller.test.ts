@@ -107,6 +107,35 @@ function fixture() {
   };
 }
 
+it("replaces a retry wait when the same turn's new observation clears it", async () => {
+  const { bridge, controller, running } = fixture();
+  running.add("retry-chat");
+  const original = bridge.observe.bind(bridge);
+  const deadline = 1_800_000_000_000;
+  let retrying = true;
+  bridge.observe = async (id) => {
+    const result = await original(id);
+    return retrying
+      ? {
+          ...result,
+          snapshot: { ...result.snapshot, retryNotBeforeMs: deadline },
+        }
+      : result;
+  };
+  controller.connect(null);
+  await controller.select("retry-chat");
+  expect(controller.read().observation?.snapshot).toMatchObject({
+    retryNotBeforeMs: deadline,
+    current: { turnId: "turn-retry-chat" },
+  });
+  retrying = false;
+  await controller.repair();
+  const next = controller.read().observation?.snapshot;
+  expect(next?.current?.turnId).toBe("turn-retry-chat");
+  expect(next).not.toHaveProperty("retryNotBeforeMs");
+  controller.disconnect();
+});
+
 it("runs only exact slash commands, preserves a lost fork identity and keeps the source selected", async () => {
   const { bridge, controller } = fixture();
   const submit = vi.spyOn(bridge, "submit");

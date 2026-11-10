@@ -600,13 +600,21 @@ export class NativeAgentChat {
     const queue = queuePositions(result.queue, queuedInputs);
     const pending = queue.filter((row) => row.goalStart);
     if (pending.length > 1) throw invalidResponse();
+    const current = result.current === null ? null : turn(result.current);
+    const retryAt = result.retryNotBeforeMs;
     const snapshot = Object.freeze({
       sessionId,
       sessionRevision: revision(result.sessionRevision),
       queuedInputs,
       ...(pending[0] && { pendingGoalId: pending[0].inputId }),
+      ...(current?.disposition === "running" &&
+        !current.paused &&
+        !current.cancelled &&
+        typeof retryAt === "number" &&
+        Number.isSafeInteger(retryAt) &&
+        retryAt > 0 && { retryNotBeforeMs: retryAt }),
       admissionPaused: flag(result.admissionPaused),
-      current: result.current === null ? null : turn(result.current),
+      current,
       latest: result.latest === null ? null : turn(result.latest),
     });
     observed.set(snapshot, {

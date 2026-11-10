@@ -9,6 +9,7 @@ import {
   NativeAgentChat,
   type NativeAgentChatLaunch,
 } from "./native-agent-chat";
+import { NativeAgentProcess } from "./native-agent-process";
 
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 
@@ -99,6 +100,147 @@ it("rejects a chat launch outside the main-selected workspace", async () => {
     test.close();
   }
 });
+
+it("projects only a valid retry wait for the currently running turn", async () => {
+  const test = fixture();
+  const running = {
+    turnId: "fixture-turn",
+    epoch: 1,
+    journalPosition: 2,
+    historyPosition: 1,
+    controlRevision: 0,
+    paused: false,
+    cancelled: false,
+    disposition: "running",
+    status: null,
+  };
+  const previous = {
+    sessionId: "fixture-session",
+    sessionRevision: 1,
+    queuedInputs: 0,
+    queue: [],
+    admissionPaused: false,
+    current: running,
+    latest: null,
+  };
+  let wire: Omit<typeof previous, "current"> & {
+    current: typeof running | null;
+    retryNotBeforeMs?: unknown;
+  } = previous;
+  const start = vi.spyOn(NativeAgentProcess, "start");
+  start.mockResolvedValueOnce({
+    request: async (method: string) =>
+      method === "session/new" ? { sessionId: previous.sessionId } : wire,
+    close: async () => {},
+  } as unknown as NativeAgentProcess);
+  let client: NativeAgentChat | undefined;
+  try {
+    client = await NativeAgentChat.start({
+      resourcesPath: test.root,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "openai-compatible",
+      model: "fixture",
+    });
+    const session = await client.create();
+    const read = () => client!.observe(session);
+    expect(await read()).not.toHaveProperty("retryNotBeforeMs");
+    const retryAt = 1_800_000_000_000;
+    wire = { ...previous, retryNotBeforeMs: retryAt };
+    expect(await read()).toMatchObject({ retryNotBeforeMs: retryAt });
+    for (const retryNotBeforeMs of [String(retryAt), -1, 1.5, Infinity]) {
+      wire = { ...previous, retryNotBeforeMs };
+      expect(await read()).not.toHaveProperty("retryNotBeforeMs");
+    }
+    for (const current of [
+      { ...running, paused: true },
+      { ...running, cancelled: true },
+      { ...running, disposition: "suspended" },
+      null,
+    ]) {
+      wire = { ...previous, current, retryNotBeforeMs: retryAt };
+      const result = await read();
+      expect(result.current).toEqual(current);
+      expect(result).not.toHaveProperty("retryNotBeforeMs");
+    }
+  } finally {
+    await client?.close();
+    start.mockRestore();
+    test.close();
+  }
+});
+
+it.runIf(Boolean(packaged))(
+  "observes and stops the built host's pending retry without another provider request",
+  async () => {
+    const test = fixture();
+    const requests: string[] = [];
+    const provider = createServer((request, response) => {
+      request.resume();
+      request.on("end", () => {
+        requests.push(request.url ?? "");
+        response
+          .writeHead(429, {
+            "content-type": "application/json",
+            "retry-after": "5",
+          })
+          .end(JSON.stringify({ error: { code: "rate_limit_exceeded" } }));
+      });
+    });
+    provider.listen(0, "127.0.0.1");
+    let client: NativeAgentChat | undefined;
+    try {
+      await once(provider, "listening");
+      const address = provider.address();
+      if (!address || typeof address === "string")
+        throw new Error("fixture_listener_unavailable");
+      client = await NativeAgentChat.start({
+        resourcesPath: packaged!,
+        stateDirectory: test.stateDirectory,
+        cwd: test.cwd,
+        endpoint: `http://127.0.0.1:${address.port}/v1`,
+        provider: "responses",
+        model: "fixture",
+      });
+      const session = await client.create();
+      const accepted = await client.submit(session, "retry-input", "Wait.");
+      const waiting = await vi.waitFor(
+        async () => {
+          const observed = await client!.observe(session);
+          expect(observed.retryNotBeforeMs).toBeGreaterThan(Date.now());
+          return observed;
+        },
+        { timeout: 3000 }
+      );
+      expect(waiting.current?.turnId).toBe(accepted.turnId);
+      await client.stop(session, waiting, "stop-retry");
+      await vi.waitFor(
+        async () => {
+          const observed = await client!.observe(session);
+          expect(observed.current).toBeNull();
+          expect(observed.latest).toMatchObject({
+            turnId: accepted.turnId,
+            status: "cancelled",
+          });
+          expect(observed).not.toHaveProperty("retryNotBeforeMs");
+        },
+        { timeout: 3000 }
+      );
+      expect(requests).toEqual(["/v1/responses"]);
+    } finally {
+      await client?.close();
+      if (provider.listening) {
+        const closed = once(provider, "close");
+        provider.close();
+        provider.closeAllConnections();
+        await closed;
+      }
+      test.close();
+    }
+  },
+  15_000
+);
 
 it.runIf(Boolean(packaged))(
   "lists detached workspace pages and restores a renamed archive after restart",

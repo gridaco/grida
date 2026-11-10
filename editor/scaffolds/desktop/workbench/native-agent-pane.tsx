@@ -97,6 +97,8 @@ export function NativeAgentPane({
       ? state.approvals[0]
       : undefined;
   const question = turn && !turn.cancelled ? state.questions[0] : undefined;
+  const retrying =
+    running && !question && snapshot?.retryNotBeforeMs !== undefined;
   const queued = snapshot?.queuedInputs ?? 0;
   const queue = state.queue;
   const previousQueueOffset = queue?.previousOffset ?? null;
@@ -119,7 +121,9 @@ export function NativeAgentPane({
               : turn?.disposition === "interrupted"
                 ? "Interrupted"
                 : running
-                  ? "Working…"
+                  ? retrying
+                    ? "Retrying after rate limit…"
+                    : "Working…"
                   : snapshot?.admissionPaused
                     ? "Stopped"
                     : snapshot?.queuedInputs
@@ -343,9 +347,11 @@ export function NativeAgentPane({
               }}
             />
           ))}
-          {running && state.messages.at(-1)?.role !== "assistant" && (
-            <PendingTurnIndicator />
-          )}
+          {running &&
+            !retrying &&
+            state.messages.at(-1)?.role !== "assistant" && (
+              <PendingTurnIndicator />
+            )}
           {!turn &&
             !state.loading &&
             !state.repairing &&

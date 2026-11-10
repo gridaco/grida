@@ -106,6 +106,8 @@ export type NativeChatSnapshot = Readonly<{
   sessionRevision: number;
   queuedInputs: number;
   pendingGoalId?: string;
+  /** Earliest provider retry time in UTC milliseconds for the current turn. */
+  retryNotBeforeMs?: number;
   admissionPaused: boolean;
   current: NativeChatTurn | null;
   latest: NativeChatTurn | null;
