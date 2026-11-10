@@ -78,7 +78,7 @@ impl SqliteStore {
                 turn: Some(turn),
             };
             let control = ControlRequest { action, ..request };
-            let receipt = apply_control(&transaction, &control, session, Some(active))?;
+            let receipt = apply_control(inner, &transaction, &control, session, Some(active))?;
             save_request(
                 &transaction,
                 &control.session,
@@ -160,7 +160,7 @@ impl SqliteStore {
                     turn,
                 },
             };
-            let receipt = apply_control(&transaction, &control, session, active)?;
+            let receipt = apply_control(inner, &transaction, &control, session, active)?;
             save_request(
                 &transaction,
                 &control.session,

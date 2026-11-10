@@ -362,6 +362,7 @@ async fn migrates_existing_catalog_without_changing_its_entries() {
     let entry = store.replace_catalog_entry(entry).await.unwrap();
     drop(store);
     let previous = rusqlite::Connection::open(&path).unwrap();
+    support::remove_turn_link_schema(&previous);
     previous
         .execute_batch("DROP TABLE session_retirements; PRAGMA user_version=7;")
         .unwrap();
@@ -383,6 +384,7 @@ async fn upgrades_a_retired_chat_without_reopening_its_identity() {
     drop(store);
 
     let previous = rusqlite::Connection::open(&path).unwrap();
+    support::remove_turn_link_schema(&previous);
     previous
         .execute_batch(
             "DROP INDEX session_retirements_pending;

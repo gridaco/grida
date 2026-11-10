@@ -636,11 +636,77 @@ fn child_observation_error(error: Error) -> Error {
     }
 }
 
-fn child_profile(parent: &SessionId, configuration: &Envelope) -> Result<Profile> {
+pub(super) fn child_profile(parent: &SessionId, configuration: &Envelope) -> Result<Profile> {
     decode_session_configuration(configuration)?
         .subagent
         .filter(|profile| profile.parent() == parent)
         .ok_or_else(|| problem(ErrorKind::Unavailable, "subagent_unavailable"))
+}
+
+pub(super) fn turn_link(
+    configuration: &Envelope,
+    input: &Envelope,
+) -> Result<agent_kit_store_sqlite::turn_links::TurnLinkDecision> {
+    use agent_kit_store_sqlite::turn_links::{TurnLinkDecision, TurnLinkParent};
+
+    if configuration.schema().as_str() != SESSION_SCHEMA
+        || input.schema().as_str() == MESSAGE_SCHEMA
+    {
+        return Ok(TurnLinkDecision::Unrelated);
+    }
+    let Some(profile) = (match decode_session_configuration(configuration) {
+        Ok(configuration) => configuration.subagent,
+        Err(_) => return Ok(incomplete_turn_link(configuration)),
+    }) else {
+        return Ok(TurnLinkDecision::Unrelated);
+    };
+    if profile.sponsorship().is_some() {
+        return Ok(TurnLinkDecision::Unrelated);
+    }
+    #[derive(Deserialize)]
+    struct RetainedAssignment {
+        subagent: Option<Assignment>,
+    }
+    let assignment = (input.schema().as_str() == INPUT_SCHEMA && matches!(input.version(), 1 | 2))
+        .then(|| serde_json::from_slice::<RetainedAssignment>(input.bytes()).ok())
+        .flatten()
+        .and_then(|stored| stored.subagent);
+    if assignment
+        .as_ref()
+        .is_some_and(|assignment| assignment.named_sponsorship.is_some())
+    {
+        return Ok(TurnLinkDecision::Unrelated);
+    }
+    Ok(TurnLinkDecision::Linked(TurnLinkParent {
+        session: profile.parent().clone(),
+        turn: assignment.map(|assignment| assignment.parent_turn),
+    }))
+}
+
+fn incomplete_turn_link(
+    configuration: &Envelope,
+) -> agent_kit_store_sqlite::turn_links::TurnLinkDecision {
+    use agent_kit_store_sqlite::turn_links::{TurnLinkDecision, TurnLinkParent};
+    #[derive(Deserialize)]
+    struct HistoricalProfile {
+        subagent: Option<HistoricalChild>,
+    }
+    #[derive(Deserialize)]
+    struct HistoricalChild {
+        parent: SessionId,
+    }
+    match serde_json::from_slice::<HistoricalProfile>(configuration.bytes()) {
+        Ok(HistoricalProfile {
+            subagent: Some(child),
+        }) => TurnLinkDecision::Linked(TurnLinkParent {
+            session: child.parent,
+            turn: None,
+        }),
+        Ok(HistoricalProfile { subagent: None }) if matches!(configuration.version(), 1 | 2) => {
+            TurnLinkDecision::Unrelated
+        }
+        _ => TurnLinkDecision::CoverageUnknown,
+    }
 }
 
 fn assignment_preview(text: &str) -> (String, bool) {
@@ -766,5 +832,103 @@ fn message_receipt(
         position: input.position,
         disposition: input.disposition,
         text: message.text,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agent_kit_store_sqlite::turn_links::TurnLinkDecision;
+    use grida_agent_master::goals::Basis;
+    use grida_agent_master::subagents::{NamedSponsorship, Sponsorship};
+    use serde_json::json;
+
+    #[test]
+    fn attribution_projects_legacy_ordinary_assignments_and_identifies_incomplete_evidence() {
+        let parent = SessionId::new("parent").unwrap();
+        let turn = TurnId::new("source-turn").unwrap();
+        let authority = AuthorityBinding {
+            principal: PrincipalId::new("principal").unwrap(),
+            binding: BindingId::new("binding").unwrap(),
+            scope: ScopeId::new("scope").unwrap(),
+        };
+        let configuration = |profile| {
+            encode(
+                SESSION_SCHEMA,
+                1,
+                &SessionConfiguration {
+                    cwd: PathBuf::from("/workspace"),
+                    execution: Fingerprint::of(&"execution").unwrap(),
+                    subagent: Some(profile),
+                },
+            )
+            .unwrap()
+        };
+        let ordinary =
+            configuration(Profile::new(parent.clone(), "Reader".into(), 2, &authority).unwrap());
+        let linked = |configuration: &Envelope, input: &Envelope| {
+            let TurnLinkDecision::Linked(link) = turn_link(configuration, input).unwrap() else {
+                panic!("expected an exact or incomplete parent link");
+            };
+            link
+        };
+        let input = |version, assignment| {
+            encode(INPUT_SCHEMA, version, &json!({"subagent":assignment})).unwrap()
+        };
+        let assignment = Assignment::new(turn.clone());
+        for version in [1, 2] {
+            let link = linked(&ordinary, &input(version, assignment.clone()));
+            assert_eq!(link.session, parent);
+            assert_eq!(link.turn.as_ref(), Some(&turn));
+        }
+        let unknown = linked(&ordinary, &input(3, assignment.clone()));
+        assert_eq!(unknown.session, parent);
+        assert!(unknown.turn.is_none());
+        let invalid = encode(INPUT_SCHEMA, 2, &json!({"subagent":{"parent_turn":12}})).unwrap();
+        assert!(linked(&ordinary, &invalid).turn.is_none());
+        let partial_configuration =
+            encode(SESSION_SCHEMA, 2, &json!({"subagent":{"parent":parent}})).unwrap();
+        let incomplete = linked(&partial_configuration, &input(2, assignment.clone()));
+        assert_eq!(incomplete.session, parent);
+        assert!(incomplete.turn.is_none());
+        let unreadable_configuration =
+            Envelope::new(SchemaId::new(SESSION_SCHEMA).unwrap(), 2, b"{".to_vec()).unwrap();
+        assert!(matches!(
+            turn_link(&unreadable_configuration, &invalid).unwrap(),
+            TurnLinkDecision::CoverageUnknown
+        ));
+        let message = encode(MESSAGE_SCHEMA, 1, &json!({"parent":parent,"text":"FYI"})).unwrap();
+        assert!(matches!(
+            turn_link(&ordinary, &message).unwrap(),
+            TurnLinkDecision::Unrelated
+        ));
+
+        let sponsor = Sponsorship {
+            parent_turn: turn.clone(),
+            operation: OperationId::new("review").unwrap(),
+            admission: Some(Fingerprint::of(&"admission").unwrap()),
+            attempt: Some(agent_kit_core::AttemptId::new("attempt").unwrap()),
+        };
+        let sponsored = configuration(
+            Profile::sponsored(parent, "Reviewer".into(), sponsor.clone(), &authority).unwrap(),
+        );
+        assert!(matches!(
+            turn_link(&sponsored, &input(2, assignment)).unwrap(),
+            TurnLinkDecision::Unrelated
+        ));
+        let named = Assignment {
+            parent_turn: turn,
+            named_sponsorship: Some(NamedSponsorship {
+                goal: Basis {
+                    goal: ChangeId::new("goal").unwrap(),
+                    revision: 1,
+                },
+                sponsor,
+            }),
+        };
+        assert!(matches!(
+            turn_link(&ordinary, &input(2, named)).unwrap(),
+            TurnLinkDecision::Unrelated
+        ));
     }
 }

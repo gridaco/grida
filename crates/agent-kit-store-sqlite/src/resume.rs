@@ -116,6 +116,7 @@ impl SqliteStore {
                 ResumeCompanion::Related(related) => (
                     None,
                     apply_related_control(
+                        inner,
                         &transaction,
                         &request.session,
                         &turn,

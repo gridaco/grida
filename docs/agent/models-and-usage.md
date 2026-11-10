@@ -73,8 +73,10 @@ Cached input and reasoning output can overlap other counts.
 
 For Grida Gateway, the summary can also show exact charges in mills for
 individual model requests from that turn. A funded independent review appears
-separately when its recorded charges belong to the same connection. Pending or
+separately when its recorded charges belong to the same connection. The
+summary can also list [assigned subagent work](./clients.md#read-a-turn-summary),
+with a notice when attribution is incomplete. Pending or
 unavailable amounts stay unknown. Use **Refresh billing** when offered to check
 that request's current settlement. Reopening the chat shows the original recorded
 evidence and leaves refresh to you. Use the connection's billing record for
-totals and for charges from other providers or unrelated delegated work.
+totals and for charges from other providers or work outside the displayed turn.

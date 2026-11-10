@@ -2130,10 +2130,26 @@ levels into one.
    Turn summary reads a bounded projection of retained evidence under the
    same scope. The renderer receives local operation and attempt identities.
    An explicit refresh must match an eligible row in the current attachment's
-   latest settled turn or its exact funded review. The worker resolves the
+   latest settled turn, its exact funded review, or an indexed child assignment.
+   The worker resolves the
    review through the parent operation's committed claim and checks the same
    Gateway authority. Main revalidates the parent attachment before lookup
    and before returning the result.
+   Named-child billing uses an owner-projected index of accepted inputs to
+   their exact source turn. Its bounded pages expose local assignment identities,
+   names, dispositions and settlement evidence, without upstream request IDs or
+   credentials. Main requires a refreshed assignment to match an eligible row
+   on its current page; the worker checks the exact attached parent, source
+   turn, assignment, attempt and original Gateway authority before resolving
+   a request. Unattributable historical work is marked
+   incomplete. Reading a summary does not request settlement or run inference.
+   The [neutral source index](crates/agent-kit-store-sqlite/src/turn_links.rs)
+   supplies exact lookup without owning credential policy.
+   [Host attribution](crates/grida-agent/src/host/subagents.rs) and
+   [process tests](crates/grida-agent/tests/process/subagents.rs) cover child
+   reuse, source scope and the retained index; the
+   [Desktop Gateway tests](desktop/src/main/native-gateway-connection.test.ts)
+   cover page-bound refresh and attachment changes.
    Independent native hosts keep their own account custody under GRIDA-SEC-010.
    The fixed exchange delivers a frozen GG grant only to a construction-time
    trusted synchronous memory sink; its public result contains only org/expiry

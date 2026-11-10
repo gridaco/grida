@@ -8,6 +8,7 @@ import {
   TRANSCRIPT_WINDOW,
   type NativeAgentLaunch,
 } from "./native-agent-process";
+import { NativeGatewayConnection } from "./native-gateway-connection";
 
 function state() {
   const root = fs.mkdtempSync(
@@ -134,6 +135,62 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       test.close();
     }
   });
+
+  it.each([
+    {
+      version: 0,
+      acceptsChildren: false,
+      childResult: { kind: "unavailable" },
+    },
+    {
+      version: 1,
+      acceptsChildren: true,
+      childResult: { kind: "settled", chargedMills: "0.75" },
+    },
+  ])(
+    "gates child Gateway billing on worker capability $version",
+    async ({ version, acceptsChildren, childResult }) => {
+      const test = fixture(
+        `if (request.method === '_co.grida/gateway/billing-status') {
+        send({id:request.id,result:request.params.child
+          ? {kind:'settled',chargedMills:'0.75'} : {kind:'pending'}});
+      }`,
+        1,
+        { [NativeGatewayConnection.childBillingCapability]: version }
+      );
+      let agent: NativeAgentProcess | undefined;
+      try {
+        agent = await NativeAgentProcess.start({
+          ...test.options,
+          gatewayScope: "a".repeat(64),
+          providerNetwork: { prepare: () => null },
+          gatewayJobBilling: async () => ({ kind: "unavailable" }),
+        });
+        expect(agent.acceptsChildGatewayBilling).toBe(acceptsChildren);
+        const attempt = {
+          sessionId: "parent",
+          turnId: "turn",
+          operationId: "operation",
+          attemptId: "attempt",
+        };
+        await expect(agent.gatewayBillingStatus(attempt)).resolves.toEqual({
+          kind: "pending",
+        });
+        await expect(
+          agent.gatewayBillingStatus({
+            ...attempt,
+            child: { childId: "child", inputId: "assignment" },
+          })
+        ).resolves.toEqual(childResult);
+      } finally {
+        try {
+          await agent?.close();
+        } finally {
+          test.close();
+        }
+      }
+    }
+  );
 
   it("keeps a transcript page intact when a legacy replay overlaps it", async () => {
     const test = fixture(

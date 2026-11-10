@@ -667,6 +667,14 @@ count has incomplete coverage, and the summary identifies requests with
 unknown counts. Cached input and reasoning output can overlap other token
 counts. Context estimates and charges are separate.
 
+When Gateway billing is available, the turn summary can also list charges for
+work assigned to named subagents. Use **More assignments** to read the next
+page, or **Reload assignments** to include work assigned since the summary was
+opened. Refreshing a pending charge checks only that model request. Some
+assignments may not have enough retained information for attribution; the
+summary calls out incomplete coverage and does not treat unavailable charges
+as zero.
+
 On a compatible image-enabled profile, ask the agent to crop a retained PNG
 in Act. Open **Turn summary** for the finished turn and choose **Preview cropped
 PNG** to inspect the image kept in private chat storage. Use **Save PNG as…**

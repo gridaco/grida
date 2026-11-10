@@ -28,6 +28,7 @@ const UNAVAILABLE: NativeGatewayBilling = { kind: "unavailable" };
 
 export class NativeGatewayConnection implements NativeProviderNetwork {
   static readonly billingCapability = "co.grida/gateway/billing-status";
+  static readonly childBillingCapability = "co.grida/gateway/child-billing";
   static readonly billingStatusMethod = "_co.grida/gateway/billing-status";
   static readonly readJobBillingMethod = "_co.grida/gateway/read-job-billing";
   readonly scope: string;

@@ -465,6 +465,189 @@ it("keeps older settled summaries and projects only bounded reported token count
   }
 });
 
+it("reads and refreshes only the exact ordinary child assignment on the requested page", async () => {
+  const test = fixture();
+  const sessionId = "parent-session";
+  const latest = {
+    turnId: "parent-turn",
+    epoch: 1,
+    journalPosition: 3,
+    historyPosition: 2,
+    controlRevision: 0,
+    paused: false,
+    cancelled: false,
+    disposition: "settled",
+    status: "succeeded",
+  };
+  const summary = {
+    turnId: latest.turnId,
+    status: latest.status,
+    text: "The parent finished.",
+    textTruncated: false,
+    steps: 1,
+    unresolvedOperations: 0,
+    toolActivity: null,
+    checks: [],
+  };
+  const attempt = {
+    operationId: "child-operation",
+    attemptId: "child-attempt",
+  };
+  const billing = { attempts: [], omittedAttempts: 0 };
+  const first = { childId: "child-1", inputId: "assignment-1" };
+  const second = { childId: "child-2", inputId: "assignment-2" };
+  const firstPage = {
+    assignments: [{ ...first, name: "First", disposition: { kind: "queued" } }],
+    nextAfter: first,
+    coverageIncomplete: true,
+  };
+  const secondAssignment = {
+    ...second,
+    name: "Second",
+    disposition: { kind: "completed", turn: "child-turn" },
+    billing: {
+      attempts: [{ ...attempt, kind: "pending", refreshable: true }],
+      omittedAttempts: 0,
+    },
+  };
+  const secondPage = {
+    assignments: [secondAssignment],
+    coverageIncomplete: true,
+  };
+  let negotiated = false;
+  let firstPageWire: unknown = firstPage;
+  const request = vi.fn<NativeAgentProcess["request"]>(
+    async (method, params) => {
+      if (method === "session/new") return { sessionId };
+      if (method === "_co.grida/session/turn-summary") {
+        const page = (params as { childBillingAfter?: unknown })
+          .childBillingAfter;
+        return {
+          ...summary,
+          gatewayBilling: {
+            ...billing,
+            children: page ? secondPage : firstPageWire,
+          },
+        };
+      }
+      return {
+        sessionId,
+        sessionRevision: 1,
+        queuedInputs: 0,
+        queue: [],
+        admissionPaused: false,
+        current: null,
+        latest,
+      };
+    }
+  );
+  const status = vi.fn<NativeAgentProcess["gatewayBillingStatus"]>(
+    async () => ({
+      kind: "settled",
+      chargedMills: "0.75",
+    })
+  );
+  const start = vi.spyOn(NativeAgentProcess, "start").mockResolvedValueOnce({
+    get acceptsChildGatewayBilling() {
+      return negotiated;
+    },
+    request,
+    gatewayBillingStatus: status,
+    close: async () => {},
+  } as unknown as NativeAgentProcess);
+  const requireCurrent = vi.fn<() => void>();
+  let client: NativeAgentChat | undefined;
+  try {
+    client = await NativeAgentChat.start({
+      resourcesPath: test.root,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "openai-compatible",
+      model: "fixture",
+    });
+    const session = await client.create();
+    const snapshot = await client.observe(session);
+    const read = () => client!.turnSummary(session, snapshot);
+    const page = { childBillingAfter: first, requireCurrent };
+    const refresh = { ...page, attempt: { ...attempt, child: second } };
+
+    await expect(read()).resolves.toEqual(summary);
+    const calls = request.mock.calls.length;
+    await expect(client.turnSummary(session, snapshot, page)).rejects.toThrow(
+      "native_chat_gateway_billing_unavailable"
+    );
+    expect(request).toHaveBeenCalledTimes(calls);
+    negotiated = true;
+    await expect(read()).resolves.toMatchObject({
+      gatewayBilling: { children: firstPage },
+    });
+    firstPageWire = { ...firstPage, nextAfter: second };
+    await expect(read()).resolves.toEqual(summary);
+    firstPageWire = firstPage;
+    await expect(
+      client.turnSummary(session, snapshot, page)
+    ).resolves.toMatchObject({ gatewayBilling: { children: secondPage } });
+    expect(request).toHaveBeenLastCalledWith("_co.grida/session/turn-summary", {
+      sessionId,
+      turnId: latest.turnId,
+      childBillingAfter: first,
+    });
+    await expect(
+      client.turnSummary(session, snapshot, {
+        ...refresh,
+        attempt: { ...attempt, child: first },
+      })
+    ).rejects.toThrow("native_chat_gateway_billing_unavailable");
+    expect(status).not.toHaveBeenCalled();
+    requireCurrent.mockImplementationOnce(() => {
+      throw new Error("stale-attachment");
+    });
+    await expect(
+      client.turnSummary(session, snapshot, refresh)
+    ).rejects.toThrow("stale-attachment");
+    expect(status).not.toHaveBeenCalled();
+    await expect(
+      client.turnSummary(session, snapshot, refresh)
+    ).resolves.toMatchObject({
+      gatewayBilling: {
+        children: {
+          assignments: [
+            {
+              ...secondAssignment,
+              billing: {
+                ...secondAssignment.billing,
+                attempts: [
+                  {
+                    ...attempt,
+                    kind: "settled",
+                    chargedMills: "0.75",
+                    refreshable: false,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+    expect(status).toHaveBeenCalledExactlyOnceWith({
+      ...attempt,
+      child: second,
+      sessionId,
+      turnId: latest.turnId,
+    });
+    await expect(
+      client.turnSummary(session, snapshot, page)
+    ).resolves.toMatchObject({ gatewayBilling: { children: secondPage } });
+    expect(status).toHaveBeenCalledTimes(1);
+  } finally {
+    await client?.close();
+    start.mockRestore();
+    test.close();
+  }
+});
+
 it.runIf(Boolean(packaged))(
   "observes and stops the built host's pending retry without another provider request",
   async () => {

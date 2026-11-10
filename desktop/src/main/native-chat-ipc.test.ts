@@ -1546,10 +1546,22 @@ describe("native chat IPC", () => {
     expect(record.turnId).toBe(latest.turnId);
     const late = Promise.withResolvers<typeof record>();
     summary.mockReturnValueOnce(late.promise);
+    const childBillingAfter = { childId: "child", inputId: "assignment" };
     const pending = ipc.turnSummary(
       first.event,
       parent.attachmentId,
-      settled.observationId
+      settled.observationId,
+      undefined,
+      childBillingAfter
+    );
+    expect(summary).toHaveBeenLastCalledWith(
+      { id: parent.sessionId },
+      settled.snapshot,
+      {
+        attempt: undefined,
+        childBillingAfter,
+        requireCurrent: expect.any(Function),
+      }
     );
     observe.mockResolvedValue({
       ...settled.snapshot,

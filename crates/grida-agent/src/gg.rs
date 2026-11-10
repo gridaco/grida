@@ -7,13 +7,15 @@ use agent_kit_core::inference::{
 };
 use agent_kit_core::turn::{OperationInput, OperationOutcome, OperationState, TurnState};
 use agent_kit_core::{
-    AttemptId, BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint,
-    ModelId, OperationId, PrincipalId, ProviderId, Result, SchemaId, ScopeId,
+    AttemptId, BindingId, BoxFuture, CancellationToken, ChangeId, Envelope, Error, ErrorKind,
+    Fingerprint, ModelId, OperationId, PrincipalId, ProviderId, Result, SchemaId, ScopeId,
+    SessionId,
 };
 use agent_kit_providers::{
     StreamingTransport, TerminalReceiptDecoder, TransportFailure, TransportOperation,
     TransportRequest, TransportResponse,
 };
+use agent_kit_sessions::InputDisposition;
 use grida_auth::{GgGrant, GgGrantScope};
 use reqwest::Url;
 use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue};
@@ -283,7 +285,7 @@ impl GatewayBillingRead {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GatewayBillingProjection {
     attempts: Vec<GatewayBillingAttempt>,
@@ -296,6 +298,8 @@ pub(crate) struct GatewayTurnBilling {
     direct: GatewayBillingProjection,
     #[serde(skip_serializing_if = "Option::is_none")]
     review: Option<GatewayBillingProjection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    children: Option<GatewayChildBillingPage>,
 }
 
 impl GatewayTurnBilling {
@@ -311,8 +315,59 @@ impl GatewayTurnBilling {
                 })
             })
         });
-        Self { direct, review }
+        Self {
+            direct,
+            review,
+            children: None,
+        }
     }
+
+    pub(crate) fn with_children(mut self, children: Option<GatewayChildBillingPage>) -> Self {
+        self.children = children;
+        self
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct GatewayChildBillingRef {
+    pub(crate) child_id: SessionId,
+    pub(crate) input_id: ChangeId,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GatewayChildBillingPage {
+    pub(crate) assignments: Vec<GatewayChildBilling>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) next_after: Option<GatewayChildBillingRef>,
+    pub(crate) coverage_incomplete: bool,
+}
+
+impl GatewayChildBillingPage {
+    pub(crate) fn with_read_coverage(
+        page: Result<Option<Self>>,
+        after: bool,
+    ) -> Result<Option<Self>> {
+        match page {
+            Err(_) if !after => Ok(Some(Self {
+                coverage_incomplete: true,
+                ..Self::default()
+            })),
+            page => page,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GatewayChildBilling {
+    pub(crate) child_id: SessionId,
+    pub(crate) input_id: ChangeId,
+    pub(crate) name: String,
+    pub(crate) disposition: InputDisposition,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) billing: Option<GatewayBillingProjection>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -765,6 +820,27 @@ fn now_ms() -> Result<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unavailable_child_page_preserves_the_direct_and_funded_billing() {
+        let base = GatewayTurnBilling::new(Default::default(), Some(Default::default()));
+        let before = serde_json::to_value(&base).unwrap();
+        let failure = Error::new(ErrorKind::Unavailable, "turn_snapshot_unavailable");
+        let partial =
+            GatewayChildBillingPage::with_read_coverage(Err(failure.clone()), false).unwrap();
+        let after = serde_json::to_value(base.with_children(partial)).unwrap();
+        for key in ["attempts", "omittedAttempts", "review"] {
+            assert_eq!(after[key], before[key]);
+        }
+        assert_eq!(
+            after["children"],
+            serde_json::json!({"assignments":[],"coverageIncomplete":true})
+        );
+        assert_eq!(
+            GatewayChildBillingPage::with_read_coverage(Err(failure.clone()), true).unwrap_err(),
+            failure
+        );
+    }
 
     #[test]
     fn selected_gateway_png_requires_the_product_or_local_editor_route() {

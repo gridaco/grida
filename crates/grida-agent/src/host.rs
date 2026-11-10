@@ -49,7 +49,9 @@ use crate::configuration::{
     Configuration, ConfigurationInspection, ConfigurationSnapshot, WorkspaceConfiguration,
 };
 use crate::configuration_tools::ConfigurationAccess;
-use crate::gg::GgConnection;
+use crate::gg::{
+    GatewayChildBilling, GatewayChildBillingPage, GatewayChildBillingRef, GgConnection,
+};
 use crate::http::{CompatibleOutputLimitField, HttpTransport, ProviderOptions, ProviderProtocol};
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, GrantSelection,
@@ -80,6 +82,7 @@ use agent_kit_sessions::{
     InputDisposition, RecoveryRequest, SessionControl, SessionRevision, SessionStore, SessionView,
     Submission, TurnDisposition, TurnSelection, TurnView,
 };
+use agent_kit_store_sqlite::turn_links::TurnLinkCursor;
 use agent_kit_store_sqlite::{OperationPairReceipt, SqliteStore};
 use grida_agent_master::configuration::SettingChange;
 use grida_agent_master::effort::Policy as EffortPolicy;
@@ -638,9 +641,10 @@ impl Host {
         } else if !database.is_file() {
             return Err(problem(ErrorKind::Unavailable, "agent_state_unavailable"));
         }
-        let store = Arc::new(SqliteStore::open_cataloged(
+        let store = Arc::new(SqliteStore::open_cataloged_with_turn_links(
             database,
             catalog::configuration_scope,
+            subagents::turn_link,
         )?);
         let configuration = execution
             .as_ref()
@@ -778,9 +782,30 @@ impl Host {
         turn: TurnId,
         operation: OperationId,
         attempt: agent_kit_core::AttemptId,
+        child: Option<GatewayChildBillingRef>,
     ) -> Option<String> {
         let gateway = self.supervised_gateway()?.clone();
         gateway.validate().ok()?;
+        if let Some(child) = child {
+            self.require_gateway_billing_parent(&session).await.ok()?;
+            let child_view = self.store.inspect(child.child_id.clone()).await.ok()?;
+            self.check_execution(&child_view).ok()?;
+            subagents::child_profile(&session, &child_view.configuration)
+                .ok()?
+                .require_authority(&gateway.binding.authority)
+                .ok()?;
+            return self
+                .store
+                .inspect_turn_link_with(session, turn, child.into(), move |state| {
+                    Ok(gateway
+                        .retained_attempt_request_id(state, &operation, &attempt)
+                        .flatten())
+                })
+                .await
+                .ok()
+                .flatten()
+                .flatten();
+        }
         let parent_gateway = gateway.clone();
         let parent_operation = operation.clone();
         let parent_attempt = attempt.clone();
@@ -825,6 +850,8 @@ impl Host {
         turn: TurnId,
         include_artifacts: bool,
         include_gateway_billing: bool,
+        include_child_billing: bool,
+        child_billing_after: Option<GatewayChildBillingRef>,
     ) -> Result<(
         TurnOutcome,
         Option<CropArtifacts>,
@@ -859,6 +886,21 @@ impl Host {
                 ))
             })
             .await?;
+        let children = match gateway.as_ref().filter(|_| include_child_billing) {
+            Some(gateway) => {
+                let after = child_billing_after.is_some();
+                let page = self
+                    .gateway_child_billing(
+                        session.clone(),
+                        turn.clone(),
+                        child_billing_after,
+                        gateway.clone(),
+                    )
+                    .await;
+                GatewayChildBillingPage::with_read_coverage(page, after)?
+            }
+            None => None,
+        };
         let billing = if let (Some(gateway), Some((direct, review_operations))) = (gateway, direct)
         {
             let review = self
@@ -870,11 +912,76 @@ impl Host {
                 .ok()
                 .flatten()
                 .flatten();
-            Some(crate::gg::GatewayTurnBilling::new(direct, review))
+            Some(crate::gg::GatewayTurnBilling::new(direct, review).with_children(children))
         } else {
-            None
+            children.map(|children| {
+                crate::gg::GatewayTurnBilling::new(Default::default(), None)
+                    .with_children(Some(children))
+            })
         };
         Ok((outcome, artifacts, image_generation, billing))
+    }
+
+    async fn require_gateway_billing_parent(&self, session: &SessionId) -> Result<()> {
+        let view = self.store.inspect(session.clone()).await?;
+        self.check_execution(&view)?;
+        if session_configuration(&view)?.subagent.is_some() {
+            return Err(problem(
+                ErrorKind::Unavailable,
+                "gateway_child_billing_unavailable",
+            ));
+        }
+        Ok(())
+    }
+
+    async fn gateway_child_billing(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+        after: Option<GatewayChildBillingRef>,
+        gateway: Arc<crate::gg::SupervisedGg>,
+    ) -> Result<Option<GatewayChildBillingPage>> {
+        if let Err(error) = self.require_gateway_billing_parent(&session).await {
+            return match error.code.as_str() {
+                "session_execution_configuration_changed" | "gateway_child_billing_unavailable" => {
+                    Ok(None)
+                }
+                _ => Err(error),
+            };
+        }
+        let parent = session.clone();
+        let authority = gateway.binding.authority.clone();
+        let page = self
+            .store
+            .turn_links(session, turn, after.map(Into::into), move |state| {
+                Ok(gateway.retained_billing(state))
+            })
+            .await?;
+        let mut coverage_incomplete = page.coverage_incomplete;
+        let mut assignments = Vec::new();
+        let mut owned_page = true;
+        for entry in page.entries {
+            let profile = subagents::child_profile(&parent, &entry.configuration).ok();
+            let Some(profile) =
+                profile.filter(|profile| profile.require_authority(&authority).is_ok())
+            else {
+                coverage_incomplete = true;
+                owned_page = false;
+                continue;
+            };
+            assignments.push(GatewayChildBilling {
+                child_id: entry.cursor.session,
+                input_id: entry.cursor.input,
+                name: profile.name().to_owned(),
+                disposition: entry.disposition,
+                billing: entry.turn.and_then(|(_, billing)| billing),
+            });
+        }
+        Ok(Some(GatewayChildBillingPage {
+            assignments,
+            next_after: page.next_after.filter(|_| owned_page).map(Into::into),
+            coverage_incomplete,
+        }))
     }
 
     pub(crate) async fn headless_gateway_billing(
@@ -2802,6 +2909,24 @@ impl Host {
         self.execution
             .as_ref()
             .is_some_and(|execution| execution.retained_inputs.is_some())
+    }
+}
+
+impl From<GatewayChildBillingRef> for TurnLinkCursor {
+    fn from(reference: GatewayChildBillingRef) -> Self {
+        Self {
+            session: reference.child_id,
+            input: reference.input_id,
+        }
+    }
+}
+
+impl From<TurnLinkCursor> for GatewayChildBillingRef {
+    fn from(cursor: TurnLinkCursor) -> Self {
+        Self {
+            child_id: cursor.session,
+            input_id: cursor.input,
+        }
     }
 }
 

@@ -626,6 +626,10 @@ export function NativeAgentPane({
                 messages={state.messages}
                 previewController={bridge.readArtifact ? controller : undefined}
                 billingRefresh={state.gatewayBillingRefresh}
+                childPage={state.gatewayChildPage}
+                onReadChildBilling={(turnId, destination) =>
+                  void controller.readGatewayChildBilling(turnId, destination)
+                }
                 onRefreshGatewayBilling={(turnId, attempt) =>
                   void controller.refreshGatewayBilling(turnId, attempt)
                 }

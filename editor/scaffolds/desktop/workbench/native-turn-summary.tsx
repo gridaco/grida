@@ -3,6 +3,7 @@ import { Button } from "@app/ui/components/button";
 import type {
   NativeChatArtifactSaveResult,
   NativeChatGatewayAttemptRef,
+  NativeChatGatewayChildRef,
   NativeChatGatewayBillingAttempts,
   NativeChatImageArtifact,
   NativeChatMessage,
@@ -47,6 +48,8 @@ export function NativeTurnSummary({
   onRetry,
   billingRefresh,
   onRefreshGatewayBilling,
+  childPage = { status: "idle", hasPrevious: false },
+  onReadChildBilling,
 }: {
   summary: NativeChatTurnSummary;
   messages: readonly NativeChatMessage[];
@@ -57,6 +60,8 @@ export function NativeTurnSummary({
     turnId: string,
     attempt: NativeChatGatewayAttemptRef
   ) => void;
+  childPage?: NativeChatView["gatewayChildPage"];
+  onReadChildBilling?: (turnId: string, destination: "first" | "next") => void;
 }) {
   const text = summary.text.trim();
   const inTranscript = messages.some(
@@ -150,6 +155,65 @@ export function NativeTurnSummary({
               onRefresh={refreshBilling}
             />
           )}
+          {summary.gatewayBilling.children && (
+            <div className="mt-2 text-muted-foreground">
+              <p>Assigned agent work</p>
+              {summary.gatewayBilling.children.assignments.map((child) => (
+                <div key={JSON.stringify([child.childId, child.inputId])}>
+                  <p>
+                    {child.name} · {child.disposition.kind}
+                  </p>
+                  {child.billing ? (
+                    <GatewayBilling
+                      heading="Gateway billing"
+                      billing={child.billing}
+                      child={{ childId: child.childId, inputId: child.inputId }}
+                      refresh={billingRefresh}
+                      onRefresh={refreshBilling}
+                    />
+                  ) : (
+                    <p>Billing unavailable for this assignment.</p>
+                  )}
+                </div>
+              ))}
+              {summary.gatewayBilling.children.coverageIncomplete && (
+                <p>Some assignments could not be attributed.</p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={
+                    childPage.status === "loading" ||
+                    billingRefresh?.status === "loading"
+                  }
+                  onClick={() => onReadChildBilling?.(summary.turnId, "first")}
+                >
+                  {childPage.hasPrevious
+                    ? "First assignments"
+                    : "Reload assignments"}
+                </Button>
+                {summary.gatewayBilling.children.nextAfter && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    disabled={
+                      childPage.status === "loading" ||
+                      billingRefresh?.status === "loading"
+                    }
+                    onClick={() => onReadChildBilling?.(summary.turnId, "next")}
+                  >
+                    More assignments
+                  </Button>
+                )}
+              </div>
+              {childPage.status === "unavailable" && (
+                <p role="status">Couldn't load assignments.</p>
+              )}
+            </div>
+          )}
         </>
       )}
       {previewController && artifacts && artifacts.length > 0 && (
@@ -201,11 +265,13 @@ function GatewayBilling({
   billing,
   refresh,
   onRefresh,
+  child,
 }: {
   heading: string;
   billing: NativeChatGatewayBillingAttempts;
   refresh?: NativeChatView["gatewayBillingRefresh"];
   onRefresh?: (attempt: NativeChatGatewayAttemptRef) => void;
+  child?: NativeChatGatewayChildRef;
 }) {
   if (!billing.attempts.length && !billing.omittedAttempts) return null;
   return (
@@ -215,7 +281,9 @@ function GatewayBilling({
         {billing.attempts.map((attempt, index) => {
           const status =
             refresh?.operationId === attempt.operationId &&
-            refresh.attemptId === attempt.attemptId
+            refresh.attemptId === attempt.attemptId &&
+            refresh.child?.childId === child?.childId &&
+            refresh.child?.inputId === child?.inputId
               ? refresh.status
               : undefined;
           const amount =
@@ -238,7 +306,9 @@ function GatewayBilling({
                   variant="ghost"
                   size="xs"
                   disabled={refresh?.status === "loading"}
-                  onClick={() => onRefresh(attempt)}
+                  onClick={() =>
+                    onRefresh(child ? { ...attempt, child } : attempt)
+                  }
                 >
                   {status === "loading" ? "Refreshing…" : "Refresh billing"}
                 </Button>

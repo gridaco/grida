@@ -19,6 +19,9 @@ import type {
   NativeChatGatewayBilling,
   NativeChatGatewayBillingAttempt,
   NativeChatGatewayBillingAttempts,
+  NativeChatGatewayChildBilling,
+  NativeChatGatewayChildBillingPage,
+  NativeChatGatewayChildRef,
   NativeChatGoalControl,
   NativeChatGoalReceipt,
   NativeChatGoalRequest,
@@ -148,6 +151,7 @@ const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const MAX_UPDATE_BYTES = 8 * 1024;
 const MAX_SUMMARY_BYTES = 8 * 1024;
 const MAX_SUMMARY_CHECKS = 8;
+const MAX_GATEWAY_CHILD_ASSIGNMENTS = 16;
 const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 const MAX_TRANSCRIPT_MESSAGES = 1024;
 const MAX_CATALOG_SESSIONS = 32;
@@ -1067,16 +1071,32 @@ export class NativeAgentChat {
   async turnSummary(
     session: NativeChatSession,
     snapshot: NativeChatSnapshot,
-    refreshBilling?: { attempt: unknown; requireCurrent: () => void }
+    billingOptions?: {
+      attempt?: unknown;
+      childBillingAfter?: unknown;
+      requireCurrent: () => void;
+    }
   ): Promise<NativeChatTurnSummary> {
     const sessionId = this.requireObservation(session, snapshot);
     const latest = snapshot.latest;
     if (latest?.disposition !== "settled" || latest.status === null)
       throw new Error("native_chat_turn_summary_unavailable");
+    const attempt =
+      billingOptions?.attempt === undefined
+        ? undefined
+        : gatewayAttempt(billingOptions.attempt);
+    const childBillingAfter =
+      billingOptions?.childBillingAfter === undefined
+        ? undefined
+        : gatewayChildRef(billingOptions.childBillingAfter);
+    const acceptsChildren = this.process.acceptsChildGatewayBilling;
+    if ((childBillingAfter || attempt?.child) && !acceptsChildren)
+      throw new Error("native_chat_gateway_billing_unavailable");
     const result = object(
       await this.process.request("_co.grida/session/turn-summary", {
         sessionId,
         turnId: latest.turnId,
+        ...(childBillingAfter && { childBillingAfter }),
       })
     );
     this.requireAttached(session);
@@ -1092,40 +1112,72 @@ export class NativeAgentChat {
     const tools =
       result.toolActivity === null ? null : object(result.toolActivity);
     const usage = tokenUsage(result.tokenUsage);
-    let billing = gatewayBilling(result.gatewayBilling);
-    if (refreshBilling) {
-      const attempt = gatewayAttempt(refreshBilling.attempt);
+    let billing = gatewayBilling(
+      result.gatewayBilling,
+      acceptsChildren,
+      childBillingAfter
+    );
+    if (childBillingAfter && !billing?.children)
+      throw new Error("native_chat_gateway_billing_unavailable");
+    if (attempt && billingOptions) {
       const matches = (row: NativeChatGatewayBillingAttempt) =>
         row.operationId === attempt.operationId &&
         row.attemptId === attempt.attemptId;
-      const group = billing?.attempts.some(matches) ? billing : billing?.review;
+      const child = attempt.child;
+      const assignment =
+        child &&
+        billing?.children?.assignments.find(
+          (row) =>
+            row.childId === child.childId && row.inputId === child.inputId
+        );
+      const group = child
+        ? assignment?.billing
+        : billing?.attempts.some(matches)
+          ? billing
+          : billing?.review;
       const selected = group?.attempts.find(matches);
       if (!billing || !group || !selected?.refreshable)
         throw new Error("native_chat_gateway_billing_unavailable");
-      refreshBilling.requireCurrent();
+      billingOptions.requireCurrent();
       const status = await this.process.gatewayBillingStatus({
         ...attempt,
         sessionId,
         turnId: latest.turnId,
       });
       this.requireAttached(session);
-      refreshBilling.requireCurrent();
+      billingOptions.requireCurrent();
       if (status.kind === "unavailable")
         throw new Error("native_chat_gateway_billing_unavailable");
       const refreshed: NativeChatGatewayBillingAttempt =
         status.kind === "settled"
-          ? Object.freeze({ ...attempt, ...status, refreshable: false })
-          : Object.freeze({ ...attempt, kind: "pending", refreshable: true });
+          ? Object.freeze({ ...selected, ...status, refreshable: false })
+          : Object.freeze({ ...selected, kind: "pending", refreshable: true });
       const refreshedGroup = Object.freeze({
         ...group,
         attempts: Object.freeze(
           group.attempts.map((row) => (row === selected ? refreshed : row))
         ),
       });
-      billing =
-        group === billing
-          ? refreshedGroup
-          : Object.freeze({ ...billing, review: refreshedGroup });
+      if (assignment && billing.children) {
+        billing = Object.freeze({
+          ...billing,
+          children: Object.freeze({
+            ...billing.children,
+            assignments: Object.freeze(
+              billing.children.assignments.map((row) =>
+                row === assignment
+                  ? Object.freeze({ ...row, billing: refreshedGroup })
+                  : row
+              )
+            ),
+          }),
+        });
+      } else {
+        billing =
+          group === billing
+            ? refreshedGroup
+            : Object.freeze({ ...billing, review: refreshedGroup });
+      }
     }
     return Object.freeze({
       turnId: latest.turnId,
@@ -2288,14 +2340,31 @@ function tokenUsage(value: unknown): NativeChatTokenUsage | undefined {
 
 function gatewayAttempt(value: unknown): NativeChatGatewayAttemptRef {
   const attempt = object(value);
-  if (Object.keys(attempt).length !== 2) throw invalidResponse();
+  if (Object.keys(attempt).length !== (attempt.child === undefined ? 2 : 3))
+    throw invalidResponse();
   return {
     operationId: identity(attempt.operationId),
     attemptId: identity(attempt.attemptId),
+    ...(attempt.child !== undefined && {
+      child: gatewayChildRef(attempt.child),
+    }),
   };
 }
 
-function gatewayBilling(value: unknown): NativeChatGatewayBilling | undefined {
+function gatewayChildRef(value: unknown): NativeChatGatewayChildRef {
+  const child = object(value);
+  if (Object.keys(child).length !== 2) throw invalidResponse();
+  return Object.freeze({
+    childId: identity(child.childId),
+    inputId: identity(child.inputId),
+  });
+}
+
+function gatewayBilling(
+  value: unknown,
+  acceptsChildren: boolean,
+  after?: NativeChatGatewayChildRef
+): NativeChatGatewayBilling | undefined {
   if (value === undefined) return undefined;
   try {
     const billing = object(value);
@@ -2305,13 +2374,110 @@ function gatewayBilling(value: unknown): NativeChatGatewayBilling | undefined {
       billing.review === undefined
         ? undefined
         : gatewayBillingAttempts(object(billing.review), seen);
-    if (!direct.attempts.length && !direct.omittedAttempts && !review)
+    const children =
+      acceptsChildren && gatewayChildBillingPage(billing.children, after);
+    if (
+      !direct.attempts.length &&
+      !direct.omittedAttempts &&
+      !review &&
+      !children
+    )
       return undefined;
-    return Object.freeze({ ...direct, ...(review && { review }) });
+    return Object.freeze({
+      ...direct,
+      ...(review && { review }),
+      ...(children && { children }),
+    });
   } catch {
     // Optional billing evidence cannot hide the recorded turn result.
     return undefined;
   }
+}
+
+function gatewayChildBillingPage(
+  value: unknown,
+  after?: NativeChatGatewayChildRef
+): NativeChatGatewayChildBillingPage | undefined {
+  if (value === undefined) return undefined;
+  try {
+    const page = object(value);
+    if (
+      Object.keys(page).length !== (page.nextAfter === undefined ? 2 : 3) ||
+      !Array.isArray(page.assignments) ||
+      page.assignments.length > MAX_GATEWAY_CHILD_ASSIGNMENTS
+    )
+      throw invalidResponse();
+    const seen = new Set<string>();
+    if (after) seen.add(JSON.stringify([after.childId, after.inputId]));
+    const assignments = page.assignments.map(
+      (value: unknown): NativeChatGatewayChildBilling => {
+        const row = object(value);
+        if (
+          Object.keys(row).length !== (row.billing === undefined ? 4 : 5) ||
+          typeof row.name !== "string" ||
+          !row.name ||
+          row.name.trim() !== row.name ||
+          Buffer.byteLength(row.name) > 128 ||
+          /\p{Cc}/u.test(row.name)
+        )
+          throw invalidResponse();
+        const childId = identity(row.childId);
+        const inputId = identity(row.inputId);
+        const key = JSON.stringify([childId, inputId]);
+        if (seen.has(key)) throw invalidResponse();
+        seen.add(key);
+        return Object.freeze({
+          childId,
+          inputId,
+          name: row.name,
+          disposition: gatewayChildDisposition(row.disposition),
+          ...(row.billing !== undefined && {
+            billing: gatewayBillingAttempts(object(row.billing), new Set()),
+          }),
+        });
+      }
+    );
+    const nextAfter =
+      page.nextAfter === undefined
+        ? undefined
+        : gatewayChildRef(page.nextAfter);
+    const last = assignments.at(-1);
+    if (
+      nextAfter &&
+      (nextAfter.childId !== last?.childId ||
+        nextAfter.inputId !== last.inputId)
+    )
+      throw invalidResponse();
+    return Object.freeze({
+      assignments: Object.freeze(assignments),
+      ...(nextAfter && { nextAfter }),
+      coverageIncomplete: flag(page.coverageIncomplete),
+    });
+  } catch {
+    // Malformed optional child evidence does not hide the parent result.
+    return undefined;
+  }
+}
+
+function gatewayChildDisposition(
+  value: unknown
+): NativeChatGatewayChildBilling["disposition"] {
+  const row = object(value);
+  const kind = choice(row.kind, [
+    "queued",
+    "claimed",
+    "completed",
+    "superseded",
+    "withdrawn",
+  ] as const);
+  const fields = Object.keys(row).length;
+  if (fields === 1 && (kind === "queued" || kind === "withdrawn"))
+    return Object.freeze({ kind });
+  if (fields === 2 && (kind === "claimed" || kind === "completed"))
+    return Object.freeze({ kind, turn: identity(row.turn) });
+  if (fields === 2 && kind === "superseded")
+    return Object.freeze({ kind, replacement: identity(row.replacement) });
+  throw invalidResponse();
 }
 
 function gatewayBillingAttempts(

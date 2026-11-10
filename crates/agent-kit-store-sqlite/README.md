@@ -70,6 +70,16 @@ from an owner-selected bucket in reverse creation order. Its anchor must
 already belong to that scope. An entry has an optional bounded display label
 and its own revision. Updating it leaves execution and history unchanged.
 
+An optional owner projection links an immutable submission to an exact retained
+source turn in the acceptance transaction. Historical submissions are projected
+in resumable batches when the owner opens the store. A known source session
+with an unresolved historical turn marks its coverage incomplete. When even
+the historical source session is unknown, every page discloses incomplete
+coverage without exposing the unclassified submission. Reads are
+bounded and require the source session and turn, and a linked input's current
+disposition determines whether it has a turn to inspect. Deleting either side
+removes the link.
+
 A live lease blocks recovery of its turn. Dropping it makes interrupted execution
 eligible for an explicit recovery request. Reopening the database preserves the
 turn's operations and outcomes, and recovery advances its writer epoch. Inspection

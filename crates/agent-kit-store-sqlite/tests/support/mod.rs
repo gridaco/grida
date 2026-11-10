@@ -16,6 +16,18 @@ pub fn private_directory() -> TempDir {
     directory
 }
 
+#[allow(dead_code)]
+pub fn remove_turn_link_schema(connection: &rusqlite::Connection) {
+    connection
+        .execute_batch(
+            "DROP TABLE turn_submission_links;
+             DROP INDEX submissions_pending_link;
+             DROP INDEX submissions_unknown_link;
+             ALTER TABLE submissions DROP COLUMN link_projected;",
+        )
+        .unwrap();
+}
+
 pub fn change(value: &str) -> ChangeId {
     ChangeId::new(value).unwrap()
 }

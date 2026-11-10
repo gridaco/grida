@@ -1,9 +1,9 @@
 //! Conditional controls for a turn and an operation's claimed destination.
 
 use super::{
-    OPERATION_CLAIM, OperationClaimRecord, SqliteStore, commit_error, database_error, decode,
-    deletion, error, execute, load_turn, lookup_request, operation_claim_key, record_control,
-    save_request,
+    Inner, OPERATION_CLAIM, OperationClaimRecord, SqliteStore, commit_error, database_error,
+    decode, deletion, error, execute, load_turn, lookup_request, operation_claim_key,
+    record_control, save_request,
 };
 use agent_kit_core::turn::TurnState;
 use agent_kit_core::{ChangeId, ErrorKind, Fingerprint, OperationId, Result, SessionId, TurnId};
@@ -130,6 +130,7 @@ impl SqliteStore {
                 return Ok(record.receipt);
             }
             let destination = apply_related_control(
+                inner,
                 &transaction,
                 &source.session,
                 &source_turn,
@@ -137,7 +138,7 @@ impl SqliteStore {
                 |_, _| Ok(None),
             )?;
             let receipt = OperationPairReceipt {
-                source: record_fresh_control(&transaction, source, None)?,
+                source: record_fresh_control(inner, &transaction, source, None)?,
                 destination,
             };
             let record = OperationPairRecord {
@@ -161,6 +162,7 @@ impl SqliteStore {
 }
 
 pub(super) fn apply_related_control(
+    inner: &Inner,
     transaction: &Transaction<'_>,
     source_session: &SessionId,
     source_turn: &TurnId,
@@ -199,7 +201,7 @@ pub(super) fn apply_related_control(
                 turn,
             )?;
             let active = before_control(request, turn)?;
-            record_fresh_control(transaction, request, active).map(Some)
+            record_fresh_control(inner, transaction, request, active).map(Some)
         }
         OperationRelatedControl::Settled {
             operation,
@@ -304,6 +306,7 @@ fn retained_request<T: DeserializeOwned>(
 }
 
 fn record_fresh_control(
+    inner: &Inner,
     transaction: &Transaction<'_>,
     request: &ControlRequest,
     active: Option<TurnState>,
@@ -323,5 +326,5 @@ fn record_fresh_control(
             "operation_pair_control_already_recorded",
         ));
     }
-    record_control(transaction, request, fingerprint, active)
+    record_control(inner, transaction, request, fingerprint, active)
 }

@@ -417,7 +417,8 @@ impl SqliteStore {
                     params![id.as_str(), end],
                 ).map_err(database_error)?;
             }
-            let acceptance = insert_input(&transaction, id, &mut session, &request.replacement, None)?;
+            let acceptance =
+                insert_input(inner, &transaction, id, &mut session, &request.replacement, None)?;
             bump_revision(&mut session)?;
             insert_view(&transaction, id, session.revision, &seed, end)?;
             save_session(&transaction, id, &session)?;

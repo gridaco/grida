@@ -225,12 +225,21 @@ export type NativeChatTokenUsage = Readonly<{
   attemptsWithoutCounts: number;
 }>;
 
+export type NativeChatGatewayChildRef = Readonly<{
+  childId: string;
+  inputId: string;
+}>;
+
 export type NativeChatGatewayAttemptRef = Readonly<{
   operationId: string;
   attemptId: string;
+  child?: NativeChatGatewayChildRef;
 }>;
 
-export type NativeChatGatewayBillingAttempt = NativeChatGatewayAttemptRef &
+export type NativeChatGatewayBillingAttempt = Omit<
+  NativeChatGatewayAttemptRef,
+  "child"
+> &
   Readonly<
     | { kind: "settled"; chargedMills: string; refreshable: false }
     | { kind: "pending" | "unavailable"; refreshable: boolean }
@@ -241,8 +250,28 @@ export type NativeChatGatewayBillingAttempts = Readonly<{
   omittedAttempts: number;
 }>;
 
+export type NativeChatGatewayChildBilling = NativeChatGatewayChildRef &
+  Readonly<{
+    name: string;
+    disposition: Readonly<
+      | { kind: "queued" | "withdrawn" }
+      | { kind: "claimed" | "completed"; turn: string }
+      | { kind: "superseded"; replacement: string }
+    >;
+    billing?: NativeChatGatewayBillingAttempts;
+  }>;
+
+export type NativeChatGatewayChildBillingPage = Readonly<{
+  assignments: readonly NativeChatGatewayChildBilling[];
+  nextAfter?: NativeChatGatewayChildRef;
+  coverageIncomplete: boolean;
+}>;
+
 export type NativeChatGatewayBilling = NativeChatGatewayBillingAttempts &
-  Readonly<{ review?: NativeChatGatewayBillingAttempts }>;
+  Readonly<{
+    review?: NativeChatGatewayBillingAttempts;
+    children?: NativeChatGatewayChildBillingPage;
+  }>;
 
 export type NativeChatTurnSummary = Readonly<{
   turnId: string;
@@ -649,7 +678,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   turnSummary?(
     attachmentId: string,
     observationId: string,
-    refreshGatewayAttempt?: NativeChatGatewayAttemptRef
+    refreshGatewayAttempt?: NativeChatGatewayAttemptRef,
+    childBillingAfter?: NativeChatGatewayChildRef
   ): Promise<NativeChatTurnSummary>;
   readArtifact?(
     attachmentId: string,

@@ -420,6 +420,7 @@ async fn previous_schema_upgrades_without_changing_completed_or_queued_input() {
     drop(store);
     let path = directory.path().join("sessions.sqlite");
     let previous = rusqlite::Connection::open(&path).unwrap();
+    support::remove_turn_link_schema(&previous);
     previous
         .execute_batch(
             "DROP TABLE session_retirements;
@@ -2098,6 +2099,7 @@ async fn version_two_upgrades_with_original_history_view() {
     drop(store);
     let path = directory.path().join("sessions.sqlite");
     let previous = rusqlite::Connection::open(&path).unwrap();
+    support::remove_turn_link_schema(&previous);
     previous
         .execute_batch(
             "DROP TABLE session_retirements;
@@ -2120,7 +2122,7 @@ async fn version_two_upgrades_with_original_history_view() {
     let version: i64 = reopened
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 10);
+    assert_eq!(version, 11);
 }
 
 #[tokio::test]
@@ -2606,6 +2608,7 @@ async fn upgrades_context_store_without_inventing_driver_state() {
     drop(store);
 
     let previous = rusqlite::Connection::open(&filename).unwrap();
+    support::remove_turn_link_schema(&previous);
     previous
         .execute_batch(
             "DROP TABLE session_retirements;

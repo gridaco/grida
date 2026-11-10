@@ -597,8 +597,20 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,
-    (event, id: string, observation: string, refreshGatewayAttempt?: unknown) =>
-      nativeChat.turnSummary(event, id, observation, refreshGatewayAttempt)
+    (
+      event,
+      id: string,
+      observation: string,
+      refreshGatewayAttempt?: unknown,
+      childBillingAfter?: unknown
+    ) =>
+      nativeChat.turnSummary(
+        event,
+        id,
+        observation,
+        refreshGatewayAttempt,
+        childBillingAfter
+      )
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_READ_ARTIFACT,

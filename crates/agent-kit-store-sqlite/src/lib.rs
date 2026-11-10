@@ -7,6 +7,7 @@ pub mod deletion;
 pub mod driver;
 pub mod history;
 mod resume;
+pub mod turn_links;
 
 pub use control_pair::{OperationPairControl, OperationPairReceipt, OperationRelatedControl};
 pub use resume::{ResumeClaimOutcome, ResumeClaimReceipt, ResumeCompanion};
@@ -36,7 +37,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
-const SCHEMA_VERSION: i64 = 10;
+const SCHEMA_VERSION: i64 = 11;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -173,6 +174,7 @@ struct Inner {
     owners: Mutex<BTreeMap<(SessionId, TurnId), Weak<()>>>,
     changed: Notify,
     catalog: Option<catalog::ScopeProjection>,
+    turn_links: Option<turn_links::TurnLinkProjection>,
     // Drop SQLite before releasing the writer lock.
     _lock: Option<WriterLock>,
 }
@@ -244,7 +246,7 @@ impl SqliteStore {
         connection
             .pragma_update(None, "temp_store", "MEMORY")
             .map_err(database_error)?;
-        Self::initialize(None, connection, None)
+        Self::initialize(None, connection, None, None)
     }
 
     /// Open a private application database with synchronous WAL commits.
@@ -252,7 +254,7 @@ impl SqliteStore {
     /// The parent directory must exist. One process owns this database while
     /// any store or bound journal handle remains alive.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_inner(path.as_ref(), None)
+        Self::open_inner(path.as_ref(), None, None)
     }
 
     /// Open with a stable, owner-defined scope projection for read-only
@@ -261,10 +263,23 @@ impl SqliteStore {
         path: impl AsRef<Path>,
         project: catalog::ScopeProjection,
     ) -> Result<Self> {
-        Self::open_inner(path.as_ref(), Some(project))
+        Self::open_inner(path.as_ref(), Some(project), None)
     }
 
-    fn open_inner(path: &Path, catalog: Option<catalog::ScopeProjection>) -> Result<Self> {
+    /// Open with owner-defined session scopes and immutable submission links.
+    pub fn open_cataloged_with_turn_links(
+        path: impl AsRef<Path>,
+        catalog: catalog::ScopeProjection,
+        project: turn_links::TurnLinkProjection,
+    ) -> Result<Self> {
+        Self::open_inner(path.as_ref(), Some(catalog), Some(project))
+    }
+
+    fn open_inner(
+        path: &Path,
+        catalog: Option<catalog::ScopeProjection>,
+        turn_links: Option<turn_links::TurnLinkProjection>,
+    ) -> Result<Self> {
         if path.file_name().is_none() || !path.parent().is_some_and(Path::is_dir) {
             return Err(error(ErrorKind::InvalidInput, "store_directory_missing"));
         }
@@ -283,7 +298,7 @@ impl SqliteStore {
         let database = open_private_file(&path)?;
         drop(database);
         let connection = Connection::open(&path).map_err(database_error)?;
-        Self::initialize(Some(lock), connection, catalog)
+        Self::initialize(Some(lock), connection, catalog, turn_links)
     }
 
     fn initialize(
@@ -291,6 +306,7 @@ impl SqliteStore {
         lock: Option<WriterLock>,
         mut connection: Connection,
         catalog: Option<catalog::ScopeProjection>,
+        turn_links: Option<turn_links::TurnLinkProjection>,
     ) -> Result<Self> {
         connection
             .busy_timeout(Duration::from_secs(5))
@@ -332,12 +348,15 @@ impl SqliteStore {
                     .execute_batch(deletion::CLEANUP_SCHEMA)
                     .map_err(database_error)?;
                 transaction
+                    .execute_batch(turn_links::SCHEMA)
+                    .map_err(database_error)?;
+                transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(database_error)?;
                 transaction.commit().map_err(database_error)?;
             }
             SCHEMA_VERSION => {}
-            1..=9 => {
+            1..=10 => {
                 let transaction = connection.transaction().map_err(database_error)?;
                 if version == 1 {
                     transaction
@@ -379,8 +398,13 @@ impl SqliteStore {
                         .execute_batch(catalog::REPROJECT_UNSCOPED)
                         .map_err(database_error)?;
                 }
+                if version <= 9 {
+                    transaction
+                        .execute_batch(deletion::CLEANUP_SCHEMA)
+                        .map_err(database_error)?;
+                }
                 transaction
-                    .execute_batch(deletion::CLEANUP_SCHEMA)
+                    .execute_batch(turn_links::SCHEMA)
                     .map_err(database_error)?;
                 transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
@@ -392,12 +416,16 @@ impl SqliteStore {
         if let Some(project) = catalog {
             catalog::project_existing(&mut connection, project)?;
         }
+        if let Some(project) = turn_links {
+            turn_links::project_existing(&mut connection, project)?;
+        }
         Ok(Self {
             inner: Arc::new(Inner {
                 connection: Mutex::new(connection),
                 owners: Mutex::new(BTreeMap::new()),
                 changed: Notify::new(),
                 catalog,
+                turn_links,
                 _lock: lock,
             }),
         })
@@ -734,7 +762,7 @@ impl SqliteStore {
         input: Submission,
         expected: Option<SessionRevision>,
     ) -> BoxFuture<'_, Result<Acceptance>> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
@@ -748,7 +776,8 @@ impl SqliteStore {
             if let Some(expected) = expected {
                 require_revision(&session, expected)?;
             }
-            let receipt = insert_input(&transaction, &session_id, &mut session, &input, None)?;
+            let receipt =
+                insert_input(inner, &transaction, &session_id, &mut session, &input, None)?;
             bump_revision(&mut session)?;
             save_session(&transaction, &session_id, &session)?;
             save_request(
@@ -870,8 +899,14 @@ fn prepare_pending_claim(
                 if waiting {
                     return Err(error(ErrorKind::Conflict, "session_queue_waiting"));
                 }
-                let receipt =
-                    insert_input(transaction, &request.session, &mut session, &input, None)?;
+                let receipt = insert_input(
+                    inner,
+                    transaction,
+                    &request.session,
+                    &mut session,
+                    &input,
+                    None,
+                )?;
                 save_request(
                     transaction,
                     &request.session,
@@ -1119,7 +1154,7 @@ impl SessionStore for SqliteStore {
             )? {
                 return Ok(receipt);
             }
-            let receipt = record_control(&transaction, &request, fingerprint, None)?;
+            let receipt = record_control(inner, &transaction, &request, fingerprint, None)?;
             transaction.commit().map_err(commit_error)?;
             inner.changed.notify_waiters();
             Ok(receipt)
@@ -1460,6 +1495,7 @@ fn save_session(
 }
 
 fn apply_control(
+    inner: &Inner,
     transaction: &Transaction<'_>,
     request: &ControlRequest,
     mut session: SessionRecord,
@@ -1485,6 +1521,7 @@ fn apply_control(
                 params![request.session.as_str(), input.as_str(), replacement.id.as_str()],
             ).map_err(database_error)?;
             let receipt = insert_input(
+                inner,
                 transaction,
                 &request.session,
                 &mut session,
@@ -1656,6 +1693,7 @@ fn apply_control(
 }
 
 fn record_control(
+    inner: &Inner,
     transaction: &Transaction<'_>,
     request: &ControlRequest,
     fingerprint: Fingerprint,
@@ -1663,7 +1701,7 @@ fn record_control(
 ) -> Result<ControlReceipt> {
     let session = load_session(transaction, &request.session)?;
     require_revision(&session, request.expected_revision)?;
-    let receipt = apply_control(transaction, request, session, active)?;
+    let receipt = apply_control(inner, transaction, request, session, active)?;
     save_request(
         transaction,
         &request.session,
@@ -1676,6 +1714,7 @@ fn record_control(
 }
 
 fn insert_input(
+    inner: &Inner,
     transaction: &Transaction<'_>,
     session_id: &SessionId,
     session: &mut SessionRecord,
@@ -1705,6 +1744,15 @@ fn insert_input(
         params![session_id.as_str(), input.id.as_str(), sql_number(receipt.position)?,
             payload, Fingerprint::of(input)?.bytes().as_slice(), sql_number(order.unwrap_or(receipt.position))?],
     ).map_err(database_error)?;
+    if let Some(project) = inner.turn_links {
+        turn_links::project_input(
+            transaction,
+            session_id,
+            &session.configuration,
+            input,
+            project,
+        )?;
+    }
     session.next_input = session
         .next_input
         .checked_add(1)

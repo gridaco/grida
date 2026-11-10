@@ -49,6 +49,7 @@ async fn upgraded_projection_indexes_previously_hidden_records() {
     drop(store);
 
     let previous = rusqlite::Connection::open(&filename).unwrap();
+    support::remove_turn_link_schema(&previous);
     previous
         .execute_batch(
             "DROP INDEX session_retirements_pending;
@@ -90,6 +91,7 @@ async fn catalog_migration_and_paging_keep_scope_and_creation_order() {
         .unwrap();
     drop(legacy);
     let legacy = rusqlite::Connection::open(&filename).unwrap();
+    support::remove_turn_link_schema(&legacy);
     legacy
         .execute_batch(
             "DROP TABLE session_retirements; DROP TABLE session_catalog; PRAGMA user_version=5;",
@@ -163,6 +165,7 @@ async fn catalog_organization_upgrades_an_existing_index_and_fences_edits() {
     drop(store);
 
     let legacy = rusqlite::Connection::open(&filename).unwrap();
+    support::remove_turn_link_schema(&legacy);
     legacy
         .execute_batch(
             "DROP TABLE session_retirements;

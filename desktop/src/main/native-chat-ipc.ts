@@ -1773,7 +1773,8 @@ export class NativeChatIpc {
     event: IpcMainInvokeEvent,
     attachmentId: string,
     observationId: string,
-    refreshGatewayAttempt?: unknown
+    refreshGatewayAttempt?: unknown,
+    childBillingAfter?: unknown
   ): Promise<NativeChatTurnSummary> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const snapshot = requireObservation(attachment, observationId);
@@ -1790,10 +1791,11 @@ export class NativeChatIpc {
         throw new Error("native_chat_turn_summary_unavailable");
     };
     const summary =
-      refreshGatewayAttempt === undefined
+      refreshGatewayAttempt === undefined && childBillingAfter === undefined
         ? await owner.active.chat.turnSummary(attachment.session, snapshot)
         : await owner.active.chat.turnSummary(attachment.session, snapshot, {
             attempt: refreshGatewayAttempt,
+            childBillingAfter,
             requireCurrent,
           });
     requireCurrent();

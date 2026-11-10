@@ -240,6 +240,13 @@ async fn serve_connection(
                             .and_then(serde_json::Value::as_u64) == Some(1)
                     {
                         advertised.insert(billing.into(), 1.into());
+                        let children = extensions::gateway_billing::CHILD_CAPABILITY;
+                        if request.client_capabilities.meta.as_ref()
+                            .and_then(|meta| meta.get(children))
+                            .and_then(serde_json::Value::as_u64) == Some(1)
+                        {
+                            advertised.insert(children.into(), 1.into());
+                        }
                     }
                     let capability = crate::host::image_generation::CAPABILITY;
                     if reviewer
@@ -338,6 +345,7 @@ async fn serve_connection(
                             crate::editor_surfaces::OPEN_CAPABILITY,
                             crate::editor_surfaces::SVG_TEXT_CAPABILITY,
                             extensions::gateway_billing::CAPABILITY,
+                            extensions::gateway_billing::CHILD_CAPABILITY,
                         ]
                         .into_iter()
                         .filter(|key| advertised.contains_key(*key)),

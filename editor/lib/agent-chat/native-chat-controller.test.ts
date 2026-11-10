@@ -1870,6 +1870,121 @@ it.each(["turn", "review"] as const)(
   }
 );
 
+it("reads and refreshes only the selected child assignment on the current page", async () => {
+  const { bridge, controller } = fixture();
+  const latest = {
+    turnId: "parent-turn",
+    epoch: 1,
+    journalPosition: 8,
+    historyPosition: 2,
+    controlRevision: 1,
+    paused: false,
+    cancelled: false,
+    disposition: "settled",
+    status: "succeeded",
+  } as const;
+  const observe = bridge.observe;
+  vi.spyOn(bridge, "observe").mockImplementation(async (id) => {
+    const observation = await observe(id);
+    return {
+      ...observation,
+      snapshot: {
+        ...observation.snapshot,
+        latest: id === "chat-a" ? latest : null,
+      },
+    };
+  });
+  const child = { childId: "child", inputId: "second" };
+  const cursor = { childId: "child", inputId: "first" };
+  const attempt = { operationId: "op", attemptId: "attempt" };
+  const pending = { ...attempt, kind: "pending", refreshable: true } as const;
+  const page = {
+    assignments: [
+      {
+        ...child,
+        name: "Research",
+        disposition: { kind: "completed", turn: "child-turn" } as const,
+        billing: { attempts: [pending], omittedAttempts: 0 },
+      },
+    ],
+    coverageIncomplete: true,
+  };
+  const detail: NativeChatTurnSummary = {
+    turnId: latest.turnId,
+    status: latest.status,
+    text: "Finished.",
+    textTruncated: false,
+    steps: 1,
+    unresolvedOperations: 0,
+    toolActivity: null,
+    checks: [],
+    gatewayBilling: {
+      attempts: [pending],
+      omittedAttempts: 0,
+      children: {
+        assignments: [],
+        nextAfter: cursor,
+        coverageIncomplete: true,
+      },
+    },
+  };
+  const read = vi.fn<NonNullable<DesktopNativeChat["turnSummary"]>>();
+  read.mockResolvedValueOnce(detail).mockResolvedValueOnce({
+    ...detail,
+    gatewayBilling: { ...detail.gatewayBilling!, children: page },
+  });
+  bridge.turnSummary = read;
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.read().turnSummary).toEqual(detail));
+  await controller.readGatewayChildBilling(latest.turnId, "next");
+  expect(read.mock.calls[1]?.[3]).toEqual(cursor);
+  expect(controller.read().gatewayChildPage.hasPrevious).toBe(true);
+  await controller.refreshGatewayBilling(latest.turnId, {
+    ...attempt,
+    child: { ...child, inputId: "other" },
+  });
+  expect(read).toHaveBeenCalledTimes(2);
+  const settled = {
+    ...attempt,
+    kind: "settled",
+    chargedMills: "0",
+    refreshable: false,
+  } as const;
+  read.mockResolvedValueOnce({
+    ...detail,
+    gatewayBilling: {
+      ...detail.gatewayBilling!,
+      children: {
+        ...page,
+        assignments: [
+          {
+            ...page.assignments[0],
+            billing: { attempts: [settled], omittedAttempts: 0 },
+          },
+        ],
+      },
+    },
+  });
+  await controller.refreshGatewayBilling(latest.turnId, { ...attempt, child });
+  expect(read.mock.calls[2]?.slice(2)).toEqual([{ ...attempt, child }, cursor]);
+  expect(controller.read().turnSummary?.gatewayBilling?.attempts).toEqual([
+    pending,
+  ]);
+  expect(
+    controller.read().turnSummary?.gatewayBilling?.children?.assignments[0]
+      ?.billing?.attempts
+  ).toEqual([settled]);
+  const late = Promise.withResolvers<NativeChatTurnSummary>();
+  read.mockReturnValueOnce(late.promise);
+  const loading = controller.readGatewayChildBilling(latest.turnId, "first");
+  await controller.select("chat-b");
+  late.resolve(detail);
+  await loading;
+  expect(controller.read().turnSummary).toBeNull();
+  expect(controller.read().gatewayChildPage.status).toBe("idle");
+  controller.disconnect();
+});
+
 it("reads a listed PNG on demand and discards its bytes after switching chats", async () => {
   const { bridge, controller } = fixture();
   const latest = {

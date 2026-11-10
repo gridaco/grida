@@ -1,11 +1,12 @@
 //! GRIDA-SEC-006 / GRIDA-GG: provider — read settlement for a retained Gateway attempt.
 
 use super::*;
-use crate::gg::GatewayBillingRead;
+use crate::gg::{GatewayBillingRead, GatewayChildBillingRef};
 use agent_kit_core::{AttemptId, OperationId};
 use std::time::Duration;
 
 pub(in crate::acp) const CAPABILITY: &str = "co.grida/gateway/billing-status";
+pub(in crate::acp) const CHILD_CAPABILITY: &str = "co.grida/gateway/child-billing";
 const LOOKUP_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Clone, Debug, Deserialize, Serialize, JsonRpcRequest)]
@@ -16,6 +17,8 @@ struct Status {
     turn_id: TurnId,
     operation_id: OperationId,
     attempt_id: AttemptId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    child: Option<GatewayChildBillingRef>,
 }
 
 #[derive(Clone, Deserialize, Serialize, JsonRpcRequest)]
@@ -40,15 +43,23 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             connection.spawn(async move {
                 let result = async {
                     require(&sessions, CAPABILITY, Some(&request.session_id))?;
+                    let has_child = request.child.is_some();
+                    if has_child {
+                        require(&sessions, CHILD_CAPABILITY, Some(&request.session_id))?;
+                    }
                     let request_id = host
                         .gateway_billing_request_id(
                             request.session_id.clone(),
                             request.turn_id,
                             request.operation_id,
                             request.attempt_id,
+                            request.child,
                         )
                         .await;
                     require(&sessions, CAPABILITY, Some(&request.session_id))?;
+                    if has_child {
+                        require(&sessions, CHILD_CAPABILITY, Some(&request.session_id))?;
+                    }
                     let Some(request_id) = request_id else {
                         return Ok(GatewayBillingRead::Unavailable);
                     };
@@ -60,6 +71,9 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     })
                     .await;
                     require(&sessions, CAPABILITY, Some(&request.session_id))?;
+                    if has_child {
+                        require(&sessions, CHILD_CAPABILITY, Some(&request.session_id))?;
+                    }
                     Ok(reply
                         .ok()
                         .and_then(std::result::Result::ok)

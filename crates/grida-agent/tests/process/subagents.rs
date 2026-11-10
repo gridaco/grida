@@ -18,6 +18,8 @@ const RESUME_QUEUE: &str = "_co.grida/subagent/resume-queue";
 const WITHDRAW: &str = "_co.grida/subagent/withdraw";
 const SUMMARY: &str = "_co.grida/session/turn-summary";
 const EFFORT: &str = "_co.grida/session/effort";
+const GATEWAY_BILLING: &str = "_co.grida/gateway/billing-status";
+const GATEWAY_CHILD_BILLING: &str = "co.grida/gateway/child-billing";
 const CAPABILITIES: [&str; 11] = [
     CREATE,
     ASSIGN,
@@ -31,6 +33,298 @@ const CAPABILITIES: [&str; 11] = [
     RESUME_QUEUE,
     WITHDRAW,
 ];
+
+#[tokio::test]
+async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_and_restart() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+
+    async fn serve_gateway(
+        state: &Path,
+        scope: &str,
+        child_billing: bool,
+        previous: Option<&Path>,
+    ) -> PrivateStdio {
+        let mut command = previous.map_or_else(executable, Command::new);
+        let process = command
+            .args([
+                "serve",
+                "--stdio",
+                "--subagents",
+                "--supervised-provider",
+                "--state-dir",
+            ])
+            .arg(state)
+            .args([
+                "--supervised-gateway-scope",
+                scope,
+                "--endpoint",
+                "https://grida.co/api/v1/ai",
+                "--model",
+                "openai/gpt-5.6-sol",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut client = PrivateStdio::from_child(process);
+        let mut initialize = extension_initialize();
+        let meta = &mut initialize["clientCapabilities"]["_meta"];
+        for key in CAPABILITIES.into_iter().chain([SUMMARY, GATEWAY_BILLING]) {
+            meta[&key[1..]] = 1.into();
+        }
+        meta["co.grida/provider/egress"] = 1.into();
+        if child_billing {
+            meta[GATEWAY_CHILD_BILLING] = 1.into();
+        }
+        let ready = client.request("initialize", initialize).await;
+        let advertised = &ready["result"]["agentCapabilities"]["_meta"];
+        assert_eq!(advertised[&GATEWAY_BILLING[1..]], 1, "{ready}");
+        let child_version = if child_billing { json!(1) } else { Value::Null };
+        assert_eq!(advertised[GATEWAY_CHILD_BILLING], child_version, "{ready}");
+        client
+    }
+
+    async fn inference(
+        client: &mut PrivateStdio,
+        method: &str,
+        request: Value,
+        provider_id: &str,
+        amount: Option<&str>,
+    ) -> Value {
+        let id = client.send(method, request).await;
+        let response = json!({
+            "choices":[{"index":0,"delta":{"content":"Recorded work."},"finish_reason":"stop"}],
+            "grida_billing":{
+                "version":1,"request_id":provider_id,
+                "status":if amount.is_some() { "settled" } else { "pending" },
+                "charged_mills":amount,
+            }
+        });
+        let mut chunk = Some(STANDARD.encode(format!("data: {response}\n\ndata: [DONE]\n\n")));
+        let mut exchange = None;
+        let mut reply = None;
+        let mut finished = false;
+        while reply.is_none() || !finished {
+            let frame = client.read_frame().await;
+            let params = &frame["params"];
+            match frame["method"].as_str() {
+                Some("_co.grida/provider/exchange") => {
+                    let result = match params["action"].as_str() {
+                        Some("open") => {
+                            assert!(exchange.is_none(), "{frame}");
+                            assert_eq!(
+                                params["target"],
+                                "https://grida.co/api/v1/ai/chat/completions"
+                            );
+                            exchange = Some(params["id"].clone());
+                            json!({"status":"accepted"})
+                        }
+                        Some("dispatch") => {
+                            json!({"status":"ready","httpStatus":200,"requestId":provider_id})
+                        }
+                        Some("read") => match chunk.take() {
+                            Some(data) => json!({"status":"chunk","data":data}),
+                            None => json!({"status":"end"}),
+                        },
+                        _ => panic!("unexpected reverse request {frame}"),
+                    };
+                    assert_eq!(exchange.as_ref(), Some(&params["id"]));
+                    client.respond(&frame["id"], result).await;
+                }
+                Some("_co.grida/provider/cancel") => {
+                    assert_eq!(exchange.as_ref(), Some(&params["id"]));
+                    assert!(chunk.is_none());
+                    finished = true;
+                }
+                None if frame["id"] == id => {
+                    assert!(frame.get("error").is_none(), "{frame}");
+                    reply = Some(frame["result"].clone());
+                }
+                _ => {}
+            }
+        }
+        reply.unwrap()
+    }
+
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let scope = "a".repeat(64);
+    let previous = std::env::var_os("GRIDA_TEST_AGENT_SCHEMA_V10").map(std::path::PathBuf::from);
+    let mut first = serve_gateway(&state, &scope, previous.is_none(), previous.as_deref()).await;
+    let parent = new_session(&mut first, workspace.path()).await;
+    let mut child = None;
+    let mut parent_turns = Vec::new();
+    let mut child_turns = Vec::new();
+    for (turn, input, amount) in [
+        ("first", "assignment-one", None),
+        ("second", "assignment-two", Some("3.25")),
+    ] {
+        let prompt = json!({"sessionId":parent,"prompt":[{"type":"text","text":turn}]});
+        let result = inference(
+            &mut first,
+            "session/prompt",
+            prompt,
+            &format!("req_parent_{turn}"),
+            Some("1"),
+        )
+        .await;
+        assert_eq!(result["stopReason"], "end_turn");
+        let parent_view = first
+            .request("_co.grida/session/snapshot", json!({"sessionId":parent}))
+            .await;
+        let parent_turn = parent_view["result"]["latest"]["turnId"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        parent_turns.push(parent_turn.clone());
+        if previous.is_none() {
+            let summary = first
+                .request(SUMMARY, json!({"sessionId":parent,"turnId":parent_turn}))
+                .await;
+            assert_eq!(
+                summary["result"]["gatewayBilling"]["children"],
+                json!({"assignments":[],"coverageIncomplete":false})
+            );
+        }
+        if child.is_none() {
+            let created = first.request(CREATE, create(&parent)).await;
+            child = Some(created["result"]["childId"].as_str().unwrap().to_owned());
+        }
+        let child_id = child.as_deref().unwrap();
+        let work = assign(&parent, child_id, &parent_turn, input, turn);
+        let accepted = inference(
+            &mut first,
+            ASSIGN,
+            work,
+            &format!("req_child_{turn}"),
+            amount,
+        )
+        .await;
+        assert_eq!(accepted["disposition"]["kind"], "queued");
+        let settled = wait_for(&mut first, &parent, child_id, input, |view| {
+            view["assignment"]["disposition"]["kind"] == "completed"
+        })
+        .await;
+        child_turns.push(settled["assignment"]["disposition"]["turn"].clone());
+    }
+    first.close().await;
+
+    let load = json!({"sessionId":parent,"cwd":workspace.path(),"mcpServers":[]});
+    let mut reopened = serve_gateway(&state, &scope, true, None).await;
+    assert!(reopened.request("session/load", load.clone()).await["result"].is_object());
+    let mut previous_attempt = Value::Null;
+    for (index, input, kind) in [
+        (0, "assignment-one", "pending"),
+        (1, "assignment-two", "settled"),
+    ] {
+        let summary = reopened
+            .request(
+                SUMMARY,
+                json!({"sessionId":parent,"turnId":parent_turns[index]}),
+            )
+            .await;
+        let billing = &summary["result"]["gatewayBilling"];
+        assert!(billing["review"].is_null(), "{summary}");
+        assert_eq!(billing["attempts"][0]["chargedMills"], "1", "{summary}");
+        let page = &billing["children"];
+        assert_eq!(page["coverageIncomplete"], false, "{summary}");
+        let [assignment] = page["assignments"].as_array().unwrap().as_slice() else {
+            panic!("expected one exact assignment: {summary}");
+        };
+        assert_eq!(assignment["childId"], child.as_deref().unwrap());
+        assert_eq!(assignment["inputId"], input);
+        assert_eq!(assignment["name"], "Researcher");
+        assert_eq!(assignment["disposition"]["turn"], child_turns[index]);
+        let attempt = &assignment["billing"]["attempts"][0];
+        assert_eq!(attempt["kind"], kind);
+        if index == 0 {
+            assert_eq!(attempt["refreshable"], true);
+            previous_attempt = attempt.clone();
+        } else {
+            assert_eq!(attempt["chargedMills"], "3.25");
+        }
+    }
+    let mut refresh = json!({
+        "sessionId":parent, "turnId":parent_turns[1],
+        "operationId":previous_attempt["operationId"], "attemptId":previous_attempt["attemptId"],
+        "child":{"childId":child,"inputId":"assignment-one"},
+    });
+    let wrong_page = reopened
+        .request(
+            SUMMARY,
+            json!({
+                "sessionId":parent,"turnId":parent_turns[1],"childBillingAfter":refresh["child"],
+            }),
+        )
+        .await;
+    assert_eq!(wrong_page["error"]["data"], "invalid_turn_link_cursor");
+    let stale = reopened.request(GATEWAY_BILLING, refresh.clone()).await;
+    assert_eq!(stale["result"]["kind"], "unavailable", "{stale}");
+    refresh["turnId"] = json!(parent_turns[0]);
+    let id = reopened.send(GATEWAY_BILLING, refresh).await;
+    let reverse = reopened.read_reply().await;
+    assert_eq!(reverse["method"], "_co.grida/gateway/read-job-billing");
+    assert_eq!(reverse["params"]["requestId"], "req_child_first");
+    reopened
+        .respond(&reverse["id"], json!({"kind":"settled","chargedMills":"0"}))
+        .await;
+    let settled = reopened.read_reply().await;
+    assert_eq!(settled["id"], id);
+    assert_eq!(
+        settled["result"],
+        json!({"kind":"settled","chargedMills":"0"})
+    );
+    reopened.close().await;
+
+    let mut legacy = serve_gateway(&state, &scope, false, None).await;
+    assert!(legacy.request("session/load", load).await["result"].is_object());
+    let summary = legacy
+        .request(
+            SUMMARY,
+            json!({"sessionId":parent,"turnId":parent_turns[0]}),
+        )
+        .await;
+    assert_eq!(
+        summary["result"]["gatewayBilling"]["attempts"][0]["chargedMills"],
+        "1"
+    );
+    assert!(summary["result"]["gatewayBilling"]["children"].is_null());
+    legacy.close().await;
+
+    let mut foreign = serve_gateway(&state, &"b".repeat(64), true, None).await;
+    let load = json!({"sessionId":parent,"cwd":workspace.path(),"mcpServers":[]});
+    assert!(foreign.request("session/load", load).await["result"].is_object());
+    let foreign_summary = foreign
+        .request(
+            SUMMARY,
+            json!({"sessionId":parent,"turnId":parent_turns[0]}),
+        )
+        .await;
+    assert!(
+        foreign_summary["result"]["gatewayBilling"].is_null(),
+        "{foreign_summary}"
+    );
+    foreign.close().await;
+
+    if let Some(previous) = previous {
+        let refused = timeout(
+            WAIT,
+            Command::new(previous)
+                .arg("inspect")
+                .arg("--state-dir")
+                .arg(&state)
+                .arg(&parent)
+                .output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert!(!refused.status.success());
+        assert!(String::from_utf8_lossy(&refused.stderr).contains("store_schema_unsupported"));
+    }
+}
 
 async fn serve(state: &Path, endpoint: &str) -> PrivateStdio {
     serve_with_key(state, endpoint, TEST_CREDENTIAL).await

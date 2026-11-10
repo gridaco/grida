@@ -26,6 +26,8 @@ pub(super) fn artifact_capability(private_stdio: bool) -> Option<&'static str> {
 struct SummaryRequest {
     session_id: SessionId,
     turn_id: TurnId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    child_billing_after: Option<crate::gg::GatewayChildBillingRef>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -240,19 +242,31 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             async move |request: SummaryRequest, responder, _| {
                 let result = async {
                     require(&summary_sessions, SUMMARY, Some(&request.session_id))?;
-                    let (include_artifacts, include_gateway_billing) = {
+                    let (include_artifacts, include_gateway_billing, include_child_billing) = {
                         let sessions = summary_sessions.lock().unwrap();
                         (
                             sessions.negotiated.contains(ARTIFACTS),
                             sessions.negotiated.contains(gateway_billing::CAPABILITY),
+                            sessions
+                                .negotiated
+                                .contains(gateway_billing::CHILD_CAPABILITY),
                         )
                     };
+                    if request.child_billing_after.is_some() {
+                        require(
+                            &summary_sessions,
+                            gateway_billing::CHILD_CAPABILITY,
+                            Some(&request.session_id),
+                        )?;
+                    }
                     let (outcome, artifacts, image_generation, gateway_billing) = summary_host
                         .settled_summary(
                             request.session_id.clone(),
                             request.turn_id.clone(),
                             include_artifacts,
                             include_gateway_billing,
+                            include_child_billing,
+                            request.child_billing_after,
                         )
                         .await
                         .map_err(host_error)?;
@@ -264,6 +278,13 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         require(
                             &summary_sessions,
                             gateway_billing::CAPABILITY,
+                            Some(&request.session_id),
+                        )?;
+                    }
+                    if include_child_billing {
+                        require(
+                            &summary_sessions,
+                            gateway_billing::CHILD_CAPABILITY,
                             Some(&request.session_id),
                         )?;
                     }

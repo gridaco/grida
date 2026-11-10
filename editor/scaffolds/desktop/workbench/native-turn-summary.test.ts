@@ -104,3 +104,29 @@ it("shows exact Gateway amounts and refreshes only eligible requests", () => {
   expect(html).toContain("Additional Gateway requests: 1");
   expect(html.match(/Refresh billing/g)).toHaveLength(1);
 });
+
+it("shows child attribution limits and escapes agent names", () => {
+  const html = render({
+    ...settled,
+    gatewayBilling: {
+      attempts: [],
+      omittedAttempts: 0,
+      children: {
+        assignments: [
+          {
+            childId: "child",
+            inputId: "input",
+            name: "<Research>",
+            disposition: { kind: "completed", turn: "turn" },
+          },
+        ],
+        nextAfter: { childId: "child", inputId: "input" },
+        coverageIncomplete: true,
+      },
+    },
+  });
+  expect(html).toContain("&lt;Research&gt;");
+  expect(html).toContain("Billing unavailable for this assignment.");
+  expect(html).toContain("Some assignments could not be attributed.");
+  expect(html).toContain("More assignments");
+});

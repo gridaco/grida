@@ -10,6 +10,7 @@ import type {
   NativeChatCommandResult,
   NativeChatControl,
   NativeChatGatewayAttemptRef,
+  NativeChatGatewayChildRef,
   NativeChatGoalAction,
   NativeChatGoalChange,
   NativeChatGoalControl,
@@ -150,6 +151,10 @@ export type NativeChatView = Readonly<{
         status: "loading" | "unavailable";
       })
     | null;
+  gatewayChildPage: Readonly<{
+    status: "idle" | "loading" | "unavailable";
+    hasPrevious: boolean;
+  }>;
   approvals: readonly NativeChatApproval[];
   approvalError: string | null;
   questions: readonly NativeChatQuestion[];
@@ -200,7 +205,11 @@ type Scope = {
   live: Map<string, NativeChatMessage & { turnId: string; bytes: number }>;
   gaps: Set<string>;
   observation: NativeChatObservation | null;
-  summaryRequest?: { turnId: string; failed?: boolean };
+  summaryRequest?: {
+    turnId: string;
+    failed?: boolean;
+    childAfter?: NativeChatGatewayChildRef;
+  };
   approvalBasis?: string;
   questionBasis?: string;
   librarySelectionAvailable?: boolean;
@@ -285,6 +294,7 @@ const EMPTY: NativeChatView = Object.freeze({
   observation: null,
   turnSummary: null,
   gatewayBillingRefresh: null,
+  gatewayChildPage: { status: "idle" as const, hasPrevious: false },
   approvals: [],
   approvalError: null,
   questions: [],
@@ -639,6 +649,7 @@ export class NativeChatController {
       observation: null,
       turnSummary: null,
       gatewayBillingRefresh: null,
+      gatewayChildPage: { status: "idle", hasPrevious: false },
       approvals: [],
       approvalError: null,
       questions: [],
@@ -2473,6 +2484,70 @@ export class NativeChatController {
     this.refreshTurnSummary(scope, scope.attachment, scope.observation);
   }
 
+  async readGatewayChildBilling(
+    turnId: string,
+    destination: "first" | "next"
+  ): Promise<void> {
+    const scope = this.scope;
+    const basis = scope?.summaryRequest;
+    const attachment = scope?.attachment;
+    const observation = scope?.observation;
+    const summary = this.view.turnSummary;
+    const children = summary?.gatewayBilling?.children;
+    const after = destination === "next" ? children?.nextAfter : undefined;
+    if (
+      !scope ||
+      !attachment ||
+      !observation ||
+      !this.bridge.turnSummary ||
+      basis?.turnId !== turnId ||
+      summary?.turnId !== turnId ||
+      !children ||
+      (destination === "next" && !after) ||
+      this.view.gatewayChildPage.status === "loading" ||
+      this.view.gatewayBillingRefresh?.status === "loading"
+    )
+      return;
+    const ownsRequest = () =>
+      this.owns(scope) &&
+      scope.attachment === attachment &&
+      scope.summaryRequest === basis &&
+      this.view.turnSummary?.turnId === turnId;
+    this.update({
+      gatewayChildPage: { ...this.view.gatewayChildPage, status: "loading" },
+    });
+    try {
+      const updated = await this.bridge.turnSummary(
+        attachment.attachmentId,
+        observation.observationId,
+        undefined,
+        after
+      );
+      if (!ownsRequest()) return;
+      const current = this.view.turnSummary;
+      const billing = current?.gatewayBilling;
+      const page = updated.gatewayBilling?.children;
+      if (updated.turnId !== turnId || !current || !billing || !page)
+        throw new Error("native_chat_gateway_billing_unavailable");
+      basis.childAfter = after;
+      this.update({
+        turnSummary: {
+          ...current,
+          gatewayBilling: { ...billing, children: page },
+        },
+        gatewayChildPage: { status: "idle", hasPrevious: !!after },
+      });
+    } catch {
+      if (ownsRequest())
+        this.update({
+          gatewayChildPage: {
+            ...this.view.gatewayChildPage,
+            status: "unavailable",
+          },
+        });
+    }
+  }
+
   async refreshGatewayBilling(
     turnId: string,
     attempt: NativeChatGatewayAttemptRef
@@ -2483,10 +2558,21 @@ export class NativeChatController {
     const observation = scope?.observation;
     const summary = this.view.turnSummary;
     const billing = summary?.gatewayBilling;
-    const direct = billing?.attempts.some((row) =>
-      sameGatewayAttempt(row, attempt)
-    );
-    const group = direct ? billing : billing?.review;
+    const child =
+      attempt.child &&
+      billing?.children?.assignments.find(
+        (row) =>
+          row.childId === attempt.child?.childId &&
+          row.inputId === attempt.child?.inputId
+      );
+    const direct =
+      !attempt.child &&
+      billing?.attempts.some((row) => sameGatewayAttempt(row, attempt));
+    const group = attempt.child
+      ? child?.billing
+      : direct
+        ? billing
+        : billing?.review;
     if (
       !scope ||
       !attachment ||
@@ -2495,8 +2581,11 @@ export class NativeChatController {
       basis?.turnId !== turnId ||
       summary?.turnId !== turnId ||
       this.view.gatewayBillingRefresh?.status === "loading" ||
+      this.view.gatewayChildPage.status === "loading" ||
       !group?.attempts.some(
-        (row) => row.refreshable && sameGatewayAttempt(row, attempt)
+        (row) =>
+          row.refreshable &&
+          sameGatewayAttempt({ ...row, child: attempt.child }, attempt)
       )
     )
       return;
@@ -2508,24 +2597,46 @@ export class NativeChatController {
     const selected = {
       operationId: attempt.operationId,
       attemptId: attempt.attemptId,
+      ...(attempt.child && { child: attempt.child }),
     };
     this.update({ gatewayBillingRefresh: { ...selected, status: "loading" } });
     try {
       const updated = await this.bridge.turnSummary(
         attachment.attachmentId,
         observation.observationId,
-        selected
+        selected,
+        basis.childAfter
       );
       if (!ownsRequest()) return;
-      const updatedGroup = direct
-        ? updated.gatewayBilling
-        : updated.gatewayBilling?.review;
+      const updatedChild =
+        selected.child &&
+        updated.gatewayBilling?.children?.assignments.find(
+          (row) =>
+            row.childId === selected.child?.childId &&
+            row.inputId === selected.child?.inputId
+        );
+      const updatedGroup = selected.child
+        ? updatedChild?.billing
+        : direct
+          ? updated.gatewayBilling
+          : updated.gatewayBilling?.review;
       const refreshed = updatedGroup?.attempts.find((row) =>
-        sameGatewayAttempt(row, selected)
+        sameGatewayAttempt({ ...row, child: selected.child }, selected)
       );
       const current = this.view.turnSummary;
       const currentBilling = current?.gatewayBilling;
-      const currentGroup = direct ? currentBilling : currentBilling?.review;
+      const currentChild =
+        selected.child &&
+        currentBilling?.children?.assignments.find(
+          (row) =>
+            row.childId === selected.child?.childId &&
+            row.inputId === selected.child?.inputId
+        );
+      const currentGroup = selected.child
+        ? currentChild?.billing
+        : direct
+          ? currentBilling
+          : currentBilling?.review;
       if (
         updated.turnId !== turnId ||
         !current ||
@@ -2538,15 +2649,32 @@ export class NativeChatController {
       const refreshedGroup = {
         ...currentGroup,
         attempts: currentGroup.attempts.map((row) =>
-          sameGatewayAttempt(row, selected) ? refreshed : row
+          sameGatewayAttempt({ ...row, child: selected.child }, selected)
+            ? refreshed
+            : row
         ),
       };
       this.update({
         turnSummary: {
           ...current,
-          gatewayBilling: direct
-            ? refreshedGroup
-            : { ...currentBilling, review: refreshedGroup },
+          gatewayBilling:
+            selected.child && currentBilling.children
+              ? {
+                  ...currentBilling,
+                  children: {
+                    ...currentBilling.children,
+                    assignments: currentBilling.children.assignments.map(
+                      (row) =>
+                        row.childId === selected.child?.childId &&
+                        row.inputId === selected.child?.inputId
+                          ? { ...row, billing: refreshedGroup }
+                          : row
+                    ),
+                  },
+                }
+              : direct
+                ? refreshedGroup
+                : { ...currentBilling, review: refreshedGroup },
         },
         gatewayBillingRefresh: null,
       });
@@ -3136,7 +3264,11 @@ export class NativeChatController {
     if (latest?.disposition !== "settled" || !latest.status) {
       if (scope.summaryRequest) {
         scope.summaryRequest = undefined;
-        this.update({ turnSummary: null, gatewayBillingRefresh: null });
+        this.update({
+          turnSummary: null,
+          gatewayBillingRefresh: null,
+          gatewayChildPage: { status: "idle", hasPrevious: false },
+        });
       }
       return;
     }
@@ -3147,7 +3279,11 @@ export class NativeChatController {
     const status = latest.status;
     scope.summaryRequest = request;
     if (this.view.turnSummary?.turnId !== latest.turnId)
-      this.update({ turnSummary: null, gatewayBillingRefresh: null });
+      this.update({
+        turnSummary: null,
+        gatewayBillingRefresh: null,
+        gatewayChildPage: { status: "idle", hasPrevious: false },
+      });
     const ownsRequest = () =>
       this.owns(scope) && scope.summaryRequest === request;
     const unavailable = () => {
@@ -3795,7 +3931,10 @@ function sameGatewayAttempt(
   right: NativeChatGatewayAttemptRef
 ): boolean {
   return (
-    left.operationId === right.operationId && left.attemptId === right.attemptId
+    left.operationId === right.operationId &&
+    left.attemptId === right.attemptId &&
+    left.child?.childId === right.child?.childId &&
+    left.child?.inputId === right.child?.inputId
   );
 }
 

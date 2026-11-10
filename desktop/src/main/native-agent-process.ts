@@ -100,6 +100,7 @@ type GatewayAttempt = Readonly<{
   turnId: string;
   operationId: string;
   attemptId: string;
+  child?: Readonly<{ childId: string; inputId: string }>;
 }>;
 
 /** Exact child custody after the bounded stop attempt has run out of time. */
@@ -149,6 +150,7 @@ export class NativeAgentProcess {
   private historyRevision = false;
   private transcriptWindow = false;
   private gatewayBillingEnabled = false;
+  private childGatewayBilling = false;
   private namedChildren = false;
   private childTurnControls = false;
   private childMessaging = false;
@@ -230,6 +232,10 @@ export class NativeAgentProcess {
 
   get acceptsTranscriptWindow(): boolean {
     return this.connected && this.transcriptWindow;
+  }
+
+  get acceptsChildGatewayBilling(): boolean {
+    return this.connected && this.childGatewayBilling;
   }
 
   get acceptsFile(): boolean {
@@ -537,6 +543,7 @@ export class NativeAgentProcess {
                 [NativeAgentArtifacts.capability]: 1,
                 ...(options.gatewayJobBilling && {
                   [NativeGatewayConnection.billingCapability]: 1,
+                  [NativeGatewayConnection.childBillingCapability]: 1,
                 }),
                 ...(options.workspace && LIBRARY_SELECTION_CAPABILITIES),
                 "co.grida/session/selected-file": 1,
@@ -563,6 +570,9 @@ export class NativeAgentProcess {
       processOwner.gatewayBillingEnabled =
         options.gatewayJobBilling !== undefined &&
         advertised?.[NativeGatewayConnection.billingCapability] === 1;
+      processOwner.childGatewayBilling =
+        processOwner.gatewayBillingEnabled &&
+        advertised?.[NativeGatewayConnection.childBillingCapability] === 1;
       for (const [capability, version] of Object.entries(capabilities)) {
         if (advertised?.[capability] !== version)
           throw new Error("native_agent_capabilities_unavailable");
@@ -656,7 +666,11 @@ export class NativeAgentProcess {
   async gatewayBillingStatus(
     attempt: GatewayAttempt
   ): Promise<NativeGatewayBilling> {
-    if (!this.connected || !this.gatewayBillingEnabled)
+    if (
+      !this.connected ||
+      !this.gatewayBillingEnabled ||
+      (attempt.child && !this.childGatewayBilling)
+    )
       return { kind: "unavailable" };
     try {
       return NativeGatewayConnection.billingResult(

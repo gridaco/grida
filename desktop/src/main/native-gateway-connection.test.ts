@@ -896,7 +896,7 @@ it.skipIf(!resourcesPath)(
       });
       const read = () => ipc.turnSummary(event, attachmentId, observationId);
       const summary = await read();
-      expect(summary.gatewayBilling).toEqual({
+      expect(summary.gatewayBilling).toMatchObject({
         attempts: [
           expect.objectContaining({ kind: "pending", refreshable: true }),
         ],
@@ -1587,6 +1587,238 @@ it.skipIf(!resourcesPath)(
         await agent?.close();
       } finally {
         connections.forEach((connection) => connection.close());
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  },
+  30_000
+);
+
+it.skipIf(!resourcesPath)(
+  "pages ordinary child charges and drops a refresh after Desktop navigation",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-child-billing-")
+    );
+    const cwd = path.join(root, "workspace");
+    await fs.mkdir(cwd, { mode: 0o700 });
+    const owner = fixture();
+    const lookupStarted = Promise.withResolvers<void>();
+    const releaseLookup = Promise.withResolvers<void>();
+    let holdLookup = false;
+    const jobNetwork = vi.fn<NativeGatewayJobNetwork>(
+      async (requestId, token) => {
+        expect(token).toBe(owner.grant.token);
+        if (holdLookup) {
+          lookupStarted.resolve();
+          await releaseLookup.promise;
+        }
+        return Response.json({
+          id: requestId,
+          request_id: requestId,
+          billing: { status: "settled", charged_mills: "0.75" },
+        });
+      }
+    );
+    const connection = await NativeGatewayConnection.open({
+      ...owner.options,
+      jobNetwork,
+    });
+    owner.dispatch.mockImplementation(async (body) => {
+      const input = JSON.parse(body.toString()).messages.at(-1).content;
+      const assignment = /^Review assignment (\d+)$/.exec(input);
+      const requestId = assignment
+        ? `req_child_${assignment[1]}`
+        : "req_parent";
+      const result = {
+        id: "fixture",
+        choices: [
+          {
+            index: 0,
+            delta: { content: "Review complete." },
+            finish_reason: "stop",
+          },
+        ],
+        grida_billing: {
+          version: 1,
+          request_id: requestId,
+          status: assignment ? "pending" : "settled",
+          charged_mills: assignment ? null : "0",
+        },
+      };
+      return new Response(
+        `data: ${JSON.stringify(result)}\n\ndata: [DONE]\n\n`,
+        {
+          headers: {
+            "content-type": "text/event-stream",
+            "x-request-id": requestId,
+          },
+        }
+      );
+    });
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...connection.launch("fixture"),
+        subagents: true,
+        resourcesPath: resourcesPath!,
+        stateDirectory: path.join(root, "state"),
+        cwd,
+      });
+      const editor = "https://editor.fixture.invalid";
+      const frame = { url: `${editor}/desktop/workspace?id=workspace` };
+      const contents = Object.assign(new EventEmitter(), {
+        mainFrame: frame,
+        isDestroyed: () => false,
+        isLoadingMainFrame: () => false,
+      });
+      const sender = contents as unknown as WebContents;
+      const event = {
+        sender,
+        senderFrame: frame,
+      } as unknown as IpcMainInvokeEvent;
+      const active = { workspaceId: "workspace", chat };
+      const ipc = new NativeChatIpc(editor, (candidate) =>
+        candidate === sender ? active : null
+      );
+      const { attachmentId } = await ipc.create(event);
+      const parent = await ipc.submit(
+        event,
+        attachmentId,
+        "parent-input",
+        "Sponsor independent reviews."
+      );
+      const { observationId } = await vi.waitFor(async () => {
+        const observed = await ipc.observe(event, attachmentId);
+        expect(observed.snapshot.current).toBeNull();
+        expect(observed.snapshot.latest?.turnId).toBe(parent.turnId);
+        return observed;
+      });
+      expect(
+        (await ipc.turnSummary(event, attachmentId, observationId))
+          .gatewayBilling?.children
+      ).toEqual({ assignments: [], coverageIncomplete: false });
+      const assignments = new Map<string, string>();
+      for (const [group, workTurns] of [8, 8, 1].entries()) {
+        const child = await ipc.createSubagent(event, attachmentId, {
+          requestId: randomUUID(),
+          name: `Reviewer ${group}`,
+          workTurns,
+        });
+        for (let turn = 0; turn < workTurns; turn++) {
+          const index = assignments.size;
+          const inputId = randomUUID();
+          await ipc.assignSubagent(event, attachmentId, {
+            childId: child.childId,
+            parentObservationId: observationId,
+            inputId,
+            instructions: `Review assignment ${index}`,
+          });
+          await vi.waitFor(async () => {
+            const observed = await ipc.inspectSubagent(
+              event,
+              attachmentId,
+              child.childId,
+              inputId
+            );
+            expect(observed.child.assignment?.result?.status).toBe("succeeded");
+          });
+          assignments.set(inputId, `req_child_${index}`);
+        }
+      }
+      const read = (after?: { childId: string; inputId: string }) =>
+        ipc.turnSummary(event, attachmentId, observationId, undefined, after);
+      const first = (await read()).gatewayBilling!;
+      expect(first.attempts).toMatchObject([
+        { kind: "settled", chargedMills: "0" },
+      ]);
+      expect(first.review).toBeUndefined();
+      expect(first.children?.assignments).toHaveLength(16);
+      expect(first.children?.coverageIncomplete).toBe(false);
+      const after = first.children!.nextAfter!;
+      const second = (await read(after)).gatewayBilling!;
+      expect(second.children?.assignments).toHaveLength(1);
+      expect(second.children?.nextAfter).toBeUndefined();
+      const [selected] = second.children!.assignments;
+      const inputIds = [...first.children!.assignments, selected].map(
+        ({ inputId }) => inputId
+      );
+      expect(new Set(inputIds)).toEqual(new Set(assignments.keys()));
+      expect(jobNetwork).not.toHaveBeenCalled();
+
+      const [{ operationId, attemptId }] = selected.billing!.attempts;
+      const refresh = {
+        operationId,
+        attemptId,
+        child: { childId: selected.childId, inputId: selected.inputId },
+      };
+      await expect(
+        ipc.turnSummary(event, attachmentId, observationId, refresh)
+      ).rejects.toThrow("native_chat_gateway_billing_unavailable");
+      await expect(
+        ipc.turnSummary(
+          event,
+          attachmentId,
+          observationId,
+          {
+            ...refresh,
+            child: after,
+          },
+          after
+        )
+      ).rejects.toThrow("native_chat_gateway_billing_unavailable");
+      expect(jobNetwork).not.toHaveBeenCalled();
+      const fresh = await ipc.turnSummary(
+        event,
+        attachmentId,
+        observationId,
+        refresh,
+        after
+      );
+      expect(
+        fresh.gatewayBilling?.children?.assignments[0].billing?.attempts
+      ).toEqual([
+        {
+          operationId,
+          attemptId,
+          kind: "settled",
+          chargedMills: "0.75",
+          refreshable: false,
+        },
+      ]);
+      const expectedJob = assignments.get(selected.inputId);
+      expect(jobNetwork.mock.calls.map(([id]) => id)).toEqual([expectedJob]);
+      expect((await read(after)).gatewayBilling).toEqual(second);
+
+      holdLookup = true;
+      const stale = ipc
+        .turnSummary(event, attachmentId, observationId, refresh, after)
+        .catch((error: unknown) => error);
+      await Promise.race([
+        lookupStarted.promise,
+        stale.then(() => {
+          throw new Error("child lookup did not start");
+        }),
+      ]);
+      contents.emit("did-start-navigation", { isMainFrame: true });
+      releaseLookup.resolve();
+      expect(await stale).toEqual(
+        new Error("native_chat_attachment_unavailable")
+      );
+      await expect(read(after)).rejects.toThrow(
+        "native_chat_attachment_unavailable"
+      );
+      expect(jobNetwork.mock.calls.map(([id]) => id)).toEqual([
+        expectedJob,
+        expectedJob,
+      ]);
+      expect(owner.dispatch).toHaveBeenCalledTimes(18);
+    } finally {
+      releaseLookup.resolve();
+      try {
+        await chat?.close();
+      } finally {
+        connection.close();
         await fs.rm(root, { recursive: true, force: true });
       }
     }
