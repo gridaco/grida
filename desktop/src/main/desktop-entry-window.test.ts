@@ -133,6 +133,7 @@ describe("DesktopEntryWindow lifecycle", () => {
 
   it("does not present onboarding/main until the authenticated backend is ready", async () => {
     const window = makeWindow();
+    const auxiliary = makeWindow();
     const backend = deferred<void>();
     windowFactory.mockReturnValue(window);
     const entry = makeController(makeAccount(["signed-in"]), {
@@ -144,6 +145,8 @@ describe("DesktopEntryWindow lifecycle", () => {
     await Promise.resolve();
     expect(window.loadURL).not.toHaveBeenCalled();
     expect(entry.role).toBe("booting");
+    expect(entry.registerSecondary(auxiliary as never)).toBe(false);
+    expect(auxiliary.close).toHaveBeenCalledOnce();
 
     backend.resolve();
     await opening;

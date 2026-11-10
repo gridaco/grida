@@ -1531,6 +1531,9 @@ Today:
   worker.
 - The [native Open Recent menu](desktop/src/menu.ts) and [recent projects palette](editor/scaffolds/desktop/home/recent-projects-command.tsx)
   reopen a saved project through the existing catalog before navigating.
+  After authenticated entry admission, native file and catalog opens can
+  proceed during a retained media restart. Compatibility-only opens still
+  require a live sidecar, and initial entry still waits for retained readiness.
   A replaced folder requires a fresh native picker selection. [Menu](desktop/src/menu.test.ts)
   and [Range](desktop/src/main/workspace-media-protocol.test.ts) fixtures
   check refusal and the exact grant after restart.

@@ -18,11 +18,16 @@ import {
 import { EDITOR_BASE_URL } from "./env";
 import { getAgentSidecarInfo } from "./main/agent-sidecar-supervisor";
 import { agentSidecarClient } from "./main/agent-sidecar-client";
+import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 import { focusWindowByUrl } from "./main/window-focus";
 import { IPC_CHANNELS } from "./bridge/contract";
 
 export type DesktopWindowAdmission = {
   can_open: () => boolean;
+  native_file_available?: (filePath?: string) => boolean;
+  native_workspaces?: () =>
+    | Pick<NativeWorkspaceCatalog, "list" | "openSelected" | "reopen">
+    | undefined;
   register: (window: BrowserWindow) => boolean;
   focus_entry: () => void;
 };
@@ -39,8 +44,7 @@ function open_or_focus_settings(app: App, admission?: DesktopWindowAdmission) {
     return;
   }
   if (focusWindowByUrl("/desktop/settings")) return;
-  const agentSidecar = getAgentSidecarInfo();
-  if (!agentSidecar) return; // pre-ready / between restarts
+  if (!getAgentSidecarInfo()) return; // pre-ready / between restarts
   const window = open_settings_window({ app, base_url: EDITOR_BASE_URL });
   admission?.register(window);
 }
@@ -75,8 +79,12 @@ async function open_picker_and_register(
     admission.focus_entry();
     return;
   }
-  const agentSidecar = getAgentSidecarInfo();
-  if (!agentSidecar) return; // pre-ready / between restarts
+  if (
+    !getAgentSidecarInfo() &&
+    !(kind !== "directory" && admission?.native_file_available?.()) &&
+    !(kind !== "file" && admission?.native_workspaces?.())
+  )
+    return;
   const focused = BrowserWindow.getFocusedWindow() ?? undefined;
   // The file filter gates selectable files to the types Grida can open (folders
   // stay selectable regardless) so the user can't pick an unopenable file and
@@ -100,6 +108,7 @@ async function open_picker_and_register(
     ? await dialog.showOpenDialog(focused, options)
     : await dialog.showOpenDialog(options);
   if (result.canceled || result.filePaths.length === 0) return;
+  if (admission && !admission.can_open()) return;
   const picked = result.filePaths[0];
 
   // A single supported file → the document-window path (handled by the OS
@@ -118,13 +127,18 @@ async function open_picker_and_register(
     return;
   }
   if (!isDirectory) {
-    onOpenFile?.(picked);
+    if (admission?.native_file_available?.(picked) || getAgentSidecarInfo())
+      onOpenFile?.(picked);
     return;
   }
 
+  const owner = admission?.native_workspaces?.();
+  if (!owner && !getAgentSidecarInfo()) return;
   let workspace: { id: string; root: string };
   try {
-    workspace = await agentSidecarClient.openWorkspace(picked);
+    workspace = owner
+      ? await owner.openSelected(picked)
+      : await agentSidecarClient.openWorkspace(picked);
   } catch (err) {
     console.error("[grida] open workspace failed:", err);
     dialog.showErrorBox(
@@ -154,12 +168,10 @@ async function open_picker_and_register(
  */
 function focus_or_open_workspace_window({
   app,
-  agentSidecar,
   workspace_id: workspaceId,
   admission,
 }: {
   app: App;
-  agentSidecar: ReturnType<typeof getAgentSidecarInfo>;
   workspace_id: string;
   admission?: DesktopWindowAdmission;
 }) {
@@ -167,7 +179,6 @@ function focus_or_open_workspace_window({
     admission.focus_entry();
     return;
   }
-  if (!agentSidecar) return;
   const needle = `/desktop/workspace?id=${encodeURIComponent(workspaceId)}`;
   if (focusWindowByUrl(needle)) return;
   const window = open_workspace_window({
@@ -185,12 +196,10 @@ function focus_or_open_workspace_window({
  */
 function focus_or_open_canvas_window({
   app,
-  agentSidecar,
   workspace_id: workspaceId,
   admission,
 }: {
   app: App;
-  agentSidecar: ReturnType<typeof getAgentSidecarInfo>;
   workspace_id: string;
   admission?: DesktopWindowAdmission;
 }) {
@@ -198,7 +207,6 @@ function focus_or_open_canvas_window({
     admission.focus_entry();
     return;
   }
-  if (!agentSidecar) return;
   const needle = `/desktop/file?id=${encodeURIComponent(workspaceId)}`;
   if (focusWindowByUrl(needle)) return;
   const window = open_canvas_window({
@@ -234,20 +242,17 @@ function route_workspace_window(
     admission.focus_entry();
     return;
   }
-  const agentSidecar = getAgentSidecarInfo();
-  if (!agentSidecar) return; // pre-ready / between restarts
+  if (!admission?.native_workspaces?.() && !getAgentSidecarInfo()) return;
   const isCanvas = existsSync(join(workspace.root, ".canvas.json"));
   if (isCanvas) {
     focus_or_open_canvas_window({
       app,
-      agentSidecar,
       workspace_id: workspace.id,
       admission,
     });
   } else {
     focus_or_open_workspace_window({
       app,
-      agentSidecar,
       workspace_id: workspace.id,
       admission,
     });
@@ -263,8 +268,12 @@ async function reopen_recent_workspace(
     admission.focus_entry();
     return;
   }
+  const owner = admission?.native_workspaces?.();
+  if (!owner && !getAgentSidecarInfo()) return;
   try {
-    const reopened = await agentSidecarClient.reopenWorkspace(workspace.root);
+    const reopened = owner
+      ? await owner.reopen(workspace.root)
+      : await agentSidecarClient.reopenWorkspace(workspace.root);
     route_workspace_window(app, reopened, admission);
   } catch {
     if (admission && !admission.can_open()) return;
@@ -280,12 +289,13 @@ async function reopen_recent_workspace(
  * ⌃R "Recent projects" palette uses (`workspaces.list()`), so the two stay in
  * lock-step. Empty when the sidecar isn't ready yet or nothing's been opened.
  */
-async function list_recent_workspaces() {
+async function list_recent_workspaces(admission?: DesktopWindowAdmission) {
   try {
-    return (await agentSidecarClient.listWorkspaces()).slice(
-      0,
-      MAX_RECENT_MENU_ITEMS
-    );
+    const owner = admission?.native_workspaces?.();
+    const workspaces = owner
+      ? await owner.list()
+      : await agentSidecarClient.listWorkspaces();
+    return workspaces.slice(0, MAX_RECENT_MENU_ITEMS);
   } catch {
     // Sidecar not ready / transient — an empty Open Recent (disabled placeholder).
     return [];
@@ -353,7 +363,9 @@ async function rebuild_application_menu_locked(
   }
 ): Promise<void> {
   const readyAtStart = opts?.windowAdmission?.can_open() ?? true;
-  let recents = readyAtStart ? await list_recent_workspaces() : [];
+  let recents = readyAtStart
+    ? await list_recent_workspaces(opts?.windowAdmission)
+    : [];
   // Authentication may change during the fetch. Never install prior-account
   // workspace names or enabled commands after admission has closed.
   const ready = opts?.windowAdmission?.can_open() ?? true;

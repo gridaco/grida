@@ -143,6 +143,7 @@ registerWorkspaceMediaScheme();
 let entryWindow: DesktopEntryWindow | null = null;
 let nativeDesktopAgent: NativeDesktopAgent | undefined;
 let nativeDocuments: NativeDocumentFiles | undefined;
+let nativeFileWorkspaces: NativeWorkspaceCatalog | undefined;
 let managedLegacyStart: ReturnType<typeof startOwnedLegacyWriter> | undefined;
 let recentFiles = agentSidecarClient.recent;
 let nativeQuitDrain: Promise<void> | undefined;
@@ -151,6 +152,12 @@ let nativeExternalRuns: NativeExternalRuns | undefined;
 let nativeQuitReady = false;
 const windowAdmission = {
   can_open: () => entryWindow?.isMain ?? false,
+  native_file_available: (filePath?: string) =>
+    filePath === undefined
+      ? nativeDocuments !== undefined
+      : open_handoff.isSupportedFile(filePath) &&
+        nativeDocumentOwner(filePath) !== undefined,
+  native_workspaces: () => nativeFileWorkspaces,
   register: (window: BrowserWindow) => {
     if (entryWindow) return entryWindow.registerSecondary(window);
     window.close();
@@ -414,14 +421,16 @@ async function openDocumentWindowForPath(filePath: string) {
  * expansion — and open (or focus) its canvas window.
  */
 async function openCanvasBundleForPath(dirPath: string) {
-  const agentSidecar = getAgentSidecarInfo();
-  if (!agentSidecar) {
+  const owner = nativeFileWorkspaces;
+  if (!owner && !getAgentSidecarInfo()) {
     console.warn("[grida] cannot open .canvas: agent sidecar not ready");
     return;
   }
   let workspaceId: string;
   try {
-    const workspace = await agentSidecarClient.openWorkspace(dirPath);
+    const workspace = owner
+      ? await owner.openSelected(dirPath)
+      : await agentSidecarClient.openWorkspace(dirPath);
     workspaceId = workspace.id;
   } catch (err) {
     console.error("[grida] open .canvas failed:", err);
@@ -439,7 +448,6 @@ async function openCanvasBundleForPath(dirPath: string) {
   }
   focus_or_open_canvas_window({
     app,
-    agentSidecar,
     workspace_id: workspaceId,
     admission: windowAdmission,
   });
@@ -453,7 +461,8 @@ function handleFilePath(filePath: string) {
     return;
   }
   if (
-    ((!nativeDocumentOwner(filePath) || isCanvas) && !agentSidecarInfo) ||
+    (!(isCanvas ? nativeFileWorkspaces : nativeDocumentOwner(filePath)) &&
+      !agentSidecarInfo) ||
     !startup_window.canDispatchLaunchIntent({
       app_ready: app.isReady(),
       entry_main: entryWindow?.isMain ?? false,
@@ -708,6 +717,7 @@ app.on("ready", async () => {
       }
       const documentWorkers = nativeWorkspaceMedia();
       if (documentWorkers) {
+        nativeFileWorkspaces = workspaceCatalog;
         nativeDocuments = new NativeDocumentFiles(
           workspaceCatalog.fileProtectionPaths(),
           app.getPath("home"),
