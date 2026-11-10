@@ -101,6 +101,21 @@ If a granted launch profile requires human approval for a tool action, the
 same exit code identifies the retained approval. Only a host-authorized
 reviewer can answer that approval. A general ACP observer can inspect it.
 
+### Work with selected folders
+
+On macOS and Linux, select a trusted [native permission profile] with
+`--permission-profile PATH`. It names a primary directory and any additional
+directories. When `grida-agent run` omits `--cwd`, the profile's primary
+supplies the working directory. Ask for a file in another directory by its
+profile ID, especially when the same relative path exists in both folders.
+
+Set `read: allow` for bounded text reads, directory listings, and literal
+search, or `read: ask` to require approval. Listing a folder in the profile
+does not grant access by itself. A changed profile can block continuation
+of a retained task after restart.
+
+[native permission profile]: https://github.com/gridaco/grida/tree/main/crates/grida-agent#filesystem-services
+
 ### Plan before carrying out a task
 
 In the native Desktop workspace pane, choose **Plan** or **Act** using

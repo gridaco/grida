@@ -23,7 +23,7 @@ use agent_kit_store_sqlite::SqliteStore;
 use grida_agent_master::hooks::CheckMode;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
@@ -224,12 +224,15 @@ impl PermissionProfile {
         self.completion_hook.as_ref()
     }
 
-    pub fn matches_primary(&self, cwd: &std::path::Path) -> bool {
-        self.workspace.primary().is_some()
-            && self
-                .workspace
-                .permission_directory(None, &self.protected)
-                .is_ok_and(|directory| directory.root() == cwd)
+    /// Resolve the pinned primary for launch context without granting access.
+    pub fn primary_directory(&self) -> Result<&Path> {
+        self.workspace
+            .permission_directory(None, &self.protected)
+            .map(DirectoryBinding::root)
+    }
+
+    pub fn matches_primary(&self, cwd: &Path) -> bool {
+        self.primary_directory().is_ok_and(|primary| primary == cwd)
     }
 
     #[cfg(unix)]

@@ -340,8 +340,9 @@ Native `run` and `serve` can offer these tools through a permission profile
 selected with `--permission-profile PATH`. Use an absolute canonical path to
 an owner-only JSON file (mode 0600) in a private directory (mode 0700). This
 launch input is separate from `config.toml` and comes from the supervisor.
-The session working directory must match the profile's canonical primary root.
-A working directory supplied over ACP does not grant access.
+With a profile, `grida-agent run` can omit `--cwd` to use its canonical primary
+root. An explicit working directory must match that root to use the profile's
+tools. ACP clients still supply their working directory.
 
 ```json
 {
@@ -369,7 +370,9 @@ A working directory supplied over ACP does not grant access.
 ```
 
 Each root's `read`, `commandRead`, and `commandReadWrite` rule accepts
-`allow`, `ask`, or `deny`, with omitted rules defaulting to `deny`. Native
+`allow`, `ask`, or `deny`, with omitted rules defaulting to `deny`. File tools
+use the primary when `directory` is omitted. Supply a named directory ID to
+target another root. Each root's rules apply independently. Native
 commands additionally require a trusted `command` installation with `helper`
 (a canonical `path` and a 32-byte `sha256` array), `runtimePaths`, and a
 private `temporaryParent`. Linux also requires `bubblewrap` with its own path

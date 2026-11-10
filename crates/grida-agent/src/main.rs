@@ -58,7 +58,8 @@ fn command() -> Command {
                         .long("cwd")
                         .value_name("DIRECTORY")
                         .value_parser(value_parser!(PathBuf))
-                        .required(true),
+                        .required_unless_present("permission-profile")
+                        .help("Working directory. Defaults to the trusted permission profile's primary."),
                 )
                 .arg(Arg::new("session").long("session").value_name("SESSION_ID"))
                 .arg(
@@ -382,6 +383,18 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             )
         })
         .transpose()?;
+    let run_cwd = if name == "run" {
+        Some(match args.get_one::<PathBuf>("cwd") {
+            Some(cwd) => cwd.clone(),
+            None => permissions
+                .as_ref()
+                .expect("permission profile required without cwd")
+                .primary_directory()?
+                .to_owned(),
+        })
+    } else {
+        None
+    };
     let supervisor = (name == "serve" && args.get_flag("supervised-provider"))
         .then(grida_agent::SupervisedProvider::default);
     let gateway_scope = if name == "serve" {
@@ -472,10 +485,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     process::run(
         &host,
         RunOptions {
-            cwd: args
-                .get_one::<PathBuf>("cwd")
-                .expect("required cwd")
-                .clone(),
+            cwd: run_cwd.expect("validated run directory"),
             session: args
                 .get_one::<String>("session")
                 .map(SessionId::new)
