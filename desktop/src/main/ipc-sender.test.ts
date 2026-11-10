@@ -26,15 +26,15 @@ it("pins the standalone document route to one exact document query", () => {
   expect(ipc_sender.isDocument(`${origin}/desktop/file?docId=a`, "a")).toBe(
     true
   );
-  expect(
-    ipc_sender.isDocument(`${origin}/desktop/file?docId=a&docId=b`, "a")
-  ).toBe(false);
-  expect(ipc_sender.isDocument(`${origin}/desktop/file?docId=b`, "a")).toBe(
-    false
-  );
-  expect(ipc_sender.isDocument(`${origin}/desktop/welcome?docId=a`, "a")).toBe(
-    false
-  );
+  for (const path of [
+    "/desktop/file?docId=a&docId=b",
+    "/desktop/file?docId=a&id=eac20941e6a410aa",
+    "/desktop/file?docId=a&path=nested.canvas",
+    "/desktop/file?docId=a#fragment",
+    "/desktop/file?docId=b",
+    "/desktop/welcome?docId=a",
+  ])
+    expect(ipc_sender.isDocument(origin + path, "a")).toBe(false);
 });
 
 describe("ipc_sender.isAllowed", () => {

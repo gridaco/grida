@@ -24,9 +24,11 @@ export namespace ipc_sender {
 
   export function isDocument(raw: string, docId: string): boolean {
     const url = parse(raw);
-    const ids = url?.searchParams.getAll("docId");
     return (
-      url?.pathname === "/desktop/file" && ids?.length === 1 && ids[0] === docId
+      url?.pathname === "/desktop/file" &&
+      !url.hash &&
+      url.searchParams.size === 1 &&
+      url.searchParams.get("docId") === docId
     );
   }
 
