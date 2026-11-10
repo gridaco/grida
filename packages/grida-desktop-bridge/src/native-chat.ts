@@ -315,6 +315,11 @@ export type NativeChatGoal = Readonly<
     progress: string | null;
     spent: NativeChatGoalUsage;
     remaining: NativeChatGoalUsage;
+    review?: Readonly<{
+      status: "pending" | "confirmed";
+      turnId: string;
+      summary: string;
+    }>;
     reservation: Readonly<{
       turnId: string;
       inferenceSteps: number;
@@ -328,7 +333,11 @@ export type NativeChatGoalObservation = Readonly<{
   goal: NativeChatGoal | null;
 }>;
 
-export type NativeChatGoalAction = "pause" | "resume" | "clear";
+export type NativeChatGoalAction =
+  | "pause"
+  | "resume"
+  | "clear"
+  | "confirm_completion";
 
 export type NativeChatGoalControl = Readonly<{
   observationId: string;

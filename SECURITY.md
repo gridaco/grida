@@ -1012,6 +1012,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   the exact goal, driver, and session revisions behind a frame-scoped token.
   Goal inspection is read-only. Desktop starts work through explicit user
   acceptance of the objective and allowance.
+  Completion confirmation requires a negotiated, attached user control. The
+  inspected work turn and objective revision are retained behind the same
+  scoped token. The owner commits the exact confirmation only while idle
+  with a settled, accounted proposal and preserves its original turn receipt.
   A queued goal retains its start request across restart. The Host refuses
   generic replacement while the goal is queued. Withdrawal uses the original
   input identity and the observed queue revision.

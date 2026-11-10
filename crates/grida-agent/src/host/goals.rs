@@ -5,7 +5,8 @@ use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision};
 use agent_kit_core::{GrantId, ToolId};
 use agent_kit_store_sqlite::driver::{DriverControlPlan, DriverControlRequest};
 use grida_agent_master::goals::{
-    Allowance, Basis, Continuation, Goal, Objective, Reservation, Status, Usage, tools,
+    Allowance, Basis, CompletionReview, Continuation, Goal, Objective, Reservation, Status, Usage,
+    tools,
 };
 use std::num::NonZeroU32;
 
@@ -18,6 +19,8 @@ pub struct GoalRequest {
     pub allowance: Allowance,
     #[serde(default)]
     pub automatic: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub user_review: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,6 +36,7 @@ pub enum GoalAction {
     Pause,
     Resume,
     Revise { objective: Objective },
+    ConfirmCompletion { turn: TurnId },
     Clear,
 }
 
@@ -68,6 +72,8 @@ pub struct GoalView {
     pub spent: Usage,
     pub remaining: Usage,
     pub reservation: Option<Reservation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<CompletionReview>,
 }
 
 impl Host {
@@ -90,7 +96,12 @@ impl Host {
             return Err(problem(ErrorKind::Unsupported, "goal_effort_unavailable"));
         }
         validate_prompt_parts(&request.parts)?;
-        Goal::start(request.id.clone(), goal.objective.clone(), goal.allowance)?;
+        Goal::start_with_review(
+            request.id.clone(),
+            goal.objective.clone(),
+            goal.allowance,
+            goal.user_review,
+        )?;
         let _admission = self.configuration_admission.lock().await;
         if let Some(accepted) = self
             .store
@@ -164,6 +175,7 @@ impl Host {
                 spent: goal.spent(),
                 remaining: goal.remaining(),
                 reservation: goal.reservation().cloned(),
+                review: goal.completion_review().cloned(),
             })
         } else {
             None
@@ -257,6 +269,7 @@ impl Host {
         let action = control.action;
         let intent = encode("grida.agent.goal.control", 1, &(&basis, &action))?;
         let decision = action.clone();
+        let request = control.id.clone();
         let receipt = self
             .store
             .control_driver_state(
@@ -316,6 +329,13 @@ impl Host {
                             }
                             current.map(|_| ControlDirective::Cancel)
                         }
+                        GoalAction::ConfirmCompletion { turn } => {
+                            if current.is_some() {
+                                return Err(problem(ErrorKind::Conflict, "goal_work_reserved"));
+                            }
+                            goal.confirm_completion(&basis, &turn, request)?;
+                            None
+                        }
                         GoalAction::Clear => {
                             goal.clear(&basis)?;
                             current.map(|_| ControlDirective::Cancel)
@@ -336,7 +356,7 @@ impl Host {
                 }
             }
             GoalAction::Resume => self.kick_queue(session).await,
-            GoalAction::Pause => {}
+            GoalAction::Pause | GoalAction::ConfirmCompletion { .. } => {}
         }
         Ok(receipt)
     }
@@ -419,7 +439,12 @@ pub(super) fn claim_update(
         GoalInput::Start(request) => {
             // Later accepted inputs remain behind the explicit goal start.
             require_no_active_goal(view)?;
-            Goal::start(input.clone(), request.objective.clone(), request.allowance)?
+            Goal::start_with_review(
+                input.clone(),
+                request.objective.clone(),
+                request.allowance,
+                request.user_review,
+            )?
         }
         GoalInput::Continue(continuation) => {
             let value = view

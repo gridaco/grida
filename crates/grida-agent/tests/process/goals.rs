@@ -30,6 +30,7 @@ fn goal() -> GoalRequest {
             inference_steps: NonZeroU32::new(5).unwrap(),
         },
         automatic: false,
+        user_review: false,
     }
 }
 
@@ -46,6 +47,15 @@ fn request(session: &SessionId, id: &str, text: &str) -> PromptRequest {
 }
 
 async fn goal_client(url: &str, negotiate: bool, inspect_config: bool) -> SharedSocket {
+    goal_connection(url, negotiate, inspect_config, false).await
+}
+
+async fn goal_connection(
+    url: &str,
+    negotiate: bool,
+    inspect_config: bool,
+    completion_review: bool,
+) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
         .unwrap();
@@ -62,12 +72,233 @@ async fn goal_client(url: &str, negotiate: bool, inspect_config: bool) -> Shared
                 1.into();
         }
     }
+    if completion_review {
+        initialize["clientCapabilities"]["_meta"]["co.grida/goal/confirm-completion"] = 1.into();
+    }
     let response = ws_rpc(&mut socket, 1, "initialize", initialize).await;
     assert_eq!(
         response["result"]["agentCapabilities"]["_meta"]["co.grida/goal/start"],
         1
     );
     socket
+}
+
+#[tokio::test]
+async fn the_user_can_confirm_only_exact_accounted_goal_work_after_restart() {
+    const REPORT: &str = r#"{"report":{"kind":"ready_for_review","summary":"Open the exported file and check its page."}}"#;
+    let (finish_goal, goal_response) = tokio::sync::oneshot::channel();
+    let (finish_ordinary, ordinary_response) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("goal_report", REPORT),
+        Reply::Release("The export is ready to inspect.", goal_response),
+        Reply::Release("This was an ordinary question.", ordinary_response),
+    ])
+    .await;
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut client = goal_connection(&url, true, true, true).await;
+    let new = ws_rpc(
+        &mut client,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = new["result"]["sessionId"].as_str().unwrap();
+    let select = json!({"sessionId":session});
+    let load = json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]});
+    let start = ws_rpc(
+        &mut client,
+        3,
+        "_co.grida/goal/start",
+        json!({
+            "sessionId":session,"inputId":"review-goal",
+            "prompt":[{"type":"text","text":"Prepare the export"}],
+            "goal":{
+                "objective":{"description":"Prepare the export","criteria":["The exported file opens"]},
+                "allowance":{"work_turns":1,"inference_steps":2},"automatic":true
+            }
+        }),
+    )
+    .await;
+    assert_eq!(start["result"]["inputId"], "review-goal", "{start}");
+    assert!(
+        endpoint.request().await["tools"]
+            .to_string()
+            .contains("ready_for_review")
+    );
+    endpoint.request().await;
+    let held = ws_rpc(&mut client, 4, "_co.grida/goal/inspect", select.clone()).await;
+    let held = &held["result"];
+    assert!(held["goal"].get("review").is_none());
+    let turn = held["goal"]["reservation"]["turn"].as_str().unwrap();
+    let confirm = |view: &Value, request: &str, turn: &str| {
+        json!({
+            "sessionId":session,"requestId":request,
+            "expectedSessionRevision":view["revision"],
+            "expectedStateRevision":view["stateRevision"],
+            "basis":view["goal"]["basis"],
+            "change":{"action":"confirm_completion","turn":turn}
+        })
+    };
+    let premature = ws_rpc(
+        &mut client,
+        5,
+        "_co.grida/goal/control",
+        confirm(held, "premature", turn),
+    )
+    .await;
+    assert_eq!(
+        premature["error"]["data"], "goal_work_reserved",
+        "{premature}"
+    );
+    finish_goal.send(()).unwrap();
+    wait_for_snapshot(&mut client, session, |view| view["current"].is_null()).await;
+    let reviewed = ws_rpc(&mut client, 6, "_co.grida/goal/inspect", select.clone()).await;
+    let reviewed = &reviewed["result"];
+    let candidate = reviewed["goal"]["review"].clone();
+    assert_eq!(candidate["status"], "pending");
+    assert_eq!(candidate["candidate"]["turn"], turn);
+    assert_eq!(candidate["candidate"]["basis"], reviewed["goal"]["basis"]);
+    assert_eq!(
+        reviewed["goal"]["remaining"],
+        json!({"work_turns":0,"inference_steps":0})
+    );
+    assert_eq!(
+        reviewed["goal"]["status"],
+        json!({"status":"blocked","reason":"unverified_completion"})
+    );
+    let early_control = confirm(reviewed, "confirm-goal", turn);
+
+    let ordinary = ws_rpc(
+        &mut client,
+        7,
+        "_co.grida/session/submit",
+        json!({"sessionId":session,"inputId":"ordinary-work",
+            "prompt":[{"type":"text","text":"An unrelated follow-up."}]}),
+    )
+    .await;
+    assert_eq!(ordinary["result"]["inputId"], "ordinary-work", "{ordinary}");
+    let request = endpoint.request().await;
+    assert!(
+        request["messages"]
+            .to_string()
+            .contains("An unrelated follow-up.")
+    );
+    let busy = ws_rpc(&mut client, 8, "_co.grida/goal/inspect", select.clone()).await;
+    assert_eq!(busy["result"]["goal"]["review"], candidate);
+    let during = ws_rpc(
+        &mut client,
+        9,
+        "_co.grida/goal/control",
+        confirm(&busy["result"], "confirm-busy", turn),
+    )
+    .await;
+    assert_eq!(
+        during["error"]["data"], "goal_control_requires_owned_turn",
+        "{during}"
+    );
+    finish_ordinary.send(()).unwrap();
+    let latest = wait_for_snapshot(&mut client, session, |view| view["current"].is_null()).await;
+    assert_ne!(latest["latest"]["turnId"], turn);
+    drop(client);
+    terminate_shared_server(child).await;
+    let endpoint_url = endpoint.url.clone();
+    endpoint.done().await;
+
+    let (child, url) = shared_server(&state, &endpoint_url).await;
+    let mut client = goal_connection(&url, true, true, true).await;
+    let foreign = ws_rpc(
+        &mut client,
+        2,
+        "_co.grida/goal/control",
+        early_control.clone(),
+    )
+    .await;
+    assert_eq!(
+        foreign["error"]["data"], "session_setup_required",
+        "{foreign}"
+    );
+    assert!(
+        ws_rpc(&mut client, 3, "session/load", load.clone())
+            .await
+            .get("result")
+            .is_some()
+    );
+    let reopened = ws_rpc(&mut client, 4, "_co.grida/goal/inspect", select.clone()).await;
+    let reopened = &reopened["result"];
+    assert_eq!(reopened["goal"]["review"], candidate);
+    let mut older = goal_client(&url, true, true).await;
+    assert!(
+        ws_rpc(&mut older, 2, "session/load", load)
+            .await
+            .get("result")
+            .is_some()
+    );
+    let legacy = ws_rpc(&mut older, 3, "_co.grida/goal/inspect", select.clone()).await;
+    assert!(legacy["result"]["goal"].get("review").is_none());
+    let exact_control = confirm(reopened, "confirm-goal", turn);
+    let unsupported = ws_rpc(
+        &mut older,
+        4,
+        "_co.grida/goal/control",
+        exact_control.clone(),
+    )
+    .await;
+    assert_eq!(unsupported["error"]["code"], -32601, "{unsupported}");
+    drop(older);
+
+    let stale = ws_rpc(&mut client, 5, "_co.grida/goal/control", early_control).await;
+    assert_eq!(stale["error"]["data"], "stale_session_revision", "{stale}");
+    let wrong = ws_rpc(
+        &mut client,
+        6,
+        "_co.grida/goal/control",
+        confirm(
+            reopened,
+            "wrong-turn",
+            latest["latest"]["turnId"].as_str().unwrap(),
+        ),
+    )
+    .await;
+    assert_eq!(
+        wrong["error"]["data"], "goal_completion_review_changed",
+        "{wrong}"
+    );
+    let confirmed = ws_rpc(
+        &mut client,
+        7,
+        "_co.grida/goal/control",
+        exact_control.clone(),
+    )
+    .await;
+    assert_eq!(
+        confirmed["result"]["requestId"], "confirm-goal",
+        "{confirmed}"
+    );
+    assert!(confirmed["result"]["turnId"].is_null());
+    let retry = ws_rpc(&mut client, 8, "_co.grida/goal/control", exact_control).await;
+    assert_eq!(retry["result"], confirmed["result"]);
+    let final_goal = ws_rpc(&mut client, 9, "_co.grida/goal/inspect", select).await;
+    assert_eq!(
+        final_goal["result"]["goal"]["status"],
+        json!({"status":"complete"})
+    );
+    assert_eq!(
+        final_goal["result"]["goal"]["spent"],
+        json!({"work_turns":1,"inference_steps":2})
+    );
+    assert_eq!(
+        final_goal["result"]["goal"]["review"],
+        json!({"status":"confirmed","request":"confirm-goal","candidate":candidate["candidate"]})
+    );
+    assert_eq!(
+        session_snapshot(&mut client, session).await["latest"]["turnId"],
+        latest["latest"]["turnId"]
+    );
+    terminate_shared_server(child).await;
 }
 
 #[tokio::test]

@@ -424,6 +424,15 @@ an active goal cancels its reserved turn without discarding its uncertainty.
 Clear an active or blocked goal before replacing an earlier message in the
 same chat. A separate fork carries no goal authorization.
 
+To use person-confirmed completion, negotiate
+`co.grida/goal/confirm-completion` version 1 when starting the goal. Goal
+inspection may then include `review` with a status and the candidate's
+`basis`, `turn`, and `summary`. A pending review stops automatic
+continuation. After the person checks the result, use the existing `control`
+method with `change: {"action":"confirm_completion","turn":"<candidate turn>"}`
+and the exact current revisions. The resulting goal retains the confirmed
+candidate and request identity. This control uses no inference allowance.
+
 ## Preserve lifecycle meaning
 
 In v1, `session/prompt` completes with the turn's stop reason. It cannot return

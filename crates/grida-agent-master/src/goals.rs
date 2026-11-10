@@ -112,6 +112,9 @@ pub enum Report {
         summary: String,
         evidence: Vec<CriterionEvidence>,
     },
+    ReadyForReview {
+        summary: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -154,6 +157,26 @@ pub struct VerifiedCriterion {
     pub operation: OperationId,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewCandidate {
+    pub basis: Basis,
+    pub turn: TurnId,
+    pub summary: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+pub enum CompletionReview {
+    Pending {
+        candidate: ReviewCandidate,
+    },
+    Confirmed {
+        candidate: ReviewCandidate,
+        request: ChangeId,
+    },
+}
+
 /// Product state persisted in a versioned envelope. Only validated transitions
 /// can produce a goal that is eligible to reserve more work.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -174,10 +197,23 @@ struct State {
     progress: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     last_work: Option<TurnId>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    user_review: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    review: Option<CompletionReview>,
 }
 
 impl Goal {
     pub fn start(id: ChangeId, objective: Objective, allowance: Allowance) -> Result<Self> {
+        Self::start_with_review(id, objective, allowance, false)
+    }
+
+    pub fn start_with_review(
+        id: ChangeId,
+        objective: Objective,
+        allowance: Allowance,
+        user_review: bool,
+    ) -> Result<Self> {
         Ok(Self {
             state: State {
                 basis: Basis {
@@ -192,6 +228,8 @@ impl Goal {
                 status: Status::Active,
                 progress: None,
                 last_work: None,
+                user_review,
+                review: None,
             },
         })
     }
@@ -251,6 +289,46 @@ impl Goal {
     pub fn progress(&self) -> Option<&str> {
         self.state.progress.as_deref()
     }
+    pub fn user_review_enabled(&self) -> bool {
+        self.state.user_review
+    }
+    pub fn completion_review(&self) -> Option<&CompletionReview> {
+        self.state.review.as_ref()
+    }
+
+    /// Record the person's review of the exact successful, accounted work.
+    /// The owning client authenticates this control and retains its receipt.
+    pub fn confirm_completion(
+        &mut self,
+        expected: &Basis,
+        turn: &TurnId,
+        request: ChangeId,
+    ) -> Result<()> {
+        self.require_basis(expected)?;
+        let Some(CompletionReview::Pending { candidate }) = self.completion_review() else {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "goal_completion_review_unavailable",
+            ));
+        };
+        if &candidate.turn != turn
+            || &candidate.basis != expected
+            || self.paused()
+            || self.reservation().is_some()
+            || self.status() != Status::Blocked(Blocker::UnverifiedCompletion)
+        {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "goal_completion_review_changed",
+            ));
+        }
+        let candidate = candidate.clone();
+        self.advance_basis()?;
+        self.state.progress = Some(candidate.summary.clone());
+        self.state.status = Status::Complete;
+        self.state.review = Some(CompletionReview::Confirmed { candidate, request });
+        Ok(())
+    }
 
     /// Observation supplies a candidate only. A host must still conditionally
     /// accept and claim it under the captured session and goal revisions.
@@ -292,6 +370,7 @@ impl Goal {
         self.state.objective = objective;
         self.state.progress = None;
         self.state.status = Status::Active;
+        self.state.review = None;
         self.mark_exhausted();
         Ok(())
     }
@@ -299,6 +378,12 @@ impl Goal {
     pub fn set_paused(&mut self, expected: &Basis, paused: bool) -> Result<()> {
         self.require_editable(expected)?;
         if paused != self.state.paused {
+            if self.completion_review().is_some() {
+                return Err(problem(
+                    ErrorKind::Conflict,
+                    "goal_completion_review_pending",
+                ));
+            }
             self.advance_basis()?;
             self.state.paused = paused;
         }
@@ -311,6 +396,7 @@ impl Goal {
             self.advance_basis()?;
             self.state.status = Status::Cleared;
             self.state.paused = false;
+            self.state.review = None;
         }
         Ok(())
     }
@@ -347,7 +433,8 @@ impl Goal {
         if self.reservation().is_some() {
             return Err(problem(ErrorKind::Conflict, "goal_work_reserved"));
         }
-        if self.status() == Status::Exhausted {
+        let remaining = self.remaining();
+        if remaining.work_turns == 0 || remaining.inference_steps == 0 {
             return Err(problem(
                 ErrorKind::LimitExceeded,
                 "goal_allowance_exhausted",
@@ -357,6 +444,7 @@ impl Goal {
             self.advance_basis()?;
             self.state.paused = false;
             self.state.status = Status::Active;
+            self.state.review = None;
         }
         Ok(())
     }
@@ -453,6 +541,7 @@ impl Goal {
                 self.state.spent.inference_steps += steps;
                 if current {
                     self.apply_report(
+                        turn,
                         report.and_then(|value| value.normalized().ok()),
                         verified_evidence,
                     );
@@ -463,7 +552,12 @@ impl Goal {
         Ok(())
     }
 
-    fn apply_report(&mut self, report: Option<Report>, verified: &BTreeSet<CriterionEvidence>) {
+    fn apply_report(
+        &mut self,
+        turn: &TurnId,
+        report: Option<Report>,
+        verified: &BTreeSet<CriterionEvidence>,
+    ) {
         match report {
             Some(Report::Progress { summary }) if self.progress() != Some(&summary) => {
                 self.state.progress = Some(summary);
@@ -493,12 +587,23 @@ impl Goal {
                     self.state.status = Status::Blocked(Blocker::UnverifiedCompletion);
                 }
             }
+            Some(Report::ReadyForReview { summary }) if self.user_review_enabled() => {
+                self.state.status = Status::Blocked(Blocker::UnverifiedCompletion);
+                self.state.review = Some(CompletionReview::Pending {
+                    candidate: ReviewCandidate {
+                        basis: self.basis().clone(),
+                        turn: turn.clone(),
+                        summary,
+                    },
+                });
+            }
             _ => self.state.status = Status::Blocked(Blocker::NoProgress),
         }
     }
 
     fn mark_exhausted(&mut self) {
         if self.state.reservation.is_none()
+            && self.state.review.is_none()
             && matches!(self.state.status, Status::Active | Status::Blocked(_))
         {
             let remaining = self.remaining();
@@ -550,11 +655,37 @@ impl Goal {
                         .saturating_sub(state.spent.inference_steps)
                 || state.spent.work_turns >= state.allowance.work_turns.get()
         });
+        let bad_review = state.review.as_ref().is_some_and(|value| {
+            let (candidate, valid_status) = match value {
+                CompletionReview::Pending { candidate } => (
+                    candidate,
+                    state.status == Status::Blocked(Blocker::UnverifiedCompletion)
+                        && candidate.basis == state.basis,
+                ),
+                CompletionReview::Confirmed { candidate, .. } => (
+                    candidate,
+                    state.status == Status::Complete
+                        && candidate.basis.revision.checked_add(1) == Some(state.basis.revision)
+                        && state.progress.as_ref() == Some(&candidate.summary),
+                ),
+            };
+            !state.user_review
+                || !valid_status
+                || state.paused
+                || state.reservation.is_some()
+                || state.spent.work_turns == 0
+                || candidate.basis.goal != state.basis.goal
+                || candidate.basis.revision == 0
+                || state.last_work.as_ref() != Some(&candidate.turn)
+                || bounded_text(candidate.summary.clone(), MAX_PROGRESS_BYTES).as_ref()
+                    != Ok(&candidate.summary)
+        });
         if state.basis.revision == 0
             || state.objective.clone().normalized()? != state.objective
             || state.spent.work_turns > state.allowance.work_turns.get()
             || state.spent.inference_steps > state.allowance.inference_steps.get()
             || bad_reservation
+            || bad_review
             || state.status == Status::Blocked(Blocker::UncertainWork)
             || state.status == Status::Complete
                 && (state.reservation.is_some() || state.progress.is_none() || state.paused)
@@ -589,6 +720,9 @@ impl Report {
     fn normalized(self) -> Result<Self> {
         Ok(match self {
             Self::Progress { summary } => Self::Progress {
+                summary: bounded_text(summary, MAX_PROGRESS_BYTES)?,
+            },
+            Self::ReadyForReview { summary } => Self::ReadyForReview {
                 summary: bounded_text(summary, MAX_PROGRESS_BYTES)?,
             },
             Self::Blocked { summary, reason } => Self::Blocked {

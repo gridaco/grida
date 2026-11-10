@@ -1388,6 +1388,7 @@ export class NativeChatIpc {
       typeof change.requestId !== "string" ||
       (change.action !== "pause" &&
         change.action !== "resume" &&
+        change.action !== "confirm_completion" &&
         change.action !== "clear")
     )
       throw new Error("native_chat_goal_control_invalid");

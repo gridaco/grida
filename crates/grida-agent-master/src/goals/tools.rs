@@ -122,11 +122,18 @@ impl GoalTool {
                 "Read the goal, its success criteria, progress, and remaining allowance captured for this work turn.",
                 json!({"type":"object", "properties":{}, "additionalProperties":false}),
             ),
-            Kind::Report => (
-                REPORT,
-                "Record a progress, blocked, or completion proposal for this goal. Call once when this work turn has collected its evidence. For completion cite a tool call ID from this turn for each numbered success criterion. The proposal does not change the goal.",
-                report_schema(),
-            ),
+            Kind::Report => {
+                let description = if goal.user_review_enabled() {
+                    "Record progress, a blocker, evidence for verified completion, or a ready_for_review proposal. Use ready_for_review when the person should check the completed work against the goal criteria. Summarize the evidence they should inspect and mention any limitations. Call once. A proposal does not complete the goal."
+                } else {
+                    "Record a progress, blocked, or completion proposal for this goal. Call once when this work turn has collected its evidence. For completion cite a tool call ID from this turn for each numbered success criterion. The proposal does not change the goal."
+                };
+                (
+                    REPORT,
+                    description,
+                    report_schema(goal.user_review_enabled()),
+                )
+            }
         };
         Ok(Self {
             kind,
@@ -146,6 +153,9 @@ impl GoalTool {
 
     fn report(&self, value: &Value) -> Result<Report> {
         let report = parse_report(value)?;
+        if matches!(report, Report::ReadyForReview { .. }) && !self.goal.user_review_enabled() {
+            return Err(invalid_arguments());
+        }
         if let Report::Completion { evidence, .. } = &report {
             let covered: BTreeSet<_> = evidence
                 .iter()
@@ -247,9 +257,9 @@ impl Tool for GoalTool {
     }
 }
 
-fn report_schema() -> Value {
+fn report_schema(user_review: bool) -> Value {
     let summary = json!({"type":"string", "minLength":1, "maxLength":MAX_PROGRESS_BYTES});
-    json!({"type":"object", "required":["report"], "additionalProperties":false, "properties":{
+    let mut schema = json!({"type":"object", "required":["report"], "additionalProperties":false, "properties":{
         "report":{"oneOf":[
             {"type":"object", "required":["kind","summary"], "additionalProperties":false,
                 "properties":{"kind":{"const":"progress"},"summary":summary}},
@@ -263,7 +273,17 @@ fn report_schema() -> Value {
                             "properties":{"criterion":{"type":"integer","minimum":1,"maximum":MAX_CRITERIA},
                                 "call":{"type":"string","minLength":1}}}}}}
         ]}
-    }})
+    }});
+    if user_review {
+        schema["properties"]["report"]["oneOf"]
+            .as_array_mut()
+            .expect("goal report alternatives")
+            .push(
+                json!({"type":"object", "required":["kind","summary"], "additionalProperties":false,
+                "properties":{"kind":{"const":"ready_for_review"},"summary":summary}}),
+            );
+    }
+    schema
 }
 
 fn success(text: &str, structured: Option<Value>, receipt: Option<Envelope>) -> ToolOutcome {

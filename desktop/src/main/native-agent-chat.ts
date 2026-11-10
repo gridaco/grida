@@ -1192,7 +1192,11 @@ export class NativeAgentChat {
     snapshot: NativeChatSnapshot
   ): Promise<NativeGoalInspection> {
     const sessionId = this.requireObservation(session, snapshot);
-    const goal = await this.goals.inspect(sessionId, snapshot.sessionRevision);
+    const goal = await this.goals.inspect(
+      sessionId,
+      snapshot.sessionRevision,
+      this.process.acceptsGoalCompletion
+    );
     this.requireAttached(session);
     return goal;
   }

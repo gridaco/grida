@@ -27,6 +27,7 @@ export function NativeGoalPanel({
 }) {
   const [adding, setAdding] = useState(false);
   const goal = view.goal?.goal;
+  const review = goal?.review?.status === "pending" ? goal.review : null;
   const pending = view.observation?.snapshot.pendingGoalId;
   const goalTurn =
     !!goal?.reservation &&
@@ -74,13 +75,43 @@ export function NativeGoalPanel({
           {goal.progress && (
             <p className="break-words text-muted-foreground">{goal.progress}</p>
           )}
+          {review && (
+            <div className="space-y-1">
+              <p className="text-muted-foreground" title={review.turnId}>
+                {view.observation?.snapshot.latest?.turnId === review.turnId
+                  ? "From the latest goal work"
+                  : "From an earlier goal work turn"}
+              </p>
+              <p className="break-words">{review.summary}</p>
+              <p className="text-muted-foreground">
+                Check the result against the success criteria.
+              </p>
+              <ol className="list-decimal space-y-0.5 break-words pl-5">
+                {goal.criteria.map((criterion, index) => (
+                  <li key={index}>{criterion}</li>
+                ))}
+              </ol>
+              <Button
+                size="xs"
+                type="button"
+                disabled={!controller.canControlGoal("confirm_completion")}
+                onClick={() =>
+                  void controller.controlGoal("confirm_completion")
+                }
+              >
+                Confirm goal complete
+              </Button>
+            </div>
+          )}
           <details className="space-y-1 text-muted-foreground">
-            <summary>Criteria and allowance</summary>
-            <ol className="list-decimal space-y-0.5 break-words pl-5">
-              {goal.criteria.map((criterion, index) => (
-                <li key={index}>{criterion}</li>
-              ))}
-            </ol>
+            <summary>{review ? "Allowance" : "Criteria and allowance"}</summary>
+            {!review && (
+              <ol className="list-decimal space-y-0.5 break-words pl-5">
+                {goal.criteria.map((criterion, index) => (
+                  <li key={index}>{criterion}</li>
+                ))}
+              </ol>
+            )}
             <p>
               {goal.spent.workTurns} of {goal.allowance.workTurns} work turns
               used
@@ -228,11 +259,15 @@ function goalStatus(
 ): string {
   switch (goal.state.status) {
     case "blocked":
-      return `Blocked · ${BLOCKER[goal.state.reason]}`;
+      return goal.review?.status === "pending"
+        ? "Ready for your review"
+        : `Blocked · ${BLOCKER[goal.state.reason]}`;
     case "exhausted":
       return "Allowance exhausted";
     case "complete":
-      return "Completed";
+      return goal.review?.status === "confirmed"
+        ? "Completed · confirmed by you"
+        : "Completed";
     case "cleared":
       return "Cleared";
     case "active":

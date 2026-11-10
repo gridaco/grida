@@ -7,6 +7,7 @@ import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type { NativeChatGoalRequest } from "@grida/desktop-bridge";
 import { expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
+import { NativeAgentGoals } from "./native-agent-goals";
 import { NativeAgentProcess } from "./native-agent-process";
 import { NativeChatIpc } from "./native-chat-ipc";
 
@@ -19,8 +20,83 @@ const REQUEST: NativeChatGoalRequest = {
   automatic: false,
 };
 
-async function provider(holdCapacity = false) {
+it("sends confirmation only for the exact negotiated goal review", async () => {
+  const basis = { goal: "goal-id", revision: 2 };
+  const pending = {
+    session: "session",
+    revision: 7,
+    stateRevision: 3,
+    goal: {
+      basis,
+      objective: { description: REQUEST.objective, criteria: REQUEST.criteria },
+      automatic: false,
+      allowance: { work_turns: 1, inference_steps: 2 },
+      spent: { work_turns: 1, inference_steps: 2 },
+      remaining: { work_turns: 0, inference_steps: 0 },
+      status: { status: "blocked", reason: "unverified_completion" },
+      reservation: null,
+      paused: false,
+      progress: null,
+      review: {
+        status: "pending",
+        candidate: { basis, turn: "work-turn", summary: "Inspect the export." },
+      },
+    },
+  };
+  const request = vi.fn<(method: string, params: unknown) => Promise<unknown>>(
+    async (method) =>
+      method.endsWith("/inspect")
+        ? pending
+        : {
+            sessionId: "session",
+            requestId: "confirmation",
+            sessionRevision: 8,
+            stateRevision: 4,
+            turnId: null,
+            journalPosition: null,
+          }
+  );
+  const goals = new NativeAgentGoals(request);
+  const change = {
+    observationId: "observed-goal",
+    requestId: "confirmation",
+    action: "confirm_completion",
+  } as const;
+  const older = await goals.inspect("session", 7);
+  expect(older.goal?.review).toBeUndefined();
+  await expect(goals.control("session", older, change)).rejects.toThrow(
+    "native_chat_goal_completion_review_unavailable"
+  );
+  const observed = await goals.inspect("session", 7, true);
+  expect(observed.goal?.review).toEqual({
+    status: "pending",
+    turnId: "work-turn",
+    summary: "Inspect the export.",
+  });
+  await expect(
+    goals.control("other-session", observed, change)
+  ).rejects.toThrow("native_chat_goal_observation_unavailable");
+  await expect(
+    goals.control("session", { ...observed }, change)
+  ).rejects.toThrow("native_chat_goal_observation_unavailable");
+  await goals.control("session", observed, change);
+  expect(request).toHaveBeenLastCalledWith("_co.grida/goal/control", {
+    sessionId: "session",
+    requestId: "confirmation",
+    expectedSessionRevision: 7,
+    expectedStateRevision: 3,
+    basis,
+    change: { action: "confirm_completion", turn: "work-turn" },
+  });
+});
+
+async function provider(
+  mode: "completion" | "capacity" | "review" = "completion"
+) {
   const requests: string[] = [];
+  const maxRequests =
+    mode === "capacity" ? NATIVE_WORK_SLOTS : mode === "review" ? 2 : 4;
+  const reportAt = mode === "review" ? 1 : 3;
   const server = createServer((request, response) => {
     request.setEncoding("utf8");
     let body = "";
@@ -30,10 +106,7 @@ async function provider(holdCapacity = false) {
     request.on("end", () => {
       requests.push(body);
       const index = requests.length;
-      if (
-        request.url !== "/v1/chat/completions" ||
-        index > (holdCapacity ? NATIVE_WORK_SLOTS : 4)
-      ) {
+      if (request.url !== "/v1/chat/completions" || index > maxRequests) {
         response.writeHead(400).end();
         return;
       }
@@ -43,11 +116,11 @@ async function provider(holdCapacity = false) {
           choices: [{ index: 0, delta, finish_reason: finish }],
         })}\n\n`;
       response.writeHead(200, { "content-type": "text/event-stream" });
-      if (holdCapacity || index <= 2) {
+      if (mode === "capacity" || index < reportAt) {
         response.write(
           chunk({ role: "assistant", content: "Working on the export." })
         );
-      } else if (index === 3) {
+      } else if (index === reportAt) {
         response.write(
           chunk({
             role: "assistant",
@@ -59,11 +132,19 @@ async function provider(holdCapacity = false) {
                 function: {
                   name: "goal_report",
                   arguments: JSON.stringify({
-                    report: {
-                      kind: "completion",
-                      summary: "Export complete",
-                      evidence: [{ criterion: 1, call: "invented-evidence" }],
-                    },
+                    report:
+                      mode === "review"
+                        ? {
+                            kind: "ready_for_review",
+                            summary: "Open the export.",
+                          }
+                        : {
+                            kind: "completion",
+                            summary: "Export complete",
+                            evidence: [
+                              { criterion: 1, call: "invented-evidence" },
+                            ],
+                          },
                   }),
                 },
               },
@@ -97,6 +178,91 @@ async function provider(holdCapacity = false) {
 }
 
 it.runIf(Boolean(packaged))(
+  "confirms a completed review through the guarded Desktop bridge without inference",
+  async () => {
+    const root = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "grida-goal-review-")
+    );
+    const cwd = path.join(root, "workspace");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const endpoint = await provider("review");
+    const origin = "https://editor.fixture.invalid";
+    const frame = { url: `${origin}/desktop/workspace?id=workspace` };
+    const sender = Object.assign(new EventEmitter(), {
+      mainFrame: frame,
+      isDestroyed: () => false,
+      isLoadingMainFrame: () => false,
+    }) as unknown as WebContents;
+    const event = {
+      sender,
+      senderFrame: frame,
+    } as unknown as IpcMainInvokeEvent;
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        resourcesPath: packaged!,
+        stateDirectory: path.join(root, "state"),
+        cwd,
+        provider: "openai-compatible",
+        endpoint: endpoint.endpoint,
+        model: "fixture",
+      });
+      const active = { workspaceId: "workspace", chat };
+      const ipc = new NativeChatIpc(origin, (candidate) =>
+        candidate === sender ? active : null
+      );
+      const { attachmentId } = await ipc.create(event);
+      const snapshot = () => ipc.observe(event, attachmentId);
+      const inspect = async () =>
+        ipc.goal(event, attachmentId, (await snapshot()).observationId);
+      await ipc.startGoal(event, attachmentId, "review-goal", {
+        ...REQUEST,
+        allowance: { workTurns: 1, inferenceSteps: 2 },
+        automatic: true,
+      });
+      const pending = await vi.waitFor(async () => {
+        const observed = await inspect();
+        expect(observed.goal?.review).toMatchObject({
+          status: "pending",
+          summary: "Open the export.",
+        });
+        return observed;
+      });
+      const change = {
+        observationId: pending.observationId,
+        requestId: "confirm",
+        action: "confirm_completion",
+      };
+      await expect(
+        ipc.controlGoal(event, attachmentId, {
+          ...change,
+          turnId: pending.goal!.review!.turnId,
+        })
+      ).rejects.toThrow("native_chat_goal_control_invalid");
+      const receipt = await ipc.controlGoal(event, attachmentId, change);
+      await expect(
+        ipc.controlGoal(event, attachmentId, change)
+      ).resolves.toEqual(receipt);
+      const completed = await inspect();
+      expect(completed.goal).toMatchObject({
+        state: { status: "complete" },
+        spent: { workTurns: 1, inferenceSteps: 2 },
+        review: { ...pending.goal!.review, status: "confirmed" },
+      });
+      expect(endpoint.requests).toHaveLength(2);
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        await endpoint.close();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  },
+  15_000
+);
+
+it.runIf(Boolean(packaged))(
   "retains an unclaimed goal through restart and requires withdrawal instead of text replacement",
   async () => {
     const root = fs.mkdtempSync(
@@ -104,7 +270,7 @@ it.runIf(Boolean(packaged))(
     );
     const cwd = path.join(root, "workspace");
     fs.mkdirSync(cwd, { mode: 0o700 });
-    const endpoint = await provider(true);
+    const endpoint = await provider("capacity");
     const launch = {
       resourcesPath: packaged!,
       stateDirectory: path.join(root, "state"),

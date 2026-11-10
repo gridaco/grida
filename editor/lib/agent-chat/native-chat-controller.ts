@@ -1002,6 +1002,13 @@ export class NativeChatController {
     )
       return false;
     if (action === "clear") return true;
+    if (action === "confirm_completion")
+      return (
+        !current &&
+        !goal.reservation &&
+        !goal.paused &&
+        goal.review?.status === "pending"
+      );
     if (action === "pause")
       return (
         goal.state.status === "active" &&
@@ -1013,7 +1020,9 @@ export class NativeChatController {
       snapshot?.admissionPaused ||
       goal.state.status === "exhausted" ||
       goal.state.status === "complete" ||
-      goal.reservation?.uncertain
+      goal.reservation?.uncertain ||
+      (goal.review?.status === "pending" &&
+        (!goal.remaining.workTurns || !goal.remaining.inferenceSteps))
     )
       return false;
     return current

@@ -32,6 +32,7 @@ export type NativeGoalInspection = Readonly<{
 }>;
 
 export class NativeAgentGoals {
+  static readonly completionCapability = "co.grida/goal/confirm-completion";
   private readonly issued = new WeakSet<NativeGoalInspection>();
 
   constructor(
@@ -92,7 +93,8 @@ export class NativeAgentGoals {
 
   async inspect(
     sessionId: string,
-    expectedRevision: number
+    expectedRevision: number,
+    completionAvailable = false
   ): Promise<NativeGoalInspection> {
     const result = object(
       await this.request("_co.grida/goal/inspect", { sessionId })
@@ -130,16 +132,31 @@ export class NativeAgentGoals {
         inferenceSteps: number(rawReservation.inference_steps, 1, MAX_U32),
         uncertain: uncertainSteps !== null,
       });
+    const status = state(row.status);
+    const paused = flag(row.paused);
+    const progress =
+      row.progress === null ? null : text(row.progress, PROGRESS_LIMIT);
+    const completion =
+      completionAvailable && row.review !== undefined
+        ? completionReview(
+            row.review,
+            basis,
+            status,
+            paused,
+            reservation,
+            progress
+          )
+        : undefined;
     const goal: NativeChatGoal = Object.freeze({
       ...NativeAgentGoals.readStoredRequest(row),
       goalId: basis.goal,
-      state: state(row.status),
-      paused: flag(row.paused),
-      progress:
-        row.progress === null ? null : text(row.progress, PROGRESS_LIMIT),
+      state: status,
+      paused,
+      progress,
       spent: usage(row.spent),
       remaining: usage(row.remaining),
       reservation,
+      ...(completion && { review: completion }),
     });
     const inspection = Object.freeze({
       sessionId,
@@ -164,6 +181,15 @@ export class NativeAgentGoals {
     )
       throw new Error("native_chat_goal_observation_unavailable");
     const requestId = identity(change.requestId);
+    const action = member(change.action, [
+      "pause",
+      "resume",
+      "clear",
+      "confirm_completion",
+    ] as const);
+    const review = inspection.goal?.review;
+    if (action === "confirm_completion" && review?.status !== "pending")
+      throw new Error("native_chat_goal_completion_review_unavailable");
     const reply = object(
       await this.request("_co.grida/goal/control", {
         sessionId,
@@ -172,7 +198,8 @@ export class NativeAgentGoals {
         expectedStateRevision: inspection.stateRevision,
         basis: inspection.basis,
         change: {
-          action: member(change.action, ["pause", "resume", "clear"] as const),
+          action,
+          ...(action === "confirm_completion" && { turn: review?.turnId }),
         },
       })
     );
@@ -195,6 +222,38 @@ export class NativeAgentGoals {
       journalPosition,
     };
   }
+}
+
+function completionReview(
+  value: unknown,
+  basis: NonNullable<NativeGoalInspection["basis"]>,
+  state: NativeChatGoalStatus,
+  paused: boolean,
+  reservation: NativeChatGoal["reservation"],
+  progress: string | null
+) {
+  const row = object(value);
+  const candidate = object(row.candidate);
+  const source = object(candidate.basis);
+  const turn = identity(candidate.turn);
+  const summary = text(candidate.summary, PROGRESS_LIMIT);
+  const reviewStatus = member(row.status, ["pending", "confirmed"] as const);
+  const sourceRevision = number(source.revision, 1);
+  if (
+    paused ||
+    reservation ||
+    identity(source.goal) !== basis.goal ||
+    (reviewStatus === "pending"
+      ? state.status !== "blocked" ||
+        state.reason !== "unverified_completion" ||
+        sourceRevision !== basis.revision
+      : state.status !== "complete" ||
+        sourceRevision !== basis.revision - 1 ||
+        progress !== summary)
+  )
+    throw invalid();
+  if (reviewStatus === "confirmed") identity(row.request);
+  return Object.freeze({ status: reviewStatus, turnId: turn, summary });
 }
 
 function state(value: unknown): NativeChatGoalStatus {

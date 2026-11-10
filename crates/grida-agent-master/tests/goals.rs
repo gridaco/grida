@@ -1,6 +1,7 @@
 use agent_kit_core::{ChangeId, Envelope, ErrorKind, OperationId, SchemaId, ToolCallId, TurnId};
 use grida_agent_master::goals::{
-    Allowance, Blocker, CriterionEvidence, Goal, Objective, Report, Status, Usage, WorkOutcome,
+    Allowance, Blocker, CompletionReview, CriterionEvidence, Goal, Objective, Report, Status,
+    Usage, WorkOutcome,
 };
 use std::collections::BTreeSet;
 use std::num::NonZeroU32;
@@ -48,6 +49,116 @@ fn completion(checks: &BTreeSet<CriterionEvidence>) -> Report {
         summary: "Handoff is ready".into(),
         evidence: checks.iter().cloned().collect(),
     }
+}
+
+#[test]
+fn user_review_is_bound_to_the_work_basis_and_survives_the_final_allowance() {
+    let original = goal(1, 2);
+    let mut goal = Goal::start_with_review(
+        original.basis().goal.clone(),
+        original.objective().clone(),
+        original.allowance(),
+        true,
+    )
+    .unwrap();
+    let basis = goal.basis().clone();
+    let work = turn("reviewable-work");
+    let request = ChangeId::new("user-confirmed").unwrap();
+    goal.reserve(&basis, work.clone(), limit(2)).unwrap();
+    goal.account(&work, WorkOutcome::Uncertain { observed_steps: 1 })
+        .unwrap();
+    assert_eq!(goal.status(), Status::Blocked(Blocker::UncertainWork));
+    assert!(
+        goal.confirm_completion(&basis, &work, request.clone())
+            .is_err()
+    );
+    goal.account(
+        &work,
+        WorkOutcome::Settled {
+            inference_steps: 2,
+            report: Some(Report::ReadyForReview {
+                summary: "Open the exported file".into(),
+            }),
+            verified_evidence: &BTreeSet::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        goal.status(),
+        Status::Blocked(Blocker::UnverifiedCompletion)
+    );
+    assert_eq!(goal.remaining(), Usage::default());
+    assert!(goal.continuation().is_none());
+    let mut goal = Goal::decode(&goal.encode().unwrap()).unwrap();
+    assert_eq!(
+        goal.resume_idle(&basis).unwrap_err().code,
+        "goal_allowance_exhausted"
+    );
+    assert!(
+        goal.confirm_completion(&basis, &turn("different-work"), request.clone())
+            .is_err()
+    );
+    let spent = goal.spent();
+    goal.confirm_completion(&basis, &work, request.clone())
+        .unwrap();
+    assert_eq!(goal.status(), Status::Complete);
+    assert_eq!(goal.spent(), spent);
+    let reopened = Goal::decode(&goal.encode().unwrap()).unwrap();
+    assert!(matches!(
+        reopened.completion_review(),
+        Some(CompletionReview::Confirmed { candidate, request: recorded })
+            if candidate.basis == basis && candidate.turn == work && recorded == &request
+    ));
+}
+
+#[test]
+fn changing_objective_or_resuming_goal_work_retires_the_old_review() {
+    let original = goal(3, 6);
+    let mut goal = Goal::start_with_review(
+        original.basis().goal.clone(),
+        original.objective().clone(),
+        original.allowance(),
+        true,
+    )
+    .unwrap();
+    let basis = goal.basis().clone();
+    let work = turn("old-goal-work");
+    goal.reserve(&basis, work.clone(), limit(2)).unwrap();
+    goal.account(
+        &work,
+        WorkOutcome::Settled {
+            inference_steps: 2,
+            report: Some(Report::ReadyForReview {
+                summary: "Review the export".into(),
+            }),
+            verified_evidence: &BTreeSet::new(),
+        },
+    )
+    .unwrap();
+    let mut revised = goal.clone();
+    let mut objective = revised.objective().clone();
+    objective.criteria = vec!["The new export has both pages".into()];
+    revised.revise(&basis, objective).unwrap();
+    assert!(revised.completion_review().is_none());
+    assert!(
+        revised
+            .confirm_completion(&basis, &work, ChangeId::new("stale-confirmation").unwrap())
+            .is_err()
+    );
+    let mut cleared = goal.clone();
+    cleared.clear(&basis).unwrap();
+    assert!(cleared.completion_review().is_none());
+    goal.resume_idle(&basis).unwrap();
+    goal.reserve(&goal.basis().clone(), turn("new-goal-work"), limit(2))
+        .unwrap();
+    assert!(goal.completion_review().is_none());
+    assert_eq!(
+        goal.spent(),
+        Usage {
+            work_turns: 1,
+            inference_steps: 2
+        }
+    );
 }
 
 #[test]

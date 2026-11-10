@@ -645,8 +645,15 @@ Without that opt-in, the goal reserves its first work turn only.
 Inspect the goal to see progress, allowance used and held, and any blocker.
 Pause and Resume preserve the allowance for the same suspended turn. Revising
 the objective or clearing the goal stops its current work. The prior
-turn's evidence and uncertainty remain available. A model report alone
-does not establish completion.
+turn's evidence and uncertainty remain available.
+
+When a goal is **Ready for your review**, inspect the proposed result and
+the success criteria. Choose **Confirm goal complete** if the work meets
+them. The goal records that you confirmed completion and keeps its used
+allowance. You can confirm after the work settles even if no allowance
+remains. The agent's proposal stays tied to the work it came from, including
+after reopening the chat.
+
 In Desktop, **Stop** ends the current turn and retains the goal's state.
 Clear an active or blocked goal before replacing an earlier message in the
 same chat. A fork starts independently.

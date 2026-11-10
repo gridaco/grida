@@ -9,6 +9,7 @@ import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
 import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeAgentRevisions } from "./native-agent-revisions";
+import { NativeAgentGoals } from "./native-agent-goals";
 import {
   NativeEditorSurfaceEndpoints,
   type NativeEditorSurfaceDelivery,
@@ -108,6 +109,7 @@ export class NativeAgentProcess {
   private childQueueControls = false;
   private artifacts = false;
   private savedChatDeletion = false;
+  private goalCompletionReview = false;
   private editorSurfaces = false;
   private editorSurfaceOpen = false;
   private readonly commandCapabilities = new Set<string>();
@@ -178,6 +180,10 @@ export class NativeAgentProcess {
 
   get acceptsHistoryRevision(): boolean {
     return this.connected && this.historyRevision;
+  }
+
+  get acceptsGoalCompletion(): boolean {
+    return this.connected && this.goalCompletionReview;
   }
 
   get acceptsSubagents(): boolean {
@@ -323,6 +329,7 @@ export class NativeAgentProcess {
                 ...capabilities,
                 ...NativeAgentCommands.capabilities,
                 ...NativeAgentRevisions.capabilities,
+                [NativeAgentGoals.completionCapability]: 1,
                 ...(options.subagents && {
                   ...SUBAGENT_CAPABILITIES,
                   [SESSION_EFFORT]: 1,
@@ -366,6 +373,8 @@ export class NativeAgentProcess {
       processOwner.historyRevision = Object.keys(
         NativeAgentRevisions.capabilities
       ).every((key) => advertised?.[key] === 1);
+      processOwner.goalCompletionReview =
+        advertised?.[NativeAgentGoals.completionCapability] === 1;
       processOwner.namedChildren =
         options.subagents === true &&
         Object.keys(SUBAGENT_CAPABILITIES).every(

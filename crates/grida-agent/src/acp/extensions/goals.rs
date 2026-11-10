@@ -10,7 +10,8 @@ const START: &str = "co.grida/goal/start";
 const INSPECT: &str = "co.grida/goal/inspect";
 const CONTROL: &str = "co.grida/goal/control";
 const RECOVER: &str = "co.grida/goal/recover";
-pub(super) const CAPABILITIES: [&str; 4] = [START, INSPECT, CONTROL, RECOVER];
+const CONFIRM_COMPLETION: &str = "co.grida/goal/confirm-completion";
+pub(super) const CAPABILITIES: [&str; 5] = [START, INSPECT, CONTROL, RECOVER, CONFIRM_COMPLETION];
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/goal/start", response = SubmitResponse)]
@@ -84,6 +85,12 @@ pub(super) fn handlers(
                 let result = async {
                     require(&start.1, START, Some(&request.session_id))?;
                     let parts = prompt_parts(request.prompt, image_intake)?;
+                    let mut goal = request.goal;
+                    let review = require(&start.1, CONFIRM_COMPLETION, None).is_ok();
+                    if goal.user_review && !review {
+                        return Err(Error::method_not_found());
+                    }
+                    goal.user_review = review;
                     start
                         .0
                         .start_goal(
@@ -101,7 +108,7 @@ pub(super) fn handlers(
                                 )?,
                                 effort: None,
                             },
-                            request.goal,
+                            goal,
                         )
                         .await
                         .map(SubmitResponse::from)
@@ -116,12 +123,17 @@ pub(super) fn handlers(
             async move |request: Inspect, responder, _| {
                 let result = async {
                     require(&inspect.1, INSPECT, Some(&request.session_id))?;
-                    inspect
+                    let mut result = inspect
                         .0
                         .inspect_goal(request.session_id)
                         .await
-                        .map(Inspection)
-                        .map_err(host_error)
+                        .map_err(host_error)?;
+                    if require(&inspect.1, CONFIRM_COMPLETION, None).is_err()
+                        && let Some(goal) = result.goal.as_mut()
+                    {
+                        goal.review = None;
+                    }
+                    Ok(Inspection(result))
                 }
                 .await;
                 responder.respond_with_result(result)
@@ -132,6 +144,9 @@ pub(super) fn handlers(
             async move |request: Control, responder, _| {
                 let result = async {
                     require(&control.1, CONTROL, Some(&request.session_id))?;
+                    if matches!(&request.change, GoalAction::ConfirmCompletion { .. }) {
+                        require(&control.1, CONFIRM_COMPLETION, None)?;
+                    }
                     let receipt = control
                         .0
                         .control_goal(GoalControl {
