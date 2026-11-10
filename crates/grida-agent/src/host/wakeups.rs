@@ -13,6 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_TIMERS: usize = 128;
 const RETRY_DELAY: Duration = Duration::from_millis(100);
+const WALL_CLOCK_RECHECK: Duration = Duration::from_secs(30);
 
 pub(super) type TimerOwners = BTreeMap<(SessionId, TurnId), Arc<CancellationToken>>;
 
@@ -484,9 +485,9 @@ impl Host {
                 }
                 Ok(
                     match prepare_delivery(state, &wait, WakeupDisposition::Due, now)? {
-                        Delivery::NotDue => TimerStep::Sleep(Duration::from_millis(
-                            read_wakeup(record)?.due_at_ms - now,
-                        )),
+                        Delivery::NotDue => {
+                            TimerStep::Sleep(clock_delay(now, read_wakeup(record)?.due_at_ms))
+                        }
                         Delivery::Paused => TimerStep::Paused,
                         Delivery::Resolve(plan) => TimerStep::Resolve(plan),
                         Delivery::AlreadyResolved
@@ -565,6 +566,12 @@ enum TimerAction {
     Done,
     WaitForControl,
     Sleep(Duration),
+}
+
+fn clock_delay(now_ms: u64, due_at_ms: u64) -> Duration {
+    // The persisted deadline uses wall time, while the sleep uses a monotonic
+    // clock that may stop during system suspend. Recheck before sleeping again.
+    Duration::from_millis(due_at_ms.saturating_sub(now_ms)).min(WALL_CLOCK_RECHECK)
 }
 
 fn now_ms() -> Result<u64> {
