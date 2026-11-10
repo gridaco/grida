@@ -358,3 +358,22 @@ The native host owns the timer and uses the ordinary task scheduler to claim
 continuation. Closing the host releases its timers while preserving their
 recorded due times and delivery state. A private client explicitly recovers the
 selected wake-up after restart. Inspecting or loading a chat leaves it idle.
+
+## Embed an outbound MCP client
+
+The library can capture MCP tools from an explicitly trusted local server
+through `mcp_client::McpClient::connect`. Supply the exact numeric loopback
+HTTP endpoint, a bearer credential, and a stable source name with the
+allowlisted tools for that source. The client uses the stateless
+2026-07-28 Streamable HTTP profile and accepts bounded JSON and SSE replies.
+This is an embedded host API. The built-in run and ACP launch paths do not
+load outbound MCP configuration.
+
+Use the returned grants as ordinary tools and retain the client while their
+lease is in use. A new connection requires fresh host authorization. The
+client captures the schema descriptor and checks for bounded object input.
+The server owns semantic validation and the effects of its tools. The
+embedded profile excludes tools requiring parameter headers, remote schema
+references, and server-initiated input. It projects text and structured
+output and leaves resource links unopened. An interrupted effect is
+uncertain and is never retried by the client.

@@ -30,6 +30,7 @@ rmcp = { version = "=3.9.0", default-features = false, features = ["server", "tr
 serde = { version = "1", features = ["derive"] }
 serde_json.workspace = true
 sha2 = "0.11"
+sse-stream = "=0.2.6"
 subtle = "2"
 tempfile = "3"
 toml_edit = "=0.25.15"

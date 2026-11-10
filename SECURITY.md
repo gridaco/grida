@@ -991,6 +991,16 @@ lazy reads, read-only mutation, and symlink escape refusal.
   request before the SDK can route it. The bearer value is removed before
   dispatch. This listener exposes only the selected headless capability and
   opens no chat, provider, credential, or workspace store.
+- The outbound [MCP client](crates/grida-agent/src/mcp_client.rs) captures
+  only a trusted source's explicitly selected tools. Its
+  [HTTP transport](crates/grida-agent/src/mcp_client/http.rs) sends the
+  sensitive bearer only to the configured numeric loopback address and
+  path. It bypasses proxies, refuses redirects, and bounds discovery and
+  responses. The caller owns trust in the local peer and grants the
+  captured lease before model use. Server annotations cannot grant access
+  or authorize replay. Loss of a correlated result leaves the call
+  uncertain. The [fixtures](crates/grida-agent/tests/mcp_client.rs) exercise
+  the native server and an independent peer.
 
 - Portable Rust provider contracts: [crates/grida-ai/src/catalogue.rs](crates/grida-ai/src/catalogue.rs),
   [crates/grida-ai/src/discovery.rs](crates/grida-ai/src/discovery.rs),
