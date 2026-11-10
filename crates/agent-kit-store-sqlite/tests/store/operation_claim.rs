@@ -15,6 +15,9 @@ use agent_kit_store_sqlite::{
     OperationClaim, OperationClaimSource, OperationPairControl, OperationRelatedControl,
 };
 
+#[path = "resume.rs"]
+mod resume;
+
 struct WorkTool(ToolDefinition);
 
 impl Tool for WorkTool {

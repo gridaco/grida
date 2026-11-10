@@ -112,7 +112,7 @@ impl SqliteStore {
             bump_revision(&mut session)?;
             save_session(&transaction, id, &session)?;
             save_request(&transaction, id, "unprompted-claim", &request.request, fingerprint,
-                &ClaimRecord { turn: request.turn })?;
+                &ClaimRecord::new(request.turn))?;
             transaction.commit().map_err(commit_error)?;
             Ok(PreparedClaim::Acquired(Acquired {
                 binding: state.binding().clone(), configuration: session.configuration,

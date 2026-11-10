@@ -6,8 +6,10 @@ mod control_pair;
 pub mod deletion;
 pub mod driver;
 pub mod history;
+mod resume;
 
 pub use control_pair::{OperationPairControl, OperationPairReceipt, OperationRelatedControl};
+pub use resume::{ResumeClaimOutcome, ResumeClaimReceipt, ResumeCompanion};
 
 use agent_kit_core::driver_state::{DriverStateChange, DriverStateSnapshot};
 use agent_kit_core::history::HistoryRecord;
@@ -177,6 +179,14 @@ struct SessionRecord {
 #[derive(Serialize, Deserialize)]
 struct ClaimRecord {
     turn: TurnId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    resume: Option<resume::ResumeRecord>,
+}
+
+impl ClaimRecord {
+    fn new(turn: TurnId) -> Self {
+        Self { turn, resume: None }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -695,6 +705,26 @@ fn prepare_claim(
         let state = load_turn(transaction, &request.session, &receipt.turn)?;
         return Ok(PreparedClaim::Existing(turn_view(inner, &state)?));
     }
+    Ok(PreparedClaim::Acquired(prepare_pending_claim(
+        inner,
+        transaction,
+        request,
+        state_change,
+        submission,
+        fingerprint,
+        None,
+    )?))
+}
+
+fn prepare_pending_claim(
+    inner: &Inner,
+    transaction: &Transaction<'_>,
+    request: ClaimRequest,
+    state_change: Option<DriverStateChange>,
+    submission: Option<Submission>,
+    fingerprint: Fingerprint,
+    resume: Option<resume::ResumeRecord>,
+) -> Result<Acquired> {
     let mut session = load_session(transaction, &request.session)?;
     require_revision(&session, request.expected_revision)?;
     if session.paused {
@@ -817,6 +847,15 @@ fn prepare_claim(
                 {
                     return Err(error(ErrorKind::Conflict, "pause_state_changed"));
                 }
+                let mut actions = Vec::new();
+                let updates_state = state_change.is_some();
+                if let Some(change) = state_change {
+                    if state.driver_state() != &session.driver_state {
+                        return Err(error(ErrorKind::Conflict, "driver_state_snapshot_mismatch"));
+                    }
+                    actions.push(JournalAction::SetDriverState(change));
+                }
+                actions.push(JournalAction::Control(ControlDirective::Resume));
                 state.apply(JournalChange::new(
                     ChangeId::new(
                         Fingerprint::of(&("resume-control", &request.id))?
@@ -828,8 +867,11 @@ fn prepare_claim(
                     state.binding().clone(),
                     state.position(),
                     *control_revision,
-                    vec![JournalAction::Control(ControlDirective::Resume)],
+                    actions,
                 )?)?;
+                if updates_state {
+                    session.driver_state = state.driver_state().clone();
+                }
             }
             if !state.controls().admits_work() {
                 return Err(error(ErrorKind::InvalidState, "turn_admission_closed"));
@@ -852,14 +894,15 @@ fn prepare_claim(
         fingerprint,
         &ClaimRecord {
             turn: state.binding().turn.clone(),
+            resume,
         },
     )?;
-    Ok(PreparedClaim::Acquired(Acquired {
+    Ok(Acquired {
         binding: state.binding().clone(),
         configuration: session.configuration,
         inputs,
         owner,
-    }))
+    })
 }
 
 impl SessionStore for SqliteStore {
@@ -939,9 +982,7 @@ impl SessionStore for SqliteStore {
                     "recover",
                     &request.id,
                     fingerprint,
-                    &ClaimRecord {
-                        turn: request.turn.clone(),
-                    },
+                    &ClaimRecord::new(request.turn.clone()),
                 )?;
                 let inputs = turn_inputs(&transaction, &request.session, &request.turn)?;
                 transaction.commit().map_err(commit_error)?;
@@ -972,7 +1013,7 @@ impl SessionStore for SqliteStore {
             )? {
                 return Ok(receipt);
             }
-            let receipt = record_control(&transaction, &request, fingerprint)?;
+            let receipt = record_control(&transaction, &request, fingerprint, None)?;
             transaction.commit().map_err(commit_error)?;
             inner.changed.notify_waiters();
             Ok(receipt)
@@ -1512,10 +1553,11 @@ fn record_control(
     transaction: &Transaction<'_>,
     request: &ControlRequest,
     fingerprint: Fingerprint,
+    active: Option<TurnState>,
 ) -> Result<ControlReceipt> {
     let session = load_session(transaction, &request.session)?;
     require_revision(&session, request.expected_revision)?;
-    let receipt = apply_control(transaction, request, session, None)?;
+    let receipt = apply_control(transaction, request, session, active)?;
     save_request(
         transaction,
         &request.session,

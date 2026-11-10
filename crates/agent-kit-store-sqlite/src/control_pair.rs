@@ -5,6 +5,7 @@ use super::{
     deletion, error, execute, load_turn, lookup_request, operation_claim_key, record_control,
     save_request,
 };
+use agent_kit_core::turn::TurnState;
 use agent_kit_core::{ChangeId, ErrorKind, Fingerprint, OperationId, Result, SessionId, TurnId};
 use agent_kit_sessions::{ControlReceipt, ControlRequest, SessionControl};
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
@@ -38,6 +39,25 @@ pub enum OperationRelatedControl {
         session: SessionId,
         turn: TurnId,
     },
+}
+
+impl OperationRelatedControl {
+    pub(super) fn require_distinct(&self, source: &SessionId) -> Result<()> {
+        let destination = match self {
+            Self::Absent { session } | Self::Settled { session, .. } => session,
+            Self::Apply { request, .. } => {
+                control_turn(&request.action)?;
+                &request.session
+            }
+        };
+        if source == destination {
+            return Err(error(
+                ErrorKind::InvalidInput,
+                "operation_pair_same_session",
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -89,20 +109,7 @@ impl SqliteStore {
         request: OperationPairControl,
     ) -> Result<OperationPairReceipt> {
         let source_turn = control_turn(&request.source.action)?.clone();
-        let destination = match &request.related {
-            OperationRelatedControl::Absent { session }
-            | OperationRelatedControl::Settled { session, .. } => session,
-            OperationRelatedControl::Apply { request, .. } => {
-                control_turn(&request.action)?;
-                &request.session
-            }
-        };
-        if request.source.session == *destination {
-            return Err(error(
-                ErrorKind::InvalidInput,
-                "operation_pair_same_session",
-            ));
-        }
+        request.related.require_distinct(&request.source.session)?;
         execute(Arc::clone(&self.inner), move |inner, connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -118,46 +125,15 @@ impl SqliteStore {
             )? {
                 return Ok(record.receipt);
             }
-            let destination = match &request.related {
-                OperationRelatedControl::Absent { session } => {
-                    require_absent(&transaction, session)?;
-                    None
-                }
-                OperationRelatedControl::Apply { operation, request } => {
-                    require_related(
-                        &transaction,
-                        &source.session,
-                        &source_turn,
-                        operation,
-                        &request.session,
-                        control_turn(&request.action)?,
-                    )?;
-                    Some(record_fresh_control(&transaction, request)?)
-                }
-                OperationRelatedControl::Settled {
-                    operation,
-                    session,
-                    turn,
-                } => {
-                    require_related(
-                        &transaction,
-                        &source.session,
-                        &source_turn,
-                        operation,
-                        session,
-                        turn,
-                    )?;
-                    if load_turn(&transaction, session, turn)?.outcome().is_none() {
-                        return Err(error(
-                            ErrorKind::Conflict,
-                            "operation_pair_destination_unsettled",
-                        ));
-                    }
-                    None
-                }
-            };
+            let destination = apply_related_control(
+                &transaction,
+                &source.session,
+                &source_turn,
+                &request.related,
+                |_, _| Ok(None),
+            )?;
             let receipt = OperationPairReceipt {
-                source: record_fresh_control(&transaction, source)?,
+                source: record_fresh_control(&transaction, source, None)?,
                 destination,
             };
             let record = OperationPairRecord {
@@ -177,6 +153,55 @@ impl SqliteStore {
             Ok(record.receipt)
         })
         .await
+    }
+}
+
+pub(super) fn apply_related_control(
+    transaction: &Transaction<'_>,
+    source_session: &SessionId,
+    source_turn: &TurnId,
+    related: &OperationRelatedControl,
+    before_control: impl FnOnce(&ControlRequest, &TurnId) -> Result<Option<TurnState>>,
+) -> Result<Option<ControlReceipt>> {
+    match related {
+        OperationRelatedControl::Absent { session } => {
+            require_absent(transaction, session)?;
+            Ok(None)
+        }
+        OperationRelatedControl::Apply { operation, request } => {
+            let turn = control_turn(&request.action)?;
+            require_related(
+                transaction,
+                source_session,
+                source_turn,
+                operation,
+                &request.session,
+                turn,
+            )?;
+            let active = before_control(request, turn)?;
+            record_fresh_control(transaction, request, active).map(Some)
+        }
+        OperationRelatedControl::Settled {
+            operation,
+            session,
+            turn,
+        } => {
+            require_related(
+                transaction,
+                source_session,
+                source_turn,
+                operation,
+                session,
+                turn,
+            )?;
+            if load_turn(transaction, session, turn)?.outcome().is_none() {
+                return Err(error(
+                    ErrorKind::Conflict,
+                    "operation_pair_destination_unsettled",
+                ));
+            }
+            Ok(None)
+        }
     }
 }
 
@@ -253,6 +278,7 @@ fn retained_request<T: DeserializeOwned>(
 fn record_fresh_control(
     transaction: &Transaction<'_>,
     request: &ControlRequest,
+    active: Option<TurnState>,
 ) -> Result<ControlReceipt> {
     let fingerprint = Fingerprint::of(request)?;
     if lookup_request::<ControlReceipt>(
@@ -269,5 +295,5 @@ fn record_fresh_control(
             "operation_pair_control_already_recorded",
         ));
     }
-    record_control(transaction, request, fingerprint)
+    record_control(transaction, request, fingerprint, active)
 }

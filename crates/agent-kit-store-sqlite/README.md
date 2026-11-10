@@ -52,6 +52,14 @@ Exact retries return the original pair receipt even after later controls.
 `control_receipt` reads the ordinary control receipt. An independently
 recorded control cannot be joined into a pair later.
 
+`resume_with` reclaims an exact paused turn with one opaque driver state
+change or one related destination control or observation. Both changes
+commit before the source lease is returned. Reopening the related turn
+requires a committed paused suspension and release of its previous owner.
+The related turn still needs a separate claim. `resume_receipt` observes the
+source turn and retained related control by the original claim request.
+Repeating a committed claim never issues a new lease.
+
 The optional owner-defined catalog projects immutable session configuration
 into a scope fingerprint. It indexes the scope at creation and upgrades earlier
 records without reading their turns. A scoped page returns at most 32 entries
