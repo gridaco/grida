@@ -70,6 +70,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_INPUT_RECEIPT: "grida:native-chat:input-receipt",
   NATIVE_CHAT_OBSERVE: "grida:native-chat:observe",
   NATIVE_CHAT_TURN_SUMMARY: "grida:native-chat:turn-summary",
+  NATIVE_CHAT_READ_ARTIFACT: "grida:native-chat:read-artifact",
   NATIVE_CHAT_QUEUE: "grida:native-chat:queue",
   NATIVE_CHAT_QUEUED_TEXT: "grida:native-chat:queued-text",
   NATIVE_CHAT_EDIT_QUEUE: "grida:native-chat:edit-queue",

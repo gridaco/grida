@@ -98,6 +98,16 @@ export type NativeChatObservation = Readonly<{
   snapshot: NativeChatSnapshot;
 }>;
 
+export type NativeChatImageArtifact = Readonly<{
+  id: string;
+  kind: "image";
+  mimeType: "image/png";
+  label: "Cropped PNG";
+  width: number;
+  height: number;
+  bytes: number;
+}>;
+
 export type NativeChatTurnSummary = Readonly<{
   turnId: string;
   status: NonNullable<NativeChatTurn["status"]>;
@@ -122,6 +132,7 @@ export type NativeChatTurnSummary = Readonly<{
     | "deferred"
     | "skipped"
   )[];
+  artifacts?: readonly NativeChatImageArtifact[];
 }>;
 
 export type NativeChatMessage = Readonly<{
@@ -372,6 +383,11 @@ export type DesktopNativeChat = {
     attachmentId: string,
     observationId: string
   ): Promise<NativeChatTurnSummary>;
+  readArtifact?(
+    attachmentId: string,
+    observationId: string,
+    artifactId: string
+  ): Promise<ArrayBuffer>;
   queue?(
     attachmentId: string,
     observationId: string,

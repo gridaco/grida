@@ -699,6 +699,41 @@ export class NativeChatController {
     if (this.scope) await this.readCatalogEntry(this.scope);
   }
 
+  async readTurnArtifact(turnId: string, artifactId: string): Promise<Blob> {
+    const scope = this.scope;
+    const attachment = scope?.attachment;
+    const observation = scope?.observation;
+    const summary = this.view.turnSummary;
+    const artifact = summary?.artifacts?.find((item) => item.id === artifactId);
+    const read = this.bridge.readArtifact;
+    if (
+      !scope ||
+      !attachment ||
+      !observation ||
+      !artifact ||
+      summary?.turnId !== turnId ||
+      observation.snapshot.current ||
+      observation.snapshot.latest?.turnId !== turnId ||
+      !read
+    )
+      throw new Error("native_chat_artifact_unavailable");
+    const bytes = await read.call(
+      this.bridge,
+      attachment.attachmentId,
+      observation.observationId,
+      artifactId
+    );
+    if (
+      !this.owns(scope) ||
+      scope.observation?.snapshot.current ||
+      scope.observation?.snapshot.latest?.turnId !== turnId ||
+      !(bytes instanceof ArrayBuffer) ||
+      bytes.byteLength !== artifact.bytes
+    )
+      throw new Error("native_chat_artifact_unavailable");
+    return new Blob([bytes], { type: artifact.mimeType });
+  }
+
   get canOpenSideChat(): boolean {
     return (
       !!this.scope?.attachment &&

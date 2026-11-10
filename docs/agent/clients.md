@@ -419,6 +419,15 @@ finished turn when it has additional details. It can show recorded tool
 outcomes, completion checks, and unresolved work. A simple reply serves as
 its own summary. Reopening the chat restores the latest recorded summary.
 
+On a compatible image-enabled profile, ask the agent to crop a retained PNG
+in Act. Open **Turn summary** for the finished turn and choose **Preview cropped
+PNG** to inspect the saved image. Use **Copy image** or **Download image** to
+keep a separate copy. The saved crop lives in private chat storage.
+
+If the working copy was removed or replaced, the summary still shows the
+recorded result and the preview reports that the image is unavailable.
+Opening a preview leaves the project and the conversation unchanged.
+
 ## Use durable client operations
 
 A capable client can opt in to individual version-1 operations through

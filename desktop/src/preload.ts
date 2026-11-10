@@ -476,6 +476,13 @@ const bridge: DesktopBridge = {
         attachmentId,
         observationId
       ),
+    readArtifact: (attachmentId, observationId, artifactId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_READ_ARTIFACT,
+        attachmentId,
+        observationId,
+        artifactId
+      ),
     queue: (attachmentId, observationId, offset) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_QUEUE,

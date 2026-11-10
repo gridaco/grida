@@ -12,6 +12,7 @@ import type {
   NativeChatGoalControl,
   NativeChatGoalReceipt,
   NativeChatGoalRequest,
+  NativeChatImageArtifact,
   NativeChatMessage,
   NativeChatOperatingRegime,
   NativeChatPage,
@@ -27,6 +28,7 @@ import type {
   NativeChatTurn,
   NativeChatTurnSummary,
 } from "@grida/desktop-bridge";
+import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import type { NativeApprovalReview } from "./native-agent-permissions";
 import {
   NativeAgentConfiguration,
@@ -629,7 +631,34 @@ export class NativeAgentChat {
       checks: Object.freeze(
         result.checks.map((check: unknown) => choice(check, CHECK_STATUSES))
       ),
+      ...(this.process.acceptsArtifacts &&
+        result.artifacts !== undefined && {
+          artifacts: NativeAgentArtifacts.describe(result.artifacts),
+        }),
     });
+  }
+
+  async readArtifact(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    artifact: NativeChatImageArtifact
+  ): Promise<ArrayBuffer> {
+    const sessionId = this.requireObservation(session, snapshot);
+    const latest = snapshot.latest;
+    if (
+      !this.process.acceptsArtifacts ||
+      snapshot.current ||
+      latest?.disposition !== "settled" ||
+      !latest.status
+    )
+      throw new Error("native_chat_artifact_unavailable");
+    const result = await this.process.request(NativeAgentArtifacts.readMethod, {
+      sessionId,
+      turnId: latest.turnId,
+      artifactId: artifact.id,
+    });
+    this.requireAttached(session);
+    return NativeAgentArtifacts.decode(result, artifact);
   }
 
   async queue(

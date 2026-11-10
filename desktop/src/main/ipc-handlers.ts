@@ -300,6 +300,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       nativeChat.turnSummary(event, id, observation)
   );
   guarded(
+    IPC_CHANNELS.NATIVE_CHAT_READ_ARTIFACT,
+    (event, id: string, observation: string, artifact: unknown) =>
+      nativeChat.readArtifact(event, id, observation, artifact)
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_QUEUE,
     (event, id: string, observation: string, offset: number) =>
       nativeChat.queue(event, id, observation, offset)

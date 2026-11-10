@@ -803,6 +803,78 @@ it("reads one summary per observed terminal turn and drops replies after switchi
   controller.disconnect();
 });
 
+it("reads a listed PNG on demand and discards its bytes after switching chats", async () => {
+  const { bridge, controller } = fixture();
+  const latest = {
+    turnId: "crop-turn",
+    epoch: 1,
+    journalPosition: 8,
+    historyPosition: 2,
+    controlRevision: 1,
+    paused: false,
+    cancelled: false,
+    disposition: "settled",
+    status: "succeeded",
+  } as const;
+  const observe = bridge.observe;
+  vi.spyOn(bridge, "observe").mockImplementation(async (id) => {
+    const observed = await observe(id);
+    return {
+      ...observed,
+      snapshot: {
+        ...observed.snapshot,
+        latest: id === "chat-a" ? latest : null,
+      },
+    };
+  });
+  const data = new Uint8Array([1, 2, 3]).buffer;
+  const artifact = {
+    id: "crop",
+    kind: "image",
+    mimeType: "image/png",
+    label: "Cropped PNG",
+    width: 1,
+    height: 2,
+    bytes: data.byteLength,
+  } as const;
+  bridge.turnSummary = async () => ({
+    turnId: latest.turnId,
+    status: latest.status,
+    text: "Cropped.",
+    textTruncated: false,
+    steps: 2,
+    unresolvedOperations: 0,
+    toolActivity: null,
+    checks: [],
+    artifacts: [artifact],
+  });
+  const read = vi.fn<NonNullable<DesktopNativeChat["readArtifact"]>>();
+  bridge.readArtifact = read;
+  read.mockResolvedValueOnce(data);
+  await controller.select("chat-a");
+  expect(read).not.toHaveBeenCalled();
+  await expect(
+    controller.readTurnArtifact(latest.turnId, "other")
+  ).rejects.toThrow("native_chat_artifact_unavailable");
+  expect(read).not.toHaveBeenCalled();
+  const image = await controller.readTurnArtifact(latest.turnId, artifact.id);
+  expect(image.type).toBe("image/png");
+  expect(await image.arrayBuffer()).toEqual(data);
+  expect(read).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    "observation-chat-a",
+    artifact.id
+  );
+
+  const late = Promise.withResolvers<ArrayBuffer>();
+  read.mockReturnValueOnce(late.promise);
+  const preview = controller.readTurnArtifact(latest.turnId, artifact.id);
+  await controller.select("chat-b");
+  late.resolve(data);
+  await expect(preview).rejects.toThrow("native_chat_artifact_unavailable");
+  controller.disconnect();
+});
+
 it("keeps PNG retries exact and drops replaced or navigated file reads", async () => {
   const { bridge, controller, running } = fixture();
   const textSend = vi.spyOn(bridge, "submit");

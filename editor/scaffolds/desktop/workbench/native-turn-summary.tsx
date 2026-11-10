@@ -1,7 +1,11 @@
+import { useCallback } from "react";
 import type {
+  NativeChatImageArtifact,
   NativeChatMessage,
   NativeChatTurnSummary,
 } from "@grida/desktop-bridge";
+import type { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
+import { FullscreenImagePreview } from "@/kits/image-preview";
 
 const CHECK_LABEL: Record<NativeChatTurnSummary["checks"][number], string> = {
   allowed: "passed",
@@ -18,9 +22,11 @@ const CHECK_LABEL: Record<NativeChatTurnSummary["checks"][number], string> = {
 export function NativeTurnSummary({
   summary,
   messages,
+  previewController,
 }: {
   summary: NativeChatTurnSummary;
   messages: readonly NativeChatMessage[];
+  previewController?: NativeChatController;
 }) {
   const text = summary.text.trim();
   const inTranscript = messages.some(
@@ -46,7 +52,14 @@ export function NativeTurnSummary({
     !!text &&
     !inTranscript &&
     (summary.status !== "succeeded" || text !== "The turn finished.");
-  if (!showText && !details.length && !summary.checks.length) return null;
+  const artifacts = previewController ? summary.artifacts : undefined;
+  if (
+    !showText &&
+    !details.length &&
+    !summary.checks.length &&
+    !artifacts?.length
+  )
+    return null;
 
   return (
     <details className="rounded-md border px-3 py-2 text-xs">
@@ -68,6 +81,44 @@ export function NativeTurnSummary({
           {summary.checks.map((status) => CHECK_LABEL[status]).join(", ")}
         </p>
       )}
+      {previewController && artifacts && artifacts.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {artifacts.map((artifact) => (
+            <li key={artifact.id}>
+              <CropPreview
+                artifact={artifact}
+                controller={previewController}
+                turnId={summary.turnId}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
     </details>
+  );
+}
+
+function CropPreview({
+  artifact,
+  controller,
+  turnId,
+}: {
+  artifact: NativeChatImageArtifact;
+  controller: NativeChatController;
+  turnId: string;
+}) {
+  const load = useCallback(
+    () => controller.readTurnArtifact(turnId, artifact.id),
+    [controller, turnId, artifact.id]
+  );
+  return (
+    <FullscreenImagePreview
+      loadImage={load}
+      alt={artifact.label}
+      downloadName="cropped.png"
+      className="cursor-pointer underline underline-offset-2"
+    >
+      Preview cropped PNG ({artifact.width} × {artifact.height})
+    </FullscreenImagePreview>
   );
 }

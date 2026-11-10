@@ -14,19 +14,25 @@ const PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPg/88AAAIvAQ+3s0AMAAAAAElFTkSuQmCC";
 const OTHER_PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z88AAAMfAQ+5sXHtAAAAAElFTkSuQmCC";
+const GRID_PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFElEQVR4nGP4z8DAAMIM////ZwAAHu8E/KPItPcAAAAASUVORK5CYII=";
 
 function finish(response: ServerResponse, text: string) {
+  finishWith(response, {
+    type: "message",
+    id: "image-fixture-message",
+    role: "assistant",
+    status: "completed",
+    content: [{ type: "output_text", text, annotations: [] }],
+  });
+}
+
+function finishWith(response: ServerResponse, item: unknown) {
   const events = [
     {
       type: "response.output_item.done",
       output_index: 0,
-      item: {
-        type: "message",
-        id: "image-fixture-message",
-        role: "assistant",
-        status: "completed",
-        content: [{ type: "output_text", text, annotations: [] }],
-      },
+      item,
     },
     {
       type: "response.completed",
@@ -41,7 +47,7 @@ function finish(response: ServerResponse, text: string) {
   );
 }
 
-async function syntheticResponses() {
+async function syntheticResponses(crop = false) {
   const requests: unknown[] = [];
   let previous: ServerResponse | undefined;
   const server = createServer((request, response) => {
@@ -52,14 +58,23 @@ async function syntheticResponses() {
       if (
         request.method !== "POST" ||
         request.url !== "/v1/responses" ||
-        requests.length > 2
+        requests.length >= (crop ? 2 : 3)
       ) {
         response.writeHead(400).end();
         return;
       }
       requests.push(JSON.parse(body));
       response.writeHead(200, { "content-type": "text/event-stream" });
-      if (requests.length === 1) previous = response;
+      if (crop && requests.length === 1) {
+        finishWith(response, {
+          type: "function_call",
+          id: "fc_crop_fixture",
+          call_id: "call_crop_fixture",
+          name: "crop_retained_image",
+          arguments: '{"x":1,"y":0,"width":1,"height":2}',
+          status: "completed",
+        });
+      } else if (requests.length === 1) previous = response;
       else finish(response, "The tiny PNG was received.");
     });
   });
@@ -81,6 +96,21 @@ async function syntheticResponses() {
   };
 }
 
+function workspaceFrame() {
+  const origin = "https://editor.fixture.invalid";
+  const frame = { url: `${origin}/desktop/workspace?id=workspace` };
+  const sender = Object.assign(new EventEmitter(), {
+    mainFrame: frame,
+    isDestroyed: () => false,
+    isLoadingMainFrame: () => false,
+  }) as unknown as WebContents;
+  return {
+    origin,
+    sender,
+    event: { sender, senderFrame: frame } as unknown as IpcMainInvokeEvent,
+  };
+}
+
 it.runIf(
   !!resources && (process.platform === "darwin" || process.platform === "linux")
 )(
@@ -92,17 +122,7 @@ it.runIf(
     const cwd = path.join(root, "workspace");
     fs.mkdirSync(cwd, { mode: 0o700 });
     const fixture = await syntheticResponses();
-    const origin = "https://editor.fixture.invalid";
-    const frame = { url: `${origin}/desktop/workspace?id=workspace` };
-    const sender = Object.assign(new EventEmitter(), {
-      mainFrame: frame,
-      isDestroyed: () => false,
-      isLoadingMainFrame: () => false,
-    }) as unknown as WebContents;
-    const event = {
-      sender,
-      senderFrame: frame,
-    } as unknown as IpcMainInvokeEvent;
+    const { origin, sender, event } = workspaceFrame();
     let chat: NativeAgentChat | undefined;
     try {
       chat = await NativeAgentChat.start({
@@ -236,6 +256,112 @@ it.runIf(
           (await ipc.observe(event, newChat.attachmentId)).snapshot.latest
         ).toMatchObject({ turnId: direct.turnId, status: "succeeded" });
       });
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        await fixture.close();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  },
+  25_000
+);
+
+it.runIf(
+  !!resources && (process.platform === "darwin" || process.platform === "linux")
+)(
+  "opens the exact completed crop through Desktop after restarting the native child",
+  async () => {
+    const root = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "grida-native-artifact-")
+    );
+    const cwd = path.join(root, "workspace");
+    const stateDirectory = path.join(root, "state");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const fixture = await syntheticResponses(true);
+    const open = () =>
+      NativeAgentChat.start({
+        resourcesPath: resources!,
+        stateDirectory,
+        cwd,
+        provider: "responses",
+        endpoint: fixture.endpoint,
+        model: "gpt-5.4",
+      });
+    const { origin, sender, event } = workspaceFrame();
+    let chat: NativeAgentChat | undefined;
+    const ipc = new NativeChatIpc(origin, (candidate) =>
+      candidate === sender && chat ? { workspaceId: "workspace", chat } : null
+    );
+    try {
+      chat = await open();
+      const opened = await ipc.create(event);
+      const accepted = await ipc.submitImage(event, opened.attachmentId, {
+        action: "submit",
+        inputId: "crop-the-grid",
+        text: "Crop the right half.",
+        png: Uint8Array.from(Buffer.from(GRID_PNG, "base64")).buffer,
+        operatingRegime: "act",
+      });
+      await vi.waitFor(
+        async () => {
+          expect(fixture.requests).toHaveLength(2);
+          const { snapshot } = await ipc.observe(event, opened.attachmentId);
+          expect(snapshot.latest).toMatchObject({
+            turnId: accepted.turnId,
+            status: "succeeded",
+          });
+          expect(snapshot.current).toBeNull();
+        },
+        { timeout: 12_000 }
+      );
+      expect(fixture.requests).toHaveLength(2);
+      expect(JSON.stringify(fixture.requests[0])).toContain(
+        "crop_retained_image"
+      );
+      expect(JSON.stringify(fixture.requests[1])).toContain(
+        "Saved cropped PNG"
+      );
+      await ipc.detach(event, opened.attachmentId);
+      await chat.close();
+      chat = await open();
+
+      const reopened = await ipc.load(event, opened.sessionId);
+      const { observationId } = await ipc.observe(event, reopened.attachmentId);
+      const result = await ipc.turnSummary(
+        event,
+        reopened.attachmentId,
+        observationId
+      );
+      expect(result.artifacts).toEqual([
+        {
+          id: expect.any(String),
+          kind: "image",
+          mimeType: "image/png",
+          label: "Cropped PNG",
+          width: 1,
+          height: 2,
+          bytes: expect.any(Number),
+        },
+      ]);
+      const crop = result.artifacts![0];
+      const bytes = await ipc.readArtifact(
+        event,
+        reopened.attachmentId,
+        observationId,
+        crop.id
+      );
+      const scopes = path.join(stateDirectory, "retained-inputs");
+      const work = path.join(scopes, fs.readdirSync(scopes)[0], "work");
+      const saved = path.join(work, fs.readdirSync(work)[0]);
+      expect(Buffer.from(bytes)).toEqual(fs.readFileSync(saved));
+      expect(fs.readdirSync(cwd)).toEqual([]);
+      fs.unlinkSync(saved);
+      await expect(
+        ipc.readArtifact(event, reopened.attachmentId, observationId, crop.id)
+      ).rejects.toThrow("artifact_unavailable");
+      expect(fixture.requests).toHaveLength(2);
     } finally {
       try {
         await chat?.close();

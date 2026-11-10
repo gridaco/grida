@@ -699,6 +699,88 @@ describe("native chat IPC", () => {
     ).rejects.toThrow("native_chat_attachment_unavailable");
   });
 
+  it("releases only a listed PNG and drops a read when its observed turn changes", async () => {
+    const { ipc, first, second, chat } = setup();
+    const parent = await ipc.create(first.event);
+    const another = await ipc.load(second.event, parent.sessionId);
+    const running = await ipc.observe(first.event, parent.attachmentId);
+    const latest = {
+      ...running.snapshot.current!,
+      disposition: "settled",
+      status: "succeeded",
+    } as const;
+    const observe = vi.spyOn(chat, "observe").mockResolvedValue({
+      ...running.snapshot,
+      current: null,
+      latest,
+    });
+    const bytes = new ArrayBuffer(67);
+    const artifact = {
+      id: "crop",
+      kind: "image",
+      mimeType: "image/png",
+      label: "Cropped PNG",
+      width: 1,
+      height: 1,
+      bytes: bytes.byteLength,
+    } as const;
+    const summarize = chat.turnSummary;
+    vi.spyOn(chat, "turnSummary").mockImplementation(
+      async (session, snapshot) => ({
+        ...(await summarize(session, snapshot)),
+        artifacts: [artifact],
+      })
+    );
+    const read = vi
+      .fn<NonNullable<ActiveNativeChat["chat"]["readArtifact"]>>()
+      .mockResolvedValueOnce(bytes);
+    chat.readArtifact = read;
+    const settled = await ipc.observe(first.event, parent.attachmentId);
+    const readIn = (id: string = artifact.id) =>
+      ipc.readArtifact(
+        first.event,
+        parent.attachmentId,
+        settled.observationId,
+        id
+      );
+    await expect(readIn()).rejects.toThrow("native_chat_artifact_unavailable");
+    await ipc.turnSummary(
+      first.event,
+      parent.attachmentId,
+      settled.observationId
+    );
+    await expect(
+      ipc.readArtifact(
+        second.event,
+        another.attachmentId,
+        settled.observationId,
+        artifact.id
+      )
+    ).rejects.toThrow("native_chat_observation_unavailable");
+    await expect(readIn("another-crop")).rejects.toThrow(
+      "native_chat_artifact_unavailable"
+    );
+    expect(read).not.toHaveBeenCalled();
+    await expect(readIn()).resolves.toBe(bytes);
+    expect(read).toHaveBeenCalledExactlyOnceWith(
+      { id: parent.sessionId },
+      settled.snapshot,
+      artifact
+    );
+
+    const late = Promise.withResolvers<ArrayBuffer>();
+    read.mockReturnValueOnce(late.promise);
+    const pending = readIn();
+    await expect(readIn()).rejects.toThrow("native_chat_artifact_busy");
+    observe.mockResolvedValue({
+      ...settled.snapshot,
+      current: running.snapshot.current,
+    });
+    await ipc.observe(first.event, parent.attachmentId);
+    late.resolve(bytes);
+    await expect(pending).rejects.toThrow("native_chat_artifact_unavailable");
+  });
+
   it("scopes temporary side chats to each parent attachment and endpoint generation", async () => {
     const { ipc, first, second, chat, scopes } = setup();
     const one = await ipc.create(first.event);

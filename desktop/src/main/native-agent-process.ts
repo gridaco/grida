@@ -3,6 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
+import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import {
   NativeAgentPermissions,
@@ -71,6 +72,7 @@ export class NativeAgentProcess {
   private nextId = 1;
   private ready = false;
   private imageInput = false;
+  private artifacts = false;
   private savedChatDeletion = false;
   private observedExit = false;
   private shutdown: Promise<void> | undefined;
@@ -127,6 +129,10 @@ export class NativeAgentProcess {
 
   get acceptsPng(): boolean {
     return this.connected && this.imageInput;
+  }
+
+  get acceptsArtifacts(): boolean {
+    return this.connected && this.artifacts;
   }
 
   get acceptsSavedChatDeletion(): boolean {
@@ -239,6 +245,7 @@ export class NativeAgentProcess {
             clientCapabilities: {
               _meta: {
                 ...capabilities,
+                [NativeAgentArtifacts.capability]: 1,
                 ...(requestDeletion && { [NativeAgentDeletion.capability]: 1 }),
               },
             },
@@ -260,6 +267,8 @@ export class NativeAgentProcess {
       }
       processOwner.imageInput =
         object(agentCapabilities?.promptCapabilities)?.image === true;
+      processOwner.artifacts =
+        advertised?.[NativeAgentArtifacts.capability] === 1;
       processOwner.savedChatDeletion =
         requestDeletion && advertised?.[NativeAgentDeletion.capability] === 1;
       processOwner.ready = true;

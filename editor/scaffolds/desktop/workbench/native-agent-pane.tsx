@@ -348,6 +348,7 @@ export function NativeAgentPane({
                 key={state.turnSummary.turnId}
                 summary={state.turnSummary}
                 messages={state.messages}
+                previewController={bridge.readArtifact ? controller : undefined}
               />
             )}
         </ConversationContent>

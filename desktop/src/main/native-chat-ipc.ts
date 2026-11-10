@@ -10,6 +10,7 @@ import type {
   NativeChatControlReceipt,
   NativeChatGoalObservation,
   NativeChatGoalReceipt,
+  NativeChatImageArtifact,
   NativeChatControlResult,
   NativeChatObservation,
   NativeChatOperatingRegime,
@@ -96,7 +97,10 @@ export type ActiveNativeChat = Readonly<{
     Partial<
       Pick<
         NativeAgentChat,
-        "acceptsSavedChatDeletion" | "deleteSavedChat" | "ownsSession"
+        | "acceptsSavedChatDeletion"
+        | "deleteSavedChat"
+        | "ownsSession"
+        | "readArtifact"
       >
     >;
 }>;
@@ -109,6 +113,8 @@ type Attachment = {
   approvals: Map<string, NativeApprovalReview>;
   questions: Map<string, NativeQuestionReview>;
   goals: Map<string, NativeGoalInspection>;
+  artifacts?: { turnId: string; items: readonly NativeChatImageArtifact[] };
+  readingArtifact?: boolean;
   deletion?: ReviewedDeletion;
   side?: SideAttachment;
   reviewedConfiguration?: {
@@ -698,7 +704,51 @@ export class NativeChatIpc {
     this.revalidate(owner, attachment);
     if (attachment.latestObservation?.latest?.turnId !== latest.turnId)
       throw new Error("native_chat_turn_summary_unavailable");
+    attachment.artifacts = summary.artifacts?.length
+      ? { turnId: latest.turnId, items: summary.artifacts }
+      : undefined;
     return summary;
+  }
+
+  async readArtifact(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string,
+    artifactId: unknown
+  ): Promise<ArrayBuffer> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = requireObservation(attachment, observationId);
+    const turnId = snapshot.latest?.turnId;
+    const projection = attachment.artifacts;
+    const chat = owner.active.chat;
+    const artifact = projection?.items.find((item) => item.id === artifactId);
+    const stillLatest = () =>
+      !attachment.latestObservation?.current &&
+      attachment.latestObservation?.latest?.turnId === turnId;
+    if (
+      !chat.readArtifact ||
+      !artifact ||
+      !turnId ||
+      snapshot.current ||
+      projection?.turnId !== turnId ||
+      !stillLatest()
+    )
+      throw new Error("native_chat_artifact_unavailable");
+    if (attachment.readingArtifact)
+      throw new Error("native_chat_artifact_busy");
+    attachment.readingArtifact = true;
+    try {
+      const bytes = await chat.readArtifact(
+        attachment.session,
+        snapshot,
+        artifact
+      );
+      this.revalidate(owner, attachment);
+      if (!stillLatest()) throw new Error("native_chat_artifact_unavailable");
+      return bytes;
+    } finally {
+      attachment.readingArtifact = false;
+    }
   }
 
   async transcript(event: IpcMainInvokeEvent, attachmentId: string) {
