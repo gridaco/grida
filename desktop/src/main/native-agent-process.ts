@@ -3,6 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
+import { NativeAgentDeletion } from "./native-agent-deletion";
 import {
   NativeAgentPermissions,
   type NativeWorkspaceSelection,
@@ -70,6 +71,7 @@ export class NativeAgentProcess {
   private nextId = 1;
   private ready = false;
   private imageInput = false;
+  private savedChatDeletion = false;
   private observedExit = false;
   private shutdown: Promise<void> | undefined;
   private failure: Error | undefined;
@@ -125,6 +127,10 @@ export class NativeAgentProcess {
 
   get acceptsPng(): boolean {
     return this.connected && this.imageInput;
+  }
+
+  get acceptsSavedChatDeletion(): boolean {
+    return this.connected && this.savedChatDeletion;
   }
 
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
@@ -190,6 +196,8 @@ export class NativeAgentProcess {
       ...(permissionProfile ? NativeAgentPermissions.capabilities : {}),
     };
     if (providerEgress) capabilities[NativeProviderEgress.capability] = 1;
+    const requestDeletion =
+      process.platform === "darwin" || process.platform === "linux";
     const args = [
       "serve",
       "--stdio",
@@ -228,7 +236,12 @@ export class NativeAgentProcess {
           "initialize",
           {
             protocolVersion: 1,
-            clientCapabilities: { _meta: capabilities },
+            clientCapabilities: {
+              _meta: {
+                ...capabilities,
+                ...(requestDeletion && { [NativeAgentDeletion.capability]: 1 }),
+              },
+            },
           },
           START_TIMEOUT_MS
         )
@@ -247,6 +260,8 @@ export class NativeAgentProcess {
       }
       processOwner.imageInput =
         object(agentCapabilities?.promptCapabilities)?.image === true;
+      processOwner.savedChatDeletion =
+        requestDeletion && advertised?.[NativeAgentDeletion.capability] === 1;
       processOwner.ready = true;
       return processOwner;
     } catch (error) {

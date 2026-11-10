@@ -359,8 +359,11 @@ export class NativeChatController {
       await this.open(scope);
       await this.refresh(scope);
     } catch (error) {
-      if (this.owns(scope))
-        this.update({ error: describe(error, "Couldn't open this chat.") });
+      if (this.owns(scope)) {
+        if (deletedAttachment(error)) this.forgetDeletedChat(scope);
+        else
+          this.update({ error: describe(error, "Couldn't open this chat.") });
+      }
     } finally {
       if (this.owns(scope)) this.update({ loading: false });
     }
@@ -632,6 +635,64 @@ export class NativeChatController {
       title: entry.title,
       archived,
     });
+  }
+
+  get canDeleteSavedChat(): boolean {
+    const snapshot = this.scope?.observation?.snapshot;
+    return !!(
+      this.bridge.deleteSavedChat &&
+      this.scope?.attachment &&
+      snapshot &&
+      this.view.catalogEntry?.deletionAvailable &&
+      !snapshot.current &&
+      !snapshot.queuedInputs &&
+      !this.view.catalogChanging &&
+      !this.view.acting
+    );
+  }
+
+  async deleteSavedChat(): Promise<void> {
+    const scope = this.scope;
+    const connection = this.catalogConnection;
+    const attachment = scope?.attachment;
+    const observation = scope?.observation;
+    const entry = this.view.catalogEntry;
+    if (
+      !this.canDeleteSavedChat ||
+      !scope ||
+      !attachment ||
+      !observation ||
+      !entry ||
+      !this.bridge.deleteSavedChat
+    )
+      return;
+    this.update({ catalogChanging: true, catalogEntryError: null });
+    try {
+      const deleted = await this.bridge.deleteSavedChat(
+        attachment.attachmentId,
+        observation.observationId,
+        entry.revision
+      );
+      if (deleted && this.catalogConnection === connection)
+        this.forgetDeletedChat(scope);
+    } catch (error) {
+      if (!this.owns(scope)) return;
+      if (deletedAttachment(error)) {
+        this.forgetDeletedChat(scope);
+        return;
+      }
+      const reason = error instanceof Error ? error.message : "";
+      if (
+        reason.includes("session_catalog_revision_changed") ||
+        reason.includes("stale_session_revision")
+      ) {
+        await Promise.all([this.readCatalogEntry(scope), this.refresh(scope)]);
+        if (!this.owns(scope)) return;
+      }
+      this.update({ catalogEntryError: deletionError(reason) });
+    } finally {
+      if (this.owns(scope)) this.update({ catalogChanging: false });
+    }
   }
 
   async readChatDetails(): Promise<void> {
@@ -1491,6 +1552,10 @@ export class NativeChatController {
       .catch((error: unknown) => {
         observable = false;
         if (!this.owns(scope)) return;
+        if (deletedAttachment(error)) {
+          this.forgetDeletedChat(scope);
+          return;
+        }
         this.update({
           error: describe(error, "Couldn't refresh this chat. Try Refresh."),
         });
@@ -1732,6 +1797,10 @@ export class NativeChatController {
   }
 
   private receive(scope: Scope, update: NativeChatUpdate): void {
+    if (update.kind === "closed" && update.reason === "session_deleted") {
+      this.forgetDeletedChat(scope);
+      return;
+    }
     if (update.kind !== "text") {
       scope.live.clear();
       scope.gaps.clear();
@@ -1781,7 +1850,9 @@ export class NativeChatController {
         }
       );
       if (!this.owns(scope)) await this.bridge.unsubscribe(id).catch(() => {});
-    } catch {
+    } catch (error) {
+      if (this.owns(scope) && deletedAttachment(error))
+        this.forgetDeletedChat(scope);
       if (this.owns(scope))
         this.update({
           error:
@@ -1820,6 +1891,32 @@ export class NativeChatController {
         : catalog;
     }
     return [...new Set([...this.recents, ...catalog])];
+  }
+
+  private forgetDeletedChat(scope: Scope): void {
+    const session = scope.attachment?.sessionId ?? scope.requested;
+    if (!session) return;
+    const selected = this.owns(scope);
+    if (
+      !selected &&
+      !this.recents.includes(session) &&
+      !this.catalog?.sessionIds.includes(session)
+    )
+      return;
+    this.recents = this.recents.filter((id) => id !== session);
+    if (this.catalog) {
+      this.catalog = {
+        ...this.catalog,
+        sessionIds: this.catalog.sessionIds.filter((id) => id !== session),
+        titles: this.catalog.titles?.filter(
+          (entry) => entry.sessionId !== session
+        ),
+      };
+    }
+    if (selected) void this.select(null);
+    this.update({ sessions: this.sessionChoices() });
+    this.save();
+    void this.listChats();
   }
 
   private restore(): { selected: string | null; sessions: string[] } {
@@ -1861,6 +1958,39 @@ export class NativeChatController {
       /* Browser storage may be disabled. */
     }
   }
+}
+
+function deletedAttachment(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes("native_chat_session_deleted")
+  );
+}
+
+function deletionError(reason: string): string {
+  if (reason.includes("deletion_unverified"))
+    return "Couldn't confirm deletion. Try Delete chat again to check the same request.";
+  if (reason.includes("has_side_chat"))
+    return "Close the side chat before deleting this chat.";
+  if (reason.includes("has_subagents"))
+    return "This chat has named subagents and can't be deleted.";
+  if (reason.includes("has_retained_inputs"))
+    return "This chat has retained inputs and can't be deleted.";
+  if (reason.includes("session_goal_exists"))
+    return "Finish or clear the Goal before deleting this chat.";
+  if (reason.includes("work_unresolved"))
+    return "This chat has unresolved work and can't be deleted.";
+  if (
+    reason.includes("requires_idle") ||
+    reason.includes("requires_empty_queue")
+  )
+    return "This chat still has running, paused, or queued work.";
+  if (
+    reason.includes("revision_changed") ||
+    reason.includes("stale_session_revision")
+  )
+    return "This chat changed. Review it before deleting.";
+  return "Couldn't delete this chat. Try again.";
 }
 
 function lifecycleBasis(observation: NativeChatObservation | null): string {

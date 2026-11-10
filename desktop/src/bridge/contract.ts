@@ -53,6 +53,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_LIST_ARCHIVED: "grida:native-chat:list-archived",
   NATIVE_CHAT_CATALOG_ENTRY: "grida:native-chat:catalog-entry",
   NATIVE_CHAT_ORGANIZE: "grida:native-chat:organize",
+  NATIVE_CHAT_DELETE: "grida:native-chat:delete",
   NATIVE_CHAT_CREATE: "grida:native-chat:create",
   NATIVE_CHAT_LOAD: "grida:native-chat:load",
   NATIVE_CHAT_OPEN_SIDE: "grida:native-chat:open-side",

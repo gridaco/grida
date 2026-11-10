@@ -105,6 +105,65 @@ function fixture() {
   };
 }
 
+it("keeps a cancelled deletion open and ignores replay after a confirmed retirement", async () => {
+  const { bridge, controller, updates, transcripts } = fixture();
+  const entries = new Set(["chat-a", "chat-b"]);
+  bridge.list = async () => ({ sessionIds: [...entries], nextCursor: null });
+  bridge.listArchived = async () => ({ sessionIds: [], nextCursor: null });
+  bridge.catalogEntry = async (sessionId) => ({
+    sessionId,
+    revision: 4,
+    title: null,
+    archived: false,
+    deletionAvailable: true,
+  });
+  bridge.organize = async (sessionId, change) => ({ sessionId, ...change });
+  const remove =
+    vi.fn<
+      (
+        attachmentId: string,
+        observationId: string,
+        catalogRevision: number
+      ) => Promise<boolean>
+    >();
+  remove.mockResolvedValueOnce(false).mockImplementationOnce(async () => {
+    entries.delete("chat-a");
+    updates.get("chat-a")?.({ kind: "closed", reason: "session_deleted" });
+    return true;
+  });
+  bridge.deleteSavedChat = remove;
+  transcripts.set("chat-a", [
+    { messageId: "old", role: "user", text: "Old transcript" },
+  ]);
+  controller.connect(null);
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.canDeleteSavedChat).toBe(true));
+  const late = updates.get("chat-a")!;
+  await controller.deleteSavedChat();
+  expect(controller.read().messages[0]?.text).toBe("Old transcript");
+  expect(controller.read().selected).toBe("chat-a");
+  await controller.deleteSavedChat();
+  expect(remove.mock.calls).toEqual([
+    ["chat-a", "observation-chat-a", 4],
+    ["chat-a", "observation-chat-a", 4],
+  ]);
+  late({
+    kind: "text",
+    messageId: "late",
+    turnId: "old-turn",
+    role: "assistant",
+    text: "Stale reply",
+    offsetBytes: 0,
+    replace: false,
+  });
+  expect(controller.read().selected).toBeNull();
+  expect(controller.read().messages).toEqual([]);
+  await vi.waitFor(() =>
+    expect(controller.read().sessions).toEqual(["chat-b"])
+  );
+  controller.disconnect();
+});
+
 it("keeps the original mode and input identity when a draft is retried", async () => {
   const { bridge, controller } = fixture();
   const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(

@@ -968,6 +968,11 @@ lazy reads, read-only mutation, and symlink escape refusal.
   side chat creation before revoking the deleted attachment. The transaction
   retires SQLite records and their execution identity. Authored files,
   independently retained chats, and the legacy archive have separate custody.
+  Desktop selects the chat through its exact frame attachment, checks the
+  observed execution and catalog revisions, and requests Main-owned native
+  confirmation. A lost reply reuses the confirmed request. A matching receipt
+  revokes every attachment for that exact chat owner, including subscriptions
+  and any in-flight load that could reinstall the retired attachment.
 - [Native goal controls](crates/grida-agent/src/acp/extensions/goals.rs) require
   version negotiation and session attachment on the existing ACP perimeter.
   The [goal owner](crates/grida-agent/src/host/goals.rs) conditions each

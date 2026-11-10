@@ -42,6 +42,7 @@ import {
   contextLimitValue,
   type ContextLimitBasis,
 } from "./native-agent-configuration";
+import { NativeAgentDeletion } from "./native-agent-deletion";
 
 const MAX_ATTACHMENTS = 16;
 const MAX_OBSERVATIONS = 16;
@@ -91,7 +92,13 @@ export type ActiveNativeChat = Readonly<{
     | "stop"
     | "resume"
     | "subscribe"
-  >;
+  > &
+    Partial<
+      Pick<
+        NativeAgentChat,
+        "acceptsSavedChatDeletion" | "deleteSavedChat" | "ownsSession"
+      >
+    >;
 }>;
 
 type Attachment = {
@@ -102,6 +109,7 @@ type Attachment = {
   approvals: Map<string, NativeApprovalReview>;
   questions: Map<string, NativeQuestionReview>;
   goals: Map<string, NativeGoalInspection>;
+  deletion?: ReviewedDeletion;
   side?: SideAttachment;
   reviewedConfiguration?: {
     input: NativeChatConfigurationInput;
@@ -110,6 +118,12 @@ type Attachment = {
     accepted?: NativeChatAcceptance;
   };
   closingSide?: Promise<void>;
+};
+
+type ReviewedDeletion = {
+  requestId: string;
+  snapshot: NativeChatSnapshot;
+  catalogRevision: number;
 };
 
 type SideAttachment = {
@@ -127,6 +141,7 @@ type Owner = {
   frame: WebFrameMain;
   active: ActiveNativeChat;
   attachments: Map<string, Attachment>;
+  retired: Set<string>;
   subscriptions: Map<string, Subscription>;
   pending: number;
   listing: boolean;
@@ -153,6 +168,7 @@ type Startup = {
 export class NativeChatIpc {
   private readonly owners = new Map<WebContents, Owner>();
   private readonly startups = new WeakMap<WebContents, Startup>();
+  private readonly deleting = new WeakSet<NativeChatSession>();
 
   constructor(
     private readonly editorOrigin: string,
@@ -167,6 +183,10 @@ export class NativeChatIpc {
     private readonly confirmConfiguration?: (
       sender: WebContents,
       review: ConfigurationReview
+    ) => Promise<boolean>,
+    private readonly confirmDeletion?: (
+      sender: WebContents,
+      title: string | null
     ) => Promise<boolean>
   ) {}
 
@@ -271,7 +291,7 @@ export class NativeChatIpc {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const entry = await owner.active.chat.catalogEntry(attachment.session);
     this.revalidate(owner, attachment);
-    return entry;
+    return this.deletableEntry(owner, entry);
   }
 
   async organize(
@@ -282,7 +302,74 @@ export class NativeChatIpc {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const entry = await owner.active.chat.organize(attachment.session, change);
     this.revalidate(owner, attachment);
-    return entry;
+    return this.deletableEntry(owner, entry);
+  }
+
+  async deleteSavedChat(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: unknown,
+    catalogRevision: unknown
+  ): Promise<boolean> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    const session = attachment.session;
+    const confirm = this.confirmDeletion;
+    if (!confirm || !chat.acceptsSavedChatDeletion || !chat.deleteSavedChat)
+      throw new Error("native_chat_deletion_unavailable");
+    if (
+      !token(observationId) ||
+      typeof catalogRevision !== "number" ||
+      !Number.isSafeInteger(catalogRevision) ||
+      catalogRevision < 0
+    )
+      throw new Error("native_chat_deletion_invalid");
+    if (this.deleting.has(session))
+      throw new Error("native_chat_deletion_in_progress");
+    this.deleting.add(session);
+    try {
+      let reviewed = attachment.deletion;
+      const retry = !!reviewed;
+      if (!reviewed) {
+        const snapshot = requireObservation(attachment, observationId);
+        if (snapshot.current || snapshot.queuedInputs)
+          throw new Error("session_deletion_requires_idle");
+        const entry = await chat.catalogEntry(session);
+        this.revalidate(owner, attachment);
+        if (
+          entry.sessionId !== session.id ||
+          entry.revision !== catalogRevision
+        )
+          throw new Error("session_catalog_revision_changed");
+        const confirmed = await confirm(owner.sender, entry.title);
+        this.revalidate(owner, attachment);
+        if (!confirmed) return false;
+        reviewed = { requestId: randomUUID(), snapshot, catalogRevision };
+        attachment.deletion = reviewed;
+      }
+      try {
+        await chat.deleteSavedChat(
+          session,
+          reviewed.snapshot,
+          reviewed.catalogRevision,
+          reviewed.requestId
+        );
+      } catch (error) {
+        const pending =
+          retry &&
+          error instanceof Error &&
+          (error.message === "session_deletion_in_progress" ||
+            error.message === "session_deletion_observation_in_progress");
+        if (!pending && !NativeAgentDeletion.isUnverified(error))
+          attachment.deletion = undefined;
+        throw error;
+      }
+      this.retireAttachments(owner.active, session);
+      this.revalidate(owner);
+      return true;
+    } finally {
+      this.deleting.delete(session);
+    }
   }
 
   async openSideChat(
@@ -979,6 +1066,11 @@ export class NativeChatIpc {
     try {
       const session = await open(owner.active.chat);
       this.revalidate(owner);
+      if (
+        owner.active.chat.ownsSession &&
+        !owner.active.chat.ownsSession(session)
+      )
+        throw new Error("native_chat_session_deleted");
       const existing = [...owner.attachments.values()].find(
         (entry) => entry.session === session
       );
@@ -1014,6 +1106,7 @@ export class NativeChatIpc {
       frame,
       active,
       attachments: new Map(),
+      retired: new Set(),
       subscriptions: new Map(),
       pending: 0,
       listing: false,
@@ -1039,6 +1132,10 @@ export class NativeChatIpc {
   ): { owner: Owner; attachment: Attachment } {
     const owner = this.owners.get(event.sender);
     const attachment = token(id) ? owner?.attachments.get(id) : undefined;
+    if (owner && owner.frame === event.senderFrame && owner.retired.has(id)) {
+      this.revalidate(owner);
+      throw new Error("native_chat_session_deleted");
+    }
     if (!owner || owner.frame !== event.senderFrame || !attachment)
       throw new Error("native_chat_attachment_unavailable");
     this.revalidate(owner, attachment);
@@ -1046,11 +1143,14 @@ export class NativeChatIpc {
   }
 
   private revalidate(owner: Owner, attachment?: Attachment): void {
-    if (
-      this.owners.get(owner.sender) !== owner ||
-      (attachment && owner.attachments.get(attachment.id) !== attachment)
-    )
+    if (this.owners.get(owner.sender) !== owner)
       throw new Error("native_chat_attachment_unavailable");
+    if (attachment && owner.attachments.get(attachment.id) !== attachment)
+      throw new Error(
+        owner.retired.has(attachment.id)
+          ? "native_chat_session_deleted"
+          : "native_chat_attachment_unavailable"
+      );
     if (!sameActive(owner.active, this.scope(owner.sender, owner.frame))) {
       owner.release();
       throw new Error("native_chat_scope_changed");
@@ -1061,6 +1161,49 @@ export class NativeChatIpc {
     const subscription = owner.subscriptions.get(id);
     owner.subscriptions.delete(id);
     subscription?.stop();
+  }
+
+  private deletableEntry(
+    owner: Owner,
+    entry: NativeChatCatalogEntry
+  ): NativeChatCatalogEntry {
+    return this.confirmDeletion &&
+      owner.active.chat.acceptsSavedChatDeletion &&
+      owner.active.chat.deleteSavedChat
+      ? { ...entry, deletionAvailable: true }
+      : entry;
+  }
+
+  private retireAttachments(
+    active: ActiveNativeChat,
+    session: NativeChatSession
+  ): void {
+    for (const owner of this.owners.values()) {
+      if (!sameActive(active, owner.active)) continue;
+      for (const attachment of owner.attachments.values()) {
+        if (attachment.session !== session) continue;
+        owner.attachments.delete(attachment.id);
+        owner.retired.add(attachment.id);
+        if (owner.retired.size > MAX_ATTACHMENTS) {
+          const oldest = owner.retired.values().next().value;
+          if (oldest) owner.retired.delete(oldest);
+        }
+        for (const [subscriptionId, subscription] of owner.subscriptions) {
+          if (subscription.attachment !== attachment) continue;
+          this.unsubscribeOwned(owner, subscriptionId);
+          try {
+            this.revalidate(owner);
+            owner.frame.send(IPC_CHANNELS.NATIVE_CHAT_UPDATE, {
+              subscriptionId,
+              attachmentId: attachment.id,
+              update: { kind: "closed", reason: "session_deleted" },
+            });
+          } catch {
+            // The frame can navigate after the host commits its deletion.
+          }
+        }
+      }
+    }
   }
 
   private releaseSide(owner: Owner, attachment: Attachment): Promise<void> {

@@ -56,6 +56,10 @@ function setup(
   confirm?: (
     sender: WebContents,
     review: ConfigurationReview
+  ) => Promise<boolean>,
+  confirmDeletion?: (
+    sender: WebContents,
+    title: string | null
   ) => Promise<boolean>
 ) {
   const first = windowAt();
@@ -293,7 +297,8 @@ function setup(
       ORIGIN,
       (sender) => scopes.get(sender) ?? null,
       undefined,
-      confirm
+      confirm,
+      confirmDeletion
     ),
     emit: (sessionId: string, update: NativeChatStreamUpdate) => {
       for (const listener of listeners.get(sessionId) ?? []) listener(update);
@@ -302,6 +307,146 @@ function setup(
 }
 
 describe("native chat IPC", () => {
+  it("keeps a confirmed request through reply loss and retires only exact owner attachments", async () => {
+    const confirm = vi.fn<
+      (sender: WebContents, title: string | null) => Promise<boolean>
+    >(async () => true);
+    const { first, second, chat, ipc, listeners, emit } = setup(
+      undefined,
+      confirm
+    );
+    const observe = chat.observe.bind(chat);
+    chat.observe = async (session) => ({
+      ...(await observe(session)),
+      current: null,
+    });
+    Object.defineProperty(chat, "acceptsSavedChatDeletion", { value: true });
+    const remove =
+      vi.fn<
+        (
+          session: NativeChatSession,
+          snapshot: NativeChatSnapshot,
+          catalogRevision: number,
+          requestId: string
+        ) => Promise<void>
+      >();
+    remove
+      .mockRejectedValueOnce(new Error("native_chat_deletion_unverified"))
+      .mockResolvedValueOnce(undefined);
+    chat.deleteSavedChat = remove;
+    const target = await ipc.create(first.event);
+    const peer = await ipc.load(second.event, target.sessionId);
+    const unrelated = await ipc.create(second.event);
+    const source = await ipc.observe(first.event, target.attachmentId);
+    const targetSubscription = randomUUID();
+    const peerSubscription = randomUUID();
+    ipc.subscribe(first.event, target.attachmentId, targetSubscription);
+    ipc.subscribe(second.event, peer.attachmentId, peerSubscription);
+
+    await expect(
+      ipc.deleteSavedChat(
+        second.event,
+        target.attachmentId,
+        source.observationId,
+        0
+      )
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    await expect(
+      ipc.deleteSavedChat(
+        first.event,
+        target.attachmentId,
+        source.observationId,
+        1
+      )
+    ).rejects.toThrow("session_catalog_revision_changed");
+    expect(confirm).not.toHaveBeenCalled();
+    await expect(
+      ipc.deleteSavedChat(
+        first.event,
+        target.attachmentId,
+        source.observationId,
+        0
+      )
+    ).rejects.toThrow("native_chat_deletion_unverified");
+    expect(listeners.get(target.sessionId)?.size).toBe(2);
+    expect(first.frame.send).not.toHaveBeenCalled();
+    const next = await ipc.observe(first.event, target.attachmentId);
+    await expect(
+      ipc.deleteSavedChat(
+        first.event,
+        target.attachmentId,
+        next.observationId,
+        0
+      )
+    ).resolves.toBe(true);
+    expect(confirm).toHaveBeenCalledExactlyOnceWith(first.sender, null);
+    expect(remove.mock.calls[1]).toEqual(remove.mock.calls[0]);
+    for (const [window, attachment, subscriptionId] of [
+      [first, target, targetSubscription],
+      [second, peer, peerSubscription],
+    ] as const) {
+      expect(window.frame.send).toHaveBeenCalledExactlyOnceWith(
+        IPC_CHANNELS.NATIVE_CHAT_UPDATE,
+        {
+          subscriptionId,
+          attachmentId: attachment.attachmentId,
+          update: { kind: "closed", reason: "session_deleted" },
+        }
+      );
+      await expect(
+        ipc.observe(window.event, attachment.attachmentId)
+      ).rejects.toThrow("native_chat_session_deleted");
+    }
+    emit(target.sessionId, UPDATE);
+    expect(first.frame.send).toHaveBeenCalledTimes(1);
+    expect(second.frame.send).toHaveBeenCalledTimes(1);
+    await expect(
+      ipc.observe(second.event, unrelated.attachmentId)
+    ).resolves.toBeTruthy();
+  });
+
+  it("requires live frame consent before dispatch and fences a late attachment", async () => {
+    const approval = Promise.withResolvers<boolean>();
+    const confirm = vi.fn<
+      (sender: WebContents, title: string | null) => Promise<boolean>
+    >(() => approval.promise);
+    const { first, second, chat, ipc } = setup(undefined, confirm);
+    const observe = chat.observe.bind(chat);
+    chat.observe = async (session) => ({
+      ...(await observe(session)),
+      current: null,
+    });
+    Object.defineProperty(chat, "acceptsSavedChatDeletion", { value: true });
+    chat.deleteSavedChat = vi.fn<
+      (
+        session: NativeChatSession,
+        snapshot: NativeChatSnapshot,
+        catalogRevision: number,
+        requestId: string
+      ) => Promise<void>
+    >(async () => {});
+    const opened = await ipc.create(first.event);
+    const observation = await ipc.observe(first.event, opened.attachmentId);
+    const pending = ipc.deleteSavedChat(
+      first.event,
+      opened.attachmentId,
+      observation.observationId,
+      0
+    );
+    await vi.waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    approval.resolve(true);
+    await expect(pending).rejects.toThrow("native_chat_attachment_unavailable");
+    expect(chat.deleteSavedChat).not.toHaveBeenCalled();
+
+    const loading = Promise.withResolvers<NativeChatSession>();
+    vi.spyOn(chat, "load").mockReturnValueOnce(loading.promise);
+    chat.ownsSession = () => false;
+    const late = ipc.load(second.event, opened.sessionId);
+    loading.resolve({ id: opened.sessionId });
+    await expect(late).rejects.toThrow("native_chat_session_deleted");
+  });
+
   it("keeps the revision private and only retries the exact reviewed context update", async () => {
     const confirm = vi.fn<
       (sender: WebContents, review: ConfigurationReview) => Promise<boolean>

@@ -43,9 +43,13 @@ export type NativeChatCatalogEntry = Readonly<{
   revision: number;
   title: string | null;
   archived: boolean;
+  deletionAvailable?: true;
 }>;
 
-export type NativeChatCatalogChange = Omit<NativeChatCatalogEntry, "sessionId">;
+export type NativeChatCatalogChange = Pick<
+  NativeChatCatalogEntry,
+  "revision" | "title" | "archived"
+>;
 
 export type NativeChatSideContext = Readonly<{
   sourceRevision: number;
@@ -294,7 +298,7 @@ export type NativeChatUpdate =
   | NativeChatStreamUpdate
   | Readonly<{
       kind: "closed";
-      reason: "delivery_limit";
+      reason: "delivery_limit" | "session_deleted";
     }>;
 
 /** Available only for a main-selected native chat in the current workspace. */
@@ -309,6 +313,11 @@ export type DesktopNativeChat = {
     attachmentId: string,
     change: NativeChatCatalogChange
   ): Promise<NativeChatCatalogEntry>;
+  deleteSavedChat?(
+    attachmentId: string,
+    observationId: string,
+    catalogRevision: number
+  ): Promise<boolean>;
   create(): Promise<NativeChatAttachment>;
   load(sessionId: string): Promise<NativeChatAttachment>;
   openSideChat?(

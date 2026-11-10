@@ -206,6 +206,12 @@ use the default name. Choose **Archive chat** to move it out of the active list
 while keeping its draft and any running work. Open it from **Archived chats**
 and choose **Restore chat** to return it to the active list.
 
+On macOS and Linux, select an eligible idle chat and choose **Delete chat**.
+Confirm in the Desktop dialog to remove the saved conversation. Desktop
+closes the deleted chat in any open workspace window. Project files and
+independent forks stay available. Chats with outstanding work or retained
+dependencies remain available to archive.
+
 With the native **Ask me** profile, a read outside the current grants pauses
 for review when its folder is eligible for additional access. The pane shows
 the requested action and target. **Allow once** authorizes that action.

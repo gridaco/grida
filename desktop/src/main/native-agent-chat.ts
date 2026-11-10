@@ -32,6 +32,7 @@ import {
   NativeAgentConfiguration,
   type ContextLimitBasis,
 } from "./native-agent-configuration";
+import { NativeAgentDeletion } from "./native-agent-deletion";
 import {
   NativeAgentGoals,
   type NativeGoalInspection,
@@ -167,6 +168,9 @@ export class NativeAgentChat {
   private readonly configuration = new NativeAgentConfiguration(
     (method, params) => this.process.request(method, params, 10_000)
   );
+  private readonly deletion = new NativeAgentDeletion((method, params) =>
+    this.process.request(method, params, 10_000)
+  );
   private readonly goals = new NativeAgentGoals((method, params) =>
     this.process.request(method, params)
   );
@@ -190,6 +194,14 @@ export class NativeAgentChat {
 
   get acceptsPng(): boolean {
     return this.connected && this.process.acceptsPng;
+  }
+
+  get acceptsSavedChatDeletion(): boolean {
+    return this.connected && this.process.acceptsSavedChatDeletion;
+  }
+
+  ownsSession(session: NativeChatSession): boolean {
+    return !this.closed && this.attached.get(session.id) === session;
   }
 
   get hasExited(): boolean {
@@ -281,6 +293,30 @@ export class NativeAgentChat {
     return catalogEntry(result, sessionId);
   }
 
+  async deleteSavedChat(
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    catalogRevision: number,
+    requestId: string
+  ): Promise<void> {
+    const sessionId = this.requireObservation(session, snapshot);
+    if (!this.acceptsSavedChatDeletion)
+      throw new Error("native_chat_deletion_unavailable");
+    await this.deletion.retire({
+      sessionId,
+      cwd: this.cwd,
+      requestId: identity(requestId),
+      expectedSessionRevision: snapshot.sessionRevision,
+      expectedCatalogRevision: revision(catalogRevision),
+    });
+    if (!this.ownsSession(session)) return;
+    this.attached.delete(sessionId);
+    this.loading.delete(sessionId);
+    this.transcripts.delete(sessionId);
+    this.unverifiedTranscripts.delete(sessionId);
+    this.listeners.delete(sessionId);
+  }
+
   async organize(
     session: NativeChatSession,
     value: unknown
@@ -328,17 +364,22 @@ export class NativeAgentChat {
       })
       .then((reply) => {
         object(reply);
+        if (this.loading.get(id) !== requested)
+          throw new Error("native_chat_attachment_required");
         return this.attach(id);
       })
       .catch((error: unknown) => {
         if (
+          this.loading.get(id) === requested &&
           error instanceof Error &&
           error.message === "native_agent_request_timeout"
         )
           this.unverifiedTranscripts.add(id);
         throw error;
       })
-      .finally(() => this.loading.delete(id));
+      .finally(() => {
+        if (this.loading.get(id) === requested) this.loading.delete(id);
+      });
     this.loading.set(id, requested);
     return requested;
   }
@@ -1162,7 +1203,7 @@ export class NativeAgentChat {
 
   private requireAttached(session: NativeChatSession): string {
     this.requireOpen();
-    if (this.attached.get(session.id) !== session)
+    if (!this.ownsSession(session))
       throw new Error("native_chat_attachment_required");
     return session.id;
   }

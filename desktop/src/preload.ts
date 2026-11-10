@@ -380,6 +380,13 @@ const bridge: DesktopBridge = {
         attachmentId,
         change
       ),
+    deleteSavedChat: (attachmentId, observationId, catalogRevision) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_DELETE,
+        attachmentId,
+        observationId,
+        catalogRevision
+      ),
     create: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
     load: (sessionId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),

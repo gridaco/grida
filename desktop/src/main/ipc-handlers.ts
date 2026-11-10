@@ -152,6 +152,22 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         noLink: true,
       });
       return confirmed.response === 1;
+    },
+    async (sender, title) => {
+      const window = admittedWindow(sender);
+      if (!window) return false;
+      const result = await dialog.showMessageBox(window, {
+        type: "warning",
+        message: "Delete this saved chat?",
+        detail: title
+          ? `“${title}” and its messages will be permanently removed. Project files and independent forks stay available.`
+          : "This chat and its messages will be permanently removed. Project files and independent forks stay available.",
+        buttons: ["Cancel", "Delete chat"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      return result.response === 1;
     }
   );
   /**
@@ -211,6 +227,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_ORGANIZE,
     (event, id: string, change: unknown) =>
       nativeChat.organize(event, id, change)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_DELETE,
+    (event, id: string, observationId: unknown, catalogRevision: unknown) =>
+      nativeChat.deleteSavedChat(event, id, observationId, catalogRevision)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_CREATE, (event) => nativeChat.create(event));
   guarded(IPC_CHANNELS.NATIVE_CHAT_LOAD, (event, id: string) =>

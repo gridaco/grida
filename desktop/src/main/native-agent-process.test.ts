@@ -83,6 +83,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         onSessionUpdate: (params) => observed.push(params),
       });
       expect(agent.acceptsPng).toBe(false);
+      expect(agent.acceptsSavedChatDeletion).toBe(false);
       const [prompt, failure] = await Promise.allSettled([
         agent.request("session/prompt", {}),
         agent.request("unavailable", {}),

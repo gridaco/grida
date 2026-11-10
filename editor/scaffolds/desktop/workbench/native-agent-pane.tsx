@@ -254,6 +254,19 @@ export function NativeAgentPane({
               >
                 {state.catalogEntry.archived ? "Restore chat" : "Archive chat"}
               </Button>
+              {state.catalogEntry.deletionAvailable &&
+                bridge.deleteSavedChat && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    className="text-destructive"
+                    disabled={!controller.canDeleteSavedChat}
+                    onClick={() => void controller.deleteSavedChat()}
+                  >
+                    Delete chat
+                  </Button>
+                )}
             </>
           ) : state.catalogEntryError ? (
             <Button
