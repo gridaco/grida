@@ -17,6 +17,8 @@
  *   stop                                         stop the registered daemon
  *   run [--session <id>] [--workspace <path>]    one turn; echoes the session id
  *       [--mode <auto|accept-edits>] [--model <id>] "message"
+ *                                                on a terminal, answers the
+ *                                                agent's `question` prompts
  *   sessions                                     list sessions
  *   messages <sessionId>                         print the linear transcript
  *   compact <sessionId>                          fire compaction; print the result
@@ -43,7 +45,15 @@ import { home } from "@grida/home";
 import { Daemon } from "@grida/daemon/server";
 import { AgentTransport } from "./transport";
 import type { DaemonServer } from "@grida/daemon/server";
+import {
+  askQuestions,
+  createTerminalPrompter,
+  findPendingQuestion,
+  QUESTION_PART_TYPE,
+  type CliPrompter,
+} from "./cli-question";
 import type { AgentMode } from "./protocol/mode";
+import type { AgentRunOptions } from "./protocol/run";
 import type { AgentUIMessageChunk } from "./protocol/wire";
 import type { ChatMessageWithParts, ChatSessionRow } from "./session/rows";
 
@@ -88,7 +98,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       await acpCommand();
       return;
     case "run":
-      await withClient((c) => runCommand(c, argv.slice(1), out));
+      await withClient((c) =>
+        runCommand(c, argv.slice(1), out, terminalPrompter())
+      );
       return;
     case "sessions":
       await withClient((c) => sessionsCommand(c, out));
@@ -328,7 +340,8 @@ async function withClient(
 export async function runCommand(
   client: AgentTransport.Client,
   args: string[],
-  out: CliWriter
+  out: CliWriter,
+  prompter?: CliPrompter
 ): Promise<void> {
   const {
     session_id: sessionId,
@@ -350,35 +363,86 @@ export async function runCommand(
   const workspaceId = workspace
     ? (await client.workspaces.open(workspace)).id
     : undefined;
-  const handle = await client.agent.run(
+  const turn = {
+    workspace_id: workspaceId,
+    // A headless one-shot `run` has no UI to answer a supervised approval, so
+    // a workspace-bound run defaults to `auto` (every command runs) — matching
+    // the CLI's unsandboxed-shell stance that the operator IS the user.
+    // `--mode accept-edits` is honored for callers that drive approvals.
+    mode: workspaceId ? (mode ?? "auto") : mode,
+    ...(modelId ? { model_id: modelId } : {}),
+    // `question` pauses only when this client can answer it: `main` passes a
+    // prompter when stdin and stderr are a terminal. Otherwise the run
+    // declares itself headless — it may target a daemon that IS interactive
+    // for a web client — so question refuses instead of leaving input pending
+    // forever. Omitting a surface snapshot independently keeps presentation
+    // headless.
+    interactive: prompter !== undefined,
+  };
+  let currentSessionId = await streamTurn(
+    client,
     {
+      ...turn,
       messages: [{ role: "user", content: message }],
       session_id: sessionId,
-      workspace_id: workspaceId,
-      // A headless one-shot `run` has no UI to answer a supervised approval, so
-      // a workspace-bound run defaults to `auto` (every command runs) — matching
-      // the CLI's unsandboxed-shell stance that the operator IS the user.
-      // `--mode accept-edits` is honored for callers that drive approvals.
-      mode: workspaceId ? (mode ?? "auto") : mode,
-      ...(modelId ? { model_id: modelId } : {}),
-      // A one-shot `run` has no UI to answer `question`, and it may target a
-      // daemon that IS interactive for a web client. Declare headless per-run
-      // so question refuses instead of leaving input pending forever. It also
-      // omits a surface snapshot, independently making presentation headless.
-      interactive: false,
     },
-    (chunk) => {
-      writeTextDelta(chunk, out);
-      // Surface tool activity on stderr so a CLI run is self-evidencing (which
-      // tool fired) without polluting the stdout transcript.
-      writeToolTrace(chunk);
-    }
+    out
   );
-  await handle.done;
+  // Answer each `question` the run paused on, then resume with the answer as
+  // the client-resolved tool result — the continuation the desktop sends via
+  // `chat.addToolResult`. The pause is read from the persisted transcript
+  // (server-authoritative; the stream ends only after the recorder flushed).
+  while (prompter) {
+    const pending = findPendingQuestion(
+      await client.sessions.list_messages(currentSessionId)
+    );
+    if (!pending) break;
+    out.write("\n");
+    const output = await askQuestions(pending.input, prompter);
+    currentSessionId = await streamTurn(
+      client,
+      {
+        ...turn,
+        session_id: currentSessionId,
+        messages: [
+          {
+            id: pending.message_id,
+            role: "assistant",
+            parts: [
+              {
+                type: QUESTION_PART_TYPE,
+                toolCallId: pending.tool_call_id,
+                state: "output-available",
+                input: pending.input,
+                output,
+              },
+            ],
+          },
+        ],
+      },
+      out
+    );
+  }
   out.write("\n");
   // Echo the (possibly newly-created) session id so the next `run --session`
   // or `compact` can target this conversation.
-  out.write(`SESSION=${handle.session_id}\n`);
+  out.write(`SESSION=${currentSessionId}\n`);
+}
+
+/** Stream one `/agent/run` turn to `out`; resolves with its session id. */
+async function streamTurn(
+  client: AgentTransport.Client,
+  opts: AgentRunOptions,
+  out: CliWriter
+): Promise<string> {
+  const handle = await client.agent.run(opts, (chunk) => {
+    writeTextDelta(chunk, out);
+    // Surface tool activity on stderr so a CLI run is self-evidencing (which
+    // tool fired) without polluting the stdout transcript.
+    writeToolTrace(chunk);
+  });
+  await handle.done;
+  return handle.session_id;
 }
 
 export async function sessionsCommand(
@@ -521,8 +585,8 @@ async function createHost(
   // Whether this host serves a human UI (RFC `tools` §question). A long-lived
   // `serve` daemon is driven by a human client (the desktop-from-web bridge),
   // so the locked `question` tool pauses for their answer. The throwaway
-  // embedded host behind a one-shot `run` has no client UI → stays headless and
-  // the tool returns the fixed refusal.
+  // embedded host behind a one-shot `run` defaults to headless; `run` declares
+  // per run whether its terminal can answer, which wins over this default.
   interactive = false
 ): Promise<DaemonServer> {
   const { createAgentDaemon } = await import("./server");
@@ -549,9 +613,9 @@ async function createHost(
     // no sandbox/containment claim. Sandboxed hosts can choose `sandboxed`, and
     // Desktop withholds ACP through `disabled`.
     external_agent_execution: "enabled",
-    // The locked `question` tool pauses for a human only when this host serves
-    // a UI (the `serve` daemon driven by the desktop-from-web bridge). A
-    // throwaway embedded host (one-shot `run`) is headless → fixed refusal.
+    // The locked `question` tool pauses for a human by default only when this
+    // host serves a UI (the `serve` daemon driven by the desktop-from-web
+    // bridge). A client's per-run `interactive` declaration overrides it.
     interactive,
     // GRIDA-SEC-006 — hosted "included" AI. The CLI daemon has no webview
     // to mint tokens, so this stays dormant unless a client pushes a
@@ -603,6 +667,17 @@ async function waitForPidExit(pid: number): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
+}
+
+/**
+ * The operator prompter for `run`, or undefined when no one can answer: both
+ * stdin (answers) and stderr (prompts) must be a terminal. Piped or scripted
+ * runs therefore stay headless and `question` keeps its fixed refusal.
+ */
+function terminalPrompter(): CliPrompter | undefined {
+  return process.stdin.isTTY && process.stderr.isTTY
+    ? createTerminalPrompter()
+    : undefined;
 }
 
 function readConfig(): CliConfig {
@@ -744,5 +819,9 @@ Usage:
   grida-agent compact <sessionId>
   grida-agent rewind <sessionId> <messageId> [--restore]
   grida-agent fork <sessionId> <messageId>
+
+On a terminal, run asks you the agent's questions and resumes with your
+answers. Piped or scripted runs stay headless: the agent proceeds on its own
+assumptions.
 `);
 }

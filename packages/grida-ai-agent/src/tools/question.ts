@@ -46,7 +46,7 @@ export const QUESTION_HEADLESS_REFUSAL =
   "answer. Do not ask — proceed with your best assumption and state the " +
   "assumption you made.";
 
-const questionInputSchema = z.object({
+export const questionInputSchema = z.object({
   questions: z
     .array(
       z.object({
