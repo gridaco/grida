@@ -8,6 +8,7 @@ use agent_kit_core::turn::{OperationInput, TurnBinding};
 use agent_kit_core::{GrantId, ToolId};
 use agent_kit_store_sqlite::{
     OperationClaimSource, OperationPairControl, OperationPairReceipt, OperationRelatedControl,
+    ResumeCompanion,
 };
 use grida_agent_master::subagents::{
     self, Assignment, PauseCause, Profile, Sponsorship, sponsored_identity,
@@ -373,6 +374,48 @@ impl Host {
             }
         }
         Err(conflict)
+    }
+
+    pub(super) async fn pause_sponsorship(
+        &self,
+        request: ControlRequest,
+    ) -> Result<ControlReceipt> {
+        let session = self.store.inspect(request.session.clone()).await?;
+        if let Some(profile) = session_configuration(&session)?
+            .subagent
+            .filter(|profile| profile.sponsorship().is_some())
+        {
+            return self
+                .store
+                .control_turn_with_driver_state(request, move |state| {
+                    let (change, _) =
+                        profile.set_sponsored_pause(state, PauseCause::Independent, true)?;
+                    Ok(change.value)
+                })
+                .await;
+        }
+        Ok(self.control_sponsorship(request).await?.source)
+    }
+
+    pub(super) async fn claim_sponsored_resume(
+        &self,
+        request: ClaimRequest,
+        view: &SessionView,
+        profile: &Profile,
+    ) -> Result<ClaimOutcome> {
+        let (change, pause) =
+            profile.set_sponsored_pause(&view.driver_state, PauseCause::Independent, false)?;
+        if pause.effective() {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "sponsored_subagent_held_by_ancestor",
+            ));
+        }
+        Ok(self
+            .store
+            .resume_with(request, ResumeCompanion::DriverState(change))
+            .await?
+            .claim)
     }
 
     async fn ordinary_control(&self, request: ControlRequest) -> Result<OperationPairReceipt> {
@@ -874,6 +917,17 @@ mod tests {
             panic!("expected child lease")
         };
 
+        control(
+            &host,
+            child.clone(),
+            child_turn.clone(),
+            ControlDirective::Pause,
+        )
+        .await
+        .unwrap();
+        let child_state = store.inspect(child.clone()).await.unwrap().driver_state;
+        assert!(!profile.sponsored_pause(&child_state).unwrap().effective());
+
         let view = store.inspect(parent.clone()).await.unwrap();
         let pause_id = change_id().unwrap();
         let control = view.current.unwrap().controls.revision;
@@ -900,7 +954,41 @@ mod tests {
                 .reserved,
             1
         );
-        assert!(child_view.current.unwrap().controls.paused);
+        let current = child_view.current.unwrap();
+        assert!(current.controls.paused);
+        let direct_resume = ClaimRequest {
+            id: change_id().unwrap(),
+            session: child.clone(),
+            expected_revision: child_view.revision,
+            selection: TurnSelection::ResumePaused {
+                turn: child_turn.clone(),
+                epoch: current.binding.epoch,
+                position: current.position,
+                control_revision: current.controls.revision,
+            },
+        };
+        let child_view = store.inspect(child.clone()).await.unwrap();
+        assert_eq!(
+            host.claim_sponsored_resume(direct_resume, &child_view, &profile)
+                .await
+                .err()
+                .unwrap()
+                .code,
+            "sponsored_subagent_held_by_ancestor"
+        );
+        let independent = || TurnControl {
+            request: ChangeId::new("independent-pause").unwrap(),
+            session: child.clone(),
+            turn: child_turn.clone(),
+            expected_session: child_view.revision,
+            expected_control: current.controls.revision,
+        };
+        let independent_receipt = host.pause(independent()).await.unwrap();
+        let child_state = store.inspect(child.clone()).await.unwrap().driver_state;
+        let (_, without_ancestor) = profile
+            .set_sponsored_pause(&child_state, PauseCause::Ancestor, false)
+            .unwrap();
+        assert!(without_ancestor.effective());
 
         host.subagents_enabled = false;
         let view = store.inspect(parent.clone()).await.unwrap();
@@ -921,6 +1009,10 @@ mod tests {
                 .await
                 .unwrap(),
             receipt
+        );
+        assert_eq!(
+            host.pause(independent()).await.unwrap(),
+            independent_receipt
         );
         assert!(
             store

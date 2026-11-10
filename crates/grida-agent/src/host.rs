@@ -1073,7 +1073,14 @@ impl Host {
                     (Some(change), _, _) => {
                         self.store.claim_with_driver_state(request, change).await?
                     }
-                    (None, _, _) => self.store.claim(request).await?,
+                    (None, _, _) => match (&request.selection, subagent.as_ref()) {
+                        (TurnSelection::ResumePaused { .. }, Some(profile))
+                            if profile.sponsorship().is_some() =>
+                        {
+                            self.claim_sponsored_resume(request, &view, profile).await?
+                        }
+                        _ => self.store.claim(request).await?,
+                    },
                 }
             }
             WorkerClaim::Recover(request) => self.store.recover(request).await?,
