@@ -253,3 +253,84 @@ mod socket_probe {
         );
     }
 }
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and working Seatbelt or bubblewrap"]
+async fn read_only_command_permits_selected_bytes_and_private_temporary_work() {
+    let fixture = Fixture::new(true);
+    let source = fixture.extra.join("input.txt");
+    let disallowed = fixture.extra.join("ungranted-output.txt");
+    let temporary = fixture._base.path().join("temporary");
+    let secret = fixture.primary.join("protected.txt");
+    fs::write(&source, "selected text").unwrap();
+    fs::write(&secret, "host private fixture").unwrap();
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["directories"][1]["commandRead"] = json!("allow");
+    profile["directories"][1]["commandReadWrite"] = json!("deny");
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = listener.local_addr().unwrap().port().to_string();
+    let arguments = json!({
+        "directory": "extra", "access": "read", "program": "/bin/bash", "cwd": fixture.extra,
+        "env": {"GRIDA_VISIBLE_FIXTURE": "explicit input"},
+        "args": ["-c", r#"
+            test "$(/bin/cat input.txt)" = "selected text" || exit 71
+            test "$GRIDA_VISIBLE_FIXTURE" = "explicit input" || exit 72
+            test -z "${GRIDA_TEST_HOST_ONLY_CREDENTIAL+x}" || exit 73
+            if (: < "$1") 2>/dev/null; then exit 74; fi
+            if (printf denied > ungranted-output.txt) 2>/dev/null; then exit 75; fi
+            if (: > "/dev/tcp/127.0.0.1/$2") 2>/dev/null; then exit 76; fi
+            printf private > "$TMPDIR/output" || exit 77
+            test "$(/bin/cat "$TMPDIR/output")" = private || exit 78
+            printf read-only-profile-verified
+        "#, "read-only-fixture", secret, port],
+    });
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool(
+            "run_command",
+            Box::leak(arguments.to_string().into_boxed_str()),
+        ),
+        Reply::Finished("Read-only operation complete."),
+    ])
+    .await;
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .args(["--prompt", "Read the selected project source."])
+            .env(
+                "GRIDA_TEST_HOST_ONLY_CREDENTIAL",
+                "synthetic host-only value",
+            )
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{} {}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+    endpoint.request().await;
+    let request = endpoint.request().await;
+    let tool = request["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|message| message["role"] == "tool")
+        .unwrap();
+    let outcome: Value = serde_json::from_str(tool["content"].as_str().unwrap()).unwrap();
+    assert_eq!(outcome["status"], "succeeded", "{outcome}");
+    assert_eq!(outcome["structured"]["completion"]["code"], 0, "{outcome}");
+    assert_eq!(outcome["structured"]["cleanup_verified"], true, "{outcome}");
+    assert!(
+        outcome.to_string().contains("read-only-profile-verified"),
+        "{outcome}"
+    );
+    assert!(!disallowed.exists());
+    assert!(fs::read_dir(temporary).unwrap().next().is_none());
+    endpoint.done().await;
+}
