@@ -14,4 +14,7 @@ declare class URL {
   protocol: string;
   username: string;
   password: string;
+  href: string;
+  hostname: string;
+  pathname: string;
 }
