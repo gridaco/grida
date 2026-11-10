@@ -7,6 +7,10 @@ const LIST: &str = "co.grida/session/wakeups";
 const CANCEL: &str = "co.grida/session/cancel-wakeup";
 const RECOVER: &str = "co.grida/session/recover-wakeup";
 const CONTINUE_CANCELLED: &str = "co.grida/session/continue-cancelled-wakeup";
+const GOAL_START: &str = "_co.grida/goal/start";
+const GOAL_INSPECT: &str = "_co.grida/goal/inspect";
+const GOAL_CONTROL: &str = "_co.grida/goal/control";
+const GOAL_RECOVER: &str = "_co.grida/goal/recover";
 const PURPOSE: &str = "Check the render again.";
 const WAKE: Reply = Reply::Tool(
     "request_wakeup",
@@ -21,6 +25,9 @@ fn initialize() -> Value {
     let mut params = extension_initialize();
     for key in [LIST, CANCEL, RECOVER] {
         params["clientCapabilities"]["_meta"][key] = 1.into();
+    }
+    for key in [GOAL_START, GOAL_INSPECT, GOAL_CONTROL, GOAL_RECOVER] {
+        params["clientCapabilities"]["_meta"][&key[1..]] = 1.into();
     }
     params
 }
@@ -155,6 +162,335 @@ async fn after_due(wakeup: &Value) {
         .as_millis() as u64;
     let remaining = wakeup["dueAtMs"].as_u64().unwrap().saturating_sub(now);
     tokio::time::sleep(Duration::from_millis(remaining + 100)).await;
+}
+
+fn goal_input(session: &str, automatic: bool) -> Value {
+    json!({
+        "sessionId":session,"inputId":"goal-with-checkin","allowWakeups":true,
+        "operatingRegime":"act",
+        "prompt":[{"type":"text","text":"Verify the export and check back if needed."}],
+        "goal":{
+            "objective":{"description":"Verify the export","criteria":["The exported file opens"]},
+            "allowance":{"work_turns":2,"inference_steps":4},"automatic":automatic,
+        }
+    })
+}
+
+async fn goal_state(client: &mut StdioClient, session: &str) -> Value {
+    let response = client
+        .request(GOAL_INSPECT, json!({"sessionId":session}))
+        .await;
+    response
+        .get("result")
+        .unwrap_or_else(|| panic!("{response}"))
+        .clone()
+}
+
+fn goal_control(session: &str, view: &Value, action: &str) -> Value {
+    json!({
+        "sessionId":session,"requestId":format!("goal-{action}"),
+        "expectedSessionRevision":view["revision"],"expectedStateRevision":view["stateRevision"],
+        "basis":view["goal"]["basis"],"change":{"action":action},
+    })
+}
+
+async fn goal_checkin(
+    client: &mut StdioClient,
+    session: &str,
+    endpoint: &mut Endpoint,
+    input: Value,
+) -> (String, Value) {
+    let submitted = client.request(GOAL_START, input).await;
+    assert_eq!(
+        submitted["result"]["inputId"], "goal-with-checkin",
+        "{submitted}"
+    );
+    let request = endpoint.request().await;
+    for expected in ["goal_report", "request_wakeup"] {
+        assert!(
+            request["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|tool| tool["function"]["name"] == expected)
+        );
+    }
+    let waiting = wait_for(client, session, |view| {
+        view["current"]["disposition"] == "suspended"
+    })
+    .await;
+    let turn = waiting["current"]["turnId"].as_str().unwrap().to_owned();
+    let wakeup = schedule(client, session, &turn).await;
+    assert_eq!(wakeup["status"], "waiting");
+    (turn, wakeup)
+}
+
+#[tokio::test]
+async fn a_goal_checkin_preserves_its_reserved_turn_and_delivers_once_after_resume() {
+    let temp = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = temp.path().join("state");
+    let (finish, final_step) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        RESTART_WAKE,
+        Reply::Tool(
+            "goal_report",
+            r#"{"report":{"kind":"progress","summary":"The export passed its first check."}}"#,
+        ),
+        Reply::Finished("The reserved task completed after the check-in."),
+        Reply::Release("Used the final inference step.", final_step),
+    ])
+    .await;
+    let mut first = client(&state, &endpoint.url).await;
+    let session = new_chat(&mut first, workspace.path()).await;
+    let input = goal_input(&session, true);
+    let mut plan = input.clone();
+    plan["operatingRegime"] = "plan".into();
+    assert_eq!(
+        first.request(GOAL_START, plan).await["error"]["data"],
+        "plan_wakeups_unavailable"
+    );
+    let (turn, wakeup) = goal_checkin(&mut first, &session, &mut endpoint, input.clone()).await;
+    let mut omitted = input;
+    omitted.as_object_mut().unwrap().remove("allowWakeups");
+    assert_eq!(
+        first.request(GOAL_START, omitted).await["error"]["data"],
+        "input_identity_reused"
+    );
+    let held = goal_state(&mut first, &session).await;
+    assert_eq!(held["goal"]["reservation"]["turn"], turn);
+    assert_eq!(held["goal"]["reservation"]["inference_steps"], 4);
+    assert_eq!(held["goal"]["spent"]["inference_steps"], 0);
+    let pause = goal_control(&session, &held, "pause");
+    let paused = first.request(GOAL_CONTROL, pause.clone()).await;
+    assert_eq!(paused["result"]["turnId"], turn, "{paused}");
+    first.close().await;
+
+    let mut reopened = client(&state, &endpoint.url).await;
+    let loaded = reopened
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    assert!(loaded["result"].is_object(), "{loaded}");
+    let observed = schedule(&mut reopened, &session, &turn).await;
+    assert_eq!(observed["status"], "paused");
+    assert_eq!(observed["armed"], false);
+    assert_eq!(observed["waitId"], wakeup["waitId"]);
+    assert_eq!(observed["dueAtMs"], wakeup["dueAtMs"]);
+    let scheduled_target = target(&session, &turn, &wakeup);
+    let rearmed = reopened
+        .request("_co.grida/session/recover-wakeup", scheduled_target.clone())
+        .await;
+    assert_eq!(rearmed["result"]["wakeup"]["armed"], true);
+    assert_eq!(
+        reopened
+            .request("_co.grida/session/recover-wakeup", scheduled_target.clone())
+            .await["result"],
+        rearmed["result"]
+    );
+    after_due(&wakeup).await;
+    assert_eq!(
+        schedule(&mut reopened, &session, &turn).await["status"],
+        "paused"
+    );
+    assert!(endpoint.requests.try_recv().is_err());
+    assert_eq!(
+        reopened.request(GOAL_CONTROL, pause).await["result"],
+        paused["result"]
+    );
+    let state = goal_state(&mut reopened, &session).await;
+    assert_eq!(state["goal"]["reservation"]["turn"], turn);
+    let resume = goal_control(&session, &state, "resume");
+    let resumed = reopened.request(GOAL_CONTROL, resume.clone()).await;
+    assert_eq!(resumed["result"]["turnId"], turn, "{resumed}");
+    assert_eq!(
+        reopened.request(GOAL_CONTROL, resume).await["result"],
+        resumed["result"]
+    );
+    let resumed_request = endpoint.request().await;
+    let deliveries = resumed_request["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|message| {
+            message["role"] == "tool"
+                && message["content"]
+                    .as_str()
+                    .is_some_and(|text| text.contains(PURPOSE))
+        })
+        .count();
+    assert_eq!(deliveries, 1);
+    endpoint.request().await;
+    let next = endpoint.request().await;
+    assert!(!next["tools"].to_string().contains("request_wakeup"));
+    assert!(next["tools"].to_string().contains("goal_report"));
+    let second = goal_state(&mut reopened, &session).await;
+    assert_eq!(
+        second["goal"]["spent"],
+        json!({"work_turns":1,"inference_steps":3})
+    );
+    assert_ne!(second["goal"]["reservation"]["turn"], turn);
+    assert_eq!(second["goal"]["reservation"]["inference_steps"], 1);
+    let delivered = schedule(&mut reopened, &session, &turn).await;
+    assert_eq!(delivered["status"], "delivered");
+    assert_eq!(delivered["waitId"], wakeup["waitId"]);
+    assert_eq!(delivered["dueAtMs"], wakeup["dueAtMs"]);
+    let recovered = reopened
+        .request("_co.grida/session/recover-wakeup", scheduled_target)
+        .await;
+    assert_eq!(recovered["result"]["wakeup"], delivered);
+    finish.send(()).unwrap();
+    wait_for(&mut reopened, &session, |view| view["current"].is_null()).await;
+    let finished = goal_state(&mut reopened, &session).await;
+    assert_eq!(
+        finished["goal"]["spent"],
+        json!({"work_turns":2,"inference_steps":4})
+    );
+    assert_eq!(finished["goal"]["status"]["status"], "exhausted");
+    assert!(endpoint.requests.try_recv().is_err());
+    reopened.close().await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn recovering_a_goal_does_not_continue_a_cancelled_checkin() {
+    let temp = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = temp.path().join("state");
+    let mut endpoint = Endpoint::start(vec![
+        RESTART_WAKE,
+        Reply::Finished("Explicitly continued the goal."),
+    ])
+    .await;
+    let mut first = client_with_continuation(&state, &endpoint.url, true).await;
+    let session = new_chat(&mut first, workspace.path()).await;
+    let (turn, wakeup) = goal_checkin(
+        &mut first,
+        &session,
+        &mut endpoint,
+        goal_input(&session, false),
+    )
+    .await;
+    let cancelled = first
+        .request(
+            "_co.grida/session/cancel-wakeup",
+            target(&session, &turn, &wakeup),
+        )
+        .await;
+    assert_eq!(
+        cancelled["result"]["wakeup"]["status"], "cancelled",
+        "{cancelled}"
+    );
+    first.close().await;
+
+    let mut reopened = client_with_continuation(&state, &endpoint.url, true).await;
+    let loaded = reopened
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    assert!(loaded["result"].is_object(), "{loaded}");
+    let before = goal_state(&mut reopened, &session).await;
+    let recovered = reopened
+        .request(GOAL_RECOVER, json!({"sessionId":session}))
+        .await;
+    assert_eq!(recovered["result"]["sessionId"], session, "{recovered}");
+    assert!(
+        timeout(Duration::from_millis(100), endpoint.requests.recv())
+            .await
+            .is_err()
+    );
+    assert_eq!(goal_state(&mut reopened, &session).await, before);
+    assert_eq!(
+        schedule(&mut reopened, &session, &turn).await["status"],
+        "cancelled"
+    );
+    let view = status(&mut reopened, &session).await;
+    let request = json!({
+        "task":task_basis(&view,&session,"continue-cancelled-goal"),
+        "expectedEpoch":view["current"]["epoch"],
+        "expectedJournalPosition":view["current"]["journalPosition"],
+        "cancelledWakeupId":wakeup["waitId"],
+    });
+    let resumed = reopened
+        .request("_co.grida/session/resume", request.clone())
+        .await;
+    assert_eq!(resumed["result"]["turn"]["turnId"], turn, "{resumed}");
+    let next = endpoint.request().await;
+    assert!(next["messages"].as_array().unwrap().iter().any(|message| {
+        message["role"] == "tool"
+            && message["content"]
+                .as_str()
+                .is_some_and(|text| text.contains("cancelled") && !text.contains(PURPOSE))
+    }));
+    let settled = wait_for(&mut reopened, &session, |view| view["current"].is_null()).await;
+    assert_eq!(settled["latest"]["turnId"], turn);
+    assert_eq!(
+        goal_state(&mut reopened, &session).await["goal"]["spent"],
+        json!({"work_turns":1,"inference_steps":2})
+    );
+    let retried = reopened.request("_co.grida/session/resume", request).await;
+    assert_eq!(
+        retried["result"]["turn"]["epoch"],
+        resumed["result"]["turn"]["epoch"]
+    );
+    assert!(endpoint.requests.try_recv().is_err());
+    reopened.close().await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn clearing_a_goal_retires_its_armed_checkin_without_new_generation() {
+    let temp = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![RESTART_WAKE]).await;
+    let mut client = client(&temp.path().join("state"), &endpoint.url).await;
+    let session = new_chat(&mut client, workspace.path()).await;
+    let (turn, wakeup) = goal_checkin(
+        &mut client,
+        &session,
+        &mut endpoint,
+        goal_input(&session, true),
+    )
+    .await;
+    assert_eq!(wakeup["armed"], true);
+    let held = goal_state(&mut client, &session).await;
+    let clear = goal_control(&session, &held, "clear");
+    let cleared = client.request(GOAL_CONTROL, clear.clone()).await;
+    assert_eq!(cleared["result"]["turnId"], turn, "{cleared}");
+    let settled = wait_for(&mut client, &session, |view| view["current"].is_null()).await;
+    assert_eq!(settled["latest"]["turnId"], turn);
+    assert_eq!(settled["latest"]["status"], "cancelled");
+    let stopped = schedule(&mut client, &session, &turn).await;
+    assert_eq!(stopped["status"], "stopped");
+    assert_eq!(stopped["armed"], false);
+    let goal = goal_state(&mut client, &session).await;
+    assert_eq!(goal["goal"]["status"]["status"], "cleared");
+    assert!(goal["goal"]["reservation"].is_null());
+    assert_eq!(
+        goal["goal"]["spent"],
+        json!({"work_turns":1,"inference_steps":1})
+    );
+    assert_eq!(
+        client.request(GOAL_CONTROL, clear).await["result"],
+        cleared["result"]
+    );
+    let recovered = client
+        .request(
+            "_co.grida/session/recover-wakeup",
+            target(&session, &turn, &wakeup),
+        )
+        .await;
+    assert_eq!(
+        recovered["error"]["data"], "wakeup_unavailable",
+        "{recovered}"
+    );
+    assert!(endpoint.requests.try_recv().is_err());
+    client.close().await;
+    endpoint.done().await;
 }
 
 #[tokio::test]
@@ -631,6 +967,11 @@ async fn shared_connections_cannot_opt_into_scheduled_provider_work() {
         submit(session, "forbidden"),
     )
     .await;
+    assert_eq!(
+        refused["error"]["data"], "wakeup_capability_required",
+        "{refused}"
+    );
+    let refused = ws_rpc(&mut socket, 4, GOAL_START, goal_input(session, true)).await;
     assert_eq!(
         refused["error"]["data"], "wakeup_capability_required",
         "{refused}"

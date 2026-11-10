@@ -1357,6 +1357,14 @@ Today:
   checks that same evidence at settlement. [Built fixtures](crates/grida-agent/tests/process/goals/verification.rs)
   cover mismatched criteria, paths and bytes, and a retained observation after restart.
 - The native [wake-up ACP extension](crates/grida-agent/src/acp/extensions/wakeups.rs) requires private stdio, a negotiated capability, and an attached session. The [timer host](crates/grida-agent/src/host/wakeups.rs) binds an explicit opt-in to its admitted turn, resolves the exact wait, and uses ordinary continuation authority. Restart recovery requires a separate identified request. [Process tests](crates/grida-agent/tests/process/wakeups.rs) cover private scope, ownership, cancellation, and restart.
+- Private [Goal Start](crates/grida-agent/src/acp/extensions/goals.rs) can opt
+  into one check-in for its first Standard Act reservation. The
+  [Goal host](crates/grida-agent/src/host/goals.rs) binds the opt-in to the
+  accepted input. Goal Resume signals the timer after its durable control
+  commits.
+  Cancellation still requires exact explicit continuation. Automatic Goal
+  follow-ups use the remaining allowance and receive no timer grant from the
+  original input.
 - Native [completion checks](crates/grida-agent/src/host/completion_checks.rs)
   require trusted launch selection and an exact turn-bound grant. The built-in
   text check uses only the bounded recorded answer. An optional command in the

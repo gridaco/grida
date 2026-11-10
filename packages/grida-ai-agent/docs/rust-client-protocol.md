@@ -453,6 +453,14 @@ an active goal cancels its reserved turn without discarding its uncertainty.
 Clear an active or blocked goal before replacing an earlier message in the
 same chat. A separate fork carries no goal authorization.
 
+Private Goal Start can set `allowWakeups` to `true` with the same wake-up
+capabilities as Submit. It applies only to the first Standard Act reservation.
+An exact input retry keeps the original opt-in. A due check-in continues the
+same Goal turn under its reserved steps. Goal Pause holds delivery, including
+after a restart, and Goal Resume releases that hold. A cancelled check-in
+requires the existing explicit cancelled-wakeup Resume. Goal recovery does
+not continue it automatically. Automatic later Goal turns omit the opt-in.
+
 For a funded review, the trusted private launch must support subagents and
 the client must negotiate `co.grida/session/effort` version 1. Goal Start
 accepts optional `effort` (`standard` or `ultra`), defaulting to `standard`.

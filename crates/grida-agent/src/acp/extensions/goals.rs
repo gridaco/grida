@@ -23,6 +23,8 @@ struct Start {
     goal: GoalRequest,
     operating_regime: Option<crate::OperatingRegime>,
     effort: Option<crate::EffortPreset>,
+    #[serde(default)]
+    allow_wakeups: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -85,6 +87,9 @@ pub(super) fn handlers(
             async move |request: Start, responder, _| {
                 let result = async {
                     require(&start.1, START, Some(&request.session_id))?;
+                    if request.allow_wakeups && !wakeups::available(&start.1) {
+                        return Err(unavailable("wakeup_capability_required"));
+                    }
                     let parts = prompt_parts(request.prompt, image_intake)?;
                     let mut goal = request.goal;
                     let review = require(&start.1, CONFIRM_COMPLETION, None).is_ok();
@@ -94,7 +99,7 @@ pub(super) fn handlers(
                     goal.user_review = review;
                     start
                         .0
-                        .start_goal(
+                        .start_goal_with_wakeup(
                             PromptRequest {
                                 id: request.input_id,
                                 session: request.session_id,
@@ -110,6 +115,7 @@ pub(super) fn handlers(
                                 effort: effort(&start.1, request.effort)?,
                             },
                             goal,
+                            request.allow_wakeups,
                         )
                         .await
                         .map(SubmitResponse::from)

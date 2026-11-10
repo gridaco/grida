@@ -568,6 +568,9 @@ Recover can account for it once its outcome is known. See the
 [Goal client contract](../../packages/grida-ai-agent/docs/rust-client-protocol.md#persistent-goal-operations).
 
 An opted-in private ACP submission can schedule one wake-up for its own task.
+Goal Start can also opt in for the first Standard Act reservation. The timer
+uses that same turn and its inference allowance. Automatic Goal follow-ups
+receive no check-in permission from that input.
 The native host owns the timer and uses the ordinary task scheduler to claim
 continuation. Closing the host releases its timers while preserving their
 recorded due times and delivery state. A private client explicitly recovers the

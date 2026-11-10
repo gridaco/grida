@@ -84,16 +84,34 @@ impl Host {
         request: PromptRequest,
         goal: GoalRequest,
     ) -> Result<DurableSubmission> {
-        self.owned_control(move |host| async move { host.accept_goal(request, goal).await })
-            .await
+        self.start_goal_with_wakeup(request, goal, false).await
+    }
+
+    pub(crate) async fn start_goal_with_wakeup(
+        &self,
+        request: PromptRequest,
+        goal: GoalRequest,
+        allow_wakeups: bool,
+    ) -> Result<DurableSubmission> {
+        self.owned_control(move |host| async move {
+            host.accept_goal(request, goal, allow_wakeups).await
+        })
+        .await
     }
 
     async fn accept_goal(
         &self,
         request: PromptRequest,
         goal: GoalRequest,
+        allow_wakeups: bool,
     ) -> Result<DurableSubmission> {
         let effort = request.effort.unwrap_or(EffortPreset::Standard);
+        if allow_wakeups && effort == EffortPreset::Ultra {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "goal_wakeup_requires_standard",
+            ));
+        }
         validate_prompt_parts(&request.parts)?;
         Goal::start_with_review(
             request.id.clone(),
@@ -110,6 +128,7 @@ impl Host {
             let stored = retained_goal_prompt(&accepted.input)?;
             if stored.goal.as_ref() != Some(&GoalInput::Start(goal))
                 || !images::same_prompt(&stored.parts, &request.parts)
+                || stored.allow_wakeups != allow_wakeups
                 || request
                     .operating_regime
                     .is_some_and(|regime| regime != stored.operating_regime)
@@ -142,7 +161,7 @@ impl Host {
         self.check_ready_capacity(&request.session).await?;
         let mut request = request;
         request.effort = Some(effort);
-        let mut policy = self.submission_policy(&request, false)?;
+        let mut policy = self.submission_policy(&request, allow_wakeups)?;
         policy.allow_host_tools = false;
         if policy.effort.as_ref().is_some_and(|effort| {
             goal.allowance.inference_steps.get() <= effort.reserved_child_generation_steps()
@@ -310,6 +329,7 @@ impl Host {
         }
         let id = continuation.input_id(&view.session)?;
         captured.parts.clear();
+        captured.allow_wakeups = false;
         captured.configuration_permission = crate::ConfigurationPermission::Disabled;
         if let Some(permission) = &captured.permission_capture {
             let profile = self
@@ -448,11 +468,15 @@ impl Host {
         match action {
             GoalAction::Clear | GoalAction::Revise { .. } => {
                 if let Some(turn) = &receipt.turn {
-                    self.kick_stopped(session, turn.record().binding.turn.clone())
-                        .await;
+                    let turn = turn.record().binding.turn.clone();
+                    self.release_timer(&session, &turn).await;
+                    self.kick_stopped(session, turn).await;
                 }
             }
-            GoalAction::Resume => self.kick_queue(session).await,
+            GoalAction::Resume => {
+                self.changed.notify_waiters();
+                self.kick_queue(session).await;
+            }
             GoalAction::Pause | GoalAction::ConfirmCompletion { .. } => {}
         }
         Ok(receipt)
@@ -475,7 +499,11 @@ impl Host {
         if !self
             .store
             .inspect_turn_with(session.clone(), turn.clone(), |state| {
-                Ok(state.waits().values().all(|wait| !wait.is_pending()))
+                Ok(state.waits().values().all(|wait| {
+                    !wait.is_pending()
+                        && (!grida_agent_master::wakeups::is_wakeup(wait)
+                            || wakeups::was_delivered(wait))
+                }))
             })
             .await
             .unwrap_or(false)
