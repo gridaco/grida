@@ -1,8 +1,8 @@
 {
   "fx-guide": {
     "repo": "gridaco/fx",
-    "ref": "v0.7.0",
-    "commit": "5bf44462c6aef45be92c523fd934858a830f960f"
+    "ref": "v0.8.0",
+    "commit": "6bba32dfe5e358c0293003cf1d7fe339e2f4c0eb"
   },
   "fx-wg": {
     "repo": "gridaco/fx",
