@@ -27,6 +27,72 @@ vi.mock("./agent-sidecar-supervisor", () => ({
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 
+it("queues bounded read bursts in order without acquiring authority for cancelled work", async () => {
+  const running = Array.from({ length: 4 }, () => Promise.withResolvers<[]>());
+  const starts: string[] = [];
+  const list = vi.fn<WorkspaceFileWorkers["list"]>(async (_grant, relative) => {
+    starts.push(relative);
+    const index = Number(relative.split("/")[1]);
+    return relative.startsWith("running/") ? running[index].promise : [];
+  });
+  const fileGrant = vi.fn<NativeWorkspaceCatalog["fileGrant"]>(
+    async (workspaceId) => ({
+      workspaceId,
+      root: "/fixture",
+      identity: { device: "1", inode: "2", birthTimeNs: "3" },
+      protected: [],
+    })
+  );
+  const reads = new NativeWorkspaceReads(
+    { fileGrant },
+    { list, open: vi.fn() }
+  );
+  const owner = new AbortController();
+  const launch = (relative: string, signal = owner.signal) =>
+    reads.list(relative, relative, signal);
+  const active = running.map((_, i) => launch(`running/${i}`));
+  await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(4));
+
+  const removed = new AbortController();
+  const expired = new AbortController();
+  const queuedOwner = launch("cancelled", removed.signal);
+  const deadline = vi.spyOn(AbortSignal, "timeout");
+  deadline.mockReturnValueOnce(expired.signal);
+  const queuedDeadline = launch("expired");
+  expect(deadline).toHaveBeenCalledWith(15_000);
+  deadline.mockRestore();
+  const waiting = Array.from({ length: 30 }, (_, i) => `waiting/${i}`);
+  const queued = waiting.map((name) => launch(name));
+  await expect(launch("over-capacity")).rejects.toThrow(
+    "workspace_read_capacity"
+  );
+  expect(fileGrant).toHaveBeenCalledTimes(4);
+
+  removed.abort(new Error("frame retired"));
+  expired.abort(new Error("deadline elapsed"));
+  await expect(queuedOwner).rejects.toThrow("frame retired");
+  await expect(queuedDeadline).rejects.toThrow("deadline elapsed");
+  const trailing = [launch("replacement/0"), launch("replacement/1")];
+  const failed = expect(active[0]).rejects.toThrow("worker refused");
+  running[0].reject(new Error("worker refused"));
+  await failed;
+  await Promise.all([...queued, ...trailing]);
+  expect(starts).toEqual([
+    "running/0",
+    "running/1",
+    "running/2",
+    "running/3",
+    ...waiting,
+    "replacement/0",
+    "replacement/1",
+  ]);
+  for (const name of ["cancelled", "expired", "over-capacity"])
+    expect(fileGrant).not.toHaveBeenCalledWith(name);
+
+  for (const operation of running.slice(1)) operation.resolve([]);
+  await Promise.all(active.slice(1));
+});
+
 it.runIf(
   Boolean(resources) &&
     process.platform === "darwin" &&

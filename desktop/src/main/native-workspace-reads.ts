@@ -14,11 +14,13 @@ import type { WorkspaceFileWorkers } from "./workspace-file-worker";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 
 const MAX_ACTIVE_READS = 4;
+const MAX_PENDING_READS = 32;
 const READ_DEADLINE_MS = 15_000;
 const MAX_PATH_BYTES = 4096;
 
 export class NativeWorkspaceReads {
   private active = 0;
+  private readonly pending = new Set<() => void>();
 
   constructor(
     private readonly catalog: Pick<NativeWorkspaceCatalog, "fileGrant">,
@@ -65,16 +67,15 @@ export class NativeWorkspaceReads {
     owner: AbortSignal,
     run: (grant: WorkspaceMediaGrant, signal: AbortSignal) => Promise<T>
   ): Promise<T> {
-    if (this.active >= MAX_ACTIVE_READS)
-      throw new Error("workspace_read_capacity");
-    this.active++;
     const signal = AbortSignal.any([
       owner,
       AbortSignal.timeout(READ_DEADLINE_MS),
     ]);
+    await this.acquire(signal);
     try {
       signal.throwIfAborted();
       const grant = await this.catalog.fileGrant(workspaceId);
+      signal.throwIfAborted();
       const result = await run(grant, signal);
       const current = await this.catalog.fileGrant(workspaceId);
       signal.throwIfAborted();
@@ -87,8 +88,37 @@ export class NativeWorkspaceReads {
         throw new Error("workspace_directory_changed");
       return result;
     } finally {
-      this.active--;
+      const next = this.pending.values().next().value;
+      if (next) {
+        // Transfer the occupied slot so fresh reads cannot overtake the queue.
+        this.pending.delete(next);
+        next();
+      } else {
+        this.active--;
+      }
     }
+  }
+
+  private async acquire(signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted();
+    if (this.active < MAX_ACTIVE_READS) {
+      this.active++;
+      return;
+    }
+    if (this.pending.size >= MAX_PENDING_READS)
+      throw new Error("workspace_read_capacity");
+    await new Promise<void>((resolve, reject) => {
+      const start = () => {
+        signal.removeEventListener("abort", abort);
+        resolve();
+      };
+      const abort = () => {
+        this.pending.delete(start);
+        reject(signal.reason);
+      };
+      this.pending.add(start);
+      signal.addEventListener("abort", abort, { once: true });
+    });
   }
 
   private async buffer(
