@@ -534,6 +534,18 @@ with **GPT-5.6 Terra** and a saved OpenRouter key. Select it at launch with
 The Gateway, ChatGPT subscription, Vercel, and custom endpoint profiles offer
 text input. The provider receives the retained PNG when the conversation uses it.
 
+## Attach a file for inspection
+
+In a native workspace chat, choose **Attach file**, select one file up to
+256 KiB, and send a message with it. The agent can verify the file’s size and
+digest and request a short text excerpt. Binary files provide integrity
+metadata. The chat keeps a private copy. The provider receives the display
+name and any requested excerpt.
+
+A queued message keeps the same file. To change the attachment after queuing,
+remove the queued message and send a new one. Use **Add PNG** for image
+understanding and cropping on compatible connections.
+
 ## Inspect a local file headlessly
 
 On macOS and Linux, `grida-agent run --input-file FILE` accepts one selected

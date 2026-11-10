@@ -1419,37 +1419,37 @@ it("keeps PNG retries exact and drops replaced or navigated file reads", async (
     bridge.submit(id, inputId, text);
   running.add("chat-a");
   await controller.select("chat-a");
-  expect(controller.canAttachPng).toBe(true);
+  expect(controller.canAttach("png")).toBe(true);
   const scope = controller.read().scope;
   const previous = Promise.withResolvers<ArrayBuffer>();
-  const first = controller.pickPng(scope, {
+  const first = controller.pickAttachment(scope, "png", {
     name: "chosen.png",
     size: 8,
     arrayBuffer: () => previous.promise,
   });
   expect(controller.canSubmit).toBe(false);
   const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]).buffer;
-  await controller.pickPng(scope, {
+  await controller.pickAttachment(scope, "png", {
     name: "chosen.png",
     size: png.byteLength,
     arrayBuffer: async () => png,
   });
   previous.resolve(new ArrayBuffer(8));
   await first;
-  expect(controller.read().imageDraft?.name).toBe("chosen.png");
+  expect(controller.read().attachmentDraft?.name).toBe("chosen.png");
   await expect(controller.submit(" ")).rejects.toThrow("native_chat_not_ready");
   expect(send).not.toHaveBeenCalled();
   await expect(controller.submit("Describe it.")).rejects.toThrow(
     "fixture lost image acknowledgement"
   );
-  expect(controller.read().imageDraft?.name).toBe("chosen.png");
+  expect(controller.read().attachmentDraft?.name).toBe("chosen.png");
   controller.selectOperatingRegime("plan");
   await expect(controller.submit("Describe it.")).rejects.toThrow(
     "native_chat_pending_regime_changed"
   );
   expect(send).toHaveBeenCalledTimes(1);
   controller.selectOperatingRegime("act");
-  await controller.pickPng(scope, {
+  await controller.pickAttachment(scope, "png", {
     name: "same-bytes.png",
     size: png.byteLength,
     arrayBuffer: async () => png.slice(0),
@@ -1466,11 +1466,11 @@ it("keeps PNG retries exact and drops replaced or navigated file reads", async (
       operatingRegime: "act",
     },
   ]);
-  expect(controller.read().imageDraft).toBeNull();
+  expect(controller.read().attachmentDraft).toBeNull();
   expect(textSend).not.toHaveBeenCalled();
 
   const late = Promise.withResolvers<ArrayBuffer>();
-  const reading = controller.pickPng(scope, {
+  const reading = controller.pickAttachment(scope, "png", {
     name: "stale.png",
     size: png.byteLength,
     arrayBuffer: () => late.promise,
@@ -1478,13 +1478,13 @@ it("keeps PNG retries exact and drops replaced or navigated file reads", async (
   await controller.select("chat-b");
   late.resolve(png);
   await reading;
-  await controller.pickPng(scope, {
+  await controller.pickAttachment(scope, "png", {
     name: "old-chooser.png",
     size: png.byteLength,
     arrayBuffer: async () => png,
   });
-  expect(controller.read().imageDraft).toBeNull();
-  expect(controller.read().imageReading).toBe(false);
+  expect(controller.read().attachmentDraft).toBeNull();
+  expect(controller.read().attachmentReading).toBe(false);
   controller.disconnect();
 });
 
@@ -1501,7 +1501,7 @@ it("uses the latest same-named PNG and blocks a failed replacement", async () =>
   const scope = controller.read().scope;
   const png = (pixel: number) => new Uint8Array([137, pixel]).buffer;
   const choose = (bytes: ArrayBuffer) =>
-    controller.pickPng(scope, {
+    controller.pickAttachment(scope, "png", {
       name: "same.png",
       size: bytes.byteLength,
       arrayBuffer: async () => bytes,
@@ -1513,14 +1513,14 @@ it("uses the latest same-named PNG and blocks a failed replacement", async () =>
   await expect(controller.submit("Describe it.")).rejects.toThrow(
     "fixture lost image acknowledgement"
   );
-  await controller.pickPng(scope, {
+  await controller.pickAttachment(scope, "png", {
     name: "same.png",
     size: second.byteLength,
     arrayBuffer: async () => {
       throw new Error("fixture read failure");
     },
   });
-  expect(controller.read().imageDraft).toMatchObject({
+  expect(controller.read().attachmentDraft).toMatchObject({
     name: "same.png",
     error: "Couldn't read the selected PNG.",
   });
@@ -1541,6 +1541,69 @@ it("uses the latest same-named PNG and blocks a failed replacement", async () =>
   controller.disconnect();
 });
 
+it("keeps an attached file and its input identity through an unconfirmed queued send", async () => {
+  const { bridge, controller, running } = fixture();
+  const sendText = vi.spyOn(bridge, "submit");
+  bridge.enqueue = async (id, inputId, text) =>
+    bridge.submit(id, inputId, text);
+  bridge.acceptsPng = async () => false;
+  let fileAvailable = true;
+  bridge.acceptsFile = async () => fileAvailable;
+  const sendFile = vi.fn<NonNullable<DesktopNativeChat["submitFile"]>>(
+    async (sessionId, input) => ({
+      sessionId,
+      inputId: input.inputId,
+      inputPosition: 1,
+      turnId: null,
+      disposition: "queued",
+    })
+  );
+  bridge.submitFile = sendFile;
+  running.add("chat-a");
+  await controller.select("chat-a");
+  expect(controller.canAttach("file")).toBe(true);
+  expect(controller.canAttach("png")).toBe(false);
+  const scope = controller.read().scope;
+  const bytes = new Uint8Array([1, 3, 7]).buffer;
+  const pick = () =>
+    controller.pickAttachment(scope, "file", {
+      name: "record.bin",
+      size: bytes.byteLength,
+      arrayBuffer: async () => bytes.slice(0),
+    });
+  await pick();
+  sendFile.mockRejectedValueOnce(new Error("lost selected-file reply"));
+  await expect(controller.submit("Inspect this file.")).rejects.toThrow(
+    "lost selected-file reply"
+  );
+  fileAvailable = false;
+  await expect(controller.submit("Inspect this file.")).rejects.toThrow(
+    "file_attachment_unavailable"
+  );
+  expect(controller.read().attachmentDraft).toMatchObject({
+    kind: "file",
+    name: "record.bin",
+  });
+  expect(sendFile).toHaveBeenCalledTimes(1);
+  fileAvailable = true;
+  await controller.submit("Inspect this file.");
+  expect(sendFile.mock.calls[0]).toEqual(sendFile.mock.calls[1]);
+  expect(sendFile.mock.calls[1]).toEqual([
+    "chat-a",
+    {
+      action: "enqueue",
+      inputId: expect.any(String),
+      text: "Inspect this file.",
+      name: "record.bin",
+      bytes,
+      operatingRegime: "act",
+    },
+  ]);
+  expect(sendText).not.toHaveBeenCalled();
+  expect(controller.read().attachmentDraft).toBeNull();
+  controller.disconnect();
+});
+
 it("rechecks PNG capability before sending and only looks up an exact existing receipt after capability loss", async () => {
   const { bridge, controller } = fixture();
   let supportsPng = true;
@@ -1551,7 +1614,7 @@ it("rechecks PNG capability before sending and only looks up an exact existing r
   bridge.submitImage = send;
   await controller.select("chat-a");
   const scope = controller.read().scope;
-  await controller.pickPng(scope, {
+  await controller.pickAttachment(scope, "png", {
     name: "chosen.png",
     size: 8,
     arrayBuffer: async () => new ArrayBuffer(8),
@@ -1562,7 +1625,7 @@ it("rechecks PNG capability before sending and only looks up an exact existing r
   );
   expect(controller.read()).toMatchObject({
     imageInput: false,
-    imageDraft: { name: "chosen.png" },
+    attachmentDraft: { name: "chosen.png" },
   });
   expect(controller.canSubmit).toBe(false);
   expect(send).not.toHaveBeenCalled();
@@ -1594,7 +1657,7 @@ it("rechecks PNG capability before sending and only looks up an exact existing r
     ["chat-a", inputId],
   ]);
   expect(normal).not.toHaveBeenCalled();
-  expect(controller.read().imageDraft).toBeNull();
+  expect(controller.read().attachmentDraft).toBeNull();
   controller.disconnect();
 });
 

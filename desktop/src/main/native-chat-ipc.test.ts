@@ -377,6 +377,7 @@ function setup(
       };
     },
     acceptsPng: false,
+    acceptsFile: false,
     async inspectContextLimit() {
       return {
         limit: null,
@@ -391,6 +392,9 @@ function setup(
     },
     async submitImage(session) {
       return this.submit(session, "image-input", "Describe image.");
+    },
+    async submitFile(session) {
+      return this.submit(session, "file-input", "Inspect file.");
     },
     async inputReceipt(session, inputId) {
       return this.submit(session, inputId, "Fixture");

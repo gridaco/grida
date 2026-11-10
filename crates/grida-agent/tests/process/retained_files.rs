@@ -11,6 +11,81 @@ const TOOL: &str = "inspect_retained_file";
 const TEXT: &[u8] = b"\xef\xbb\xbfThe selected text stays byte exact.\r\n";
 const BINARY: &[u8] = b"\x89\x00\xff\x01opaque fixture\x00";
 
+#[tokio::test]
+async fn selected_file_wire_admits_only_negotiated_bounded_bytes_with_text() {
+    const CAPABILITY: &str = "co.grida/session/selected-file";
+    let root = TempDir::new().unwrap();
+    let project = TempDir::new().unwrap();
+    let state = root.path().join("state");
+    let mut endpoint = Endpoint::start(vec![]).await;
+    let mut client = PrivateStdio::from_child(spawn_serve(&state, &endpoint.url));
+    let response = client.request("initialize", extension_initialize()).await;
+    assert_eq!(
+        response["result"]["agentCapabilities"]["_meta"][CAPABILITY],
+        1
+    );
+    let session = read(
+        &mut client,
+        "session/new",
+        json!({"cwd":project.path(),"mcpServers":[]}),
+    )
+    .await["sessionId"]
+        .clone();
+    let request = json!({
+        "sessionId":session,"inputId":"file","prompt":[{"type":"text","text":"Inspect my file."}],
+        "selectedFile":{"name":"notes.txt","data":STANDARD.encode(TEXT)},
+    });
+    let rejected = client
+        .request("_co.grida/session/submit", request.clone())
+        .await;
+    assert!(rejected["error"].is_object(), "{rejected}");
+    assert!(!state.join("retained-inputs").exists());
+    client.close().await;
+
+    let mut client = PrivateStdio::from_child(spawn_serve(&state, &endpoint.url));
+    let mut initialize = extension_initialize();
+    initialize["clientCapabilities"]["_meta"][CAPABILITY] = 1.into();
+    let response = client.request("initialize", initialize).await;
+    assert_eq!(
+        response["result"]["agentCapabilities"]["_meta"][CAPABILITY],
+        1
+    );
+    read(
+        &mut client,
+        "session/load",
+        json!({"sessionId":session,"cwd":project.path(),"mcpServers":[]}),
+    )
+    .await;
+    for (field, value, code) in [
+        (
+            "name",
+            json!("other/notes.txt"),
+            "retained_file_name_invalid",
+        ),
+        ("data", json!("%%%"), "invalid_file_attachment"),
+        (
+            "data",
+            json!(STANDARD.encode(vec![0u8; 256 * 1024 + 1])),
+            "file_size_limit",
+        ),
+    ] {
+        let mut invalid = request.clone();
+        invalid["selectedFile"][field] = value;
+        let rejected = client.request("_co.grida/session/submit", invalid).await;
+        assert_eq!(rejected["error"]["data"], code, "{rejected}");
+    }
+    let mut no_text = request;
+    no_text["prompt"] = json!([]);
+    let rejected = client.request("_co.grida/session/submit", no_text).await;
+    assert_eq!(
+        rejected["error"]["data"], "selected_file_requires_text",
+        "{rejected}"
+    );
+    assert!(!state.join("retained-inputs").exists());
+    assert!(endpoint.requests.try_recv().is_err());
+    client.close().await;
+}
+
 fn run(state: &Path, endpoint: &str, selected: &Path) -> Command {
     let mut command = executable();
     command.arg("run");

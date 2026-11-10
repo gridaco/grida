@@ -105,6 +105,7 @@ export class NativeAgentProcess {
   private nextId = 1;
   private ready = false;
   private imageInput = false;
+  private fileInput = false;
   private agentEffort = false;
   private scheduledWakeups = false;
   private historyRevision = false;
@@ -175,6 +176,10 @@ export class NativeAgentProcess {
 
   get acceptsPng(): boolean {
     return this.connected && this.imageInput;
+  }
+
+  get acceptsFile(): boolean {
+    return this.connected && this.fileInput;
   }
 
   get acceptsEffort(): boolean {
@@ -398,6 +403,7 @@ export class NativeAgentProcess {
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
+                "co.grida/session/selected-file": 1,
                 ...(requestDeletion && {
                   [NativeAgentDeletion.capability]: 1,
                   [NativeAgentDeletion.previewCapability]: 1,
@@ -422,6 +428,8 @@ export class NativeAgentProcess {
       }
       processOwner.imageInput =
         object(agentCapabilities?.promptCapabilities)?.image === true;
+      processOwner.fileInput =
+        advertised?.["co.grida/session/selected-file"] === 1;
       processOwner.agentEffort =
         options.subagents === true && advertised?.[SESSION_EFFORT] === 1;
       processOwner.scheduledWakeups = Object.keys(

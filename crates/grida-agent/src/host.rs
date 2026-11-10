@@ -492,7 +492,9 @@ impl Host {
     pub fn open(state_dir: &Path, provider: Option<ProviderOptions>) -> Result<Self> {
         Self::open_with(
             state_dir,
-            provider.map(|options| || Execution::new(state_dir, options, None)),
+            provider.map(|options| {
+                |retained_inputs| Execution::new(state_dir, options, None, retained_inputs)
+            }),
             None,
         )
     }
@@ -505,7 +507,9 @@ impl Host {
     ) -> Result<Self> {
         Self::open_with(
             state_dir,
-            Some(|| Execution::new(state_dir, provider, Some(supervisor))),
+            Some(|retained_inputs| {
+                Execution::new(state_dir, provider, Some(supervisor), retained_inputs)
+            }),
             workspace_configuration,
         )
     }
@@ -523,7 +527,7 @@ impl Host {
         let connection = Arc::new(crate::gg::SupervisedGg::new(endpoint, scope, supervisor)?);
         Self::open_with(
             state_dir,
-            Some(|| {
+            Some(|_| {
                 Execution::new_gg(
                     options,
                     connection.scope,
@@ -550,7 +554,7 @@ impl Host {
         )?);
         Self::open_with(
             state_dir,
-            Some(|| Execution::new_chatgpt(model, connection)),
+            Some(|_| Execution::new_chatgpt(model, connection)),
             workspace_configuration,
         )
     }
@@ -568,7 +572,7 @@ impl Host {
         options.validate()?;
         let mut host = Self::open_with(
             state_dir,
-            Some(|| {
+            Some(|_| {
                 Execution::new_gg(
                     options,
                     connection.scope_fingerprint(),
@@ -585,7 +589,9 @@ impl Host {
 
     fn open_with(
         state_dir: &Path,
-        execution: Option<impl FnOnce() -> Result<Execution>>,
+        execution: Option<
+            impl FnOnce(Option<Arc<retained_inputs::RetainedInputs>>) -> Result<Execution>,
+        >,
         workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         let database = state_dir.join("runtime.sqlite");
@@ -606,7 +612,16 @@ impl Host {
             })
             .transpose()?
             .map(Arc::new);
-        let execution = execution.map(|open| open()).transpose()?.map(Arc::new);
+        let execution = execution
+            .map(|open| {
+                let retained_inputs = cfg!(any(target_os = "macos", target_os = "linux"))
+                    .then(|| retained_inputs::RetainedInputs::open(state_dir).map(Arc::new))
+                    .transpose()?;
+                let mut execution = open(retained_inputs.clone())?;
+                execution.retained_inputs = retained_inputs;
+                Ok::<_, agent_kit_core::Error>(Arc::new(execution))
+            })
+            .transpose()?;
         let state_dir = state_dir
             .canonicalize()
             .map_err(|_| problem(ErrorKind::Unavailable, "state_directory_unavailable"))?;
@@ -2451,6 +2466,12 @@ impl Host {
             .as_ref()
             .is_some_and(|execution| execution.images.is_some())
     }
+
+    pub(crate) fn accepts_files(&self) -> bool {
+        self.execution
+            .as_ref()
+            .is_some_and(|execution| execution.retained_inputs.is_some())
+    }
 }
 
 impl Execution {
@@ -2458,6 +2479,7 @@ impl Execution {
         state_dir: &Path,
         options: ProviderOptions,
         supervised: Option<crate::SupervisedProvider>,
+        retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
     ) -> Result<Self> {
         let legacy_configuration = Fingerprint::of(&options)?;
         let transport = Arc::new(HttpTransport::new(state_dir, &options, supervised)?);
@@ -2473,9 +2495,6 @@ impl Execution {
         } else {
             None
         };
-        let retained_inputs = cfg!(any(target_os = "macos", target_os = "linux"))
-            .then(|| retained_inputs::RetainedInputs::open(state_dir).map(Arc::new))
-            .transpose()?;
         let images = if let Some(profile) = image_profile.filter(|_| retained_inputs.is_some()) {
             capabilities.revision = BindingId::new(profile)?;
             capabilities.input_modalities.insert(Modality::Image);
@@ -2559,7 +2578,6 @@ impl Execution {
             Credential::Http(transport),
         )?;
         execution.images = images;
-        execution.retained_inputs = retained_inputs;
         Ok(execution)
     }
 

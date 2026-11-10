@@ -136,7 +136,7 @@ const INPUT_DISPOSITIONS = [
   "withdrawn",
 ] as const;
 const MAX_TEXT_BYTES = 512 * 1024;
-const MAX_PNG_BYTES = 256 * 1024;
+const MAX_ATTACHMENT_BYTES = 256 * 1024;
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const MAX_UPDATE_BYTES = 8 * 1024;
 const MAX_SUMMARY_BYTES = 8 * 1024;
@@ -237,6 +237,10 @@ export class NativeAgentChat {
 
   get acceptsPng(): boolean {
     return this.connected && this.process.acceptsPng;
+  }
+
+  get acceptsFile(): boolean {
+    return this.connected && this.process.acceptsFile;
   }
 
   get acceptsEffort(): boolean {
@@ -799,6 +803,32 @@ export class NativeAgentChat {
     );
   }
 
+  async submitFile(
+    session: NativeChatSession,
+    value: unknown
+  ): Promise<NativeChatAcceptance> {
+    this.requireAttached(session);
+    if (!this.acceptsFile) throw new Error("file_attachment_unavailable");
+    const input = object(value);
+    const effort =
+      input.effort === undefined
+        ? undefined
+        : choice(input.effort, ["standard", "ultra"] as const);
+    if (
+      Object.keys(input).length !== (effort ? 7 : 6) ||
+      typeof input.text !== "string"
+    )
+      throw invalidResponse();
+    return this.send(
+      choice(input.action, ["submit", "enqueue"] as const),
+      session,
+      identity(input.inputId),
+      input.text,
+      choice(input.operatingRegime, ["act", "plan"] as const),
+      { file: selectedFile(input.name, input.bytes), effort }
+    );
+  }
+
   private async send(
     mode: "submit" | "enqueue",
     session: NativeChatSession,
@@ -807,6 +837,7 @@ export class NativeAgentChat {
     operatingRegime?: NativeChatOperatingRegime,
     options: {
       image?: ReturnType<typeof pngPrompt>;
+      file?: ReturnType<typeof selectedFile>;
       allowConfigurationChanges?: true;
       allowWakeups?: true;
       editorSurfaces?: NativeEditorSurfaceSelection;
@@ -817,6 +848,7 @@ export class NativeAgentChat {
     identity(inputId);
     const {
       image,
+      file,
       allowConfigurationChanges,
       allowWakeups,
       editorSurfaces,
@@ -829,6 +861,7 @@ export class NativeAgentChat {
         sessionId,
         inputId,
         prompt: [...textPrompt(text), ...(image ? [image] : [])],
+        ...(file && { selectedFile: file }),
         ...(operatingRegime && { operatingRegime }),
         ...(effort && { effort }),
         ...(allowConfigurationChanges && { allowConfigurationChanges }),
@@ -836,6 +869,7 @@ export class NativeAgentChat {
         ...(mode === "submit" &&
           operatingRegime === "act" &&
           !image &&
+          !file &&
           !allowConfigurationChanges &&
           editorSurfaces),
       }),
@@ -1751,7 +1785,10 @@ function textPrompt(text: string) {
 }
 
 function pngPrompt(value: unknown) {
-  if (!(value instanceof ArrayBuffer) || value.byteLength > MAX_PNG_BYTES)
+  if (
+    !(value instanceof ArrayBuffer) ||
+    value.byteLength > MAX_ATTACHMENT_BYTES
+  )
     throw new Error("image_size_limit");
   const bytes = Buffer.from(value);
   if (!bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE))
@@ -1761,6 +1798,24 @@ function pngPrompt(value: unknown) {
     mimeType: "image/png",
     data: bytes.toString("base64"),
   };
+}
+
+function selectedFile(name: unknown, value: unknown) {
+  if (
+    typeof name !== "string" ||
+    !name ||
+    Buffer.byteLength(name) > 256 ||
+    name.includes("/") ||
+    name.includes("\\") ||
+    /\p{Cc}/u.test(name)
+  )
+    throw new Error("retained_file_name_invalid");
+  if (
+    !(value instanceof ArrayBuffer) ||
+    value.byteLength > MAX_ATTACHMENT_BYTES
+  )
+    throw new Error("file_size_limit");
+  return { name, data: Buffer.from(value).toString("base64") };
 }
 
 function queuePositions(

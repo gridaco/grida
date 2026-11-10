@@ -36,6 +36,7 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 const SUBMIT: &str = "co.grida/session/submit";
+const FILE_INTAKE: &str = "co.grida/session/selected-file";
 const SNAPSHOT: &str = "co.grida/session/snapshot";
 const STOP: &str = "co.grida/session/stop";
 const OPERATING_REGIME: &str = "co.grida/session/operating-regime";
@@ -53,8 +54,14 @@ const CAPABILITIES: [&str; 7] = [
     CONFIG_RELOAD,
 ];
 
-pub(super) fn advertised(reviewer: bool, subagents: bool, delete_chat: bool, effort: bool) -> Meta {
-    capability_keys(reviewer, subagents, delete_chat, effort)
+pub(super) fn advertised(
+    reviewer: bool,
+    subagents: bool,
+    delete_chat: bool,
+    effort: bool,
+    files: bool,
+) -> Meta {
+    capability_keys(reviewer, subagents, delete_chat, effort, files)
         .map(|key| (key.into(), 1.into()))
         .collect()
 }
@@ -85,8 +92,9 @@ pub(super) fn negotiated(
     subagents: bool,
     delete_chat: bool,
     effort: bool,
+    files: bool,
 ) -> BTreeSet<&'static str> {
-    capability_keys(reviewer, subagents, delete_chat, effort)
+    capability_keys(reviewer, subagents, delete_chat, effort, files)
         .filter(|key| meta.and_then(|meta| meta.get(*key)).and_then(Value::as_u64) == Some(1))
         .collect()
 }
@@ -96,6 +104,7 @@ fn capability_keys(
     subagents: bool,
     delete_chat: bool,
     effort: bool,
+    files: bool,
 ) -> impl Iterator<Item = &'static str> {
     CAPABILITIES
         .into_iter()
@@ -115,6 +124,7 @@ fn capability_keys(
         .chain(wakeups::capabilities(reviewer))
         .chain(subagents::capabilities(reviewer && subagents))
         .chain((reviewer && effort).then_some(EFFORT))
+        .chain((reviewer && files).then_some(FILE_INTAKE))
 }
 
 pub(super) fn configuration_permission(
@@ -147,6 +157,7 @@ struct Submit {
     session_id: SessionId,
     input_id: ChangeId,
     prompt: Vec<ContentBlock>,
+    selected_file: Option<SelectedFile>,
     #[serde(default)]
     allow_configuration_changes: bool,
     #[serde(default)]
@@ -157,6 +168,44 @@ struct Submit {
     #[serde(default)]
     editor_presentation: bool,
     editor_svg_target_id: Option<BindingId>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SelectedFile {
+    name: String,
+    data: String,
+}
+
+impl std::fmt::Debug for SelectedFile {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SelectedFile")
+            .finish_non_exhaustive()
+    }
+}
+
+fn identified_prompt(
+    prompt: Vec<ContentBlock>,
+    image_intake: bool,
+    file: Option<SelectedFile>,
+    sessions: &Mutex<ConnectionSessions>,
+    incompatible: bool,
+) -> Result<Vec<crate::host::PromptPart>> {
+    let mut parts = prompt_parts(prompt, image_intake)?;
+    if let Some(file) = file {
+        require(sessions, FILE_INTAKE, None)?;
+        if incompatible {
+            return Err(Error::invalid_params().data("selected_file_options_unsupported"));
+        }
+        if !parts.iter().any(|part| matches!(part, crate::host::PromptPart::Text { text } if !text.trim().is_empty())) {
+            return Err(Error::invalid_params().data("selected_file_requires_text"));
+        }
+        parts.push(crate::host::PromptPart::File {
+            file: crate::host::FileUpload::decode(&file.name, &file.data).map_err(host_error)?,
+        });
+    }
+    Ok(parts)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -416,7 +465,15 @@ pub(super) fn handlers(
                             return Err(Error::invalid_params());
                         }
                     }
-                    let parts = prompt_parts(request.prompt, image_intake)?;
+                    let parts = identified_prompt(
+                        request.prompt,
+                        image_intake,
+                        request.selected_file,
+                        &submit_sessions,
+                        request.allow_wakeups
+                            || request.allow_configuration_changes
+                            || request.editor_endpoint_id.is_some(),
+                    )?;
                     let accepted = submit_host
                         .submit_prompt_with_context(
                             PromptRequest {

@@ -41,6 +41,16 @@ export type NativeChatImageInput = Readonly<{
   effort?: NativeChatEffort;
 }>;
 
+export type NativeChatFileInput = Readonly<{
+  action: "submit" | "enqueue";
+  inputId: string;
+  text: string;
+  name: string;
+  bytes: ArrayBuffer;
+  operatingRegime: NativeChatOperatingRegime;
+  effort?: NativeChatEffort;
+}>;
+
 export type NativeContextLimit = Readonly<{
   reviewId: string;
   limit: number | null;
@@ -517,6 +527,7 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   ): Promise<NativeChatAcceptance>;
   acceptsEffort?(): Promise<boolean>;
   acceptsPng?(): Promise<boolean>;
+  acceptsFile?(): Promise<boolean>;
   acceptsWakeups?(): Promise<boolean>;
   submitWithWakeup?(
     attachmentId: string,
@@ -537,6 +548,10 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   submitImage?(
     attachmentId: string,
     input: NativeChatImageInput
+  ): Promise<NativeChatAcceptance>;
+  submitFile?(
+    attachmentId: string,
+    input: NativeChatFileInput
   ): Promise<NativeChatAcceptance>;
   contextLimit?(): Promise<NativeContextLimit>;
   saveContextLimit?(

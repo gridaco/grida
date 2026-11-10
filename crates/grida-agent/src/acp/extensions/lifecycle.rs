@@ -33,6 +33,7 @@ struct Enqueue {
     session_id: SessionId,
     input_id: ChangeId,
     prompt: Vec<ContentBlock>,
+    selected_file: Option<SelectedFile>,
     #[serde(default)]
     allow_configuration_changes: bool,
     operating_regime: Option<crate::OperatingRegime>,
@@ -190,7 +191,13 @@ pub(super) fn handlers(
                         .enqueue(PromptRequest {
                             id: request.input_id,
                             session: request.session_id,
-                            parts: prompt_parts(request.prompt, image_intake)?,
+                            parts: identified_prompt(
+                                request.prompt,
+                                image_intake,
+                                request.selected_file,
+                                &enqueue.1,
+                                request.allow_configuration_changes,
+                            )?,
                             questions: questions::available(&enqueue.1),
                             configuration_permission: configuration_permission(
                                 &enqueue.1,

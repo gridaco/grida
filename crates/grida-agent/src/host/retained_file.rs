@@ -13,6 +13,7 @@ use agent_kit_core::turn::TurnBinding;
 use agent_kit_core::{
     BindingId, BoxFuture, ErrorKind, Fingerprint, GrantId, PrincipalId, Result, ScopeId, ToolId,
 };
+use base64::{Engine, engine::general_purpose::STANDARD};
 use grida_agent_master::retained_file::{LOCATOR_PREFIX, MAX_NAME_BYTES, MEDIA_TYPE};
 use serde::Deserialize;
 use serde_json::json;
@@ -42,6 +43,29 @@ impl std::fmt::Debug for FileUpload {
 }
 
 impl FileUpload {
+    pub(crate) fn decode(name: &str, data: &str) -> Result<Self> {
+        if name.is_empty()
+            || name.len() > 256
+            || name.contains(['/', '\\'])
+            || name.chars().any(char::is_control)
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "retained_file_name_invalid",
+            ));
+        }
+        if data.len() > MAX_FILE_BYTES.div_ceil(3) * 4 {
+            return Err(problem(ErrorKind::LimitExceeded, "file_size_limit"));
+        }
+        let bytes = STANDARD
+            .decode(data)
+            .map_err(|_| problem(ErrorKind::InvalidInput, "invalid_file_attachment"))?;
+        if bytes.len() > MAX_FILE_BYTES {
+            return Err(problem(ErrorKind::LimitExceeded, "file_size_limit"));
+        }
+        Ok(Self::with_bytes(name, bytes))
+    }
+
     pub(crate) fn read_selected_file(path: &Path) -> Result<Self> {
         let bytes = super::selected_file::read_selected(
             path,
@@ -50,10 +74,15 @@ impl FileUpload {
             "selected_file_changed",
             "file_size_limit",
         )?;
-        let name: String = path
+        let name = path
             .file_name()
             .and_then(|name| name.to_str())
-            .unwrap_or("attachment")
+            .unwrap_or("attachment");
+        Ok(Self::with_bytes(name, bytes))
+    }
+
+    fn with_bytes(name: &str, bytes: Vec<u8>) -> Self {
+        let name: String = name
             .chars()
             .take(MAX_NAME_BYTES)
             .map(|c| {
@@ -65,7 +94,7 @@ impl FileUpload {
             })
             .collect();
         let name = name.trim_start_matches('.');
-        Ok(Self {
+        Self {
             name: if name.is_empty() {
                 "attachment".into()
             } else {
@@ -73,7 +102,7 @@ impl FileUpload {
             },
             digest: Sha256::digest(&bytes).into(),
             bytes,
-        })
+        }
     }
 
     pub(super) fn matches(&self, asset: &AssetRef) -> bool {

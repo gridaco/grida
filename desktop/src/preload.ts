@@ -701,6 +701,8 @@ const bridge: DesktopBridge = {
     acceptsEffort: () =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT),
     acceptsPng: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
+    acceptsFile: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE),
     acceptsWakeups: () =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_WAKEUPS),
     submitWithWakeup: (attachmentId, inputId, text, effort) =>
@@ -742,6 +744,12 @@ const bridge: DesktopBridge = {
     submitImage: (attachmentId, input) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_IMAGE,
+        attachmentId,
+        input
+      ),
+    submitFile: (attachmentId, input) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_FILE,
         attachmentId,
         input
       ),

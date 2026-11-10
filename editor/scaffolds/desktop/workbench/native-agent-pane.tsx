@@ -84,6 +84,7 @@ export function NativeAgentPane({
   );
   const draft = useRef<Pick<ComposerController, "appendText">>(null);
   const pngPicker = useRef<HTMLInputElement>(null);
+  const filePicker = useRef<HTMLInputElement>(null);
   const side = state.sideChat;
   useEffect(() => {
     controller.connect(initialSession);
@@ -826,32 +827,62 @@ export function NativeAgentPane({
               const input = event.currentTarget;
               const file = input.files?.[0];
               input.value = "";
-              if (file) void controller.pickPng(state.scope, file);
+              if (file)
+                void controller.pickAttachment(state.scope, "png", file);
             }}
           />
         )}
-        {(state.imageDraft || state.imageReading) && (
+        {state.fileInput && (
+          <input
+            key={`file-${state.scope}`}
+            ref={filePicker}
+            type="file"
+            aria-label="Select file to inspect"
+            className="hidden"
+            onChange={(event) => {
+              const input = event.currentTarget;
+              const file = input.files?.[0];
+              input.value = "";
+              if (file)
+                void controller.pickAttachment(state.scope, "file", file);
+            }}
+          />
+        )}
+        {(state.attachmentDraft || state.attachmentReading) && (
           <div className="flex items-center gap-2 px-1 pb-1 text-xs">
             <span className="min-w-0 flex-1 truncate">
-              {state.imageReading ? "Reading PNG…" : state.imageDraft?.name}
+              {state.attachmentReading
+                ? "Reading attachment…"
+                : state.attachmentDraft?.name}
             </span>
             <Button
               type="button"
               variant="ghost"
               size="xs"
               disabled={state.acting}
-              onClick={() => controller.removePng(state.scope)}
+              onClick={() => controller.removeAttachment(state.scope)}
             >
-              Remove PNG
+              {state.attachmentDraft?.kind === "png"
+                ? "Remove PNG"
+                : "Remove file"}
             </Button>
           </div>
         )}
-        {state.imageDraft && (state.imageDraft.error || !state.imageInput) && (
-          <p role="status" className="text-muted-foreground px-1 pb-1 text-xs">
-            {state.imageDraft.error ??
-              "This connection cannot use the attached PNG. Remove it from this draft or use a compatible connection."}
-          </p>
-        )}
+        {state.attachmentDraft &&
+          (state.attachmentDraft.error ||
+            !(state.attachmentDraft.kind === "png"
+              ? state.imageInput
+              : state.fileInput)) && (
+            <p
+              role="status"
+              className="text-muted-foreground px-1 pb-1 text-xs"
+            >
+              {state.attachmentDraft.error ??
+                (state.attachmentDraft.kind === "png"
+                  ? "This connection cannot use the attached PNG. Remove it from this draft or use a compatible connection."
+                  : "This chat cannot inspect the attached file. Remove it to send the message by itself.")}
+            </p>
+          )}
         {(state.commandRunning || state.commandNotice) && (
           <div className="flex items-center gap-2 px-1 pb-1 text-xs">
             <span role="status">
@@ -892,8 +923,8 @@ export function NativeAgentPane({
           busy={!!turn}
           isStreaming={streamingControlsOnly}
           placeholder={
-            state.imageDraft
-              ? "Add a message to send this PNG…"
+            state.attachmentDraft
+              ? "Add a message to send this attachment…"
               : state.steering
                 ? "Add guidance to this turn…"
                 : turn || snapshot?.admissionPaused || queued
@@ -911,10 +942,25 @@ export function NativeAgentPane({
                   type="button"
                   variant="ghost"
                   size="xs"
-                  disabled={!controller.canAttachPng}
+                  disabled={!controller.canAttach("png")}
                   onClick={() => pngPicker.current?.click()}
                 >
-                  {state.imageDraft ? "Replace PNG" : "Add PNG"}
+                  {state.attachmentDraft?.kind === "png"
+                    ? "Replace PNG"
+                    : "Add PNG"}
+                </Button>
+              )}
+              {state.fileInput && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={!controller.canAttach("file")}
+                  onClick={() => filePicker.current?.click()}
+                >
+                  {state.attachmentDraft?.kind === "file"
+                    ? "Replace file"
+                    : "Attach file"}
                 </Button>
               )}
               {bridge.submitInRegime && !state.steering && (

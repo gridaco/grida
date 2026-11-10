@@ -296,6 +296,15 @@ verifies the exact retained bytes before dispatch. A fork or compaction can
 omit earlier image content and records that omission. Image steering, earlier
 message replacement, and shared WebSocket intake are unavailable.
 
+Private stdio clients may negotiate `co.grida/session/selected-file` version 1
+when the host has retained input storage. Identified Submit and Enqueue then
+accept one `selectedFile` with `name` and standard-base64 `data` alongside a
+nonempty text prompt. The name carries no path. The file is at most 256 KiB and
+has the same input identity on retry. Admission retains an exact original and
+working copy. The prepared request contains a display marker. The bound
+`inspect_retained_file` tool returns its size, digest, and a bounded text
+excerpt on request. Reopening an input returns a marker and its receipt.
+
 An admitted turn can offer `crop_retained_image` when its captured context
 contains a retained PNG owned by the chat. The tool uses the most recent such
 image and takes a rectangle in original pixel coordinates. It writes a private

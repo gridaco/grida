@@ -436,6 +436,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG, (event) =>
     nativeChat.acceptsPng(event)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE, (event) =>
+    nativeChat.acceptsFile(event)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_WAKEUPS, (event) =>
     nativeChat.acceptsWakeups(event)
   );
@@ -471,6 +474,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_SUBMIT_IMAGE,
     (event, id: string, input: unknown) =>
       nativeChat.submitImage(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_FILE,
+    (event, id: string, input: unknown) =>
+      nativeChat.submitFile(event, id, input)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,

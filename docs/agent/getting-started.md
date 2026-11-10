@@ -26,9 +26,10 @@ On a profile with image editing, a crop uses a private working copy.
 Open **Turn summary** to inspect and save a result the chat retained.
 [Inspect and save results](./results.md)
 
-For other file types in a native workspace chat, open the folder that
-contains the file and name it in your request. Which files the agent can
-read depends on the workspace access and tools available to the chat.
+If the chat offers **Attach file**, select a file up to 256 KiB and ask
+the agent to inspect it. For work on project files, open the folder and
+name the file in your request. Access follows the chat’s workspace grants.
+[Attach a file for inspection](./clients.md#attach-a-file-for-inspection)
 
 ## Work without a project
 

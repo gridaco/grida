@@ -1,10 +1,14 @@
 import { EventEmitter, once } from "node:events";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { createServer, type ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
-import type { NativeChatImageInput } from "@grida/desktop-bridge";
+import type {
+  NativeChatFileInput,
+  NativeChatImageInput,
+} from "@grida/desktop-bridge";
 import { expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
 import { NativeChatIpc } from "./native-chat-ipc";
@@ -47,7 +51,7 @@ function finishWith(response: ServerResponse, item: unknown) {
   );
 }
 
-async function syntheticResponses(crop = false) {
+async function syntheticResponses(mode: "image" | "crop" | "file" = "image") {
   const requests: unknown[] = [];
   let previous: ServerResponse | undefined;
   const server = createServer((request, response) => {
@@ -58,14 +62,14 @@ async function syntheticResponses(crop = false) {
       if (
         request.method !== "POST" ||
         request.url !== "/v1/responses" ||
-        requests.length >= (crop ? 2 : 3)
+        requests.length >= (mode === "crop" ? 2 : 3)
       ) {
         response.writeHead(400).end();
         return;
       }
       requests.push(JSON.parse(body));
       response.writeHead(200, { "content-type": "text/event-stream" });
-      if (crop && requests.length === 1) {
+      if (mode === "crop" && requests.length === 1) {
         finishWith(response, {
           type: "function_call",
           id: "fc_crop_fixture",
@@ -74,8 +78,23 @@ async function syntheticResponses(crop = false) {
           arguments: '{"x":1,"y":0,"width":1,"height":2}',
           status: "completed",
         });
+      } else if (mode === "file" && requests.length === 2) {
+        finishWith(response, {
+          type: "function_call",
+          id: "fc_file_fixture",
+          call_id: "call_file_fixture",
+          name: "inspect_retained_file",
+          arguments: '{"include_text":true}',
+          status: "completed",
+        });
       } else if (requests.length === 1) previous = response;
-      else finish(response, "The tiny PNG was received.");
+      else
+        finish(
+          response,
+          mode === "file"
+            ? "Selected file inspected."
+            : "The tiny PNG was received."
+        );
     });
   });
   server.listen(0, "127.0.0.1");
@@ -95,6 +114,145 @@ async function syntheticResponses(crop = false) {
     },
   };
 }
+
+it.runIf(
+  !!resources && (process.platform === "darwin" || process.platform === "linux")
+)(
+  "queues one selected file on a text-only connection and reopens its exact receipt",
+  async () => {
+    const root = fs.mkdtempSync(
+      path.join(fs.realpathSync(os.tmpdir()), "grida-native-file-")
+    );
+    const cwd = path.join(root, "workspace");
+    const stateDirectory = path.join(root, "state");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const fixture = await syntheticResponses("file");
+    const { origin, sender, event } = workspaceFrame();
+    const bytes = new TextEncoder().encode(
+      "Synthetic selected text with CRLF.\r\n"
+    );
+    const digest = createHash("sha256").update(bytes).digest("hex");
+    const start = () =>
+      NativeAgentChat.start({
+        resourcesPath: resources!,
+        stateDirectory,
+        cwd,
+        provider: "responses",
+        endpoint: fixture.endpoint,
+        model: "gpt-5.4-mini",
+      });
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await start();
+      const active = { workspaceId: "workspace", chat };
+      const ipc = new NativeChatIpc(origin, (candidate) =>
+        candidate === sender ? active : null
+      );
+      expect(ipc.acceptsFile(event)).toBe(true);
+      expect(ipc.acceptsPng(event)).toBe(false);
+      const { attachmentId, sessionId } = await ipc.create(event);
+      const selected: NativeChatFileInput = {
+        action: "enqueue",
+        inputId: "selected-file",
+        text: "Inspect the selected file.",
+        name: "selected.txt",
+        bytes: bytes.buffer,
+        operatingRegime: "plan",
+      };
+      await expect(
+        ipc.submitFile(event, attachmentId, {
+          ...selected,
+          name: "folder/selected.txt",
+        })
+      ).rejects.toThrow("retained_file_name_invalid");
+      await expect(
+        ipc.submitFile(event, attachmentId, {
+          ...selected,
+          bytes: new ArrayBuffer(256 * 1024 + 1),
+        })
+      ).rejects.toThrow("file_size_limit");
+      await expect(
+        ipc.inputReceipt(event, attachmentId, selected.inputId)
+      ).rejects.toThrow("input_unavailable");
+      expect(fixture.requests).toEqual([]);
+      await ipc.submit(
+        event,
+        attachmentId,
+        "first-text",
+        "Complete this first."
+      );
+      await vi.waitFor(() => expect(fixture.requests).toHaveLength(1));
+      const queued = await ipc.submitFile(event, attachmentId, selected);
+      expect(queued.disposition).toBe("queued");
+      expect(await ipc.submitFile(event, attachmentId, selected)).toEqual(
+        queued
+      );
+      await expect(
+        ipc.submitFile(event, attachmentId, {
+          ...selected,
+          bytes: new Uint8Array([1, 2]).buffer,
+        })
+      ).rejects.toThrow("submission_input_changed");
+      const observation = await ipc.observe(event, attachmentId);
+      await expect(
+        ipc.queuedText(
+          event,
+          attachmentId,
+          observation.observationId,
+          selected.inputId
+        )
+      ).rejects.toThrow("native_chat_queue_input_unavailable");
+      fixture.release();
+      await vi.waitFor(
+        async () => {
+          expect(fixture.requests).toHaveLength(3);
+          expect(
+            (await ipc.observe(event, attachmentId)).snapshot.latest?.status
+          ).toBe("succeeded");
+        },
+        { timeout: 15_000 }
+      );
+      const offered = JSON.stringify(fixture.requests[1]);
+      expect(offered).toContain("Attached file selected.txt.");
+      expect(offered).toContain("inspect_retained_file");
+      expect(offered).not.toContain("Synthetic selected text");
+      expect(offered).not.toContain(Buffer.from(bytes).toString("base64"));
+      expect(offered).not.toContain(cwd);
+      const inspected = JSON.stringify(fixture.requests[2]);
+      expect(inspected).toContain(digest);
+      expect(inspected).toContain("Synthetic selected text");
+      expect(fs.readdirSync(cwd)).toEqual([]);
+      const finished = await ipc.inputReceipt(
+        event,
+        attachmentId,
+        selected.inputId
+      );
+      await chat.close();
+      chat = await start();
+      active.chat = chat;
+      const reopened = new NativeChatIpc(origin, (candidate) =>
+        candidate === sender ? active : null
+      );
+      const loaded = await reopened.load(event, sessionId);
+      expect(
+        await reopened.inputReceipt(
+          event,
+          loaded.attachmentId,
+          selected.inputId
+        )
+      ).toEqual(finished);
+      expect(
+        JSON.stringify(await reopened.transcript(event, loaded.attachmentId))
+      ).toContain("Attached file selected.txt.");
+      expect(fixture.requests).toHaveLength(3);
+    } finally {
+      await chat?.close();
+      await fixture.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  },
+  30_000
+);
 
 function workspaceFrame() {
   const origin = "https://editor.fixture.invalid";
@@ -366,7 +524,7 @@ it.runIf(
     fs.mkdirSync(exports, { mode: 0o700 });
     let destination = path.join(exports, "existing.png");
     fs.writeFileSync(destination, "existing file");
-    const fixture = await syntheticResponses(true);
+    const fixture = await syntheticResponses("crop");
     const open = () =>
       NativeAgentChat.start({
         resourcesPath: resources!,
