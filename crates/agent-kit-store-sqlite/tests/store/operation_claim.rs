@@ -367,6 +367,87 @@ async fn claim_destination(store: &SqliteStore, request: OperationClaim) -> Clai
 }
 
 #[tokio::test]
+async fn operation_claim_observation_preserves_exact_assignment_after_reuse() {
+    let (directory, store) = store().await;
+    let (parent, launch) = owning_operation(&store).await;
+    let child = claim_destination(&store, request(launch.clone(), "reviewer")).await;
+    let original = child.lease.binding().clone();
+    commit(
+        &child,
+        "settle-review",
+        vec![JournalAction::Settle(TurnOutcome {
+            status: OutcomeStatus::Succeeded,
+            account: None,
+            evidence: vec![],
+        })],
+    )
+    .await;
+    let later_input = submission("later-input", "Later, unrelated assignment");
+    store
+        .submit(original.session.clone(), later_input.clone())
+        .await
+        .unwrap();
+    let view = store.inspect(original.session.clone()).await.unwrap();
+    let ClaimOutcome::Acquired(later) = store
+        .claim(ClaimRequest {
+            id: change("later-claim"),
+            session: original.session.clone(),
+            expected_revision: view.revision,
+            selection: TurnSelection::New {
+                turn: TurnId::new("later-review").unwrap(),
+                inputs: vec![later_input.id],
+            },
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected a later assignment")
+    };
+    assert_ne!(later.lease.binding().turn, original.turn);
+
+    let unrelated = source(&parent, "another-launch", "another-attempt").await;
+    let another = claim_destination(&store, request(unrelated.clone(), "another-reviewer")).await;
+    assert_error(
+        store
+            .inspect_operation_claim_with(
+                launch.binding.session.clone(),
+                launch.binding.turn.clone(),
+                vec![launch.operation.clone(), unrelated.operation.clone()],
+                |_| Ok(()),
+            )
+            .await,
+        ErrorKind::Conflict,
+        "operation_claim_ambiguous",
+    );
+    let mut settled = [launch.clone(), unrelated]
+        .map(|source| JournalAction::CompleteAttempt {
+            operation: source.operation,
+            attempt: source.attempt,
+            outcome: OperationOutcome::Tool(ToolOutcome::failed("fixture_complete")),
+        })
+        .to_vec();
+    settled.push(JournalAction::Settle(TurnOutcome {
+        status: OutcomeStatus::Succeeded,
+        account: None,
+        evidence: vec![],
+    }));
+    commit(&parent, "settle-parent", settled).await;
+    drop((another, later, child, parent, store));
+
+    let store = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    let observed = store
+        .inspect_operation_claim_with(
+            launch.binding.session,
+            launch.binding.turn,
+            vec![launch.operation, OperationId::new("unclaimed").unwrap()],
+            |state| Ok((state.binding().clone(), state.outcome().unwrap().status)),
+        )
+        .await
+        .unwrap();
+    assert_eq!(observed, Some((original, OutcomeStatus::Succeeded)));
+}
+
+#[tokio::test]
 async fn derived_turn_control_replays_the_original_request_after_related_mutation() {
     let (_directory, store) = store().await;
     let (parent, operation) = owning_operation(&store).await;

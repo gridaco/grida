@@ -511,6 +511,40 @@ impl SqliteStore {
         .await
     }
 
+    /// Read the exact turn claimed by one of the caller-authorized source operations.
+    /// Multiple committed claims are ambiguous. The projection issues no lease.
+    pub async fn inspect_operation_claim_with<T: Send + 'static>(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+        operations: Vec<OperationId>,
+        project: impl FnOnce(&TurnState) -> Result<T> + Send + 'static,
+    ) -> Result<Option<T>> {
+        if operations.is_empty() {
+            return Ok(None);
+        }
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let mut destination = None;
+            for operation in operations {
+                if let Some(claim) =
+                    control_pair::retained_operation_claim(connection, &session, &turn, &operation)?
+                    && destination.replace(claim).is_some()
+                {
+                    return Err(error(ErrorKind::Conflict, "operation_claim_ambiguous"));
+                }
+            }
+            let Some(claim) = destination else {
+                return Ok(None);
+            };
+            match load_turn(connection, &claim.session, &claim.turn) {
+                Ok(state) => project(&state).map(Some),
+                Err(error) if error.code == "turn_missing" => Ok(None),
+                Err(error) => Err(error),
+            }
+        })
+        .await
+    }
+
     /// Read the selected view's seed and committed local history in append order.
     ///
     /// A `before_turn` cut uses the view that owned that turn and excludes the

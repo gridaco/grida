@@ -74,6 +74,18 @@ it("shows exact Gateway amounts and refreshes only eligible requests", () => {
         },
       ],
       omittedAttempts: 1,
+      review: {
+        attempts: [
+          {
+            operationId: "review",
+            attemptId: "a",
+            kind: "settled",
+            chargedMills: "0.75",
+            refreshable: false,
+          },
+        ],
+        omittedAttempts: 0,
+      },
     },
   };
   const html = renderToStaticMarkup(
@@ -85,6 +97,8 @@ it("shows exact Gateway amounts and refreshes only eligible requests", () => {
   );
   expect(html).toContain("Gateway billing for this turn");
   expect(html).toContain("0 mills charged");
+  expect(html).toContain("Gateway billing for the independent review");
+  expect(html).toContain("0.75 mills charged");
   expect(html).toContain("Settlement pending");
   expect(html).toContain("Amount unavailable");
   expect(html).toContain("Additional Gateway requests: 1");

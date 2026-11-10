@@ -18,6 +18,7 @@ import type {
   NativeChatGatewayAttemptRef,
   NativeChatGatewayBilling,
   NativeChatGatewayBillingAttempt,
+  NativeChatGatewayBillingAttempts,
   NativeChatGoalControl,
   NativeChatGoalReceipt,
   NativeChatGoalRequest,
@@ -1094,12 +1095,12 @@ export class NativeAgentChat {
     let billing = gatewayBilling(result.gatewayBilling);
     if (refreshBilling) {
       const attempt = gatewayAttempt(refreshBilling.attempt);
-      const selected = billing?.attempts.find(
-        (row) =>
-          row.operationId === attempt.operationId &&
-          row.attemptId === attempt.attemptId
-      );
-      if (!billing || !selected?.refreshable)
+      const matches = (row: NativeChatGatewayBillingAttempt) =>
+        row.operationId === attempt.operationId &&
+        row.attemptId === attempt.attemptId;
+      const group = billing?.attempts.some(matches) ? billing : billing?.review;
+      const selected = group?.attempts.find(matches);
+      if (!billing || !group || !selected?.refreshable)
         throw new Error("native_chat_gateway_billing_unavailable");
       refreshBilling.requireCurrent();
       const status = await this.process.gatewayBillingStatus({
@@ -1115,12 +1116,16 @@ export class NativeAgentChat {
         status.kind === "settled"
           ? Object.freeze({ ...attempt, ...status, refreshable: false })
           : Object.freeze({ ...attempt, kind: "pending", refreshable: true });
-      billing = Object.freeze({
-        ...billing,
+      const refreshedGroup = Object.freeze({
+        ...group,
         attempts: Object.freeze(
-          billing.attempts.map((row) => (row === selected ? refreshed : row))
+          group.attempts.map((row) => (row === selected ? refreshed : row))
         ),
       });
+      billing =
+        group === billing
+          ? refreshedGroup
+          : Object.freeze({ ...billing, review: refreshedGroup });
     }
     return Object.freeze({
       turnId: latest.turnId,
@@ -2294,50 +2299,63 @@ function gatewayBilling(value: unknown): NativeChatGatewayBilling | undefined {
   if (value === undefined) return undefined;
   try {
     const billing = object(value);
-    if (!Array.isArray(billing.attempts) || billing.attempts.length > 32)
-      return undefined;
-    const omittedAttempts = revision(billing.omittedAttempts);
     const seen = new Set<string>();
-    const attempts: NativeChatGatewayBillingAttempt[] = billing.attempts.map(
-      (entry: unknown) => {
-        const row = object(entry);
-        const attempt = {
-          operationId: identity(row.operationId),
-          attemptId: identity(row.attemptId),
-        };
-        const key = JSON.stringify([attempt.operationId, attempt.attemptId]);
-        if (seen.has(key)) throw invalidResponse();
-        seen.add(key);
-        if (row.kind === "settled") {
-          const settled = NativeGatewayConnection.billingResult({
-            kind: row.kind,
-            chargedMills: row.chargedMills,
-          });
-          if (
-            settled.kind !== "settled" ||
-            row.refreshable !== false ||
-            Object.keys(row).length !== 5
-          )
-            throw invalidResponse();
-          return Object.freeze({ ...attempt, ...settled, refreshable: false });
-        }
-        if (Object.keys(row).length !== 4) throw invalidResponse();
-        return Object.freeze({
-          ...attempt,
-          kind: choice(row.kind, ["pending", "unavailable"] as const),
-          refreshable: flag(row.refreshable),
-        });
-      }
-    );
-    if (!attempts.length && !omittedAttempts) return undefined;
-    return Object.freeze({
-      attempts: Object.freeze(attempts),
-      omittedAttempts,
-    });
+    const direct = gatewayBillingAttempts(billing, seen);
+    const review =
+      billing.review === undefined
+        ? undefined
+        : gatewayBillingAttempts(object(billing.review), seen);
+    if (!direct.attempts.length && !direct.omittedAttempts && !review)
+      return undefined;
+    return Object.freeze({ ...direct, ...(review && { review }) });
   } catch {
     // Optional billing evidence cannot hide the recorded turn result.
     return undefined;
   }
+}
+
+function gatewayBillingAttempts(
+  billing: Record<string, unknown>,
+  seen: Set<string>
+): NativeChatGatewayBillingAttempts {
+  if (!Array.isArray(billing.attempts) || billing.attempts.length > 32)
+    throw invalidResponse();
+  const omittedAttempts = revision(billing.omittedAttempts);
+  const attempts: NativeChatGatewayBillingAttempt[] = billing.attempts.map(
+    (entry: unknown) => {
+      const row = object(entry);
+      const attempt = {
+        operationId: identity(row.operationId),
+        attemptId: identity(row.attemptId),
+      };
+      const key = JSON.stringify([attempt.operationId, attempt.attemptId]);
+      if (seen.has(key)) throw invalidResponse();
+      seen.add(key);
+      if (row.kind === "settled") {
+        const settled = NativeGatewayConnection.billingResult({
+          kind: row.kind,
+          chargedMills: row.chargedMills,
+        });
+        if (
+          settled.kind !== "settled" ||
+          row.refreshable !== false ||
+          Object.keys(row).length !== 5
+        )
+          throw invalidResponse();
+        return Object.freeze({ ...attempt, ...settled, refreshable: false });
+      }
+      if (Object.keys(row).length !== 4) throw invalidResponse();
+      return Object.freeze({
+        ...attempt,
+        kind: choice(row.kind, ["pending", "unavailable"] as const),
+        refreshable: flag(row.refreshable),
+      });
+    }
+  );
+  return Object.freeze({
+    attempts: Object.freeze(attempts),
+    omittedAttempts,
+  });
 }
 
 function choice<T extends string>(value: unknown, choices: readonly T[]): T {

@@ -2416,6 +2416,11 @@ export class NativeChatController {
     const attachment = scope?.attachment;
     const observation = scope?.observation;
     const summary = this.view.turnSummary;
+    const billing = summary?.gatewayBilling;
+    const direct = billing?.attempts.some((row) =>
+      sameGatewayAttempt(row, attempt)
+    );
+    const group = direct ? billing : billing?.review;
     if (
       !scope ||
       !attachment ||
@@ -2424,7 +2429,7 @@ export class NativeChatController {
       basis?.turnId !== turnId ||
       summary?.turnId !== turnId ||
       this.view.gatewayBillingRefresh?.status === "loading" ||
-      !summary.gatewayBilling?.attempts.some(
+      !group?.attempts.some(
         (row) => row.refreshable && sameGatewayAttempt(row, attempt)
       )
     )
@@ -2446,26 +2451,36 @@ export class NativeChatController {
         selected
       );
       if (!ownsRequest()) return;
-      const refreshed = updated.gatewayBilling?.attempts.find((row) =>
+      const updatedGroup = direct
+        ? updated.gatewayBilling
+        : updated.gatewayBilling?.review;
+      const refreshed = updatedGroup?.attempts.find((row) =>
         sameGatewayAttempt(row, selected)
       );
       const current = this.view.turnSummary;
+      const currentBilling = current?.gatewayBilling;
+      const currentGroup = direct ? currentBilling : currentBilling?.review;
       if (
         updated.turnId !== turnId ||
-        !current?.gatewayBilling ||
+        !current ||
+        !currentBilling ||
+        !currentGroup ||
         !refreshed ||
         refreshed.kind === "unavailable"
       )
         throw new Error("native_chat_gateway_billing_unavailable");
+      const refreshedGroup = {
+        ...currentGroup,
+        attempts: currentGroup.attempts.map((row) =>
+          sameGatewayAttempt(row, selected) ? refreshed : row
+        ),
+      };
       this.update({
         turnSummary: {
           ...current,
-          gatewayBilling: {
-            ...current.gatewayBilling,
-            attempts: current.gatewayBilling.attempts.map((row) =>
-              sameGatewayAttempt(row, selected) ? refreshed : row
-            ),
-          },
+          gatewayBilling: direct
+            ? refreshedGroup
+            : { ...currentBilling, review: refreshedGroup },
         },
         gatewayBillingRefresh: null,
       });

@@ -265,10 +265,8 @@ fn require_related(
     session: &SessionId,
     turn: &TurnId,
 ) -> Result<()> {
-    let key = operation_claim_key(source_turn, operation)?;
-    let receipt: OperationClaimRecord =
-        retained_request(transaction, source_session, OPERATION_CLAIM, &key)?
-            .ok_or_else(|| error(ErrorKind::Conflict, "operation_pair_claim_missing"))?;
+    let receipt = retained_operation_claim(transaction, source_session, source_turn, operation)?
+        .ok_or_else(|| error(ErrorKind::Conflict, "operation_pair_claim_missing"))?;
     if receipt.session != *session || receipt.turn != *turn {
         return Err(error(
             ErrorKind::Conflict,
@@ -276,6 +274,16 @@ fn require_related(
         ));
     }
     Ok(())
+}
+
+pub(super) fn retained_operation_claim(
+    connection: &Connection,
+    source_session: &SessionId,
+    source_turn: &TurnId,
+    operation: &OperationId,
+) -> Result<Option<OperationClaimRecord>> {
+    let key = operation_claim_key(source_turn, operation)?;
+    retained_request(connection, source_session, OPERATION_CLAIM, &key)
 }
 
 fn retained_request<T: DeserializeOwned>(

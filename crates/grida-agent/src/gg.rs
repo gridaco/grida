@@ -102,21 +102,23 @@ impl SupervisedGg {
         self.supervisor.validate()
     }
 
-    pub(crate) fn retained_request_id(
+    /// Distinguish a missing attempt from an exact attempt without a dispatch ID.
+    pub(crate) fn retained_attempt_request_id(
         &self,
         state: &TurnState,
         operation: &OperationId,
         attempt: &AttemptId,
-    ) -> Option<String> {
+    ) -> Option<Option<String>> {
         let operation = state.operations().get(operation)?;
-        if !self.owns_retained_inference(operation) {
-            return None;
-        }
         let attempt = operation.attempts.iter().find(|item| &item.id == attempt)?;
-        let OperationOutcome::Inference(outcome) = attempt.outcome.as_ref()? else {
-            return None;
-        };
-        attempt_request_id(outcome).map(str::to_owned)
+        Some(match &attempt.outcome {
+            Some(OperationOutcome::Inference(outcome))
+                if self.owns_retained_inference(operation) =>
+            {
+                attempt_request_id(outcome).map(str::to_owned)
+            }
+            _ => None,
+        })
     }
 
     fn owns_retained_inference(&self, operation: &OperationState) -> bool {
@@ -128,6 +130,12 @@ impl SupervisedGg {
             && binding.authority == operation.record.grants.authority
             && binding.authority.principal == self.binding.authority.principal
             && binding.authority.scope == self.binding.authority.scope
+    }
+
+    pub(crate) fn owns_retained_turn(&self, state: &TurnState) -> bool {
+        state.operations().values().any(|operation| {
+            !operation.attempts.is_empty() && self.owns_retained_inference(operation)
+        })
     }
 
     pub(crate) fn retained_billing(&self, state: &TurnState) -> Option<GatewayBillingProjection> {
@@ -255,6 +263,31 @@ impl GatewayBillingRead {
 pub(crate) struct GatewayBillingProjection {
     attempts: Vec<GatewayBillingAttempt>,
     omitted_attempts: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct GatewayTurnBilling {
+    #[serde(flatten)]
+    direct: GatewayBillingProjection,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    review: Option<GatewayBillingProjection>,
+}
+
+impl GatewayTurnBilling {
+    pub(crate) fn new(
+        direct: GatewayBillingProjection,
+        review: Option<GatewayBillingProjection>,
+    ) -> Self {
+        let review = review.filter(|review| {
+            !review.attempts.iter().any(|child| {
+                direct.attempts.iter().any(|parent| {
+                    child.operation_id == parent.operation_id
+                        && child.attempt_id == parent.attempt_id
+                })
+            })
+        });
+        Self { direct, review }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -848,7 +881,31 @@ mod tests {
         );
         assert_eq!(foreign.retained_billing(&state).unwrap().attempts.len(), 1);
         assert!(open('c').retained_billing(&state).is_none());
-        serde_json::from_value::<GatewayBillingProjection>(projection).unwrap();
+        let direct: GatewayBillingProjection = serde_json::from_value(projection.clone()).unwrap();
+        assert_eq!(
+            serde_json::to_value(GatewayTurnBilling::new(direct.clone(), None)).unwrap(),
+            projection
+        );
+        let mut review = direct.clone();
+        review.attempts.truncate(1);
+        review.omitted_attempts = 0;
+        assert_eq!(
+            serde_json::to_value(GatewayTurnBilling::new(
+                direct.clone(),
+                Some(review.clone())
+            ))
+            .unwrap(),
+            projection
+        );
+        review.attempts[0].operation_id = OperationId::new("review-operation").unwrap();
+        review.attempts[0].attempt_id = AttemptId::new("review-attempt").unwrap();
+        let combined = serde_json::to_value(GatewayTurnBilling::new(direct, Some(review))).unwrap();
+        assert_eq!(combined["attempts"], projection["attempts"]);
+        assert_eq!(
+            combined["review"],
+            json!({"attempts":[{"operationId":"review-operation","attemptId":"review-attempt","kind":"settled","chargedMills":"0","refreshable":false}],"omittedAttempts":0})
+        );
+        serde_json::from_value::<GatewayTurnBilling>(combined).unwrap();
     }
 
     #[test]

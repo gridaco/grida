@@ -44,7 +44,7 @@ pub(super) struct SummaryResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     token_usage: Option<ReportedTokenUsage>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    gateway_billing: Option<crate::gg::GatewayBillingProjection>,
+    gateway_billing: Option<crate::gg::GatewayTurnBilling>,
     #[serde(skip_serializing_if = "Option::is_none")]
     artifacts: Option<Vec<CropArtifact>>,
     #[serde(skip_serializing_if = "Option::is_none")]

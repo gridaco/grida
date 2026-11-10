@@ -429,7 +429,7 @@ it.skipIf(!resourcesPath)(
 );
 
 it.skipIf(!resourcesPath)(
-  "funds one Goal review on the same Gateway allowance and accounts for it after restart",
+  "accounts for the exact funded Goal review and its Gateway charges after restart",
   async () => {
     const root = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-goal-funding-")
@@ -437,7 +437,18 @@ it.skipIf(!resourcesPath)(
     const cwd = path.join(root, "workspace");
     await fs.mkdir(cwd, { mode: 0o700 });
     const owner = fixture();
-    const connection = await NativeGatewayConnection.open(owner.options);
+    const reviewRequest = "req_funded_review";
+    const jobNetwork = vi.fn<NativeGatewayJobNetwork>(async (id) =>
+      Response.json({
+        id,
+        request_id: id,
+        billing: { status: "settled", charged_mills: "0.75" },
+      })
+    );
+    const connection = await NativeGatewayConnection.open({
+      ...owner.options,
+      jobNetwork,
+    });
     const release = Promise.withResolvers<void>();
     const endpoint = "https://editor.fixture.invalid";
     const frame = { url: `${endpoint}/desktop/workspace?id=workspace` };
@@ -450,16 +461,40 @@ it.skipIf(!resourcesPath)(
       sender,
       senderFrame: frame,
     } as unknown as IpcMainInvokeEvent;
-    const finish = (delta: unknown, reason: "stop" | "tool_calls") =>
+    const finish = (
+      delta: unknown,
+      reason: "stop" | "tool_calls",
+      requestId: string,
+      amount: string | null
+    ) =>
       new Response(
-        `data: ${JSON.stringify({ id: "goal-fixture", choices: [{ index: 0, delta, finish_reason: reason }] })}\n\ndata: [DONE]\n\n`,
-        { headers: { "content-type": "text/event-stream" } }
+        `data: ${JSON.stringify({
+          id: "goal-fixture",
+          choices: [{ index: 0, delta, finish_reason: reason }],
+          grida_billing: {
+            version: 1,
+            request_id: requestId,
+            status: amount === null ? "pending" : "settled",
+            charged_mills: amount,
+          },
+        })}\n\ndata: [DONE]\n\n`,
+        {
+          headers: {
+            "content-type": "text/event-stream",
+            "x-request-id": requestId,
+          },
+        }
       );
     owner.dispatch.mockImplementation(async (bytes) => {
       const body = JSON.parse(bytes.toString("utf8"));
       if (!body.tools) {
         await release.promise;
-        return finish({ content: "Independent review result." }, "stop");
+        return finish(
+          { content: "Independent review result." },
+          "stop",
+          reviewRequest,
+          null
+        );
       }
       expect(
         body.tools.some(
@@ -470,7 +505,12 @@ it.skipIf(!resourcesPath)(
       if (
         body.messages.some((entry: { role: string }) => entry.role === "tool")
       ) {
-        return finish({ content: "Parent finished first." }, "stop");
+        return finish(
+          { content: "Parent finished first." },
+          "stop",
+          "req_parent_finish",
+          "0"
+        );
       }
       return finish(
         {
@@ -486,7 +526,9 @@ it.skipIf(!resourcesPath)(
             },
           ],
         },
-        "tool_calls"
+        "tool_calls",
+        "req_parent_start",
+        "0.025"
       );
     });
     let chat: NativeAgentChat | undefined;
@@ -610,6 +652,47 @@ it.skipIf(!resourcesPath)(
         remaining: { workTurns: 1, inferenceSteps: 4 },
         reservation: null,
       });
+      const { observationId } = await ipc.observe(event, reopened.attachmentId);
+      const readSummary = () =>
+        ipc.turnSummary(event, reopened.attachmentId, observationId);
+      const summary = await readSummary();
+      expect(summary.gatewayBilling?.attempts).toHaveLength(2);
+      expect(summary.gatewayBilling?.attempts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: "settled", chargedMills: "0" }),
+          expect.objectContaining({ kind: "settled", chargedMills: "0.025" }),
+        ])
+      );
+      expect(summary.gatewayBilling?.review?.attempts).toEqual([
+        expect.objectContaining({ kind: "pending", refreshable: true }),
+      ]);
+      expect(JSON.stringify(summary)).not.toContain(reviewRequest);
+      expect(jobNetwork).not.toHaveBeenCalled();
+      const { operationId, attemptId } =
+        summary.gatewayBilling!.review!.attempts[0];
+      await expect(
+        ipc.turnSummary(event, reopened.attachmentId, observationId, {
+          operationId,
+          attemptId,
+        })
+      ).resolves.toMatchObject({
+        gatewayBilling: {
+          attempts: summary.gatewayBilling?.attempts,
+          review: {
+            attempts: [
+              {
+                operationId,
+                attemptId,
+                kind: "settled",
+                chargedMills: "0.75",
+                refreshable: false,
+              },
+            ],
+          },
+        },
+      });
+      expect(jobNetwork.mock.calls.map(([id]) => id)).toEqual([reviewRequest]);
+      await expect(readSummary()).resolves.toEqual(summary);
       expect(owner.dispatch).toHaveBeenCalledTimes(3);
     } finally {
       release.resolve();

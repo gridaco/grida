@@ -554,6 +554,9 @@ repeated after reopening. The retained inference evidence stays intact.
 
 With that capability negotiated, a settled turn summary can include
 `gatewayBilling` with up to 32 `attempts` and an `omittedAttempts` count.
+An optional `review` contains the same bounded fields for the exact funded
+review assignment. The parent turn's committed delegation claim determines
+the assignment, including when a named reviewer later performs other work.
 The rows contain `operationId`, `attemptId`, `kind`, and `refreshable`.
 Only a settled row has `chargedMills`. The projection reads retained evidence
 for the captured Gateway scope without a jobs request. Desktop refresh takes

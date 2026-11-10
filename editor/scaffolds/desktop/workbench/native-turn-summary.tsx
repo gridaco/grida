@@ -3,7 +3,7 @@ import { Button } from "@app/ui/components/button";
 import type {
   NativeChatArtifactSaveResult,
   NativeChatGatewayAttemptRef,
-  NativeChatGatewayBilling,
+  NativeChatGatewayBillingAttempts,
   NativeChatImageArtifact,
   NativeChatMessage,
   NativeChatTokenCategory,
@@ -100,6 +100,11 @@ export function NativeTurnSummary({
   )
     return null;
 
+  const refreshBilling =
+    onRefreshGatewayBilling &&
+    ((attempt: NativeChatGatewayAttemptRef) =>
+      onRefreshGatewayBilling(summary.turnId, attempt));
+
   return (
     <details className="rounded-md border px-3 py-2 text-xs">
       <summary className="cursor-pointer text-muted-foreground">
@@ -130,14 +135,22 @@ export function NativeTurnSummary({
       )}
       {summary.tokenUsage && <TokenUsage usage={summary.tokenUsage} />}
       {summary.gatewayBilling && (
-        <GatewayBilling
-          billing={summary.gatewayBilling}
-          refresh={billingRefresh}
-          onRefresh={
-            onRefreshGatewayBilling &&
-            ((attempt) => onRefreshGatewayBilling(summary.turnId, attempt))
-          }
-        />
+        <>
+          <GatewayBilling
+            heading="Gateway billing for this turn"
+            billing={summary.gatewayBilling}
+            refresh={billingRefresh}
+            onRefresh={refreshBilling}
+          />
+          {summary.gatewayBilling.review && (
+            <GatewayBilling
+              heading="Gateway billing for the independent review"
+              billing={summary.gatewayBilling.review}
+              refresh={billingRefresh}
+              onRefresh={refreshBilling}
+            />
+          )}
+        </>
       )}
       {previewController && artifacts && artifacts.length > 0 && (
         <ul className="mt-2 space-y-1">
@@ -184,17 +197,20 @@ function TokenUsage({ usage }: { usage: NativeChatTokenUsage }) {
 }
 
 function GatewayBilling({
+  heading,
   billing,
   refresh,
   onRefresh,
 }: {
-  billing: NativeChatGatewayBilling;
+  heading: string;
+  billing: NativeChatGatewayBillingAttempts;
   refresh?: NativeChatView["gatewayBillingRefresh"];
   onRefresh?: (attempt: NativeChatGatewayAttemptRef) => void;
 }) {
+  if (!billing.attempts.length && !billing.omittedAttempts) return null;
   return (
     <div className="mt-2 text-muted-foreground">
-      <p>Gateway billing for this turn</p>
+      <p>{heading}</p>
       <ul>
         {billing.attempts.map((attempt, index) => {
           const status =

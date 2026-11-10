@@ -3,6 +3,7 @@ import type {
   DesktopNativeChat,
   NativeChatCommand,
   NativeChatCommandResult,
+  NativeChatGatewayBillingAttempt,
   NativeChatCatalogEntry,
   NativeChatMessage,
   NativeChatObservation,
@@ -1690,90 +1691,107 @@ it.each(["rejected read", "mismatched turn"] as const)(
   }
 );
 
-it("refreshes billing for the exact displayed request only when asked", async () => {
-  const { bridge, controller } = fixture();
-  const latest = {
-    turnId: "billing-turn",
-    epoch: 1,
-    journalPosition: 8,
-    historyPosition: 2,
-    controlRevision: 1,
-    paused: false,
-    cancelled: false,
-    disposition: "settled",
-    status: "succeeded",
-  } as const;
-  const observe = bridge.observe;
-  vi.spyOn(bridge, "observe").mockImplementation(async (id) => {
-    const observation = await observe(id);
-    return {
-      ...observation,
-      snapshot: {
-        ...observation.snapshot,
-        latest: id === "chat-a" ? latest : null,
-      },
+it.each(["turn", "review"] as const)(
+  "refreshes the exact displayed %s request only when asked",
+  async (section) => {
+    const { bridge, controller } = fixture();
+    const latest = {
+      turnId: "billing-turn",
+      epoch: 1,
+      journalPosition: 8,
+      historyPosition: 2,
+      controlRevision: 1,
+      paused: false,
+      cancelled: false,
+      disposition: "settled",
+      status: "succeeded",
+    } as const;
+    const observe = bridge.observe;
+    vi.spyOn(bridge, "observe").mockImplementation(async (id) => {
+      const observation = await observe(id);
+      return {
+        ...observation,
+        snapshot: {
+          ...observation.snapshot,
+          latest: id === "chat-a" ? latest : null,
+        },
+      };
+    });
+    const selected = { operationId: "op", attemptId: "first" };
+    const another = { operationId: "op", attemptId: "second" };
+    const sibling = {
+      operationId: "sibling-op",
+      attemptId: "sibling-attempt",
+      kind: "settled",
+      chargedMills: "0.5",
+      refreshable: false,
+    } as const;
+    const billingOf = (
+      attempts: readonly NativeChatGatewayBillingAttempt[]
+    ) => {
+      const group = { attempts, omittedAttempts: 0 };
+      const other = { attempts: [sibling], omittedAttempts: 0 };
+      return section === "turn"
+        ? { ...group, review: other }
+        : { ...other, review: group };
     };
-  });
-  const selected = { operationId: "op", attemptId: "first" };
-  const another = { operationId: "op", attemptId: "second" };
-  const detail: NativeChatTurnSummary = {
-    turnId: latest.turnId,
-    status: latest.status,
-    text: "Finished.",
-    textTruncated: false,
-    steps: 1,
-    unresolvedOperations: 0,
-    toolActivity: null,
-    checks: [],
-    gatewayBilling: {
-      attempts: [
+    const detail: NativeChatTurnSummary = {
+      turnId: latest.turnId,
+      status: latest.status,
+      text: "Finished.",
+      textTruncated: false,
+      steps: 1,
+      unresolvedOperations: 0,
+      toolActivity: null,
+      checks: [],
+      gatewayBilling: billingOf([
         { ...selected, kind: "pending", refreshable: true },
         { ...another, kind: "pending", refreshable: true },
-      ],
-      omittedAttempts: 0,
-    },
-  };
-  const read = vi
-    .fn<NonNullable<DesktopNativeChat["turnSummary"]>>()
-    .mockResolvedValueOnce(detail);
-  bridge.turnSummary = read;
-  await controller.select("chat-a");
-  await vi.waitFor(() => expect(controller.read().turnSummary).toEqual(detail));
-  await controller.refreshGatewayBilling(latest.turnId, {
-    ...selected,
-    attemptId: "stale",
-  });
-  expect(read).toHaveBeenCalledTimes(1);
-  const settled = {
-    ...selected,
-    kind: "settled",
-    chargedMills: "0.125",
-    refreshable: false,
-  } as const;
-  read.mockResolvedValueOnce({
-    ...detail,
-    gatewayBilling: { attempts: [settled], omittedAttempts: 0 },
-  });
-  await controller.refreshGatewayBilling(latest.turnId, selected);
-  expect(read.mock.calls[1]?.[2]).toEqual(selected);
-  expect(controller.read().turnSummary?.gatewayBilling?.attempts).toEqual([
-    settled,
-    { ...another, kind: "pending", refreshable: true },
-  ]);
-  const late = Promise.withResolvers<NativeChatTurnSummary>();
-  read.mockReturnValueOnce(late.promise);
-  const refresh = controller.refreshGatewayBilling(latest.turnId, another);
-  expect(controller.read().gatewayBillingRefresh).toEqual({
-    ...another,
-    status: "loading",
-  });
-  await controller.select("chat-b");
-  late.resolve(detail);
-  await refresh;
-  expect(controller.read().turnSummary).toBeNull();
-  expect(controller.read().gatewayBillingRefresh).toBeNull();
-  controller.disconnect();
-});
+      ]),
+    };
+    const read = vi
+      .fn<NonNullable<DesktopNativeChat["turnSummary"]>>()
+      .mockResolvedValueOnce(detail);
+    bridge.turnSummary = read;
+    await controller.select("chat-a");
+    await vi.waitFor(() =>
+      expect(controller.read().turnSummary).toEqual(detail)
+    );
+    await controller.refreshGatewayBilling(latest.turnId, {
+      ...selected,
+      attemptId: "stale",
+    });
+    expect(read).toHaveBeenCalledTimes(1);
+    const settled = {
+      ...selected,
+      kind: "settled",
+      chargedMills: "0.125",
+      refreshable: false,
+    } as const;
+    read.mockResolvedValueOnce({
+      ...detail,
+      gatewayBilling: billingOf([settled]),
+    });
+    await controller.refreshGatewayBilling(latest.turnId, selected);
+    expect(read.mock.calls[1]?.[2]).toEqual(selected);
+    expect(controller.read().turnSummary?.gatewayBilling).toEqual(
+      billingOf([settled, { ...another, kind: "pending", refreshable: true }])
+    );
+    const late = Promise.withResolvers<NativeChatTurnSummary>();
+    read.mockReturnValueOnce(late.promise);
+    const refresh = controller.refreshGatewayBilling(latest.turnId, another);
+    expect(controller.read().gatewayBillingRefresh).toEqual({
+      ...another,
+      status: "loading",
+    });
+    await controller.select("chat-b");
+    late.resolve(detail);
+    await refresh;
+    expect(controller.read().turnSummary).toBeNull();
+    expect(controller.read().gatewayBillingRefresh).toBeNull();
+    controller.disconnect();
+  }
+);
 
 it("reads a listed PNG on demand and discards its bytes after switching chats", async () => {
   const { bridge, controller } = fixture();

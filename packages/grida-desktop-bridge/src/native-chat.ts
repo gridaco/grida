@@ -236,10 +236,13 @@ export type NativeChatGatewayBillingAttempt = NativeChatGatewayAttemptRef &
     | { kind: "pending" | "unavailable"; refreshable: boolean }
   >;
 
-export type NativeChatGatewayBilling = Readonly<{
+export type NativeChatGatewayBillingAttempts = Readonly<{
   attempts: readonly NativeChatGatewayBillingAttempt[];
   omittedAttempts: number;
 }>;
+
+export type NativeChatGatewayBilling = NativeChatGatewayBillingAttempts &
+  Readonly<{ review?: NativeChatGatewayBillingAttempts }>;
 
 export type NativeChatTurnSummary = Readonly<{
   turnId: string;

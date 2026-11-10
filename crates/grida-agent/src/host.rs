@@ -778,12 +778,42 @@ impl Host {
     ) -> Option<String> {
         let gateway = self.supervised_gateway()?.clone();
         gateway.validate().ok()?;
-        self.store
-            .inspect_turn_with(session, turn, move |state| {
-                Ok(gateway.retained_request_id(state, &operation, &attempt))
+        let parent_gateway = gateway.clone();
+        let parent_operation = operation.clone();
+        let parent_attempt = attempt.clone();
+        let (parent, review_operations) = self
+            .store
+            .inspect_turn_with(session.clone(), turn.clone(), move |state| {
+                Ok((
+                    parent_gateway.retained_attempt_request_id(
+                        state,
+                        &parent_operation,
+                        &parent_attempt,
+                    ),
+                    if parent_gateway.owns_retained_turn(state) {
+                        sponsorship::retained_review_operations(state).unwrap_or_default()
+                    } else {
+                        vec![]
+                    },
+                ))
             })
             .await
-            .ok()?
+            .ok()?;
+        let review = match self
+            .store
+            .inspect_operation_claim_with(session, turn, review_operations, move |state| {
+                Ok(gateway.retained_attempt_request_id(state, &operation, &attempt))
+            })
+            .await
+        {
+            Ok(review) => review.flatten(),
+            Err(error) if error.code == "operation_claim_ambiguous" => return None,
+            Err(_) => None,
+        };
+        match (parent, review) {
+            (Some(id), None) | (None, Some(id)) => id,
+            _ => None,
+        }
     }
 
     pub(crate) async fn settled_summary(
@@ -796,14 +826,16 @@ impl Host {
         TurnOutcome,
         Option<CropArtifacts>,
         Option<&'static str>,
-        Option<crate::gg::GatewayBillingProjection>,
+        Option<crate::gg::GatewayTurnBilling>,
     )> {
         let gateway = self
             .supervised_gateway()
             .filter(|owner| include_gateway_billing && owner.validate().is_ok())
             .cloned();
-        self.store
-            .inspect_turn_with(session, turn, move |state| {
+        let parent_gateway = gateway.clone();
+        let (outcome, artifacts, image_generation, direct) = self
+            .store
+            .inspect_turn_with(session.clone(), turn.clone(), move |state| {
                 let outcome = state
                     .outcome()
                     .cloned()
@@ -812,12 +844,34 @@ impl Host {
                     outcome,
                     include_artifacts.then(|| image_tools::artifacts(state)),
                     image_generation::summary_note(state),
-                    gateway
+                    parent_gateway
                         .as_ref()
-                        .and_then(|owner| owner.retained_billing(state)),
+                        .and_then(|owner| owner.retained_billing(state))
+                        .map(|direct| {
+                            (
+                                direct,
+                                sponsorship::retained_review_operations(state).unwrap_or_default(),
+                            )
+                        }),
                 ))
             })
-            .await
+            .await?;
+        let billing = if let (Some(gateway), Some((direct, review_operations))) = (gateway, direct)
+        {
+            let review = self
+                .store
+                .inspect_operation_claim_with(session, turn, review_operations, move |state| {
+                    Ok(gateway.retained_billing(state))
+                })
+                .await
+                .ok()
+                .flatten()
+                .flatten();
+            Some(crate::gg::GatewayTurnBilling::new(direct, review))
+        } else {
+            None
+        };
+        Ok((outcome, artifacts, image_generation, billing))
     }
 
     pub(crate) async fn read_crop_artifact(

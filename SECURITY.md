@@ -2094,8 +2094,10 @@ levels into one.
    Turn summary reads a bounded projection of retained evidence under the
    same scope. The renderer receives local operation and attempt identities.
    An explicit refresh must match an eligible row in the current attachment's
-   latest settled turn. Main revalidates that attachment before lookup and
-   before returning the result.
+   latest settled turn or its exact funded review. The worker resolves the
+   review through the parent operation's committed claim and checks the same
+   Gateway authority. Main revalidates the parent attachment before lookup
+   and before returning the result.
    Independent native hosts keep their own account custody under GRIDA-SEC-010.
    The fixed exchange delivers a frozen GG grant only to a construction-time
    trusted synchronous memory sink; its public result contains only org/expiry

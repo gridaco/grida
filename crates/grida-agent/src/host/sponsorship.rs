@@ -14,7 +14,7 @@ use agent_kit_core::tools::{
     InventorySnapshot, Invocation, InvocationContext, InvocationRecovery, RecoveryKind, Tool,
     ToolDefinition, ToolOutcome,
 };
-use agent_kit_core::turn::{OperationInput, TurnBinding};
+use agent_kit_core::turn::{OperationInput, TurnBinding, TurnState};
 use agent_kit_core::{GrantId, ToolId};
 use agent_kit_runtime::TurnOperations;
 use agent_kit_store_sqlite::{
@@ -116,6 +116,34 @@ fn delegation_grant(binding: &TurnBinding) -> Result<GrantSelection> {
     let digest = Fingerprint::of(&(&binding.session, &binding.turn))?;
     let id = uuid::Uuid::from_bytes(digest.bytes()[..16].try_into().expect("fingerprint prefix"));
     delegation_selection(BindingId::new(format!("delegation/{id}"))?, DELEGATE)
+}
+
+pub(super) fn retained_review_operations(state: &TurnState) -> Result<Vec<OperationId>> {
+    if state.outcome().is_none() {
+        return Ok(vec![]);
+    }
+    const MAX_CANDIDATES: usize = 64;
+    let grant = delegation_grant(state.binding())?;
+    let definition = delegation_definition()?;
+    let operations: Vec<_> = state
+        .operations()
+        .values()
+        .filter(|operation| {
+            !operation.attempts.is_empty()
+                && operation.record.grants == grant
+                && matches!(&operation.record.input, OperationInput::Tool(invocation)
+                    if invocation.definition() == &definition)
+        })
+        .take(MAX_CANDIDATES + 1)
+        .map(|operation| operation.record.id.clone())
+        .collect();
+    if operations.len() > MAX_CANDIDATES {
+        return Err(problem(
+            ErrorKind::LimitExceeded,
+            "retained_review_operations_limit",
+        ));
+    }
+    Ok(operations)
 }
 
 fn delegation_selection(binding: BindingId, grant: &str) -> Result<GrantSelection> {
