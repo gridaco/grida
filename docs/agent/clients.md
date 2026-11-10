@@ -452,8 +452,13 @@ For the Desktop export workflow, see [Inspect and save results](./results.md).
 
 In the native Desktop workspace pane, open **Turn summary** below the latest
 finished turn when it has additional details. It can show recorded tool
-outcomes, completion checks, and unresolved work. A simple reply serves as
-its own summary. Reopening the chat restores the latest recorded summary.
+outcomes, completion checks, unresolved work, and provider-reported token
+counts. Reopening the chat restores the latest recorded summary.
+
+Token counts describe the model requests made during that turn. A partial
+count has incomplete coverage, and the summary identifies requests with
+unknown counts. Cached input and reasoning output can overlap other token
+counts. Context estimates and charges are separate.
 
 On a compatible image-enabled profile, ask the agent to crop a retained PNG
 in Act. Open **Turn summary** for the finished turn and choose **Preview cropped

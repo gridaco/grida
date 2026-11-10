@@ -30,6 +30,7 @@ import type {
   NativeChatSnapshot,
   NativeChatSteer,
   NativeChatStreamUpdate,
+  NativeChatTokenUsage,
   NativeChatTurn,
   NativeChatTurnSummary,
   NativeChatWakeup,
@@ -110,6 +111,15 @@ const CHECK_STATUSES = [
   "unavailable",
   "deferred",
   "skipped",
+] as const;
+const TOKEN_CATEGORIES = [
+  "input",
+  "output",
+  "uncached_input",
+  "cached_input",
+  "cache_creation_input",
+  "tool_input",
+  "reasoning_output",
 ] as const;
 const INPUT_DISPOSITIONS = [
   "queued",
@@ -852,6 +862,7 @@ export class NativeAgentChat {
       throw invalidResponse();
     const tools =
       result.toolActivity === null ? null : object(result.toolActivity);
+    const usage = tokenUsage(result.tokenUsage);
     return Object.freeze({
       turnId: latest.turnId,
       status: latest.status,
@@ -873,6 +884,7 @@ export class NativeAgentChat {
       checks: Object.freeze(
         result.checks.map((check: unknown) => choice(check, CHECK_STATUSES))
       ),
+      ...(usage && { tokenUsage: usage }),
       ...(this.process.acceptsArtifacts &&
         result.artifacts !== undefined && {
           artifacts: NativeAgentArtifacts.describe(result.artifacts),
@@ -1715,6 +1727,44 @@ function catalogChange(value: unknown): NativeChatCatalogChange {
 function flag(value: unknown): boolean {
   if (typeof value !== "boolean") throw invalidResponse();
   return value;
+}
+
+function tokenUsage(value: unknown): NativeChatTokenUsage | undefined {
+  if (value === undefined) return undefined;
+  try {
+    const usage = object(value);
+    if (
+      !Array.isArray(usage.reported) ||
+      usage.reported.length > TOKEN_CATEGORIES.length
+    )
+      return undefined;
+    const attemptsWithoutCounts = revision(usage.attemptsWithoutCounts);
+    const seen = new Set<string>();
+    const reported = usage.reported.map((value: unknown) => {
+      const row = object(value);
+      const category = choice(row.category, TOKEN_CATEGORIES);
+      if (
+        seen.has(category) ||
+        typeof row.tokens !== "string" ||
+        !/^(0|[1-9][0-9]{0,38})$/.test(row.tokens)
+      )
+        throw invalidResponse();
+      seen.add(category);
+      return Object.freeze({
+        category,
+        tokens: row.tokens,
+        partial: flag(row.partial),
+      });
+    });
+    if (!reported.length && !attemptsWithoutCounts) return undefined;
+    return Object.freeze({
+      reported: Object.freeze(reported),
+      attemptsWithoutCounts,
+    });
+  } catch {
+    // Older or invalid optional accounting must not hide the settled result.
+    return undefined;
+  }
 }
 
 function choice<T extends string>(value: unknown, choices: readonly T[]): T {

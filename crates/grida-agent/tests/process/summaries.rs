@@ -15,6 +15,32 @@ fn rejected(status: &str, code: &str) -> Reply {
     ))
 }
 
+fn reported_usage_answer() -> Reply {
+    let mut body = fixture_body(
+        Reply::Finished("Finished and ready to review."),
+        ProviderProtocol::OpenAiCompatible,
+    );
+    body.truncate(body.len() - "data: [DONE]\n\n".len());
+    for prompt_tokens in [5, 11, 11] {
+        let usage = json!({
+            "id": "fixture-response",
+            "choices": [],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": 3,
+                "prompt_tokens_details": { "cached_tokens": 0 }
+            }
+        });
+        use std::fmt::Write as _;
+        write!(body, "data: {usage}\n\n").unwrap();
+    }
+    body.push_str("data: [DONE]\n\n");
+    Reply::RawHttp(format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    ))
+}
+
 async fn connect(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
@@ -48,7 +74,7 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
     );
     let (mut replies, expected): (Vec<_>, Vec<_>) = [
         (
-            Reply::Finished("Finished and ready to review."),
+            reported_usage_answer(),
             "succeeded",
             "Finished and ready to review.",
         ),
@@ -154,6 +180,19 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
         assert_eq!(result["text"], text);
         assert_eq!(result["textTruncated"], false);
         assert_eq!(result["toolActivity"]["succeeded"], 0);
+        let usage = if index == 0 {
+            json!({
+                "reported": [
+                    {"category":"input","tokens":"11","partial":false},
+                    {"category":"output","tokens":"3","partial":false},
+                    {"category":"cached_input","tokens":"0","partial":false}
+                ],
+                "attemptsWithoutCounts": 0
+            })
+        } else {
+            json!({"reported":[],"attemptsWithoutCounts":1})
+        };
+        assert_eq!(result["tokenUsage"], usage, "{recorded}");
         if status == "uncertain" {
             assert_eq!(result["unresolvedOperations"], 1);
         }
@@ -184,6 +223,7 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
     assert_eq!(fallback["result"]["text"], "The turn failed.");
     assert!(fallback["result"]["toolActivity"].is_null());
     assert!(fallback["result"]["unresolvedOperations"].is_null());
+    assert!(fallback["result"].get("tokenUsage").is_none());
     retained.push((turn.to_owned(), fallback["result"].clone()));
     drop(socket);
     terminate_shared_server(first).await;

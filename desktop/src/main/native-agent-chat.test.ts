@@ -46,6 +46,20 @@ async function heldProvider() {
         return;
       }
       response.writeHead(200, { "content-type": "text/event-stream" });
+      if (prompts.length === 1) {
+        for (const promptTokens of [4, 7, 7]) {
+          response.write(
+            `data: ${JSON.stringify({
+              id: "fixture-1",
+              choices: [],
+              usage: {
+                prompt_tokens: promptTokens,
+                prompt_tokens_details: { cached_tokens: 0 },
+              },
+            })}\n\n`
+          );
+        }
+      }
       response.write(
         `data: ${JSON.stringify({
           id: `fixture-${prompts.length}`,
@@ -163,6 +177,82 @@ it("projects only a valid retry wait for the currently running turn", async () =
       const result = await read();
       expect(result.current).toEqual(current);
       expect(result).not.toHaveProperty("retryNotBeforeMs");
+    }
+  } finally {
+    await client?.close();
+    start.mockRestore();
+    test.close();
+  }
+});
+
+it("keeps older settled summaries and projects only bounded reported token counts", async () => {
+  const test = fixture();
+  const sessionId = "fixture-session";
+  const latest = {
+    turnId: "fixture-turn",
+    epoch: 1,
+    journalPosition: 3,
+    historyPosition: 2,
+    controlRevision: 0,
+    paused: false,
+    cancelled: false,
+    disposition: "settled",
+    status: "succeeded",
+  };
+  const summary = {
+    turnId: latest.turnId,
+    status: latest.status,
+    text: "The turn finished.",
+    textTruncated: false,
+    steps: 1,
+    unresolvedOperations: 0,
+    toolActivity: null,
+    checks: [],
+  };
+  let wire: typeof summary & { tokenUsage?: unknown } = summary;
+  const start = vi.spyOn(NativeAgentProcess, "start");
+  start.mockResolvedValueOnce({
+    request: async (method: string) => {
+      if (method === "session/new") return { sessionId };
+      if (method === "_co.grida/session/turn-summary") return wire;
+      return {
+        sessionId,
+        sessionRevision: 1,
+        queuedInputs: 0,
+        queue: [],
+        admissionPaused: false,
+        current: null,
+        latest,
+      };
+    },
+    close: async () => {},
+  } as unknown as NativeAgentProcess);
+  let client: NativeAgentChat | undefined;
+  try {
+    client = await NativeAgentChat.start({
+      resourcesPath: test.root,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "openai-compatible",
+      model: "fixture",
+    });
+    const session = await client.create();
+    const snapshot = await client.observe(session);
+    const read = () => client!.turnSummary(session, snapshot);
+    await expect(read()).resolves.toEqual(summary);
+    const output = { category: "output", tokens: "0", partial: true };
+    const usage = { reported: [output], attemptsWithoutCounts: 1 };
+    wire = { ...summary, tokenUsage: usage };
+    await expect(read()).resolves.toEqual(wire);
+    for (const reported of [
+      [output, output],
+      [{ ...output, tokens: 0 }],
+      [{ ...output, tokens: "1".repeat(40) }],
+      [{ ...output, category: "estimated_input" }],
+    ]) {
+      wire = { ...summary, tokenUsage: { ...usage, reported } };
+      await expect(read()).resolves.toEqual(summary);
     }
   } finally {
     await client?.close();
@@ -664,6 +754,13 @@ it.runIf(Boolean(packaged))(
         textTruncated: false,
         toolActivity: { succeeded: 0, failed: 0, cancelled: 0, unresolved: 0 },
         checks: [],
+        tokenUsage: {
+          reported: [
+            { category: "input", tokens: "7", partial: true },
+            { category: "cached_input", tokens: "0", partial: true },
+          ],
+          attemptsWithoutCounts: 1,
+        },
       });
       await expect(
         client.turnSummary(reattached, { ...settled })

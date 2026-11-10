@@ -3,6 +3,8 @@ import type {
   NativeChatArtifactSaveResult,
   NativeChatImageArtifact,
   NativeChatMessage,
+  NativeChatTokenCategory,
+  NativeChatTokenUsage,
   NativeChatTurnSummary,
 } from "@grida/desktop-bridge";
 import type { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
@@ -19,6 +21,18 @@ const CHECK_LABEL: Record<NativeChatTurnSummary["checks"][number], string> = {
   deferred: "deferred",
   skipped: "skipped",
 };
+
+const TOKEN_LABEL: Record<NativeChatTokenCategory, string> = {
+  input: "Input",
+  output: "Output",
+  uncached_input: "Uncached input",
+  cached_input: "Cached input",
+  cache_creation_input: "Cache creation input",
+  tool_input: "Tool input",
+  reasoning_output: "Reasoning output",
+};
+
+const TOKEN_FORMAT = new Intl.NumberFormat();
 
 export function NativeTurnSummary({
   summary,
@@ -58,6 +72,7 @@ export function NativeTurnSummary({
     !showText &&
     !details.length &&
     !summary.checks.length &&
+    !summary.tokenUsage &&
     !artifacts?.length
   )
     return null;
@@ -82,6 +97,7 @@ export function NativeTurnSummary({
           {summary.checks.map((status) => CHECK_LABEL[status]).join(", ")}
         </p>
       )}
+      {summary.tokenUsage && <TokenUsage usage={summary.tokenUsage} />}
       {previewController && artifacts && artifacts.length > 0 && (
         <ul className="mt-2 space-y-1">
           {artifacts.map((artifact) => (
@@ -96,6 +112,33 @@ export function NativeTurnSummary({
         </ul>
       )}
     </details>
+  );
+}
+
+function TokenUsage({ usage }: { usage: NativeChatTokenUsage }) {
+  const { reported, attemptsWithoutCounts } = usage;
+  return (
+    <div className="mt-2 text-muted-foreground">
+      <p>Provider-reported tokens</p>
+      {reported.length > 0 && (
+        <p>
+          {reported
+            .map(
+              ({ category, tokens, partial }) =>
+                `${TOKEN_LABEL[category]} ${TOKEN_FORMAT.format(BigInt(tokens))}${
+                  partial ? " (partial)" : ""
+                }`
+            )
+            .join(" · ")}
+        </p>
+      )}
+      {attemptsWithoutCounts > 0 && (
+        <p>
+          Token counts unknown for {attemptsWithoutCounts}{" "}
+          {attemptsWithoutCounts === 1 ? "model request" : "model requests"}.
+        </p>
+      )}
+    </div>
   );
 }
 

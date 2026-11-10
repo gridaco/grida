@@ -2,11 +2,14 @@
 
 use super::*;
 use crate::host::CropArtifact;
-use agent_kit_core::OperationId;
+use agent_kit_core::inference::MeasurementKind;
 use agent_kit_core::turn::TurnOutcome;
+use agent_kit_core::{AttemptId, OperationId};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use grida_agent_master::hooks::CheckStatus;
+use grida_agent_master::usage::InferenceUsage;
 use grida_agent_master::{ToolActivity, read_account};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 pub(super) const SUMMARY: &str = "co.grida/session/turn-summary";
@@ -37,6 +40,8 @@ pub(super) struct SummaryResponse {
     tool_activity: Option<ToolActivity>,
     checks: Vec<CheckStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    token_usage: Option<ReportedTokenUsage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     artifacts: Option<Vec<CropArtifact>>,
 }
 
@@ -66,6 +71,9 @@ impl SummaryResponse {
             steps: account.as_ref().map(|account| account.steps),
             unresolved_operations: account.as_ref().map(|account| account.unresolved.len()),
             tool_activity: account.as_ref().and_then(|account| account.tool_activity),
+            token_usage: account
+                .as_ref()
+                .and_then(|account| ReportedTokenUsage::from_usage(&account.inference_usage)),
             checks: account.map_or_else(Vec::new, |account| {
                 account
                     .completion_checks
@@ -75,6 +83,104 @@ impl SummaryResponse {
             }),
             artifacts: None,
         }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReportedTokenUsage {
+    reported: Vec<ReportedTokenCount>,
+    attempts_without_counts: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReportedTokenCount {
+    category: TokenCategory,
+    /// Decimal preserves the exact subtotal on clients with narrower numbers.
+    tokens: String,
+    partial: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum TokenCategory {
+    Input,
+    Output,
+    UncachedInput,
+    CachedInput,
+    CacheCreationInput,
+    ToolInput,
+    ReasoningOutput,
+}
+
+impl TokenCategory {
+    fn from_provider(category: &str) -> Option<Self> {
+        match category {
+            "input_tokens" => Some(Self::Input),
+            "output_tokens" => Some(Self::Output),
+            "uncached_input_tokens" => Some(Self::UncachedInput),
+            "cached_input_tokens" => Some(Self::CachedInput),
+            "cache_creation_input_tokens" => Some(Self::CacheCreationInput),
+            "tool_input_tokens" => Some(Self::ToolInput),
+            "reasoning_output_tokens" => Some(Self::ReasoningOutput),
+            _ => None,
+        }
+    }
+}
+
+impl ReportedTokenUsage {
+    fn from_usage(usage: &InferenceUsage) -> Option<Self> {
+        let mut attempts: BTreeSet<_> = usage.unreported_attempts.iter().collect();
+        let mut categories: BTreeMap<_, BTreeMap<&AttemptId, _>> = BTreeMap::new();
+        for observation in &usage.observations {
+            attempts.insert(&observation.attempt);
+            if observation.unit != "tokens" || observation.certainty != MeasurementKind::Exact {
+                continue;
+            }
+            let Some(category) = TokenCategory::from_provider(&observation.category) else {
+                continue;
+            };
+            // The account already retains the newest revision per source. If
+            // two sources claim one metric for the same attempt, that metric
+            // lacks a unique value for this projection.
+            categories
+                .entry(category)
+                .or_default()
+                .entry(&observation.attempt)
+                .and_modify(|value| *value = None)
+                .or_insert(Some(observation));
+        }
+        if attempts.is_empty() {
+            return None;
+        }
+        let mut counted = BTreeSet::new();
+        let mut reported = Vec::new();
+        for (category, observations) in categories {
+            let mut coverage = 0;
+            let mut final_values = true;
+            let mut tokens = 0_u128;
+            for (attempt, observation) in observations {
+                let Some(observation) = observation else {
+                    continue;
+                };
+                counted.insert(attempt);
+                coverage += 1;
+                tokens += u128::from(observation.quantity);
+                final_values &= observation.final_value;
+            }
+            if coverage > 0 {
+                reported.push(ReportedTokenCount {
+                    category,
+                    tokens: tokens.to_string(),
+                    partial: coverage < attempts.len() || !final_values,
+                });
+            }
+        }
+        Some(Self {
+            reported,
+            attempts_without_counts: attempts.len() - counted.len(),
+        })
     }
 }
 

@@ -165,6 +165,25 @@ export type NativeChatImageArtifact = Readonly<{
 
 export type NativeChatArtifactSaveResult = "saved" | "cancelled" | "failed";
 
+export type NativeChatTokenCategory =
+  | "input"
+  | "output"
+  | "uncached_input"
+  | "cached_input"
+  | "cache_creation_input"
+  | "tool_input"
+  | "reasoning_output";
+
+export type NativeChatTokenUsage = Readonly<{
+  reported: readonly Readonly<{
+    category: NativeChatTokenCategory;
+    /** Exact decimal subtotal from the reported attempts. */
+    tokens: string;
+    partial: boolean;
+  }>[];
+  attemptsWithoutCounts: number;
+}>;
+
 export type NativeChatTurnSummary = Readonly<{
   turnId: string;
   status: NonNullable<NativeChatTurn["status"]>;
@@ -189,6 +208,7 @@ export type NativeChatTurnSummary = Readonly<{
     | "deferred"
     | "skipped"
   )[];
+  tokenUsage?: NativeChatTokenUsage;
   artifacts?: readonly NativeChatImageArtifact[];
 }>;
 

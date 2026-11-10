@@ -141,6 +141,17 @@ dispositions, unresolved count, and check statuses come from the retained
 account. Earlier accounts may omit tool counts. A missing summary uses the
 recorded terminal status as a fallback.
 
+When a settled turn account records inference attempts, the summary may include
+`tokenUsage`. Its `reported` array contains up to seven token categories
+(`input`, `output`, `uncached_input`, `cached_input`, `cache_creation_input`,
+`tool_input`, `reasoning_output`). Each row has `category`, `tokens` as an exact
+decimal string, and `partial`. The host sums each category across distinct attempts
+using its retained latest observation. Partial means at least one attempt
+did not contribute to that category or supplied a non-final observation.
+`attemptsWithoutCounts` is the number of attempts with no usable exact token
+count. Categories can overlap. An explicit zero is a reported count, while an
+absent category has no reported value in the projection.
+
 Private stdio clients on macOS or Linux can also negotiate
 `co.grida/session/artifacts` version 1. A settled turn summary then includes
 `artifacts`, a list of up to eight recorded PNG crop results in operation ID
