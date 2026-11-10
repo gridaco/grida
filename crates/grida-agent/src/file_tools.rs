@@ -258,7 +258,7 @@ impl Operation {
     }
 }
 
-fn validate_path(path: &Path) -> Result<()> {
+pub(crate) fn validate_path(path: &Path) -> Result<()> {
     if path.as_os_str().as_encoded_bytes().len() > MAX_PATH_BYTES
         || path
             .to_str()
@@ -330,3 +330,5 @@ impl FileTools {
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod native;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub(crate) use native::{open_root_file, verify_open_path};

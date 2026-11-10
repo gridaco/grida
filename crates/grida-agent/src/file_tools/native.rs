@@ -108,7 +108,7 @@ impl FileTools {
         if path.as_os_str().is_empty() {
             return Ok(root.file);
         }
-        open_beneath(root, path, expected, budget)
+        open_beneath(root, path, expected, || budget.check())
     }
 
     fn list(
@@ -329,14 +329,34 @@ fn read_flags(kind: Kind) -> OFlags {
     flags
 }
 
+pub(crate) fn open_root_file(directory: &File, root: &Path, path: &Path) -> Result<File> {
+    validate_path(path)?;
+    if path.as_os_str().is_empty() {
+        return Err(problem(
+            ErrorKind::InvalidInput,
+            "file_relative_path_invalid",
+        ));
+    }
+    let root = Root {
+        file: directory.try_clone().map_err(|_| unavailable())?,
+        path: root.to_path_buf(),
+    };
+    open_beneath(root, path, Kind::File, || Ok(()))
+}
+
 #[cfg(target_os = "linux")]
-fn open_beneath(root: Root, path: &Path, expected: Kind, budget: &Budget) -> Result<File> {
+fn open_beneath(
+    root: Root,
+    path: &Path,
+    expected: Kind,
+    check: impl Fn() -> Result<()>,
+) -> Result<File> {
     use rustix::fs::ResolveFlags;
 
     let Root { file, path: _path } = root;
     let root_stat = unix::fstat(&file).map_err(open_error)?;
     let open = |flags| {
-        budget.check()?;
+        check()?;
         unix::openat2(
             &file,
             path,
@@ -363,9 +383,12 @@ fn open_beneath(root: Root, path: &Path, expected: Kind, budget: &Budget) -> Res
 }
 
 #[cfg(target_os = "macos")]
-fn open_beneath(root: Root, path: &Path, expected: Kind, budget: &Budget) -> Result<File> {
-    use std::os::unix::ffi::OsStrExt;
-
+fn open_beneath(
+    root: Root,
+    path: &Path,
+    expected: Kind,
+    check: impl Fn() -> Result<()>,
+) -> Result<File> {
     let Root {
         mut file,
         path: root_path,
@@ -378,10 +401,10 @@ fn open_beneath(root: Root, path: &Path, expected: Kind, budget: &Budget) -> Res
         } else {
             expected
         };
-        budget.check()?;
+        check()?;
         let prior = unix::statat(&file, name, AtFlags::SYMLINK_NOFOLLOW).map_err(open_error)?;
         check_kind(&prior, kind, &root_stat)?;
-        budget.check()?;
+        check()?;
         let next: File = unix::openat(&file, name, read_flags(kind), Mode::empty())
             .map_err(open_error)?
             .into();
@@ -392,12 +415,28 @@ fn open_beneath(root: Root, path: &Path, expected: Kind, budget: &Budget) -> Res
     }
     // A directory descriptor can survive a concurrent move. Verify the
     // opened object's kernel path before consuming its bytes or names.
-    let observed = unix::getpath(&file).map_err(open_error)?;
-    let observed = Path::new(std::ffi::OsStr::from_bytes(observed.to_bytes()));
-    if !observed.starts_with(root_path) {
+    verify_open_path(&file, &root_path)?;
+    Ok(file)
+}
+
+pub(crate) fn verify_open_path(file: &File, root: &Path) -> Result<()> {
+    if !observed_path(file)?.starts_with(root) {
         return Err(problem(ErrorKind::Conflict, "file_path_changed"));
     }
-    Ok(file)
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn observed_path(file: &File) -> Result<PathBuf> {
+    use std::os::unix::ffi::OsStrExt;
+    let path = unix::getpath(file).map_err(open_error)?;
+    Ok(PathBuf::from(std::ffi::OsStr::from_bytes(path.to_bytes())))
+}
+
+#[cfg(target_os = "linux")]
+fn observed_path(file: &File) -> Result<PathBuf> {
+    use std::os::fd::AsRawFd;
+    std::fs::read_link(format!("/proc/self/fd/{}", file.as_raw_fd())).map_err(|_| unavailable())
 }
 
 fn same_inode(before: &Stat, after: &Stat) -> Result<()> {

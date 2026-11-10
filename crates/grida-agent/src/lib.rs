@@ -20,6 +20,8 @@ mod supervised_provider;
 pub mod surface_tools;
 pub mod tool_host;
 pub mod workspace;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub mod workspace_file;
 
 pub use http::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol};
 pub use supervised_provider::SupervisedProvider;

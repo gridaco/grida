@@ -432,3 +432,189 @@ async fn one_turn_bounds_blocking_worker_admission() {
     assert_eq!(first.await.unwrap().status, OutcomeStatus::Succeeded);
     assert_eq!(second.await.unwrap().status, OutcomeStatus::Succeeded);
 }
+
+#[test]
+fn registered_range_keeps_the_metadata_and_bytes_of_one_opened_inode() {
+    use grida_agent::workspace_file::OpenedWorkspaceFile;
+    use std::io::Read;
+
+    let fixture = Fixture::new();
+    let file = fixture.first.join("clip.mp4");
+    fs::write(&file, b"0123456789").unwrap();
+    let modified = fs::metadata(&file).unwrap().modified().unwrap();
+    let live = fixture.current.clone();
+    let open = || {
+        let live = live.clone();
+        OpenedWorkspaceFile::open(
+            &fixture.captured,
+            &id("first"),
+            Path::new("clip.mp4"),
+            Arc::new(move || Ok(live.read().unwrap().clone())),
+        )
+        .unwrap()
+    };
+
+    let opened = open();
+    assert_eq!(opened.size(), 10);
+    assert_eq!(opened.modified(), modified);
+    fs::rename(&file, fixture.first.join("prior.mp4")).unwrap();
+    fs::write(&file, b"new").unwrap();
+
+    let mut bytes = Vec::new();
+    opened.range(3, 4).unwrap().read_to_end(&mut bytes).unwrap();
+    assert_eq!(bytes, b"3456");
+    assert!(
+        open()
+            .range(3, 0)
+            .unwrap()
+            .read_to_end(&mut Vec::new())
+            .is_ok()
+    );
+    assert_eq!(
+        open().range(u64::MAX, 1).err().unwrap().code,
+        "workspace_file_range_invalid"
+    );
+    assert_eq!(
+        open().range(2, 2).err().unwrap().code,
+        "workspace_file_range_invalid"
+    );
+}
+
+#[test]
+fn registered_range_refuses_unproven_aliases_and_uses_an_in_root_symbolic_target() {
+    use grida_agent::workspace_file::OpenedWorkspaceFile;
+    use std::io::Read;
+
+    let fixture = Fixture::new();
+    let outside = fixture.second.join("outside.mp4");
+    let inside = fixture.first.join("inside.mp4");
+    fs::write(&outside, b"outside").unwrap();
+    fs::write(&inside, b"inside").unwrap();
+    symlink(&outside, fixture.first.join("escape.mp4")).unwrap();
+    symlink(&inside, fixture.first.join("alias.mp4")).unwrap();
+    fs::hard_link(&outside, fixture.first.join("hardlink.mp4")).unwrap();
+    fs::create_dir(fixture.first.join("folder")).unwrap();
+    let open = |path: &str| {
+        let live = fixture.current.clone();
+        OpenedWorkspaceFile::open(
+            &fixture.captured,
+            &id("first"),
+            Path::new(path),
+            Arc::new(move || Ok(live.read().unwrap().clone())),
+        )
+    };
+
+    let mut bytes = Vec::new();
+    open("alias.mp4")
+        .unwrap()
+        .range(1, 3)
+        .unwrap()
+        .read_to_end(&mut bytes)
+        .unwrap();
+    assert_eq!(bytes, b"nsi");
+    for (path, error) in [
+        ("../second/outside.mp4", "file_relative_path_invalid"),
+        ("escape.mp4", "workspace_path_outside_root"),
+        ("hardlink.mp4", "file_type_unsupported"),
+        ("folder", "file_type_unsupported"),
+    ] {
+        assert_eq!(open(path).err().unwrap().code, error);
+    }
+    fs::hard_link(&inside, fixture.first.join("other-name.mp4")).unwrap();
+    assert_eq!(
+        open("inside.mp4").err().unwrap().code,
+        "file_type_unsupported"
+    );
+}
+
+#[test]
+fn registered_range_withholds_bytes_if_the_grant_changes_during_a_read() {
+    use grida_agent::workspace_file::OpenedWorkspaceFile;
+    use std::io::{ErrorKind, Read};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let fixture = Fixture::new();
+    fs::write(fixture.first.join("video.mp4"), b"private").unwrap();
+    let live = fixture.current.clone();
+    let checks = Arc::new(AtomicUsize::new(0));
+    let current = {
+        let checks = checks.clone();
+        Arc::new(move || {
+            let mut current = live.read().unwrap().clone();
+            let check = checks.load(Ordering::Relaxed);
+            if check > 0 && checks.fetch_add(1, Ordering::Relaxed) > 1 {
+                current.grants = Arc::default();
+            }
+            Ok(current)
+        })
+    };
+    let mut range = OpenedWorkspaceFile::open(
+        &fixture.captured,
+        &id("first"),
+        Path::new("video.mp4"),
+        current,
+    )
+    .unwrap()
+    .range(0, 7)
+    .unwrap();
+
+    checks.store(1, Ordering::Relaxed);
+    let mut bytes = [0xa5; 7];
+    let error = range.read(&mut bytes).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+    assert_eq!(error.to_string(), "workspace_access_denied");
+    assert_eq!(bytes, [0xa5; 7]);
+}
+
+#[test]
+fn registered_range_refuses_replaced_roots_and_current_protected_paths() {
+    use grida_agent::workspace_file::OpenedWorkspaceFile;
+
+    let fixture = Fixture::new();
+    fs::write(fixture.first.join("video.mp4"), b"private").unwrap();
+    let open = || {
+        let live = fixture.current.clone();
+        OpenedWorkspaceFile::open(
+            &fixture.captured,
+            &id("first"),
+            Path::new("video.mp4"),
+            Arc::new(move || Ok(live.read().unwrap().clone())),
+        )
+    };
+
+    fixture.current.write().unwrap().protected =
+        Arc::new(ProtectedRoots::new(vec![fixture.first.join("video.mp4")]).unwrap());
+    assert_eq!(open().err().unwrap().code, "protected_root_overlap");
+    fixture.current.write().unwrap().protected = Arc::new(ProtectedRoots::new(vec![]).unwrap());
+    fs::rename(&fixture.first, fixture.base.join("old-workspace")).unwrap();
+    fs::create_dir(&fixture.first).unwrap();
+    fs::write(fixture.first.join("video.mp4"), b"other identity").unwrap();
+    assert_eq!(open().err().unwrap().code, "workspace_directory_changed");
+}
+
+#[test]
+fn registered_range_refuses_an_open_inode_moved_outside_its_root() {
+    use grida_agent::workspace_file::OpenedWorkspaceFile;
+    use std::io::{ErrorKind, Read};
+
+    let fixture = Fixture::new();
+    let clip = fixture.first.join("clip.mp4");
+    fs::write(&clip, b"private").unwrap();
+    let live = fixture.current.clone();
+    let mut range = OpenedWorkspaceFile::open(
+        &fixture.captured,
+        &id("first"),
+        Path::new("clip.mp4"),
+        Arc::new(move || Ok(live.read().unwrap().clone())),
+    )
+    .unwrap()
+    .range(0, 7)
+    .unwrap();
+    fs::rename(&clip, fixture.second.join("moved.mp4")).unwrap();
+    fs::write(&clip, b"replacement").unwrap();
+    let mut output = [0xa5; 7];
+    let error = range.read(&mut output).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+    assert_eq!(error.to_string(), "file_path_changed");
+    assert_eq!(output, [0xa5; 7]);
+}

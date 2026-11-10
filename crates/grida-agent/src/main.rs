@@ -44,7 +44,7 @@ fn main() -> ExitCode {
 }
 
 fn command() -> Command {
-    Command::new("grida-agent")
+    let command = Command::new("grida-agent")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Native Grida Agent host")
         .subcommand_required(true)
@@ -163,7 +163,10 @@ fn command() -> Command {
                 .about("Read a persisted session without running a prompt")
                 .arg(state_dir())
                 .arg(Arg::new("session").value_name("SESSION_ID").required(true)),
-        )
+        );
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    let command = command.subcommand(Command::new("workspace-file").hide(true));
+    command
 }
 
 fn state_dir() -> Arg {
@@ -248,6 +251,10 @@ fn launch(command: Command) -> Command {
 
 async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let (name, args) = matches.subcommand().expect("required subcommand");
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    if name == "workspace-file" {
+        return grida_agent::workspace_file::serve_stdio().map(|()| 0);
+    }
     if name == "serve-mcp" {
         let options = mcp::ListenOptions::from_environment(
             args.get_one::<String>("listen")

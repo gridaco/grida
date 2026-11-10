@@ -242,6 +242,23 @@ resolve the current files, and stale explicit references require reselection.
 
 ## Filesystem services
 
+The private `workspace-file` process reads one span from a registered
+workspace on macOS and Linux. Its owner supplies a canonical root, the
+registered directory identity, protected paths, and a relative file name.
+The process reports the opened descriptor's size before reading any bytes.
+The owner supplies an exact offset and length, or closes the request pipe
+to release the descriptor without reading. Byte output and size refer to
+the same opened file.
+
+The process accepts two bounded JSON lines on stdin. The first contains
+`workspaceId`, `root`, `identity`, `protected`, and `path`. The identity
+contains decimal strings `device`, `inode`, and `birthTimeNs`. Stdout reports
+`{"size":"…"}` as one JSON line. The second input contains decimal string
+`offset` and `length`, followed on stdout by exactly that byte span on success.
+The owning client supplies live process controls and any kernel launch profile.
+The process rejects unproven hard links, mounts, and paths outside the granted
+directory. The existing Desktop HTTP route still owns Range and MIME handling.
+
 The workspace and scratch modules provide host-owned filesystem building blocks.
 Workspace membership records named roots and a primary default. Independent
 grants bind to captured native directory identities. Restored targets require

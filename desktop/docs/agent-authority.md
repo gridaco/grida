@@ -397,6 +397,16 @@ Main's workspace Trash helper covers one path-checked native operation.
 Moving file I/O out of the compatibility process requires equivalent
 per-workspace containment and the existing exact registered-handle checks.
 
+The native workspace reader can open one registered directory's file and
+stream an exact byte span from the descriptor used for metadata. It checks
+the registered directory's native identity and protected roots, then
+confirms the open file remains in scope before delivering each chunk.
+In-root symbolic aliases can resolve to regular files. Hard links without
+proven scope and cross-device targets are refused. The private worker can
+run under an exact read-only Seatbelt profile. Desktop route adoption also
+requires a live registry owner and the existing Range and cancellation
+semantics.
+
 The packaged native fixture uses synthetic provider responses and verifies
 retained media, shared custody, transferred sockets, and clean shutdown.
 Its kernel probe exercises denied direct network, unrelated file access,
