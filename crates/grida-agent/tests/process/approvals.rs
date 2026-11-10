@@ -178,12 +178,21 @@ impl Stdio {
     pub(super) async fn send(&mut self, method: &str, params: Value) -> u64 {
         self.id += 1;
         let id = self.id;
-        let frame = json!({"jsonrpc":"2.0","id":id,"method":method,"params":params});
+        self.write_frame(json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}))
+            .await;
+        id
+    }
+
+    pub(super) async fn respond(&mut self, id: &Value, result: Value) {
+        self.write_frame(json!({"jsonrpc":"2.0","id":id,"result":result}))
+            .await;
+    }
+
+    async fn write_frame(&mut self, frame: Value) {
         timeout(WAIT, self.stdin.write_all(format!("{frame}\n").as_bytes()))
             .await
             .unwrap()
             .unwrap();
-        id
     }
 
     pub(super) async fn read_reply(&mut self) -> Value {

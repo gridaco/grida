@@ -7,6 +7,8 @@ use agent_kit_core::{ChangeId, SessionId};
 use base64::{Engine, engine::general_purpose::STANDARD};
 
 const IMAGE_MODEL: &str = "gpt-5.4";
+const GATEWAY_PNG_MODEL: &str = "openai/gpt-5.6-sol";
+const GATEWAY_ENDPOINT: &str = "https://grida.co/api/v1/ai";
 const ARTIFACTS: &str = "co.grida/session/artifacts";
 
 #[tokio::test]
@@ -971,6 +973,191 @@ async fn settled(client: &mut StdioClient, session: &str) -> Value {
     })
     .await
     .unwrap()
+}
+
+#[tokio::test]
+async fn supervised_gateway_sends_only_the_selected_png_and_reopens_its_scope() {
+    let directory = TempDir::new().unwrap();
+    let state = directory.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let scope = "a".repeat(64);
+    let mut first = gateway_stdio(&state, &scope).await;
+    let created = first
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let data = STANDARD.encode(png([15, 255, 0]));
+    let request = gateway_exchange(&mut first, upload(session, "selected-png", &data)).await;
+    assert_gateway_png(&request, &data);
+    assert_eq!(
+        settled(&mut first, session).await["latest"]["status"],
+        "succeeded"
+    );
+    first.close().await;
+
+    let load = json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]});
+    let mut foreign = gateway_stdio(&state, &"b".repeat(64)).await;
+    let loaded = foreign.request("session/load", load.clone()).await;
+    assert!(loaded["result"].is_object(), "{loaded}");
+    let denied_id = foreign
+        .send(
+            "_co.grida/session/submit",
+            super::lifecycle::prompt_request(session, "foreign", "Describe the image again."),
+        )
+        .await;
+    let denied = foreign.read_reply().await;
+    assert_eq!(denied["id"], denied_id, "{denied}");
+    assert_eq!(
+        denied["error"]["data"], "session_execution_configuration_changed",
+        "{denied}"
+    );
+    foreign.close().await;
+
+    let mut reopened = gateway_stdio(&state, &scope).await;
+    let loaded = reopened.request("session/load", load).await;
+    assert!(loaded["result"].is_object(), "{loaded}");
+    let retained = reopened
+        .request(
+            "_co.grida/session/input",
+            json!({"sessionId":session,"inputId":"selected-png"}),
+        )
+        .await;
+    assert_eq!(
+        retained["result"]["prompt"][1]["text"],
+        "[Retained PNG image]"
+    );
+    assert!(!retained.to_string().contains(&data));
+    let request = gateway_exchange(
+        &mut reopened,
+        super::lifecycle::prompt_request(session, "follow-up", "Describe the image again."),
+    )
+    .await;
+    assert_gateway_png(&request, &data);
+    assert_eq!(
+        settled(&mut reopened, session).await["latest"]["status"],
+        "succeeded"
+    );
+    reopened.close().await;
+}
+
+async fn gateway_stdio(state: &Path, scope: &str) -> StdioClient {
+    let child = executable()
+        .args(["serve", "--stdio", "--supervised-provider", "--state-dir"])
+        .arg(state)
+        .args([
+            "--supervised-gateway-scope",
+            scope,
+            "--endpoint",
+            GATEWAY_ENDPOINT,
+            "--model",
+            GATEWAY_PNG_MODEL,
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut client = StdioClient::from_child(child);
+    let mut initialize = extension_initialize();
+    initialize["clientCapabilities"]["_meta"]["co.grida/provider/egress"] = 1.into();
+    let ready = client.request("initialize", initialize).await;
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["promptCapabilities"]["image"], true,
+        "{ready}"
+    );
+    client
+}
+
+async fn gateway_exchange(client: &mut StdioClient, prompt: Value) -> Value {
+    let submit = client.send("_co.grida/session/submit", prompt).await;
+    let mut accepted = false;
+    let mut completed = false;
+    let mut id = None;
+    let mut body = None;
+    let mut chunk = Some(STANDARD.encode(fixture_body(
+        Reply::Finished("A tiny image."),
+        ProviderProtocol::OpenAiCompatible,
+    )));
+    while !accepted || !completed {
+        let frame = client.read_frame().await;
+        let params = &frame["params"];
+        match frame["method"].as_str() {
+            Some("_co.grida/provider/exchange") => {
+                let result = match params["action"].as_str() {
+                    Some("open") => {
+                        assert!(id.is_none(), "{frame}");
+                        assert_eq!(
+                            params["target"],
+                            format!("{GATEWAY_ENDPOINT}/chat/completions")
+                        );
+                        id = Some(params["id"].clone());
+                        let bytes = STANDARD
+                            .decode(params["initial"].as_str().unwrap())
+                            .unwrap();
+                        body = Some(serde_json::from_slice(&bytes).unwrap());
+                        json!({"status":"accepted"})
+                    }
+                    Some("dispatch") => json!({"status":"ready","httpStatus":200}),
+                    Some("read") => match chunk.take() {
+                        Some(data) => json!({"status":"chunk","data":data}),
+                        None => json!({"status":"end"}),
+                    },
+                    _ => panic!("unexpected fixture exchange: {frame}"),
+                };
+                assert_eq!(id.as_ref(), Some(&params["id"]), "{frame}");
+                client.respond(&frame["id"], result).await;
+            }
+            Some("_co.grida/provider/cancel") => {
+                assert_eq!(id.as_ref(), Some(&params["id"]), "{frame}");
+                assert!(chunk.is_none(), "{frame}");
+                completed = true;
+            }
+            None if frame["id"] == submit => {
+                assert_eq!(frame["result"]["disposition"], "claimed", "{frame}");
+                accepted = true;
+            }
+            _ => {}
+        }
+    }
+    body.unwrap()
+}
+
+fn assert_gateway_png(request: &Value, data: &str) {
+    assert_eq!(request["model"], GATEWAY_PNG_MODEL);
+    let images: Vec<_> = request["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|message| message["content"].as_array())
+        .flatten()
+        .filter(|part| part["type"] == "image_url")
+        .collect();
+    assert_eq!(
+        images,
+        vec![
+            &json!({"type":"image_url","image_url":{"url":format!("data:image/png;base64,{data}")}})
+        ]
+    );
+    if let Some(tools) = request["tools"].as_array() {
+        assert!(
+            tools.iter().all(|tool| !matches!(
+                tool["function"]["name"].as_str(),
+                Some(
+                    "crop_retained_image"
+                        | "view_image"
+                        | "design_search"
+                        | "generate_image"
+                        | "place_generated_image"
+                        | "capture_image_reference"
+                        | "generate_image_from_workspace_reference"
+                )
+            )),
+            "{tools:?}"
+        );
+    }
 }
 
 #[tokio::test]

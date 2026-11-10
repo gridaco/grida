@@ -2106,6 +2106,10 @@ levels into one.
    organization. The connector adds the bearer only to the fixed chat route
    through the dedicated provider session. The child receives no bearer or
    account cookie through that connection.
+   The reviewed default model may receive a user-selected retained PNG on
+   that route. The native resolver verifies its owner, identity, size and
+   digest before dispatch. Other Gateway model and origin combinations do
+   not gain image input from this profile.
    The connector requests Gateway billing evidence on that same chat POST.
    The [chat route](<editor/app/(api)/(public)/api/v1/ai/chat/completions/route.ts>)
    emits a terminal observation only for an authenticated Gateway execution

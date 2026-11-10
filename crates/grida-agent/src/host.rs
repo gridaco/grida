@@ -151,7 +151,8 @@ struct Execution {
     authorization: Arc<ExecutionAuthority>,
     questions: Arc<questions::QuestionAccess>,
     configuration_tools: Arc<ConfigurationAccess>,
-    images: Option<Arc<retained_inputs::RetainedInputs>>,
+    accepts_selected_png: bool,
+    image_tools: Option<Arc<retained_inputs::RetainedInputs>>,
     workspace_vision: bool,
     tool_result_images: bool,
     retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
@@ -562,13 +563,14 @@ impl Host {
         let connection = Arc::new(crate::gg::SupervisedGg::new(endpoint, scope, supervisor)?);
         Self::open_with(
             state_dir,
-            Some(|_| {
+            Some(|retained_inputs| {
                 Execution::new_gg(
                     options,
                     connection.scope,
                     connection.binding.clone(),
                     connection.clone(),
                     Credential::SupervisedGg(connection),
+                    retained_inputs,
                 )
             }),
             workspace_configuration,
@@ -607,13 +609,14 @@ impl Host {
         options.validate()?;
         let mut host = Self::open_with(
             state_dir,
-            Some(|_| {
+            Some(|retained_inputs| {
                 Execution::new_gg(
                     options,
                     connection.scope_fingerprint(),
                     connection.binding().clone(),
                     transport,
                     Credential::Gg(connection.clone()),
+                    retained_inputs,
                 )
             }),
             None,
@@ -1457,7 +1460,7 @@ impl Host {
             })
             .transpose()?;
         let image = execution
-            .images
+            .image_tools
             .as_ref()
             .filter(|_| prepared.operating_regime.is_act() && !prepared.subagent)
             .map(|images| {
@@ -1487,7 +1490,7 @@ impl Host {
         let mut authority = execution.authority.clone();
         let mut inventory = Inventory::new();
         let capture_image = execution
-            .images
+            .image_tools
             .as_ref()
             .filter(|_| execution.workspace_vision && !prepared.subagent)
             .map(|images| {
@@ -2792,7 +2795,7 @@ impl Host {
     pub(crate) fn accepts_images(&self) -> bool {
         self.execution
             .as_ref()
-            .is_some_and(|execution| execution.images.is_some())
+            .is_some_and(|execution| execution.accepts_selected_png)
     }
 
     pub(crate) fn accepts_files(&self) -> bool {
@@ -2923,7 +2926,8 @@ impl Execution {
             binding,
             Credential::Http(transport),
         )?;
-        execution.images = images;
+        execution.accepts_selected_png = images.is_some();
+        execution.image_tools = images;
         execution.workspace_vision = workspace_vision;
         execution.tool_result_images = workspace_vision || compatible_tool_images;
         Ok(execution)
@@ -2935,25 +2939,43 @@ impl Execution {
         binding: ProviderBinding,
         transport: Arc<dyn StreamingTransport>,
         credential: Credential,
+        retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
     ) -> Result<Self> {
         let configuration = Fingerprint::of(&("gg-chat-selection-v1", scope, &options.model))?;
-        let provider = OpenAiCompatible::new(
+        let images = retained_inputs.filter(|_| match &credential {
+            Credential::Gg(connection) => connection.accepts_retained_png(&options.model),
+            Credential::SupervisedGg(connection) => connection.accepts_retained_png(&options.model),
+            _ => false,
+        });
+        let mut capabilities = text_capabilities("gg")?;
+        let image_resolver = images.as_ref().map(|images| {
+            let images = images.clone();
+            Arc::new(move |media: &agent_kit_core::messages::MediaRef, maximum| {
+                images.resolve_selected_image(media, maximum)
+            }) as Arc<agent_kit_providers::InputImageResolver>
+        });
+        if image_resolver.is_some() {
+            capabilities.revision = BindingId::new("gg-selected-png-v1")?;
+            capabilities.input_modalities.insert(Modality::Image);
+        }
+        let provider = OpenAiCompatible::with_image_resolver(
             binding.clone(),
             BTreeMap::from([(
                 options.model.clone(),
                 ModelProfile {
-                    capabilities: text_capabilities("gg")?,
+                    capabilities,
                     output_limit: OutputLimitField::CompletionTokens,
                     include_usage: true,
                 },
             )]),
             transport,
             PROVIDER_LIMITS,
+            image_resolver,
         )?
         // The first-party chat route uses this typed rejection only for
         // its pre-dispatch throttle. Downstream 429s have a different type.
         .with_admission_rate_limit_evidence();
-        Self::compose(
+        let mut execution = Self::compose(
             configuration,
             configuration,
             options.model,
@@ -2961,7 +2983,9 @@ impl Execution {
             Arc::new(provider),
             binding,
             credential,
-        )
+        )?;
+        execution.accepts_selected_png = images.is_some();
+        Ok(execution)
     }
 
     fn new_chatgpt(
@@ -3053,7 +3077,8 @@ impl Execution {
             authorization,
             questions,
             configuration_tools,
-            images: None,
+            accepts_selected_png: false,
+            image_tools: None,
             workspace_vision: false,
             tool_result_images: false,
             retained_inputs: None,

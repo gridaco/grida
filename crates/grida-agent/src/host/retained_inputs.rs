@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 const STORAGE: &str = "retained-inputs";
+const SELECTED_IMAGE: &str = "input/";
 pub(super) const WORKSPACE_VIEW: &str = "workspace-view/";
 pub(super) const WORKSPACE_REFERENCE: &str = "workspace-reference/";
 pub(super) const LIBRARY_SELECTION: &str = "library-selection/";
@@ -73,7 +74,7 @@ impl RetainedInputs {
         upload: ImageUpload,
     ) -> Result<AssetRef> {
         let identity = Fingerprint::of(&(input, upload.digest))?;
-        self.retain_png(session, cwd, "input/", identity, &upload.bytes)
+        self.retain_png(session, cwd, SELECTED_IMAGE, identity, &upload.bytes)
     }
 
     pub(super) fn retain_library_image(
@@ -212,6 +213,17 @@ impl RetainedInputs {
                 unavailable()
             }
         })
+    }
+
+    pub(super) fn resolve_selected_image(
+        &self,
+        media: &MediaRef,
+        maximum: usize,
+    ) -> Result<Vec<u8>> {
+        if !media.id.as_str().starts_with(SELECTED_IMAGE) {
+            return Err(retained_unavailable());
+        }
+        self.resolve(media, maximum)
     }
 
     pub(super) fn read_working(

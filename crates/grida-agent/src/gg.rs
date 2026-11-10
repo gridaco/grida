@@ -8,7 +8,7 @@ use agent_kit_core::inference::{
 use agent_kit_core::turn::{OperationInput, OperationOutcome, OperationState, TurnState};
 use agent_kit_core::{
     AttemptId, BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint,
-    OperationId, PrincipalId, ProviderId, Result, SchemaId, ScopeId,
+    ModelId, OperationId, PrincipalId, ProviderId, Result, SchemaId, ScopeId,
 };
 use agent_kit_providers::{
     StreamingTransport, TerminalReceiptDecoder, TransportFailure, TransportOperation,
@@ -32,6 +32,16 @@ const FAILED_RENEWAL_COOLDOWN: Duration = Duration::from_secs(1);
 const BILLING_RECEIPT_SCHEMA: &str = "grida.gateway.billing-receipt";
 const MAX_BILLING_RECEIPT_BYTES: usize = 512;
 const MAX_SUMMARY_BILLING_ATTEMPTS: usize = 32;
+const RETAINED_PNG_MODEL: &str = "openai/gpt-5.6-sol";
+const RETAINED_PNG_TARGET: &str = "https://grida.co/api/v1/ai/chat/completions";
+
+fn accepts_retained_png(target: &Url, model: &ModelId) -> bool {
+    model.as_str() == RETAINED_PNG_MODEL
+        && matches!(
+            target.as_str(),
+            RETAINED_PNG_TARGET | "http://localhost:3000/api/v1/ai/chat/completions"
+        )
+}
 
 /// Secret-bearing input for a trusted host HTTP adapter. It has no debug or
 /// serialization projection. The transport checks expiry again before sending.
@@ -100,6 +110,10 @@ impl SupervisedGg {
 
     pub(crate) fn validate(&self) -> Result<()> {
         self.supervisor.validate()
+    }
+
+    pub(crate) fn accepts_retained_png(&self, model: &ModelId) -> bool {
+        accepts_retained_png(&self.target, model)
     }
 
     /// Distinguish a missing attempt from an exact attempt without a dispatch ID.
@@ -538,6 +552,10 @@ impl GgConnection {
         self.target.origin().ascii_serialization()
     }
 
+    pub(crate) fn accepts_retained_png(&self, model: &ModelId) -> bool {
+        accepts_retained_png(self.target(), model)
+    }
+
     /// Decode billing evidence carried by the fixed chat response for this scope.
     pub fn terminal_receipt_decoder(&self) -> Arc<TerminalReceiptDecoder> {
         terminal_receipt_decoder(self.scope)
@@ -747,6 +765,249 @@ fn now_ms() -> Result<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selected_gateway_png_requires_the_product_or_local_editor_route() {
+        let model = ModelId::new(RETAINED_PNG_MODEL).unwrap();
+        for (origin, direct, supervised) in [
+            ("https://grida.co", true, true),
+            ("http://localhost:3000", false, true),
+            ("http://127.0.0.1:3000", false, false),
+            ("http://localhost:3001", false, false),
+            ("https://grida.co:444", false, false),
+            ("https://other.example", false, false),
+        ] {
+            assert_eq!(
+                GgConnection::bind(origin, "fixture-owner", 7, i64::MAX, "synthetic.gg.grant")
+                    .is_ok_and(|connection| connection.accepts_retained_png(&model)),
+                direct,
+                "{origin}"
+            );
+            let endpoint = format!("{origin}/api/v1/ai");
+            let connection =
+                SupervisedGg::new(&endpoint, &"a".repeat(64), SupervisedProvider::default())
+                    .unwrap();
+            assert_eq!(
+                connection.accepts_retained_png(&model),
+                supervised,
+                "{origin}"
+            );
+        }
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[tokio::test]
+    async fn selected_gateway_png_stays_on_the_exact_chat_connection() {
+        use crate::ConfigurationPermission;
+        use crate::host::{GgOptions, Host, ImageUpload, PromptPart, PromptRequest, RunResult};
+        use agent_kit_core::messages::OutcomeStatus;
+        use base64::{Engine, engine::general_purpose::STANDARD};
+        use futures_util::StreamExt;
+        use grida_agent_master::read_account;
+        use serde_json::{Value, json};
+        use std::fs;
+
+        struct ChatFixture {
+            connection: Arc<GgConnection>,
+            requests: Arc<Mutex<Vec<Value>>>,
+        }
+
+        impl StreamingTransport for ChatFixture {
+            fn send(
+                &self,
+                request: TransportRequest,
+                _control: RequestControl,
+            ) -> BoxFuture<'_, std::result::Result<TransportResponse, TransportFailure>>
+            {
+                Box::pin(async move {
+                    let request = self.connection.chat_request(request).unwrap();
+                    assert_eq!(request.target, RETAINED_PNG_TARGET);
+                    assert_eq!(request.authorization, "Bearer synthetic.gg.grant");
+                    self.requests
+                        .lock()
+                        .unwrap()
+                        .push(serde_json::from_slice(&request.body).unwrap());
+                    Ok(TransportResponse {
+                        status: 200,
+                        request_id: None,
+                        retry_after_ms: None,
+                        body: futures_util::stream::iter([Ok(concat!(
+                            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Seen.\"},",
+                            "\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n"
+                        )
+                        .as_bytes()
+                        .to_vec())])
+                        .boxed(),
+                    })
+                })
+            }
+        }
+
+        const PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPg/88AAAIvAQ+3s0AMAAAAAElFTkSuQmCC";
+        let temporary = tempfile::tempdir().unwrap();
+        let state = temporary.path().join("state");
+        let workspace = temporary.path().join("workspace");
+        fs::create_dir(&workspace).unwrap();
+        let selected = workspace.join("selected.png");
+        let bytes = STANDARD.decode(PNG).unwrap();
+        fs::write(&selected, &bytes).unwrap();
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let open = |origin, model, account, organization| {
+            let connection = Arc::new(
+                GgConnection::bind(
+                    origin,
+                    account,
+                    organization,
+                    i64::MAX,
+                    "synthetic.gg.grant",
+                )
+                .unwrap(),
+            );
+            Host::open_gg(
+                &state,
+                GgOptions {
+                    model: ModelId::new(model).unwrap(),
+                    max_output_tokens: 1024,
+                },
+                connection.clone(),
+                Arc::new(ChatFixture {
+                    connection,
+                    requests: requests.clone(),
+                }),
+            )
+            .unwrap()
+        };
+        let request = |session, parts| PromptRequest {
+            id: crate::host::change_id().unwrap(),
+            session,
+            parts,
+            questions: false,
+            configuration_permission: ConfigurationPermission::Disabled,
+            operating_regime: None,
+            effort: None,
+        };
+        let png = || PromptPart::Image {
+            image: ImageUpload::read_selected_png(&selected).unwrap(),
+        };
+        let text = || PromptPart::Text {
+            text: "Describe the selected image.".into(),
+        };
+
+        for (origin, model) in [
+            ("https://grida.co", "openai/gpt-5.6-terra"),
+            ("https://elsewhere.example", RETAINED_PNG_MODEL),
+        ] {
+            let host = open(origin, model, "fixture-account", 7);
+            assert!(!host.accepts_images());
+            let session = host.new_session(workspace.clone()).await.unwrap();
+            let error = host
+                .start_prompt(request(session, vec![text(), png()]))
+                .await
+                .err()
+                .unwrap();
+            assert_eq!(error.code, "image_input_unavailable");
+            host.shutdown().await.unwrap();
+        }
+        assert!(requests.lock().unwrap().is_empty());
+        assert!(!state.join("retained-inputs").exists());
+
+        let host = open("https://grida.co", RETAINED_PNG_MODEL, "fixture-account", 7);
+        assert!(host.accepts_images());
+        let session = host.new_session(workspace.clone()).await.unwrap();
+        let sent = host
+            .start_prompt(request(session.clone(), vec![text(), png()]))
+            .await
+            .unwrap();
+        let RunResult::Settled(first) = sent.completion.await.unwrap().unwrap() else {
+            panic!("expected selected PNG to settle");
+        };
+        assert_eq!(first.status, OutcomeStatus::Succeeded);
+        host.shutdown().await.unwrap();
+        drop(host);
+
+        for (account, organization) in [("different-account", 7), ("fixture-account", 8)] {
+            let host = open(
+                "https://grida.co",
+                RETAINED_PNG_MODEL,
+                account,
+                organization,
+            );
+            let error = host
+                .start_prompt(request(session.clone(), vec![text()]))
+                .await
+                .err()
+                .unwrap();
+            assert_eq!(error.code, "session_execution_configuration_changed");
+            host.shutdown().await.unwrap();
+        }
+        assert_eq!(requests.lock().unwrap().len(), 1);
+
+        // The source path is independent of the image already accepted in chat.
+        fs::write(&selected, b"changed source").unwrap();
+        let host = open("https://grida.co", RETAINED_PNG_MODEL, "fixture-account", 7);
+        let sent = host
+            .start_prompt(request(session.clone(), vec![text()]))
+            .await
+            .unwrap();
+        let RunResult::Settled(followup) = sent.completion.await.unwrap().unwrap() else {
+            panic!("expected selected PNG history to settle");
+        };
+        assert_eq!(followup.status, OutcomeStatus::Succeeded);
+        host.shutdown().await.unwrap();
+        drop(host);
+        {
+            let requests = requests.lock().unwrap();
+            assert_eq!(requests.len(), 2);
+            for body in requests.iter() {
+                assert_eq!(body["model"], RETAINED_PNG_MODEL);
+                assert!(body["tools"].is_null());
+                assert_eq!(
+                    body["messages"][1]["content"][1],
+                    json!({
+                        "type":"image_url", "image_url":{"url":format!("data:image/png;base64,{PNG}")}
+                    })
+                );
+            }
+        }
+
+        let retained = fs::read_dir(state.join("retained-inputs"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| path.is_dir())
+            .unwrap()
+            .join("sources");
+        let original = fs::read_dir(retained)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "asset")
+            })
+            .unwrap();
+        for missing in [false, true] {
+            if missing {
+                fs::remove_file(&original).unwrap();
+            } else {
+                fs::write(&original, vec![0; bytes.len()]).unwrap();
+            }
+            let host = open("https://grida.co", RETAINED_PNG_MODEL, "fixture-account", 7);
+            let sent = host
+                .start_prompt(request(session.clone(), vec![text()]))
+                .await
+                .unwrap();
+            let RunResult::Settled(blocked) = sent.completion.await.unwrap().unwrap() else {
+                panic!("expected unavailable retained bytes to stop the turn");
+            };
+            assert_eq!(blocked.status, OutcomeStatus::Failed);
+            let account = read_account(blocked.account.as_ref().unwrap()).unwrap();
+            assert_eq!(
+                account.inference_failure.unwrap().code,
+                "retained_image_unavailable"
+            );
+            assert_eq!(requests.lock().unwrap().len(), 2);
+            host.shutdown().await.unwrap();
+        }
+    }
 
     #[test]
     fn projects_exact_scoped_billing_and_bounded_attempts() {

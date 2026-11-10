@@ -560,8 +560,9 @@ Image edits use a retained working copy. [Run locally with a PNG](https://github
 On macOS and Linux, the isolated native Desktop preview supports PNG input
 with **GPT-5.6 Terra** and a saved OpenRouter key. Select it at launch with
 `--native-chat-provider=openrouter --native-chat-model=openai/gpt-5.6-terra`.
-The Gateway, ChatGPT subscription, Vercel, and custom endpoint profiles offer
-text input. The provider receives the retained PNG when the conversation uses it.
+The default Gateway connection also accepts a selected PNG. ChatGPT subscription,
+Vercel, and custom endpoint profiles offer text input. The selected provider
+receives the retained PNG when the conversation uses it.
 
 ## Attach a Library image
 
