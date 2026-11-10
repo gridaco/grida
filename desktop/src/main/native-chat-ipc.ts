@@ -4,6 +4,7 @@ import type { IpcMainInvokeEvent, WebContents, WebFrameMain } from "electron";
 import type {
   NativeChatAttachment,
   NativeChatApproval,
+  NativeChatCatalogEntry,
   NativeChatControlReceipt,
   NativeChatGoalObservation,
   NativeChatGoalReceipt,
@@ -48,6 +49,8 @@ export type ActiveNativeChat = Readonly<{
   chat: Pick<
     NativeAgentChat,
     | "list"
+    | "catalogEntry"
+    | "organize"
     | "create"
     | "load"
     | "openSideChat"
@@ -199,13 +202,16 @@ export class NativeChatIpc {
 
   async list(
     event: IpcMainInvokeEvent,
-    cursor?: string | null
+    cursor?: string | null,
+    archived = false
   ): Promise<NativeChatPage> {
     const owner = this.owner(event);
     if (owner.listing) throw new Error("native_chat_catalog_busy");
     owner.listing = true;
     try {
-      const page = await owner.active.chat.list(cursor);
+      const page = archived
+        ? await owner.active.chat.list(cursor, true)
+        : await owner.active.chat.list(cursor);
       this.revalidate(owner);
       return page;
     } finally {
@@ -222,6 +228,27 @@ export class NativeChatIpc {
     sessionId: string
   ): Promise<NativeChatAttachment> {
     return this.attach(event, (chat) => chat.load(sessionId));
+  }
+
+  async catalogEntry(
+    event: IpcMainInvokeEvent,
+    attachmentId: string
+  ): Promise<NativeChatCatalogEntry> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const entry = await owner.active.chat.catalogEntry(attachment.session);
+    this.revalidate(owner, attachment);
+    return entry;
+  }
+
+  async organize(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    change: unknown
+  ): Promise<NativeChatCatalogEntry> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const entry = await owner.active.chat.organize(attachment.session, change);
+    this.revalidate(owner, attachment);
+    return entry;
   }
 
   async openSideChat(

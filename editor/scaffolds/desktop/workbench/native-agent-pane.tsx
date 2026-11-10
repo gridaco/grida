@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import type { DesktopNativeChat } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
+import { Input } from "@app/ui/components/input";
 import { Textarea } from "@app/ui/components/textarea";
 import { MessageAction } from "@app/ui/ai-elements/message";
 import { ArrowDownIcon, ArrowUpIcon, PencilIcon, XIcon } from "lucide-react";
@@ -130,14 +131,30 @@ export function NativeAgentPane({
         >
           <option value="">New Chat</option>
           {state.selected && !state.sessions.includes(state.selected) && (
-            <option value={state.selected}>Current Chat</option>
+            <option value={state.selected}>
+              {controller.chatTitle(state.selected)}
+              {state.catalogEntry?.archived ? " (archived)" : ""}
+            </option>
           )}
           {state.sessions.map((id) => (
             <option key={id} value={id}>
-              Chat {id.slice(0, 8)}
+              {controller.chatTitle(id)}
             </option>
           ))}
         </select>
+        {controller.canOrganizeChats && (
+          <Button
+            type="button"
+            size="xs"
+            variant={state.catalogArchived ? "secondary" : "ghost"}
+            disabled={state.catalogLoading}
+            onClick={() =>
+              void controller.listChats(null, !state.catalogArchived)
+            }
+          >
+            {state.catalogArchived ? "Active chats" : "Archived chats"}
+          </Button>
+        )}
         {controller.canOpenSideChat && (
           <Button
             type="button"
@@ -157,6 +174,83 @@ export function NativeAgentPane({
           New Chat
         </Button>
       </div>
+      {controller.canOrganizeChats && state.selected && (
+        <div className="flex flex-wrap items-center gap-1 px-3 pb-2 text-xs">
+          {state.catalogDraft ? (
+            <form
+              className="flex min-w-0 flex-1 items-center gap-1"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void controller.saveTitle();
+              }}
+            >
+              <Input
+                aria-label="Chat title"
+                autoFocus
+                maxLength={256}
+                value={state.catalogDraft.text}
+                disabled={state.catalogChanging}
+                onChange={(event) =>
+                  controller.changeTitle(event.currentTarget.value)
+                }
+                className="h-7 text-xs md:text-xs"
+              />
+              <Button type="submit" size="xs" disabled={state.catalogChanging}>
+                Save title
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                disabled={state.catalogChanging}
+                onClick={() => controller.cancelRename()}
+              >
+                Cancel
+              </Button>
+            </form>
+          ) : state.catalogEntry ? (
+            <>
+              {state.catalogEntry.archived && (
+                <span className="text-muted-foreground">Archived</span>
+              )}
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                disabled={state.catalogChanging}
+                onClick={() => controller.beginRename()}
+              >
+                Rename chat
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                disabled={state.catalogChanging}
+                onClick={() =>
+                  void controller.setChatArchived(!state.catalogEntry?.archived)
+                }
+              >
+                {state.catalogEntry.archived ? "Restore chat" : "Archive chat"}
+              </Button>
+            </>
+          ) : state.catalogEntryError ? (
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              onClick={() => void controller.readChatDetails()}
+            >
+              Retry chat details
+            </Button>
+          ) : null}
+          {state.catalogEntryError && (
+            <p role="alert" className="basis-full text-destructive">
+              {state.catalogEntryError}
+            </p>
+          )}
+        </div>
+      )}
       {(state.catalogCursor ||
         state.nextCatalogCursor ||
         state.catalogLoading ||

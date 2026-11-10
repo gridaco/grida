@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   DesktopNativeChat,
+  NativeChatCatalogEntry,
   NativeChatMessage,
   NativeChatObservation,
+  NativeChatPage,
   NativeChatTurn,
   NativeChatTurnSummary,
   NativeChatUpdate,
@@ -790,6 +792,113 @@ it("keeps the old bridge's legacy selection and drops a disposed startup reply",
   started.resolve("native-ready");
   await started.promise;
   expect(publish).toHaveBeenCalledExactlyOnceWith("native-starting");
+});
+
+it("uses catalog membership, retains an exact rename draft on conflict, and ignores a retired mutation reply", async () => {
+  const { bridge, running, transcripts } = fixture();
+  const entries = new Map<string, NativeChatCatalogEntry>([
+    [
+      "chat-a",
+      { sessionId: "chat-a", revision: 1, title: "First", archived: false },
+    ],
+    [
+      "chat-b",
+      {
+        sessionId: "chat-b",
+        revision: 1,
+        title: "Saved archive",
+        archived: true,
+      },
+    ],
+  ]);
+  const listing = (archived: boolean) => ({
+    sessionIds: [...entries.values()]
+      .filter((entry) => entry.archived === archived)
+      .map((entry) => entry.sessionId),
+    nextCursor: null,
+  });
+  const list = vi.fn<DesktopNativeChat["list"]>(async () => listing(false));
+  bridge.list = list;
+  bridge.listArchived = async () => listing(true);
+  bridge.catalogEntry = async (sessionId) => entries.get(sessionId)!;
+  const organize = vi.fn<NonNullable<DesktopNativeChat["organize"]>>(
+    async (sessionId, change) => {
+      const current = entries.get(sessionId)!;
+      if (change.revision !== current.revision)
+        throw new Error("session_catalog_revision_changed");
+      const next = { ...change, sessionId, revision: current.revision + 1 };
+      entries.set(sessionId, next);
+      return next;
+    }
+  );
+  bridge.organize = organize;
+  const memory = {
+    getItem: () =>
+      JSON.stringify({ selected: "chat-a", sessions: ["chat-b", "chat-a"] }),
+    setItem: () => {},
+  };
+  const controller = new NativeChatController(bridge, memory, "fixture");
+  running.add("chat-a");
+  transcripts.set("chat-a", [
+    { messageId: "kept", role: "user", text: "Working request." },
+  ]);
+  controller.connect(null);
+  await vi.waitFor(() =>
+    expect(controller.read().catalogEntry?.title).toBe("First")
+  );
+  expect(controller.read().sessions).toEqual(["chat-a"]);
+  controller.beginRename();
+  controller.changeTitle("My rename");
+  entries.set("chat-a", {
+    ...entries.get("chat-a")!,
+    revision: 2,
+    title: "Changed elsewhere",
+  });
+  await controller.saveTitle();
+  expect(controller.chatTitle("chat-a")).toBe("Changed elsewhere");
+  expect(controller.read().catalogDraft?.text).toBe("My rename");
+  expect(organize).toHaveBeenCalledExactlyOnceWith("chat-a", {
+    revision: 1,
+    title: "My rename",
+    archived: false,
+  });
+  await controller.saveTitle();
+  expect(controller.chatTitle("chat-a")).toBe("My rename");
+  expect(organize).toHaveBeenLastCalledWith("chat-a", {
+    revision: 2,
+    title: "My rename",
+    archived: false,
+  });
+  const stalePage = Promise.withResolvers<NativeChatPage>();
+  list.mockReturnValueOnce(stalePage.promise);
+  const refresh = controller.listChats();
+  await vi.waitFor(() =>
+    expect(list.mock.results.at(-1)?.value).toBe(stalePage.promise)
+  );
+  await controller.setChatArchived(true);
+  stalePage.resolve({ sessionIds: ["chat-a"], nextCursor: null });
+  await refresh;
+  expect(controller.read().sessions).not.toContain("chat-a");
+  expect(controller.read().selected).toBe("chat-a");
+  expect(controller.read().observation?.snapshot.current?.turnId).toBe(
+    "turn-chat-a"
+  );
+  expect(controller.read().messages[0]?.text).toBe("Working request.");
+  await controller.listChats(null, true);
+  expect(controller.read().sessions).toContain("chat-a");
+
+  const late = Promise.withResolvers<NativeChatCatalogEntry>();
+  organize.mockReturnValueOnce(late.promise);
+  const restore = controller.setChatArchived(false);
+  await controller.select("chat-b");
+  late.resolve({ ...entries.get("chat-a")!, archived: false });
+  await restore;
+  expect(controller.read().catalogEntry).toMatchObject({
+    sessionId: "chat-b",
+    title: "Saved archive",
+    archived: true,
+  });
+  controller.disconnect();
 });
 
 it("browses saved pages without opening a chat until it is selected", async () => {

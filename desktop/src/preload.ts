@@ -370,6 +370,16 @@ const bridge: DesktopBridge = {
     status: (start) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),
     list: (cursor) => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
+    listArchived: (cursor) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST_ARCHIVED, cursor),
+    catalogEntry: (attachmentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CATALOG_ENTRY, attachmentId),
+    organize: (attachmentId, change) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ORGANIZE,
+        attachmentId,
+        change
+      ),
     create: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
     load: (sessionId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),

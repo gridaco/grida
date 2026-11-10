@@ -101,7 +101,7 @@ it("rejects a chat launch outside the main-selected workspace", async () => {
 });
 
 it.runIf(Boolean(packaged))(
-  "lists retained workspace pages over a fresh native connection without attaching",
+  "lists detached workspace pages and restores a renamed archive after restart",
   async () => {
     const test = fixture();
     const otherWorkspace = path.join(test.root, "other-workspace");
@@ -145,6 +145,61 @@ it.runIf(Boolean(packaged))(
       );
       const selected = await client.load(saved[0]);
       expect((await client.observe(selected)).current).toBeNull();
+      const entry = await client.catalogEntry(selected);
+      const name = {
+        revision: entry.revision,
+        title: "  An organized chat  ",
+        archived: false,
+      };
+      await expect(
+        client.organize(selected, { ...name, sessionId: other.id })
+      ).rejects.toThrow("native_chat_invalid_protocol_value");
+      const renamed = await client.organize(selected, name);
+      expect(renamed.title).toBe("An organized chat");
+      expect(renamed.revision).toBeGreaterThan(entry.revision);
+      await expect(client.organize(selected, name)).resolves.toEqual(renamed);
+      await expect(
+        client.organize(selected, { ...name, title: "A conflicting title" })
+      ).rejects.toThrow("session_catalog_revision_changed");
+      await expect(
+        client.organize(selected, { ...name, title: "🙂".repeat(65) })
+      ).rejects.toThrow("native_chat_invalid_protocol_value");
+      expect((await client.list()).titles).toContainEqual({
+        sessionId: selected.id,
+        title: renamed.title,
+      });
+      const archived = await client.organize(selected, {
+        revision: renamed.revision,
+        title: renamed.title,
+        archived: true,
+      });
+      expect((await client.list()).sessionIds).not.toContain(selected.id);
+      expect(await client.list(null, true)).toEqual({
+        sessionIds: [selected.id],
+        nextCursor: null,
+        titles: [{ sessionId: selected.id, title: renamed.title }],
+      });
+
+      await client.close();
+      client = await NativeAgentChat.start(launch);
+      const reopened = await client.load(selected.id);
+      expect(await client.catalogEntry(reopened)).toEqual(archived);
+      expect((await client.observe(reopened)).current).toBeNull();
+      const restored = await client.organize(reopened, {
+        revision: archived.revision,
+        title: archived.title,
+        archived: false,
+      });
+      expect((await client.list()).sessionIds).toContain(selected.id);
+      expect((await client.list(null, true)).sessionIds).toEqual([]);
+      await expect(
+        client.organize(reopened, {
+          revision: restored.revision,
+          title: null,
+          archived: false,
+        })
+      ).resolves.toMatchObject({ title: null });
+      expect((await client.list()).titles).toBeUndefined();
 
       await client.close();
       client = await NativeAgentChat.start({ ...launch, cwd: otherWorkspace });
@@ -164,7 +219,7 @@ it.runIf(Boolean(packaged))(
 );
 
 it.runIf(Boolean(packaged))(
-  "observes one accepted turn and pauses, resumes after restart, and stops that exact turn",
+  "keeps archived work running, then pauses, resumes, and reads the stopped turn",
   async () => {
     const test = fixture();
     const provider = await heldProvider();
@@ -252,6 +307,13 @@ it.runIf(Boolean(packaged))(
       await expect(client.turnSummary(session, running)).rejects.toThrow(
         "native_chat_turn_summary_unavailable"
       );
+      const entry = await client.catalogEntry(session);
+      await client.organize(session, {
+        revision: entry.revision,
+        title: "Still running",
+        archived: true,
+      });
+      expect((await client.observe(session)).current).toEqual(running.current);
       const pause = await client.pause(session, running, "pause-fixture");
       expect(await client.pause(session, running, "pause-fixture")).toEqual(
         pause

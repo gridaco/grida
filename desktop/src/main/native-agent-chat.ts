@@ -5,6 +5,8 @@ import path from "node:path";
 import type {
   NativeChatAcceptance,
   NativeChatApprovalDecision,
+  NativeChatCatalogChange,
+  NativeChatCatalogEntry,
   NativeChatControlReceipt,
   NativeChatGoalControl,
   NativeChatGoalReceipt,
@@ -48,6 +50,7 @@ const CAPABILITIES = {
   "co.grida/session/resume-queue": 1,
   "co.grida/session/steer": 1,
   "co.grida/session/input": 1,
+  "co.grida/session/organize": 1,
   "co.grida/session/snapshot": 1,
   "co.grida/session/turn-summary": 1,
   "co.grida/session/stop": 1,
@@ -100,6 +103,7 @@ const MAX_SUMMARY_CHECKS = 8;
 const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 const MAX_TRANSCRIPT_MESSAGES = 1024;
 const MAX_CATALOG_SESSIONS = 32;
+const MAX_TITLE_BYTES = 256;
 const MAX_QUEUE_INPUTS = 256;
 const QUEUE_PAGE_SIZE = 8;
 const QUEUE_PREVIEW_LENGTH = 2048;
@@ -207,25 +211,35 @@ export class NativeAgentChat {
     return client;
   }
 
-  async list(cursor: string | null = null): Promise<NativeChatPage> {
+  async list(
+    cursor: string | null = null,
+    archived = false
+  ): Promise<NativeChatPage> {
     this.requireOpen();
     if (cursor !== null && !isCatalogCursor(cursor))
       throw new Error("native_chat_cursor_invalid");
     const result = object(
-      await this.process.request("session/list", {
-        cwd: this.cwd,
-        ...(cursor === null ? {} : { cursor }),
-      })
+      await this.process.request(
+        archived ? "_co.grida/session/list-archived" : "session/list",
+        {
+          cwd: this.cwd,
+          ...(cursor === null ? {} : { cursor }),
+        }
+      )
     );
     if (
       !Array.isArray(result.sessions) ||
       result.sessions.length > MAX_CATALOG_SESSIONS
     )
       throw invalidResponse();
+    const titles: NonNullable<NativeChatPage["titles"]>[number][] = [];
     const sessionIds = result.sessions.map((entry: unknown) => {
       const session = object(entry);
       if (session.cwd !== this.cwd) throw invalidResponse();
-      return identity(session.sessionId);
+      const sessionId = identity(session.sessionId);
+      const title = catalogTitle(session.title ?? null);
+      if (title !== null) titles.push({ sessionId, title });
+      return sessionId;
     });
     const nextCursor = result.nextCursor ?? null;
     if (
@@ -236,7 +250,40 @@ export class NativeAgentChat {
           sessionIds.length === 0))
     )
       throw invalidResponse();
-    return { sessionIds, nextCursor };
+    return { sessionIds, nextCursor, ...(titles.length && { titles }) };
+  }
+
+  async catalogEntry(
+    session: NativeChatSession
+  ): Promise<NativeChatCatalogEntry> {
+    const sessionId = this.requireAttached(session);
+    const result = await this.process.request(
+      "_co.grida/session/catalog-entry",
+      { sessionId }
+    );
+    this.requireAttached(session);
+    return catalogEntry(result, sessionId);
+  }
+
+  async organize(
+    session: NativeChatSession,
+    value: unknown
+  ): Promise<NativeChatCatalogEntry> {
+    const sessionId = this.requireAttached(session);
+    const change = catalogChange(value);
+    const result = await this.process.request("_co.grida/session/organize", {
+      sessionId,
+      ...change,
+    });
+    this.requireAttached(session);
+    const saved = catalogEntry(result, sessionId);
+    if (
+      saved.title !== change.title ||
+      saved.archived !== change.archived ||
+      saved.revision < change.revision
+    )
+      throw invalidResponse();
+    return saved;
   }
 
   async create(): Promise<NativeChatSession> {
@@ -1170,6 +1217,50 @@ function revision(value: unknown): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0)
     throw invalidResponse();
   return value;
+}
+
+function catalogTitle(value: unknown): string | null {
+  if (value === null) return null;
+  if (
+    typeof value !== "string" ||
+    !value.length ||
+    Buffer.byteLength(value) > MAX_TITLE_BYTES ||
+    /\p{Cc}/u.test(value)
+  )
+    throw invalidResponse();
+  return value;
+}
+
+function catalogEntry(
+  value: unknown,
+  sessionId: string
+): NativeChatCatalogEntry {
+  const entry = object(value);
+  if (entry.sessionId !== sessionId) throw invalidResponse();
+  return Object.freeze({
+    sessionId,
+    revision: revision(entry.revision),
+    title: catalogTitle(entry.title),
+    archived: flag(entry.archived),
+  });
+}
+
+function catalogChange(value: unknown): NativeChatCatalogChange {
+  const change = object(value);
+  if (
+    Object.keys(change).length !== 3 ||
+    (typeof change.title === "string" && change.title.length > MAX_TITLE_BYTES)
+  )
+    throw invalidResponse();
+  return {
+    revision: revision(change.revision),
+    title: catalogTitle(
+      typeof change.title === "string"
+        ? change.title.replace(/^\p{White_Space}+|\p{White_Space}+$/gu, "")
+        : change.title
+    ),
+    archived: flag(change.archived),
+  };
 }
 
 function flag(value: unknown): boolean {

@@ -3,6 +3,8 @@ import type {
   NativeChatApproval,
   NativeChatApprovalDecision,
   NativeChatAttachment,
+  NativeChatCatalogChange,
+  NativeChatCatalogEntry,
   NativeChatControl,
   NativeChatGoalAction,
   NativeChatGoalControl,
@@ -38,6 +40,14 @@ export type NativeChatView = Readonly<{
   nextCatalogCursor: string | null;
   catalogLoading: boolean;
   catalogError: string | null;
+  catalogArchived: boolean;
+  catalogEntry: NativeChatCatalogEntry | null;
+  catalogEntryError: string | null;
+  catalogChanging: boolean;
+  catalogDraft: Readonly<{
+    text: string;
+    basis: NativeChatCatalogEntry;
+  }> | null;
   messages: readonly NativeChatMessage[];
   sideChat: NativeSideChatController | null;
   observation: NativeChatObservation | null;
@@ -103,6 +113,11 @@ const EMPTY: NativeChatView = Object.freeze({
   nextCatalogCursor: null,
   catalogLoading: false,
   catalogError: null,
+  catalogArchived: false,
+  catalogEntry: null,
+  catalogEntryError: null,
+  catalogChanging: false,
+  catalogDraft: null,
   messages: [],
   sideChat: null,
   observation: null,
@@ -133,6 +148,7 @@ export class NativeChatController {
   private generation = 0;
   private attachments = Promise.resolve();
   private catalogConnection?: object;
+  private catalogRequest?: object;
   private catalog: NativeChatPage | null = null;
   private listing?: Promise<NativeChatPage>;
   private recents: readonly string[] = [];
@@ -192,11 +208,12 @@ export class NativeChatController {
     this.catalog = null;
     this.recents = saved.sessions;
     this.update({
-      sessions: this.recents,
+      sessions: this.sessionChoices(),
       catalogCursor: null,
       nextCatalogCursor: null,
       catalogLoading: false,
       catalogError: null,
+      catalogArchived: false,
     });
     void this.listChats();
     void this.select(initial ?? saved.selected);
@@ -209,19 +226,36 @@ export class NativeChatController {
     this.queueRelease(previous);
   }
 
-  async listChats(cursor: string | null = null): Promise<void> {
+  async listChats(
+    cursor: string | null = null,
+    archived = this.view.catalogArchived
+  ): Promise<void> {
     const connection = this.catalogConnection;
-    if (!connection || this.view.catalogLoading) return;
+    const list = archived ? this.bridge.listArchived : this.bridge.list;
+    if (!connection || !list) return;
+    const request = {};
+    this.catalogRequest = request;
+    const owns = () =>
+      this.catalogConnection === connection && this.catalogRequest === request;
+    if (archived !== this.view.catalogArchived) {
+      this.catalog = null;
+      this.update({
+        catalogArchived: archived,
+        sessions: [],
+        catalogCursor: null,
+        nextCatalogCursor: null,
+      });
+    }
     this.update({ catalogLoading: true, catalogError: null });
     try {
       // A reconnect can happen before the old page releases the frame's slot.
       await this.listing?.catch(() => {});
-      if (this.catalogConnection !== connection) return;
-      this.listing = this.bridge.list(cursor).finally(() => {
+      if (!owns()) return;
+      this.listing = list.call(this.bridge, cursor).finally(() => {
         this.listing = undefined;
       });
       const page = await this.listing;
-      if (this.catalogConnection !== connection) return;
+      if (!owns()) return;
       this.catalog = page;
       this.update({
         sessions: this.sessionChoices(),
@@ -229,11 +263,9 @@ export class NativeChatController {
         nextCatalogCursor: page.nextCursor,
       });
     } catch {
-      if (this.catalogConnection === connection)
-        this.update({ catalogError: "Couldn't list saved chats." });
+      if (owns()) this.update({ catalogError: "Couldn't list saved chats." });
     } finally {
-      if (this.catalogConnection === connection)
-        this.update({ catalogLoading: false });
+      if (owns()) this.update({ catalogLoading: false });
     }
   }
 
@@ -259,6 +291,10 @@ export class NativeChatController {
     this.update({
       scope: scope.id,
       selected: sessionId,
+      catalogEntry: null,
+      catalogEntryError: null,
+      catalogChanging: false,
+      catalogDraft: null,
       messages: [],
       sideChat: null,
       observation: null,
@@ -306,6 +342,76 @@ export class NativeChatController {
             this.view.observation?.snapshot.current?.turnId
         : !this.needsQueue || !!this.bridge.enqueue)
     );
+  }
+
+  get canOrganizeChats(): boolean {
+    return (
+      !!this.bridge.listArchived &&
+      !!this.bridge.catalogEntry &&
+      !!this.bridge.organize
+    );
+  }
+
+  chatTitle(sessionId: string): string {
+    const selected = this.view.catalogEntry;
+    const title =
+      selected?.sessionId === sessionId
+        ? selected.title
+        : this.catalog?.titles?.find((entry) => entry.sessionId === sessionId)
+            ?.title;
+    return title ?? `Chat ${sessionId.slice(0, 8)}`;
+  }
+
+  beginRename(): void {
+    const basis = this.view.catalogEntry;
+    if (basis && !this.view.catalogChanging)
+      this.update({
+        catalogDraft: { text: basis.title ?? "", basis },
+        catalogEntryError: null,
+      });
+  }
+
+  changeTitle(text: string): void {
+    const draft = this.view.catalogDraft;
+    if (draft && !this.view.catalogChanging)
+      this.update({ catalogDraft: { ...draft, text } });
+  }
+
+  cancelRename(): void {
+    if (!this.view.catalogChanging)
+      this.update({ catalogDraft: null, catalogEntryError: null });
+  }
+
+  async saveTitle(): Promise<void> {
+    const draft = this.view.catalogDraft;
+    if (!draft) return;
+    const text = draft.text.trim();
+    if (/\p{Cc}/u.test(text) || utf8.encode(text).length > 256) {
+      this.update({
+        catalogEntryError:
+          "Use a title of at most 256 UTF-8 bytes without control characters.",
+      });
+      return;
+    }
+    await this.organize({
+      revision: draft.basis.revision,
+      title: text || null,
+      archived: draft.basis.archived,
+    });
+  }
+
+  async setChatArchived(archived: boolean): Promise<void> {
+    const entry = this.view.catalogEntry;
+    if (!entry || this.view.catalogDraft || entry.archived === archived) return;
+    await this.organize({
+      revision: entry.revision,
+      title: entry.title,
+      archived,
+    });
+  }
+
+  async readChatDetails(): Promise<void> {
+    if (this.scope) await this.readCatalogEntry(this.scope);
   }
 
   get canOpenSideChat(): boolean {
@@ -928,6 +1034,7 @@ export class NativeChatController {
         sessions: this.sessionChoices(),
       });
       this.save();
+      void this.readCatalogEntry(scope);
       await this.renewSubscription(scope);
     });
     this.attachments = opening.catch(() => {});
@@ -946,6 +1053,88 @@ export class NativeChatController {
       if (scope.attachment)
         await this.bridge.detach(scope.attachment.attachmentId).catch(() => {});
     });
+  }
+
+  private async readCatalogEntry(
+    scope: Scope
+  ): Promise<NativeChatCatalogEntry | null> {
+    const attachment = scope.attachment;
+    if (!attachment || !this.canOrganizeChats || !this.bridge.catalogEntry)
+      return null;
+    try {
+      const entry = await this.bridge.catalogEntry(attachment.attachmentId);
+      if (!this.owns(scope)) return null;
+      if (entry.sessionId !== attachment.sessionId)
+        throw new Error("native_chat_catalog_entry_mismatch");
+      return this.installCatalogEntry(entry);
+    } catch {
+      if (this.owns(scope))
+        this.update({ catalogEntryError: "Couldn't load the chat details." });
+      return null;
+    }
+  }
+
+  private installCatalogEntry(
+    entry: NativeChatCatalogEntry
+  ): NativeChatCatalogEntry {
+    const current = this.view.catalogEntry;
+    if (current && current.revision > entry.revision) return current;
+    if (this.catalog && entry.archived !== this.view.catalogArchived)
+      this.catalog = {
+        ...this.catalog,
+        sessionIds: this.catalog.sessionIds.filter(
+          (id) => id !== entry.sessionId
+        ),
+      };
+    this.update({
+      catalogEntry: entry,
+      catalogEntryError: null,
+      sessions: this.sessionChoices(entry),
+    });
+    return entry;
+  }
+
+  private async organize(change: NativeChatCatalogChange): Promise<void> {
+    const scope = this.scope;
+    const attachment = scope?.attachment;
+    if (
+      !scope ||
+      !attachment ||
+      !this.bridge.organize ||
+      this.view.catalogChanging
+    )
+      return;
+    this.update({ catalogChanging: true, catalogEntryError: null });
+    try {
+      const saved = await this.bridge.organize(attachment.attachmentId, change);
+      if (!this.owns(scope)) return;
+      if (saved.sessionId !== attachment.sessionId)
+        throw new Error("native_chat_catalog_entry_mismatch");
+      this.installCatalogEntry(saved);
+      this.update({ catalogDraft: null });
+      void this.listChats();
+    } catch (error) {
+      if (!this.owns(scope)) return;
+      if (
+        error instanceof Error &&
+        error.message.includes("session_catalog_revision_changed")
+      ) {
+        const entry = await this.readCatalogEntry(scope);
+        if (!this.owns(scope)) return;
+        const draft = this.view.catalogDraft;
+        this.update({
+          ...(draft && entry && { catalogDraft: { ...draft, basis: entry } }),
+          catalogEntryError:
+            "The chat changed. Review its details and try again.",
+        });
+      } else {
+        this.update({
+          catalogEntryError: "Couldn't confirm the change. Try again.",
+        });
+      }
+    } finally {
+      if (this.owns(scope)) this.update({ catalogChanging: false });
+    }
   }
 
   private refresh(scope: Scope): Promise<void> {
@@ -1332,8 +1521,14 @@ export class NativeChatController {
     for (const listener of this.listeners) listener();
   }
 
-  private sessionChoices(): readonly string[] {
-    return [...new Set([...this.recents, ...(this.catalog?.sessionIds ?? [])])];
+  private sessionChoices(entry = this.view.catalogEntry): readonly string[] {
+    const catalog = this.catalog?.sessionIds ?? [];
+    if (this.canOrganizeChats) {
+      return entry && entry.archived !== this.view.catalogArchived
+        ? catalog.filter((id) => id !== entry.sessionId)
+        : catalog;
+    }
+    return [...new Set([...this.recents, ...catalog])];
   }
 
   private restore(): { selected: string | null; sessions: string[] } {

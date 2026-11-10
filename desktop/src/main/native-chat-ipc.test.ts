@@ -85,6 +85,22 @@ function setup() {
     async list() {
       return { sessionIds: [], nextCursor: null };
     },
+    async catalogEntry(session) {
+      return {
+        sessionId: session.id,
+        revision: 0,
+        title: null,
+        archived: false,
+      };
+    },
+    async organize(session) {
+      return {
+        sessionId: session.id,
+        revision: 1,
+        title: "Fixture",
+        archived: false,
+      };
+    },
     async create() {
       return load(`session-${sessions.size}`);
     },
@@ -256,6 +272,37 @@ function setup() {
 }
 
 describe("native chat IPC", () => {
+  it("keeps archive browsing detached and binds organization to the admitted attachment", async () => {
+    const { ipc, first, second, chat } = setup();
+    const list = vi.spyOn(chat, "list");
+    const load = vi.spyOn(chat, "load");
+    const organize = vi.spyOn(chat, "organize");
+    await ipc.list(first.event, "archive-page", true);
+    expect(list).toHaveBeenCalledExactlyOnceWith("archive-page", true);
+    expect(load).not.toHaveBeenCalled();
+    const opened = await ipc.load(first.event, "archived-chat");
+    const current = await ipc.catalogEntry(first.event, opened.attachmentId);
+    const change = {
+      revision: current.revision,
+      title: "Restored",
+      archived: false,
+    };
+    await expect(
+      ipc.organize(second.event, opened.attachmentId, change)
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    expect(organize).not.toHaveBeenCalled();
+    const late = Promise.withResolvers<typeof current>();
+    organize.mockReturnValueOnce(late.promise);
+    const pending = ipc.organize(first.event, opened.attachmentId, change);
+    expect(organize).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      change
+    );
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    late.resolve({ ...current, ...change });
+    await expect(pending).rejects.toThrow("native_chat_attachment_unavailable");
+  });
+
   it("reads only the current attached terminal basis and drops a superseded reply", async () => {
     const { ipc, first, second, chat } = setup();
     const parent = await ipc.create(first.event);

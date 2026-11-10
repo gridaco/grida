@@ -176,6 +176,18 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_CHAT_LIST, (event, cursor?: string | null) =>
     nativeChat.list(event, cursor)
   );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_LIST_ARCHIVED,
+    (event, cursor?: string | null) => nativeChat.list(event, cursor, true)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_CATALOG_ENTRY, (event, id: string) =>
+    nativeChat.catalogEntry(event, id)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ORGANIZE,
+    (event, id: string, change: unknown) =>
+      nativeChat.organize(event, id, change)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_CREATE, (event) => nativeChat.create(event));
   guarded(IPC_CHANNELS.NATIVE_CHAT_LOAD, (event, id: string) =>
     nativeChat.load(event, id)

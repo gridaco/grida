@@ -931,8 +931,11 @@ lazy reads, read-only mutation, and symlink escape refusal.
   the latest observed settled turn and rechecks the frame and turn before
   returning bounded text and validated disposition counts and check statuses.
   Saved-chat discovery uses the main-owned workspace and a bounded cursor.
-  Its reply contains only chat IDs and the next cursor, after the same frame
-  and workspace recheck. Discovery creates no chat attachment.
+  Active and archived pages return bounded IDs and titles with the next
+  cursor after the same frame and workspace recheck. Discovery creates no
+  chat attachment. Organization derives its target from the frame's exact
+  attachment, forwards the metadata revision, and revalidates the attachment
+  after the native reply.
   Native startup accepts only a start flag. Main resolves the workspace from
   the admitted route and rechecks that scope before returning readiness.
   Navigation invalidates an outstanding reply. A failed native startup reports

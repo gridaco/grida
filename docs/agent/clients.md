@@ -189,9 +189,13 @@ the same workspace. For an attached chat, read the current title, archive state,
 and revision before renaming, archiving, or restoring. Archiving leaves active
 work running. An archived chat can still be loaded by its ID.
 
-When a native chat owner is active in Desktop, the workspace Chat selector
-combines recent chats with saved chats from that workspace. Use **Older chats**
-to browse further. Selecting a chat opens its transcript.
+When a native chat owner is active in Desktop, the workspace **Chat** selector
+shows saved chats in that workspace. Use **Older chats** to browse further or
+**Archived chats** to find an archived chat. Selecting a chat opens its transcript.
+With a chat open, choose **Rename chat** and **Save title**. Clear the title to
+use the default name. Choose **Archive chat** to move it out of the active list
+while keeping its draft and any running work. Open it from **Archived chats**
+and choose **Restore chat** to return it to the active list.
 
 With the native **Ask me** profile, a read outside the current grants pauses
 for review when its folder is eligible for additional access. The pane shows

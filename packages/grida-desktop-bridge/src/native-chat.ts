@@ -8,8 +8,18 @@ export type NativeChatOperatingRegime = "act" | "plan";
 
 export type NativeChatPage = Readonly<{
   sessionIds: readonly string[];
+  titles?: readonly Readonly<{ sessionId: string; title: string }>[];
   nextCursor: string | null;
 }>;
+
+export type NativeChatCatalogEntry = Readonly<{
+  sessionId: string;
+  revision: number;
+  title: string | null;
+  archived: boolean;
+}>;
+
+export type NativeChatCatalogChange = Omit<NativeChatCatalogEntry, "sessionId">;
 
 export type NativeChatSideContext = Readonly<{
   sourceRevision: number;
@@ -266,6 +276,12 @@ export type DesktopNativeChat = {
   /** Starts the admitted workspace when requested and native mode is selected. */
   status?(start?: boolean): Promise<NativeChatReadiness>;
   list(cursor?: string | null): Promise<NativeChatPage>;
+  listArchived?(cursor?: string | null): Promise<NativeChatPage>;
+  catalogEntry?(attachmentId: string): Promise<NativeChatCatalogEntry>;
+  organize?(
+    attachmentId: string,
+    change: NativeChatCatalogChange
+  ): Promise<NativeChatCatalogEntry>;
   create(): Promise<NativeChatAttachment>;
   load(sessionId: string): Promise<NativeChatAttachment>;
   openSideChat?(
