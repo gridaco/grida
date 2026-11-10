@@ -1,6 +1,6 @@
 ---
 title: Start an agent task with files and folders
-description: Open a project, attach a PNG, or run an image task in private scratch without a project.
+description: Open a project, attach a PNG, or work with a selected file in private scratch.
 keywords: [agent workspace, PNG attachment, project files, Grida Desktop]
 format: md
 ---
@@ -30,9 +30,13 @@ For other file types in a native workspace chat, open the folder that
 contains the file and name it in your request. Which files the agent can
 read depends on the workspace access and tools available to the chat.
 
-## Work with an image without a project
+## Work without a project
 
 On macOS and Linux, a source-built native run can take one explicitly
 selected PNG with `--input-png` and keep its work in private scratch.
 Omit the workspace and permission profile to work without a project grant.
 [Run locally with a PNG](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-locally)
+
+Use `--input-file` to inspect a selected file in the same private setting.
+The agent can verify the file’s size and digest and read a short text excerpt.
+[Inspect a local file headlessly](./clients.md#inspect-a-local-file-headlessly)
