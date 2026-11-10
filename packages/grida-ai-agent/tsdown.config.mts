@@ -1,18 +1,9 @@
 import { defineConfig } from "tsdown";
 
 /**
- * Two build passes, one per platform — preserving the platform split the
- * three merged packages had before consolidation:
- *
- *   - neutral: the renderer/web-safe surface (the Grida agent, tiers,
- *     the virtual fs core + OPFS backend, todos). The editor's web
- *     /svg route imports these; they must never assume Node.
- *   - node:   the AgentHost HTTP core, sandbox policy intent, CLI, and
- *     the transport helper (node:fs, node:sqlite, child_process,
- *     @hono/node-server). Consumed by Node host adapters and the CLI.
- *     The Node fs backend is no longer a public entry (internal + tests).
- *
- * Subpath exports in package.json gate which entry a consumer can reach.
+ * The renderer imports the neutral bindings. Host adapters import the Node
+ * service, transport, ACP and sandbox exports. The package manifest declares
+ * each public entry point.
  */
 const shared = {
   format: ["cjs", "esm"],
@@ -45,8 +36,6 @@ export default defineConfig([
       "src/sandbox/index.ts",
       "src/transport.ts",
       "src/acp/index.ts",
-      "src/cli.ts",
-      "src/cli.bin.ts",
     ],
     platform: "node",
   },

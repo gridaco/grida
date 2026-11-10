@@ -1,14 +1,7 @@
 // GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-GG: provider — the `--editor-base-url` GG base URL flag (docs/wg/platform/hosted-ai.md)
 /**
- * grida-agent CLI — the canonical, host-agnostic entrypoint to the agent
- * system.
- *
- * Source-of-truth rule: every agent feature lands HERE first. Desktop and any
- * other host are thin wrappers over the same `DaemonServer` + `AgentTransport`
- * this CLI drives — if a capability exists in the UI but not here, that's the
- * bug. Keeping the CLI complete is also what makes the core testable without
- * an Electron shell (see `cli.test.ts`).
+ * Command harness for the TypeScript host's compatibility tests.
  *
  * Commands:
  *   serve [--register] [--allow-origin <o>]      start the HTTP server; print PORT
@@ -165,8 +158,7 @@ async function serveCommand(args: string[]): Promise<void> {
       config.user_data_path
     );
   }
-  // A `serve` daemon is the host the desktop-from-web bridge drives — a human
-  // is present, so `question` may resolve through the attached client.
+  // An attached compatibility client may answer a retained question.
   const host = await createHost(config, flags, true);
   await host.start();
   process.stdout.write(`PORT=${host.port}\n`);
@@ -580,7 +572,7 @@ function createClient(
  * Re-invoke this same CLI entry as a detached daemon
  * (`node [execArgv] <entry> serve --register`). `execArgv` carries dev
  * loader flags (`--import tsx`) so the spawn works both from the built bin
- * and the dev `pnpm cli` path. The child outlives this process.
+ * and direct TypeScript fixtures. The child outlives this process.
  */
 function spawnDetachedDaemon(): void {
   const entry = process.argv[1];

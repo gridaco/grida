@@ -6,9 +6,6 @@
   "license": "MIT",
   "author": "Grida",
   "repository": "https://github.com/gridaco/grida",
-  "bin": {
-    "grida-agent": "./dist/cli.bin.cjs"
-  },
   "files": [
     "dist",
     "src"
@@ -160,7 +157,6 @@
   },
   "scripts": {
     "build": "tsdown",
-    "cli": "node --import tsx src/cli.bin.ts",
     "dev": "tsdown --watch",
     "prepack": "tsdown",
     "smoke:sessions:live": "node --import tsx src/session/smoke.live.ts",
