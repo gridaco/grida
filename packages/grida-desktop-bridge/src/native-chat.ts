@@ -225,6 +225,22 @@ export type NativeChatTokenUsage = Readonly<{
   attemptsWithoutCounts: number;
 }>;
 
+export type NativeChatGatewayAttemptRef = Readonly<{
+  operationId: string;
+  attemptId: string;
+}>;
+
+export type NativeChatGatewayBillingAttempt = NativeChatGatewayAttemptRef &
+  Readonly<
+    | { kind: "settled"; chargedMills: string; refreshable: false }
+    | { kind: "pending" | "unavailable"; refreshable: boolean }
+  >;
+
+export type NativeChatGatewayBilling = Readonly<{
+  attempts: readonly NativeChatGatewayBillingAttempt[];
+  omittedAttempts: number;
+}>;
+
 export type NativeChatTurnSummary = Readonly<{
   turnId: string;
   status: NonNullable<NativeChatTurn["status"]>;
@@ -250,6 +266,7 @@ export type NativeChatTurnSummary = Readonly<{
     | "skipped"
   )[];
   tokenUsage?: NativeChatTokenUsage;
+  gatewayBilling?: NativeChatGatewayBilling;
   reviewFindingsCollected?: boolean;
   artifacts?: readonly NativeChatImageArtifact[];
   artifactsOmitted?: number;
@@ -609,7 +626,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   observe(attachmentId: string): Promise<NativeChatObservation>;
   turnSummary?(
     attachmentId: string,
-    observationId: string
+    observationId: string,
+    refreshGatewayAttempt?: NativeChatGatewayAttemptRef
   ): Promise<NativeChatTurnSummary>;
   readArtifact?(
     attachmentId: string,

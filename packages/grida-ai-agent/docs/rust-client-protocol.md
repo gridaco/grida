@@ -552,6 +552,14 @@ unavailable receipt can result from a missing dispatch identity, changed
 scope, or a jobs response above 2 MiB. Lookup is observational and can be
 repeated after reopening. The retained inference evidence stays intact.
 
+With that capability negotiated, a settled turn summary can include
+`gatewayBilling` with up to 32 `attempts` and an `omittedAttempts` count.
+The rows contain `operationId`, `attemptId`, `kind`, and `refreshable`.
+Only a settled row has `chargedMills`. The projection reads retained evidence
+for the captured Gateway scope without a jobs request. Desktop refresh takes
+one eligible row from the attached latest settled turn and returns the current
+observation without changing the original summary evidence.
+
 ### Persistent goal operations
 
 Negotiate each `co.grida/goal/` capability at version `1`. The methods apply

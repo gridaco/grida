@@ -9,6 +9,7 @@ import type {
   NativeChatCommand,
   NativeChatCommandResult,
   NativeChatControl,
+  NativeChatGatewayAttemptRef,
   NativeChatGoalAction,
   NativeChatGoalControl,
   NativeChatGoalObservation,
@@ -142,6 +143,11 @@ export type NativeChatView = Readonly<{
   reviewConfiguration: boolean;
   observation: NativeChatObservation | null;
   turnSummary: (NativeChatTurnSummary & { detailsUnavailable?: true }) | null;
+  gatewayBillingRefresh:
+    | (NativeChatGatewayAttemptRef & {
+        status: "loading" | "unavailable";
+      })
+    | null;
   approvals: readonly NativeChatApproval[];
   approvalError: string | null;
   questions: readonly NativeChatQuestion[];
@@ -276,6 +282,7 @@ const EMPTY: NativeChatView = Object.freeze({
   reviewConfiguration: false,
   observation: null,
   turnSummary: null,
+  gatewayBillingRefresh: null,
   approvals: [],
   approvalError: null,
   questions: [],
@@ -593,6 +600,7 @@ export class NativeChatController {
       reviewConfiguration: false,
       observation: null,
       turnSummary: null,
+      gatewayBillingRefresh: null,
       approvals: [],
       approvalError: null,
       questions: [],
@@ -2371,6 +2379,76 @@ export class NativeChatController {
     this.refreshTurnSummary(scope, scope.attachment, scope.observation);
   }
 
+  async refreshGatewayBilling(
+    turnId: string,
+    attempt: NativeChatGatewayAttemptRef
+  ): Promise<void> {
+    const scope = this.scope;
+    const basis = scope?.summaryRequest;
+    const attachment = scope?.attachment;
+    const observation = scope?.observation;
+    const summary = this.view.turnSummary;
+    if (
+      !scope ||
+      !attachment ||
+      !observation ||
+      !this.bridge.turnSummary ||
+      basis?.turnId !== turnId ||
+      summary?.turnId !== turnId ||
+      this.view.gatewayBillingRefresh?.status === "loading" ||
+      !summary.gatewayBilling?.attempts.some(
+        (row) => row.refreshable && sameGatewayAttempt(row, attempt)
+      )
+    )
+      return;
+    const ownsRequest = () =>
+      this.owns(scope) &&
+      scope.attachment === attachment &&
+      scope.summaryRequest === basis &&
+      this.view.turnSummary?.turnId === turnId;
+    const selected = {
+      operationId: attempt.operationId,
+      attemptId: attempt.attemptId,
+    };
+    this.update({ gatewayBillingRefresh: { ...selected, status: "loading" } });
+    try {
+      const updated = await this.bridge.turnSummary(
+        attachment.attachmentId,
+        observation.observationId,
+        selected
+      );
+      if (!ownsRequest()) return;
+      const refreshed = updated.gatewayBilling?.attempts.find((row) =>
+        sameGatewayAttempt(row, selected)
+      );
+      const current = this.view.turnSummary;
+      if (
+        updated.turnId !== turnId ||
+        !current?.gatewayBilling ||
+        !refreshed ||
+        refreshed.kind === "unavailable"
+      )
+        throw new Error("native_chat_gateway_billing_unavailable");
+      this.update({
+        turnSummary: {
+          ...current,
+          gatewayBilling: {
+            ...current.gatewayBilling,
+            attempts: current.gatewayBilling.attempts.map((row) =>
+              sameGatewayAttempt(row, selected) ? refreshed : row
+            ),
+          },
+        },
+        gatewayBillingRefresh: null,
+      });
+    } catch {
+      if (ownsRequest())
+        this.update({
+          gatewayBillingRefresh: { ...selected, status: "unavailable" },
+        });
+    }
+  }
+
   async answerApproval(
     reviewId: string,
     decision: NativeChatApprovalDecision
@@ -2949,7 +3027,7 @@ export class NativeChatController {
     if (latest?.disposition !== "settled" || !latest.status) {
       if (scope.summaryRequest) {
         scope.summaryRequest = undefined;
-        this.update({ turnSummary: null });
+        this.update({ turnSummary: null, gatewayBillingRefresh: null });
       }
       return;
     }
@@ -2960,7 +3038,7 @@ export class NativeChatController {
     const status = latest.status;
     scope.summaryRequest = request;
     if (this.view.turnSummary?.turnId !== latest.turnId)
-      this.update({ turnSummary: null });
+      this.update({ turnSummary: null, gatewayBillingRefresh: null });
     const ownsRequest = () =>
       this.owns(scope) && scope.summaryRequest === request;
     const unavailable = () => {
@@ -3596,6 +3674,15 @@ function revisionChanged(error: unknown): boolean {
     /stale_session_revision|stale_journal_change|history_position_changed|driver_state_revision_changed|goal_revision_changed|goal_review_reservation_changed|native_chat_(observation_unavailable|queue_changed|goal_observation_unavailable)/.test(
       error.message
     )
+  );
+}
+
+function sameGatewayAttempt(
+  left: NativeChatGatewayAttemptRef,
+  right: NativeChatGatewayAttemptRef
+): boolean {
+  return (
+    left.operationId === right.operationId && left.attemptId === right.attemptId
   );
 }
 

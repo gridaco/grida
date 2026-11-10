@@ -2091,6 +2091,11 @@ levels into one.
    Gateway scope. Main uses the current scoped grant for a bounded fixed
    jobs GET. The response exposes settlement status and a verified amount,
    and leaves the original inference receipt intact.
+   Turn summary reads a bounded projection of retained evidence under the
+   same scope. The renderer receives local operation and attempt identities.
+   An explicit refresh must match an eligible row in the current attachment's
+   latest settled turn. Main revalidates that attachment before lookup and
+   before returning the result.
    Independent native hosts keep their own account custody under GRIDA-SEC-010.
    The fixed exchange delivers a frozen GG grant only to a construction-time
    trusted synchronous memory sink; its public result contains only org/expiry

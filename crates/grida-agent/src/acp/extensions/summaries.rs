@@ -44,6 +44,8 @@ pub(super) struct SummaryResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     token_usage: Option<ReportedTokenUsage>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    gateway_billing: Option<crate::gg::GatewayBillingProjection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     artifacts: Option<Vec<CropArtifact>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     artifacts_omitted: Option<usize>,
@@ -78,6 +80,7 @@ impl SummaryResponse {
             token_usage: account
                 .as_ref()
                 .and_then(|account| ReportedTokenUsage::from_usage(&account.inference_usage)),
+            gateway_billing: None,
             review_findings_collected: account
                 .as_ref()
                 .and_then(|account| account.independent_review.as_ref())
@@ -237,16 +240,19 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             async move |request: SummaryRequest, responder, _| {
                 let result = async {
                     require(&summary_sessions, SUMMARY, Some(&request.session_id))?;
-                    let include_artifacts = summary_sessions
-                        .lock()
-                        .unwrap()
-                        .negotiated
-                        .contains(ARTIFACTS);
-                    let (outcome, artifacts, image_generation) = summary_host
+                    let (include_artifacts, include_gateway_billing) = {
+                        let sessions = summary_sessions.lock().unwrap();
+                        (
+                            sessions.negotiated.contains(ARTIFACTS),
+                            sessions.negotiated.contains(gateway_billing::CAPABILITY),
+                        )
+                    };
+                    let (outcome, artifacts, image_generation, gateway_billing) = summary_host
                         .settled_summary(
                             request.session_id.clone(),
                             request.turn_id.clone(),
                             include_artifacts,
+                            include_gateway_billing,
                         )
                         .await
                         .map_err(host_error)?;
@@ -254,7 +260,15 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     if include_artifacts {
                         require(&summary_sessions, ARTIFACTS, Some(&request.session_id))?;
                     }
+                    if include_gateway_billing {
+                        require(
+                            &summary_sessions,
+                            gateway_billing::CAPABILITY,
+                            Some(&request.session_id),
+                        )?;
+                    }
                     let mut summary = SummaryResponse::from_outcome(request.turn_id, &outcome);
+                    summary.gateway_billing = gateway_billing;
                     if let Some(note) = image_generation {
                         summary.prepend_factual_note(note);
                     }

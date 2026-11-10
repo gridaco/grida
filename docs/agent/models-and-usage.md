@@ -64,5 +64,12 @@ while it waits. [Follow a provider retry](./clients.md#follow-a-provider-retry)
 
 Open **Turn summary** after a turn ends to see the token counts reported
 by the provider. A partial count covers only the requests with known usage.
-Cached input and reasoning output can overlap other counts. Use the
-connection's billing record for charges. [Read a turn summary](./clients.md#read-a-turn-summary)
+Cached input and reasoning output can overlap other counts.
+[Read a turn summary](./clients.md#read-a-turn-summary)
+
+For Grida Gateway, the summary can also show exact charges in mills for
+individual model requests from that turn. Pending or unavailable amounts stay
+unknown. Use **Refresh billing** when offered to check that request's current
+settlement. Reopening the chat shows the original recorded evidence and leaves
+refresh to you. Use the connection's billing record for totals and for charges
+from other providers or separate delegated work.

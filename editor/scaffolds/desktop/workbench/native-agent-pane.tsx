@@ -613,6 +613,10 @@ export function NativeAgentPane({
                 summary={state.turnSummary}
                 messages={state.messages}
                 previewController={bridge.readArtifact ? controller : undefined}
+                billingRefresh={state.gatewayBillingRefresh}
+                onRefreshGatewayBilling={(turnId, attempt) =>
+                  void controller.refreshGatewayBilling(turnId, attempt)
+                }
                 onRetry={
                   state.turnSummary.detailsUnavailable
                     ? () => controller.retryTurnSummary()

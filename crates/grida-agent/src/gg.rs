@@ -2,8 +2,10 @@
 
 use agent_client_protocol::JsonRpcResponse;
 use agent_kit_core::authority::AuthorityBinding;
-use agent_kit_core::inference::{DispatchEvidence, ProviderBinding, RequestControl};
-use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnState};
+use agent_kit_core::inference::{
+    DispatchEvidence, InferenceOutcome, ProviderBinding, RequestControl,
+};
+use agent_kit_core::turn::{OperationInput, OperationOutcome, OperationState, TurnState};
 use agent_kit_core::{
     AttemptId, BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint,
     OperationId, PrincipalId, ProviderId, Result, SchemaId, ScopeId,
@@ -27,6 +29,9 @@ use crate::SupervisedProvider;
 
 const RENEWAL_MARGIN_MS: i64 = 30_000;
 const FAILED_RENEWAL_COOLDOWN: Duration = Duration::from_secs(1);
+const BILLING_RECEIPT_SCHEMA: &str = "grida.gateway.billing-receipt";
+const MAX_BILLING_RECEIPT_BYTES: usize = 512;
+const MAX_SUMMARY_BILLING_ATTEMPTS: usize = 32;
 
 /// Secret-bearing input for a trusted host HTTP adapter. It has no debug or
 /// serialization projection. The transport checks expiry again before sending.
@@ -104,30 +109,65 @@ impl SupervisedGg {
         attempt: &AttemptId,
     ) -> Option<String> {
         let operation = state.operations().get(operation)?;
-        let OperationInput::Inference(request) = &operation.record.input else {
-            return None;
-        };
-        let binding = request.binding();
-        if binding.provider != self.binding.provider
-            || binding.authority != operation.record.grants.authority
-            || binding.authority.principal != self.binding.authority.principal
-            || binding.authority.scope != self.binding.authority.scope
-        {
+        if !self.owns_retained_inference(operation) {
             return None;
         }
         let attempt = operation.attempts.iter().find(|item| &item.id == attempt)?;
         let OperationOutcome::Inference(outcome) = attempt.outcome.as_ref()? else {
             return None;
         };
-        if outcome
-            .failure
-            .as_ref()
-            .and_then(|failure| failure.dispatch)
-            == Some(DispatchEvidence::RejectedBeforeExecution)
+        attempt_request_id(outcome).map(str::to_owned)
+    }
+
+    fn owns_retained_inference(&self, operation: &OperationState) -> bool {
+        let OperationInput::Inference(request) = &operation.record.input else {
+            return false;
+        };
+        let binding = request.binding();
+        binding.provider == self.binding.provider
+            && binding.authority == operation.record.grants.authority
+            && binding.authority.principal == self.binding.authority.principal
+            && binding.authority.scope == self.binding.authority.scope
+    }
+
+    pub(crate) fn retained_billing(&self, state: &TurnState) -> Option<GatewayBillingProjection> {
+        let mut attempts = Vec::new();
+        let mut omitted_attempts = 0;
+        // The operation map and each operation's attempt order are retained.
+        for operation in state
+            .operations()
+            .values()
+            .filter(|op| self.owns_retained_inference(op))
         {
-            return None;
+            for attempt in &operation.attempts {
+                if attempts.len() >= MAX_SUMMARY_BILLING_ATTEMPTS {
+                    omitted_attempts += 1;
+                    continue;
+                }
+                let retained = match &attempt.outcome {
+                    Some(OperationOutcome::Inference(outcome)) => {
+                        attempt_request_id(outcome).map(|id| (id, outcome))
+                    }
+                    _ => None,
+                };
+                let billing = retained
+                    .and_then(|(id, outcome)| {
+                        retained_billing_receipt(self.scope, id, outcome.terminal_receipt.as_ref()?)
+                    })
+                    .unwrap_or(GatewayBillingRead::Unavailable);
+                attempts.push(GatewayBillingAttempt {
+                    operation_id: operation.record.id.clone(),
+                    attempt_id: attempt.id.clone(),
+                    refreshable: retained.is_some()
+                        && !matches!(billing, GatewayBillingRead::Settled { .. }),
+                    billing,
+                });
+            }
         }
-        gateway_request_id(outcome.receipt.as_ref()?).map(str::to_owned)
+        (!attempts.is_empty()).then_some(GatewayBillingProjection {
+            attempts,
+            omitted_attempts,
+        })
     }
 }
 
@@ -210,6 +250,60 @@ impl GatewayBillingRead {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GatewayBillingProjection {
+    attempts: Vec<GatewayBillingAttempt>,
+    omitted_attempts: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GatewayBillingAttempt {
+    operation_id: OperationId,
+    attempt_id: AttemptId,
+    refreshable: bool,
+    #[serde(flatten)]
+    billing: GatewayBillingRead,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RetainedGatewayBilling {
+    scope: Fingerprint,
+    request_id: String,
+    status: GatewayBillingStatus,
+    charged_mills: serde_json::Value,
+}
+
+fn retained_billing_receipt(
+    scope: Fingerprint,
+    id: &str,
+    receipt: &Envelope,
+) -> Option<GatewayBillingRead> {
+    if receipt.schema().as_str() != BILLING_RECEIPT_SCHEMA
+        || receipt.version() != 1
+        || receipt.bytes().len() > MAX_BILLING_RECEIPT_BYTES
+    {
+        return None;
+    }
+    let record: RetainedGatewayBilling = serde_json::from_slice(receipt.bytes()).ok()?;
+    if record.scope != scope || record.request_id != id {
+        return None;
+    }
+    match (record.status, record.charged_mills) {
+        (GatewayBillingStatus::Pending, serde_json::Value::Null) => {
+            Some(GatewayBillingRead::Pending)
+        }
+        (GatewayBillingStatus::Settled, serde_json::Value::String(charged_mills))
+            if valid_decimal(&charged_mills) =>
+        {
+            Some(GatewayBillingRead::Settled { charged_mills })
+        }
+        _ => None,
+    }
+}
+
 fn gateway_billing_receipt(
     scope: Fingerprint,
     request: &Envelope,
@@ -232,7 +326,7 @@ fn gateway_billing_receipt(
         _ => return None,
     };
     Envelope::new(
-        SchemaId::new("grida.gateway.billing-receipt").ok()?,
+        SchemaId::new(BILLING_RECEIPT_SCHEMA).ok()?,
         1,
         serde_json::to_vec(&serde_json::json!({
             "scope": scope,
@@ -243,6 +337,18 @@ fn gateway_billing_receipt(
         .ok()?,
     )
     .ok()
+}
+
+fn attempt_request_id(outcome: &InferenceOutcome) -> Option<&str> {
+    if outcome
+        .failure
+        .as_ref()
+        .and_then(|failure| failure.dispatch)
+        == Some(DispatchEvidence::RejectedBeforeExecution)
+    {
+        return None;
+    }
+    gateway_request_id(outcome.receipt.as_ref()?)
 }
 
 fn gateway_request_id(request: &Envelope) -> Option<&str> {
@@ -588,6 +694,162 @@ fn now_ms() -> Result<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn projects_exact_scoped_billing_and_bounded_attempts() {
+        use agent_kit_core::authority::GrantSelection;
+        use agent_kit_core::inference::{
+            InferenceRequest, InferenceStatus, ModelCapabilities, PreparedRequest,
+        };
+        use agent_kit_core::turn::{JournalAction, JournalChange, OperationRecord, TurnBinding};
+        use agent_kit_core::{ChangeId, ModelId, SessionId, TurnId};
+        use serde_json::json;
+
+        let open = |scope: char| {
+            SupervisedGg::new(
+                "https://grida.example/api/v1/ai",
+                &scope.to_string().repeat(64),
+                SupervisedProvider::default(),
+            )
+            .unwrap()
+        };
+        let original = open('a');
+        let reopened = open('a');
+        let foreign = open('b');
+        let turn = TurnBinding {
+            session: SessionId::new("session").unwrap(),
+            turn: TurnId::new("turn").unwrap(),
+            epoch: 1,
+        };
+        let mut state = TurnState::new(turn.clone()).unwrap();
+        let dispatch = |id: &str| {
+            Envelope::new(
+                SchemaId::new("http.request-id").unwrap(),
+                1,
+                id.as_bytes().to_vec(),
+            )
+            .unwrap()
+        };
+        let terminal = |id: &str, status: &str, amount: serde_json::Value| {
+            gateway_billing_receipt(original.scope, &dispatch(id), &serde_json::to_vec(&json!({
+                "grida_billing":{"version":1,"request_id":id,"status":status,"charged_mills":amount}
+            })).unwrap()).unwrap()
+        };
+        let mut add = |index: usize, gateway: &SupervisedGg, receipt, terminal_receipt| {
+            let operation = OperationId::new(format!("operation-{index:02}")).unwrap();
+            let attempt = AttemptId::new(format!("attempt-{index:02}")).unwrap();
+            let request = PreparedRequest::from_validated(
+                InferenceRequest {
+                    model: ModelId::new("fixture").unwrap(),
+                    messages: vec![],
+                    tools: vec![],
+                    max_output_tokens: None,
+                    extension: None,
+                },
+                gateway.binding.clone(),
+                ModelCapabilities {
+                    revision: BindingId::new("fixture").unwrap(),
+                    input_modalities: Default::default(),
+                    json_tools: false,
+                    text_tools: false,
+                    max_output_tokens: None,
+                },
+            )
+            .unwrap();
+            let actions = vec![
+                JournalAction::prepare(OperationRecord {
+                    id: operation.clone(),
+                    input: OperationInput::Inference(request),
+                    grants: GrantSelection {
+                        authority: gateway.binding.authority.clone(),
+                        grants: vec![],
+                    },
+                    origin: None,
+                    source_call: None,
+                }),
+                JournalAction::StartAttempt {
+                    operation: operation.clone(),
+                    attempt: attempt.clone(),
+                },
+                JournalAction::CompleteAttempt {
+                    operation,
+                    attempt,
+                    outcome: OperationOutcome::Inference(InferenceOutcome {
+                        status: InferenceStatus::Completed,
+                        messages: vec![],
+                        usage: vec![],
+                        failure: None,
+                        receipt,
+                        terminal_receipt,
+                    }),
+                },
+            ];
+            state
+                .apply(
+                    JournalChange::new(
+                        ChangeId::new(format!("record-{index}")).unwrap(),
+                        turn.clone(),
+                        state.position(),
+                        state.controls().revision,
+                        actions,
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+        };
+        add(
+            0,
+            &original,
+            Some(dispatch("req_exact")),
+            Some(terminal("req_exact", "settled", json!("0"))),
+        );
+        add(
+            1,
+            &original,
+            Some(dispatch("req_pending")),
+            Some(terminal("req_pending", "pending", json!(null))),
+        );
+        add(2, &original, Some(dispatch("req_unknown")), None);
+        add(3, &original, None, None);
+        add(
+            4,
+            &original,
+            Some(dispatch("req_mismatch")),
+            Some(terminal("req_other", "settled", json!("7"))),
+        );
+        for index in 5..34 {
+            add(index, &original, None, None);
+        }
+        add(34, &foreign, None, None);
+
+        let projection = serde_json::to_value(reopened.retained_billing(&state).unwrap()).unwrap();
+        let attempts = projection["attempts"].as_array().unwrap();
+        assert_eq!(attempts.len(), 32);
+        assert_eq!(projection["omittedAttempts"], 2);
+        assert_eq!(
+            attempts[0],
+            json!({"operationId":"operation-00","attemptId":"attempt-00","kind":"settled","chargedMills":"0","refreshable":false})
+        );
+        assert_eq!(
+            attempts[1],
+            json!({"operationId":"operation-01","attemptId":"attempt-01","kind":"pending","refreshable":true})
+        );
+        assert_eq!(
+            attempts[2],
+            json!({"operationId":"operation-02","attemptId":"attempt-02","kind":"unavailable","refreshable":true})
+        );
+        assert_eq!(
+            attempts[3],
+            json!({"operationId":"operation-03","attemptId":"attempt-03","kind":"unavailable","refreshable":false})
+        );
+        assert_eq!(
+            attempts[4],
+            json!({"operationId":"operation-04","attemptId":"attempt-04","kind":"unavailable","refreshable":true})
+        );
+        assert_eq!(foreign.retained_billing(&state).unwrap().attempts.len(), 1);
+        assert!(open('c').retained_billing(&state).is_none());
+        serde_json::from_value::<GatewayBillingProjection>(projection).unwrap();
+    }
 
     #[test]
     fn desktop_scope_retains_identity_without_a_bearer() {

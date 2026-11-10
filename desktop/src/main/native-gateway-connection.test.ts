@@ -727,6 +727,142 @@ it.skipIf(!resourcesPath)(
   20_000
 );
 
+it.skipIf(!resourcesPath)(
+  "shows recorded Gateway billing offline and refreshes only the attached attempt",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-gateway-summary-")
+    );
+    const cwd = path.join(root, "workspace");
+    await fs.mkdir(cwd, { mode: 0o700 });
+    const owner = fixture();
+    const requestId = "req_summary_fixture";
+    const jobNetwork = vi.fn<NativeGatewayJobNetwork>(async (id) =>
+      Response.json({
+        id,
+        request_id: id,
+        billing: { status: "settled", charged_mills: "0.125" },
+      })
+    );
+    const connection = await NativeGatewayConnection.open({
+      ...owner.options,
+      jobNetwork,
+    });
+    const reply = {
+      id: "fixture-completion",
+      choices: [
+        { index: 0, delta: { content: "Finished." }, finish_reason: "stop" },
+      ],
+      grida_billing: {
+        version: 1,
+        request_id: requestId,
+        status: "pending",
+        charged_mills: null,
+      },
+    };
+    owner.dispatch.mockResolvedValueOnce(
+      new Response(`data: ${JSON.stringify(reply)}\n\ndata: [DONE]\n\n`, {
+        headers: {
+          "content-type": "text/event-stream",
+          "x-request-id": requestId,
+        },
+      })
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      const active = (chat = await NativeAgentChat.start({
+        ...connection.launch("fixture"),
+        resourcesPath: resourcesPath!,
+        stateDirectory: path.join(root, "state"),
+        cwd,
+      }));
+      const endpoint = "https://editor.fixture.invalid";
+      const frame = {
+        url: `${endpoint}/desktop/workspace?id=workspace`,
+        send: vi.fn<(channel: string, payload: unknown) => void>(),
+      };
+      const sender = Object.assign(new EventEmitter(), {
+        mainFrame: frame,
+        isDestroyed: () => false,
+        isLoadingMainFrame: () => false,
+      });
+      const event = {
+        sender,
+        senderFrame: frame,
+      } as unknown as IpcMainInvokeEvent;
+      const ipc = new NativeChatIpc(endpoint, (candidate) =>
+        candidate === event.sender
+          ? { workspaceId: "workspace", chat: active }
+          : null
+      );
+      const { attachmentId } = await ipc.create(event);
+      const turn = await ipc.submit(
+        event,
+        attachmentId,
+        "billing",
+        "Finish.",
+        "act"
+      );
+      const { observationId } = await vi.waitFor(async () => {
+        const observation = await ipc.observe(event, attachmentId);
+        expect(observation.snapshot.latest).toMatchObject({
+          turnId: turn.turnId,
+          status: "succeeded",
+        });
+        return observation;
+      });
+      const read = () => ipc.turnSummary(event, attachmentId, observationId);
+      const summary = await read();
+      expect(summary.gatewayBilling).toEqual({
+        attempts: [
+          expect.objectContaining({ kind: "pending", refreshable: true }),
+        ],
+        omittedAttempts: 0,
+      });
+      expect(JSON.stringify(summary)).not.toContain(requestId);
+      expect(jobNetwork).not.toHaveBeenCalled();
+      const { operationId, attemptId } = summary.gatewayBilling!.attempts[0];
+      await expect(
+        ipc.turnSummary(event, attachmentId, observationId, {
+          operationId,
+          attemptId: "stale",
+        })
+      ).rejects.toThrow("native_chat_gateway_billing_unavailable");
+      expect(jobNetwork).not.toHaveBeenCalled();
+      await expect(
+        ipc.turnSummary(event, attachmentId, observationId, {
+          operationId,
+          attemptId,
+        })
+      ).resolves.toMatchObject({
+        gatewayBilling: {
+          attempts: [
+            {
+              operationId,
+              attemptId,
+              kind: "settled",
+              chargedMills: "0.125",
+              refreshable: false,
+            },
+          ],
+        },
+      });
+      expect(jobNetwork.mock.calls.map(([id]) => id)).toEqual([requestId]);
+      await expect(read()).resolves.toEqual(summary);
+      expect(jobNetwork).toHaveBeenCalledTimes(1);
+      expect(owner.dispatch).toHaveBeenCalledTimes(1);
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        connection.close();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  },
+  15_000
+);
+
 it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
   "retains an unconfirmed presentation without repeating the send or stopping artifact work",
   async () => {

@@ -47,3 +47,46 @@ it("distinguishes unreported usage from an explicitly reported zero", () => {
   expect(html).toContain("Token counts unknown for 2 model requests.");
   expect(html).not.toContain("Input 0");
 });
+
+it("shows exact Gateway amounts and refreshes only eligible requests", () => {
+  const summary: NativeChatTurnSummary = {
+    ...settled,
+    gatewayBilling: {
+      attempts: [
+        {
+          operationId: "op",
+          attemptId: "a",
+          kind: "settled",
+          chargedMills: "0",
+          refreshable: false,
+        },
+        {
+          operationId: "op",
+          attemptId: "b",
+          kind: "pending",
+          refreshable: true,
+        },
+        {
+          operationId: "op",
+          attemptId: "c",
+          kind: "unavailable",
+          refreshable: false,
+        },
+      ],
+      omittedAttempts: 1,
+    },
+  };
+  const html = renderToStaticMarkup(
+    createElement(NativeTurnSummary, {
+      summary,
+      messages: [],
+      onRefreshGatewayBilling: () => {},
+    })
+  );
+  expect(html).toContain("Gateway billing for this turn");
+  expect(html).toContain("0 mills charged");
+  expect(html).toContain("Settlement pending");
+  expect(html).toContain("Amount unavailable");
+  expect(html).toContain("Additional Gateway requests: 1");
+  expect(html.match(/Refresh billing/g)).toHaveLength(1);
+});

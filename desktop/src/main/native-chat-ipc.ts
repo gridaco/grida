@@ -1769,7 +1769,8 @@ export class NativeChatIpc {
   async turnSummary(
     event: IpcMainInvokeEvent,
     attachmentId: string,
-    observationId: string
+    observationId: string,
+    refreshGatewayAttempt?: unknown
   ): Promise<NativeChatTurnSummary> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const snapshot = requireObservation(attachment, observationId);
@@ -1780,13 +1781,19 @@ export class NativeChatIpc {
       attachment.latestObservation?.latest?.turnId !== latest.turnId
     )
       throw new Error("native_chat_turn_summary_unavailable");
-    const summary = await owner.active.chat.turnSummary(
-      attachment.session,
-      snapshot
-    );
-    this.revalidate(owner, attachment);
-    if (attachment.latestObservation?.latest?.turnId !== latest.turnId)
-      throw new Error("native_chat_turn_summary_unavailable");
+    const requireCurrent = () => {
+      this.revalidate(owner, attachment);
+      if (attachment.latestObservation?.latest?.turnId !== latest.turnId)
+        throw new Error("native_chat_turn_summary_unavailable");
+    };
+    const summary =
+      refreshGatewayAttempt === undefined
+        ? await owner.active.chat.turnSummary(attachment.session, snapshot)
+        : await owner.active.chat.turnSummary(attachment.session, snapshot, {
+            attempt: refreshGatewayAttempt,
+            requireCurrent,
+          });
+    requireCurrent();
     attachment.artifacts = summary.artifacts?.length
       ? { turnId: latest.turnId, items: summary.artifacts }
       : undefined;

@@ -815,11 +815,12 @@ const bridge: DesktopBridge = {
         attachmentId,
         input
       ),
-    turnSummary: (attachmentId, observationId) =>
+    turnSummary: (attachmentId, observationId, refreshGatewayAttempt) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,
         attachmentId,
-        observationId
+        observationId,
+        refreshGatewayAttempt
       ),
     readArtifact: (attachmentId, observationId, artifactId) =>
       ipcRenderer.invoke(

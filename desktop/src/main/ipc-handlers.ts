@@ -588,8 +588,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,
-    (event, id: string, observation: string) =>
-      nativeChat.turnSummary(event, id, observation)
+    (event, id: string, observation: string, refreshGatewayAttempt?: unknown) =>
+      nativeChat.turnSummary(event, id, observation, refreshGatewayAttempt)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_READ_ARTIFACT,

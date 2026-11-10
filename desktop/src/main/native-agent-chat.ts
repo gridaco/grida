@@ -15,6 +15,9 @@ import type {
   NativeChatConfigurationInput,
   NativeChatControlReceipt,
   NativeChatEffort,
+  NativeChatGatewayAttemptRef,
+  NativeChatGatewayBilling,
+  NativeChatGatewayBillingAttempt,
   NativeChatGoalControl,
   NativeChatGoalReceipt,
   NativeChatGoalRequest,
@@ -70,6 +73,7 @@ import {
   TRANSCRIPT_WINDOW,
   type NativeAgentLaunch,
 } from "./native-agent-process";
+import { NativeGatewayConnection } from "./native-gateway-connection";
 
 const CAPABILITIES = {
   ...NativeAgentConfiguration.capabilities,
@@ -1061,7 +1065,8 @@ export class NativeAgentChat {
 
   async turnSummary(
     session: NativeChatSession,
-    snapshot: NativeChatSnapshot
+    snapshot: NativeChatSnapshot,
+    refreshBilling?: { attempt: unknown; requireCurrent: () => void }
   ): Promise<NativeChatTurnSummary> {
     const sessionId = this.requireObservation(session, snapshot);
     const latest = snapshot.latest;
@@ -1086,6 +1091,37 @@ export class NativeAgentChat {
     const tools =
       result.toolActivity === null ? null : object(result.toolActivity);
     const usage = tokenUsage(result.tokenUsage);
+    let billing = gatewayBilling(result.gatewayBilling);
+    if (refreshBilling) {
+      const attempt = gatewayAttempt(refreshBilling.attempt);
+      const selected = billing?.attempts.find(
+        (row) =>
+          row.operationId === attempt.operationId &&
+          row.attemptId === attempt.attemptId
+      );
+      if (!billing || !selected?.refreshable)
+        throw new Error("native_chat_gateway_billing_unavailable");
+      refreshBilling.requireCurrent();
+      const status = await this.process.gatewayBillingStatus({
+        ...attempt,
+        sessionId,
+        turnId: latest.turnId,
+      });
+      this.requireAttached(session);
+      refreshBilling.requireCurrent();
+      if (status.kind === "unavailable")
+        throw new Error("native_chat_gateway_billing_unavailable");
+      const refreshed: NativeChatGatewayBillingAttempt =
+        status.kind === "settled"
+          ? Object.freeze({ ...attempt, ...status, refreshable: false })
+          : Object.freeze({ ...attempt, kind: "pending", refreshable: true });
+      billing = Object.freeze({
+        ...billing,
+        attempts: Object.freeze(
+          billing.attempts.map((row) => (row === selected ? refreshed : row))
+        ),
+      });
+    }
     return Object.freeze({
       turnId: latest.turnId,
       status: latest.status,
@@ -1108,6 +1144,7 @@ export class NativeAgentChat {
         result.checks.map((check: unknown) => choice(check, CHECK_STATUSES))
       ),
       ...(usage && { tokenUsage: usage }),
+      ...(billing && { gatewayBilling: billing }),
       ...(typeof result.reviewFindingsCollected === "boolean" && {
         reviewFindingsCollected: result.reviewFindingsCollected,
       }),
@@ -2240,6 +2277,65 @@ function tokenUsage(value: unknown): NativeChatTokenUsage | undefined {
     });
   } catch {
     // Older or invalid optional accounting must not hide the settled result.
+    return undefined;
+  }
+}
+
+function gatewayAttempt(value: unknown): NativeChatGatewayAttemptRef {
+  const attempt = object(value);
+  if (Object.keys(attempt).length !== 2) throw invalidResponse();
+  return {
+    operationId: identity(attempt.operationId),
+    attemptId: identity(attempt.attemptId),
+  };
+}
+
+function gatewayBilling(value: unknown): NativeChatGatewayBilling | undefined {
+  if (value === undefined) return undefined;
+  try {
+    const billing = object(value);
+    if (!Array.isArray(billing.attempts) || billing.attempts.length > 32)
+      return undefined;
+    const omittedAttempts = revision(billing.omittedAttempts);
+    const seen = new Set<string>();
+    const attempts: NativeChatGatewayBillingAttempt[] = billing.attempts.map(
+      (entry: unknown) => {
+        const row = object(entry);
+        const attempt = {
+          operationId: identity(row.operationId),
+          attemptId: identity(row.attemptId),
+        };
+        const key = JSON.stringify([attempt.operationId, attempt.attemptId]);
+        if (seen.has(key)) throw invalidResponse();
+        seen.add(key);
+        if (row.kind === "settled") {
+          const settled = NativeGatewayConnection.billingResult({
+            kind: row.kind,
+            chargedMills: row.chargedMills,
+          });
+          if (
+            settled.kind !== "settled" ||
+            row.refreshable !== false ||
+            Object.keys(row).length !== 5
+          )
+            throw invalidResponse();
+          return Object.freeze({ ...attempt, ...settled, refreshable: false });
+        }
+        if (Object.keys(row).length !== 4) throw invalidResponse();
+        return Object.freeze({
+          ...attempt,
+          kind: choice(row.kind, ["pending", "unavailable"] as const),
+          refreshable: flag(row.refreshable),
+        });
+      }
+    );
+    if (!attempts.length && !omittedAttempts) return undefined;
+    return Object.freeze({
+      attempts: Object.freeze(attempts),
+      omittedAttempts,
+    });
+  } catch {
+    // Optional billing evidence cannot hide the recorded turn result.
     return undefined;
   }
 }

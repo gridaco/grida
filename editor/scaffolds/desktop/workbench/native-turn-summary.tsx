@@ -2,13 +2,18 @@ import { useCallback, useState } from "react";
 import { Button } from "@app/ui/components/button";
 import type {
   NativeChatArtifactSaveResult,
+  NativeChatGatewayAttemptRef,
+  NativeChatGatewayBilling,
   NativeChatImageArtifact,
   NativeChatMessage,
   NativeChatTokenCategory,
   NativeChatTokenUsage,
   NativeChatTurnSummary,
 } from "@grida/desktop-bridge";
-import type { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
+import type {
+  NativeChatController,
+  NativeChatView,
+} from "@/lib/agent-chat/native-chat-controller";
 import { FullscreenImagePreview } from "@/kits/image-preview";
 
 const CHECK_LABEL: Record<NativeChatTurnSummary["checks"][number], string> = {
@@ -40,11 +45,18 @@ export function NativeTurnSummary({
   messages,
   previewController,
   onRetry,
+  billingRefresh,
+  onRefreshGatewayBilling,
 }: {
   summary: NativeChatTurnSummary;
   messages: readonly NativeChatMessage[];
   previewController?: NativeChatController;
   onRetry?: () => void;
+  billingRefresh?: NativeChatView["gatewayBillingRefresh"];
+  onRefreshGatewayBilling?: (
+    turnId: string,
+    attempt: NativeChatGatewayAttemptRef
+  ) => void;
 }) {
   const text = summary.text.trim();
   const inTranscript = messages.some(
@@ -83,6 +95,7 @@ export function NativeTurnSummary({
     !details.length &&
     !summary.checks.length &&
     !summary.tokenUsage &&
+    !summary.gatewayBilling &&
     !artifacts?.length
   )
     return null;
@@ -116,6 +129,16 @@ export function NativeTurnSummary({
         </p>
       )}
       {summary.tokenUsage && <TokenUsage usage={summary.tokenUsage} />}
+      {summary.gatewayBilling && (
+        <GatewayBilling
+          billing={summary.gatewayBilling}
+          refresh={billingRefresh}
+          onRefresh={
+            onRefreshGatewayBilling &&
+            ((attempt) => onRefreshGatewayBilling(summary.turnId, attempt))
+          }
+        />
+      )}
       {previewController && artifacts && artifacts.length > 0 && (
         <ul className="mt-2 space-y-1">
           {artifacts.map((artifact) => (
@@ -155,6 +178,64 @@ function TokenUsage({ usage }: { usage: NativeChatTokenUsage }) {
           Token counts unknown for {attemptsWithoutCounts}{" "}
           {attemptsWithoutCounts === 1 ? "model request" : "model requests"}.
         </p>
+      )}
+    </div>
+  );
+}
+
+function GatewayBilling({
+  billing,
+  refresh,
+  onRefresh,
+}: {
+  billing: NativeChatGatewayBilling;
+  refresh?: NativeChatView["gatewayBillingRefresh"];
+  onRefresh?: (attempt: NativeChatGatewayAttemptRef) => void;
+}) {
+  return (
+    <div className="mt-2 text-muted-foreground">
+      <p>Gateway billing for this turn</p>
+      <ul>
+        {billing.attempts.map((attempt, index) => {
+          const status =
+            refresh?.operationId === attempt.operationId &&
+            refresh.attemptId === attempt.attemptId
+              ? refresh.status
+              : undefined;
+          const amount =
+            attempt.kind === "settled"
+              ? `${attempt.chargedMills} mills charged`
+              : attempt.kind === "pending"
+                ? "Settlement pending"
+                : "Amount unavailable";
+          return (
+            <li
+              key={JSON.stringify([attempt.operationId, attempt.attemptId])}
+              className="flex flex-wrap items-center gap-x-2"
+            >
+              <span>
+                Model request {index + 1} · {amount}
+              </span>
+              {onRefresh && attempt.refreshable && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={refresh?.status === "loading"}
+                  onClick={() => onRefresh(attempt)}
+                >
+                  {status === "loading" ? "Refreshing…" : "Refresh billing"}
+                </Button>
+              )}
+              {status === "unavailable" && (
+                <span role="status">Couldn't refresh billing.</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {billing.omittedAttempts > 0 && (
+        <p>Additional Gateway requests: {billing.omittedAttempts}</p>
       )}
     </div>
   );

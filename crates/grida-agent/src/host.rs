@@ -791,7 +791,17 @@ impl Host {
         session: SessionId,
         turn: TurnId,
         include_artifacts: bool,
-    ) -> Result<(TurnOutcome, Option<CropArtifacts>, Option<&'static str>)> {
+        include_gateway_billing: bool,
+    ) -> Result<(
+        TurnOutcome,
+        Option<CropArtifacts>,
+        Option<&'static str>,
+        Option<crate::gg::GatewayBillingProjection>,
+    )> {
+        let gateway = self
+            .supervised_gateway()
+            .filter(|owner| include_gateway_billing && owner.validate().is_ok())
+            .cloned();
         self.store
             .inspect_turn_with(session, turn, move |state| {
                 let outcome = state
@@ -802,6 +812,9 @@ impl Host {
                     outcome,
                     include_artifacts.then(|| image_tools::artifacts(state)),
                     image_generation::summary_note(state),
+                    gateway
+                        .as_ref()
+                        .and_then(|owner| owner.retained_billing(state)),
                 ))
             })
             .await
