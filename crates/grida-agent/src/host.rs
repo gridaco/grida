@@ -294,6 +294,8 @@ struct StoredPrompt {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     editor_presentation: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    editor_svg_target: Option<BindingId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     guidance: Option<crate::skills::CapturedGuidance>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     goal: Option<goals::GoalInput>,
@@ -316,6 +318,7 @@ struct SubmissionPolicy {
     allow_host_tools: bool,
     editor_endpoint: Option<BindingId>,
     editor_presentation: bool,
+    editor_svg_target: Option<BindingId>,
     operating_regime: OperatingRegime,
     subagent: Option<grida_agent_master::subagents::Assignment>,
     effort: Option<EffortPolicy>,
@@ -1441,6 +1444,7 @@ impl Host {
             allow_host_tools: true,
             editor_endpoint: None,
             editor_presentation: false,
+            editor_svg_target: None,
             operating_regime,
             subagent: None,
             effort: self.capture_effort(request.effort.unwrap_or(self.effort))?,
@@ -1461,6 +1465,7 @@ impl Host {
             allow_host_tools,
             editor_endpoint,
             editor_presentation,
+            editor_svg_target,
             operating_regime,
             subagent,
             effort,
@@ -1556,6 +1561,7 @@ impl Host {
                     host_tools_capture,
                     editor_endpoint,
                     editor_presentation,
+                    editor_svg_target,
                     guidance,
                     goal: None,
                     subagent,
@@ -1649,6 +1655,7 @@ impl Host {
                         || stored.host_tools_capture.is_some()
                         || stored.editor_endpoint.is_some()
                         || stored.editor_presentation
+                        || stored.editor_svg_target.is_some()
                         || stored.guidance.is_some()
                         || stored.goal.is_some()
                         || stored.effort.is_some()
@@ -1683,6 +1690,12 @@ impl Host {
                         .push_str(grida_agent_master::presentation::INSTRUCTIONS);
                 }
                 if !cancellation_only
+                    && stored.editor_svg_target.is_some()
+                    && (stored.editor_endpoint.is_none() || stored.allow_wakeups)
+                {
+                    return Err(problem(ErrorKind::InvalidState, "invalid_svg_text_scope"));
+                }
+                if !cancellation_only
                     && stored.operating_regime.is_act()
                     && let Some(capture) = &stored.host_tools_capture
                 {
@@ -1705,9 +1718,11 @@ impl Host {
                             session.clone(),
                             endpoint.clone(),
                             stored.editor_presentation,
+                            stored.editor_svg_target.clone(),
                         )?,
                         endpoint.clone(),
                         stored.editor_presentation,
+                        stored.editor_svg_target.is_some(),
                     )?));
                 }
                 authority.validate(
@@ -1936,7 +1951,7 @@ impl Host {
     }
 
     pub async fn submit_prompt(&self, request: PromptRequest) -> Result<DurableSubmission> {
-        self.submit_prompt_with_context(request, false, None, false)
+        self.submit_prompt_with_context(request, false, None, false, None)
             .await
     }
 
@@ -1946,12 +1961,19 @@ impl Host {
         allow_wakeups: bool,
         editor_endpoint: Option<BindingId>,
         editor_presentation: bool,
+        editor_svg_target: Option<BindingId>,
     ) -> Result<DurableSubmission> {
         validate_prompt_parts(&request.parts)?;
         if let Some(accepted) = self.existing_submission(&request, allow_wakeups).await? {
             return Ok(accepted);
         }
         let mut policy = self.submission_policy(&request, allow_wakeups)?;
+        if editor_svg_target.is_some() && (editor_endpoint.is_none() || allow_wakeups) {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "svg_text_requires_attached_act",
+            ));
+        }
         if editor_endpoint.is_some()
             && (!policy.operating_regime.is_act()
                 || self.side_context.is_some()
@@ -1969,6 +1991,7 @@ impl Host {
         }
         policy.editor_endpoint = editor_endpoint;
         policy.editor_presentation = editor_presentation;
+        policy.editor_svg_target = editor_svg_target;
         match self.launch_prompt(request.clone(), true, policy).await {
             Ok(run) => Ok(DurableSubmission {
                 session: run.session,

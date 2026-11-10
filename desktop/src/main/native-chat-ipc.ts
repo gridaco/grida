@@ -1,7 +1,11 @@
 // GRIDA-SEC-004 — native chat attachments and delivery belong to the admitted frame.
 import { randomUUID } from "node:crypto";
 import type { IpcMainInvokeEvent, WebContents, WebFrameMain } from "electron";
-import { NativeEditorSurfaces } from "@grida/desktop-bridge";
+import {
+  NativeEditorSurfaces,
+  NativeEditorSvgText,
+} from "@grida/desktop-bridge";
+import { NativeEditorSvgTextReplies } from "./native-editor-svg-text-replies";
 import type {
   NativeChatAcceptance,
   NativeChatAttachment,
@@ -210,6 +214,7 @@ export class NativeChatIpc {
   private readonly startups = new WeakMap<WebContents, Startup>();
   private readonly deleting = new WeakSet<NativeChatSession>();
   private readonly savingArtifact = new WeakSet<WebContents>();
+  private readonly svgTextReplies = new NativeEditorSvgTextReplies();
 
   constructor(
     private readonly editorOrigin: string,
@@ -805,9 +810,27 @@ export class NativeChatIpc {
             attachmentId: attachment.id,
             ...request,
           }),
-        revision
+        revision,
+        (request) =>
+          this.svgTextReplies.dispatch(attachment.id, request, () => {
+            this.revalidate(owner, attachment);
+            owner.frame.send(IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT, {
+              attachmentId: attachment.id,
+              ...request,
+            });
+          })
       );
     }
+  }
+
+  replyEditorSvgText(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    callId: unknown,
+    value: unknown
+  ): void {
+    const { attachment } = this.requireAttachment(event, attachmentId);
+    this.svgTextReplies.respond(attachment.id, callId, value);
   }
 
   async submit(
@@ -816,13 +839,21 @@ export class NativeChatIpc {
     inputId: string,
     text: string,
     regime?: unknown,
-    effort?: unknown
+    effort?: unknown,
+    svgTargetId?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const mode = operatingRegime(regime);
+    if (
+      svgTargetId !== undefined &&
+      (mode !== "act" || !NativeEditorSvgText.isId(svgTargetId))
+    )
+      throw new Error("native_chat_svg_text_target_invalid");
     const selected = agentEffort(effort);
     const surfaces =
-      mode === "act" ? attachment.editorSurfaces?.selection() : undefined;
+      mode === "act"
+        ? attachment.editorSurfaces?.selection(svgTargetId)
+        : undefined;
     const result = await owner.active.chat.submit(
       attachment.session,
       inputId,

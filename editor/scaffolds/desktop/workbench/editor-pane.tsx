@@ -30,6 +30,7 @@ import type { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 import { useWorkspaceChanges } from "./workspace-changes";
 import { WorkspaceFileIcon } from "./workspace-file-icon";
 import { WorkspaceTabThumbnail } from "./workspace-tab-thumbnail";
+import type { WorkspaceSvgText } from "./workspace-svg-text";
 import { FileContextMenu } from "./workbench-file-context-menu";
 import {
   isWorkspaceWorkbenchCommand,
@@ -40,6 +41,7 @@ import {
 
 export type EditorPaneProps = {
   workspace: Workspace;
+  svgText?: WorkspaceSvgText;
   openTabs: readonly string[];
   activeRelPath: string | null;
   onSelectTab: (relPath: string) => void;
@@ -65,6 +67,7 @@ export type EditorPaneProps = {
 
 export function EditorPane({
   workspace,
+  svgText,
   openTabs,
   activeRelPath,
   onSelectTab,
@@ -235,6 +238,7 @@ export function EditorPane({
                     <EditorPaneTab
                       key={`${workspace.id}:${relPath}`}
                       workspace={workspace}
+                      svgText={svgText}
                       relPath={relPath}
                       active={relPath === activeRelPath}
                       onDirtyChange={onTabDirtyChange}

@@ -3,6 +3,7 @@ import type {
   NativeEditorSurfaceOpen,
   NativeEditorSurfaceSnapshot,
 } from "./native-editor-surfaces";
+import type { NativeEditorSvgText } from "./native-editor-svg-text";
 import type { NativeSubagentClient } from "./native-subagents";
 
 export type NativeChatAttachment = Readonly<{
@@ -466,6 +467,10 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     open: (request: NativeEditorSurfaceOpen, isCurrent: () => boolean) => void
   ): () => void;
+  onEditorSvgText?(
+    attachmentId: string,
+    invoke: (request: NativeEditorSvgText.Request) => NativeEditorSvgText.Result
+  ): () => void;
   submit(
     attachmentId: string,
     inputId: string,
@@ -482,7 +487,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     inputId: string,
     text: string,
     operatingRegime: NativeChatOperatingRegime,
-    effort?: NativeChatEffort
+    effort?: NativeChatEffort,
+    editorSvgTargetId?: string
   ): Promise<NativeChatAcceptance>;
   acceptsEffort?(): Promise<boolean>;
   acceptsPng?(): Promise<boolean>;

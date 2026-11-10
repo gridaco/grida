@@ -221,6 +221,7 @@ async fn serve_connection(
                             == Some(1)
                     {
                         let open = crate::editor_surfaces::OPEN_CAPABILITY;
+                        let svg_text = crate::editor_surfaces::SVG_TEXT_CAPABILITY;
                         let presentation = request
                             .client_capabilities
                             .meta
@@ -228,12 +229,24 @@ async fn serve_connection(
                             .and_then(|meta| meta.get(open))
                             .and_then(serde_json::Value::as_u64)
                             == Some(1);
-                        initialized_host
-                            .editor_surfaces
-                            .attach(connection.clone(), presentation);
+                        let svg = request
+                            .client_capabilities
+                            .meta
+                            .as_ref()
+                            .and_then(|meta| meta.get(svg_text))
+                            .and_then(serde_json::Value::as_u64)
+                            == Some(1);
+                        initialized_host.editor_surfaces.attach(
+                            connection.clone(),
+                            presentation,
+                            svg,
+                        );
                         advertised.insert(capability.into(), 1.into());
                         if presentation {
                             advertised.insert(open.into(), 1.into());
+                        }
+                        if svg {
+                            advertised.insert(svg_text.into(), 1.into());
                         }
                     }
                 }
@@ -247,6 +260,7 @@ async fn serve_connection(
                         [
                             crate::editor_surfaces::CAPABILITY,
                             crate::editor_surfaces::OPEN_CAPABILITY,
+                            crate::editor_surfaces::SVG_TEXT_CAPABILITY,
                         ]
                         .into_iter()
                         .filter(|key| advertised.contains_key(*key)),

@@ -212,6 +212,48 @@ it("fences presentation by the current attachment, tab revision, and delivery li
   expect(open.mock.calls[1][1]()).toBe(false);
 });
 
+it("keeps the captured SVG target when the same submission reply is lost", async () => {
+  const { bridge } = fixture();
+  bridge.publishEditorSurfaces = async () => {};
+  bridge.onEditorSvgText = () => () => {};
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "claimed",
+      inputPosition: 1,
+      turnId: "turn-workbench",
+    })
+  );
+  send.mockRejectedValueOnce(new Error("fixture lost reply"));
+  bridge.submitInRegime = send;
+  const target = crypto.randomUUID();
+  const capture = vi.fn<() => string>();
+  capture.mockReturnValueOnce(target);
+  capture.mockReturnValue(crypto.randomUUID());
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    readEditorSurfaces: () => ({
+      active: "/poster.svg",
+      open: ["/poster.svg"],
+      truncated: false,
+    }),
+    subscribeToEditorSurfaces: () => () => {},
+    svgText: { capture, invoke: () => ({ kind: "unavailable" }) },
+  });
+  try {
+    await controller.select("workbench");
+    await expect(controller.submit("Read this SVG selection.")).rejects.toThrow(
+      "fixture lost reply"
+    );
+    await controller.submit("Read this SVG selection.");
+    expect(send.mock.calls[0]?.at(-1)).toBe(target);
+    expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
+    expect(capture).toHaveBeenCalledTimes(1);
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("replaces a retry wait when the same turn's new observation clears it", async () => {
   const { bridge, controller, running } = fixture();
   running.add("retry-chat");

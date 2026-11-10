@@ -1,7 +1,7 @@
 //! GRIDA-SEC-004 — tool-host authority belongs to the captured endpoints and turn.
 
 use super::{Host, problem};
-use crate::editor_surfaces::LIST_OPEN;
+use crate::editor_surfaces::{LIST_OPEN, READ_TEXT, REPLACE_TEXT};
 use crate::mcp_client::McpClient;
 use crate::surface_tools::{OPEN_SURFACE, headless_surface};
 use crate::tool_host::{CapabilityGrant, ToolHost};
@@ -117,16 +117,23 @@ impl HostTools {
         Self::with_local(mcp, surface, &[OPEN_SURFACE], lease, principal)
     }
 
-    pub(super) fn editor(surface: ToolHost, lease: BindingId, present: bool) -> Result<Self> {
-        let capabilities: &[&str] = if present {
-            &[LIST_OPEN, presentation::OPEN]
-        } else {
-            &[LIST_OPEN]
-        };
+    pub(super) fn editor(
+        surface: ToolHost,
+        lease: BindingId,
+        present: bool,
+        svg_text: bool,
+    ) -> Result<Self> {
+        let mut capabilities = vec![LIST_OPEN];
+        if present {
+            capabilities.push(presentation::OPEN);
+        }
+        if svg_text {
+            capabilities.extend([READ_TEXT, REPLACE_TEXT]);
+        }
         Self::with_local(
             None,
             Some(surface),
-            capabilities,
+            &capabilities,
             lease,
             presentation::PRINCIPAL,
         )

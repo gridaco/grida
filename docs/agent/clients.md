@@ -506,6 +506,20 @@ This picker was verified with a disposable Responses API GPT-5.4 profile.
 The current native Desktop Gateway and ChatGPT subscription profiles
 offer text input.
 
+## Edit selected SVG text
+
+Open an SVG in the native Desktop workspace and select one plain text element.
+Send an immediate text message in **Act** asking the agent to read or replace
+that selection. The agent works against the editor and selection captured for
+the message. A tab, selection, or editor revision change makes that target
+unavailable. Select the text and send a new message to work on a new target.
+
+The change appears in the SVG editor and can be undone there. Use the editor's
+normal **Save** command to write it to disk. If another process changed the
+file, the existing save dialog lets you keep editing or resolve the conflict.
+The selected-text tools are available only for immediate Act messages in an
+attached workspace. Plan and queued messages omit them.
+
 ## Read a turn summary
 
 For the Desktop export workflow, see [Inspect and save results](./results.md).

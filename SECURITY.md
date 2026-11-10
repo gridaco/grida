@@ -967,6 +967,15 @@ lazy reads, read-only mutation, and symlink escape refusal.
   checks the reply's chat and endpoint identity, and bounds the projected
   workspace-relative paths. The read supplies editor context only and confers
   no file, network, or document-edit authority.
+- The separately negotiated [SVG text tools](crates/grida-agent/src/editor_surfaces/svg_text.rs)
+  capture one exact workbench selection for an immediate Act text input.
+  Main dispatches to the admitted frame and validates the bounded
+  [correlated response](desktop/src/main/native-editor-svg-text-replies.ts).
+  The [renderer owner](editor/scaffolds/desktop/workbench/workspace-svg-text.ts)
+  requires the captured editor, view, selection, and revision before the
+  existing SVG text command can run. Its result is a live edit. The normal
+  editor save remains a separate operation. An unverified mutation reply
+  stays uncertain and is never replayed.
 - Live presentation requires a separately negotiated capability and a
   subscription from the exact attached workbench. Main dispatches a bounded
   workspace-relative path to the authorized frame. Its receipt identifies the

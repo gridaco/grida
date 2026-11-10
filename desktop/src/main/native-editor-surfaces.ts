@@ -2,6 +2,7 @@
 import { randomUUID } from "node:crypto";
 import {
   NativeEditorSurfaces,
+  NativeEditorSvgText,
   type NativeEditorSurfaceOpen,
   type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
@@ -13,7 +14,7 @@ const SESSION_ID = /^[A-Za-z0-9_.:@/-]{1,256}$/;
 const ENDPOINT_ID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 
 export type NativeEditorSurfaceLease = Readonly<{
-  selection(): NativeEditorSurfaceSelection;
+  selection(editorSvgTargetId?: string): NativeEditorSurfaceSelection;
   update(snapshot: NativeEditorSurfaceSnapshot, revision?: number): void;
   close(): void;
 }>;
@@ -21,11 +22,15 @@ export type NativeEditorSurfaceLease = Readonly<{
 export type NativeEditorSurfaceSelection = Readonly<{
   editorEndpointId: string;
   editorPresentation?: true;
+  editorSvgTargetId?: string;
 }>;
 
 export type NativeEditorSurfaceDelivery = (
   request: NativeEditorSurfaceOpen
 ) => void;
+export type NativeEditorSvgTextDelivery = (
+  request: NativeEditorSvgText.Request & { callId: string }
+) => Promise<NativeEditorSvgText.Result>;
 
 type Endpoint = {
   sessionId: string;
@@ -33,6 +38,7 @@ type Endpoint = {
   requireCurrent(): void;
   revision?: number;
   deliver?: NativeEditorSurfaceDelivery;
+  svgText?: NativeEditorSvgTextDelivery;
   calls: Map<string, { path: string; requested: boolean }>;
 };
 
@@ -41,6 +47,8 @@ export class NativeEditorSurfaceEndpoints {
   static readonly readMethod = "_co.grida/editor/surface-list-open";
   static readonly openCapability = "co.grida/session/editor-surface-open";
   static readonly openMethod = "_co.grida/editor/surface-open";
+  static readonly svgTextCapability = "co.grida/session/editor-svg-text";
+  static readonly svgTextMethod = "_co.grida/editor/svg-selected-text";
 
   private readonly endpoints = new Map<string, Endpoint>();
 
@@ -49,7 +57,8 @@ export class NativeEditorSurfaceEndpoints {
     snapshot: NativeEditorSurfaceSnapshot,
     requireCurrent: () => void,
     deliver?: NativeEditorSurfaceDelivery,
-    revision?: number
+    revision?: number,
+    svgText?: NativeEditorSvgTextDelivery
   ): NativeEditorSurfaceLease {
     requireCurrent();
     if (this.endpoints.size >= MAX_ENDPOINTS)
@@ -61,17 +70,21 @@ export class NativeEditorSurfaceEndpoints {
       requireCurrent,
       revision,
       deliver,
+      svgText,
       calls: new Map(),
     };
     this.endpoints.set(id, endpoint);
     return Object.freeze({
-      selection: () => ({
+      selection: (editorSvgTargetId?: string) => ({
         editorEndpointId: id,
         ...(this.endpoints.get(id) === endpoint &&
           endpoint.deliver &&
           endpoint.revision !== undefined && {
             editorPresentation: true as const,
           }),
+        ...(editorSvgTargetId &&
+          this.endpoints.get(id) === endpoint &&
+          endpoint.svgText && { editorSvgTargetId }),
       }),
       update: (next: NativeEditorSurfaceSnapshot, revision?: number) => {
         if (this.endpoints.get(id) !== endpoint) return;
@@ -89,6 +102,38 @@ export class NativeEditorSurfaceEndpoints {
         this.endpoints.delete(id);
       },
     });
+  }
+
+  async svgText(value: unknown) {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return null;
+    const { sessionId, endpointId, targetId, callId, operation, expiresAtMs } =
+      value as Record<string, unknown>;
+    const action = NativeEditorSvgText.operation(operation);
+    if (
+      Object.keys(value).length !== 6 ||
+      typeof sessionId !== "string" ||
+      !SESSION_ID.test(sessionId) ||
+      !NativeEditorSvgText.isId(endpointId) ||
+      !NativeEditorSvgText.isId(targetId) ||
+      !NativeEditorSvgText.isId(callId) ||
+      typeof expiresAtMs !== "number" ||
+      !Number.isSafeInteger(expiresAtMs) ||
+      !action
+    )
+      return null;
+    const endpoint = this.current(sessionId, endpointId);
+    const result = endpoint?.svgText
+      ? await endpoint.svgText({
+          callId,
+          targetId,
+          operation: action,
+          expiresAtMs: Math.min(expiresAtMs, Date.now() + 1500),
+        })
+      : { kind: "unavailable" };
+    if (endpoint?.svgText && this.current(sessionId, endpointId) !== endpoint)
+      throw new Error("native_chat_svg_text_unverified");
+    return { sessionId, endpointId, targetId, callId, result };
   }
 
   read(value: unknown) {

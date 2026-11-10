@@ -565,6 +565,7 @@ impl Host {
         captured.host_tools_capture = None;
         captured.editor_endpoint = None;
         captured.editor_presentation = false;
+        captured.editor_svg_target = None;
         captured.guidance = None;
         captured.subagent = Some(Assignment {
             parent_turn: source.binding.turn.clone(),
@@ -1043,6 +1044,7 @@ mod tests {
                     allow_host_tools: false,
                     editor_endpoint: None,
                     editor_presentation: false,
+                    editor_svg_target: None,
                     operating_regime: regime,
                     subagent: None,
                     effort: host.capture_effort(EffortPreset::Ultra).unwrap(),

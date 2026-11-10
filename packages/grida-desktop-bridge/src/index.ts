@@ -67,6 +67,7 @@ import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
 export type * from "./native-chat";
 export type * from "./native-subagents";
 export { NativeEditorSurfaces } from "./native-editor-surfaces";
+export { NativeEditorSvgText } from "./native-editor-svg-text";
 export type {
   NativeEditorSurfaceOpen,
   NativeEditorSurfaceSnapshot,

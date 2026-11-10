@@ -1758,7 +1758,8 @@ describe("native chat IPC", () => {
       (key) =>
         key.startsWith("NATIVE_CHAT_") &&
         key !== "NATIVE_CHAT_UPDATE" &&
-        key !== "NATIVE_CHAT_EDITOR_SURFACE_OPEN"
+        key !== "NATIVE_CHAT_EDITOR_SURFACE_OPEN" &&
+        key !== "NATIVE_CHAT_EDITOR_SVG_TEXT"
     )) {
       expect(handlers).toMatch(
         new RegExp(`guarded\\(\\s*IPC_CHANNELS\\.${key}\\b`)

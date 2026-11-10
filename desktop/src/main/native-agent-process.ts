@@ -14,6 +14,7 @@ import { NativeAgentGoals } from "./native-agent-goals";
 import {
   NativeEditorSurfaceEndpoints,
   type NativeEditorSurfaceDelivery,
+  type NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
 import {
   NativeAgentPermissions,
@@ -115,6 +116,7 @@ export class NativeAgentProcess {
   private goalCompletionReview = false;
   private editorSurfaces = false;
   private editorSurfaceOpen = false;
+  private editorSvgText = false;
   private readonly commandCapabilities = new Set<string>();
   private observedExit = false;
   private shutdown: Promise<void> | undefined;
@@ -367,6 +369,7 @@ export class NativeAgentProcess {
                 [NativeEditorSurfaceEndpoints.capability]: 1,
                 ...(providerEgress && {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
+                  [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
                 ...(requestDeletion && {
@@ -429,6 +432,9 @@ export class NativeAgentProcess {
       processOwner.editorSurfaceOpen =
         processOwner.editorSurfaces &&
         advertised?.[NativeEditorSurfaceEndpoints.openCapability] === 1;
+      processOwner.editorSvgText =
+        processOwner.editorSurfaces &&
+        advertised?.[NativeEditorSurfaceEndpoints.svgTextCapability] === 1;
       processOwner.ready = true;
       return processOwner;
     } catch (error) {
@@ -452,7 +458,8 @@ export class NativeAgentProcess {
     snapshot: NativeEditorSurfaceSnapshot,
     requireCurrent: () => void,
     deliver: NativeEditorSurfaceDelivery,
-    revision?: number
+    revision?: number,
+    svgText?: NativeEditorSvgTextDelivery
   ) {
     if (this.connected && this.editorSurfaces)
       return this.editorEndpoints.register(
@@ -460,7 +467,8 @@ export class NativeAgentProcess {
         snapshot,
         requireCurrent,
         this.editorSurfaceOpen ? deliver : undefined,
-        revision
+        revision,
+        this.editorSvgText ? svgText : undefined
       );
   }
 
@@ -582,6 +590,35 @@ export class NativeAgentProcess {
           !this.shutdown
         ) {
           this.providerRequest(message.id, message.params);
+          return;
+        }
+        if (
+          this.connected &&
+          this.editorSvgText &&
+          message.method === NativeEditorSurfaceEndpoints.svgTextMethod
+        ) {
+          const id = message.id;
+          void this.editorEndpoints
+            .svgText(message.params)
+            .then(
+              (result) =>
+                this.write({
+                  jsonrpc: "2.0",
+                  id,
+                  ...(result
+                    ? { result }
+                    : {
+                        error: { code: -32602, message: "Invalid params" },
+                      }),
+                }),
+              () =>
+                this.write({
+                  jsonrpc: "2.0",
+                  id,
+                  error: { code: -32603, message: "Editor reply unverified" },
+                })
+            )
+            .catch(() => {});
           return;
         }
         if (

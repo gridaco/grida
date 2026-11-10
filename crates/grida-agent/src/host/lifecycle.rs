@@ -335,6 +335,7 @@ impl Host {
                             allow_host_tools,
                             editor_endpoint: None,
                             editor_presentation: false,
+                            editor_svg_target: None,
                             operating_regime,
                             subagent: None,
                             effort,

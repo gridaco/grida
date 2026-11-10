@@ -44,6 +44,7 @@ import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import type {
   NativeEditorSurfaceDelivery,
   NativeEditorSurfaceSelection,
+  NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
 import type { NativeApprovalReview } from "./native-agent-permissions";
@@ -679,14 +680,16 @@ export class NativeAgentChat {
     snapshot: NativeEditorSurfaceSnapshot,
     requireCurrent: () => void,
     deliver: NativeEditorSurfaceDelivery,
-    revision?: number
+    revision?: number,
+    svgText?: NativeEditorSvgTextDelivery
   ) {
     return this.process.registerEditorSurfaces(
       this.requireAttached(session),
       snapshot,
       requireCurrent,
       deliver,
-      revision
+      revision,
+      svgText
     );
   }
 

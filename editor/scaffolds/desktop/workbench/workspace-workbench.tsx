@@ -513,6 +513,7 @@ export function WorkspaceWorkbench({
                     <ResizablePanel data-workbench-decorative-overflow>
                       <EditorPane
                         workspace={workspace}
+                        svgText={surfaceHost.svgText}
                         openTabs={openTabs}
                         activeRelPath={activeRelPath}
                         onSelectTab={activateTab}

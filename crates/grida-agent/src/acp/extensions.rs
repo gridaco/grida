@@ -156,6 +156,7 @@ struct Submit {
     editor_endpoint_id: Option<BindingId>,
     #[serde(default)]
     editor_presentation: bool,
+    editor_svg_target_id: Option<BindingId>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -402,6 +403,19 @@ pub(super) fn handlers(
                             return Err(Error::invalid_params());
                         }
                     }
+                    if let Some(target) = &request.editor_svg_target_id {
+                        require(
+                            &submit_sessions,
+                            crate::editor_surfaces::SVG_TEXT_CAPABILITY,
+                            None,
+                        )?;
+                        if request.editor_endpoint_id.is_none()
+                            || request.allow_wakeups
+                            || uuid::Uuid::parse_str(target.as_str()).is_err()
+                        {
+                            return Err(Error::invalid_params());
+                        }
+                    }
                     let parts = prompt_parts(request.prompt, image_intake)?;
                     let accepted = submit_host
                         .submit_prompt_with_context(
@@ -423,6 +437,7 @@ pub(super) fn handlers(
                             request.allow_wakeups,
                             request.editor_endpoint_id,
                             request.editor_presentation,
+                            request.editor_svg_target_id,
                         )
                         .await
                         .map_err(host_error)?;

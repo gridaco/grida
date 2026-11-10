@@ -240,6 +240,7 @@ impl Host {
                     allow_host_tools: false,
                     editor_endpoint: None,
                     editor_presentation: false,
+                    editor_svg_target: None,
                     operating_regime: OperatingRegime::Act,
                     subagent: Some(Assignment {
                         parent_turn: parent_turn.clone(),

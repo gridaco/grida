@@ -6,6 +6,7 @@ import {
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import type { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import type { EditorGroup } from "./editor-group";
+import { WorkspaceSvgText } from "./workspace-svg-text";
 
 /**
  * Interactive surface host for one workspace workbench.
@@ -17,6 +18,8 @@ import type { EditorGroup } from "./editor-group";
  * `EditorGroup`.
  */
 export class WorkspaceSurfaceHost implements AgentSurface.Host {
+  readonly svgText: WorkspaceSvgText;
+
   constructor(
     private readonly readdir: WorkspaceArtifact.Readdir,
     private readonly group: Pick<
@@ -25,7 +28,9 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
     >,
     private readonly isVirtual: (id: string) => boolean = (id) =>
       id.startsWith("virtual://")
-  ) {}
+  ) {
+    this.svgText = new WorkspaceSvgText(this.group.getSnapshot);
+  }
 
   async open(
     path: string,

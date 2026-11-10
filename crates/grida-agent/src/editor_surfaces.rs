@@ -23,6 +23,9 @@ const MAX_OPEN_PATHS: usize = 50;
 const SNAPSHOT_BYTES: usize = 16 * 1024;
 const REPLY_TIMEOUT: Duration = Duration::from_secs(2);
 
+mod svg_text;
+pub(crate) use svg_text::{CAPABILITY as SVG_TEXT_CAPABILITY, READ_TEXT, REPLACE_TEXT};
+
 #[derive(Clone, Default)]
 pub(crate) struct EditorSurfaces {
     connection: Arc<Mutex<Option<DesktopConnection>>>,
@@ -31,13 +34,15 @@ pub(crate) struct EditorSurfaces {
 struct DesktopConnection {
     client: ConnectionTo<Client>,
     presentation: bool,
+    svg_text: bool,
 }
 
 impl EditorSurfaces {
-    pub(crate) fn attach(&self, client: ConnectionTo<Client>, presentation: bool) {
+    pub(crate) fn attach(&self, client: ConnectionTo<Client>, presentation: bool, svg_text: bool) {
         *self.connection.lock().unwrap() = Some(DesktopConnection {
             client,
             presentation,
+            svg_text,
         });
     }
 
@@ -54,11 +59,21 @@ impl EditorSurfaces {
             .map(|connection| connection.client.clone())
     }
 
+    fn svg_client(&self) -> Option<ConnectionTo<Client>> {
+        self.connection
+            .lock()
+            .unwrap()
+            .as_ref()
+            .filter(|connection| connection.svg_text)
+            .map(|connection| connection.client.clone())
+    }
+
     pub(crate) fn tool_host(
         &self,
         session: SessionId,
         endpoint: BindingId,
         present: bool,
+        svg_target: Option<BindingId>,
     ) -> Result<ToolHost> {
         let mut capabilities = vec![(
             open_surfaces_definition()?,
@@ -88,10 +103,13 @@ impl EditorSurfaces {
                 },
                 Arc::new(Present {
                     owner: self.clone(),
-                    session,
-                    endpoint,
+                    session: session.clone(),
+                    endpoint: endpoint.clone(),
                 }),
             ));
+        }
+        if let Some(target) = svg_target {
+            capabilities.extend(svg_text::tools(self.clone(), session, endpoint, target)?);
         }
         ToolHost::new(capabilities)
     }

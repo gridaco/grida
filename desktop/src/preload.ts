@@ -20,6 +20,7 @@ import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { AgentTransport } from "@grida/agent/transport";
 import {
   NativeEditorSurfaces,
+  NativeEditorSvgText,
   type NativeEditorSurfaceOpen,
 } from "@grida/desktop-bridge";
 import type {
@@ -108,11 +109,63 @@ const nativeEditorHandlers = new Map<
     open(request: NativeEditorSurfaceOpen, isCurrent: () => boolean): void;
   }
 >();
+const nativeSvgTextHandlers = new Map<
+  string,
+  {
+    href: string;
+    invoke(request: NativeEditorSvgText.Request): NativeEditorSvgText.Result;
+  }
+>();
 
 function clearNativeChatDelivery(): void {
   nativeChatHandlers.clear();
   nativeEditorHandlers.clear();
+  nativeSvgTextHandlers.clear();
 }
+
+ipcRenderer.on(
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
+  (_event, value: unknown) => {
+    if (
+      location.pathname !== "/desktop/workspace" ||
+      !value ||
+      typeof value !== "object"
+    )
+      return;
+    const { attachmentId, callId, targetId, expiresAtMs, operation } =
+      value as Record<string, unknown>;
+    const action = NativeEditorSvgText.operation(operation);
+    if (
+      !NativeEditorSvgText.isId(attachmentId) ||
+      !NativeEditorSvgText.isId(callId) ||
+      !NativeEditorSvgText.isId(targetId) ||
+      typeof expiresAtMs !== "number" ||
+      !Number.isSafeInteger(expiresAtMs) ||
+      !action
+    )
+      return;
+    const handler = nativeSvgTextHandlers.get(attachmentId);
+    try {
+      const result =
+        handler?.href === location.href && Date.now() < expiresAtMs
+          ? NativeEditorSvgText.result(
+              handler.invoke({ targetId, expiresAtMs, operation: action })
+            )
+          : { kind: "unavailable" };
+      if (result)
+        void ipcRenderer
+          .invoke(
+            IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+            attachmentId,
+            callId,
+            result
+          )
+          .catch(() => {});
+    } catch {
+      // An exception after dispatch is unverified. Do not send a false receipt.
+    }
+  }
+);
 
 ipcRenderer.on(
   IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
@@ -537,6 +590,7 @@ const bridge: DesktopBridge = {
       ),
     detach: async (attachmentId) => {
       nativeEditorHandlers.delete(attachmentId);
+      nativeSvgTextHandlers.delete(attachmentId);
       for (const [id, subscriber] of nativeChatHandlers) {
         if (subscriber.attachmentId === attachmentId)
           nativeChatHandlers.delete(id);
@@ -568,6 +622,22 @@ const bridge: DesktopBridge = {
           nativeEditorHandlers.delete(attachmentId);
       };
     },
+    onEditorSvgText: (attachmentId, invoke) => {
+      if (
+        !NativeEditorSvgText.isId(attachmentId) ||
+        typeof invoke !== "function" ||
+        nativeSvgTextHandlers.has(attachmentId) ||
+        nativeSvgTextHandlers.size >= 16 ||
+        location.pathname !== "/desktop/workspace"
+      )
+        throw new Error("native_chat_svg_text_unavailable");
+      const handler = { href: location.href, invoke };
+      nativeSvgTextHandlers.set(attachmentId, handler);
+      return () => {
+        if (nativeSvgTextHandlers.get(attachmentId) === handler)
+          nativeSvgTextHandlers.delete(attachmentId);
+      };
+    },
     submit: (attachmentId, inputId, text) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
@@ -581,7 +651,8 @@ const bridge: DesktopBridge = {
       inputId,
       text,
       operatingRegime,
-      effort
+      effort,
+      editorSvgTargetId
     ) =>
       ipcRenderer.invoke(
         action === "enqueue"
@@ -591,7 +662,11 @@ const bridge: DesktopBridge = {
         inputId,
         text,
         operatingRegime,
-        ...(effort === undefined ? [] : [effort])
+        ...(editorSvgTargetId !== undefined
+          ? [effort, editorSvgTargetId]
+          : effort === undefined
+            ? []
+            : [effort])
       ),
     enqueue: (attachmentId, inputId, text) =>
       ipcRenderer.invoke(

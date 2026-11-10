@@ -108,6 +108,14 @@ accepted the send to the captured frame. Observed display requires separate
 evidence. An unconfirmed dispatch remains in the turn's account and leaves
 the model free to continue work. Reopening a chat never replays presentation.
 
+The SVG text binding captures one plain selected text node at immediate Act
+submission. The renderer owns the loaded editor, tab and selection identity.
+`svg_read_selected_text` supplies the text and its opaque revision.
+`svg_replace_selected_text` verifies that same capture and calls the editor's
+undoable text command. The result reports the live edit separately from disk
+save. The editor's normal Save command retains its existing mtime precondition.
+An unverified mutation reply remains uncertain and the bridge does not replay it.
+
 The document tool defines the meaning of its document, selection, and content
 arguments. It returns its own domain result or error. A tool that requires a
 version or other precondition validates it inside the document implementation.

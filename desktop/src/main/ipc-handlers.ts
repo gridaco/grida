@@ -363,8 +363,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       input: string,
       text: string,
       regime?: unknown,
-      effort?: unknown
-    ) => nativeChat.submit(event, id, input, text, regime, effort)
+      effort?: unknown,
+      svgTargetId?: unknown
+    ) => nativeChat.submit(event, id, input, text, regime, effort, svgTargetId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+    (event, attachmentId: string, callId: unknown, result: unknown) =>
+      nativeChat.replyEditorSvgText(event, attachmentId, callId, result)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,

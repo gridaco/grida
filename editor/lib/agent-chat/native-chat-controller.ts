@@ -34,6 +34,7 @@ import type {
   NativeChatWakeupAction,
   NativeContextLimit,
   NativeEditorSurfaceSnapshot,
+  NativeEditorSvgText,
   NativeSubagentClient,
 } from "@grida/desktop-bridge";
 import { NativeSideChatController } from "./native-side-chat-controller";
@@ -112,6 +113,7 @@ type Scope = {
   attachment?: NativeChatAttachment;
   stopEditorSurfaceUpdates?: () => void;
   stopEditorSurfaceOpen?: () => void;
+  stopEditorSvgText?: () => void;
   editorPresentationRevision?: number;
   sideChat?: NativeSideChatController;
   subagents?: NativeSubagentController;
@@ -152,6 +154,7 @@ type Scope = {
     image?: ArrayBuffer;
     reviewConfiguration: boolean;
     allowWakeup: boolean;
+    editorSvgTargetId?: string;
   };
   awaitingTurn?: string;
 };
@@ -234,6 +237,12 @@ export class NativeChatController {
       readEditorSurfaces(): NativeEditorSurfaceSnapshot;
       subscribeToEditorSurfaces(listener: () => void): () => void;
       open?(path: string, requireCurrent: () => boolean): Promise<void>;
+      svgText?: {
+        capture(): string | undefined;
+        invoke(
+          request: NativeEditorSvgText.Request
+        ): NativeEditorSvgText.Result;
+      };
     }
   ) {}
 
@@ -1201,6 +1210,16 @@ export class NativeChatController {
         ? this.view.operatingRegime
         : undefined;
     const effort = this.view.effortAvailable ? this.view.effort : undefined;
+    const svgTarget =
+      !retained &&
+      mode === "submit" &&
+      operatingRegime === "act" &&
+      !allowWakeup &&
+      !reviewConfiguration &&
+      !image &&
+      this.bridge.onEditorSvgText
+        ? this.editorSurfaces?.svgText?.capture()
+        : undefined;
     this.update({ acting: true, error: null });
     try {
       await this.open(scope);
@@ -1220,6 +1239,7 @@ export class NativeChatController {
         image,
         reviewConfiguration,
         allowWakeup,
+        editorSvgTargetId: scope.stopEditorSvgText ? svgTarget : undefined,
       };
       scope.pending = pending;
       let accepted;
@@ -1259,13 +1279,19 @@ export class NativeChatController {
         } else if (pending.operatingRegime) {
           if (!this.bridge.submitInRegime)
             throw new Error("native_chat_operating_regime_unavailable");
+          const options: [effort?: NativeChatEffort, svgTargetId?: string] =
+            pending.editorSvgTargetId
+              ? [pending.effort, pending.editorSvgTargetId]
+              : pending.effort
+                ? [pending.effort]
+                : [];
           accepted = await this.bridge.submitInRegime(
             pending.mode,
             attachment.attachmentId,
             pending.inputId,
             pending.text,
             pending.operatingRegime,
-            ...(pending.effort ? [pending.effort] : [])
+            ...options
           );
         } else {
           const send = this.bridge[pending.mode];
@@ -1942,6 +1968,20 @@ export class NativeChatController {
       if (!this.owns(scope)) return;
       if (this.editorSurfaces && this.bridge.publishEditorSurfaces) {
         this.subscribeToEditorPresentation(scope, attachment);
+        const svgText = this.editorSurfaces.svgText;
+        if (svgText && this.bridge.onEditorSvgText) {
+          try {
+            scope.stopEditorSvgText = this.bridge.onEditorSvgText(
+              attachment.attachmentId,
+              (request) =>
+                this.owns(scope) && scope.attachment === attachment
+                  ? svgText.invoke(request)
+                  : { kind: "unavailable" }
+            );
+          } catch {
+            // This attachment can still supply the ordinary editor context.
+          }
+        }
         const publish = () => this.publishEditorSurfaces(scope, attachment);
         scope.stopEditorSurfaceUpdates =
           this.editorSurfaces.subscribeToEditorSurfaces(() => void publish());
@@ -1972,6 +2012,7 @@ export class NativeChatController {
     if (!scope) return;
     clearTimeout(scope.timer);
     scope.stopEditorSurfaceOpen?.();
+    scope.stopEditorSvgText?.();
     scope.stopEditorSurfaceUpdates?.();
     void scope.sideChat?.close().catch(() => {});
     scope.subagents?.dispose();

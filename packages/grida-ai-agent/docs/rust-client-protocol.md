@@ -410,6 +410,21 @@ public MCP adapter exposes a separately enabled authenticated loopback endpoint
 for independent callers. These bindings share product operations, while their
 wire protocols and connection lifetimes remain distinct.
 
+On the supervised Desktop connection, the client and agent negotiate
+`co.grida/session/editor-svg-text` version 1 alongside editor surfaces.
+An immediate Act text submission may carry `editorSvgTargetId` with its
+`editorEndpointId`. This is the renderer's opaque capture of the current
+workspace SVG selection. The submission retains the original capture on retry.
+Queued inputs and check-ins have no SVG target.
+
+The reverse `_co.grida/editor/svg-selected-text` request carries the exact
+`sessionId`, `endpointId`, `targetId`, `callId`, and `expiresAtMs`, with a
+`read` or `replace` operation. Replacement requires the opaque revision from
+read and at most 4 KiB of valid SVG text. A verified response echoes the four
+identities and carries `result`. Applied and unchanged replacement results
+report `saved: false`. Unavailable or stale targets supply a domain failure.
+Malformed, lost, or uncorrelated replies leave the tool outcome uncertain.
+
 ### Persistent goal operations
 
 Negotiate each `co.grida/goal/` capability at version `1`. The methods apply

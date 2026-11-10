@@ -75,6 +75,9 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_PUBLISH_EDITOR_SURFACES:
     "grida:native-chat:publish-editor-surfaces",
   NATIVE_CHAT_EDITOR_SURFACE_OPEN: "grida:native-chat:editor-surface-open",
+  NATIVE_CHAT_EDITOR_SVG_TEXT: "grida:native-chat:editor-svg-text",
+  NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT:
+    "grida:native-chat:editor-svg-text-result",
   NATIVE_CHAT_SUBMIT: "grida:native-chat:submit",
   NATIVE_CHAT_ENQUEUE: "grida:native-chat:enqueue",
   NATIVE_CHAT_ACCEPTS_EFFORT: "grida:native-chat:accepts-effort",
