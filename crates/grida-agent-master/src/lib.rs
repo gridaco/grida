@@ -16,7 +16,8 @@ pub mod wakeups;
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::history::{HistoryPosition, HistoryRecord};
 use agent_kit_core::inference::{
-    FailureKind, InferenceFailure, InferenceRequest, InferenceStatus, PreparedRequest, Provider,
+    FailureKind, InferenceFailure, InferenceOutcome, InferenceRequest, InferenceStatus,
+    PreparedRequest, Provider,
 };
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::tools::InventorySnapshot;
@@ -582,7 +583,7 @@ impl Master {
                             &turn,
                             OutcomeStatus::Uncertain,
                             continuation.step,
-                            "The model response was interrupted.",
+                            inference_failure_text(&step.inference),
                             None,
                             step.inference.failure.as_ref(),
                         )?),
@@ -595,7 +596,7 @@ impl Master {
                                 &turn,
                                 OutcomeStatus::Failed,
                                 continuation.step,
-                                "The model reached its context limit.",
+                                inference_failure_text(&step.inference),
                                 None,
                                 step.inference.failure.as_ref(),
                             )?)
@@ -604,7 +605,7 @@ impl Master {
                             &turn,
                             OutcomeStatus::Failed,
                             continuation.step,
-                            "The model reached its output limit.",
+                            "The model reached its output limit. Ask for a shorter response.",
                             Some(StopReason::OutputLimit),
                             step.inference.failure.as_ref(),
                         )?),
@@ -618,23 +619,11 @@ impl Master {
                         )?),
                         InferenceStatus::Failed => {
                             let failure = step.inference.failure.as_ref();
-                            let explanation = match failure.map(|failure| failure.code.as_str()) {
-                                Some("input_token_limit") => {
-                                    "The prepared request exceeds the configured input limit."
-                                }
-                                Some(
-                                    "input_measurement_unavailable" | "input_bound_unavailable",
-                                ) => "The selected model cannot verify the configured input limit.",
-                                Some("rate_limit") => {
-                                    "The provider rate limit prevented this turn from finishing."
-                                }
-                                _ => "The model request failed.",
-                            };
                             Some(self.account(
                                 &turn,
                                 OutcomeStatus::Failed,
                                 continuation.step,
-                                explanation,
+                                inference_failure_text(&step.inference),
                                 None,
                                 failure,
                             )?)
@@ -1121,6 +1110,48 @@ fn decode<T: serde::de::DeserializeOwned>(schema: &str, envelope: &Envelope) -> 
     }
     serde_json::from_slice(envelope.bytes())
         .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid_master_state"))
+}
+
+fn inference_failure_text(inference: &InferenceOutcome) -> &'static str {
+    if inference.status == InferenceStatus::Interrupted {
+        return "The provider did not confirm the result. Review any partial work before trying again.";
+    }
+    let Some(failure) = &inference.failure else {
+        return "The model request failed.";
+    };
+    match (failure.kind, failure.code.as_str()) {
+        (FailureKind::ContextLimit, "input_token_limit") => {
+            "The request exceeds the configured input limit. Shorten the input or change the limit in settings."
+        }
+        (
+            FailureKind::Configuration,
+            "input_measurement_unavailable" | "input_bound_unavailable",
+        ) => {
+            "The selected model cannot verify the configured input limit. Choose another model or change the limit in settings."
+        }
+        (FailureKind::Configuration, "model_unavailable") => {
+            "The selected model is unavailable from this provider. Choose another model or check your access."
+        }
+        (FailureKind::Configuration, "provider_unavailable") => {
+            "The selected provider is unavailable. Check its configuration or choose another provider."
+        }
+        (FailureKind::Authentication, _) => {
+            "The provider rejected authentication or access. Check the provider's credentials and permissions."
+        }
+        (FailureKind::Quota, _) => {
+            "The provider's quota or billing limit blocked this turn. Check its balance or quota, or choose another provider."
+        }
+        (FailureKind::ContextLimit, _) => {
+            "The request exceeds the selected model's context limit. Shorten the input or compact the conversation."
+        }
+        (FailureKind::RateLimit, _) => {
+            "The provider rate limit prevented this turn from finishing. Wait before trying again."
+        }
+        (FailureKind::Cancelled, "deadline") => {
+            "The model request reached its time limit. Try a shorter request."
+        }
+        _ => "The model request failed.",
+    }
 }
 
 fn answer(messages: &[Message]) -> String {

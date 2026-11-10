@@ -2356,14 +2356,19 @@ async fn hard_input_limit_measures_the_assembled_request_before_dispatch() {
 
 #[tokio::test]
 async fn unsupported_estimated_and_excessive_input_settle_without_provider_dispatch() {
-    for (measurement, code) in [
-        (None, "input_measurement_unavailable"),
+    for (measurement, code, explanation) in [
+        (
+            None,
+            "input_measurement_unavailable",
+            "The selected model cannot verify the configured input limit.",
+        ),
         (
             Some(InputMeasurement {
                 tokens: 1,
                 kind: MeasurementKind::Estimate,
             }),
             "input_bound_unavailable",
+            "The selected model cannot verify the configured input limit.",
         ),
         (
             Some(InputMeasurement {
@@ -2371,6 +2376,7 @@ async fn unsupported_estimated_and_excessive_input_settle_without_provider_dispa
                 kind: MeasurementKind::Exact,
             }),
             "input_token_limit",
+            "The request exceeds the configured input limit.",
         ),
     ] {
         let fixture = Fixture::new(Script::Answer);
@@ -2390,6 +2396,7 @@ async fn unsupported_estimated_and_excessive_input_settle_without_provider_dispa
         assert_eq!(receipt.outcome.status, OutcomeStatus::Failed);
         let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
         assert_eq!(account.failure.unwrap().code, code);
+        assert!(account.text.starts_with(explanation), "{}", account.text);
         assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
         store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
         assert_eq!(

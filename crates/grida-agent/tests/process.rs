@@ -94,6 +94,8 @@ enum Reply {
         code: &'static str,
         retry_after: &'static [&'static str],
     },
+    #[cfg(unix)]
+    RawHttp(String),
     Hold(&'static str),
     Stop(&'static str),
     #[cfg(unix)]
@@ -225,6 +227,16 @@ async fn fixture_request(
     stream.read_exact(&mut request).await.unwrap();
     sent.send(serde_json::from_slice(&request).unwrap())
         .unwrap();
+    #[cfg(unix)]
+    if let Reply::RawHttp(response) = reply {
+        assert!(response.len() <= 16 * 1024, "oversized fixture response");
+        stream
+            .get_mut()
+            .write_all(response.as_bytes())
+            .await
+            .unwrap();
+        return;
+    }
     if let Reply::InputCount(tokens) = reply {
         assert_eq!(protocol, ProviderProtocol::Responses);
         assert_eq!(accept.as_deref(), Some("application/json"));
@@ -307,6 +319,8 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         Reply::Stop(reason) => ("", Some(reason)),
         Reply::InputCount(_) => unreachable!("count responses use the JSON endpoint"),
         Reply::RateLimited { .. } => unreachable!("rate limits use an HTTP error response"),
+        #[cfg(unix)]
+        Reply::RawHttp(_) => unreachable!("raw responses include their own HTTP headers"),
         #[cfg(unix)]
         Reply::Tool(name, arguments) => {
             if protocol == ProviderProtocol::Responses {

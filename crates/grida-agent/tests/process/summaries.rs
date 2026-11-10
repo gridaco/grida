@@ -5,6 +5,15 @@ use super::lifecycle::{
 use super::*;
 
 const SUMMARY: &str = "co.grida/session/turn-summary";
+const PRIVATE_DIAGNOSTIC: &str = "fixture private provider diagnostic";
+
+fn rejected(status: &str, code: &str) -> Reply {
+    let body = json!({"error":{"code":code,"message":PRIVATE_DIAGNOSTIC}}).to_string();
+    Reply::RawHttp(format!(
+        "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    ))
+}
 
 async fn connect(url: &str) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
@@ -33,13 +42,69 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("state");
     let workspace = TempDir::new().unwrap();
-    let mut endpoint = Endpoint::start(vec![
-        Reply::Finished("Finished and ready to review."),
-        Reply::Stop("length"),
-        Reply::Hold("Partial answer."),
-        Reply::Stop("length"),
-    ])
-    .await;
+    let partial = fixture_body(
+        Reply::Hold("Unconfirmed partial answer."),
+        ProviderProtocol::OpenAiCompatible,
+    );
+    let (mut replies, expected): (Vec<_>, Vec<_>) = [
+        (
+            Reply::Finished("Finished and ready to review."),
+            "succeeded",
+            "Finished and ready to review.",
+        ),
+        (
+            rejected("401 Unauthorized", "invalid_api_key"),
+            "failed",
+            "The provider rejected authentication or access. Check the provider's credentials and permissions.",
+        ),
+        (
+            rejected("429 Too Many Requests", "insufficient_quota"),
+            "failed",
+            "The provider's quota or billing limit blocked this turn. Check its balance or quota, or choose another provider.",
+        ),
+        (
+            rejected("404 Not Found", "model_not_found"),
+            "failed",
+            "The selected model is unavailable from this provider. Choose another model or check your access.",
+        ),
+        (
+            rejected("429 Too Many Requests", "rate_limit_exceeded"),
+            "failed",
+            "The provider rate limit prevented this turn from finishing. Wait before trying again.",
+        ),
+        (
+            rejected("400 Bad Request", "context_length_exceeded"),
+            "failed",
+            "The request exceeds the selected model's context limit. Shorten the input or compact the conversation.",
+        ),
+        (
+            Reply::Stop("length"),
+            "failed",
+            "The model reached its output limit. Ask for a shorter response.",
+        ),
+        (
+            Reply::Stop("content_filter"),
+            "failed",
+            "The model declined the request.",
+        ),
+        (
+            Reply::RawHttp(format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: 1048576\r\nConnection: close\r\n\r\n{partial}"
+            )),
+            "uncertain",
+            "The provider did not confirm the result. Review any partial work before trying again.",
+        ),
+        (
+            Reply::Hold("Partial answer."),
+            "cancelled",
+            "Work was stopped.",
+        ),
+    ]
+    .into_iter()
+    .map(|(reply, status, text)| (reply, (status, text)))
+    .unzip();
+    replies.push(Reply::Stop("length"));
+    let mut endpoint = Endpoint::start(replies).await;
     let (first, url) = shared_server(&state, &endpoint.url).await;
     let mut socket = connect(&url).await;
     let created = ws_rpc(
@@ -51,7 +116,7 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
     .await;
     let session = created["result"]["sessionId"].as_str().unwrap();
     let mut retained = Vec::new();
-    for (index, status) in ["succeeded", "failed", "cancelled"].into_iter().enumerate() {
+    for (index, (status, text)) in expected.into_iter().enumerate() {
         let accepted = ws_rpc(
             &mut socket,
             index as u64 + 3,
@@ -71,7 +136,7 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
             let snapshot = session_snapshot(&mut socket, session).await;
             let stop = ws_rpc(
                 &mut socket,
-                6,
+                100,
                 "_co.grida/session/stop",
                 task_basis(&snapshot, session, "stop-summary-fixture"),
             )
@@ -86,18 +151,19 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
         let result = &recorded["result"];
         assert_eq!(result["status"], status, "{recorded}");
         assert_eq!(result["turnId"], turn);
-        assert!(!result["text"].as_str().unwrap().trim().is_empty());
+        assert_eq!(result["text"], text);
         assert_eq!(result["textTruncated"], false);
         assert_eq!(result["toolActivity"]["succeeded"], 0);
-        if status == "succeeded" {
-            assert_eq!(result["text"], "Finished and ready to review.");
+        if status == "uncertain" {
+            assert_eq!(result["unresolvedOperations"], 1);
         }
+        assert!(!result.to_string().contains(PRIVATE_DIAGNOSTIC));
         retained.push((turn.to_owned(), result.clone()));
     }
     let stopped = session_snapshot(&mut socket, session).await;
     let resumed = ws_rpc(
         &mut socket,
-        7,
+        101,
         "_co.grida/session/resume-queue",
         queue_basis(&stopped, session, "resume-for-compaction"),
     )
@@ -105,7 +171,7 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
     assert!(resumed.get("result").is_some(), "{resumed}");
     let compaction = ws_rpc(
         &mut socket,
-        8,
+        102,
         "_co.grida/session/compact",
         json!({"sessionId":session,"requestId":"unavailable-summary"}),
     )
