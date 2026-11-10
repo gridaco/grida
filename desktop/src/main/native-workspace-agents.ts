@@ -30,6 +30,7 @@ type ChatProfile = Readonly<{
 }>;
 type Owner = {
   active: ActiveNativeChat & { chat: NativeAgentChat };
+  gatewayScope?: string;
   release?: () => void;
 };
 type Slot = {
@@ -57,6 +58,13 @@ export class NativeWorkspaceAgents {
 
   current(workspaceId: string, profileId?: string): ActiveNativeChat | null {
     return this.active(slotKey(workspaceId, profileId));
+  }
+
+  gatewayScope(workspaceId: string, profileId?: string): string | undefined {
+    const key = slotKey(workspaceId, profileId);
+    return this.active(key)
+      ? this.slots.get(key)?.owner?.gatewayScope
+      : undefined;
   }
 
   currentDocument(key: string): ActiveNativeChat | null {
@@ -192,6 +200,7 @@ export class NativeWorkspaceAgents {
           ...(identity && { directoryIdentity: identity }),
           chat: opened.chat,
         }),
+        gatewayScope: candidate.launch.gatewayScope,
         release: candidate.release,
       };
     } catch (error) {

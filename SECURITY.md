@@ -1016,9 +1016,13 @@ lazy reads, read-only mutation, and symlink escape refusal.
   revision for new input. A pending file edit does not change accepted work.
   The [model selector](desktop/src/main/native-chat-profiles.ts) accepts only
   opaque IDs in the admitted workspace. Main resolves the current approved
-  saved endpoint or built-in BYOK connection and the exact model before
-  starting a separate chat worker. OpenRouter and Vercel selections use
-  their fixed reviewed routes and existing private key custody.
+  saved endpoint, built-in BYOK connection, or discovered Gateway chat model
+  before starting a separate chat worker. OpenRouter and Vercel selections use
+  their fixed reviewed routes and existing private key custody. Gateway
+  choices use the default worker's captured scope without minting a grant.
+  The separate worker verifies the opaque binding against the exact model,
+  origin, account and organization of its own scoped grant. It uses the
+  existing fixed Gateway chat route.
   The private profile record contains display labels and semantic IDs. It
   retains no endpoint URL or credential bytes. A changed connection cannot
   reopen history under a different owner. Switching models invalidates the

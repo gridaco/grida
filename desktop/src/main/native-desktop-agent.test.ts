@@ -1,5 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — native Desktop provider lifetime fixtures.
 import { AuthStore, SecretsStore } from "@grida/daemon/server";
+import { AGENT_DEFAULT_TIER } from "@grida/agent/tiers";
+import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -36,6 +38,10 @@ const sidecar = vi.hoisted(() => ({
     vi.fn<
       typeof import("./agent-sidecar-client").agentSidecarClient.listProviderEndpoints
     >(),
+  listGatewayModels:
+    vi.fn<
+      typeof import("./agent-sidecar-client").agentSidecarClient.listGatewayModels
+    >(),
   nativeBuiltInByok:
     vi.fn<
       typeof import("./agent-sidecar-client").agentSidecarClient.nativeBuiltInByok
@@ -55,7 +61,197 @@ const PNG =
 const OTHER_PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z88AAAMfAQ+5sXHtAAAAAElFTkSuQmCC";
 
-beforeEach(() => vi.resetModules());
+beforeEach(() => {
+  vi.resetModules();
+  sidecar.nativeAgentGatewayConnection.mockClear();
+  sidecar.listGatewayModels.mockResolvedValue([]);
+});
+
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "opens a discovered Gateway model under its original account scope and output limit",
+  async () => {
+    const base = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-gateway-model-")
+    );
+    const source = {
+      userDataPath: path.join(base, "agent"),
+      desktopUserDataPath: path.join(base, "browser"),
+      scratchBase: path.join(base, "scratch"),
+      providerHome: path.join(base, "providers"),
+      mediaRoot: path.join(base, "media"),
+    };
+    const root = path.join(base, "workspace");
+    const origin = "https://editor.example.test";
+    const model = {
+      id: "fixture/alternate-chat",
+      label: "Alternate chat",
+      kind: "text",
+      created: 0,
+      owned_by: "fixture",
+      interfaces: ["chat.completions"],
+      input_modalities: ["text"],
+      output_modalities: ["text"],
+      operation_ids: [],
+      capabilities: { tools: true },
+      limits: { context_tokens: 8192, max_output_tokens: 1024 },
+    };
+    let organization = 17;
+    let mints = 0;
+    const requests: unknown[] = [];
+    const prepare: NativeProviderNetwork["prepare"] = (target, headers) => {
+      expect(target).toBe(origin + "/api/v1/ai/chat/completions");
+      expect(headers.get("authorization")).toBe("Bearer fixture.gg.key");
+      return async (body) => {
+        requests.push(JSON.parse(body.toString()));
+        const chunk = {
+          id: "gateway-model-fixture",
+          choices: [
+            {
+              index: 0,
+              delta: { content: "Alternate model answered." },
+              finish_reason: "stop",
+            },
+          ],
+        };
+        return new Response(
+          `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`,
+          { headers: { "content-type": "text/event-stream" } }
+        );
+      };
+    };
+    let agent: import("./native-desktop-agent").NativeDesktopAgent | undefined;
+    try {
+      await Promise.all(
+        [root, source.userDataPath, source.desktopUserDataPath].map(
+          (directory) => fs.mkdir(directory, { mode: 0o700 })
+        )
+      );
+      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.listProviderEndpoints.mockResolvedValue([]);
+      sidecar.nativeBuiltInByok.mockRejectedValue(new Error("no saved key"));
+      sidecar.listGatewayModels.mockResolvedValue([
+        model,
+        { ...model, id: TIER_MODEL_IDS[AGENT_DEFAULT_TIER] },
+        { ...model, id: "fixture/no-tools", capabilities: { tools: false } },
+        { ...model, id: "fixture/image", kind: "image" },
+        { ...model, id: "fixture/invalid-limit", limits: {} },
+      ]);
+      sidecar.nativeAgentGatewayConnection.mockImplementation(
+        (account, organizationId, signal) =>
+          NativeGatewayConnection.open({
+            origin,
+            account,
+            network: { prepare },
+            organizationId,
+            signal,
+          })
+      );
+      const workspaces = new NativeWorkspaceCatalog({
+        browserData: source.desktopUserDataPath,
+        projectsRoot: path.join(base, "projects"),
+        protectedPaths: [source.userDataPath, source.providerHome],
+      });
+      const workspace = await workspaces.openSelected(root);
+      sidecar.findWorkspace.mockImplementation((id) => workspaces.find(id));
+      const launch = async () => {
+        const { NativeDesktopAgent } = await import("./native-desktop-agent");
+        return NativeDesktopAgent.prepareFresh(
+          new DesktopAccountSession({
+            base_url: origin,
+            fetch: async () => {
+              mints += 1;
+              return Response.json({
+                token: "fixture.gg.key",
+                account_subject: "fixture-user",
+                expires_at: new Date(Date.now() + 120_000).toISOString(),
+                organization: { id: organization },
+              });
+            },
+          }),
+          resources!,
+          {
+            provider: "gateway",
+            openExternal: async () => {},
+            selectableProfiles: true,
+          }
+        );
+      };
+      agent = await launch();
+      await agent.ensure(workspace.id);
+      const original = agent.current(workspace.id)!.chat;
+      const originalSession = await original.create();
+      const { choices } = await agent.profiles(workspace.id);
+      expect(choices).toEqual([
+        { id: expect.any(String), connection: "Grida", model: model.label },
+      ]);
+      expect(await agent.profiles(workspace.id)).toEqual({
+        choices,
+        saved: [],
+      });
+      expect(mints).toBe(1);
+
+      const { id } = choices[0]!;
+      await agent.selectProfile(workspace.id, { kind: "new", id }, () => {});
+      expect(mints).toBe(2);
+      const selected = agent.current(workspace.id, id)!.chat;
+      await agent.selectProfile(workspace.id, { kind: "saved", id }, () => {});
+      expect(agent.current(workspace.id, id)?.chat).toBe(selected);
+      expect(mints).toBe(2);
+      expect(agent.current(workspace.id)?.chat).toBe(original);
+      await expect(selected.load(originalSession.id)).rejects.toThrow(
+        "session_missing"
+      );
+      const session = await selected.create();
+      await selected.submit(session, "alternate-input", "Use this model.");
+      await vi.waitFor(async () => {
+        expect((await selected.observe(session)).latest?.status).toBe(
+          "succeeded"
+        );
+      });
+      expect(requests).toEqual([
+        expect.objectContaining({
+          model: model.id,
+          max_completion_tokens: model.limits.max_output_tokens,
+        }),
+      ]);
+
+      await agent.close();
+      vi.resetModules();
+      agent = await launch();
+      await agent.selectProfile(workspace.id, { kind: "saved", id }, () => {});
+      const restored = agent.current(workspace.id, id)!.chat;
+      const saved = await restored.load(session.id);
+      expect(
+        (await restored.transcript(saved)).map(({ text }) => text)
+      ).toContain("Alternate model answered.");
+      expect(requests).toHaveLength(1);
+
+      sidecar.listGatewayModels.mockResolvedValueOnce([]);
+      await expect(
+        agent.selectProfile(workspace.id, { kind: "saved", id }, () => {})
+      ).rejects.toThrow("native_provider_model_unavailable");
+
+      await agent.close();
+      organization = 18;
+      vi.resetModules();
+      agent = await launch();
+      await agent.ensure(workspace.id);
+      expect((await agent.profiles(workspace.id)).saved).toEqual([
+        { ...choices[0], available: false },
+      ]);
+      await expect(
+        agent.selectProfile(workspace.id, { kind: "saved", id }, () => {})
+      ).rejects.toThrow("native_chat_profile_changed");
+      expect(agent.current(workspace.id, id)).toBeNull();
+      expect(mints).toBe(4);
+      expect(requests).toHaveLength(1);
+    } finally {
+      await agent?.close();
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  },
+  20_000
+);
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
   "runs a nested deck with only its physical child grant and its own durable transcript",

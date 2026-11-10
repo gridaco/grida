@@ -55,6 +55,7 @@ export type NativeAgentLaunch = {
   provider: "openai-compatible" | "responses" | "anthropic" | "gemini";
   endpoint: string;
   model: string;
+  maxOutputTokens?: number;
   credentialHome?: string;
   configuredEndpointKey?: string;
   workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
@@ -270,6 +271,13 @@ export class NativeAgentProcess {
   }
 
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
+    if (
+      options.maxOutputTokens !== undefined &&
+      (!Number.isSafeInteger(options.maxOutputTokens) ||
+        options.maxOutputTokens < 1 ||
+        options.maxOutputTokens > 65_536)
+    )
+      throw new Error("native_agent_output_limit_invalid");
     if (options.workspaceConfiguration && !options.providerNetwork)
       throw new Error("native_workspace_configuration_requires_supervision");
     if (options.subagents && !options.gatewayScope)
@@ -344,6 +352,8 @@ export class NativeAgentProcess {
       "--model",
       options.model,
     ];
+    if (options.maxOutputTokens !== undefined)
+      args.push("--max-output-tokens", String(options.maxOutputTokens));
     if (options.credentialHome)
       args.push("--credential-home", options.credentialHome);
     if (providerEgress) args.push("--supervised-provider");

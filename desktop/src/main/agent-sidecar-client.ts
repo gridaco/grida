@@ -218,6 +218,10 @@ export namespace agentSidecarClient {
     return await client().providers.list_endpoints();
   }
 
+  export async function listGatewayModels() {
+    return (await client().providers.gg_models()).models;
+  }
+
   export function nativeConfiguredEndpoint(
     providerId: string,
     modelId?: string

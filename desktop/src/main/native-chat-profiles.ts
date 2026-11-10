@@ -5,8 +5,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   byokProvidersFor,
+  GG_PROVIDER_ID,
+  GG_PROVIDER_METADATA,
   isValidEndpointProviderId,
   type EndpointProviderConfig,
+  type GGModelsView,
 } from "@grida/agent";
 import { catalog } from "@grida/ai/catalogue";
 import type { NativeChatProfileChoice } from "@grida/desktop-bridge";
@@ -18,6 +21,7 @@ const MAX_SAVED = 24;
 const MAX_BYTES = 24 * 1024;
 const MAX_CHOICES = 256;
 const MAX_ENDPOINTS = 16;
+const GATEWAY_OUTPUT_LIMIT = 4_096;
 type Launch = Awaited<
   ReturnType<typeof NativeProviderSelection.configuredEndpoint>
 >;
@@ -26,6 +30,7 @@ type Resolve = (providerId: string, modelId?: string) => Promise<Launch>;
 export namespace NativeChatProfiles {
   export type Saved = NativeChatProfileChoice &
     Readonly<{ providerId: string; modelId: string }>;
+  type GatewayModel = GGModelsView["models"][number];
 
   export function validId(id: unknown): id is string {
     return typeof id === "string" && PROFILE_ID.test(id);
@@ -49,6 +54,47 @@ export namespace NativeChatProfiles {
         ])
       )
       .digest("hex");
+  }
+
+  export function gatewayBinding(scope: string, modelId: string): string {
+    return createHash("sha256")
+      .update(JSON.stringify(["desktop-gateway-model-chat-v1", scope, modelId]))
+      .digest("hex");
+  }
+
+  export function gatewayOutputLimit(model: GatewayModel | undefined) {
+    if (
+      !model ||
+      !/^[A-Za-z0-9_.:/@-]{1,128}$/.test(model.id) ||
+      model.kind !== "text" ||
+      !model.interfaces.includes("chat.completions") ||
+      model.capabilities.tools !== true
+    )
+      return undefined;
+    const { max_output_tokens: limit } = model.limits;
+    return Number.isSafeInteger(limit) && limit > 0
+      ? Math.min(limit, GATEWAY_OUTPUT_LIMIT)
+      : undefined;
+  }
+
+  export function gatewayChoices(
+    models: readonly GatewayModel[],
+    scope: string,
+    defaultModel: string
+  ): Saved[] {
+    return models
+      .filter(
+        (model) =>
+          model.id !== defaultModel && gatewayOutputLimit(model) !== undefined
+      )
+      .slice(0, MAX_CHOICES)
+      .map((model) => ({
+        id: gatewayBinding(scope, model.id),
+        providerId: GG_PROVIDER_ID,
+        modelId: model.id,
+        connection: GG_PROVIDER_METADATA.label,
+        model: label(model.label, model.id),
+      }));
   }
 
   export async function builtInChoices(
@@ -228,7 +274,8 @@ function saved(value: unknown): value is NativeChatProfiles.Saved {
     Object.keys(entry).length === 5 &&
     NativeChatProfiles.validId(entry.id) &&
     typeof entry.providerId === "string" &&
-    (isValidEndpointProviderId(entry.providerId) ||
+    (entry.providerId === GG_PROVIDER_ID ||
+      isValidEndpointProviderId(entry.providerId) ||
       NativeProviderSelection.isBuiltInByok(entry.providerId)) &&
     modelId(entry.modelId) &&
     modelId(entry.connection) &&

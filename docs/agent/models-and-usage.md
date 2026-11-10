@@ -16,18 +16,21 @@ the endpoint can use a key saved under its own ID.
 
 ## Start a chat with a saved model
 
-In a managed native workspace on macOS with Apple silicon, add an OpenRouter or
-Vercel AI Gateway key in Desktop settings, or save and approve a compatible
-endpoint. Once the workspace chat is ready, open **Model connection** and choose
-a model under **New chat with…**. Each choice shows the connection and model.
-Use **Refresh models** after changing the saved connection.
+In a managed native workspace on macOS with Apple silicon, wait for workspace
+chat to be ready. Open **Model connection** and choose a model under **New chat
+with…**. Grida lists its current tool-capable Gateway text models when discovery
+is available. Add an OpenRouter or Vercel AI Gateway key, or save and approve a
+compatible endpoint in Desktop settings, to see those models too. Use
+**Refresh models** after changing a connection.
 
 Each chat keeps its original model connection. **Saved chats by model** reopens
 the chat list for that connection, and **Default connection** returns to the default
 list. Switching lists leaves existing work and pending questions in their
 original chats. All connections in the workspace share its context-limit setting.
-Removing a key or changing a compatible endpoint can make its saved chats
-unavailable. Restore access to the original connection to reopen them.
+Removing a key, changing an endpoint, or losing access to the original Gateway
+organization can make its saved chats unavailable. A Gateway model must also
+remain available for chat. Restore access to the original connection to reopen
+its chats.
 
 ## Recover a connection
 

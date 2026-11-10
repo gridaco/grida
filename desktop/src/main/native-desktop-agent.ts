@@ -1,5 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 / GRIDA-SEC-008 — native Desktop composition.
+// GRIDA-GG: desktop — exact Gateway model and organization for each worker.
 import { randomUUID } from "node:crypto";
+import { GG_PROVIDER_ID } from "@grida/agent";
 import { AGENT_DEFAULT_TIER } from "@grida/agent/tiers";
 import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import type { Workspace } from "@grida/daemon";
@@ -31,6 +33,7 @@ import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 import type { NativeChatLifecycle } from "./native-agent-chat";
 
 const DRAIN_TIMEOUT_MS = 35_000;
+const DEFAULT_GATEWAY_MODEL = TIER_MODEL_IDS[AGENT_DEFAULT_TIER];
 type Subscription = Readonly<{
   host: NativeChatGptHost;
   oauth: ChatGptOAuthCoordinator;
@@ -305,7 +308,7 @@ export class NativeDesktopAgent {
           workspace.root
         );
         const [choices, saved] = await Promise.all([
-          this.availableProfiles(),
+          this.availableProfiles(workspace.id),
           NativeChatProfiles.read(directory),
         ]);
         requireCurrent();
@@ -352,10 +355,19 @@ export class NativeDesktopAgent {
     );
     const profiles =
       selection.kind === "new"
-        ? await this.availableProfiles()
+        ? await this.availableProfiles(workspace.id)
         : await NativeChatProfiles.read(directory);
     const profile = profiles.find(({ id }) => id === selection.id);
     if (!profile) throw new Error("native_chat_profile_unavailable");
+    if (profile.providerId === GG_PROVIDER_ID) {
+      await this.openGatewayProfile(
+        workspace,
+        profile,
+        selection.kind === "new" ? directory : undefined,
+        check
+      );
+      return;
+    }
     const launchProfile = NativeProviderSelection.isBuiltInByok(
       profile.providerId
     )
@@ -369,19 +381,8 @@ export class NativeDesktopAgent {
       return launch;
     };
     await resolve();
-    if (selection.kind === "new") {
-      const publish = this.profileWrites.then(async () => {
-        check();
-        await this.cutover.workspaceDirectory(
-          workspace.id,
-          workspace.root,
-          true
-        );
-        await NativeChatProfiles.remember(directory, profile, check);
-      });
-      this.profileWrites = publish.catch(() => {});
-      await publish;
-    }
+    if (selection.kind === "new")
+      await this.rememberProfile(workspace, directory, profile, check);
     check();
     const owners = (this.owners ??= this.newOwners());
     await owners.open(workspace, {
@@ -399,13 +400,94 @@ export class NativeDesktopAgent {
     check();
   }
 
+  private async openGatewayProfile(
+    workspace: SelectedWorkspace,
+    profile: NativeChatProfiles.Saved,
+    saveDirectory: string | undefined,
+    check: () => void
+  ) {
+    if (this.provider !== "gateway")
+      throw new Error("native_chat_profile_unavailable");
+    const models = await agentSidecarClient.listGatewayModels().catch(() => []);
+    const model = models.find(({ id }) => id === profile.modelId);
+    const maxOutputTokens = NativeChatProfiles.gatewayOutputLimit(model);
+    if (
+      maxOutputTokens === undefined ||
+      profile.modelId === DEFAULT_GATEWAY_MODEL
+    )
+      throw new Error("native_provider_model_unavailable");
+    check();
+    const owners = (this.owners ??= this.newOwners());
+    const requireScope = (scope: string | undefined) => {
+      if (
+        scope &&
+        NativeChatProfiles.gatewayBinding(scope, profile.modelId) !== profile.id
+      )
+        throw new Error("native_chat_profile_changed");
+    };
+    requireScope(owners.gatewayScope(workspace.id));
+    requireScope(owners.gatewayScope(workspace.id, profile.id));
+    await owners.open(workspace, {
+      id: profile.id,
+      prepare: async (signal) => {
+        check();
+        signal.throwIfAborted();
+        const { provider, release } = await this.prepareGatewayProvider(
+          profile.modelId,
+          signal
+        );
+        try {
+          check();
+          signal.throwIfAborted();
+          requireScope(provider.gatewayScope);
+          const launch = await this.workspaceLaunch(workspace, provider);
+          if (saveDirectory)
+            await this.rememberProfile(
+              workspace,
+              saveDirectory,
+              profile,
+              check
+            );
+          return {
+            launch: {
+              ...launch,
+              maxOutputTokens,
+              mcp: this.mcp?.forWorkspace(workspace.root),
+            },
+            release,
+          };
+        } catch (error) {
+          release();
+          throw error;
+        }
+      },
+    });
+    check();
+  }
+
+  private async rememberProfile(
+    workspace: SelectedWorkspace,
+    directory: string,
+    profile: NativeChatProfiles.Saved,
+    check: () => void
+  ) {
+    const publish = this.profileWrites.then(async () => {
+      check();
+      await this.cutover.workspaceDirectory(workspace.id, workspace.root, true);
+      await NativeChatProfiles.remember(directory, profile, check);
+    });
+    this.profileWrites = publish.catch(() => {});
+    await publish;
+  }
+
   private requireProfiles(): void {
     if (!this.selectableProfiles)
       throw new Error("native_chat_profiles_unavailable");
   }
 
-  private async availableProfiles() {
-    const [builtIn, configured] = await Promise.all([
+  private async availableProfiles(workspaceId: string) {
+    const gatewayScope = this.owners?.gatewayScope(workspaceId);
+    const [builtIn, configured, gateway] = await Promise.all([
       NativeChatProfiles.builtInChoices(agentSidecarClient.nativeBuiltInByok),
       agentSidecarClient
         .listProviderEndpoints()
@@ -415,8 +497,26 @@ export class NativeDesktopAgent {
             agentSidecarClient.nativeConfiguredEndpoint
           )
         ),
+      gatewayScope
+        ? agentSidecarClient
+            .listGatewayModels()
+            .then((models) =>
+              NativeChatProfiles.gatewayChoices(
+                models,
+                gatewayScope,
+                DEFAULT_GATEWAY_MODEL
+              )
+            )
+            .catch(() => [])
+        : [],
     ]);
-    return [...builtIn, ...configured];
+    return [
+      ...(gatewayScope === this.owners?.gatewayScope(workspaceId)
+        ? gateway
+        : []),
+      ...builtIn,
+      ...configured,
+    ];
   }
 
   private async withWorkspace<T>(
@@ -609,6 +709,7 @@ export class NativeDesktopAgent {
           CHATGPT_SUBSCRIPTION_CONFIG.default_model_id,
           signal
         ),
+        release: undefined,
       };
     }
     if (typeof this.provider !== "string") {
@@ -618,8 +719,12 @@ export class NativeDesktopAgent {
           ? await agentSidecarClient.nativeBuiltInByok(id, model)
           : await agentSidecarClient.nativeConfiguredEndpoint(id, model);
       signal.throwIfAborted();
-      return { provider };
+      return { provider, release: undefined };
     }
+    return await this.prepareGatewayProvider(DEFAULT_GATEWAY_MODEL, signal);
+  }
+
+  private async prepareGatewayProvider(model: string, signal: AbortSignal) {
     const gateway = await nativeAgentGatewayConnection(
       this.account,
       undefined,
@@ -627,7 +732,7 @@ export class NativeDesktopAgent {
     );
     return {
       provider: {
-        ...gateway.launch(TIER_MODEL_IDS[AGENT_DEFAULT_TIER]),
+        ...gateway.launch(model),
         subagents: true as const,
       },
       release: () => gateway.close(),
