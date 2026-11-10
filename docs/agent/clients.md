@@ -489,6 +489,10 @@ finished turn when it has additional details. It can show recorded tool
 outcomes, completion checks, unresolved work, and provider-reported token
 counts. Reopening the chat restores the latest recorded summary.
 
+When a required completion check fails or its outcome cannot be verified,
+the summary reports that result and keeps the earlier reply and recorded
+work available for review.
+
 Token counts describe the model requests made during that turn. A partial
 count has incomplete coverage, and the summary identifies requests with
 unknown counts. Cached input and reasoning output can overlap other token
@@ -504,6 +508,8 @@ The preview also offers **Copy image** and **Download image**.
 
 If the working copy was removed or replaced, the summary still shows the
 recorded result and the preview reports that the image is unavailable.
+The summary lists up to eight recorded PNG crops and counts any further
+records it leaves out.
 Opening a preview leaves the project and the conversation unchanged.
 
 ## Follow a provider retry

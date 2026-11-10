@@ -45,6 +45,11 @@ pub(crate) struct CropArtifact {
     bytes: usize,
 }
 
+pub(crate) struct CropArtifacts {
+    pub(crate) items: Vec<CropArtifact>,
+    pub(crate) omitted: usize,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CropReceipt {
@@ -141,14 +146,20 @@ impl CropReceipt {
     }
 }
 
-pub(super) fn artifacts(state: &TurnState) -> Vec<CropArtifact> {
-    state
+pub(super) fn artifacts(state: &TurnState) -> CropArtifacts {
+    let mut receipts = state
         .operations()
         .values()
-        .filter_map(|operation| CropReceipt::from_operation(state, operation))
+        .filter_map(|operation| CropReceipt::from_operation(state, operation));
+    let items = receipts
+        .by_ref()
         .take(MAX_ARTIFACTS)
         .map(|receipt| receipt.artifact())
-        .collect()
+        .collect();
+    CropArtifacts {
+        items,
+        omitted: receipts.count(),
+    }
 }
 
 pub(super) fn artifact_proof(state: &TurnState, id: &OperationId) -> Option<WorkingCopyProof> {

@@ -1039,6 +1039,12 @@ impl Master {
                     ErrorKind::Unavailable
                 };
                 account.failure = Some(Error::new(kind, "completion_check_blocked"));
+                account.text = if uncertain {
+                    "A required completion check could not be verified. Review the recorded work before continuing."
+                } else {
+                    "A required completion check did not pass. Review the recorded work before continuing."
+                }
+                .into();
             }
             account.completion_checks = review.checks;
             outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);

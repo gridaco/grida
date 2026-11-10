@@ -220,6 +220,7 @@ export type NativeChatTurnSummary = Readonly<{
   tokenUsage?: NativeChatTokenUsage;
   reviewFindingsCollected?: boolean;
   artifacts?: readonly NativeChatImageArtifact[];
+  artifactsOmitted?: number;
 }>;
 
 export type NativeChatMessage = Readonly<{

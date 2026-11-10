@@ -24,7 +24,7 @@ pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use goals::{GoalAction, GoalControl, GoalInspection, GoalRequest, GoalView};
 pub(crate) use history::RevisionTarget;
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
-pub(crate) use image_tools::CropArtifact;
+pub(crate) use image_tools::{CropArtifact, CropArtifacts};
 pub use images::ImageUpload;
 pub(crate) use images::is_retained_image;
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
@@ -643,7 +643,7 @@ impl Host {
         session: SessionId,
         turn: TurnId,
         include_artifacts: bool,
-    ) -> Result<(TurnOutcome, Option<Vec<CropArtifact>>)> {
+    ) -> Result<(TurnOutcome, Option<CropArtifacts>)> {
         self.store
             .inspect_turn_with(session, turn, move |state| {
                 let outcome = state

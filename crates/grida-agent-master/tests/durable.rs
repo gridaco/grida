@@ -925,6 +925,7 @@ fn intercept_publication(lease: TurnLease, interruption: PublicationInterruption
 struct ReviewedCheck {
     definition: ToolDefinition,
     calls: AtomicUsize,
+    result: CheckStatus,
 }
 
 impl Tool for ReviewedCheck {
@@ -941,10 +942,24 @@ impl Tool for ReviewedCheck {
             let invocation = CheckInvocation::read(invocation.arguments()).unwrap();
             assert!(invocation.occurrence.has_text);
             self.calls.fetch_add(1, Ordering::SeqCst);
+            let (status, reply) = match self.result {
+                CheckStatus::Allowed => (
+                    OutcomeStatus::Succeeded,
+                    Some(serde_json::json!({"decision":"allow"})),
+                ),
+                CheckStatus::Denied => (
+                    OutcomeStatus::Succeeded,
+                    Some(
+                        serde_json::json!({"decision":"deny","reason":"The result failed verification."}),
+                    ),
+                ),
+                CheckStatus::Uncertain => (OutcomeStatus::Uncertain, None),
+                _ => unreachable!("unsupported test check result"),
+            };
             ToolOutcome {
-                status: OutcomeStatus::Succeeded,
+                status,
                 content: Vec::new(),
-                structured: Some(serde_json::json!({"decision":"allow"})),
+                structured: reply,
                 receipt: None,
                 truncated: false,
             }
@@ -954,7 +969,31 @@ impl Tool for ReviewedCheck {
 
 #[tokio::test]
 async fn settlement_recovery_reuses_the_original_candidate_and_completion_check() {
-    let fixture = Fixture::new(Script::Answer);
+    recover_completion_check(CheckStatus::Allowed, OutcomeStatus::Succeeded, "Finished").await;
+}
+
+#[tokio::test]
+async fn blocked_completion_accounts_for_retained_work_without_replaying_the_check() {
+    recover_completion_check(
+        CheckStatus::Denied,
+        OutcomeStatus::Failed,
+        "A required completion check did not pass. Review the recorded work before continuing.",
+    )
+    .await;
+    recover_completion_check(
+        CheckStatus::Uncertain,
+        OutcomeStatus::Uncertain,
+        "A required completion check could not be verified. Review the recorded work before continuing.",
+    )
+    .await;
+}
+
+async fn recover_completion_check(
+    check_result: CheckStatus,
+    outcome_status: OutcomeStatus,
+    text: &str,
+) {
+    let fixture = Fixture::new(Script::ToolThenAnswer);
     let store = fixture.store();
     let handler = Arc::new(ReviewedCheck {
         definition: ToolDefinition {
@@ -967,6 +1006,7 @@ async fn settlement_recovery_reuses_the_original_candidate_and_completion_check(
             recovery: RecoveryKind::Unavailable,
         },
         calls: AtomicUsize::new(0),
+        result: check_result,
     });
     let check = CompletionCheck {
         id: BindingId::new("review").unwrap(),
@@ -1025,16 +1065,27 @@ async fn settlement_recovery_reuses_the_original_candidate_and_completion_check(
     else {
         panic!("expected recovered settlement");
     };
-    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    assert_eq!(receipt.outcome.status, outcome_status);
     let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
-    assert_eq!(account.text, "Finished");
-    assert_eq!(account.steps, 1);
+    assert_eq!(account.text, text);
+    assert_eq!(account.steps, 2);
+    assert_eq!(account.tool_activity.unwrap().succeeded, 1);
     assert_eq!(account.completion_checks.len(), 1);
-    assert_eq!(account.completion_checks[0].status, CheckStatus::Allowed);
+    assert_eq!(account.completion_checks[0].status, check_result);
     let operation = account.completion_checks[0].operation.as_ref().unwrap();
     assert!(receipt.outcome.evidence.contains(operation));
+    assert_eq!(
+        account.unresolved.contains(operation),
+        check_result == CheckStatus::Uncertain
+    );
+    let history = store.history(session_id(), None).await.unwrap();
+    assert!(history.iter().any(|HistoryRecord::Message(message)| {
+        message.role == Role::Assistant
+            && message.content.contains(&Content::Text("Finished".into()))
+    }));
     assert_eq!(handler.calls.load(Ordering::SeqCst), 1);
-    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
 }
 

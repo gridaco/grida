@@ -1002,6 +1002,9 @@ export class NativeAgentChat {
       ...(this.process.acceptsArtifacts &&
         result.artifacts !== undefined && {
           artifacts: NativeAgentArtifacts.describe(result.artifacts),
+          ...(result.artifactsOmitted !== undefined && {
+            artifactsOmitted: revision(result.artifactsOmitted),
+          }),
         }),
     });
   }

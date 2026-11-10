@@ -160,6 +160,8 @@ Private stdio clients on macOS or Linux can also negotiate
 order. Each entry contains `id`, `kind` (`image`), `mimeType` (`image/png`),
 `label`, `width`, `height`, and `bytes`. An entry describes a saved result. It
 does not imply the bytes are still available.
+When additional crop receipts exceed the list limit, `artifactsOmitted`
+counts the records beyond the displayed list.
 
 `_co.grida/session/read-artifact` takes the attached `sessionId`, exact `turnId`,
 and `artifactId`. It returns `artifactId`, `mimeType`, and standard base64

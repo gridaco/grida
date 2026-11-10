@@ -66,6 +66,8 @@ export function NativeTurnSummary({
       (summary.reviewFindingsCollected
         ? "Independent review findings collected"
         : "Independent review findings were not collected"),
+    summary.artifactsOmitted &&
+      `Recorded artifacts not listed: ${summary.artifactsOmitted}`,
   ].filter(Boolean);
   const showText =
     !!text &&

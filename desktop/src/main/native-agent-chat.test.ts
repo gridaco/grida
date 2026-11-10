@@ -213,9 +213,12 @@ it("keeps older settled summaries and projects only bounded reported token count
     tokenUsage?: unknown;
     reviewFindingsCollected?: unknown;
     childId?: unknown;
+    artifacts?: unknown;
+    artifactsOmitted?: unknown;
   } = summary;
   const start = vi.spyOn(NativeAgentProcess, "start");
   start.mockResolvedValueOnce({
+    acceptsArtifacts: true,
     request: async (method: string) => {
       if (method === "session/new") return { sessionId };
       if (method === "_co.grida/session/turn-summary") return wire;
@@ -254,6 +257,19 @@ it("keeps older settled summaries and projects only bounded reported token count
     }
     wire = { ...summary, reviewFindingsCollected: "true" };
     await expect(read()).resolves.toEqual(summary);
+    const artifacts = Array.from({ length: 8 }, (_, index) => ({
+      id: `artifact-${index}`,
+      kind: "image",
+      mimeType: "image/png",
+      label: "Cropped PNG",
+      width: 1,
+      height: 1,
+      bytes: 70,
+    }));
+    wire = { ...summary, artifactsOmitted: 1 };
+    await expect(read()).resolves.toEqual(summary);
+    wire = { ...summary, artifacts, artifactsOmitted: 1 };
+    await expect(read()).resolves.toEqual(wire);
     const output = { category: "output", tokens: "0", partial: true };
     const usage = { reported: [output], attemptsWithoutCounts: 1 };
     wire = { ...summary, tokenUsage: usage };

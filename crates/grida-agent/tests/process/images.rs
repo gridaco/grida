@@ -725,6 +725,7 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
     let snapshot = settled(&mut client, session).await;
     let turn = snapshot["latest"]["turnId"].as_str().unwrap();
     let summary = crop_summary(&mut client, session, turn).await;
+    assert!(summary["result"].get("artifactsOmitted").is_none());
     let artifacts = summary["result"]["artifacts"].as_array().unwrap();
     let [artifact] = artifacts.as_slice() else {
         panic!("expected exactly one result in {summary}");
@@ -911,6 +912,115 @@ async fn a_crop_saves_a_recoverable_copy_in_its_chat_without_touching_the_origin
         "authored"
     );
     assert_eq!(fs::read_dir(workspace.path()).unwrap().count(), 1);
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn a_failed_final_response_retains_partial_crops_and_discloses_the_listing_limit() {
+    use std::fmt::Write as _;
+
+    let root = TempDir::new().unwrap();
+    let state = root.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut body = String::new();
+    for index in 0..8 {
+        let item = json!({
+            "type":"response.output_item.done", "output_index":index,
+            "item":{"type":"function_call","id":format!("crop-{index}"),
+                "call_id":format!("crop-call-{index}"),"name":"crop_retained_image",
+                "arguments":r#"{"x":0,"y":0,"width":1,"height":1}"#,"status":"completed"}
+        });
+        write!(body, "data: {item}\n\n").unwrap();
+    }
+    let done = json!({"type":"response.completed", "response":{"status":"completed"}});
+    write!(body, "data: {done}\n\n").unwrap();
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Responses,
+        vec![
+            Reply::RawHttp(response),
+            Reply::Tool(
+                "crop_retained_image",
+                r#"{"x":0,"y":0,"width":1,"height":1}"#,
+            ),
+            Reply::RawHttp(
+                "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    .into(),
+            ),
+        ],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let mut client = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    client.request("initialize", artifact_initialize()).await;
+    let created = client
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let data = STANDARD.encode(png([150, 50, 90]));
+    let accepted = client
+        .request(
+            "_co.grida/session/submit",
+            upload(session, "partial-crops", &data),
+        )
+        .await;
+    assert_eq!(accepted["result"]["inputId"], "partial-crops", "{accepted}");
+    endpoint.request().await;
+    endpoint.request().await;
+    endpoint.request().await;
+    let latest = settled(&mut client, session).await;
+    let turn = latest["latest"]["turnId"].as_str().unwrap();
+    let before = crop_summary(&mut client, session, turn).await;
+    let summary = &before["result"];
+    assert_eq!(summary["status"], "failed", "{before}");
+    assert!(summary["text"].as_str().unwrap().contains("authentication"));
+    assert_eq!(summary["toolActivity"]["succeeded"], 9);
+    let artifacts = summary["artifacts"].as_array().unwrap();
+    assert_eq!(artifacts.len(), 8);
+    assert_eq!(summary["artifactsOmitted"], 1);
+    let artifact = artifacts[0]["id"].as_str().unwrap();
+    let preview = read_crop(&mut client, session, turn, artifact).await;
+    assert!(preview["result"]["data"].is_string(), "{preview}");
+    client.close().await;
+
+    let load = json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]});
+    let mut ordinary = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    let mut initialize = artifact_initialize();
+    initialize["clientCapabilities"]["_meta"]
+        .as_object_mut()
+        .unwrap()
+        .remove(ARTIFACTS);
+    ordinary.request("initialize", initialize).await;
+    ordinary.request("session/load", load.clone()).await;
+    let without_artifacts = crop_summary(&mut ordinary, session, turn).await;
+    assert_eq!(without_artifacts["result"]["status"], "failed");
+    assert!(without_artifacts["result"].get("artifacts").is_none());
+    assert!(
+        without_artifacts["result"]
+            .get("artifactsOmitted")
+            .is_none()
+    );
+    ordinary.close().await;
+
+    let mut reopened = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    reopened.request("initialize", artifact_initialize()).await;
+    reopened.request("session/load", load).await;
+    assert_eq!(
+        crop_summary(&mut reopened, session, turn).await["result"],
+        *summary
+    );
+    assert_eq!(
+        read_crop(&mut reopened, session, turn, artifact).await["result"],
+        preview["result"]
+    );
+    reopened.close().await;
+    assert!(endpoint.requests.try_recv().is_err());
     endpoint.done().await;
 }
 

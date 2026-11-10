@@ -45,6 +45,8 @@ pub(super) struct SummaryResponse {
     token_usage: Option<ReportedTokenUsage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     artifacts: Option<Vec<CropArtifact>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    artifacts_omitted: Option<usize>,
 }
 
 impl SummaryResponse {
@@ -88,6 +90,7 @@ impl SummaryResponse {
                     .collect()
             }),
             artifacts: None,
+            artifacts_omitted: None,
         }
     }
 }
@@ -244,7 +247,11 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         require(&summary_sessions, ARTIFACTS, Some(&request.session_id))?;
                     }
                     let mut summary = SummaryResponse::from_outcome(request.turn_id, &outcome);
-                    summary.artifacts = artifacts;
+                    if let Some(artifacts) = artifacts {
+                        summary.artifacts = Some(artifacts.items);
+                        summary.artifacts_omitted =
+                            (artifacts.omitted > 0).then_some(artifacts.omitted);
+                    }
                     Ok(summary)
                 }
                 .await;
