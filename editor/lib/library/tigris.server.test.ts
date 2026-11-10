@@ -7,9 +7,9 @@ import {
   it,
   vi,
 } from "vitest";
-import { createServer } from "node:http";
+import { createServer, type ServerResponse } from "node:http";
 import { createHash } from "node:crypto";
-import { S3Client } from "@aws-sdk/client-s3";
+import { S3Client, type GetObjectCommandOutput } from "@aws-sdk/client-s3";
 import { LibraryTigris } from "./tigris.server";
 import { LibraryCAS } from "./cas";
 
@@ -31,6 +31,8 @@ describe("LibraryTigris", () => {
   }[] = [];
   let dropResponse = false;
   let rejectBeforeBody = false;
+  let stalledMethod: string | undefined;
+  const stalledResponses: ServerResponse[] = [];
   const earlyResponses: boolean[] = [];
   let endpoint: string;
   let client: S3Client;
@@ -48,6 +50,11 @@ describe("LibraryTigris", () => {
       condition: req.headers["if-none-match"] as string,
       expectContinue: req.headers.expect,
     });
+    if (stalledMethod === req.method && req.method !== "GET") {
+      stalledResponses.push(res);
+      req.resume();
+      return;
+    }
     if (req.method === "PUT") {
       if (rejectBeforeBody && objects.has(path)) {
         earlyResponses.push(req.complete);
@@ -100,6 +107,12 @@ describe("LibraryTigris", () => {
       res.setHeader("x-amz-checksum-type", object.checksumType);
     res.setHeader("cache-control", object.cache);
     res.writeHead(200);
+    if (stalledMethod === "GET" && req.method === "GET") {
+      stalledResponses.push(res);
+      res.flushHeaders();
+      res.write(object.body.subarray(0, 1));
+      return;
+    }
     res.end(req.method === "HEAD" ? undefined : object.body);
   });
   beforeAll(async () => {
@@ -123,11 +136,15 @@ describe("LibraryTigris", () => {
     requests.length = 0;
     dropResponse = false;
     rejectBeforeBody = false;
+    stalledMethod = undefined;
+    stalledResponses.length = 0;
     earlyResponses.length = 0;
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
   afterAll(async () => {
     client.destroy();
+    server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
@@ -241,6 +258,105 @@ describe("LibraryTigris", () => {
       store.upload(Buffer.alloc(LibraryTigris.maxBytes + 1), "image/png")
     ).rejects.toThrow("30 MiB");
     expect(requests).toHaveLength(0);
+  });
+
+  it.each(["PUT", "HEAD", "GET"])(
+    "expires the shared upload deadline during a stalled %s",
+    async (method) => {
+      stalledMethod = method;
+      vi.stubEnv("GRIDA_LIBRARY_TIGRIS_BUCKET", "library");
+      vi.stubEnv("GRIDA_LIBRARY_TIGRIS_ENDPOINT", endpoint);
+      vi.stubEnv("GRIDA_LIBRARY_TIGRIS_ACCESS_KEY_ID", "local-only");
+      vi.stubEnv("GRIDA_LIBRARY_TIGRIS_SECRET_ACCESS_KEY", "local-only");
+      const tigris = LibraryTigris.fromEnv();
+      const timers = vi.spyOn(globalThis, "setTimeout");
+      const pending = tigris.upload(bytes, "image/png");
+      const settled = pending.catch((error: unknown) => error);
+      const [expire, milliseconds] = timers.mock.calls[0];
+      try {
+        expect(milliseconds).toBe(LibraryTigris.uploadTimeoutMs);
+        await vi.waitFor(() => expect(stalledResponses).toHaveLength(1));
+        expire();
+        expect(await settled).toEqual(new Error("Library upload timed out"));
+        await vi.waitFor(() =>
+          expect(stalledResponses[0].destroyed).toBe(true)
+        );
+        expect(requests.map((request) => request.method)).toEqual(
+          ["PUT", "HEAD", "GET"].slice(
+            0,
+            ["PUT", "HEAD", "GET"].indexOf(method) + 1
+          )
+        );
+      } finally {
+        expire();
+        await settled;
+      }
+    }
+  );
+
+  it("expires even when response-body cancellation never settles", async () => {
+    const cancel = vi.fn<() => Promise<void>>(
+      () => new Promise<void>(() => {})
+    );
+    const body = new ReadableStream<Uint8Array>({ cancel });
+    const checksum = createHash("sha256").update(bytes).digest("base64");
+    vi.spyOn(client, "send")
+      .mockImplementationOnce(async () => ({ $metadata: {} }))
+      .mockImplementationOnce(async () => ({
+        $metadata: {},
+        ContentLength: bytes.length,
+        ContentType: "image/png",
+        ChecksumType: "FULL_OBJECT",
+        ChecksumSHA256: checksum,
+      }))
+      .mockImplementationOnce(async () => ({
+        $metadata: {},
+        ContentLength: bytes.length,
+        ContentType: "image/png",
+        Body: {
+          transformToWebStream: () => body,
+        } as GetObjectCommandOutput["Body"],
+      }));
+    const timers = vi.spyOn(globalThis, "setTimeout");
+    const pending = store.upload(bytes, "image/png");
+    const settled = pending.catch((error: unknown) => error);
+    const [expire] = timers.mock.calls[0];
+    try {
+      await vi.waitFor(() => expect(body.locked).toBe(true));
+      expire();
+      expect(await settled).toEqual(new Error("Library upload timed out"));
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(body.locked).toBe(false);
+    } finally {
+      expire();
+      await settled;
+    }
+  });
+
+  it("expires while SDK middleware is still waiting and prevents late follow-up requests", async () => {
+    let finish: (() => void) | undefined;
+    const send = vi.spyOn(client, "send").mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve({ $metadata: {} });
+        })
+    );
+    const timers = vi.spyOn(globalThis, "setTimeout");
+    const pending = store.upload(bytes, "image/png");
+    const settled = pending.catch((error: unknown) => error);
+    const [expire] = timers.mock.calls[0];
+    try {
+      expire();
+      expect(await settled).toEqual(new Error("Library upload timed out"));
+      finish?.();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(send).toHaveBeenCalledOnce();
+      expect(requests).toHaveLength(0);
+    } finally {
+      expire();
+      finish?.();
+      await settled;
+    }
   });
 
   it("requires dedicated runtime credentials and never falls back to another provider", () => {

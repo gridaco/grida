@@ -103,7 +103,9 @@ address is deliberately _not_ the catalog's primary reference.
   Historical assets **MAY** share it; their identities, metadata,
   representations and collection references **MUST** survive hash backfill.
   Repeated ingestion **SHOULD** adopt an existing asset without creating
-  another blob or enrichment event.
+  another blob or enrichment event. When several catalog records share an
+  address, adoption **MUST** choose the record with the earliest creation time,
+  then the lowest catalog identifier to break ties.
 - On a duplicate hit the existing asset's facts stand (**first-writer-wins**).
   Metadata corrections are a deliberate curation act on the existing asset;
   re-submission **MUST NOT** be used as a correction channel.
@@ -140,11 +142,11 @@ The order of operations is fixed: **hash** the exact bytes → optionally
 **pre-check** whether the address is known (on a hit, adopt the existing asset
 and stop with zero writes) → **store** the blob at the conventional location
 (an "already exists" outcome is a _success signal_, not an error) →
-**register** the asset with its address (a duplicate-address outcome resolves
-to the existing asset). Every step is idempotent, so a crash anywhere is
-healed by retrying the whole sequence; a failure between store and register
-leaves an inert, unregistered blob, collected by a reconciliation sweep that
-compares the store against the catalog.
+**register** the asset with its address (a conflict on the unique storage
+location resolves to the existing asset selected under §3.2). Every step is
+idempotent, so a crash anywhere is healed by retrying the whole sequence; a
+failure between store and register leaves an inert, unregistered blob,
+collected by a reconciliation sweep that compares the store against the catalog.
 
 Producers **MUST** compute the address themselves, register through the
 sanctioned write surface, and adopt the catalog record a registration

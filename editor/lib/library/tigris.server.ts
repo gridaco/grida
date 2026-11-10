@@ -14,6 +14,7 @@ import { LibraryStorage } from "./storage";
 /** Immutable Library bytes. Catalog registration remains with the caller. */
 export class LibraryTigris {
   static readonly maxBytes = 30 * 1024 * 1024;
+  static readonly uploadTimeoutMs = 120_000;
 
   constructor(
     private readonly client: S3Client,
@@ -69,10 +70,40 @@ export class LibraryTigris {
     if (!bytes.length || bytes.length > LibraryTigris.maxBytes) {
       throw new Error("Library uploads require 1 byte to 30 MiB");
     }
+    const controller = new AbortController();
+    // One budget includes SDK retries, recovery attempts and response bodies.
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => {
+        const error = new Error("Library upload timed out");
+        controller.abort(error);
+        reject(error);
+      }, LibraryTigris.uploadTimeoutMs);
+    });
+    try {
+      return await Promise.race([
+        this.uploadBytes(bytes, mimetype, controller.signal),
+        deadline,
+      ]);
+    } catch (error) {
+      controller.signal.throwIfAborted();
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      controller.abort();
+    }
+  }
+
+  private async uploadBytes(
+    bytes: Uint8Array,
+    mimetype: string,
+    signal: AbortSignal
+  ): Promise<{ path: string; sha256: string }> {
     const sha256 = LibraryCAS.sha256Hex(bytes);
     const path = LibraryStorage.key(sha256, mimetype);
     const expected = Buffer.from(sha256, "hex").toString("base64");
     for (let attempt = 0; attempt < 3; attempt++) {
+      signal.throwIfAborted();
       try {
         await this.client.send(
           new PutObjectCommand({
@@ -84,22 +115,27 @@ export class LibraryTigris {
             CacheControl: "public, max-age=31536000, immutable",
             ChecksumSHA256: expected,
             IfNoneMatch: "*",
-          })
+          }),
+          { abortSignal: signal }
         );
       } catch (error) {
+        signal.throwIfAborted();
         const status = (error as { $metadata?: { httpStatusCode?: number } })
           .$metadata?.httpStatusCode;
         if (status && status !== 409 && status !== 412 && status < 500)
           throw error;
       }
       try {
+        signal.throwIfAborted();
         const head = await this.client.send(
           new HeadObjectCommand({
             Bucket: this.bucket,
             Key: path,
             ChecksumMode: "ENABLED",
-          })
+          }),
+          { abortSignal: signal }
         );
+        signal.throwIfAborted();
         if (
           head.ContentLength !== bytes.length ||
           head.ContentType !== mimetype ||
@@ -110,7 +146,8 @@ export class LibraryTigris {
             "Library Tigris object does not match its content address"
           );
         }
-        await this.verifyBytes(path, sha256, bytes.length, mimetype);
+        await this.verifyBytes(path, sha256, bytes.length, mimetype, signal);
+        signal.throwIfAborted();
         return { path, sha256 };
       } catch (error) {
         const status = (error as { $metadata?: { httpStatusCode?: number } })
@@ -125,14 +162,22 @@ export class LibraryTigris {
     path: string,
     sha256: string,
     length: number,
-    mimetype: string
+    mimetype: string,
+    signal: AbortSignal
   ): Promise<void> {
+    signal.throwIfAborted();
     const object = await this.client.send(
-      new GetObjectCommand({ Bucket: this.bucket, Key: path })
+      new GetObjectCommand({ Bucket: this.bucket, Key: path }),
+      { abortSignal: signal }
     );
     if (!object.Body) throw new Error("Library Tigris object has no byte body");
     const reader = object.Body.transformToWebStream().getReader();
+    const cancel = () => {
+      void reader.cancel(signal.reason).catch(() => {});
+    };
+    signal.addEventListener("abort", cancel, { once: true });
     try {
+      signal.throwIfAborted();
       if (object.ContentLength !== length || object.ContentType !== mimetype)
         throw new Error(
           "Library Tigris object does not match its content address"
@@ -142,7 +187,9 @@ export class LibraryTigris {
       const hash = createHash("sha256");
       let received = 0;
       for (;;) {
+        signal.throwIfAborted();
         const { done, value } = await reader.read();
+        signal.throwIfAborted();
         if (done) break;
         received += value.byteLength;
         if (received > length)
@@ -154,7 +201,9 @@ export class LibraryTigris {
           "Library Tigris object does not match its content address"
         );
     } finally {
-      await reader.cancel().catch(() => {});
+      signal.removeEventListener("abort", cancel);
+      // Cancellation itself must not extend an expired upload's deadline.
+      cancel();
       reader.releaseLock();
     }
   }
