@@ -13,6 +13,11 @@ const MAX_LIVE_WORKSPACES = 8;
 type Project =
   | (Pick<Workspace, "id" | "root"> & {
       identity?: WorkspaceDirectoryIdentity;
+      nestedDeck?: {
+        parentWorkspaceId: string;
+        protectedPaths: readonly string[];
+        requireCurrent(): Promise<void>;
+      };
     })
   | { id: string; requireCurrent(): void };
 type ProviderLaunch = Readonly<{
@@ -58,6 +63,10 @@ export class NativeWorkspaceAgents {
     return this.active(documentSlot(key));
   }
 
+  currentNestedDeck(key: string): ActiveNativeChat | null {
+    return this.active(nestedDeckSlot(key));
+  }
+
   private active(key: string): ActiveNativeChat | null {
     if (this.stopping.signal.aborted) return null;
     const slot = this.slots.get(key);
@@ -72,6 +81,8 @@ export class NativeWorkspaceAgents {
   ): Promise<ActiveNativeChat> {
     if (this.stopping.signal.aborted) throw closing();
     const { id } = workspace;
+    const nested = "root" in workspace ? workspace.nestedDeck : undefined;
+    if (nested && profile) throw new Error("native_chat_profiles_unavailable");
     if (
       [...this.slots.values()].some(
         (slot) =>
@@ -82,7 +93,11 @@ export class NativeWorkspaceAgents {
     )
       throw closing();
     const key =
-      "root" in workspace ? slotKey(id, profile?.id) : documentSlot(id);
+      "root" in workspace
+        ? nested
+          ? nestedDeckSlot(id)
+          : slotKey(id, profile?.id)
+        : documentSlot(id);
     const existing = this.slots.get(key);
     if (existing) {
       const chat = existing.owner?.active.chat;
@@ -133,13 +148,22 @@ export class NativeWorkspaceAgents {
     return this.drain(
       [...this.slots].filter(
         ([, slot]) =>
-          "root" in slot.workspace && slot.workspace.id === workspaceId
+          "root" in slot.workspace &&
+          (slot.workspace.nestedDeck?.parentWorkspaceId ??
+            slot.workspace.id) === workspaceId
       )
     );
   }
 
   closeDocument(documentKey: string): Promise<void> {
-    const key = documentSlot(documentKey);
+    return this.closeSlot(documentSlot(documentKey));
+  }
+
+  closeNestedDeck(key: string): Promise<void> {
+    return this.closeSlot(nestedDeckSlot(key));
+  }
+
+  private closeSlot(key: string): Promise<void> {
     const slot = this.slots.get(key);
     return slot ? this.drain([[key, slot]]) : Promise.resolve();
   }
@@ -181,12 +205,13 @@ export class NativeWorkspaceAgents {
     }
   }
 
-  private startProject(
+  private async startProject(
     workspace: Project,
     launch: ProviderLaunch["launch"],
     profile?: ChatProfile
   ) {
     if ("root" in workspace) {
+      if (workspace.nestedDeck) await workspace.nestedDeck.requireCurrent();
       const options = { ...launch, cwd: workspace.root };
       return profile
         ? this.cutover.startWorkspace(workspace.id, options, profile.id)
@@ -260,4 +285,8 @@ function slotKey(workspaceId: string, profileId?: string): string {
 
 function documentSlot(key: string): string {
   return JSON.stringify(["document", key]);
+}
+
+function nestedDeckSlot(key: string): string {
+  return JSON.stringify(["nested-deck", key]);
 }

@@ -66,6 +66,104 @@ it.runIf(process.platform !== "win32")(
 );
 
 it.runIf(process.platform !== "win32")(
+  "admits an exact canonical nested bundle and rotates its scope on replacement",
+  async () => {
+    const base = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), "grida-nested-deck-"))
+    );
+    const browserData = path.join(base, "browser");
+    const parent = path.join(base, "selected");
+    const nested = path.join(parent, "decks", "Launch.Canvas");
+    const sibling = path.join(parent, "decks", "Sibling.canvas");
+    const external = path.join(base, "outside.canvas");
+    const marker = path.join(nested, ".canvas.json");
+    const options = {
+      browserData,
+      projectsRoot: path.join(base, "projects"),
+      protectedPaths: [external],
+    };
+    try {
+      for (const directory of [browserData, nested, sibling, external])
+        await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+      const catalog = new NativeWorkspaceCatalog(options);
+      const selected = await catalog.openSelected(parent);
+      const relative = "decks/Launch.Canvas";
+      const original = await catalog.nestedDeck(selected.id, relative);
+      expect(original).toMatchObject({
+        root: nested,
+        parentWorkspaceId: selected.id,
+      });
+      expect(original.workspaceId).not.toBe(selected.id);
+      const firstSibling = await catalog.nestedDeck(
+        selected.id,
+        "decks/Sibling.canvas"
+      );
+      expect(firstSibling.workspaceId).not.toBe(original.workspaceId);
+      await expect(
+        new NativeWorkspaceCatalog(options).nestedDeck(selected.id, relative)
+      ).resolves.toEqual(original);
+      await fs.writeFile(marker, "{}");
+      await fs.writeFile(marker + ".save", "{}");
+      await fs.rename(marker + ".save", marker);
+      await expect(catalog.nestedDeck(selected.id, relative)).resolves.toEqual(
+        original
+      );
+      await fs.unlink(marker);
+      await fs.symlink(path.join(external, ".canvas.json"), marker);
+      await fs.symlink(external, path.join(parent, "External.canvas"));
+      await fs.symlink(path.join(parent, "decks"), path.join(parent, "alias"));
+      await fs.writeFile(path.join(parent, "File.canvas"), "{}");
+      for (const invalid of [
+        relative,
+        "External.canvas",
+        "File.canvas",
+        "alias/Sibling.canvas",
+        "../outside.canvas",
+        "/outside.canvas",
+        "decks//Sibling.canvas",
+        "decks/./Sibling.canvas",
+        "decks/Sibling.canvas/",
+        "decks",
+        "decks\\Sibling.canvas",
+      ])
+        await expect(catalog.nestedDeck(selected.id, invalid)).rejects.toThrow(
+          "workspace_not_registered"
+        );
+      await fs.unlink(marker);
+      await fs.link(path.join(parent, "File.canvas"), marker);
+      await expect(catalog.nestedDeck(selected.id, relative)).rejects.toThrow(
+        "workspace_not_registered"
+      );
+
+      await fs.rename(nested, nested + "-previous");
+      await fs.mkdir(nested, { mode: 0o700 });
+      const replacement = await catalog.nestedDeck(selected.id, relative);
+      expect(replacement.workspaceId).not.toBe(original.workspaceId);
+      await expect(
+        catalog.nestedDeck(selected.id, "decks/Sibling.canvas")
+      ).resolves.toEqual(firstSibling);
+      const previousParent = parent + "-previous";
+      await fs.rename(parent, previousParent);
+      await fs.mkdir(path.dirname(nested), { recursive: true, mode: 0o700 });
+      await fs.rename(path.join(previousParent, relative), nested);
+      await expect(catalog.nestedDeck(selected.id, relative)).rejects.toThrow(
+        "workspace_not_registered"
+      );
+      await catalog.openSelected(parent);
+      const reselected = await catalog.nestedDeck(selected.id, relative);
+      expect(reselected.identity).toEqual(replacement.identity);
+      expect(reselected.workspaceId).not.toBe(replacement.workspaceId);
+      await catalog.forget(selected.id);
+      await expect(catalog.nestedDeck(selected.id, relative)).rejects.toThrow(
+        "workspace_not_registered"
+      );
+    } finally {
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  }
+);
+
+it.runIf(process.platform !== "win32")(
   "keeps external scratch reserved and preserves registration when external cleanup is unverified",
   async () => {
     const root = await fs.realpath(

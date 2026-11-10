@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { IpcMainInvokeEvent, WebContents, WebFrameMain } from "electron";
 import type { WorkspaceDirectoryIdentity } from "@grida/daemon/server";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
+import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
 import {
   NativeEditorSurfaces,
   NativeEditorSvgText,
@@ -255,6 +256,28 @@ type DocumentFrame = {
   release(): void;
 };
 
+type NestedDeckFrame = {
+  frame: WebFrameMain;
+  href: string;
+  parentWorkspaceId: string;
+  grant?: NativeNestedDeckGrant;
+  recheck(): Promise<void>;
+  release(): void;
+};
+
+export type NativeChatNestedDeckOwner = Readonly<{
+  grant(
+    parentWorkspaceId: string,
+    relativePath: string
+  ): Promise<NativeNestedDeckGrant>;
+  current(parentWorkspaceId: string, key: string): ActiveNativeChat | null;
+  ensure(
+    grant: NativeNestedDeckGrant,
+    requireCurrent: () => Promise<void>
+  ): Promise<void>;
+  close(key: string): Promise<void>;
+}>;
+
 export type NativeChatDocumentOwner = Readonly<{
   identity(
     sender: WebContents,
@@ -271,6 +294,7 @@ const DOCUMENT_SURFACE = "/canvas.svg";
 export class NativeChatIpc {
   private readonly owners = new Map<WebContents, Owner>();
   private readonly deckFrames = new Map<WebContents, DeckFrame>();
+  private readonly nestedDeckFrames = new Map<WebContents, NestedDeckFrame>();
   private readonly documentFrames = new Map<WebContents, DocumentFrame>();
   private readonly startups = new Map<WebContents, Startup>();
   private readonly deleting = new WeakSet<NativeChatSession>();
@@ -310,7 +334,8 @@ export class NativeChatIpc {
       id: string
     ) => Promise<WorkspaceMediaGrant>,
     private readonly disabled = false,
-    private readonly documents?: NativeChatDocumentOwner
+    private readonly documents?: NativeChatDocumentOwner,
+    private readonly nestedDecks?: NativeChatNestedDeckOwner
   ) {}
 
   async documentRequest<T>(
@@ -404,6 +429,19 @@ export class NativeChatIpc {
     invoke: () => T
   ): Promise<Awaited<T>> {
     const href = frame?.url;
+    const nested = ipc_sender.nestedDeck(href);
+    if (nested && frame && href && this.frameCurrent(sender, frame, href)) {
+      if (!this.startup) return await invoke();
+      const owner = this.nestedDecks;
+      if (!owner) throw new Error("native_chat_unavailable");
+      const binding =
+        this.nestedDeckFrame(sender, frame) ??
+        this.bindNestedDeck(sender, frame, href, nested, owner);
+      await binding.recheck();
+      const result = await invoke();
+      await binding.recheck();
+      return result;
+    }
     const workspaceId = ipc_sender.rootDeckId(href);
     const checkFrame = () => {
       if (!frame || !href || !this.frameCurrent(sender, frame, href))
@@ -439,12 +477,88 @@ export class NativeChatIpc {
     for (const binding of this.deckFrames.values()) {
       if (binding.workspaceId === workspaceId) binding.release();
     }
+    for (const binding of this.nestedDeckFrames.values()) {
+      if (binding.parentWorkspaceId === workspaceId) binding.release();
+    }
     for (const owner of this.owners.values()) {
       if (owner.active.workspaceId === workspaceId) owner.release();
     }
     for (const startup of this.startups.values()) {
       if (startup.workspaceId === workspaceId) startup.release();
     }
+  }
+
+  private bindNestedDeck(
+    sender: WebContents,
+    frame: WebFrameMain,
+    href: string,
+    {
+      workspaceId: parentWorkspaceId,
+      relativePath,
+    }: NonNullable<ReturnType<typeof ipc_sender.nestedDeck>>,
+    owner: NativeChatNestedDeckOwner
+  ): NestedDeckFrame {
+    this.nestedDeckFrames.get(sender)?.release();
+    const checkFrame = () => {
+      if (
+        this.nestedDeckFrames.get(sender) !== binding ||
+        !this.frameCurrent(sender, frame, href)
+      )
+        throw new Error("native_chat_scope_changed");
+    };
+    const binding: NestedDeckFrame = {
+      frame,
+      href,
+      parentWorkspaceId,
+      recheck: async () => {
+        checkFrame();
+        try {
+          const grant = await owner.grant(parentWorkspaceId, relativePath);
+          checkFrame();
+          if (
+            grant.parentWorkspaceId !== parentWorkspaceId ||
+            (binding.grant && binding.grant.workspaceId !== grant.workspaceId)
+          )
+            throw new Error("native_chat_scope_changed");
+          binding.grant ??= grant;
+        } catch (error) {
+          if (fileScopeBusy(error)) throw error;
+          // A stale frame cannot revoke another frame's live grant. If the
+          // same frame observed a retired generation, revoke all its users.
+          if (
+            binding.grant &&
+            this.nestedDeckFrames.get(sender) === binding &&
+            this.frameCurrent(sender, frame, href)
+          ) {
+            for (const current of this.nestedDeckFrames.values()) {
+              if (current.grant?.workspaceId === binding.grant.workspaceId)
+                current.release();
+            }
+          } else binding.release();
+          throw new Error("native_chat_scope_changed");
+        }
+      },
+      release: () => {
+        if (this.nestedDeckFrames.get(sender) !== binding) return;
+        this.nestedDeckFrames.delete(sender);
+        stopWatching();
+        const attached = this.owners.get(sender);
+        if (attached?.href === href) attached.release();
+        const startup = this.startups.get(sender);
+        if (startup?.href === href) startup.release();
+        const key = binding.grant?.workspaceId;
+        if (
+          key &&
+          ![...this.nestedDeckFrames.values()].some(
+            (other) => other.grant?.workspaceId === key
+          )
+        )
+          void owner.close(key).catch(() => {});
+      },
+    };
+    const stopWatching = ipc_sender.watchNavigation(sender, binding.release);
+    this.nestedDeckFrames.set(sender, binding);
+    return binding;
   }
 
   private bindDeck(
@@ -507,6 +621,7 @@ export class NativeChatIpc {
       return existing.result;
     existing?.release();
     const document = this.documentFrame(sender, frame);
+    const nested = this.nestedDeckFrame(sender, frame);
     const profile = this.profile(sender, frame, workspaceId);
 
     const requireCurrent = () => {
@@ -536,6 +651,13 @@ export class NativeChatIpc {
               await document.recheck();
               await this.documents.ensure(workspaceId, requireCurrent);
               await document.recheck();
+            } else if (nested?.grant && this.nestedDecks) {
+              await this.nestedDecks.ensure(nested.grant, async () => {
+                requireCurrent();
+                await nested.recheck();
+                requireCurrent();
+              });
+              await nested.recheck();
             } else if (profile && this.profilesOwner)
               await this.profilesOwner.select(
                 workspaceId,
@@ -593,7 +715,12 @@ export class NativeChatIpc {
     senderFrame: frame,
   }: IpcMainInvokeEvent): Promise<NativeChatProfileCatalog | null> {
     const owner = this.profilesOwner;
-    if (!owner || this.documentFrame(sender, frame)) return null;
+    if (
+      !owner ||
+      this.documentFrame(sender, frame) ||
+      this.nestedDeckFrame(sender, frame)
+    )
+      return null;
     const workspaceId = this.workspaceId(sender, frame);
     if (!frame || !workspaceId) throw new Error("native_chat_scope_changed");
     const href = frame.url;
@@ -623,7 +750,13 @@ export class NativeChatIpc {
   ): Promise<void> {
     const owner = this.profilesOwner;
     const workspaceId = this.workspaceId(sender, frame);
-    if (!owner || !frame || !workspaceId || this.documentFrame(sender, frame))
+    if (
+      !owner ||
+      !frame ||
+      !workspaceId ||
+      this.documentFrame(sender, frame) ||
+      this.nestedDeckFrame(sender, frame)
+    )
       throw new Error("native_chat_profiles_unavailable");
     const href = frame.url;
     const chosen = chatProfileSelection(selection);
@@ -1140,6 +1273,8 @@ export class NativeChatIpc {
   ): void {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const document = this.documentFrame(owner.sender, owner.frame);
+    if (this.nestedDeckFrame(owner.sender, owner.frame))
+      throw new Error("native_chat_editor_surfaces_invalid");
     const snapshot = NativeEditorSurfaces.parse(value);
     if (
       !snapshot ||
@@ -2046,7 +2181,9 @@ export class NativeChatIpc {
       throw new Error("native_chat_subscription_unavailable");
     const subscription: Subscription = { attachment, stop: () => {} };
     owner.subscriptions.set(subscriptionId, subscription);
-    const document = this.documentFrame(owner.sender, owner.frame);
+    const file =
+      this.documentFrame(owner.sender, owner.frame) ??
+      this.nestedDeckFrame(owner.sender, owner.frame);
     let delivery = Promise.resolve();
     let delivered = 0;
     let chunks = 0;
@@ -2078,16 +2215,16 @@ export class NativeChatIpc {
             update: payload,
           });
         };
-        if (document) {
+        if (file) {
           delivery = delivery
             .then(async () => {
               if (owner.subscriptions.get(subscriptionId) !== subscription)
                 return;
-              await document.recheck();
+              await file.recheck();
               send();
             })
             .catch((error: unknown) => {
-              if (limited || !(error instanceof NativeDocumentIdentityBusy))
+              if (limited || !fileScopeBusy(error))
                 this.unsubscribeOwned(owner, subscriptionId);
             });
           return;
@@ -2325,6 +2462,15 @@ export class NativeChatIpc {
       const active = this.documents?.current(id);
       return active?.workspaceId === id ? active : null;
     }
+    const nested = this.nestedDeckFrame(sender, frame)?.grant;
+    if (nested) {
+      const active = this.nestedDecks?.current(nested.parentWorkspaceId, id);
+      return active?.workspaceId === id &&
+        active.directoryIdentity &&
+        sameDirectory(nested.identity, active.directoryIdentity)
+        ? active
+        : null;
+    }
     const active = this.resolve(
       sender,
       id,
@@ -2363,6 +2509,13 @@ export class NativeChatIpc {
       : undefined;
   }
 
+  private nestedDeckFrame(sender: WebContents, frame: WebFrameMain | null) {
+    const nested = this.nestedDeckFrames.get(sender);
+    return nested?.frame === frame && nested.href === frame?.url
+      ? nested
+      : undefined;
+  }
+
   private workspaceId(
     sender: WebContents,
     frame: WebFrameMain | null
@@ -2384,6 +2537,11 @@ export class NativeChatIpc {
         if (this.disabled) return docId;
         return this.documentFrame(sender, frame)?.key ?? null;
       }
+      const nested = ipc_sender.nestedDeck(raw);
+      if (nested)
+        return this.startup
+          ? (this.nestedDeckFrame(sender, frame)?.grant?.workspaceId ?? null)
+          : nested.workspaceId;
       const id = ipc_sender.rootDeckId(raw);
       const deck = this.deckFrames.get(sender);
       return id &&
@@ -2399,6 +2557,13 @@ export class NativeChatIpc {
     const [id, duplicate] = url.searchParams.getAll("id");
     return id && id.length <= 1024 && duplicate === undefined ? id : null;
   }
+}
+
+function fileScopeBusy(error: unknown): boolean {
+  return (
+    error instanceof NativeDocumentIdentityBusy ||
+    (error instanceof Error && error.message === "workspace_catalog_busy")
+  );
 }
 
 function sameDirectory(

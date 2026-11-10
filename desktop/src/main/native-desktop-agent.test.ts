@@ -57,6 +57,170 @@ const OTHER_PNG =
 
 beforeEach(() => vi.resetModules());
 
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "runs a nested deck with only its physical child grant and its own durable transcript",
+  async () => {
+    const base = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-native-deck-")
+    );
+    const source = {
+      userDataPath: path.join(base, "agent"),
+      desktopUserDataPath: path.join(base, "browser"),
+      scratchBase: path.join(base, "scratch"),
+      providerHome: path.join(base, "providers"),
+      mediaRoot: path.join(base, "media"),
+    };
+    const parent = path.join(base, "workspace");
+    const first = path.join(parent, "Launch.canvas");
+    const sibling = path.join(parent, "Sibling.canvas");
+    const reads = [
+      "inside.txt",
+      "../outside.txt",
+      "../Sibling.canvas/inside.txt",
+      "alias.txt",
+    ];
+    const received: string[] = [];
+    let agent: import("./native-desktop-agent").NativeDesktopAgent | undefined;
+    try {
+      for (const folder of [
+        first,
+        sibling,
+        source.userDataPath,
+        source.desktopUserDataPath,
+      ])
+        await fs.mkdir(folder, { recursive: true, mode: 0o700 });
+      await fs.writeFile(path.join(first, "inside.txt"), "Launch deck content");
+      await fs.writeFile(
+        path.join(sibling, "inside.txt"),
+        "Sibling deck content"
+      );
+      await fs.writeFile(
+        path.join(parent, "outside.txt"),
+        "Parent workspace content"
+      );
+      await fs.symlink(
+        path.join(parent, "outside.txt"),
+        path.join(first, "alias.txt")
+      );
+      const catalog = new NativeWorkspaceCatalog({
+        browserData: source.desktopUserDataPath,
+        projectsRoot: path.join(base, "projects"),
+        protectedPaths: [source.userDataPath],
+      });
+      const selected = await catalog.openSelected(parent);
+      const one = await catalog.nestedDeck(selected.id, "Launch.canvas");
+      const two = await catalog.nestedDeck(selected.id, "Sibling.canvas");
+      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.forgetWorkspace.mockImplementation((id) => catalog.forget(id));
+      sidecar.nativeConfiguredEndpoint.mockResolvedValue({
+        provider: "openai-compatible",
+        endpoint: "http://127.0.0.1:1/v1",
+        model: "fixture",
+        providerNetwork: {
+          prepare: () => async (body) => {
+            const next = reads[received.length];
+            received.push(body.toString());
+            const delta = next
+              ? {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: `read-${received.length}`,
+                      type: "function",
+                      function: {
+                        name: "read_file",
+                        arguments: JSON.stringify({ path: next }),
+                      },
+                    },
+                  ],
+                }
+              : { content: "Finished checking the deck boundary." };
+            const event = JSON.stringify({
+              id: "fixture",
+              choices: [
+                {
+                  index: 0,
+                  delta,
+                  finish_reason: next ? "tool_calls" : "stop",
+                },
+              ],
+            });
+            return new Response(`data: ${event}\n\ndata: [DONE]\n\n`, {
+              headers: { "content-type": "text/event-stream" },
+            });
+          },
+        },
+      });
+      const { NativeDesktopAgent } = await import("./native-desktop-agent");
+      agent = await NativeDesktopAgent.prepareFresh(
+        new DesktopAccountSession({
+          base_url: "https://editor.example.test",
+          fetch: vi.fn<typeof fetch>(),
+        }),
+        resources!,
+        {
+          provider: { kind: "endpoint", id: "fixture" },
+          openExternal: vi.fn<() => Promise<void>>(),
+          workspaceCatalogRoot: path.dirname(catalog.directory),
+          workspaceGrant: catalog.fileGrant.bind(catalog),
+          selectableProfiles: true,
+        }
+      );
+      await agent.ensureNestedDeck(one, () => {});
+      await agent.ensureNestedDeck(two, () => {});
+      expect(agent.current(selected.id)).toBeNull();
+      expect(agent.current(one.workspaceId)).toBeNull();
+      const launch = agent.currentNestedDeck(
+        selected.id,
+        one.workspaceId
+      )!.chat;
+      const other = agent.currentNestedDeck(selected.id, two.workspaceId)!.chat;
+      const session = await launch.create();
+      await expect(other.load(session.id)).rejects.toThrow("session_missing");
+      await launch.submit(
+        session,
+        "fixture-input",
+        "Check the deck boundary.",
+        "plan"
+      );
+      await vi.waitFor(
+        async () =>
+          expect((await launch.observe(session)).latest?.status).toBe(
+            "succeeded"
+          ),
+        { timeout: 6000 }
+      );
+      expect(received).toHaveLength(5);
+      const providerContext = received.join("\n");
+      expect(providerContext).toContain("Launch deck content");
+      expect(providerContext).not.toContain("Parent workspace content");
+      expect(providerContext).not.toContain("Sibling deck content");
+      await agent.closeNestedDeck(one.workspaceId);
+      await agent.ensureNestedDeck(one, () => {});
+      const reopened = agent.currentNestedDeck(
+        selected.id,
+        one.workspaceId
+      )!.chat;
+      expect(
+        (await reopened.transcript(await reopened.load(session.id))).map(
+          ({ text }) => text
+        )
+      ).toContain("Finished checking the deck boundary.");
+      expect(received).toHaveLength(5);
+      await agent.forgetWorkspace(selected.id);
+      expect(agent.currentNestedDeck(selected.id, one.workspaceId)).toBeNull();
+      expect(agent.currentNestedDeck(selected.id, two.workspaceId)).toBeNull();
+      await expect(
+        catalog.nestedDeck(selected.id, "Launch.canvas")
+      ).rejects.toThrow("workspace_not_registered");
+    } finally {
+      await agent?.close();
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  },
+  15_000
+);
+
 function heldExchange() {
   return {
     cancelled: vi.fn<() => void>(),

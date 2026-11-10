@@ -61,7 +61,11 @@ import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
 import { ipc_sender } from "./ipc-sender";
 import { DesktopMediaHost } from "./media-host";
 import { DesktopMediaRoot } from "./media-root";
-import { NativeChatIpc, type ActiveNativeChat } from "./native-chat-ipc";
+import {
+  NativeChatIpc,
+  type ActiveNativeChat,
+  type NativeChatNestedDeckOwner,
+} from "./native-chat-ipc";
 import type { NativeDocumentFiles } from "./native-document-files";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 import { NativeExternalRunIpc } from "./native-external-run-ipc";
@@ -101,6 +105,7 @@ type RegisterIpcHandlersOptions = {
   native_chat_disabled?: boolean;
   forget_native_workspace?: (workspaceId: string) => Promise<void>;
   resolve_native_deck?: (workspaceId: string) => Promise<WorkspaceMediaGrant>;
+  native_nested_deck_chat?: NativeChatNestedDeckOwner;
   native_document_chat?: Pick<
     import("./native-chat-ipc").NativeChatDocumentOwner,
     "current" | "ensure" | "close"
@@ -222,7 +227,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         if (!files) throw new Error("native_chat_unavailable");
         return files.chatIdentity(docId, { signal: owner.signal, check });
       },
-    }
+    },
+    options.native_nested_deck_chat
   );
   const externalAgent = new NativeExternalRunIpc(
     EDITOR_ORIGIN,
@@ -250,11 +256,18 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       const pathname = ipc_sender.pathname(senderUrl);
       const docId = ipc_sender.documentId(senderUrl);
       const selectedDocument = docId !== null;
+      const nestedDeck = ipc_sender.nestedDeck(senderUrl) !== null;
       if (
         !ipc_sender.isAllowed(senderUrl, EDITOR_ORIGIN) ||
         !role ||
         !pathname ||
-        !ipc_admission.allows({ role, channel, pathname, selectedDocument })
+        !ipc_admission.allows({
+          role,
+          channel,
+          pathname,
+          selectedDocument,
+          nestedDeck,
+        })
       ) {
         console.warn(
           `[grida] IPC ${channel} denied: sender=${ipc_sender.diagnostic(senderUrl)}`

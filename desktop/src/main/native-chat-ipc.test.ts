@@ -19,6 +19,7 @@ import type { NativeChatSession } from "./native-agent-chat";
 import type { NativeSavedChatDeletionPreview } from "./native-agent-deletion";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
 import { NativeDocumentIdentityBusy } from "./native-document-files";
+import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
 
 const ORIGIN = "https://fixture.invalid";
 const WORKSPACE = "workspace";
@@ -533,6 +534,115 @@ function setup(
 }
 
 describe("native chat IPC", () => {
+  it("isolates sibling deck attachments and revokes a replaced or forgotten nested deck", async () => {
+    const { chat, emit, listeners } = setup();
+    const workspaceId = "eac20941e6a410aa";
+    const route = `${ORIGIN}/desktop/file?id=${workspaceId}`;
+    const first = windowAt(`${route}&path=decks%2FA.canvas`);
+    const peer = windowAt(first.frame.url);
+    const sibling = windowAt(`${route}&path=decks%2FB.canvas`);
+    const malformed = windowAt(`${first.frame.url}&docId=file`);
+    const identity = { device: "1", inode: "2", birthTimeNs: "3" };
+    let deckA: NativeNestedDeckGrant = {
+      workspaceId: "a",
+      parentWorkspaceId: workspaceId,
+      parentIdentity: identity,
+      identity,
+      root: "/fixture/decks/A.canvas",
+      protected: [],
+    };
+    const deckB = {
+      ...deckA,
+      workspaceId: "b",
+      root: "/fixture/decks/B.canvas",
+    };
+    const active = new Map<string, NativeNestedDeckGrant>();
+    const grant = vi.fn<
+      (id: string, relative: string) => Promise<NativeNestedDeckGrant>
+    >(async (_, relative) => (relative === "decks/A.canvas" ? deckA : deckB));
+    const ensure = vi.fn<
+      (
+        deck: NativeNestedDeckGrant,
+        requireCurrent: () => Promise<void>
+      ) => Promise<void>
+    >(async (deck, check) => {
+      await check();
+      active.set(deck.workspaceId, deck);
+    });
+    const close = vi.fn<(key: string) => Promise<void>>(async (key) => {
+      active.delete(key);
+    });
+    const workspace = vi.fn<(id: string) => Promise<void>>(async () => {});
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      () => null,
+      { admits: () => true, ensure: workspace },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      undefined,
+      {
+        grant,
+        ensure,
+        close,
+        current: (_parent, key) => {
+          const current = active.get(key);
+          return current
+            ? { workspaceId: key, directoryIdentity: current.identity, chat }
+            : null;
+        },
+      }
+    );
+    const at = <T>(window: typeof first, invoke: () => T) =>
+      ipc.deckRequest(window.event, invoke);
+    await expect(
+      at(malformed, () => ipc.status(malformed.event, true))
+    ).rejects.toThrow("native_chat_scope_changed");
+    expect(grant).not.toHaveBeenCalled();
+    for (const frame of [first, peer, sibling])
+      await expect(
+        at(frame, () => ipc.status(frame.event, true))
+      ).resolves.toBe("native-ready");
+    expect(ensure).toHaveBeenCalledTimes(2);
+    expect(workspace).not.toHaveBeenCalled();
+    const a = await at(first, () => ipc.create(first.event));
+    const peerChat = await at(peer, () => ipc.create(peer.event));
+    const b = await at(sibling, () => ipc.create(sibling.event));
+    await expect(
+      at(sibling, () => ipc.transcript(sibling.event, a.attachmentId))
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    expect(close).not.toHaveBeenCalled();
+    await at(peer, () =>
+      ipc.subscribe(peer.event, peerChat.attachmentId, randomUUID())
+    );
+    await at(sibling, () =>
+      ipc.subscribe(sibling.event, b.attachmentId, randomUUID())
+    );
+
+    const held = Promise.withResolvers<NativeNestedDeckGrant>();
+    grant.mockReturnValueOnce(held.promise);
+    emit(peerChat.sessionId, UPDATE);
+    deckA = {
+      ...deckA,
+      workspaceId: "replacement",
+      identity: { ...identity, inode: "9" },
+    };
+    held.resolve(deckA);
+    await vi.waitFor(() => expect(close).toHaveBeenCalledExactlyOnceWith("a"));
+    expect(peer.frame.send).not.toHaveBeenCalled();
+    expect(listeners.get(peerChat.sessionId)?.size).toBe(0);
+    emit(b.sessionId, UPDATE);
+    await vi.waitFor(() => expect(sibling.frame.send).toHaveBeenCalledTimes(1));
+
+    ipc.revokeWorkspace(workspaceId);
+    expect(close).toHaveBeenLastCalledWith("b");
+    expect(listeners.get(b.sessionId)?.size).toBe(0);
+  });
+
   it("withdraws selected-file chat delivery on physical replacement or navigation", async () => {
     const { chat, emit, listeners } = setup();
     const docId = randomUUID();
@@ -644,7 +754,7 @@ describe("native chat IPC", () => {
     const workspaceId = "eac20941e6a410aa";
     const deck = `${ORIGIN}/desktop/file?id=${workspaceId}`;
     const first = windowAt(deck);
-    const second = windowAt(`${deck}&path=nested.canvas`);
+    const second = windowAt(`${deck}&path=nested.canvas&path=other.canvas`);
     const identity = { device: "1", inode: "2", birthTimeNs: "3" };
     let grant = {
       workspaceId,

@@ -25,6 +25,12 @@ type Options = Readonly<{
   protectedPaths: readonly string[];
 }>;
 
+export type NativeNestedDeckGrant = WorkspaceMediaGrant &
+  Readonly<{
+    parentWorkspaceId: string;
+    parentIdentity: WorkspaceDirectoryIdentity;
+  }>;
+
 type ExternalAccess = Readonly<{
   privateDirectory: string;
   temporaryDirectory: string;
@@ -220,23 +226,60 @@ export class NativeWorkspaceCatalog {
   rootDeck(id: string): Promise<WorkspaceMediaGrant> {
     return this.run(async () => {
       const grant = await this.resolveFileGrant(id);
-      const marker = await fs
-        .lstat(path.join(grant.root, ".canvas.json"), { bigint: true })
-        .catch((error: NodeJS.ErrnoException) => {
-          if (error.code === "ENOENT") return null;
-          throw error;
-        });
-      const root = await fs.lstat(grant.root, { bigint: true });
+      await requireDeck(
+        grant.root,
+        grant.identity,
+        path.extname(grant.root).toLowerCase() === ".canvas"
+      );
+      return grant;
+    });
+  }
+
+  /** Resolve a nested bundle without granting the workspace which contains it. */
+  nestedDeck(id: string, relativePath: string): Promise<NativeNestedDeckGrant> {
+    return this.run(async () => {
       if (
-        !root.isDirectory() ||
-        !matchesIdentity(root, grant.identity) ||
-        (await fs.realpath(grant.root)) !== grant.root ||
-        (marker
-          ? !marker.isFile() || marker.nlink !== 1n || marker.dev !== root.dev
-          : path.extname(grant.root).toLowerCase() !== ".canvas")
+        Buffer.byteLength(relativePath) > 4096 ||
+        relativePath.includes("\0") ||
+        /[\\\uD800-\uDFFF]/u.test(relativePath) ||
+        relativePath
+          .split("/")
+          .some((part) => !part || part === "." || part === "..") ||
+        !relativePath.toLowerCase().endsWith(".canvas")
       )
         throw unavailable();
-      return grant;
+      const parent = await this.resolveFileGrant(id);
+      const root = path.join(parent.root, relativePath);
+      if (this.ordinaryDenials.overlaps(root)) throw unavailable();
+      const metadata = await fs.lstat(root, { bigint: true }).catch(() => {
+        throw unavailable();
+      });
+      const identity = {
+        device: String(metadata.dev),
+        inode: String(metadata.ino),
+        birthTimeNs: String(metadata.birthtimeNs),
+      };
+      if (
+        !metadata.isDirectory() ||
+        identity.device !== parent.identity.device ||
+        identity.birthTimeNs === "0"
+      )
+        throw unavailable();
+      await requireDeck(root, identity, true);
+      const checked = await fs.lstat(parent.root, { bigint: true });
+      if (!checked.isDirectory() || !matchesIdentity(checked, parent.identity))
+        throw unavailable();
+      const digest = createHash("sha256")
+        .update(JSON.stringify([id, parent.identity, relativePath, identity]))
+        .digest("hex");
+      return {
+        workspaceId: `deck-${digest}`,
+        parentWorkspaceId: id,
+        parentIdentity: parent.identity,
+        root,
+        identity,
+        protected: parent.protected,
+      };
     });
   }
 
@@ -350,6 +393,29 @@ function matchesIdentity(
     String(metadata.ino) === identity.inode &&
     String(metadata.birthtimeNs) === identity.birthTimeNs
   );
+}
+
+async function requireDeck(
+  rootPath: string,
+  identity: WorkspaceDirectoryIdentity,
+  implicit: boolean
+) {
+  const marker = await fs
+    .lstat(path.join(rootPath, ".canvas.json"), { bigint: true })
+    .catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    });
+  const root = await fs.lstat(rootPath, { bigint: true });
+  if (
+    !root.isDirectory() ||
+    !matchesIdentity(root, identity) ||
+    (await fs.realpath(rootPath)) !== rootPath ||
+    (marker
+      ? !marker.isFile() || marker.nlink !== 1n || marker.dev !== root.dev
+      : !implicit)
+  )
+    throw unavailable();
 }
 
 async function assertPrivateDirectory(directory: string) {

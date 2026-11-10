@@ -25,6 +25,7 @@ import { NativeChatProfiles } from "./native-chat-profiles";
 import type { NativeDesktopProfile } from "./native-desktop-profile";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeProviderSelection } from "./native-provider-selection";
+import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 
@@ -215,6 +216,51 @@ export class NativeDesktopAgent {
 
   closeDocument(key: string): Promise<void> {
     return this.owners?.closeDocument(key) ?? Promise.resolve();
+  }
+
+  currentNestedDeck(parentWorkspaceId: string, key: string) {
+    if (this.workspaceActivity.get(parentWorkspaceId)?.retired) return null;
+    return this.owners?.currentNestedDeck(key) ?? null;
+  }
+
+  closeNestedDeck(key: string): Promise<void> {
+    return this.owners?.closeNestedDeck(key) ?? Promise.resolve();
+  }
+
+  async ensureNestedDeck(
+    grant: NativeNestedDeckGrant,
+    requireFrame: () => void | Promise<void>
+  ) {
+    await this.withWorkspace(
+      grant.parentWorkspaceId,
+      async (parent, requireParent) => {
+        const identity = grant.parentIdentity;
+        if (
+          parent.identity?.device !== identity.device ||
+          parent.identity.inode !== identity.inode ||
+          parent.identity.birthTimeNs !== identity.birthTimeNs
+        )
+          throw new Error("native_chat_scope_changed");
+        const requireCurrent = async () => {
+          requireParent();
+          await requireFrame();
+          requireParent();
+        };
+        await requireCurrent();
+        const owners = (this.owners ??= this.newOwners());
+        await owners.open({
+          id: grant.workspaceId,
+          root: grant.root,
+          identity: grant.identity,
+          nestedDeck: {
+            parentWorkspaceId: grant.parentWorkspaceId,
+            protectedPaths: grant.protected,
+            requireCurrent,
+          },
+        });
+        await requireCurrent();
+      }
+    );
   }
 
   forgetWorkspace(workspaceId: string): Promise<void> {
@@ -477,8 +523,14 @@ export class NativeDesktopAgent {
             };
           return {
             launch: {
-              ...(await this.workspaceLaunch(workspace, provider)),
-              mcp: this.mcp?.forWorkspace(workspace.root),
+              ...(await this.workspaceLaunch(
+                workspace,
+                provider,
+                workspace.nestedDeck?.protectedPaths
+              )),
+              mcp: workspace.nestedDeck
+                ? undefined
+                : this.mcp?.forWorkspace(workspace.root),
             },
             release,
           };
@@ -494,14 +546,16 @@ export class NativeDesktopAgent {
     { id, root, identity }: SelectedWorkspace,
     provider: Awaited<
       ReturnType<NativeDesktopAgent["prepareProvider"]>
-    >["provider"]
+    >["provider"],
+    nestedProtectedPaths?: readonly string[]
   ) {
-    const workspaceConfiguration = this.selectableProfiles
-      ? {
-          directory: await this.cutover.workspaceDirectory(id, root),
-          epoch: this.configurationEpoch,
-        }
-      : undefined;
+    const workspaceConfiguration =
+      this.selectableProfiles && !nestedProtectedPaths
+        ? {
+            directory: await this.cutover.workspaceDirectory(id, root),
+            epoch: this.configurationEpoch,
+          }
+        : undefined;
     return {
       ...provider,
       workspaceConfiguration,
@@ -515,9 +569,11 @@ export class NativeDesktopAgent {
           ...(identity && { identity }),
         },
         additionalReadRoots: [],
-        protectedPaths: this.workspaceCatalogRoot
-          ? [...this.cutover.protectedPaths, this.workspaceCatalogRoot]
-          : this.cutover.protectedPaths,
+        protectedPaths: [
+          ...this.cutover.protectedPaths,
+          ...(this.workspaceCatalogRoot ? [this.workspaceCatalogRoot] : []),
+          ...(nestedProtectedPaths ?? []),
+        ],
       },
     };
   }

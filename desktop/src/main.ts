@@ -815,6 +815,13 @@ app.on("ready", async () => {
       forget_native_workspace: (workspaceId) =>
         native.forgetWorkspace(workspaceId),
       resolve_native_deck: workspaceCatalog?.rootDeck.bind(workspaceCatalog),
+      native_nested_deck_chat: workspaceCatalog && {
+        grant: workspaceCatalog.nestedDeck.bind(workspaceCatalog),
+        current: (parent, key) => native.currentNestedDeck(parent, key),
+        ensure: (grant, requireCurrent) =>
+          native.ensureNestedDeck(grant, requireCurrent),
+        close: (key) => native.closeNestedDeck(key),
+      },
       native_document_chat: {
         current: (key) => native.currentDocument(key),
         ensure: (key, requireCurrent) =>

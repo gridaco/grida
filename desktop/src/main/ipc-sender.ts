@@ -53,6 +53,21 @@ export namespace ipc_sender {
       : null;
   }
 
+  export function nestedDeck(raw: string | undefined) {
+    const url = parse(raw);
+    if (
+      url?.pathname !== "/desktop/file" ||
+      url.hash ||
+      url.searchParams.size !== 2
+    )
+      return null;
+    const workspaceId = url.searchParams.get("id");
+    const relativePath = url.searchParams.get("path");
+    return workspaceId && /^[a-f0-9]{16}$/.test(workspaceId) && relativePath
+      ? { workspaceId, relativePath }
+      : null;
+  }
+
   export function diagnostic(raw: string | undefined): string {
     if (!raw) return "<no frame>";
     const url = parse(raw);

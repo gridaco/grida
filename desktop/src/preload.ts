@@ -508,6 +508,7 @@ const bridge: DesktopBridge = {
 
   nativeChat: {
     deck: true,
+    nestedDeck: true,
     ...(selectedDocumentRoute() && { document: true as const }),
     available: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE),
     status: (start) =>

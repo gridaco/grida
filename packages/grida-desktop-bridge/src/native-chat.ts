@@ -454,6 +454,8 @@ export type NativeChatUpdate =
 export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   /** This host also accepts native chat requests from an admitted root deck. */
   readonly deck?: true;
+  /** This host also offers native chat for the exact selected nested deck. */
+  readonly nestedDeck?: true;
   /** This native package offers chat for the exact selected standalone SVG. */
   readonly document?: true;
   available(): Promise<boolean>;

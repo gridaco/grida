@@ -21,6 +21,26 @@ it("accepts only a single canonical workspace ID on the root deck route", () => 
   }
 });
 
+it("parses the exact registered workspace and relative selector for a nested deck", () => {
+  const root = "https://grida.co/desktop/file?id=eac20941e6a410aa";
+  const route = `${root}&path=work%2FLaunch%20Deck.canvas`;
+  expect(ipc_sender.nestedDeck(route)).toEqual({
+    workspaceId: "eac20941e6a410aa",
+    relativePath: "work/Launch Deck.canvas",
+  });
+  for (const invalid of [
+    root,
+    `${root}&path=`,
+    `${route}&path=other.canvas`,
+    `${route}&id=eac20941e6a410aa`,
+    `${route}&docId=file`,
+    `${route}#fragment`,
+    route.replace("/file", "/workspace"),
+    route.replace("eac20941e6a410aa", "other"),
+  ])
+    expect(ipc_sender.nestedDeck(invalid)).toBeNull();
+});
+
 it("pins the standalone document route to one exact document query", () => {
   const origin = "https://fixture.invalid";
   expect(ipc_sender.isDocument(`${origin}/desktop/file?docId=a`, "a")).toBe(

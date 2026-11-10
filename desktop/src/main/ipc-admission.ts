@@ -74,11 +74,13 @@ export namespace ipc_admission {
     channel,
     pathname,
     selectedDocument = false,
+    nestedDeck = false,
   }: {
     role: DesktopIpcRole;
     channel: IpcChannel;
     pathname: string;
     selectedDocument?: boolean;
+    nestedDeck?: boolean;
   }): boolean {
     switch (role) {
       case "main":
@@ -109,7 +111,9 @@ export namespace ipc_admission {
                 ? DOCUMENT_EDITOR_CHANNELS.has(channel) ||
                   (isDeckChat(channel) &&
                     !PROJECT_CONFIGURATION_CHANNELS.has(channel))
-                : isDeckChat(channel)))
+                : isDeckChat(channel) &&
+                  (!nestedDeck ||
+                    !PROJECT_CONFIGURATION_CHANNELS.has(channel))))
           );
         }
         if (

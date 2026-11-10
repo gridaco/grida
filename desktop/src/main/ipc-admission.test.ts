@@ -130,6 +130,35 @@ describe("ipc_admission", () => {
     }
   });
 
+  it("keeps nested decks on scoped native chat without workspace configuration or live editor endpoints", () => {
+    const deck = allChannels.filter((channel) =>
+      ipc_admission.allows({
+        role: "main",
+        pathname: "/desktop/file",
+        channel,
+        nestedDeck: true,
+      })
+    );
+    expect(deck).toEqual(
+      expect.arrayContaining([
+        IPC_CHANNELS.NATIVE_CHAT_STATUS,
+        IPC_CHANNELS.NATIVE_CHAT_LIST,
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
+      ])
+    );
+    for (const channel of [
+      IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
+      IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT,
+      IPC_CHANNELS.NATIVE_CHAT_SAVE_CONTEXT_LIMIT,
+      IPC_CHANNELS.NATIVE_CHAT_SUBMIT_CONFIGURATION,
+      IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
+      IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
+      IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+      ...nativeExternal,
+    ])
+      expect(deck).not.toContain(channel);
+  });
+
   it("admits external agents only on the exact main workspace route", () => {
     expect(nativeExternal).toEqual([
       IPC_CHANNELS.NATIVE_EXTERNAL_STATUS,
