@@ -26,6 +26,10 @@ On a profile with image editing, a crop uses a private working copy.
 Open **Turn summary** to inspect and save a result the chat retained.
 [Inspect and save results](./results.md)
 
+For other file types in a native workspace chat, open the folder that
+contains the file and name it in your request. Which files the agent can
+read depends on the workspace access and tools available to the chat.
+
 ## Work with an image without a project
 
 On macOS and Linux, a source-built native run can take one explicitly

@@ -10,8 +10,9 @@ format: md
 In native Desktop chat, open **Turn summary** to inspect the latest finished
 turn’s recorded work. Supported image profiles can retain a PNG crop in the
 chat. Open **Preview cropped PNG** and choose **Save PNG as…** to save it to a
-new file. You can retry while the crop is available. For details on what the
-summary includes, see [Read a turn summary](./clients.md#read-a-turn-summary).
+new file. You can retry while the crop is available. A later crop of the same
+upload can replace the working copy. Save the version you want to keep as a
+separate file. [Read a turn summary](./clients.md#read-a-turn-summary)
 
 If the summary details are unavailable, the chat keeps the recorded turn
 status and transcript. Choose **Retry summary** to read the details for
