@@ -1,6 +1,7 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — trusted launch-only permission input.
 
 use crate::command::CommandLimits;
+use crate::goal_verification::ReadVerification;
 use crate::permissions::{
     AccessRule, CommandProfile, CompletionHook, DirectoryAccess, PermissionProfile,
 };
@@ -35,6 +36,7 @@ struct ProfileFile {
     command: Option<Command>,
     before_completion: Option<BeforeCompletion>,
     automatic_read_review: Option<ReadProfile>,
+    goal_read_verification: Option<ReadVerification>,
 }
 
 #[derive(Deserialize)]
@@ -227,6 +229,7 @@ pub fn load_permission_profile(
         &protected,
     )?;
     let selected_review = profile.automatic_read_review;
+    let goal_read_verification = profile.goal_read_verification;
     let profile = PermissionProfile::with_denials(
         profile.revision,
         Arc::new(workspace),
@@ -238,8 +241,12 @@ pub fn load_permission_profile(
         Some(hook) => profile.with_completion_hook(hook, hooks_only)?,
         None => profile,
     };
-    Ok(Arc::new(match selected_review {
+    let profile = match selected_review {
         Some(review) => profile.with_automatic_read_review(review)?,
+        None => profile,
+    };
+    Ok(Arc::new(match goal_read_verification {
+        Some(verification) => profile.with_goal_read_verification(verification)?,
         None => profile,
     }))
 }

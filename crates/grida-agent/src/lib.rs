@@ -9,6 +9,7 @@ mod custody;
 mod editor_surfaces;
 pub mod file_tools;
 pub mod gg;
+mod goal_verification;
 pub mod host;
 mod http;
 pub mod launch_permissions;

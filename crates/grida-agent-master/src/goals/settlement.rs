@@ -5,7 +5,7 @@ use super::{
 use agent_kit_core::driver_state::DriverStateChange;
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{OperationInput, OperationState, TurnState};
-use agent_kit_core::{ErrorKind, OperationId, Result};
+use agent_kit_core::{ErrorKind, OperationId, Result, ToolCallId};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) type Verifier = dyn Fn(&str, &OperationState) -> bool + Send + Sync;
@@ -26,6 +26,43 @@ pub(crate) fn step_limit(state: &TurnState, configured: u32, reserves_child: boo
                 .get(),
         )
     }))
+}
+
+/// One eligible call per criterion for the current reserved work. These hints
+/// describe recorded evidence; the final proposal must still be evaluated.
+pub(crate) fn evidence_hints(
+    state: &TurnState,
+    verify: &Verifier,
+) -> Result<Vec<CriterionEvidence>> {
+    let Some(goal) = work_goal(state)? else {
+        return Ok(Vec::new());
+    };
+    if goal.paused()
+        || &goal.reservation().expect("reserved work").basis != goal.basis()
+        || !state.controls().admits_work()
+        || state
+            .operations()
+            .values()
+            .any(OperationState::is_uncertain)
+    {
+        return Ok(Vec::new());
+    }
+    let operations = unique_calls(state);
+    Ok(goal
+        .objective()
+        .criteria
+        .iter()
+        .enumerate()
+        .filter_map(|(index, criterion)| {
+            let (&call, _) = operations.iter().find(|(_, operation)| {
+                operation.is_some_and(|operation| verified(criterion, operation, verify))
+            })?;
+            Some(CriterionEvidence {
+                criterion: u8::try_from(index + 1).ok()?,
+                call: call.clone(),
+            })
+        })
+        .collect())
 }
 
 pub(crate) fn prepare(
@@ -149,6 +186,7 @@ fn verified_links(
     evidence: &[CriterionEvidence],
     verify: &Verifier,
 ) -> BTreeMap<CriterionEvidence, OperationId> {
+    let operations = unique_calls(state);
     evidence
         .iter()
         .filter_map(|link| {
@@ -156,26 +194,31 @@ fn verified_links(
                 .objective()
                 .criteria
                 .get(usize::from(link.criterion.checked_sub(1)?))?;
-            let mut matches = state
-                .operations()
-                .values()
-                .filter(|operation| operation.record.source_call.as_ref() == Some(&link.call));
-            let operation = matches.next()?;
-            if matches.next().is_some() {
-                return None;
-            }
-            let OperationInput::Tool(invocation) = &operation.record.input else {
-                return None;
-            };
-            if tools::is_goal_tool(&invocation.definition().id)
-                || !operation
-                    .outcome()
-                    .is_some_and(|outcome| outcome.is_success())
-                || !verify(criterion, operation)
-            {
-                return None;
-            }
-            Some((link.clone(), operation.record.id.clone()))
+            let operation = operations.get(&link.call).copied().flatten()?;
+            verified(criterion, operation, verify)
+                .then(|| (link.clone(), operation.record.id.clone()))
         })
         .collect()
+}
+
+fn unique_calls(state: &TurnState) -> BTreeMap<&ToolCallId, Option<&OperationState>> {
+    let mut calls = BTreeMap::new();
+    for operation in state.operations().values() {
+        if let Some(call) = &operation.record.source_call {
+            calls
+                .entry(call)
+                .and_modify(|value| *value = None)
+                .or_insert(Some(operation));
+        }
+    }
+    calls
+}
+
+fn verified(criterion: &str, operation: &OperationState, verify: &Verifier) -> bool {
+    matches!(&operation.record.input, OperationInput::Tool(invocation)
+        if !tools::is_goal_tool(&invocation.definition().id))
+        && operation
+            .outcome()
+            .is_some_and(|outcome| outcome.is_success())
+        && verify(criterion, operation)
 }

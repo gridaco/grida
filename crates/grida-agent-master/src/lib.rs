@@ -297,7 +297,8 @@ impl Master {
 
     /// Accept evidence through a product verifier of recorded tool outcomes.
     /// The verifier must check the criterion against the outcome independently
-    /// of the model's proposal and must not perform I/O or create effects.
+    /// of the model's proposal. It can be called when preparing an evidence
+    /// hint and again at settlement, so it must be pure.
     pub fn with_goal_verifier(
         mut self,
         verifier: impl Fn(&str, &OperationState) -> bool + Send + Sync + 'static,
@@ -867,6 +868,27 @@ impl Master {
                     fingerprint: Some(Fingerprint::of(&self.config.instructions)?),
                 },
             });
+        }
+        if let Some(verifier) = self.goal_verifier.as_deref() {
+            let evidence = goals::settlement::evidence_hints(&view.state, verifier)?;
+            if !evidence.is_empty() {
+                let data = serde_json::to_string(&evidence).map_err(|_| {
+                    Error::new(ErrorKind::InvalidState, "goal_evidence_encoding_failed")
+                })?;
+                messages.push(Message {
+                    id: MessageId::new("grida-goal-evidence")?,
+                    role: Role::System,
+                    phase: None,
+                    content: vec![Content::Text(format!(
+                        "Use these retained call IDs for the indicated goal criteria in goal_report: {data}"
+                    ))],
+                    provenance: Provenance {
+                        source: "goal-evidence".into(),
+                        kind: ProvenanceKind::Transformed,
+                        fingerprint: Some(Fingerprint::of(&evidence)?),
+                    },
+                });
+            }
         }
         messages.extend(self.history.iter().cloned());
         messages.extend(history::project(&view.state).into_iter().map(|record| {

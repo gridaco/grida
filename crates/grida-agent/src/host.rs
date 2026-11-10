@@ -1454,6 +1454,12 @@ impl Host {
         if let Some(effort) = prepared.effort {
             master = master.with_effort(effort)?;
         }
+        if prepared.goal.is_some()
+            && let Some(permissions) = &permission_scope
+            && let Some(verifier) = permissions.goal_read_verifier()
+        {
+            master = master.with_goal_verifier(verifier);
+        }
         if let Some(checks) = prepared.completion_checks {
             let (inventory, grants) = match completion {
                 Some(completion) => (completion.inventory()?, completion.grants()),

@@ -1325,6 +1325,12 @@ Today:
   require trusted launch selection and an exact turn-bound grant. The built-in
   text check uses only the bounded recorded answer. An optional command in the
   [launch profile](crates/grida-agent/src/launch_permissions.rs) runs in Act under
+- The optional [Goal file verifier](crates/grida-agent/src/goal_verification.rs)
+  matches one criterion from the trusted launch profile to a complete native
+  read under the exact recorded turn grant. The [Master](crates/grida-agent-master/src/goals/settlement.rs)
+  gives the model a bounded reference to the verified operation and independently
+  checks that same evidence at settlement. [Built fixtures](crates/grida-agent/tests/process/goals/verification.rs)
+  cover mismatched criteria, paths and bytes, and a retained observation after restart.
   the existing read-only primary scope and no-network [command supervisor](crates/grida-agent/src/command.rs).
   It receives literal arguments and bounded event input without inherited
   credentials. [Native preparation](crates/agent-kit-sandbox/src/native.rs)

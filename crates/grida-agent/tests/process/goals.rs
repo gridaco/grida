@@ -7,6 +7,10 @@ use grida_agent::{ConfigurationPermission, ProviderOptions};
 use grida_agent_master::goals::{Allowance, Blocker, Objective, Status, Usage};
 use std::num::NonZeroU32;
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "goals/verification.rs"]
+mod verification;
+
 fn options(endpoint: &Endpoint) -> ProviderOptions {
     ProviderOptions {
         endpoint: endpoint.url.clone(),

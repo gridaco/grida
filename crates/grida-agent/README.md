@@ -521,6 +521,37 @@ continuation. Closing the host releases its timers while preserving their
 recorded due times and delivery state. A private client explicitly recovers the
 selected wake-up after restart. Inspecting or loading a chat leaves it idle.
 
+### Verify a goal's observed file bytes
+
+A trusted `--permission-profile` can select one file and its expected SHA-256
+digest. This example expects the exact UTF-8 bytes `approved` followed by a
+newline in `manifest.txt` under the existing `reference` directory ID.
+
+```json
+{
+  "goalReadVerification": {
+    "directory": "reference",
+    "relativePath": "manifest.txt",
+    "sha256": [
+      127, 133, 24, 247, 219, 94, 154, 85, 4, 159, 73, 196, 234, 109, 110, 143,
+      80, 150, 149, 35, 30, 96, 203, 214, 7, 188, 179, 108, 136, 167, 90, 20
+    ]
+  }
+}
+```
+
+Use this exact criterion for that example:
+
+```text
+Observe SHA-256 7f8518f7db5e9a55049f49c4ea6d6e8f509695231e60cbd607bcb36c88a75a14 for directory "reference", path "manifest.txt".
+```
+
+The Goal turn must read the file using `read_file` with the explicit directory
+ID and relative path, then cite its retained call in `goal_report`. The host
+checks the complete, recorded bytes independently at settlement. The existing
+permission rules apply to the read. The verification describes the bytes
+observed in that turn, and reopening the chat preserves that evidence.
+
 ## Use headless presentation
 
 Add `--headless-surface` to native `run` or unsupervised `serve --stdio`

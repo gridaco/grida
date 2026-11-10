@@ -4,12 +4,15 @@ use crate::command::{
     AuthorizedCommand, CommandAccess, CommandArguments, CommandLimits, CommandTool, ReviewedCommand,
 };
 use crate::file_tools::{FileAuthority, FileTools, read_request};
+use crate::goal_verification::ReadVerification;
 use crate::workspace::{DirectoryBinding, DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, Denial, GrantSelection,
 };
 use agent_kit_core::tools::{Inventory, Invocation, Tool};
-use agent_kit_core::turn::{OperationInput, ResponseContract, TurnBinding, WaitRecord};
+use agent_kit_core::turn::{
+    OperationInput, OperationState, ResponseContract, TurnBinding, WaitRecord,
+};
 use agent_kit_core::{
     BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint, GrantId,
     OperationId, PrincipalId, Result, SchemaId, ScopeId, SessionId, ToolId, TurnId, WaitId,
@@ -77,6 +80,7 @@ pub struct PermissionProfile {
     hooks_only: bool,
     completion_hook: Option<CompletionHook>,
     automatic_read_review: Option<ReadProfile>,
+    goal_read_verification: Option<ReadVerification>,
     revision: BindingId,
     identity: Fingerprint,
     context: String,
@@ -196,6 +200,7 @@ impl PermissionProfile {
             hooks_only: false,
             completion_hook: None,
             automatic_read_review: None,
+            goal_read_verification: None,
             revision,
             identity,
             context,
@@ -257,6 +262,26 @@ impl PermissionProfile {
 
     pub(crate) fn automatic_read_review(&self) -> Option<&ReadProfile> {
         self.automatic_read_review.as_ref()
+    }
+
+    pub(crate) fn with_goal_read_verification(
+        mut self,
+        verification: ReadVerification,
+    ) -> Result<Self> {
+        verification.validate()?;
+        if self
+            .directories
+            .get(&verification.directory)
+            .is_none_or(|rules| rules.read == AccessRule::Deny)
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "goal_read_verification_requires_read_authority",
+            ));
+        }
+        self.identity = Fingerprint::of(&(self.identity, "goal-read-verification", &verification))?;
+        self.goal_read_verification = Some(verification);
+        Ok(self)
     }
 
     /// Resolve the pinned primary for launch context without granting access.
@@ -533,6 +558,17 @@ impl TurnPermissions {
 
     pub fn handles(&self, selection: &GrantSelection) -> bool {
         selection == &self.files || (!self.profile.hooks_only && selection == &self.commands)
+    }
+
+    pub(crate) fn goal_read_verifier(
+        &self,
+    ) -> Option<impl Fn(&str, &OperationState) -> bool + use<>> {
+        Some(
+            self.profile
+                .goal_read_verification
+                .clone()?
+                .verifier(self.files.clone()),
+        )
     }
 
     pub(crate) fn insert_file_tools(
