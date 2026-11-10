@@ -60,7 +60,7 @@ fn command() -> Command {
                         .long("cwd")
                         .value_name("DIRECTORY")
                         .value_parser(value_parser!(PathBuf))
-                        .required_unless_present_any(["permission-profile", "input-png"])
+                        .required_unless_present_any(["permission-profile", "input-png", "input-file"])
                         .help("Working directory. Defaults to the trusted profile's primary or a private attachment context."),
                 )
                 .arg(
@@ -69,6 +69,14 @@ fn command() -> Command {
                         .value_name("FILE")
                         .value_parser(value_parser!(PathBuf))
                         .help("Attach one explicitly selected PNG to the prompt"),
+                )
+                .arg(
+                    Arg::new("input-file")
+                        .long("input-file")
+                        .value_name("FILE")
+                        .value_parser(value_parser!(PathBuf))
+                        .conflicts_with("input-png")
+                        .help("Attach one explicitly selected regular file for bounded local inspection"),
                 )
                 .arg(Arg::new("session").long("session").value_name("SESSION_ID"))
                 .arg(Arg::new("effort").long("effort").value_parser(["standard", "ultra"])
@@ -627,7 +635,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         }
         return process::serve(host, listener, process::shutdown_signal()).await;
     }
-    process::run(
+    process::run_with_file(
         &host,
         RunOptions {
             cwd: match run_cwd {
@@ -654,6 +662,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                     .unwrap_or(DEFAULT_RUN_TIMEOUT_MS),
             ),
         },
+        args.get_one::<PathBuf>("input-file").cloned(),
         process::shutdown_signal(),
     )
     .await

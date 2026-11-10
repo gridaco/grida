@@ -534,6 +534,15 @@ with **GPT-5.6 Terra** and a saved OpenRouter key. Select it at launch with
 The Gateway, ChatGPT subscription, Vercel, and custom endpoint profiles offer
 text input. The provider receives the retained PNG when the conversation uses it.
 
+## Inspect a local file headlessly
+
+On macOS and Linux, `grida-agent run --input-file FILE` accepts one selected
+regular file up to 256 KiB, including without a project. The task can verify
+its size and digest and request a short text excerpt. Binary files provide
+integrity metadata. The original and private working copy stay with the chat.
+Reopening preserves the same file or identifies which copy is unavailable.
+[Run with a selected file](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-locally)
+
 ## Edit selected SVG text
 
 Open an SVG in the native Desktop workspace and select one plain text element.

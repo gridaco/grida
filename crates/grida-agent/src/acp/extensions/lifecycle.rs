@@ -414,5 +414,12 @@ fn prompt_block(part: PromptPart) -> ContentBlock {
         PromptPart::RetainedImage { .. } | PromptPart::Image { .. } => {
             crate::host::RETAINED_IMAGE_LABEL.trim().into()
         }
+        PromptPart::RetainedFile { work } => {
+            grida_agent_master::retained_file::display_name(work.asset().name())
+                .as_deref()
+                .map_or("Attached file.", str::trim)
+                .into()
+        }
+        PromptPart::File { .. } => "Attached file.".into(),
     }
 }

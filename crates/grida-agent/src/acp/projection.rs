@@ -91,6 +91,7 @@ impl Projection {
                 Content::Media(media) if crate::host::is_retained_image(&media) => {
                     Some(crate::host::RETAINED_IMAGE_LABEL.to_owned())
                 }
+                Content::Media(media) => grida_agent_master::retained_file::display(&media),
                 _ => None,
             })
             .collect();

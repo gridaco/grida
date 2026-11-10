@@ -10,6 +10,7 @@ pub mod history;
 pub mod hooks;
 pub mod presentation;
 pub mod questions;
+pub mod retained_file;
 mod retry;
 pub mod side_context;
 pub mod subagents;
@@ -29,7 +30,7 @@ use agent_kit_core::turn::{
     TurnOutcome, TurnState,
 };
 use agent_kit_core::{
-    Envelope, Error, ErrorKind, Fingerprint, MessageId, OperationId, Result, SchemaId,
+    BoxFuture, Envelope, Error, ErrorKind, Fingerprint, MessageId, OperationId, Result, SchemaId,
 };
 use agent_kit_runtime::{
     CompletionDraft, FinishOutcome, InvokeOutcome, OperationKey, StepPlan, SuspendOutcome,
@@ -153,6 +154,7 @@ pub struct Master {
     authority: MasterAuthority,
     history: Vec<Message>,
     input_limit: Option<NonZeroU64>,
+    retained_file_check: Option<Box<dyn Fn() -> BoxFuture<'static, Result<()>> + Send + Sync>>,
     effort: Option<effort::Policy>,
     goal_verifier: Option<Box<goals::settlement::Verifier>>,
     goal_child_work: Option<Arc<dyn goals::ChildWorkObserver>>,
@@ -239,6 +241,7 @@ impl Master {
             authority,
             history: Vec::new(),
             input_limit: None,
+            retained_file_check: None,
             effort: None,
             goal_verifier: None,
             goal_child_work: None,
@@ -256,6 +259,16 @@ impl Master {
     /// Apply the accepted task's hard limit to the complete provider input.
     pub fn with_input_limit(mut self, limit: Option<NonZeroU64>) -> Self {
         self.input_limit = limit;
+        self
+    }
+
+    /// Check the captured file dependency before generation, including when
+    /// a prepared inference request is restored after suspension.
+    pub fn with_retained_file_check(
+        mut self,
+        check: impl Fn() -> BoxFuture<'static, Result<()>> + Send + Sync + 'static,
+    ) -> Self {
+        self.retained_file_check = Some(Box::new(check));
         self
     }
 
@@ -429,8 +442,25 @@ impl Master {
             {
                 continue;
             }
+            let checked = if let Some(check) = &self.retained_file_check
+                && delay.is_ok()
+            {
+                let result = check().await;
+                if !turn.view().state.controls().admits_work() {
+                    continue;
+                }
+                result
+            } else {
+                Ok(())
+            };
+            if checked.is_err() {
+                // A restored step can still own prepared tool work even when
+                // its inference has already completed. Preserve the answer
+                // and close unstarted work before settling the missing input.
+                Self::retire_outstanding_work(&turn).await?;
+            }
             let input_view = turn.view();
-            let prepared = delay.and_then(|_| {
+            let prepared = delay.and(checked).and_then(|_| {
                 let request = match &continuation.request {
                     Some(request) => request.clone(),
                     None => self.prepare(&input_view)?,
@@ -443,7 +473,11 @@ impl Master {
             let request = match prepared {
                 Ok(request) => request,
                 Err(error) => {
-                    let text = if retry.is_some() {
+                    let text = if error.code == "retained_file_original_unavailable" {
+                        "The original attachment is unavailable. Attach the file again in a new message."
+                    } else if error.code == "retained_file_working_copy_unavailable" {
+                        "The recorded attachment working copy is unavailable. Attach the file again in a new message."
+                    } else if retry.is_some() {
                         "The rate-limited request could not retry with its captured configuration."
                     } else {
                         "The model input could not be prepared with the selected configuration."
@@ -906,6 +940,13 @@ impl Master {
             let HistoryRecord::Message(message) = record;
             message
         }));
+        for content in messages.iter_mut().flat_map(|message| &mut message.content) {
+            if let Content::Media(media) = content
+                && let Some(display) = retained_file::display(media)
+            {
+                *content = Content::Text(display);
+            }
+        }
         let request = self.provider.prepare(InferenceRequest {
             model: self.config.model.clone(),
             messages,
@@ -919,7 +960,7 @@ impl Master {
         }
     }
 
-    async fn cancelled_outcome(&self, turn: &Turn, steps: u32) -> Result<TurnOutcome> {
+    async fn retire_outstanding_work(turn: &Turn) -> Result<()> {
         let view = turn.view();
         let operations = turn.operations();
         for (id, operation) in view.state.operations() {
@@ -936,6 +977,11 @@ impl Master {
                 operations.withdraw_input(id.clone()).await?;
             }
         }
+        Ok(())
+    }
+
+    async fn cancelled_outcome(&self, turn: &Turn, steps: u32) -> Result<TurnOutcome> {
+        Self::retire_outstanding_work(turn).await?;
         self.account(
             turn,
             OutcomeStatus::Cancelled,

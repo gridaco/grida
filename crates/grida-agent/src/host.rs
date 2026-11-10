@@ -14,6 +14,9 @@ mod lifecycle;
 pub(crate) mod live;
 mod permissions;
 mod questions;
+mod retained_file;
+mod retained_inputs;
+mod selected_file;
 pub(crate) mod side_chats;
 mod skills;
 mod sponsorship;
@@ -31,6 +34,7 @@ pub(crate) use images::is_retained_image;
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use permissions::{Approvals, PendingApproval};
 pub use questions::{PendingQuestion, Questions};
+pub use retained_file::FileUpload;
 pub use subagents::{
     SubagentAssignment, SubagentInspection, SubagentMessage, SubagentMessageReceipt, SubagentWork,
 };
@@ -142,7 +146,8 @@ struct Execution {
     authorization: Arc<ExecutionAuthority>,
     questions: Arc<questions::QuestionAccess>,
     configuration_tools: Arc<ConfigurationAccess>,
-    images: Option<Arc<images::Images>>,
+    images: Option<Arc<retained_inputs::RetainedInputs>>,
+    retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
 }
 
 #[derive(Default)]
@@ -235,6 +240,13 @@ pub enum PromptPart {
     },
     RetainedImage {
         asset: crate::scratch::AssetRef,
+    },
+    #[serde(skip)]
+    File {
+        file: FileUpload,
+    },
+    RetainedFile {
+        work: crate::scratch::WorkingCopyReceipt,
     },
 }
 
@@ -420,6 +432,7 @@ struct PreparedInput {
     subagent: bool,
     operating_regime: OperatingRegime,
     messages: Vec<Message>,
+    retained_file: Option<crate::scratch::WorkingCopyReceipt>,
     limit: Option<NonZeroU64>,
     questions: bool,
     allow_wakeups: bool,
@@ -731,11 +744,11 @@ impl Host {
         let images = self
             .execution
             .as_ref()
-            .and_then(|execution| execution.images.clone());
+            .and_then(|execution| execution.retained_inputs.clone());
         tokio::task::spawn_blocking(move || {
             let images = match images {
                 Some(images) => images,
-                None => Arc::new(images::Images::open(&state_dir)?),
+                None => Arc::new(retained_inputs::RetainedInputs::open(&state_dir)?),
             };
             images.read_working(session, &proof)
         })
@@ -1289,6 +1302,16 @@ impl Host {
             })
             .transpose()?
             .flatten();
+        let file = prepared
+            .retained_file
+            .take()
+            .map(|work| {
+                let storage = execution.retained_inputs.clone().ok_or_else(|| {
+                    problem(ErrorKind::Unsupported, "file_attachment_unavailable")
+                })?;
+                retained_file::TurnFile::bind(storage, claim.lease.binding(), work)
+            })
+            .transpose()?;
         let wakeups = prepared
             .allow_wakeups
             .then(|| wakeups::WakeupAccess::bind(self.clone(), claim.lease.binding()))
@@ -1328,7 +1351,10 @@ impl Host {
         let tool_authority = permissions::ToolAuthority::bind(
             execution.authorization.clone(),
             permission_scope.clone(),
-            image.clone(),
+            permissions::AttachmentTools {
+                image: image.clone(),
+                file: file.clone(),
+            },
             wakeups.clone(),
             completion.clone(),
             host_tools.clone(),
@@ -1387,6 +1413,9 @@ impl Host {
         let operations = opened.turn.operations();
         if let Some(image) = image {
             image.insert(&mut inventory, &mut authority.tools)?;
+        }
+        if let Some(file) = &file {
+            file.insert(&mut inventory, &mut authority.tools)?;
         }
         if prepared.questions {
             execution
@@ -1457,6 +1486,9 @@ impl Host {
         )?
         .with_history(prior)
         .with_input_limit(prepared.limit);
+        if let Some(file) = file {
+            master = master.with_retained_file_check(move || file.check());
+        }
         if !cancellation_only
             && prepared.goal.is_none()
             && permission_scope.is_some()
@@ -1640,12 +1672,19 @@ impl Host {
         };
         let parts = if parts
             .iter()
-            .any(|part| matches!(part, PromptPart::Image { .. }))
+            .any(|part| matches!(part, PromptPart::Image { .. } | PromptPart::File { .. }))
         {
-            let images = execution
-                .images
+            if parts
+                .iter()
+                .any(|part| matches!(part, PromptPart::Image { .. }))
+                && !self.accepts_images()
+            {
+                return Err(problem(ErrorKind::Unsupported, "image_input_unavailable"));
+            }
+            let storage = execution
+                .retained_inputs
                 .clone()
-                .ok_or_else(|| problem(ErrorKind::Unsupported, "image_input_unavailable"))?;
+                .ok_or_else(|| problem(ErrorKind::Unsupported, "file_attachment_unavailable"))?;
             let cwd = session_configuration(session)?.cwd;
             let session = session.session.clone();
             let input = id.clone();
@@ -1654,7 +1693,10 @@ impl Host {
                     .into_iter()
                     .map(|part| match part {
                         PromptPart::Image { image } => Ok(PromptPart::RetainedImage {
-                            asset: images.retain(&session, &cwd, &input, image)?,
+                            asset: storage.retain_image(&session, &cwd, &input, image)?,
+                        }),
+                        PromptPart::File { file } => Ok(PromptPart::RetainedFile {
+                            work: storage.retain_file(&session, &cwd, &input, file)?,
                         }),
                         other => Ok(other),
                     })
@@ -1728,6 +1770,7 @@ impl Host {
         let mut host_tools = Vec::new();
         let mut subagent = false;
         let mut effort = None;
+        let mut retained_file = None;
         let (
             messages,
             operating_regime,
@@ -1760,6 +1803,20 @@ impl Host {
             }
             2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
+                if !cancellation_only {
+                    retained_file = stored.parts.iter().find_map(|part| match part {
+                        PromptPart::RetainedFile { work } => Some(work.clone()),
+                        _ => None,
+                    });
+                    if retained_file.is_some()
+                        && (subagent_profile.is_some() || self.side_context.is_some())
+                    {
+                        return Err(problem(
+                            ErrorKind::InvalidState,
+                            "retained_file_scope_mismatch",
+                        ));
+                    }
+                }
                 effort = stored.effort.clone();
                 if !cancellation_only && effort.is_some() && !self.sponsorship_available() {
                     return Err(problem(ErrorKind::Unsupported, "delegation_unavailable"));
@@ -1948,6 +2005,7 @@ impl Host {
             subagent,
             operating_regime,
             messages,
+            retained_file,
             limit,
             questions,
             allow_wakeups,
@@ -2415,12 +2473,13 @@ impl Execution {
         } else {
             None
         };
-        let images = if let Some(profile) =
-            image_profile.filter(|_| cfg!(any(target_os = "macos", target_os = "linux")))
-        {
+        let retained_inputs = cfg!(any(target_os = "macos", target_os = "linux"))
+            .then(|| retained_inputs::RetainedInputs::open(state_dir).map(Arc::new))
+            .transpose()?;
+        let images = if let Some(profile) = image_profile.filter(|_| retained_inputs.is_some()) {
             capabilities.revision = BindingId::new(profile)?;
             capabilities.input_modalities.insert(Modality::Image);
-            Some(Arc::new(images::Images::open(state_dir)?))
+            retained_inputs.clone()
         } else {
             None
         };
@@ -2500,6 +2559,7 @@ impl Execution {
             Credential::Http(transport),
         )?;
         execution.images = images;
+        execution.retained_inputs = retained_inputs;
         Ok(execution)
     }
 
@@ -2625,6 +2685,7 @@ impl Execution {
             questions,
             configuration_tools,
             images: None,
+            retained_inputs: None,
         })
     }
 }
@@ -2864,13 +2925,21 @@ fn decode_input<T: serde::de::DeserializeOwned>(input: &Submission) -> Result<T>
 
 pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
     let mut uploads = 0;
+    let mut files = 0;
     for part in parts {
         match part {
             PromptPart::Image { .. } => uploads += 1,
+            PromptPart::File { .. } => files += 1,
             PromptPart::RetainedImage { .. } => {
                 return Err(problem(
                     ErrorKind::InvalidInput,
                     "retained_image_not_supplied",
+                ));
+            }
+            PromptPart::RetainedFile { .. } => {
+                return Err(problem(
+                    ErrorKind::InvalidInput,
+                    "retained_file_not_supplied",
                 ));
             }
             _ => {}
@@ -2878,6 +2947,12 @@ pub(crate) fn validate_prompt_parts(parts: &[PromptPart]) -> Result<()> {
     }
     if uploads > 1 {
         return Err(problem(ErrorKind::LimitExceeded, "image_count_limit"));
+    }
+    if files > 1 || files > 0 && uploads > 0 {
+        return Err(problem(
+            ErrorKind::LimitExceeded,
+            "file_attachment_count_limit",
+        ));
     }
     validate_prompt_record(parts)
 }
@@ -2888,7 +2963,7 @@ fn validate_prompt_record(parts: &[PromptPart]) -> Result<()> {
     }
     let metadata: Vec<_> = parts
         .iter()
-        .filter(|part| !matches!(part, PromptPart::Image { .. }))
+        .filter(|part| !matches!(part, PromptPart::Image { .. } | PromptPart::File { .. }))
         .collect();
     let bytes = serde_json::to_vec(&metadata)
         .map_err(|_| problem(ErrorKind::InvalidInput, "prompt_encoding_failed"))?;
@@ -2920,6 +2995,15 @@ fn prompt_input(id: &ChangeId, parts: &[PromptPart]) -> Result<Vec<Message>> {
                     ));
                 }
                 PromptPart::RetainedImage { asset } => Content::Media(images::media(asset)?),
+                PromptPart::File { .. } => {
+                    return Err(problem(
+                        ErrorKind::InvalidInput,
+                        "file_input_requires_acceptance",
+                    ));
+                }
+                PromptPart::RetainedFile { work } => {
+                    Content::Media(retained_file::media(work.asset())?)
+                }
             })
         })
         .collect::<Result<Vec<_>>>()?;

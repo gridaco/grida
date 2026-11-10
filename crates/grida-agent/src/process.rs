@@ -5,7 +5,7 @@ pub mod external;
 
 use crate::acp::{self, ListenOptions};
 use crate::host::{
-    AcceptedRun, Host, ImageUpload, PromptPart, PromptRequest, RunResult, change_id,
+    AcceptedRun, FileUpload, Host, ImageUpload, PromptPart, PromptRequest, RunResult, change_id,
     validate_prompt_parts,
 };
 use agent_kit_core::messages::OutcomeStatus;
@@ -76,11 +76,22 @@ pub async fn run(
     options: RunOptions,
     signal: impl Future<Output = Result<()>>,
 ) -> Result<u8> {
+    run_with_file(host, options, None, signal).await
+}
+
+/// Run a task with one explicitly selected local file, independent of PNG
+/// provider input support.
+pub async fn run_with_file(
+    host: &Host,
+    options: RunOptions,
+    input_file: Option<PathBuf>,
+    signal: impl Future<Output = Result<()>>,
+) -> Result<u8> {
     let result = if options.timeout.is_zero() || options.timeout > MAX_RUN_TIMEOUT {
         Err(problem(ErrorKind::InvalidInput, "invalid_run_deadline"))
     } else {
         match host.clone().with_headless_guidance(&options.cwd) {
-            Ok(scoped) => run_once(&scoped, options, signal).await,
+            Ok(scoped) => run_once(&scoped, options, input_file, signal).await,
             Err(error) => Err(error),
         }
     };
@@ -144,12 +155,13 @@ async fn serve_stdio(
 async fn run_once(
     host: &Host,
     options: RunOptions,
+    input_file: Option<PathBuf>,
     signal: impl Future<Output = Result<()>>,
 ) -> Result<u8> {
     let deadline = tokio::time::Instant::now() + options.timeout;
     tokio::pin!(signal);
     let mut accepted = tokio::select! {
-        result = tokio::time::timeout_at(deadline, admit_run(host, options)) => result
+        result = tokio::time::timeout_at(deadline, admit_run(host, options, input_file)) => result
             .map_err(|_| problem(ErrorKind::Unavailable, "run_deadline_reached"))??,
         result = &mut signal => {
             result?;
@@ -227,7 +239,11 @@ fn settled_status(status: OutcomeStatus) -> (&'static str, u8) {
     }
 }
 
-async fn admit_run(host: &Host, options: RunOptions) -> Result<AcceptedRun> {
+async fn admit_run(
+    host: &Host,
+    options: RunOptions,
+    input_file: Option<PathBuf>,
+) -> Result<AcceptedRun> {
     let prompt = match options.prompt {
         Some(prompt) => prompt,
         None => read_prompt().await?,
@@ -236,6 +252,18 @@ async fn admit_run(host: &Host, options: RunOptions) -> Result<AcceptedRun> {
         return Err(problem(ErrorKind::InvalidInput, "empty_prompt"));
     }
     let mut parts = vec![PromptPart::Text { text: prompt }];
+    if let Some(path) = input_file {
+        if options.input_png.is_some() {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "file_attachment_count_limit",
+            ));
+        }
+        let file = tokio::task::spawn_blocking(move || FileUpload::read_selected_file(&path))
+            .await
+            .map_err(|_| problem(ErrorKind::Unavailable, "selected_file_unavailable"))??;
+        parts.push(PromptPart::File { file });
+    }
     if let Some(path) = options.input_png {
         if !host.accepts_images() {
             return Err(problem(ErrorKind::Unsupported, "image_input_unavailable"));

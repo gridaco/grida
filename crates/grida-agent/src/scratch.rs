@@ -495,7 +495,7 @@ mod native {
         }
 
         pub(super) fn read_working(&self, proof: &WorkingCopyProof) -> Result<Vec<u8>> {
-            if proof.size == 0 || proof.size as u64 > self.sources.limits.max_asset_bytes {
+            if proof.size as u64 > self.sources.limits.max_asset_bytes {
                 return Err(limit());
             }
             let key = self

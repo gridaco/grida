@@ -41,6 +41,15 @@ provider and session ID. Use the absolute path to the state directory's
 `attachment-context` as the ACP working directory, then read its settled
 turn summary and any listed artifacts.
 
+Use `run --input-file FILE` on macOS or Linux to inspect one selected regular
+file up to 256 KiB. With no project selected, the run uses the same private
+attachment context. The host retains the exact original and creates a separate
+working copy before accepting the turn. The provider sees the sanitized file
+name. The turn's `inspect_retained_file` tool returns verified size and SHA-256
+and can request up to 2 KiB of UTF-8 text. Binary inspection returns integrity
+metadata. An unavailable original or working copy stops dependent work after
+reopening and the turn account identifies which input is missing.
+
 Select a provider protocol, base URL, and model. HTTPS is accepted for remote
 providers. HTTP is limited to numeric loopback addresses or `localhost`,
 which resolves to loopback without DNS.

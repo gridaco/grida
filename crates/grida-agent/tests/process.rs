@@ -62,6 +62,9 @@ mod questions;
 #[path = "process/responses.rs"]
 mod responses;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/retained_files.rs"]
+mod retained_files;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/side_chats.rs"]
 mod side_chats;
 #[cfg(unix)]

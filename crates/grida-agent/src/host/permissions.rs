@@ -30,25 +30,31 @@ pub struct Approvals {
 pub(super) struct ToolAuthority {
     base: Arc<ExecutionAuthority>,
     permissions: Option<Arc<TurnPermissions>>,
-    image: Option<Arc<image_tools::TurnImage>>,
+    attachments: AttachmentTools,
     wakeups: Option<Arc<wakeups::WakeupAccess>>,
     completion: Option<Arc<completion_checks::CompletionAccess>>,
     host_tools: Vec<Arc<host_tools::TurnTools>>,
     delegation: Option<Arc<sponsorship::DelegationAccess>>,
 }
 
+pub(super) struct AttachmentTools {
+    pub(super) image: Option<Arc<image_tools::TurnImage>>,
+    pub(super) file: Option<Arc<retained_file::TurnFile>>,
+}
+
 impl ToolAuthority {
     pub(super) fn bind(
         base: Arc<ExecutionAuthority>,
         permissions: Option<Arc<TurnPermissions>>,
-        image: Option<Arc<image_tools::TurnImage>>,
+        attachments: AttachmentTools,
         wakeups: Option<Arc<wakeups::WakeupAccess>>,
         completion: Option<Arc<completion_checks::CompletionAccess>>,
         host_tools: Vec<Arc<host_tools::TurnTools>>,
         delegation: Option<Arc<sponsorship::DelegationAccess>>,
     ) -> Option<Arc<Self>> {
         if permissions.is_none()
-            && image.is_none()
+            && attachments.image.is_none()
+            && attachments.file.is_none()
             && wakeups.is_none()
             && completion.is_none()
             && host_tools.is_empty()
@@ -59,7 +65,7 @@ impl ToolAuthority {
         Some(Arc::new(Self {
             base,
             permissions,
-            image,
+            attachments,
             wakeups,
             completion,
             host_tools,
@@ -92,11 +98,20 @@ impl AuthorityValidator for ToolAuthority {
             return Box::pin(async { Ok(()) });
         }
         if let Some(image) = self
+            .attachments
             .image
             .as_ref()
             .filter(|image| image.handles(&request.selection))
         {
             return image.validate(request);
+        }
+        if self
+            .attachments
+            .file
+            .as_ref()
+            .is_some_and(|file| file.handles(&request.selection))
+        {
+            return Box::pin(async { Ok(()) });
         }
         if let Some(permissions) = self
             .permissions
@@ -144,11 +159,20 @@ impl ToolGate for ToolAuthority {
             return wakeups.decide(admission, context);
         }
         if let Some(image) = self
+            .attachments
             .image
             .as_ref()
             .filter(|image| image.handles(&admission.grants))
         {
             return image.decide(admission, context);
+        }
+        if let Some(file) = self
+            .attachments
+            .file
+            .as_ref()
+            .filter(|file| file.handles(&admission.grants))
+        {
+            return file.decide(admission, context);
         }
         if let Some(permissions) = self
             .permissions

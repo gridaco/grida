@@ -1,6 +1,7 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — exact session image authority and scratch-only edits.
 
-use super::images::{Images, MAX_DECODED_BYTES, MAX_IMAGE_BYTES, MAX_PIXELS, asset_ref, decoder};
+use super::images::{MAX_DECODED_BYTES, MAX_IMAGE_BYTES, MAX_PIXELS, asset_ref, decoder};
+use super::retained_inputs::RetainedInputs;
 use super::{AdmissionContext, ToolAdmission, ToolDecision, ToolGate, problem};
 use crate::scratch::{AssetRef, WorkingCopyProof};
 use agent_kit_core::authority::{
@@ -183,7 +184,7 @@ fn deserialize_digest<'de, D: serde::Deserializer<'de>>(
 }
 
 pub(super) struct TurnImage {
-    images: Arc<Images>,
+    images: Arc<RetainedInputs>,
     turn: TurnBinding,
     source: AssetRef,
     grants: GrantSelection,
@@ -192,7 +193,7 @@ pub(super) struct TurnImage {
 
 impl TurnImage {
     pub(super) fn bind(
-        images: Arc<Images>,
+        images: Arc<RetainedInputs>,
         turn: &TurnBinding,
         previous: &[Message],
         current: &[Message],

@@ -156,14 +156,16 @@ impl Host {
             // Named children only accept text. Unexpected retained storage
             // needs its own ownership proof before the family can retire.
             for child in children {
-                if images::Images::retirement_identity(&state_dir, &child)?.is_some() {
+                if retained_inputs::RetainedInputs::retirement_identity(&state_dir, &child)?
+                    .is_some()
+                {
                     return Err(problem(
                         ErrorKind::Conflict,
                         "session_deletion_has_retained_inputs",
                     ));
                 }
             }
-            images::Images::retirement_identity(&state_dir, &owner)
+            retained_inputs::RetainedInputs::retirement_identity(&state_dir, &owner)
         })
         .await
         .map_err(|_| problem(ErrorKind::Unavailable, "attachment_storage_unavailable"))?
@@ -215,9 +217,11 @@ impl Host {
             .clone()
             .ok_or_else(|| problem(ErrorKind::Unavailable, "attachment_storage_unavailable"))?;
         let owner = session.clone();
-        tokio::task::spawn_blocking(move || images::Images::retire(&state_dir, &owner, identity))
-            .await
-            .map_err(|_| problem(ErrorKind::Uncertain, "session_deletion_unverified"))??;
+        tokio::task::spawn_blocking(move || {
+            retained_inputs::RetainedInputs::retire(&state_dir, &owner, identity)
+        })
+        .await
+        .map_err(|_| problem(ErrorKind::Uncertain, "session_deletion_unverified"))??;
         self.store
             .finish_retirement_cleanup(session, identity)
             .await

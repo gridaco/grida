@@ -542,7 +542,7 @@ pub(super) fn check_input(input: &Submission, parts: &[PromptPart]) -> Result<()
         1 => {
             if parts
                 .iter()
-                .any(|part| matches!(part, PromptPart::Image { .. }))
+                .any(|part| matches!(part, PromptPart::Image { .. } | PromptPart::File { .. }))
             {
                 return Err(problem(ErrorKind::Conflict, "submission_input_changed"));
             }

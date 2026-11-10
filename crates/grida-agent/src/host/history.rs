@@ -11,6 +11,7 @@ use grida_agent_master::conversation_seed::{
     SeedOmissions, is_editable_user,
 };
 use grida_agent_master::history::project;
+use std::borrow::Cow;
 
 const HISTORY_PAGE: usize = 128;
 const HISTORY_PREVIEW_BYTES: usize = 256;
@@ -530,8 +531,11 @@ fn history_message(
         return None;
     }
     let mut text = message.content.iter().filter_map(|part| match part {
-        Content::Text(value) if !value.is_empty() => Some(value.as_str()),
-        Content::Media(media) if is_retained_image(media) => Some(RETAINED_IMAGE_LABEL),
+        Content::Text(value) if !value.is_empty() => Some(Cow::Borrowed(value.as_str())),
+        Content::Media(media) if is_retained_image(media) => {
+            Some(Cow::Borrowed(RETAINED_IMAGE_LABEL))
+        }
+        Content::Media(media) => grida_agent_master::retained_file::display(media).map(Cow::Owned),
         _ => None,
     });
     let first = text.next()?;
@@ -556,6 +560,7 @@ fn visible_message(message: &Message) -> bool {
         && message.content.iter().any(|part| {
             matches!(part, Content::Text(text) if !text.is_empty())
                 || matches!(part, Content::Media(media) if is_retained_image(media))
+                || matches!(part, Content::Media(media) if grida_agent_master::retained_file::display(media).is_some())
         })
 }
 

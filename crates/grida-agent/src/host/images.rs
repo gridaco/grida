@@ -1,36 +1,26 @@
-//! GRIDA-SEC-004 / GRIDA-SEC-014 — retain supplied bytes and resolve only exact originals.
+//! GRIDA-SEC-004 / GRIDA-SEC-014 — validate PNG intake and its retained identity.
 
 use super::{PromptPart, problem};
-use crate::scratch::{AssetRef, ScratchLimits, ScratchScope, WorkingCopyProof};
-use crate::workspace::ProtectedRoots;
+use crate::scratch::AssetRef;
 use agent_kit_core::messages::{MediaRef, Retention};
-use agent_kit_core::{ArtifactId, BindingId, ChangeId, ErrorKind, Fingerprint, Result, SessionId};
+use agent_kit_core::{BindingId, ErrorKind, Result, SessionId};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use sha2::{Digest, Sha256};
 use std::fmt;
 use std::io::{BufRead, Cursor, Seek};
-use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::path::Path;
 
 const MIME: &str = "image/png";
-const NAME: &str = "image.png";
+pub(super) const NAME: &str = "image.png";
 const LOCATOR: &str = "retained-input:";
-const STORAGE: &str = "retained-inputs";
 pub(super) const MAX_IMAGE_BYTES: usize = 256 * 1024;
 pub(super) const MAX_PIXELS: u64 = 4 * 1024 * 1024;
 pub(super) const MAX_DECODED_BYTES: usize = 8 * 1024 * 1024;
-const LIMITS: ScratchLimits = ScratchLimits {
-    max_assets: 16,
-    max_asset_bytes: MAX_IMAGE_BYTES as u64,
-    max_source_bytes: 2 * 1024 * 1024,
-    max_work_bytes: 2 * 1024 * 1024,
-};
-
 /// Transient supplied PNG. Only the retained asset identity is serializable.
 #[derive(Clone, PartialEq, Eq)]
 pub struct ImageUpload {
-    bytes: Vec<u8>,
-    digest: [u8; 32],
+    pub(super) bytes: Vec<u8>,
+    pub(super) digest: [u8; 32],
 }
 
 impl fmt::Debug for ImageUpload {
@@ -66,177 +56,17 @@ impl ImageUpload {
     }
 
     pub(crate) fn read_selected_png(path: &Path) -> Result<Self> {
-        #[cfg(any(target_os = "macos", target_os = "linux"))]
-        {
-            use rustix::fs::{Mode, OFlags, open};
-            use std::fs::File;
-            use std::io::Read;
-            use std::os::unix::fs::MetadataExt;
-
-            let unavailable = || problem(ErrorKind::Unavailable, "selected_image_unavailable");
-            let opened = open(
-                path,
-                OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
-                Mode::empty(),
-            )
-            .map_err(|_| unavailable())?;
-            let mut file = File::from(opened);
-            let before = file.metadata().map_err(|_| unavailable())?;
-            if !before.is_file() || before.nlink() != 1 {
-                return Err(unavailable());
-            }
-            if before.len() > MAX_IMAGE_BYTES as u64 {
-                return Err(image_too_large());
-            }
-            let mut bytes = Vec::new();
-            (&mut file)
-                .take(MAX_IMAGE_BYTES as u64 + 1)
-                .read_to_end(&mut bytes)
-                .map_err(|_| unavailable())?;
-            let after = file.metadata().map_err(|_| unavailable())?;
-            if after.len() != bytes.len() as u64
-                || before.len() != after.len()
-                || before.mtime() != after.mtime()
-                || before.mtime_nsec() != after.mtime_nsec()
-                || before.ctime() != after.ctime()
-                || before.ctime_nsec() != after.ctime_nsec()
-                || after.nlink() != 1
-            {
-                return Err(problem(ErrorKind::Conflict, "selected_image_changed"));
-            }
-            Self::from_png(bytes)
-        }
-        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-        {
-            let _ = path;
-            Err(problem(
-                ErrorKind::Unsupported,
-                "attachment_storage_unsupported",
-            ))
-        }
+        Self::from_png(super::selected_file::read_selected(
+            path,
+            MAX_IMAGE_BYTES,
+            "selected_image_unavailable",
+            "selected_image_changed",
+            "image_size_limit",
+        )?)
     }
 
     pub(super) fn matches(&self, asset: &AssetRef) -> bool {
         self.bytes.len() as u64 == asset.size() && &self.digest == asset.digest()
-    }
-}
-
-pub(super) struct Images {
-    base: PathBuf,
-    // ScratchScope has an exclusive per-session lock. Keep local intake and
-    // provider reads from racing each other for it.
-    access: Mutex<()>,
-}
-
-impl Images {
-    pub(super) fn retirement_identity(
-        state_dir: &Path,
-        session: &SessionId,
-    ) -> Result<Option<[u8; 32]>> {
-        crate::scratch::retirement_identity(state_dir, STORAGE, session)
-    }
-
-    pub(super) fn retire(state_dir: &Path, session: &SessionId, identity: [u8; 32]) -> Result<()> {
-        crate::scratch::retire(state_dir, STORAGE, session, identity)
-    }
-
-    pub(super) fn open(state_dir: &Path) -> Result<Self> {
-        #[cfg(any(target_os = "macos", target_os = "linux"))]
-        {
-            let state_dir = state_dir
-                .canonicalize()
-                .map_err(|_| storage_unavailable())?;
-            crate::scratch::check_private_directory(&state_dir)?;
-            Ok(Self {
-                base: state_dir.join(STORAGE),
-                access: Mutex::new(()),
-            })
-        }
-        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-        {
-            let _ = state_dir;
-            Err(problem(
-                ErrorKind::Unsupported,
-                "attachment_storage_unsupported",
-            ))
-        }
-    }
-
-    pub(super) fn retain(
-        &self,
-        session: &SessionId,
-        cwd: &Path,
-        input: &ChangeId,
-        upload: ImageUpload,
-    ) -> Result<AssetRef> {
-        let _access = self.access.lock().unwrap();
-        let protected = ProtectedRoots::new(vec![cwd.to_owned()])?;
-        protected.check(&self.base)?;
-        let mut directory = std::fs::DirBuilder::new();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::DirBuilderExt;
-            directory.mode(0o700);
-        }
-        match directory.create(&self.base) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
-            Err(_) => return Err(storage_unavailable()),
-        }
-        let mut scope = ScratchScope::open(&self.base, session.clone(), LIMITS, &protected)?;
-        let identity = Fingerprint::of(&(input, upload.digest))?;
-        let id = uuid::Uuid::from_bytes(
-            identity.bytes()[..16]
-                .try_into()
-                .expect("fingerprint prefix"),
-        );
-        scope.retain(
-            ArtifactId::new(format!("input/{id}"))?,
-            1,
-            NAME,
-            upload.bytes.as_slice(),
-        )
-    }
-
-    pub(super) fn resolve(&self, media: &MediaRef, maximum: usize) -> Result<Vec<u8>> {
-        let asset = asset_ref(media)?;
-        let _access = self.access.lock().unwrap();
-        let protected = ProtectedRoots::new(vec![])?;
-        ScratchScope::read_existing_retained(
-            &self.base,
-            LIMITS,
-            &protected,
-            &asset,
-            maximum.min(MAX_IMAGE_BYTES),
-        )
-        .map_err(|error| {
-            if error.kind == ErrorKind::LimitExceeded {
-                error
-            } else {
-                retained_unavailable()
-            }
-        })
-    }
-
-    pub(super) fn read_working(
-        &self,
-        owner: SessionId,
-        proof: &WorkingCopyProof,
-    ) -> Result<Vec<u8>> {
-        let _access = self.access.lock().unwrap();
-        let protected = ProtectedRoots::new(vec![])?;
-        ScratchScope::read_working(&self.base, owner, LIMITS, &protected, proof)
-    }
-
-    pub(super) fn with_scope<T>(
-        &self,
-        owner: &SessionId,
-        operate: impl FnOnce(&mut ScratchScope) -> Result<T>,
-    ) -> Result<T> {
-        let _access = self.access.lock().unwrap();
-        let protected = ProtectedRoots::new(vec![])?;
-        let mut scope = ScratchScope::open(&self.base, owner.clone(), LIMITS, &protected)?;
-        operate(&mut scope)
     }
 }
 
@@ -283,6 +113,9 @@ pub(super) fn same_prompt(left: &[PromptPart], right: &[PromptPart]) -> bool {
             .all(|(stored, supplied)| match (stored, supplied) {
                 (PromptPart::RetainedImage { asset }, PromptPart::Image { image }) => {
                     image.matches(asset)
+                }
+                (PromptPart::RetainedFile { work }, PromptPart::File { file }) => {
+                    file.matches(work.asset())
                 }
                 _ => stored == supplied,
             })
@@ -339,10 +172,6 @@ fn image_too_large() -> agent_kit_core::Error {
     problem(ErrorKind::LimitExceeded, "image_size_limit")
 }
 
-fn retained_unavailable() -> agent_kit_core::Error {
+pub(super) fn retained_unavailable() -> agent_kit_core::Error {
     problem(ErrorKind::Unavailable, "retained_image_unavailable")
-}
-
-fn storage_unavailable() -> agent_kit_core::Error {
-    problem(ErrorKind::Unavailable, "attachment_storage_unavailable")
 }

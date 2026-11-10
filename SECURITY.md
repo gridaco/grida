@@ -1535,6 +1535,15 @@ Today:
 - The trusted [embedded run](crates/grida-agent/src/process.rs) can supply one explicit local PNG argument. The [image host](crates/grida-agent/src/host/images.rs) opens a bounded regular file without following a final symlink, checks the opened version, and validates it before input acceptance. A run with no selected project uses a private empty context identity and grants no project access. The [built fixture](crates/grida-agent/tests/process/images.rs) reopens the exact crop and verifies the original file bytes and directory contents.
 - The Desktop PNG picker supplies bytes from a selected browser file. [Main](desktop/src/main/native-agent-chat.ts) checks the private child's advertised image capability, exact chat attachment, byte limit, and PNG signature. The bridge carries image bytes only. The [Desktop process fixture](desktop/src/main/native-agent-images.test.ts) exercises exact retry, queued-image preservation, and both native admission paths.
 - The native [image crop tool](crates/grida-agent/src/host/image_tools.rs) receives a turn-bound grant to the most recent retained PNG owned by the chat. [Tool authority](crates/grida-agent/src/host/permissions.rs) checks that grant independently from workspace permissions. The [scratch owner](crates/grida-agent/src/scratch.rs) verifies the original digest and working-copy receipt before bounded, atomic replacement. The crop result exposes the copy identity and digest. [Process tests](crates/grida-agent/tests/process/images.rs) verify restart retention, missing-copy refusal, chat isolation, and untouched project files.
+- The source-built [file intake](crates/grida-agent/src/host/selected_file.rs)
+  reads only the selected regular file through a pinned descriptor. The
+  [retained owner](crates/grida-agent/src/host/retained_inputs.rs) retains the
+  original and a separate byte-exact copy before acceptance. The
+  [inspection tool](crates/grida-agent/src/host/retained_file.rs) grants only
+  the accepted task a bounded read of that copy, without a filesystem path
+  argument or workspace authority. The provider receives display metadata and
+  may request a bounded text excerpt through the tool. [Process fixtures](crates/grida-agent/tests/process/retained_files.rs)
+  verify isolation, restart and refusal after loss of either copy.
 - The native [artifact read](crates/grida-agent/src/acp/extensions/summaries.rs) requires negotiated private stdio and an exact attached session. It returns a bounded PNG only when the settled turn's successful crop receipt matches the existing private scratch bytes. The read uses pinned descriptors, creates no files, and exposes no path, digest, or unrelated tool output. [Process tests](crates/grida-agent/tests/process/images.rs) cover reopen, a replaced or missing copy, and refusal across sessions and shared connections.
 - The Desktop [artifact IPC](desktop/src/main/native-chat-ipc.ts) admits only an artifact listed for the same attachment's latest observed finished turn. Main rechecks the frame, chat, and observation after the read. The [PNG response validator](desktop/src/main/native-agent-artifacts.ts) validates the bounded byte response against the selected descriptor and returns only bytes. The [Desktop fixture](desktop/src/main/native-agent-images.test.ts) verifies restart recovery and missing-file refusal through the built native child.
 - The [retained file exporter](desktop/src/main/retained-file-export.ts) publishes a new file exclusively from bounded retained bytes. A window-owned chooser supplies the destination to Main. The chat caller supplies only its attachment, observation and artifact identities, and the Tools caller supplies only its media item ID. Main rechecks the initiating scope before publication. Existing destination files and the retained result remain available after a failed copy.
@@ -3578,6 +3587,7 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [standalone file owner](desktop/src/main/native-document-files.ts),
   [standalone file owner tests](desktop/src/main/native-document-files.test.ts),
   [private retained inputs](crates/grida-agent/src/scratch.rs),
+  [native retained-input owner](crates/grida-agent/src/host/retained_inputs.rs),
   [native image input references](crates/grida-agent/src/host/images.rs),
   [native scratch image crop](crates/grida-agent/src/host/image_tools.rs),
   [workspace tests](crates/grida-agent/tests/workspace.rs),
