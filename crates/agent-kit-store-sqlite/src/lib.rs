@@ -2,6 +2,7 @@
 
 pub mod catalog;
 pub mod context;
+pub mod deletion;
 pub mod driver;
 pub mod history;
 
@@ -29,7 +30,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
-const SCHEMA_VERSION: i64 = 7;
+const SCHEMA_VERSION: i64 = 8;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -250,12 +251,15 @@ impl SqliteStore {
                     .execute_batch(catalog::ORGANIZATION_SCHEMA)
                     .map_err(database_error)?;
                 transaction
+                    .execute_batch(deletion::SCHEMA)
+                    .map_err(database_error)?;
+                transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(database_error)?;
                 transaction.commit().map_err(database_error)?;
             }
             SCHEMA_VERSION => {}
-            1..=6 => {
+            1..=7 => {
                 let transaction = connection.transaction().map_err(database_error)?;
                 if version == 1 {
                     transaction
@@ -282,8 +286,13 @@ impl SqliteStore {
                         .execute_batch(catalog::SCHEMA)
                         .map_err(database_error)?;
                 }
+                if version <= 6 {
+                    transaction
+                        .execute_batch(catalog::ORGANIZATION_SCHEMA)
+                        .map_err(database_error)?;
+                }
                 transaction
-                    .execute_batch(catalog::ORGANIZATION_SCHEMA)
+                    .execute_batch(deletion::SCHEMA)
                     .map_err(database_error)?;
                 transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
@@ -994,6 +1003,7 @@ fn insert_session(
     request: &CreateSession,
     catalog: Option<catalog::ScopeProjection>,
 ) -> Result<SessionCreated> {
+    deletion::require_unretired(transaction, &request.id)?;
     let inserted = transaction
         .execute(
             "INSERT INTO sessions(id,configuration,revision,paused,next_input) VALUES(?1,?2,0,0,0)
@@ -1589,6 +1599,15 @@ fn require_revision(session: &SessionRecord, revision: SessionRevision) -> Resul
         return Err(error(ErrorKind::Conflict, "stale_session_revision"));
     }
     Ok(())
+}
+
+fn has_live_session_owner(inner: &Inner, session: &SessionId) -> Result<bool> {
+    Ok(inner
+        .owners
+        .lock()
+        .map_err(|_| error(ErrorKind::Unavailable, "store_owners_poisoned"))?
+        .iter()
+        .any(|((owner_session, _), owner)| owner_session == session && owner.strong_count() > 0))
 }
 
 fn require_binding(state: &TurnState, binding: &TurnBinding) -> Result<()> {

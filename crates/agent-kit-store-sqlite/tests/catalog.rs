@@ -50,7 +50,9 @@ async fn catalog_migration_and_paging_keep_scope_and_creation_order() {
     drop(legacy);
     let legacy = rusqlite::Connection::open(&filename).unwrap();
     legacy
-        .execute_batch("DROP TABLE session_catalog; PRAGMA user_version=5;")
+        .execute_batch(
+            "DROP TABLE session_retirements; DROP TABLE session_catalog; PRAGMA user_version=5;",
+        )
         .unwrap();
     drop(legacy);
 
@@ -122,7 +124,8 @@ async fn catalog_organization_upgrades_an_existing_index_and_fences_edits() {
     let legacy = rusqlite::Connection::open(&filename).unwrap();
     legacy
         .execute_batch(
-            "DROP INDEX session_catalog_bucket;
+            "DROP TABLE session_retirements;
+             DROP INDEX session_catalog_bucket;
              ALTER TABLE session_catalog DROP COLUMN revision;
              ALTER TABLE session_catalog DROP COLUMN label;
              ALTER TABLE session_catalog DROP COLUMN bucket;

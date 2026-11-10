@@ -3,8 +3,8 @@
 use super::{
     MAX_HISTORY_BYTES, MAX_HISTORY_RECORDS, MAX_HISTORY_SCAN_BYTES, MAX_HISTORY_TURNS, SqliteStore,
     bump_revision, commit_error, database_error, decode, decode_turn, encode, error, execute,
-    insert_input, insert_session, load_session, lookup_request, require_revision, save_request,
-    save_session, sql_number, unsigned,
+    has_live_session_owner, insert_input, insert_session, load_session, lookup_request,
+    require_revision, save_request, save_session, sql_number, unsigned,
 };
 use agent_kit_core::history::{History, HistoryPosition, HistoryRecord};
 use agent_kit_core::turn::{JournalPosition, TurnState};
@@ -187,14 +187,7 @@ impl SqliteStore {
             }
             let mut session = load_session(&transaction, id)?;
             require_revision(&session, request.expected_revision)?;
-            if session.active_turn.is_some()
-                || inner
-                    .owners
-                    .lock()
-                    .map_err(|_| error(ErrorKind::Unavailable, "store_owners_poisoned"))?
-                    .iter()
-                    .any(|((session, _), owner)| session == id && owner.strong_count() > 0)
-            {
+            if session.active_turn.is_some() || has_live_session_owner(inner, id)? {
                 return Err(error(ErrorKind::Conflict, "history_revision_requires_idle"));
             }
             let queued: bool = transaction.query_row(
