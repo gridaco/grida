@@ -12,13 +12,14 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 const MAX_PATH_BYTES: usize = 4096;
+pub(crate) const OPEN_SURFACE: &str = "surface_open";
 
 pub fn headless_surface() -> Result<ToolHost> {
     let path = json!({"type": "string", "minLength": 1, "maxLength": MAX_PATH_BYTES});
     ToolHost::new([(
         CapabilityDefinition {
             tool: ToolDefinition {
-                id: ToolId::new("surface_open")?,
+                id: ToolId::new(OPEN_SURFACE)?,
                 version: 1,
                 description: "Request presentation of an existing workspace artifact. A headless host reports that presentation was unavailable.".into(),
                 input: InputFormat::Json(json!({

@@ -6,11 +6,11 @@ mod completion_checks;
 pub(crate) mod deletion;
 mod goals;
 mod history;
+mod host_tools;
 mod image_tools;
 mod images;
 mod lifecycle;
 pub(crate) mod live;
-mod mcp_tools;
 mod permissions;
 mod questions;
 pub(crate) mod side_chats;
@@ -105,7 +105,7 @@ pub struct Host {
     gg_connection: Option<Arc<GgConnection>>,
     configuration: Option<Arc<Configuration>>,
     permissions: Option<Arc<crate::permissions::PermissionProfile>>,
-    mcp_tools: Option<Arc<mcp_tools::McpTools>>,
+    host_tools: Option<Arc<host_tools::HostTools>>,
     subagents_enabled: bool,
     operating_regime: OperatingRegime,
     require_completion_text: bool,
@@ -269,8 +269,12 @@ struct StoredPrompt {
     configuration_permission: crate::ConfigurationPermission,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     permission_capture: Option<crate::permissions::PermissionCapture>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    mcp_capture: Option<mcp_tools::Capture>,
+    #[serde(
+        rename = "mcp_capture",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    host_tools_capture: Option<host_tools::Capture>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     guidance: Option<crate::skills::CapturedGuidance>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -291,7 +295,7 @@ struct SubmissionPolicy {
     questions: bool,
     configuration_permission: crate::ConfigurationPermission,
     allow_wakeups: bool,
-    allow_mcp: bool,
+    allow_host_tools: bool,
     operating_regime: OperatingRegime,
     subagent: Option<grida_agent_master::subagents::Assignment>,
 }
@@ -367,7 +371,7 @@ struct PreparedInput {
     configuration_permission: crate::ConfigurationPermission,
     captured: Option<ConfigurationSnapshot>,
     permission_capture: Option<crate::permissions::PermissionCapture>,
-    mcp_tools: Option<Arc<mcp_tools::McpTools>>,
+    host_tools: Option<Arc<host_tools::HostTools>>,
     guidance: Option<Message>,
     goal: Option<goals::GoalInput>,
     completion_checks: Option<CompletionChecks>,
@@ -537,7 +541,7 @@ impl Host {
             gg_connection: None,
             configuration,
             permissions: None,
-            mcp_tools: None,
+            host_tools: None,
             subagents_enabled: false,
             operating_regime: OperatingRegime::default(),
             require_completion_text: false,
@@ -1056,8 +1060,8 @@ impl Host {
             .completion_authorized
             .then(|| completion_checks::CompletionAccess::bind(claim.lease.binding()))
             .transpose()?;
-        let mcp = prepared
-            .mcp_tools
+        let host_tools = prepared
+            .host_tools
             .take()
             .map(|owner| owner.bind(claim.lease.binding()))
             .transpose()?;
@@ -1067,7 +1071,7 @@ impl Host {
             image.clone(),
             wakeups.clone(),
             completion.clone(),
-            mcp.clone(),
+            host_tools.clone(),
         );
         let goal_authority = if prepared.goal.is_some() {
             let (validator, gate): (Arc<dyn AuthorityValidator>, Arc<dyn ToolGate>) =
@@ -1155,8 +1159,8 @@ impl Host {
                 &mut authority.tools,
             )?;
         }
-        if let Some(mcp) = mcp {
-            mcp.insert(&mut inventory, &mut authority.tools)?;
+        if let Some(host_tools) = host_tools {
+            host_tools.insert(&mut inventory, &mut authority.tools)?;
         }
         if let Some(goal) = goal_authority {
             goal.insert(&mut inventory, &mut authority.tools)?;
@@ -1291,7 +1295,7 @@ impl Host {
             questions: request.questions,
             configuration_permission: request.configuration_permission,
             allow_wakeups,
-            allow_mcp: true,
+            allow_host_tools: true,
             operating_regime,
             subagent: None,
         })
@@ -1308,7 +1312,7 @@ impl Host {
             questions,
             configuration_permission,
             allow_wakeups,
-            allow_mcp,
+            allow_host_tools,
             operating_regime,
             subagent,
         } = policy;
@@ -1330,8 +1334,8 @@ impl Host {
         } else {
             self.capture_permissions(session, &id)?
         };
-        let mcp_capture =
-            self.capture_mcp(!child_work && allow_mcp && operating_regime.is_act())?;
+        let host_tools_capture =
+            self.capture_host_tools(!child_work && allow_host_tools && operating_regime.is_act())?;
         let guidance = if child_work {
             None
         } else if self.side_context.is_some() {
@@ -1399,7 +1403,7 @@ impl Host {
                     allow_wakeups,
                     configuration_permission,
                     permission_capture,
-                    mcp_capture,
+                    host_tools_capture,
                     guidance,
                     goal: None,
                     subagent,
@@ -1429,7 +1433,7 @@ impl Host {
                 .push_str(grida_agent_master::side_context::INSTRUCTIONS);
         }
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
-        let mut mcp_tools = None;
+        let mut host_tools = None;
         let mut subagent = false;
         let (
             messages,
@@ -1474,7 +1478,7 @@ impl Host {
                         || stored.configuration_permission
                             != crate::ConfigurationPermission::Disabled
                         || stored.permission_capture.is_some()
-                        || stored.mcp_capture.is_some()
+                        || stored.host_tools_capture.is_some()
                         || stored.guidance.is_some()
                         || stored.goal.is_some()
                         || stored.completion_checks.is_some()
@@ -1503,9 +1507,9 @@ impl Host {
                 stored.operating_regime.apply(&mut config);
                 if !cancellation_only
                     && stored.operating_regime.is_act()
-                    && let Some(capture) = &stored.mcp_capture
+                    && let Some(capture) = &stored.host_tools_capture
                 {
-                    mcp_tools = Some(self.retained_mcp(capture)?);
+                    host_tools = Some(self.retained_host_tools(capture)?);
                 }
                 authority.validate(
                     stored.authority.as_ref(),
@@ -1601,7 +1605,7 @@ impl Host {
             configuration_permission,
             captured,
             permission_capture,
-            mcp_tools,
+            host_tools,
             guidance,
             goal,
             completion_checks,
@@ -1904,8 +1908,8 @@ impl Host {
                 .await
                 .map_err(|_| problem(ErrorKind::Uncertain, "host_shutdown_timeout"))?;
             work.closed = true;
-            if let Some(mcp) = &self.mcp_tools {
-                mcp.close();
+            if let Some(host_tools) = &self.host_tools {
+                host_tools.close();
             }
             for timer in work.timers.values() {
                 timer.cancel();

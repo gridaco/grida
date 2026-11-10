@@ -123,7 +123,7 @@ impl Host {
         require_goal_start(&view)?;
         self.check_ready_capacity(&request.session).await?;
         let mut policy = self.submission_policy(&request, false)?;
-        policy.allow_mcp = false;
+        policy.allow_host_tools = false;
         let mut input = self
             .capture_input(&view, request.id, request.parts, policy)
             .await?;

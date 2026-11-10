@@ -288,6 +288,10 @@ clients on the exact numeric loopback address. It supports MCP revisions
 
 The headless service offers `surface_open`. Its result reports that no
 presentation was requested because no editor is attached.
+Pass `--headless-surface` to native `run` or unsupervised `serve --stdio`
+to offer the same operation directly in Act. It takes the same workspace
+artifact path and returns the same outcome without an MCP connection.
+Plan leaves it unavailable. A resumed turn requires its captured tool set.
 
 ## Use tools from a local MCP server
 

@@ -295,9 +295,9 @@ impl Host {
                         .filter(|input| input.payload.version() == 2)
                         .map(decode_input::<StoredPrompt>)
                         .transpose()?
-                        .and_then(|stored| stored.mcp_capture);
+                        .and_then(|stored| stored.host_tools_capture);
                     if let Some(capture) = &capture {
-                        self.retained_mcp(capture)?;
+                        self.retained_host_tools(capture)?;
                     }
                     self.capture_input(
                         &view,
@@ -307,7 +307,7 @@ impl Host {
                             questions,
                             configuration_permission,
                             allow_wakeups: false,
-                            allow_mcp: capture.is_some(),
+                            allow_host_tools: capture.is_some(),
                             operating_regime,
                             subagent: None,
                         },

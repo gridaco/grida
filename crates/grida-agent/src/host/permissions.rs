@@ -31,7 +31,7 @@ pub(super) struct ToolAuthority {
     image: Option<Arc<image_tools::TurnImage>>,
     wakeups: Option<Arc<wakeups::WakeupAccess>>,
     completion: Option<Arc<completion_checks::CompletionAccess>>,
-    mcp: Option<Arc<mcp_tools::TurnTools>>,
+    host_tools: Option<Arc<host_tools::TurnTools>>,
 }
 
 impl ToolAuthority {
@@ -41,13 +41,13 @@ impl ToolAuthority {
         image: Option<Arc<image_tools::TurnImage>>,
         wakeups: Option<Arc<wakeups::WakeupAccess>>,
         completion: Option<Arc<completion_checks::CompletionAccess>>,
-        mcp: Option<Arc<mcp_tools::TurnTools>>,
+        host_tools: Option<Arc<host_tools::TurnTools>>,
     ) -> Option<Arc<Self>> {
         if permissions.is_none()
             && image.is_none()
             && wakeups.is_none()
             && completion.is_none()
-            && mcp.is_none()
+            && host_tools.is_none()
         {
             return None;
         }
@@ -57,7 +57,7 @@ impl ToolAuthority {
             image,
             wakeups,
             completion,
-            mcp,
+            host_tools,
         }))
     }
 }
@@ -92,12 +92,12 @@ impl AuthorityValidator for ToolAuthority {
         {
             return permissions.validate(request);
         }
-        if let Some(mcp) = self
-            .mcp
+        if let Some(host_tools) = self
+            .host_tools
             .as_ref()
             .filter(|scope| scope.handles(&request.selection))
         {
-            return mcp.validate(request);
+            return host_tools.validate(request);
         }
         self.base.validate(request)
     }
@@ -137,12 +137,12 @@ impl ToolGate for ToolAuthority {
         {
             return permissions.decide(admission, context);
         }
-        if let Some(mcp) = self
-            .mcp
+        if let Some(host_tools) = self
+            .host_tools
             .as_ref()
             .filter(|scope| scope.handles(&admission.grants))
         {
-            return mcp.decide(admission, context);
+            return host_tools.decide(admission, context);
         }
         self.base.decide(admission, context)
     }

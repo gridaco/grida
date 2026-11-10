@@ -159,7 +159,7 @@ impl Host {
                     questions: false,
                     configuration_permission: crate::ConfigurationPermission::Disabled,
                     allow_wakeups: false,
-                    allow_mcp: false,
+                    allow_host_tools: false,
                     operating_regime: OperatingRegime::Act,
                     subagent: Some(Assignment {
                         parent_turn: parent_turn.clone(),

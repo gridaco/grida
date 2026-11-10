@@ -1,6 +1,6 @@
 //! GRIDA-SEC-004 — explicitly enabled MCP tools over authenticated loopback HTTP.
 
-use crate::surface_tools::headless_surface;
+use crate::surface_tools::{OPEN_SURFACE, headless_surface};
 use crate::tool_host::CapabilityGrant;
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ResultContent};
@@ -83,7 +83,7 @@ pub async fn serve_headless(
     shutdown: impl Future<Output = Result<()>>,
 ) -> Result<()> {
     let host = headless_surface()?;
-    let surface = host.grant(&ToolId::new("surface_open")?)?;
+    let surface = host.grant(&ToolId::new(OPEN_SURFACE)?)?;
     let listener = TcpListener::bind(options.address)
         .await
         .map_err(|_| Error::new(ErrorKind::Unavailable, "mcp_listener_unavailable"))?;

@@ -380,6 +380,14 @@ continuation. Closing the host releases its timers while preserving their
 recorded due times and delivery state. A private client explicitly recovers the
 selected wake-up after restart. Inspecting or loading a chat leaves it idle.
 
+## Use headless presentation
+
+Add `--headless-surface` to native `run` or unsupervised `serve --stdio`
+to offer `surface_open` to Act prompts. It shares the standalone MCP
+server's capability definition and reports that presentation was unavailable.
+It grants no filesystem access. Native and explicitly selected MCP tools
+can be offered together. A suspended turn keeps its captured set of tools.
+
 ## Use a trusted local MCP tool
 
 Add the four MCP flags to a configured `run` or unsupervised `serve --stdio`

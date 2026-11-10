@@ -1,8 +1,9 @@
-//! GRIDA-SEC-004 — outbound MCP authority belongs to one captured host lease and turn.
+//! GRIDA-SEC-004 — tool-host authority belongs to the captured endpoints and turn.
 
 use super::{Host, problem};
 use crate::mcp_client::McpClient;
-use crate::tool_host::CapabilityGrant;
+use crate::surface_tools::{OPEN_SURFACE, headless_surface};
+use crate::tool_host::{CapabilityGrant, ToolHost};
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, GrantSelection,
 };
@@ -16,14 +17,17 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+const HEADLESS_BINDING: &str = "grida-headless-surface-v1";
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) struct Capture {
     lease: BindingId,
     catalog: Fingerprint,
 }
 
-pub(super) struct McpTools {
-    client: McpClient,
+pub(super) struct HostTools {
+    mcp: Option<McpClient>,
+    surface: Option<ToolHost>,
     capture: Capture,
     grants: BTreeMap<ToolId, CapabilityGrant>,
 }
@@ -31,65 +35,137 @@ pub(super) struct McpTools {
 impl Host {
     /// Adds the explicitly trusted local MCP client to new headless Act work.
     /// The caller must finish composition before admitting requests.
-    pub fn with_mcp_client(mut self, client: McpClient) -> Result<Self> {
+    pub fn with_mcp_client(self, client: McpClient) -> Result<Self> {
+        self.with_tools(Some(client), None)
+    }
+
+    /// Offer the built-in headless presentation capability to Act work.
+    pub fn with_headless_surface(self) -> Result<Self> {
+        self.with_tools(None, Some(headless_surface()?))
+    }
+
+    fn with_tools(mut self, mcp: Option<McpClient>, surface: Option<ToolHost>) -> Result<Self> {
         self.execution()?;
-        if self.mcp_tools.is_some() {
+        let (previous_mcp, previous_surface) = if let Some(owner) = self.host_tools.take() {
+            let owner = Arc::try_unwrap(owner)
+                .map_err(|_| problem(ErrorKind::Conflict, "host_tool_owner_already_shared"))?;
+            (owner.mcp, owner.surface)
+        } else {
+            (None, None)
+        };
+        if mcp.is_some() && previous_mcp.is_some() {
             return Err(problem(ErrorKind::Conflict, "mcp_owner_already_configured"));
         }
-        self.mcp_tools = Some(Arc::new(McpTools::new(client)?));
+        if surface.is_some() && previous_surface.is_some() {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "surface_owner_already_configured",
+            ));
+        }
+        self.host_tools = Some(Arc::new(HostTools::new(
+            mcp.or(previous_mcp),
+            surface.or(previous_surface),
+        )?));
         Ok(self)
     }
 
-    pub(super) fn capture_mcp(&self, allowed: bool) -> Result<Option<Capture>> {
-        self.mcp_tools
+    pub(super) fn capture_host_tools(&self, allowed: bool) -> Result<Option<Capture>> {
+        self.host_tools
             .as_ref()
             .filter(|_| allowed && self.side_context.is_none())
             .map(|owner| {
-                owner.client.ensure_open()?;
+                owner.ensure_open()?;
                 Ok(owner.capture.clone())
             })
             .transpose()
     }
 
-    pub(super) fn retained_mcp(&self, capture: &Capture) -> Result<Arc<McpTools>> {
+    pub(super) fn retained_host_tools(&self, capture: &Capture) -> Result<Arc<HostTools>> {
         let owner = self
-            .mcp_tools
+            .host_tools
             .as_ref()
             .filter(|owner| &owner.capture == capture)
-            .ok_or_else(|| problem(ErrorKind::Unavailable, "retained_mcp_lease_unavailable"))?;
-        owner.client.ensure_open()?;
+            .ok_or_else(|| {
+                problem(
+                    ErrorKind::Unavailable,
+                    if capture.lease.as_str() == HEADLESS_BINDING {
+                        "retained_surface_definition_unavailable"
+                    } else {
+                        "retained_mcp_lease_unavailable"
+                    },
+                )
+            })?;
+        owner.ensure_open()?;
         Ok(owner.clone())
     }
 }
 
-impl McpTools {
-    fn new(client: McpClient) -> Result<Self> {
+impl HostTools {
+    fn new(mcp: Option<McpClient>, surface: Option<ToolHost>) -> Result<Self> {
         let mut grants = BTreeMap::new();
         let mut definitions = BTreeMap::new();
-        for grant in client.selected_grants()? {
+        let selected = mcp
+            .as_ref()
+            .map(McpClient::selected_grants)
+            .transpose()?
+            .unwrap_or_default();
+        let local = surface
+            .as_ref()
+            .map(|host| host.grant(&ToolId::new(OPEN_SURFACE)?))
+            .transpose()?;
+        for grant in selected.into_iter().chain(local) {
             let definition = grant.describe()?;
             let id = definition.tool.id.clone();
-            definitions.insert(id.clone(), Fingerprint::of(definition)?);
+            if definitions
+                .insert(id.clone(), Fingerprint::of(definition)?)
+                .is_some()
+            {
+                return Err(problem(ErrorKind::Conflict, "duplicate_host_tool"));
+            }
             grants.insert(id, grant);
         }
         let capture = Capture {
-            lease: client.lease().clone(),
+            // The local implementation is stateless and does not present
+            // anything. Its exact definition can be rebound after restart.
+            lease: mcp
+                .as_ref()
+                .map(|client| Ok(client.lease().clone()))
+                .unwrap_or_else(|| BindingId::new(HEADLESS_BINDING))?,
             catalog: Fingerprint::of(&definitions)?,
         };
         Ok(Self {
-            client,
+            mcp,
+            surface,
             capture,
             grants,
         })
     }
 
     pub(super) fn close(&self) {
-        self.client.close();
+        if let Some(mcp) = &self.mcp {
+            mcp.close();
+        }
+        if let Some(surface) = &self.surface {
+            surface.close();
+        }
+    }
+
+    fn ensure_open(&self) -> Result<()> {
+        if let Some(mcp) = &self.mcp {
+            mcp.ensure_open()?;
+        }
+        self.grants
+            .values()
+            .try_for_each(|grant| grant.describe().map(|_| ()))
     }
 
     pub(super) fn bind(self: Arc<Self>, turn: &TurnBinding) -> Result<Arc<TurnTools>> {
         let authority = AuthorityBinding {
-            principal: PrincipalId::new("local-mcp")?,
+            principal: PrincipalId::new(if self.mcp.is_some() {
+                "local-mcp"
+            } else {
+                "local-headless"
+            })?,
             binding: self.capture.lease.clone(),
             // A resumed turn can still use the exact same live owner.
             scope: ScopeId::new(turn.turn.as_str())?,
@@ -116,7 +192,7 @@ impl McpTools {
 }
 
 pub(super) struct TurnTools {
-    owner: Arc<McpTools>,
+    owner: Arc<HostTools>,
     turn: TurnBinding,
     selections: BTreeMap<ToolId, GrantSelection>,
 }
@@ -145,10 +221,10 @@ impl AuthorityValidator for TurnTools {
             if !self.handles(&request.selection) {
                 return Err(problem(
                     ErrorKind::Unavailable,
-                    "mcp_tool_authority_unavailable",
+                    "host_tool_authority_unavailable",
                 ));
             }
-            self.owner.client.ensure_open()
+            self.owner.ensure_open()
         })
     }
 }
@@ -168,10 +244,10 @@ impl ToolGate for TurnTools {
             {
                 return Err(problem(
                     ErrorKind::Unavailable,
-                    "mcp_tool_authority_unavailable",
+                    "host_tool_authority_unavailable",
                 ));
             }
-            self.owner.client.ensure_open()?;
+            self.owner.ensure_open()?;
             Ok(ToolDecision::Permit)
         })
     }

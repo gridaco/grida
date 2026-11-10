@@ -106,7 +106,7 @@ fn command() -> Command {
                     Arg::new("supervised-provider")
                         .long("supervised-provider")
                         .requires("stdio")
-                        .conflicts_with("mcp-endpoint")
+                        .conflicts_with_all(["mcp-endpoint", "headless-surface"])
                         .action(ArgAction::SetTrue),
                 )
                 .arg(
@@ -140,7 +140,7 @@ fn command() -> Command {
                         .long("listen")
                         .value_name("LOOPBACK_WS_URL")
                         .requires("server-token-env")
-                        .conflicts_with("mcp-endpoint"),
+                        .conflicts_with_all(["mcp-endpoint", "headless-surface"]),
                 )
                 .arg(
                     Arg::new("server-token-env")
@@ -211,6 +211,12 @@ fn launch(command: Command) -> Command {
                 .value_name("PRIVATE_JSON")
                 .value_parser(value_parser!(PathBuf))
                 .help("Trusted launch profile for explicitly selected workspace roots"),
+        )
+        .arg(
+            Arg::new("headless-surface")
+                .long("headless-surface")
+                .action(ArgAction::SetTrue)
+                .help("Offer the headless surface operation to Act prompts"),
         )
         .arg(
             Arg::new("mcp-endpoint")
@@ -442,6 +448,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let host = match mcp_client {
         Some(client) => host.with_mcp_client(client)?,
         None => host,
+    };
+    let host = if args.get_flag("headless-surface") {
+        host.with_headless_surface()?
+    } else {
+        host
     };
     let host = match permissions {
         Some(profile) => host.with_permission_profile(profile),

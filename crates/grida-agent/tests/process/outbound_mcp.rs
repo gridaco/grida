@@ -7,6 +7,7 @@ use super::*;
 const MCP_TOKEN: &str = "ab0123456789ab0123456789ab0123456789ab0123456789ab0123456789ab01";
 const TOKEN_ENV: &str = "GRIDA_FIXTURE_OUTBOUND_MCP_TOKEN";
 const TOOL: &str = "mcp_grida_surface_open";
+const NATIVE: &str = "surface_open";
 const OPEN_ARGUMENTS: &str = r#"{"path":"/poster.canvas"}"#;
 
 async fn local_mcp(workspace: &Path) -> (Child, String) {
@@ -64,9 +65,14 @@ fn run(state: &Path, workspace: &Path, provider: &str, peer: &str, mode: &str) -
 }
 
 fn offered(request: &Value) -> bool {
+    tool_definition(request, TOOL).is_some()
+}
+
+fn tool_definition<'a>(request: &'a Value, name: &str) -> Option<&'a Value> {
     request["tools"]
         .as_array()
-        .is_some_and(|tools| tools.iter().any(|tool| tool["function"]["name"] == TOOL))
+        .and_then(|tools| tools.iter().find(|tool| tool["function"]["name"] == name))
+        .map(|tool| &tool["function"])
 }
 
 fn assert_domain_result(request: &Value) {
@@ -84,6 +90,80 @@ fn assert_domain_result(request: &Value) {
         result["structured"],
         json!({"path":"/poster.canvas","requested":false,"reason":"not_interactive"})
     );
+}
+
+#[tokio::test]
+async fn native_and_mcp_surface_use_the_same_arguments_and_domain_result() {
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let (mut peer, address) = local_mcp(workspace.path()).await;
+    let mut provider = Endpoint::start(vec![
+        Reply::Tool(NATIVE, OPEN_ARGUMENTS),
+        Reply::Finished("Native presentation was unavailable."),
+        Reply::Tool(TOOL, OPEN_ARGUMENTS),
+        Reply::Finished("Remote presentation was unavailable."),
+    ])
+    .await;
+    let mut command = executable();
+    command
+        .args([
+            "run",
+            "--headless-surface",
+            "--prompt",
+            "Handle presentation.",
+            "--cwd",
+        ])
+        .arg(workspace.path());
+    configured(
+        &mut command,
+        &temporary.path().join("native"),
+        &provider.url,
+    );
+    let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let direct = provider.request().await;
+    let native = tool_definition(&direct, NATIVE).unwrap();
+    assert!(!offered(&direct));
+    assert_domain_result(&provider.request().await);
+
+    let output = timeout(
+        WAIT,
+        run(
+            &temporary.path().join("combined"),
+            workspace.path(),
+            &provider.url,
+            &address,
+            "act",
+        )
+        .arg("--headless-surface")
+        .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let combined = provider.request().await;
+    assert_eq!(tool_definition(&combined, NATIVE), Some(native));
+    let mcp = tool_definition(&combined, TOOL).unwrap();
+    assert_eq!(mcp["parameters"], native["parameters"]);
+    assert_eq!(
+        mcp["description"],
+        format!(
+            "MCP tool surface_open from grida. {}",
+            native["description"].as_str().unwrap()
+        )
+    );
+    assert_domain_result(&provider.request().await);
+    provider.done().await;
+    peer.kill().await.unwrap();
 }
 
 #[tokio::test]
@@ -132,6 +212,7 @@ async fn act_runs_allowlisted_mcp_tool_and_plan_never_contacts_peer() {
             &decoy,
             "plan",
         )
+        .arg("--headless-surface")
         .output(),
     )
     .await
@@ -145,6 +226,7 @@ async fn act_runs_allowlisted_mcp_tool_and_plan_never_contacts_peer() {
     assert_eq!(records(&plan.stdout)[1]["disposition"], "succeeded");
     let planned = provider.request().await;
     assert!(!offered(&planned));
+    assert!(tool_definition(&planned, NATIVE).is_none());
     assert!(planned["messages"].to_string().contains("Plan is active"));
     assert!(
         timeout(Duration::from_millis(50), untouched.accept())
@@ -160,6 +242,20 @@ async fn serve(state: &Path, endpoint: &str, peer: &str) -> PrivateStdio {
     command.args(["serve", "--stdio"]);
     configured(&mut command, state, endpoint);
     with_mcp(&mut command, peer);
+    start_private(command).await
+}
+
+async fn serve_surface(state: &Path, endpoint: &str, enabled: bool) -> PrivateStdio {
+    let mut command = executable();
+    command.args(["serve", "--stdio"]);
+    configured(&mut command, state, endpoint);
+    if enabled {
+        command.arg("--headless-surface");
+    }
+    start_private(command).await
+}
+
+async fn start_private(mut command: Command) -> PrivateStdio {
     let child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -185,6 +281,81 @@ async fn snapshot(client: &mut PrivateStdio, session: &str) -> Value {
         .await;
     assert!(snapshot["result"].is_object(), "{snapshot}");
     snapshot["result"].clone()
+}
+
+#[tokio::test]
+async fn retained_surface_requires_the_same_local_definition_after_restart() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut provider = Endpoint::start(vec![
+        Reply::Tool(NATIVE, OPEN_ARGUMENTS),
+        Reply::Hold("Presentation is unavailable."),
+        Reply::Finished("Continued with the retained outcome."),
+    ])
+    .await;
+    let mut first = serve_surface(&state, &provider.url, true).await;
+    let session = new_session(&mut first, workspace.path()).await;
+    let accepted = first
+        .request(
+            "_co.grida/session/submit",
+            prompt_request(&session, "show-poster", "Request presentation."),
+        )
+        .await;
+    assert!(accepted.get("error").is_none(), "{accepted}");
+    assert!(tool_definition(&provider.request().await, NATIVE).is_some());
+    assert_domain_result(&provider.request().await);
+    first.close().await;
+
+    let load = json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]});
+    let mut missing = serve_surface(&state, &provider.url, false).await;
+    let loaded = missing.request("session/load", load.clone()).await;
+    assert!(loaded.get("error").is_none(), "{loaded}");
+    let suspended = snapshot(&mut missing, &session).await;
+    let turn = suspended["current"]["turnId"].as_str().unwrap().to_owned();
+    assert_eq!(suspended["current"]["disposition"], "suspended");
+    let resume = |id| {
+        json!({
+            "task":task_basis(&suspended,&session,id),
+            "expectedEpoch":suspended["current"]["epoch"],
+            "expectedJournalPosition":suspended["current"]["journalPosition"],
+        })
+    };
+    let refused = missing
+        .request("_co.grida/session/resume", resume("absent"))
+        .await;
+    assert_eq!(
+        refused["error"]["data"],
+        "retained_surface_definition_unavailable"
+    );
+    assert!(provider.requests.try_recv().is_err());
+    missing.close().await;
+
+    let mut reopened = serve_surface(&state, &provider.url, true).await;
+    let loaded = reopened.request("session/load", load).await;
+    assert!(loaded.get("error").is_none(), "{loaded}");
+    let resumed = reopened
+        .request("_co.grida/session/resume", resume("same-definition"))
+        .await;
+    assert_eq!(resumed["result"]["turn"]["turnId"], turn, "{resumed}");
+    let continuation = provider.request().await;
+    assert!(tool_definition(&continuation, NATIVE).is_some());
+    assert_domain_result(&continuation);
+    timeout(WAIT, async {
+        loop {
+            let view = snapshot(&mut reopened, &session).await;
+            if view["current"].is_null() {
+                assert_eq!(view["latest"]["turnId"], turn);
+                assert_eq!(view["latest"]["status"], "succeeded");
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    reopened.close().await;
+    provider.done().await;
 }
 
 #[tokio::test]
