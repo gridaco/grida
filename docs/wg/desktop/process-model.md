@@ -274,8 +274,9 @@ response. See [Agent security](./agent-security.md).
   capability-shaped: main owns the exact listener and the sidecar receives only
   accepted connected sockets. Provider control/data remains on separately
   bounded framed stdin/stdout.
-- **CLI consumer.** `grida-agent serve`, `run`, and `sessions` exercise
-  the same daemon/client path without Electron.
+- **Headless clients.** The native host runs tasks and serves ACP without
+  Electron. The same runtime can retain work for subsequent inspection.
+  [Connect an agent client](../../agent/clients.md)
 
 ## See also
 

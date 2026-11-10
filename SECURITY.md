@@ -407,10 +407,9 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    the main-owned loopback port across Bubblewrap's private Linux network
    namespace.
 
-   **Daemon mode (#798).** When the daemon runs as a registered local
-   daemon (`grida-agent serve --register`; WG spec
-   [docs/wg/ai/agent/daemon.md](docs/wg/ai/agent/daemon.md)), the per-spawn
-   password gives way to a **persistent** credential stored owner-only
+   **Registered compatibility daemon (#798).** The
+   [local registration protocol](docs/wg/ai/agent/daemon.md) uses a
+   **persistent** credential stored owner-only
    (0600) at `<state-dir>/daemon.credential`, alongside the `daemon.json`
    registration record (also 0600, atomic temp+rename write;
    `Daemon.read` refuses non-loopback URLs so a tampered record cannot

@@ -335,7 +335,7 @@ export namespace Daemon {
   export type ConnectOrSpawnOptions = ProbeOptions & {
     /**
      * Start a daemon process, detached from the caller, that publishes
-     * its registration on start (e.g. `grida-agent serve --register`).
+     * its registration on start.
      * Called at most once.
      */
     spawn: () => void | Promise<void>;
