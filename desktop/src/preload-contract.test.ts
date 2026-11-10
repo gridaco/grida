@@ -102,4 +102,14 @@ describe("Desktop preload agent seam", () => {
       'window.addEventListener("pagehide", clearNativeChatDelivery)'
     );
   });
+
+  it("forwards effort through the optional native chat submission argument", () => {
+    const submission = preloadSource.match(
+      /submitInRegime:\s*\(([^)]*)\)\s*=>\s*ipcRenderer\.invoke\(([\s\S]*?)\),/
+    );
+    expect(submission?.[1]).toMatch(/\beffort\s*$/);
+    expect(submission?.[2]).toContain(
+      "...(effort === undefined ? [] : [effort])"
+    );
+  });
 });
