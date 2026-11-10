@@ -2,6 +2,9 @@
 // GRIDA-SEC-004 — sidecar supervision and launch-scoped command authority.
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("electron", () => ({
@@ -14,6 +17,7 @@ vi.mock("electron", () => ({
     ),
     getAppPath: vi.fn<() => string>(() => "/app/desktop"),
     hasSingleInstanceLock: vi.fn<() => boolean>(() => true),
+    isPackaged: true,
   },
 }));
 vi.mock("../env", () => ({ EDITOR_BASE_URL: "https://grida.co" }));
@@ -35,6 +39,7 @@ import { app } from "electron";
 import { AgentNetworkHost } from "./agent-network-host";
 import { AgentNetworkPolicy } from "../agent-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
+import { RetainedMediaLaunch } from "./retained-media-launch";
 import { ensureInitialized, wrap } from "./sandbox/manager";
 
 describe("AgentSidecarSupervisor recovery", () => {
@@ -133,6 +138,50 @@ describe("AgentSidecarSupervisor recovery", () => {
       })
     );
     supervisor.stop();
+  });
+
+  it("starts strict media on the disabled native profile without sealing chat", async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-disabled-media-")
+    );
+    const agent = path.join(root, "agent");
+    const temporary = path.join(root, "temp");
+    const settings = path.join(agent, "retained-settings");
+    try {
+      await fs.mkdir(agent, { mode: 0o700 });
+      await fs.mkdir(temporary, { mode: 0o700 });
+      vi.spyOn(NativeDesktopProfile, "mediaOnly").mockReturnValue(true);
+      vi.spyOn(NativeDesktopProfile, "selected").mockReturnValue(true);
+      vi.spyOn(NativeDesktopProfile, "agentData").mockReturnValue(agent);
+      vi.mocked(app.getPath).mockReturnValueOnce(temporary);
+      const prepare = vi
+        .spyOn(RetainedMediaLaunch, "prepareSettings")
+        .mockResolvedValue(settings);
+      const supervisor = new AgentSidecarSupervisor({ agent: false });
+      const spawn = vi
+        .fn<() => ReturnType<typeof supervisor.startRetainedMedia>>()
+        .mockResolvedValue({ port: 43123, password: "fixture" });
+      Object.assign(supervisor, { spawn });
+      await expect(supervisor.sealLegacyChatForColdStart()).rejects.toThrow(
+        "legacy_chat_cold_start_required"
+      );
+      expect(await supervisor.startRetainedMedia()).toEqual({
+        port: 43123,
+        password: "fixture",
+      });
+      expect(prepare).toHaveBeenCalledExactlyOnceWith(agent);
+      expect(spawn).toHaveBeenCalledOnce();
+      expect(Reflect.get(supervisor, "coldStartSource")).toBeUndefined();
+      expect(await Reflect.get(supervisor, "retainedMedia")).toMatchObject({
+        settings,
+        providerHome: agent,
+        temporary: path.join(temporary, "retained-media"),
+        mediaOnly: true,
+      });
+      expect(await fs.readdir(agent)).toEqual(["providers"]);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it("prepares an owned writer without admitting scratch or commands before wrapping", async () => {

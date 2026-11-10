@@ -56,6 +56,12 @@ handshake reports those capabilities as unavailable. No chat database, skill
 discovery, scratch preparation or finite-command authority is initialized.
 This is a host launch choice, not a renderer setting or fallback after failure.
 
+On packaged macOS arm64, `--disable-agent` reuses a verified existing managed
+native profile. Main keeps its file, workspace, and recent-file owners while
+the confined media sidecar uses the same media library and provider custody.
+Saved text-provider settings stay available to the next chat-enabled launch.
+An unfinished managed legacy handoff requires a normal launch.
+
 The separate media entry is an application adapter in the existing package.
 It establishes startup independence; Desktop still bundles the agent package.
 The independently usable model SDK is `@grida/ai`, which owns no HTTP routes,

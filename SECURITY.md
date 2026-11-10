@@ -297,6 +297,12 @@ TOML owner, with one memory-only GG session and one catalogue per composition.
 The first provider access retires legacy API entries through GRIDA-SEC-014;
 subsequent reads never use that retired source.
 
+Packaged macOS arm64 can reuse an existing verified native profile for
+media-only startup. Main retains its native file, workspace, and recent-file
+owners and confines the media sidecar to its settings, custody, media, and
+temporary roots. This role opens neither chat store and cannot admit an
+unfinished legacy profile.
+
 Shared image, video, audio and 3D operations and provider HTTP belong to
 [`@grida/ai`](packages/grida-ai/README.md). The tenant supplies narrow key/token
 readers and the same host-authorized transport; host adapters retain request admission,

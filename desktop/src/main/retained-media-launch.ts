@@ -41,6 +41,7 @@ export namespace RetainedMediaLaunch {
     media: string;
     temporary: string;
     editorBaseUrl: string;
+    mediaOnly?: boolean;
   }>;
 
   /** The caller has retired the original settings writer before preparing this partition. */
@@ -311,7 +312,7 @@ export namespace RetainedMediaLaunch {
       sandboxArgs: profile(executable, application, writable),
       sidecarArgs: [
         path.join(asar, ".vite", "build", "agent-sidecar.js"),
-        "--agent=native-chat",
+        input.mediaOnly ? "--agent=disabled" : "--agent=native-chat",
         "--retained-media-scope=1",
         `--user-data=${settings}`,
         `--provider-home=${providerHome}`,

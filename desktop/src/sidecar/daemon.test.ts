@@ -117,6 +117,24 @@ describe("Desktop daemon composition", () => {
     expect(mocks.agent).not.toHaveBeenCalled();
   });
 
+  it("leaves files and recents to Main without enabling endpoints or chat", async () => {
+    const prepare = vi.fn<() => Promise<void>>();
+    await DesktopDaemon.create({
+      ...common,
+      agent: false,
+      retained_media_scope: true,
+      prepare_provider_custody: prepare,
+    });
+    expect(mocks.media).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capabilities: { recent: false, files: false, workspaces: false },
+        endpoint_settings: false,
+        prepare_provider_custody: prepare,
+      })
+    );
+    expect(mocks.agent).not.toHaveBeenCalled();
+  });
+
   it("protects owned legacy state only with a confined, command-free writer", async () => {
     const agent = {
       scratch_base: "/synthetic/scratch",

@@ -98,6 +98,7 @@ type RegisterIpcHandlersOptions = {
   ) => ActiveNativeChat | null;
   /** Present when this main process has selected native chat mode. */
   ensure_native_chat?: (workspaceId: string) => Promise<void>;
+  native_chat_disabled?: boolean;
   forget_native_workspace?: (workspaceId: string) => Promise<void>;
   resolve_native_deck?: (workspaceId: string) => Promise<WorkspaceMediaGrant>;
   native_external_agent?: NativeExternalRuns;
@@ -201,7 +202,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       return result.canceled || !result.filePath ? null : result.filePath;
     },
     options.native_chat_profiles,
-    options.resolve_native_deck
+    options.resolve_native_deck,
+    options.native_chat_disabled
   );
   const externalAgent = new NativeExternalRunIpc(
     EDITOR_ORIGIN,

@@ -622,6 +622,31 @@ describe("native chat IPC", () => {
     ).resolves.toBe("legacy");
   });
 
+  it("keeps chat unavailable in managed media-only workbenches and decks", async () => {
+    const resolve = vi.fn<() => null>(() => null);
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      resolve,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      true
+    );
+    const workbench = windowAt();
+    const deck = windowAt(`${ORIGIN}/desktop/file?id=eac20941e6a410aa`);
+    await expect(ipc.status(workbench.event)).resolves.toBe(
+      "native-unavailable"
+    );
+    await expect(
+      ipc.deckRequest(deck.event, () => ipc.status(deck.event, true))
+    ).resolves.toBe("native-unavailable");
+    expect(ipc.available(workbench.event)).toBe(false);
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
   it("withdraws matching workbench attachments and pending startup on Forget", async () => {
     const { chat, emit, first, listeners } = setup();
     const other = windowAt(`${ORIGIN}/desktop/workspace?id=other`);

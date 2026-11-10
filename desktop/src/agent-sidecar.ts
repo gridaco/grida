@@ -31,7 +31,7 @@
  *                          Host launch choice; enabled by default. Media
  *                          compositions do not load scratch or skills.
  *                        --retained-media-scope=1
- *                          Private packaged launcher selection with native-chat.
+ *                          Private packaged media launcher without chat startup.
  *                        --owned-legacy-writer=1
  *                          Confined legacy writer with no command executor.
  *                        --legacy-state-root=<absolute path>
@@ -153,7 +153,7 @@ if (
 }
 if (
   retainedMediaScope !== undefined &&
-  (retainedMediaScope !== "1" || agentMode !== "native-chat" || sandboxEnforced)
+  (retainedMediaScope !== "1" || agentMode === "enabled" || sandboxEnforced)
 ) {
   console.error("[agent-sidecar] fatal: invalid retained media scope");
   process.exit(1);

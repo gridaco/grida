@@ -46,7 +46,7 @@ export namespace DesktopDaemon {
     if (ownedLegacy && (!agent.sandbox_enforced || agent.shell_executor)) {
       throw new Error("owned_legacy_writer_scope_invalid");
     }
-    if (opts.retained_media_scope && opts.agent !== "native-chat") {
+    if (opts.retained_media_scope && typeof agent === "object") {
       throw new Error("retained_media_scope_invalid");
     }
     if (
@@ -83,10 +83,10 @@ export namespace DesktopDaemon {
     if (opts.agent === false || opts.agent === "native-chat") {
       const { createMediaDaemon } = await import("@grida/agent/media-server");
       return createMediaDaemon(
-        opts.agent === "native-chat"
+        opts.agent === "native-chat" || opts.retained_media_scope
           ? {
               ...shared,
-              endpoint_settings: true,
+              endpoint_settings: opts.agent === "native-chat",
               capabilities: {
                 recent: false,
                 ...(opts.workspace_catalog ? { workspaces: false } : undefined),

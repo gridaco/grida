@@ -24,6 +24,7 @@ export namespace NativeDesktopProfile {
   };
   const admitted = new WeakMap<Pick<App, "getPath">, ProtectedRoots>();
   let first: NativeFirstProfile.Paths | undefined;
+  let firstMediaOnly = false;
 
   /** Runs before Electron chooses the browser/session store and instance lock. */
   export function prepareFirst(
@@ -33,6 +34,7 @@ export namespace NativeDesktopProfile {
   ): void {
     if (first) throw invalidProfile();
     if (allowBirth && legacyPredecessor) throw invalidProfile();
+    const mediaOnly = process.argv.includes("--disable-agent");
     const supported =
       process.platform === "darwin" &&
       process.arch === "arm64" &&
@@ -40,7 +42,6 @@ export namespace NativeDesktopProfile {
       !process.env.GRIDA_AGENT_USER_DATA &&
       !process.argv.some(
         (arg) =>
-          arg === "--disable-agent" ||
           arg === "--native-chat" ||
           arg.startsWith("--native-chat-") ||
           arg === "--user-data-dir" ||
@@ -56,21 +57,29 @@ export namespace NativeDesktopProfile {
         )),
       {
         supported,
-        allowBirth: allowBirth || legacyPredecessor,
+        allowBirth: !mediaOnly && (allowBirth || legacyPredecessor),
         legacyPredecessor,
       }
     );
     if (!scope || !protectedLegacy) return;
+    // The media-only role can reuse an admitted native profile. A legacy
+    // record still requires the chat writer handoff in a normal launch.
+    if (mediaOnly && scope.mode !== "native") throw invalidProfile();
     app.setPath("userData", scope.browser);
     app.setPath("sessionData", scope.browser);
     app.setPath("temp", scope.temp);
     app.setPath("documents", scope.projects);
     admitted.set(app, protectedLegacy);
     first = scope;
+    firstMediaOnly = mediaOnly;
   }
 
   export function firstSelected(): boolean {
     return first !== undefined;
+  }
+
+  export function mediaOnly(): boolean {
+    return firstMediaOnly;
   }
 
   export function managedPredecessor(): boolean {

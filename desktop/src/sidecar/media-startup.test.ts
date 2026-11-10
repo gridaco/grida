@@ -9,6 +9,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ProtectedRoots, RecentStore } from "@grida/daemon/server";
 import { describe, expect, it, vi } from "vitest";
 
 // Only the Electron fetch adapter is replaced. The real host validates grants
@@ -22,6 +23,9 @@ import { LegacyChatSourceLease } from "../main/legacy-chat-source-lease";
 import { DesktopMediaHost } from "../main/media-host";
 import { RetainedMediaLaunch } from "../main/retained-media-launch";
 import { NativeWorkspaceCatalog } from "../main/native-workspace-catalog";
+import { NativeDocumentFiles } from "../main/native-document-files";
+import { NativeFirstProfile } from "../main/native-first-profile";
+import { WorkspaceFileWorkers } from "../main/workspace-file-worker";
 import { DesktopAgentSandboxPolicy } from "../main/agent-sandbox-policy";
 import { dispose, ensureInitialized, wrapArgv } from "../main/sandbox/manager";
 
@@ -158,6 +162,164 @@ describe.skipIf(
     } finally {
       await active?.stop(false);
       await fs.rm(scope.root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps an existing native profile's files, recents, settings and custody with the agent disabled", async () => {
+    const scope = await packagedScope();
+    const { root, options } = scope;
+    const legacy = path.join(root, "Grida");
+    const oldChat = path.join(legacy, "sessions.db");
+    const workers = new WorkspaceFileWorkers(
+      path.join(path.dirname(path.dirname(options.executable)), "Resources")
+    );
+    let active: Sidecar | undefined;
+    try {
+      await fs.mkdir(legacy, { mode: 0o700 });
+      await fs.writeFile(oldChat, "untouched old chat", { mode: 0o600 });
+      const profile = NativeFirstProfile.open(
+        root,
+        () => new ProtectedRoots([legacy]),
+        { supported: true, allowBirth: true }
+      )!;
+      const nativeChatRoot = path.join(profile.browser, "native-chat");
+      const nativeChat = path.join(nativeChatRoot, "retained");
+      await fs.mkdir(nativeChatRoot, { mode: 0o700 });
+      await fs.writeFile(nativeChat, "untouched native chat", { mode: 0o600 });
+      const protectedPaths = [
+        legacy,
+        profile.agent,
+        profile.media,
+        profile.temp,
+      ];
+      const catalogOptions = {
+        browserData: profile.browser,
+        projectsRoot: profile.projects,
+        protectedPaths,
+      };
+      const catalog = new NativeWorkspaceCatalog(catalogOptions);
+      const selected = path.join(profile.projects, "drawing.svg");
+      await fs.writeFile(selected, "<svg/>");
+      const workspace = await catalog.openSelected(profile.projects);
+      const recent = new RecentStore(profile.browser, { privateFile: true });
+      await recent.touch(selected);
+      await recent.pin(selected, true);
+      const configuration = {
+        id: "saved_endpoint",
+        base_url: "https://provider.invalid/v1",
+        models: [{ id: "fixture-model" }],
+      };
+      await fs.mkdir(path.join(profile.agent, "providers"), { mode: 0o700 });
+      const settings = await RetainedMediaLaunch.prepareSettings(profile.agent);
+      const temporary = path.join(profile.temp, "retained-media");
+      await fs.mkdir(temporary, { mode: 0o700 });
+      const launch = {
+        ...options,
+        settings,
+        providerHome: profile.agent,
+        media: profile.media,
+        temporary,
+      };
+      const discovery = ggContractFixture([]);
+      let providerRequests = 0;
+      const provider: StartOptions["fetchProvider"] = async (url, init) => {
+        const metadata = discovery.response(url);
+        if (metadata) return metadata;
+        expect(url).toBe(
+          "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128"
+        );
+        expect(new Headers(init.headers).get("xi-api-key")).toBe(key);
+        providerRequests++;
+        return new Response(audio, {
+          headers: { "content-type": "audio/mpeg" },
+        });
+      };
+      active = await Sidecar.startRetained(launch, provider);
+      expect(
+        (
+          await active.post("/providers/endpoints/set", {
+            config: configuration,
+          })
+        ).status
+      ).toBe(200);
+      expect(
+        (await active.post("/secrets/set", { provider_id: "elevenlabs", key }))
+          .status
+      ).toBe(200);
+      await active.stop();
+      active = undefined;
+      const endpointFile = path.join(settings, "endpoints.json");
+      const storedSettings = await fs.readFile(endpointFile);
+      const profileRecord = await fs.readFile(
+        path.join(profile.root, "profile.json")
+      );
+
+      active = await Sidecar.startRetained(
+        { ...launch, mediaOnly: true },
+        provider
+      );
+      const handshake = await active.post("/handshake");
+      expect((await handshake.json()).capabilities).toMatchObject({
+        agent: false,
+        sessions: false,
+        shell: false,
+        providers: false,
+        files: false,
+        recent: false,
+        workspaces: false,
+        sound_effects: true,
+      });
+      for (const route of [
+        "/agent/run",
+        "/recent/list",
+        "/files/register",
+        "/workspaces/list",
+        "/providers/endpoints/list",
+      ])
+        expect((await active.post(route)).status).toBe(404);
+      const reopened = new NativeWorkspaceCatalog(catalogOptions);
+      expect((await reopened.fileGrant(workspace.id)).root).toBe(
+        profile.projects
+      );
+      expect(
+        await new RecentStore(profile.browser, { privateFile: true }).list()
+      ).toEqual([expect.objectContaining({ path: selected, pinned: true })]);
+      const documents = new NativeDocumentFiles(
+        reopened.fileProtectionPaths(),
+        root,
+        workers
+      );
+      const owner = { signal: new AbortController().signal, check: () => {} };
+      const id = await documents.register(selected);
+      expect((await documents.read(id, owner)).content).toBe("<svg/>");
+      await documents.write(id, "<svg><g/></svg>", owner);
+      expect(await fs.readFile(selected, "utf8")).toBe("<svg><g/></svg>");
+      const result = await active.post("/audio/sound-effects/generate", {
+        model_id: "eleven_text_to_sound_v2",
+        prompt: "A door closes",
+      });
+      expect(result.status).toBe(200);
+      await expectReceipt(profile.media, (await result.json()).stored_media);
+      await active.stop();
+      active = undefined;
+
+      expect(providerRequests).toBe(1);
+      expect(await fs.readFile(oldChat, "utf8")).toBe("untouched old chat");
+      expect(await fs.readdir(legacy)).toEqual(["sessions.db"]);
+      expect(await fs.readFile(nativeChat, "utf8")).toBe(
+        "untouched native chat"
+      );
+      expect(await fs.readdir(nativeChatRoot)).toEqual(["retained"]);
+      expect(await fs.readFile(endpointFile)).toEqual(storedSettings);
+      expect(
+        await fs.readFile(path.join(profile.root, "profile.json"))
+      ).toEqual(profileRecord);
+      expect(await fs.readdir(profile.agent)).not.toContain("chat-archive");
+      expect(await fs.readdir(profile.root)).not.toContain("promotion.json");
+    } finally {
+      workers.close();
+      await active?.stop(false);
+      await fs.rm(root, { recursive: true, force: true });
     }
   });
 

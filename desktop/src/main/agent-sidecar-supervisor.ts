@@ -212,9 +212,10 @@ export class AgentSidecarSupervisor {
   }
 
   async startRetainedMedia(): Promise<AgentSidecarInfo> {
+    const mediaOnly = NativeDesktopProfile.mediaOnly();
     const source = this.coldStartSource;
     if (
-      !source ||
+      (!source && !mediaOnly) ||
       !app.hasSingleInstanceLock() ||
       !app.isPackaged ||
       !NativeDesktopProfile.selected() ||
@@ -225,15 +226,16 @@ export class AgentSidecarSupervisor {
       this.isShuttingDown
     )
       throw new Error("retained_media_profile_unavailable");
-    this.retainedMedia ??= source.then(async (sealed) => {
-      if (sealed.userDataPath !== sealed.providerHome)
+    this.retainedMedia ??= (async () => {
+      await source;
+      if (this.user_data_path !== this.provider_home)
         throw new Error("retained_media_profile_unavailable");
       const settings = await RetainedMediaLaunch.prepareSettings(
-        sealed.userDataPath
+        this.user_data_path
       );
       const temporary = path.join(app.getPath("temp"), "retained-media");
       for (const directory of [
-        path.join(sealed.providerHome, "providers"),
+        path.join(this.provider_home, "providers"),
         temporary,
       ]) {
         await fs.promises
@@ -245,12 +247,13 @@ export class AgentSidecarSupervisor {
       return Object.freeze({
         executable: process.execPath,
         settings,
-        providerHome: sealed.providerHome,
-        media: sealed.mediaRoot,
+        providerHome: this.provider_home,
+        media: this.media_root,
         temporary,
         editorBaseUrl: EDITOR_BASE_URL,
+        mediaOnly,
       });
-    });
+    })();
     if (this.retiringMedia) await this.retiringMedia;
     if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
     return await this.spawn();
@@ -333,6 +336,7 @@ export class AgentSidecarSupervisor {
   async sealLegacyChatForColdStart(): Promise<LegacyChatSource> {
     if (
       !app.hasSingleInstanceLock() ||
+      NativeDesktopProfile.mediaOnly() ||
       this.legacyLaunchStarted ||
       this.isShuttingDown
     ) {
@@ -740,7 +744,7 @@ export class AgentSidecarSupervisor {
 
     const mode = this.agentEnabled
       ? "enabled"
-      : this.coldStartSource
+      : this.coldStartSource && !retained?.mediaOnly
         ? "native-chat"
         : "disabled";
     const agentEnabled = mode === "enabled";

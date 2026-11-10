@@ -285,7 +285,8 @@ export class NativeChatIpc {
     private readonly profilesOwner?: NativeChatProfileOwner,
     private readonly deckWorkspace?: (
       id: string
-    ) => Promise<WorkspaceMediaGrant>
+    ) => Promise<WorkspaceMediaGrant>,
+    private readonly disabled = false
   ) {}
 
   async deckRequest<T>(
@@ -376,6 +377,7 @@ export class NativeChatIpc {
   }
 
   available(event: IpcMainInvokeEvent): boolean | Promise<boolean> {
+    if (this.disabled) return false;
     if (!this.startup)
       return this.scope(event.sender, event.senderFrame) !== null;
     return this.status(event, true).then((state) => {
@@ -392,6 +394,7 @@ export class NativeChatIpc {
       throw new Error("native_chat_start_invalid");
     const workspaceId = this.workspaceId(sender, frame);
     if (!frame || !workspaceId) throw new Error("native_chat_scope_changed");
+    if (this.disabled) return "native-unavailable";
     const href = frame.url;
     if (this.scope(sender, frame)) return "native-ready";
     const startup = this.startup;

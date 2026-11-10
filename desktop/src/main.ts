@@ -608,11 +608,12 @@ app.on("ready", async () => {
 
   // Keep a disposable profile on the build it was launched to exercise.
   const nativeProfile = NativeDesktopProfile.selected();
+  const nativeChatProfile = nativeProfile && !NativeDesktopProfile.mediaOnly();
   let externalProfile: string | undefined;
   try {
     externalProfile = NativeExternalRuns.launchProfile(
       process.argv,
-      nativeProfile
+      nativeChatProfile
     );
   } catch {
     dialog.showErrorBox(
@@ -646,39 +647,43 @@ app.on("ready", async () => {
   if (nativeProfile) {
     try {
       const provider = await NativeDesktopProfile.configure(app);
-      const mcp = await NativeMcpLaunch.configure(
-        process.argv,
-        app.getPath("userData"),
-        provider
-      );
-      workspaceCatalog = nativeWorkspaceCatalog();
-      const options = {
-        provider,
-        mcp,
-        openExternal: (url: string) => shell.openExternal(url),
-        workspaceCatalogRoot: path.dirname(workspaceCatalog.directory),
-        workspaceGrant: workspaceCatalog.fileGrant.bind(workspaceCatalog),
-        selectableProfiles: strictRetainedMedia,
-      };
-      nativeDesktopAgent = NativeDesktopProfile.managedCutover()
-        ? await NativeDesktopAgent.prepareExisting(
-            accountSession,
-            process.resourcesPath,
-            {
-              requireDrainedClaim: true,
-              verifyWriterAdmission: async (identity, claimId) => {
-                if (!claimId) return false;
-                NativeDesktopProfile.beginPromotion({ ...identity, claimId });
-                return true;
-              },
-            },
-            options
+      const mcp = nativeChatProfile
+        ? await NativeMcpLaunch.configure(
+            process.argv,
+            app.getPath("userData"),
+            provider
           )
-        : await NativeDesktopAgent.prepareFresh(
-            accountSession,
-            process.resourcesPath,
-            options
-          );
+        : undefined;
+      workspaceCatalog = nativeWorkspaceCatalog();
+      if (nativeChatProfile) {
+        const options = {
+          provider,
+          mcp,
+          openExternal: (url: string) => shell.openExternal(url),
+          workspaceCatalogRoot: path.dirname(workspaceCatalog.directory),
+          workspaceGrant: workspaceCatalog.fileGrant.bind(workspaceCatalog),
+          selectableProfiles: strictRetainedMedia,
+        };
+        nativeDesktopAgent = NativeDesktopProfile.managedCutover()
+          ? await NativeDesktopAgent.prepareExisting(
+              accountSession,
+              process.resourcesPath,
+              {
+                requireDrainedClaim: true,
+                verifyWriterAdmission: async (identity, claimId) => {
+                  if (!claimId) return false;
+                  NativeDesktopProfile.beginPromotion({ ...identity, claimId });
+                  return true;
+                },
+              },
+              options
+            )
+          : await NativeDesktopAgent.prepareFresh(
+              accountSession,
+              process.resourcesPath,
+              options
+            );
+      }
       await workspaceCatalog.initialize();
       if (externalProfile) {
         const profileFile = externalProfile;
@@ -702,7 +707,7 @@ app.on("ready", async () => {
         privateFile: true,
       });
       agentSidecarClient.setWorkspaceCatalog(workspaceCatalog);
-      if (process.argv.includes("--native-chat")) {
+      if (nativeChatProfile && process.argv.includes("--native-chat")) {
         const catalog = workspaceCatalog;
         nativeEditorMcp = await NativeEditorMcpExport.start(
           process.argv,
@@ -724,12 +729,16 @@ app.on("ready", async () => {
       dialog.showErrorBox(
         externalProfile
           ? "External agent could not start"
-          : "Native chat could not start",
+          : nativeChatProfile
+            ? "Native chat could not start"
+            : "Native files could not start",
         externalProfile
           ? "Check the private launch profile and its registered workspace."
-          : NativeDesktopProfile.managedCutover()
-            ? "The managed legacy profile could not be verified for archival."
-            : "Use a fresh Desktop profile with a separate Grida agent data directory."
+          : !nativeChatProfile
+            ? "The managed file and media profile could not be verified."
+            : NativeDesktopProfile.managedCutover()
+              ? "The managed legacy profile could not be verified for archival."
+              : "Use a fresh Desktop profile with a separate Grida agent data directory."
       );
       app.quit();
       return;
@@ -792,6 +801,7 @@ app.on("ready", async () => {
   registerIpcHandlers({
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
     recent_files: recentFiles,
+    native_chat_disabled: NativeDesktopProfile.mediaOnly(),
     document_files: nativeDocuments,
     native_external_agent: nativeExternalRuns,
     resolve_document_window: (id) => documentWindows.get(id),
