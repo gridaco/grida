@@ -772,7 +772,10 @@ async function copyScratch(
   return copied;
 }
 
-async function inspectArchive(directory: string): Promise<Manifest> {
+async function inspectArchive(
+  directory: string,
+  retainedId?: string
+): Promise<Manifest> {
   checkPrivateDirectory(await fs.lstat(directory));
   const entries = await fs.opendir(directory);
   for await (const entry of entries) {
@@ -803,14 +806,31 @@ async function inspectArchive(directory: string): Promise<Manifest> {
     });
   }
   files.sort(comparePaths);
-  const inputCaveats = inspectInputs(database, files, sessions);
-  return {
+  const manifest: Manifest = {
     version: 1,
     sqliteVersion,
     sessionCount: sessions.size,
     files,
-    inputCaveats,
+    inputCaveats: [],
   };
+  try {
+    manifest.inputCaveats = inspectInputs(database, files, sessions, "stored");
+    if (!retainedId || sha256(encodeManifest(manifest)) === retainedId)
+      return manifest;
+  } catch (error) {
+    // An older receipt can fit even when the corrected projection expands
+    // beyond the caveat budget. File and database validation already ran.
+    if (
+      !retainedId ||
+      !(error instanceof ArchiveFailure) ||
+      error.code !== "archive_limit"
+    )
+      throw error;
+  }
+  // Previously published receipts used only the bare descriptor shape. Rebuild
+  // that interpretation against the same file evidence for exact verification.
+  manifest.inputCaveats = inspectInputs(database, files, sessions, "bare");
+  return manifest;
 }
 
 function comparePaths(a: FileEvidence, b: FileEvidence) {
@@ -820,7 +840,8 @@ function comparePaths(a: FileEvidence, b: FileEvidence) {
 function inspectInputs(
   database: string,
   files: FileEvidence[],
-  sessions: Set<string>
+  sessions: Set<string>,
+  descriptorShape: "stored" | "bare"
 ): InputCaveat[] {
   const evidence = new Map(files.map((file) => [file.path, file]));
   const scratchSessions = new Set(
@@ -848,11 +869,15 @@ function inspectInputs(
         typeof id !== "string" ||
         id.length > 128 ||
         typeof session_id !== "string" ||
-        !sessions.has(session_id)
+        !sessions.has(session_id) ||
+        (type !== FILE_ATTACHMENTS && type !== TEMPLATE_SELECTION)
       ) {
         throw new ArchiveFailure("invalid_database");
       }
-      const payload = parseDescriptor(data);
+      const payload = parseDescriptor(
+        data,
+        descriptorShape === "stored" ? type : undefined
+      );
       if (type === TEMPLATE_SELECTION) {
         if (payload?.bundle_location !== "scratch") {
           caveats.push({ partId: id, reason: "invalid_descriptor" });
@@ -907,33 +932,43 @@ function inspectInputs(
   return caveats;
 }
 
-function parseDescriptor(value: unknown): Record<string, unknown> | undefined {
+function parseDescriptor(
+  value: unknown,
+  expectedType?: string
+): Record<string, unknown> | undefined {
   if (typeof value !== "string") return undefined;
   try {
     const parsed: unknown = JSON.parse(value);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
+    if (!isRecord(parsed)) return undefined;
+    if (
+      expectedType &&
+      (Object.hasOwn(parsed, "type") || Object.hasOwn(parsed, "data"))
+    )
+      return parsed.type === expectedType && isRecord(parsed.data)
+        ? parsed.data
+        : undefined;
+    return parsed;
   } catch {
     /* The original malformed value remains in SQLite. */
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 async function verifyArchive(parent: string, id: string): Promise<Receipt> {
   const directory = path.join(parent, id);
   checkPrivateDirectory(await fs.lstat(directory));
-  const manifest = await inspectArchive(directory);
-  const encoded = encodeManifest(manifest);
   const existing = await digestFile(
     path.join(directory, MANIFEST_NAME),
     undefined,
     true
   );
-  if (
-    sha256(encoded) !== id ||
-    existing.sha256 !== id ||
-    existing.size !== encoded.byteLength
-  ) {
+  if (existing.sha256 !== id) throw new ArchiveFailure("invalid_receipt");
+  const manifest = await inspectArchive(directory, id);
+  const encoded = encodeManifest(manifest);
+  if (sha256(encoded) !== id || existing.size !== encoded.byteLength) {
     throw new ArchiveFailure("invalid_receipt");
   }
   return archiveReceipt(directory, id, manifest);

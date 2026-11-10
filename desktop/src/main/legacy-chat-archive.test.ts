@@ -575,6 +575,175 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
     expect(await archive.snapshotQuiesced()).toEqual(receipt);
   });
 
+  it("reads stored attachment parts and still verifies earlier immutable receipts", async () => {
+    const { archive, db, scratch } = await fixture();
+    createDatabase(db);
+    const filesType = "data-user_file_attachments";
+    const templateType = "data-user_template_selection";
+    const saved = {
+      location: "scratch",
+      files: [{ path: "upload.png", size: 4 }],
+    };
+    const legacy = new DatabaseSync(db);
+    try {
+      const insert = legacy.prepare(
+        "INSERT INTO chat_parts VALUES (?, 'ses_fixture', ?, ?)"
+      );
+      insert.run(
+        "wrapped_files",
+        filesType,
+        JSON.stringify({ type: filesType, data: saved })
+      );
+      insert.run(
+        "wrapped_template",
+        templateType,
+        JSON.stringify({
+          type: templateType,
+          data: { bundle_location: "scratch" },
+        })
+      );
+      insert.run(
+        "wrapped_wrong_type",
+        filesType,
+        JSON.stringify({ ...saved, type: templateType, data: saved })
+      );
+      insert.run(
+        "wrapped_wrong_size",
+        filesType,
+        JSON.stringify({
+          type: filesType,
+          data: {
+            location: "scratch",
+            files: [{ path: "upload.png", size: 3 }],
+          },
+        })
+      );
+      insert.run(
+        "wrapped_wrong_path",
+        filesType,
+        JSON.stringify({
+          type: filesType,
+          data: {
+            location: "scratch",
+            files: [{ path: "../upload.png", size: 4 }],
+          },
+        })
+      );
+    } finally {
+      legacy.close();
+    }
+    await fs.mkdir(scratch, { recursive: true, mode: 0o700 });
+    await fs.writeFile(path.join(scratch, "upload.png"), "abcd");
+    const current = (await archive.snapshotQuiesced())!;
+    expect(current.inputCaveats).toEqual([
+      { partId: "p_files", path: "swept.pdf", reason: "missing" },
+      { partId: "p_template", reason: "template_scratch_missing" },
+      { partId: "p_template_present", reason: "template_members_unknown" },
+      { partId: "wrapped_template", reason: "template_members_unknown" },
+      { partId: "wrapped_wrong_path", reason: "invalid_descriptor" },
+      {
+        partId: "wrapped_wrong_size",
+        path: "upload.png",
+        reason: "size_changed",
+      },
+      { partId: "wrapped_wrong_type", reason: "invalid_descriptor" },
+    ]);
+    expect(await archive.verify(current.id)).toEqual(current);
+
+    // Reconstruct the manifest a previous reader published over the exact same
+    // SQLite and scratch files, including its former caveat interpretation.
+    const inputCaveats = [
+      ...current.inputCaveats.slice(0, 3),
+      ...[
+        "wrapped_files",
+        "wrapped_template",
+        "wrapped_wrong_path",
+        "wrapped_wrong_size",
+      ].map((partId) => ({ partId, reason: "invalid_descriptor" })),
+    ];
+    const manifest = JSON.parse(
+      await fs.readFile(path.join(current.directory, "manifest.json"), "utf8")
+    );
+    const bytes = `${JSON.stringify({ ...manifest, inputCaveats })}\n`;
+    const id = createHash("sha256").update(bytes).digest("hex");
+    const directory = path.join(path.dirname(current.directory), id);
+    await fs.rename(current.directory, directory);
+    const manifestPath = path.join(directory, "manifest.json");
+    await fs.writeFile(manifestPath, bytes);
+    expect(await archive.verify(id)).toEqual({
+      ...current,
+      directory,
+      id,
+      inputCaveats,
+    });
+    expect(await fs.readFile(manifestPath, "utf8")).toBe(bytes);
+    await fs.writeFile(
+      path.join(directory, "scratch", "ses_fixture", "upload.png"),
+      "dcba"
+    );
+    await expect(archive.verify(id)).rejects.toThrow(
+      "Legacy chat archive: invalid_receipt"
+    );
+  });
+
+  it("verifies an old receipt when corrected caveats exceed the capture budget", async () => {
+    const { archive, archiveRoot, db } = await fixture();
+    createDatabase(db);
+    const type = "data-user_file_attachments";
+    const data = JSON.stringify({
+      type,
+      data: {
+        location: "scratch",
+        files: Array.from({ length: 64 }, (_, index) => ({
+          path: `missing-${index}.png`,
+          size: 4,
+        })),
+      },
+    });
+    const inputCaveats = Array.from({ length: 1_563 }, (_, index) => ({
+      partId: `part-${String(index).padStart(4, "0")}`,
+      reason: "invalid_descriptor",
+    }));
+    const legacy = new DatabaseSync(db);
+    try {
+      legacy.exec("BEGIN; DELETE FROM chat_parts");
+      const insert = legacy.prepare(
+        "INSERT INTO chat_parts VALUES (?, 'ses_fixture', ?, ?)"
+      );
+      for (const caveat of inputCaveats) insert.run(caveat.partId, type, data);
+      legacy.exec("COMMIT");
+    } finally {
+      legacy.close();
+    }
+    await expect(archive.snapshotQuiesced()).rejects.toThrow(
+      "Legacy chat archive: archive_limit"
+    );
+    const database = await fs.readFile(db);
+    const manifest = `${JSON.stringify({
+      version: 1,
+      sqliteVersion: 3,
+      sessionCount: 2,
+      files: [
+        {
+          path: "sessions.db",
+          size: database.length,
+          sha256: createHash("sha256").update(database).digest("hex"),
+        },
+      ],
+      inputCaveats,
+    })}\n`;
+    const id = createHash("sha256").update(manifest).digest("hex");
+    const directory = path.join(archiveRoot, id);
+    await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+    await fs.writeFile(path.join(directory, "sessions.db"), database, {
+      mode: 0o600,
+    });
+    await fs.writeFile(path.join(directory, "manifest.json"), manifest, {
+      mode: 0o600,
+    });
+    expect(await archive.verify(id)).toMatchObject({ id, inputCaveats });
+  });
+
   it("preserves a historical SRT candidate separately and reports conflicting bytes", async () => {
     const { db, root, scratch, scratchBase, userDataPath } = await fixture();
     createDatabase(db);
