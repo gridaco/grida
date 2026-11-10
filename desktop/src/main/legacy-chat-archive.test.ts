@@ -778,10 +778,13 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
       path.join(unrelated, "unrelated.txt"),
       "outside history"
     );
+    const source = { userDataPath, scratchBase };
     const archive = new LegacyChatArchive({
-      userDataPath,
-      scratchBase,
-      historicalSrtTempRoot,
+      ...source,
+      historicalScratch: await LegacyChatArchive.observeHistoricalScratch(
+        source,
+        historicalSrtTempRoot
+      ),
     });
     const before = await archive.snapshotQuiesced();
     expect(before?.inputCaveats).toContainEqual({
@@ -837,14 +840,27 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
     createDatabase(db);
     const historicalSrtTempRoot = path.join(await fs.realpath(root), "empty");
     await fs.mkdir(historicalSrtTempRoot, { mode: 0o700 });
+    const source = { userDataPath, scratchBase };
+    const historicalScratch = await LegacyChatArchive.observeHistoricalScratch(
+      source,
+      historicalSrtTempRoot
+    );
     const original = await archive.snapshotQuiesced();
     expect(
       await new LegacyChatArchive({
-        userDataPath,
-        scratchBase,
-        historicalSrtTempRoot,
+        ...source,
+        historicalScratch,
       }).snapshotQuiesced()
     ).toEqual(original);
+    const tag = createHash("sha256")
+      .update(userDataPath)
+      .digest("hex")
+      .slice(0, 16);
+    await fs.mkdir(path.join(historicalSrtTempRoot, `grida-agent-${tag}`));
+    await expect(
+      new LegacyChatArchive({ ...source, historicalScratch }).snapshotQuiesced()
+    ).rejects.toThrow("Legacy chat archive: historical_scratch_changed");
+    expect(await archive.verify(original!.id)).toEqual(original);
   });
 
   it("refuses an overlapping historical scratch root or a symlink candidate", async () => {
@@ -858,11 +874,15 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
       .slice(0, 16);
     const historical = path.join(historicalSrtTempRoot, `grida-agent-${tag}`);
     await fs.mkdir(historical, { recursive: true, mode: 0o700 });
+    const historicalScratch = await LegacyChatArchive.observeHistoricalScratch(
+      { userDataPath, scratchBase },
+      historicalSrtTempRoot
+    );
     await expect(
       new LegacyChatArchive({
         userDataPath,
         scratchBase: historical,
-        historicalSrtTempRoot,
+        historicalScratch,
       }).snapshotQuiesced()
     ).rejects.toThrow("Legacy chat archive: unsafe_source");
     await fs.rename(historical, scratchBase);
@@ -871,10 +891,12 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
       new LegacyChatArchive({
         userDataPath,
         scratchBase,
-        historicalSrtTempRoot,
+        historicalScratch,
       }).snapshotQuiesced()
     ).rejects.toThrow("Legacy chat archive: unsafe_source");
-    expect(await fs.readdir(archiveRoot)).toEqual([]);
+    await expect(fs.lstat(archiveRoot)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
   it("restarts a partial archive and converges concurrent retries without replacing receipts", async () => {

@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 — private preservation of the retired chat store and scratch.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { constants, type Stats } from "node:fs";
+import { constants, type BigIntStats, type Stats } from "node:fs";
 import fs, { type FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { backup, DatabaseSync } from "node:sqlite";
@@ -40,12 +40,16 @@ const TEMPLATE_SELECTION = "data-user_template_selection";
 const SCRATCH_ARCHIVES = ["scratch", "scratch-srt"] as const;
 type ScratchArchive = (typeof SCRATCH_ARCHIVES)[number];
 type ScratchBudget = { entries: number; pathBytes: number };
+export type HistoricalScratchWitness = Readonly<{
+  tempRoot: string;
+  tempDirectoryId: string;
+  scratchDirectoryId: string | null;
+}>;
 type Source = Readonly<{
   userDataPath: string;
   scratchBase: string;
-  /** Exact canonical temp root attested from the legacy SRT launch. The
-   * caller also establishes quiescence for this root before capture. */
-  historicalSrtTempRoot?: string;
+  /** The trusted owner observed this temp root and established quiescence. */
+  historicalScratch?: HistoricalScratchWitness;
 }>;
 type FileEvidence = { path: string; size: number; sha256: string };
 type InputCaveat = {
@@ -91,12 +95,43 @@ export class LegacyChatArchive {
   readonly historicalScratchBase: string | undefined;
 
   constructor(source: Source) {
-    this.source = { ...source };
-    if (source.historicalSrtTempRoot !== undefined) {
+    const historicalScratch = source.historicalScratch;
+    this.source = {
+      ...source,
+      historicalScratch: historicalScratch && { ...historicalScratch },
+    };
+    if (historicalScratch) {
+      if (
+        !DIGEST.test(historicalScratch.tempDirectoryId) ||
+        (historicalScratch.scratchDirectoryId !== null &&
+          !DIGEST.test(historicalScratch.scratchDirectoryId))
+      )
+        throw new ArchiveFailure("unsafe_source");
       this.historicalScratchBase = historicalScratchBase(
         source.userDataPath,
-        source.historicalSrtTempRoot
+        historicalScratch.tempRoot
       );
+    }
+  }
+
+  /** Record the exact roots observed by the legacy launch owner. This checks
+   * directory identity; the caller still owns process and command drain. */
+  static async observeHistoricalScratch(
+    source: Omit<Source, "historicalScratch">,
+    tempRoot: string
+  ): Promise<HistoricalScratchWitness> {
+    try {
+      requirePrivatePlatform();
+      const userData = await canonicalDirectory(source.userDataPath);
+      if (!userData) throw new ArchiveFailure("source_missing");
+      const { witness } = await inspectHistoricalScratch(
+        historicalScratchBase(source.userDataPath, tempRoot),
+        userData,
+        (await canonicalDirectory(source.scratchBase)) ?? source.scratchBase
+      );
+      return Object.freeze(witness);
+    } catch (error) {
+      return safeFailure(error);
     }
   }
 
@@ -149,6 +184,26 @@ export class LegacyChatArchive {
     } catch (error) {
       return safeFailure(error);
     }
+  }
+
+  private async verifyHistoricalScratch(
+    userData: string,
+    scratch: string | undefined
+  ) {
+    const expected = this.source.historicalScratch;
+    const candidate = this.historicalScratchBase;
+    if (!expected || !candidate) return;
+    const { witness, directory } = await inspectHistoricalScratch(
+      candidate,
+      userData,
+      scratch ?? this.source.scratchBase
+    );
+    if (
+      witness.tempDirectoryId !== expected.tempDirectoryId ||
+      witness.scratchDirectoryId !== expected.scratchDirectoryId
+    )
+      throw new ArchiveFailure("historical_scratch_changed");
+    return directory;
   }
 
   private async snapshot(seal?: Seal): Promise<Receipt | null> {
@@ -232,6 +287,17 @@ export class LegacyChatArchive {
           interruptedArchive = verified;
         }
       }
+      const scratch = await canonicalDirectory(this.source.scratchBase);
+      if (
+        scratch &&
+        (contains(scratch, userData) || contains(userData, scratch))
+      ) {
+        throw new ArchiveFailure("unsafe_source");
+      }
+      const historicalScratch = await this.verifyHistoricalScratch(
+        userData,
+        scratch
+      );
       await makePrivateDirectory(parent);
       await checkArchiveRoot(parent);
       const pending = path.join(parent, PENDING_NAME);
@@ -266,18 +332,6 @@ export class LegacyChatArchive {
         destination.close();
       }
       await syncFile(archivedDb);
-      const scratch = await canonicalDirectory(this.source.scratchBase);
-      if (
-        scratch &&
-        (contains(scratch, userData) || contains(userData, scratch))
-      ) {
-        throw new ArchiveFailure("unsafe_source");
-      }
-      const historicalScratch = await captureHistoricalScratch(
-        this.historicalScratchBase,
-        userData,
-        scratch
-      );
       const { sessions } = readDatabase(archivedDb);
       const budget = { entries: 0, pathBytes: 0 };
       const copied = scratch
@@ -291,9 +345,6 @@ export class LegacyChatArchive {
           "scratch-srt",
           budget
         );
-        const current = await fs.lstat(historicalScratch.directory);
-        if (!sameSnapshot(historicalScratch.stat, current))
-          throw new ArchiveFailure("source_changed");
         for (const file of historicalFiles) copied.push(file);
       }
       const manifest = await inspectArchive(stage);
@@ -317,6 +368,20 @@ export class LegacyChatArchive {
         await manifestFile.close();
       }
       await syncDirectory(stage);
+      const retainedHistoricalScratch = await this.verifyHistoricalScratch(
+        userData,
+        scratch
+      );
+      if (
+        historicalScratch &&
+        (!retainedHistoricalScratch ||
+          historicalScratch.stat.mtimeNs !==
+            retainedHistoricalScratch.stat.mtimeNs ||
+          historicalScratch.stat.ctimeNs !==
+            retainedHistoricalScratch.stat.ctimeNs ||
+          historicalScratch.stat.size !== retainedHistoricalScratch.stat.size)
+      )
+        throw new ArchiveFailure("source_changed");
       if (!sameSnapshot(current, await fs.lstat(sourceDb))) {
         throw new ArchiveFailure("source_changed");
       }
@@ -384,6 +449,7 @@ type FailureCode =
   | "source_changed"
   | "source_busy"
   | "source_fence_incomplete"
+  | "historical_scratch_changed"
   | "unsupported_platform"
   | "unsafe_archive"
   | "invalid_database"
@@ -692,18 +758,15 @@ function historicalScratchBase(userDataPath: string, temp: string): string {
   return path.join(temp, `grida-agent-${tag}`);
 }
 
-async function captureHistoricalScratch(
-  candidate: string | undefined,
+async function inspectHistoricalScratch(
+  candidate: string,
   userData: string,
-  scratch: string | undefined
+  scratch: string
 ) {
-  if (candidate === undefined) return;
   const temp = path.dirname(candidate);
-  const tempStat = await statIfPresent(temp);
-  if (!tempStat) return;
-  if (!tempStat.isDirectory() || (await fs.realpath(temp)) !== temp)
-    throw new ArchiveFailure("unsafe_source");
-  const otherRoots = [userData, scratch].filter((root) => root !== undefined);
+  const tempStat = await historicalDirectoryStat(temp);
+  if (!tempStat) throw new ArchiveFailure("historical_scratch_changed");
+  const otherRoots = [userData, scratch];
   if (
     otherRoots.some(
       (root) => contains(root, candidate) || contains(candidate, root)
@@ -711,16 +774,57 @@ async function captureHistoricalScratch(
   ) {
     throw new ArchiveFailure("unsafe_source");
   }
-  const directory = await canonicalDirectory(candidate);
-  if (!directory) return;
-  if (directory !== candidate) throw new ArchiveFailure("unsafe_source");
-  const stat = await fs.lstat(directory);
-  checkSourceDirectory(stat);
-  for (const root of otherRoots) {
-    if (sameIdentity(stat, await fs.lstat(root)))
-      throw new ArchiveFailure("unsafe_source");
+  const stat = await historicalDirectoryStat(candidate);
+  if (stat) {
+    for (const root of otherRoots) {
+      const other = await statIfPresent(root);
+      if (
+        other &&
+        Number(stat.dev) === other.dev &&
+        Number(stat.ino) === other.ino
+      )
+        throw new ArchiveFailure("unsafe_source");
+    }
   }
-  return { directory, stat };
+  return {
+    witness: {
+      tempRoot: temp,
+      tempDirectoryId: historicalDirectoryId(temp, tempStat),
+      scratchDirectoryId: stat ? historicalDirectoryId(candidate, stat) : null,
+    },
+    directory: stat ? { directory: candidate, stat } : undefined,
+  };
+}
+
+async function historicalDirectoryStat(
+  directory: string
+): Promise<BigIntStats | undefined> {
+  const resolved = await canonicalDirectory(directory);
+  if (!resolved) return;
+  if (resolved !== directory) throw new ArchiveFailure("unsafe_source");
+  const stat = await fs.lstat(directory, { bigint: true });
+  if (
+    !stat.isDirectory() ||
+    stat.uid !== BigInt(process.geteuid!()) ||
+    (stat.mode & 0o022n) !== 0n ||
+    stat.birthtimeNs <= 0n ||
+    (await fs.realpath(directory)) !== directory
+  )
+    throw new ArchiveFailure("unsafe_source");
+  return stat;
+}
+
+function historicalDirectoryId(directory: string, stat: BigIntStats): string {
+  return sha256(
+    Buffer.from(
+      JSON.stringify([
+        directory,
+        stat.dev.toString(),
+        stat.ino.toString(),
+        stat.birthtimeNs.toString(),
+      ])
+    )
+  );
 }
 
 async function copyScratch(

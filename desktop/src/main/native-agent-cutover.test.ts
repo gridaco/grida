@@ -319,7 +319,10 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
         source.ino.toString(),
       ]),
       scratchId: digest(["legacy-chat-scratch-v1", test.scratchBase]),
-      tempRoot,
+      witness: await LegacyChatArchive.observeHistoricalScratch(
+        { userDataPath: test.legacy, scratchBase: test.scratchBase },
+        tempRoot
+      ),
     };
     const verifyWriterAdmission = vi.fn<LegacyChatWriterAdmission>(
       async () => true
@@ -334,6 +337,19 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     expect(fs.existsSync(test.archiveRoot)).toBe(false);
 
     const admission = { verifyWriterAdmission, historicalScratch };
+    const displaced = historicalBase + ".displaced";
+    fs.renameSync(historicalBase, displaced);
+    await expect(test.prepare(undefined, admission)).rejects.toThrow(
+      "historical_scratch_changed"
+    );
+    fs.mkdirSync(historicalBase, { mode: 0o700 });
+    await expect(test.prepare(undefined, admission)).rejects.toThrow(
+      "historical_scratch_changed"
+    );
+    expect(fs.existsSync(test.archiveRoot)).toBe(false);
+    fs.rmdirSync(historicalBase);
+    fs.renameSync(displaced, historicalBase);
+
     const unfinished = path.join(historicalBase, "commands", "cmd-unverified");
     fs.mkdirSync(unfinished, { mode: 0o700, recursive: true });
     await expect(test.prepare(undefined, admission)).rejects.toThrow(
@@ -357,6 +373,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
         "utf8"
       )
     ).toBe("four");
+    fs.renameSync(tempRoot, tempRoot + ".retired");
     const reopened = await test.prepare(undefined, admission);
     expect(reopened.archive).toEqual(first.archive);
     await expect(test.prepare()).rejects.toThrow(
@@ -367,7 +384,10 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
         ...admission,
         historicalScratch: {
           ...historicalScratch,
-          tempRoot: test.child("different-srt"),
+          witness: await LegacyChatArchive.observeHistoricalScratch(
+            { userDataPath: test.legacy, scratchBase: test.scratchBase },
+            test.child("different-srt")
+          ),
         },
       })
     ).rejects.toThrow("native_chat_cutover_source_changed");

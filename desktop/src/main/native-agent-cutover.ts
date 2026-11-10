@@ -4,7 +4,10 @@ import { constants, type Stats } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { sealLegacyChatForColdStart } from "./agent-sidecar-supervisor";
-import { LegacyChatArchive } from "./legacy-chat-archive";
+import {
+  LegacyChatArchive,
+  type HistoricalScratchWitness,
+} from "./legacy-chat-archive";
 import {
   LegacyChatSourceLease,
   type LegacyChatWriterAdmission,
@@ -36,7 +39,9 @@ type Ready = Readonly<{
 
 type Launch = Omit<NativeAgentChatLaunch, "stateDirectory">;
 type HistoricalScratchEvidence = Readonly<
-  Parameters<LegacyChatWriterAdmission>[0] & { tempRoot: string }
+  Parameters<LegacyChatWriterAdmission>[0] & {
+    witness: HistoricalScratchWitness;
+  }
 >;
 export type ExistingCutoff = Readonly<{
   verifyWriterAdmission: LegacyChatWriterAdmission;
@@ -65,6 +70,7 @@ export class NativeAgentCutover {
       ...existing,
       historicalScratch: existing.historicalScratch && {
         ...existing.historicalScratch,
+        witness: { ...existing.historicalScratch.witness },
       },
     });
   }
@@ -116,7 +122,7 @@ export class NativeAgentCutover {
     const archive = existing
       ? new LegacyChatArchive({
           ...source,
-          historicalSrtTempRoot: historical?.tempRoot,
+          historicalScratch: historical?.witness,
         })
       : undefined;
     const historicalBase = archive?.historicalScratchBase;
@@ -124,7 +130,14 @@ export class NativeAgentCutover {
     if (historical && historicalBase) {
       if ([desktop, ...separate].some((root) => overlaps(root, historicalBase)))
         throw new Error("native_chat_cutover_historical_scratch_overlap");
-      basis.push(historical.sourceId, historical.scratchId, historicalBase);
+      const { tempDirectoryId, scratchDirectoryId } = historical.witness;
+      basis.push(
+        historical.sourceId,
+        historical.scratchId,
+        historicalBase,
+        tempDirectoryId,
+        scratchDirectoryId ?? "absent"
+      );
       separate.push(historicalBase);
     }
     if (!existing)
@@ -281,7 +294,7 @@ async function retireLegacy(
       if (retained && !retained.archiveId)
         throw new Error("native_chat_cutover_archive_changed");
       await requireDrainedCommands(source.scratchBase);
-      if (archive.historicalScratchBase)
+      if (!retained && archive.historicalScratchBase)
         await requireDrainedCommands(archive.historicalScratchBase, true);
       cutoff = await archive.sealQuiesced({
         requestId,
