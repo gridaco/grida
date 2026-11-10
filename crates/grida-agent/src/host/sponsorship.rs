@@ -587,6 +587,7 @@ impl Host {
         captured.permission_capture = None;
         captured.host_tools_capture = None;
         captured.desktop_image_generation = None;
+        captured.allow_image_reference = false;
         captured.editor_endpoint = None;
         captured.editor_presentation = false;
         captured.editor_svg_target = None;

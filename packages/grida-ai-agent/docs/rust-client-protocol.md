@@ -486,6 +486,15 @@ Cancellation aborts the matching request and preserves uncertainty about any
 completed provider work. Confirmed generation without retention ends the turn
 with a factual summary before another inference can repeat the request.
 
+The reviewed OpenRouter PNG profile can also negotiate
+`co.grida/media/image-reference` version 1 with both Library operations.
+An identified Act input with Library selection enabled can offer
+`library_reference_id` on `generate_image`. It resolves one verified selection
+from that turn's successful Library tool receipt. The worker checks the
+chat-owned bytes and sends one bounded `referencePng` to Main. The media
+service verifies the same provider variant and constructs its inline image
+input. A missing or stale selection fails before generation.
+
 ### Persistent goal operations
 
 Negotiate each `co.grida/goal/` capability at version `1`. The methods apply

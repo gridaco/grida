@@ -115,6 +115,7 @@ export class NativeAgentProcess {
   private nextId = 1;
   private ready = false;
   private imageInput = false;
+  private imageReference = false;
   private librarySelection = false;
   private fileInput = false;
   private agentEffort = false;
@@ -456,6 +457,9 @@ export class NativeAgentProcess {
             clientCapabilities: {
               _meta: {
                 ...capabilities,
+                ...(imageGeneration?.supportsReference && {
+                  [NativeImageGeneration.referenceCapability]: 1,
+                }),
                 ...NativeAgentCommands.capabilities,
                 ...NativeAgentRevisions.capabilities,
                 [NativeAgentGoals.completionCapability]: 1,
@@ -503,6 +507,10 @@ export class NativeAgentProcess {
       }
       processOwner.imageInput =
         object(agentCapabilities?.promptCapabilities)?.image === true;
+      processOwner.imageReference =
+        imageGeneration?.supportsReference === true &&
+        processOwner.imageInput &&
+        advertised?.[NativeImageGeneration.referenceCapability] === 1;
       processOwner.librarySelection =
         options.workspace !== undefined &&
         processOwner.imageInput &&
@@ -718,7 +726,7 @@ export class NativeAgentProcess {
         ) {
           const id = message.id;
           void this.imageGeneration
-            .generate(id, message.params)
+            .generate(id, message.params, this.imageReference)
             .then((result) => {
               if (this.connected) this.write({ jsonrpc: "2.0", id, result });
             })

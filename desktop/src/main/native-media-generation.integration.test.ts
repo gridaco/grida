@@ -12,6 +12,9 @@ const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const model = "openai/gpt-5.6-terra";
 const credential = "retained-image-fixture-key";
 const mediaId = "cf1e741a-cddd-4c14-b5f4-bf6a44b5ed28";
+const libraryId = "c04cacb3-70ba-4181-89cf-27079ea97ca2";
+const referencePng =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPg/88AAAIvAQ+3s0AMAAAAAElFTkSuQmCC";
 const prompt = "A blue circle on a clear background";
 const poll = { timeout: 7000 };
 
@@ -35,6 +38,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         });
         expect(body.model_id).toEqual(expect.any(String));
         expect(body.binding_id).toEqual(expect.any(String));
+        expect(body.reference_png).toBe(
+          media.mock.calls.length === 4 ? referencePng : undefined
+        );
         const { nonce, proof } = body.credential;
         expect(nonce).toMatch(/^[a-f0-9]{32}$/);
         expect(proof).toBe(
@@ -69,8 +75,8 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       );
       const secrets = new SecretsStore(new AuthStore(root), credentialHome);
       await secrets.set("openrouter", credential);
-      const select = () =>
-        NativeProviderSelection.builtInByok("openrouter", model, {
+      const select = (chatModel: string) =>
+        NativeProviderSelection.builtInByok("openrouter", chatModel, {
           credentialHome,
           hasKey: (id) => secrets.has(id),
           imageRequest: media,
@@ -82,39 +88,31 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
               expect(headers.get("authorization")).toBe(`Bearer ${credential}`);
               return async (body) => {
                 chatRequests.push(JSON.parse(body.toString()));
-                const call = [1, 4, 5].includes(chatRequests.length);
-                return completion(
-                  call
-                    ? {
-                        tool_calls: [
-                          {
-                            index: 0,
-                            id: "fixture-image",
-                            type: "function",
-                            function: {
-                              name: "generate_image",
-                              arguments: JSON.stringify({
-                                prompt,
-                                background: "transparent",
-                              }),
-                            },
-                          },
-                        ],
-                      }
-                    : { content: "Finished." },
-                  call ? "tool_calls" : "stop"
-                );
+                const step = chatRequests.length;
+                if (step === 6)
+                  return toolCompletion("design_search", {
+                    initial_search_query: "blue circles",
+                  });
+                if ([1, 4, 5, 7, 9, 11].includes(step))
+                  return toolCompletion("generate_image", {
+                    prompt,
+                    background: "transparent",
+                    ...([7, 9].includes(step) && {
+                      library_reference_id: libraryId,
+                    }),
+                  });
+                return completion({ content: "Finished." }, "stop");
               };
             },
           }),
         });
-      const start = async () => {
-        const launch = await select();
+      const start = async (chatModel = model, state = stateDirectory) => {
+        const launch = await select(chatModel);
         expect(launch.imageGeneration).toBeDefined();
         return NativeAgentChat.start({
           ...launch,
           resourcesPath: resources!,
-          stateDirectory,
+          stateDirectory: state,
           cwd,
           workspace: {
             id: "media-workspace",
@@ -254,6 +252,115 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       );
       expect(media).toHaveBeenCalledTimes(3);
       expect(chatRequests).toHaveLength(5);
+
+      const referenceChat = await reopened.create();
+      const referenced = await reopened.submitWithLibrarySelection(
+        referenceChat,
+        "select-and-generate",
+        "Select a Library reference, then generate an image with it.",
+        "act"
+      );
+      const waiting = await vi.waitFor(async () => {
+        const snapshot = await reopened.observe(referenceChat);
+        expect(snapshot.current).toMatchObject({
+          turnId: referenced.turnId,
+          disposition: "suspended",
+        });
+        return snapshot;
+      }, poll);
+      await reopened.pause(referenceChat, waiting, "hold-library-selection");
+      const paused = await reopened.observe(referenceChat);
+      expect(paused.current?.paused).toBe(true);
+      const reviews = await reopened.librarySelections(referenceChat, paused);
+      expect(reviews).toHaveLength(1);
+      expect(reviews[0].initialSearchQuery).toBe("blue circles");
+      await reopened.answerLibrarySelection(referenceChat, reviews[0], {
+        kind: "selected",
+        id: libraryId,
+        png: Uint8Array.from(Buffer.from(referencePng, "base64")),
+      });
+      expect(media).toHaveBeenCalledTimes(3);
+      expect(chatRequests).toHaveLength(6);
+      await reopened.close();
+      owner = undefined;
+
+      const resumed = await start();
+      owner = resumed;
+      const referenceSession = await resumed.load(referenceChat.id);
+      const held = await resumed.observe(referenceSession);
+      expect(held.current).toMatchObject({
+        turnId: referenced.turnId,
+        disposition: "suspended",
+        paused: true,
+      });
+      expect(chatRequests).toHaveLength(6);
+      await resumed.resume(referenceSession, held, "resume-with-reference");
+      await vi.waitFor(async () => {
+        expect((await resumed.observe(referenceSession)).latest).toMatchObject({
+          turnId: referenced.turnId,
+          status: "succeeded",
+        });
+      }, poll);
+      expect(media).toHaveBeenCalledTimes(4);
+      expect(chatRequests).toHaveLength(8);
+      expect(JSON.stringify(chatRequests[5].tools)).toContain(
+        "library_reference_id"
+      );
+      expect(JSON.stringify(chatRequests[6])).toContain(
+        `data:image/png;base64,${referencePng}`
+      );
+
+      const stale = await resumed.submitWithLibrarySelection(
+        referenceSession,
+        "prior-reference",
+        "Try to generate with the prior turn's reference.",
+        "act"
+      );
+      await vi.waitFor(async () => {
+        expect((await resumed.observe(referenceSession)).latest).toMatchObject({
+          turnId: stale.turnId,
+          status: "succeeded",
+        });
+      }, poll);
+      expect(media).toHaveBeenCalledTimes(4);
+      expect(chatRequests).toHaveLength(10);
+      expect(JSON.stringify(chatRequests[8])).not.toContain(referencePng);
+      const messages = chatRequests[9].messages as {
+        role: string;
+        content: string;
+      }[];
+      const refusal = messages.findLast((message) => message.role === "tool");
+      expect(JSON.parse(refusal!.content)).toMatchObject({ status: "failed" });
+
+      await resumed.close();
+      owner = undefined;
+      const textOnly = await start(
+        "openai/gpt-5.5",
+        path.join(root, "text-state")
+      );
+      owner = textOnly;
+      expect(textOnly.acceptsLibrarySelection).toBe(false);
+      const plainSession = await textOnly.create();
+      const plain = await textOnly.submit(
+        plainSession,
+        "text-only",
+        prompt,
+        "act"
+      );
+      await vi.waitFor(async () => {
+        expect((await textOnly.observe(plainSession)).latest).toMatchObject({
+          turnId: plain.turnId,
+          status: "succeeded",
+        });
+      }, poll);
+      expect(media).toHaveBeenCalledTimes(5);
+      expect(chatRequests).toHaveLength(12);
+      expect(JSON.stringify(chatRequests[10].tools)).toContain(
+        "generate_image"
+      );
+      expect(JSON.stringify(chatRequests[10].tools)).not.toContain(
+        "library_reference_id"
+      );
     } finally {
       try {
         await owner?.close();
@@ -262,8 +369,24 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       }
     }
   },
-  45_000
+  75_000
 );
+
+function toolCompletion(name: string, args: object): Response {
+  return completion(
+    {
+      tool_calls: [
+        {
+          index: 0,
+          id: `fixture-${name}`,
+          type: "function",
+          function: { name, arguments: JSON.stringify(args) },
+        },
+      ],
+    },
+    "tool_calls"
+  );
+}
 
 function completion(
   delta: object,

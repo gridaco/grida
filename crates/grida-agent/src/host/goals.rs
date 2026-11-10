@@ -377,6 +377,7 @@ impl Host {
         captured.allow_wakeups = false;
         captured.allow_library_selection = false;
         captured.desktop_image_generation = None;
+        captured.allow_image_reference = false;
         captured.configuration_permission = crate::ConfigurationPermission::Disabled;
         if let Some(permission) = &captured.permission_capture {
             let profile = self

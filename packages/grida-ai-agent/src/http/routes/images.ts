@@ -25,6 +25,7 @@ import type { GGDiscoveryStore } from "@grida/ai";
  */
 
 import { createHash, timingSafeEqual } from "node:crypto";
+import { crc32 } from "node:zlib";
 import type { Hono } from "hono";
 import { ImageClient } from "@grida/ai";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
@@ -49,7 +50,11 @@ const RETAINED_IMAGE_FIELDS = new Set([
   "background",
   "credential",
   "n",
+  "reference_png",
 ]);
+const MAX_REFERENCE_BYTES = 256 * 1024;
+const MAX_REFERENCE_PIXELS = 4 * 1024 * 1024;
+const PNG_SIGNATURE = Buffer.from("89504e470d0a1a0a", "hex");
 const RETAINED_IMAGE_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -104,12 +109,15 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
     const retainedOnly = c.req.header("accept") === RETAINED_IMAGE_TYPE;
     let imageKeys: Pick<SecretsStore, "_getKey"> = secrets;
     let requiredBinding: string | undefined;
+    let reference: string | undefined;
     if (retainedOnly) {
       const request = await c.req.json<Record<string, unknown>>();
       const credential = retainedCredential(request.credential);
+      reference = retainedReference(request.reference_png);
       if (
         (provider !== "openrouter" && provider !== "vercel") ||
         !credential ||
+        (request.reference_png !== undefined && !reference) ||
         typeof request.binding_id !== "string" ||
         !request.binding_id ||
         request.binding_id.length > 256 ||
@@ -148,7 +156,11 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
           gg_catalog,
         },
         model_id,
-        { ...(provider ? { explicit: provider } : {}), background }
+        {
+          ...(provider ? { explicit: provider } : {}),
+          ...(reference && { references: true }),
+          background,
+        }
       );
     } catch (e) {
       if (e instanceof ImageModelUnavailableError) {
@@ -178,6 +190,7 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
           : {}),
         ...(seed !== undefined ? { seed } : {}),
         ...(quality ? { quality } : {}),
+        ...(reference && { references: [reference] }),
         signal: c.req.raw.signal,
       });
     } catch (e) {
@@ -263,6 +276,53 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
       images,
     });
   });
+}
+
+function retainedReference(value: unknown): string | undefined {
+  if (
+    typeof value !== "string" ||
+    value.length > Math.ceil(MAX_REFERENCE_BYTES / 3) * 4
+  )
+    return undefined;
+  const bytes = Buffer.from(value, "base64");
+  if (
+    bytes.length < 45 ||
+    bytes.length > MAX_REFERENCE_BYTES ||
+    !bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE) ||
+    bytes.toString("base64") !== value ||
+    bytes.readUInt32BE(8) !== 13 ||
+    bytes.toString("ascii", 12, 16) !== "IHDR"
+  )
+    return undefined;
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+  if (!width || !height || width * height > MAX_REFERENCE_PIXELS)
+    return undefined;
+
+  // The native owner already decoded the image. Recheck the bounded PNG
+  // envelope at this service boundary before constructing a provider input.
+  let hasData = false;
+  for (let offset = 8; offset + 12 <= bytes.length; ) {
+    const size = bytes.readUInt32BE(offset);
+    const end = offset + 8 + size;
+    if (end + 4 > bytes.length) return undefined;
+    const type = bytes.toString("latin1", offset + 4, offset + 8);
+    if (
+      !/^[A-Za-z]{4}$/.test(type) ||
+      (offset !== 8 && type === "IHDR") ||
+      type === "acTL" ||
+      crc32(bytes.subarray(offset + 4, end)) !== bytes.readUInt32BE(end)
+    )
+      return undefined;
+    if (type === "IDAT" && size > 0) hasData = true;
+    if (type === "IEND") {
+      return hasData && size === 0 && end + 4 === bytes.length
+        ? `data:image/png;base64,${value}`
+        : undefined;
+    }
+    offset = end + 4;
+  }
+  return undefined;
 }
 
 function retainedCredential(value: unknown) {

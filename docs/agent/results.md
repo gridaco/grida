@@ -26,6 +26,10 @@ one image from text and can honor an explicit background where the connection
 supports it. The selected connection uses your saved provider key for the
 request.
 
+On the reviewed OpenRouter image connection, you can ask the agent to use a
+Library reference. Choose one image when prompted. The generator receives the
+PNG from that choice in the same turn. [Choose a reference](./clients.md#choose-a-reference-the-agent-asks-for)
+
 Check **Turn summary** for the result. Desktop keeps a retained image in
 **Tools → Recents**. If the provider generated the image and Desktop could
 not retain it, the summary explains what happened and the turn ends without

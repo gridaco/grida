@@ -326,6 +326,8 @@ struct StoredPrompt {
     host_tools_capture: Option<host_tools::Capture>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     desktop_image_generation: Option<BindingId>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    allow_image_reference: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     editor_endpoint: Option<BindingId>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -454,6 +456,7 @@ struct PreparedInput {
     captured: Option<ConfigurationSnapshot>,
     permission_capture: Option<crate::permissions::PermissionCapture>,
     host_tools: Vec<Arc<host_tools::HostTools>>,
+    image_generation: Option<image_generation::Prepared>,
     guidance: Option<Message>,
     goal: Option<goals::GoalInput>,
     completion_checks: Option<CompletionChecks>,
@@ -1395,6 +1398,13 @@ impl Host {
                 )
             })
             .transpose()?;
+        if let Some(image_generation) = prepared.image_generation.take() {
+            prepared.host_tools.push(image_generation.bind(
+                self.store.clone(),
+                execution,
+                claim.lease.binding(),
+            )?);
+        }
         let host_tools = prepared
             .host_tools
             .into_iter()
@@ -1734,6 +1744,12 @@ impl Host {
         };
         let host_tools_capture =
             self.capture_host_tools(!child_work && allow_host_tools && operating_regime.is_act())?;
+        let allow_image_reference = allow_library_selection
+            && desktop_image_generation.is_some()
+            && self
+                .desktop_image_generation
+                .as_ref()
+                .is_some_and(image_generation::DesktopImageGeneration::references);
         let guidance = if child_work {
             None
         } else if self.side_context.is_some() {
@@ -1815,6 +1831,7 @@ impl Host {
                     permission_capture,
                     host_tools_capture,
                     desktop_image_generation,
+                    allow_image_reference,
                     editor_endpoint,
                     editor_presentation,
                     editor_svg_target,
@@ -1850,6 +1867,7 @@ impl Host {
         }
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
         let mut host_tools = Vec::new();
+        let mut image_generation = None;
         let mut subagent = false;
         let mut effort = None;
         let mut retained_file = None;
@@ -1928,6 +1946,7 @@ impl Host {
                         || stored.permission_capture.is_some()
                         || stored.host_tools_capture.is_some()
                         || stored.desktop_image_generation.is_some()
+                        || stored.allow_image_reference
                         || stored.editor_endpoint.is_some()
                         || stored.editor_presentation
                         || stored.editor_svg_target.is_some()
@@ -2015,6 +2034,7 @@ impl Host {
                         || stored.goal.is_some()
                         || subagent
                         || self.side_context.is_some()
+                        || (stored.allow_image_reference && !stored.allow_library_selection)
                     {
                         return Err(problem(
                             ErrorKind::InvalidState,
@@ -2031,10 +2051,12 @@ impl Host {
                                 "retained_image_generation_binding_unavailable",
                             )
                         })?;
-                    host_tools.push(Arc::new(host_tools::HostTools::image_generation(
-                        owner.tool_host(session.clone())?,
-                        binding.clone(),
-                    )?));
+                    image_generation = Some(owner.prepare(stored.allow_image_reference)?);
+                } else if !cancellation_only && stored.allow_image_reference {
+                    return Err(problem(
+                        ErrorKind::InvalidState,
+                        "invalid_image_generation_scope",
+                    ));
                 }
                 authority.validate(
                     stored.authority.as_ref(),
@@ -2137,6 +2159,7 @@ impl Host {
             captured,
             permission_capture,
             host_tools,
+            image_generation,
             guidance,
             goal,
             completion_checks,

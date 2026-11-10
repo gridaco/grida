@@ -17,6 +17,8 @@ const RECEIPT_TYPE = "application/vnd.grida.retained-image+json";
 const MAX_RESPONSE_BYTES = 16 * 1024;
 const MAX_IMAGE_BYTES = 64 * 1024 * 1024;
 const MAX_PROMPT_BYTES = 8 * 1024;
+const MAX_REFERENCE_BYTES = 256 * 1024;
+const PNG_SIGNATURE = Buffer.from("89504e470d0a1a0a", "hex");
 const MAX_CALLS = 1024;
 const DEADLINE_MS = 120_000;
 
@@ -31,6 +33,7 @@ const mediaNames = {
 export class NativeImageGeneration {
   static readonly capability = "co.grida/media/generate-image";
   static readonly method = `_${this.capability}`;
+  static readonly referenceCapability = "co.grida/media/image-reference";
   readonly binding: string;
   private readonly calls = new Set<string>();
   private readonly lifetime = new AbortController();
@@ -42,6 +45,7 @@ export class NativeImageGeneration {
     private readonly model: string,
     private readonly mediaBinding: string,
     private readonly supportsBackground: boolean,
+    readonly supportsReference: boolean,
     private readonly request: Request
   ) {
     this.binding = createHash("sha256")
@@ -70,6 +74,8 @@ export class NativeImageGeneration {
       model,
       binding.id,
       catalog.image.supportsTransparentBackground(card, provider),
+      // A reference may only reuse the exact paid route captured at admission.
+      binding.references?.id === binding.id,
       request
     );
   }
@@ -83,17 +89,24 @@ export class NativeImageGeneration {
     if (active && active.id === id) active.abort.abort();
   }
 
-  async generate(id: number | string, value: unknown): Promise<Reply> {
+  async generate(
+    id: number | string,
+    value: unknown,
+    referenceNegotiated = false
+  ): Promise<Reply> {
     const params = record(value);
     if (!params) return { kind: "unavailable" };
-    const { sessionId, callId, prompt, background } = params;
+    const { sessionId, callId, prompt, background, referencePng } = params;
     const credential = credentialProof(params.credential);
     if (
       this.lifetime.signal.aborted ||
       this.active ||
       this.calls.size >= MAX_CALLS ||
       !credential ||
-      Object.keys(params).length !== (background === undefined ? 4 : 5) ||
+      Object.keys(params).length !==
+        4 +
+          Number(background !== undefined) +
+          Number(referencePng !== undefined) ||
       typeof sessionId !== "string" ||
       !ID.test(sessionId) ||
       typeof callId !== "string" ||
@@ -101,6 +114,10 @@ export class NativeImageGeneration {
       typeof prompt !== "string" ||
       !prompt.trim() ||
       Buffer.byteLength(prompt) > MAX_PROMPT_BYTES ||
+      (referencePng !== undefined &&
+        (!referenceNegotiated ||
+          !this.supportsReference ||
+          !isBoundedPng(referencePng))) ||
       (background !== undefined &&
         background !== "auto" &&
         !(
@@ -123,6 +140,7 @@ export class NativeImageGeneration {
     const body: ImageGenerateRequest & {
       binding_id: string;
       credential: CredentialProof;
+      reference_png?: string;
     } = {
       model_id: this.model,
       binding_id: this.mediaBinding,
@@ -131,6 +149,7 @@ export class NativeImageGeneration {
       n: 1,
       credential,
       ...(background && { background }),
+      ...(typeof referencePng === "string" && { reference_png: referencePng }),
     };
     try {
       const response = await this.request({
@@ -164,6 +183,21 @@ export class NativeImageGeneration {
       this.active = undefined;
     }
   }
+}
+
+function isBoundedPng(value: unknown): value is string {
+  if (
+    typeof value !== "string" ||
+    value.length > Math.ceil(MAX_REFERENCE_BYTES / 3) * 4
+  )
+    return false;
+  const bytes = Buffer.from(value, "base64");
+  return (
+    bytes.length >= 45 &&
+    bytes.length <= MAX_REFERENCE_BYTES &&
+    bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE) &&
+    bytes.toString("base64") === value
+  );
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {

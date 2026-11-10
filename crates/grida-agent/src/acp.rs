@@ -202,6 +202,12 @@ async fn serve_connection(
                 let mut advertised =
                     extensions::advertised(reviewer, subagents, deletion, effort, files);
                 let library_selection = reviewer && initialized_host.accepts_library_selection();
+                let library_negotiated = library_selection
+                    && extensions::library::CAPABILITIES.iter().all(|key| {
+                        request.client_capabilities.meta.as_ref()
+                            .and_then(|meta| meta.get(*key))
+                            .and_then(serde_json::Value::as_u64) == Some(1)
+                    });
                 if library_selection {
                     advertised.extend(extensions::library::CAPABILITIES.map(|key| (key.into(), 1.into())));
                 }
@@ -233,8 +239,16 @@ async fn serve_connection(
                             .and_then(|meta| meta.get(capability))
                             .and_then(serde_json::Value::as_u64) == Some(1)
                     {
-                        generation.attach(connection.clone());
+                        let reference = crate::host::image_generation::REFERENCE_CAPABILITY;
+                        let references = library_negotiated
+                            && request.client_capabilities.meta.as_ref()
+                                .and_then(|meta| meta.get(reference))
+                                .and_then(serde_json::Value::as_u64) == Some(1);
+                        generation.attach(connection.clone(), references);
                         advertised.insert(capability.into(), 1.into());
+                        if references {
+                            advertised.insert(reference.into(), 1.into());
+                        }
                     }
                     let capability = crate::editor_surfaces::CAPABILITY;
                     if reviewer
@@ -283,11 +297,7 @@ async fn serve_connection(
                     let meta = request.client_capabilities.meta.as_ref();
                     sessions.negotiated =
                         extensions::negotiated(meta, reviewer, subagents, deletion, effort, files);
-                    if library_selection
-                        && extensions::library::CAPABILITIES.iter().all(|key| {
-                            meta.and_then(|meta| meta.get(*key)).and_then(serde_json::Value::as_u64) == Some(1)
-                        })
-                    {
+                    if library_negotiated {
                         sessions.negotiated.extend(extensions::library::CAPABILITIES);
                     }
                     sessions.negotiated.extend(

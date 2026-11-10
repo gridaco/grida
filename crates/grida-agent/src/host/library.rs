@@ -2,13 +2,13 @@
 
 use super::*;
 use agent_kit_core::inference::InputFormat;
-use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
+use agent_kit_core::messages::{MediaRef, OutcomeStatus, ResultContent, ToolArguments};
 use agent_kit_core::tools::{
     Invocation, InvocationContext, InvocationRecovery, RecoveryKind, Tool, ToolDefinition,
     ToolOutcome,
 };
 use agent_kit_core::turn::{
-    OperationInput, OperationState, ResponseContract, TurnState, WaitRecord,
+    OperationInput, OperationOutcome, OperationState, ResponseContract, TurnState, WaitRecord,
 };
 use agent_kit_core::{ToolId, WaitId};
 use agent_kit_runtime::{TurnOperations, TurnView as OperationView};
@@ -110,6 +110,80 @@ fn selection_wait(invocation: &Invocation) -> Result<WaitRecord> {
         answer: None,
         withdrawn: false,
     })
+}
+
+pub(super) fn generation_reference(
+    state: &TurnState,
+    catalog_id: &str,
+    access: &questions::QuestionAccess,
+) -> Result<MediaRef> {
+    let unavailable = || {
+        problem(
+            ErrorKind::Unavailable,
+            "image_generation_reference_unavailable",
+        )
+    };
+    let mut reference = None;
+    for wait in state
+        .waits()
+        .values()
+        .filter(|wait| is_selection(wait) && !wait.withdrawn)
+    {
+        let Some(answer) = &wait.answer else { continue };
+        let Answer::Selected { id, asset } = decode(ANSWER, answer)? else {
+            continue;
+        };
+        if id != catalog_id {
+            continue;
+        }
+        if reference.is_some()
+            || asset.owner() != &state.binding().session
+            || !asset
+                .id()
+                .as_str()
+                .starts_with(retained_inputs::LIBRARY_SELECTION)
+        {
+            return Err(unavailable());
+        }
+        let request = read_request(wait)?;
+        let operation = state
+            .operations()
+            .get(&request.operation)
+            .ok_or_else(unavailable)?;
+        let OperationInput::Tool(invocation) = &operation.record.input else {
+            return Err(unavailable());
+        };
+        if invocation.id() != &request.operation
+            || invocation.definition().id.as_str() != TOOL
+            || invocation.definition().version != 1
+            || !access.accepts(&operation.record.grants)
+        {
+            return Err(unavailable());
+        }
+        let expected = selection_wait(invocation)?;
+        let Some(OperationOutcome::Tool(outcome)) = operation.outcome() else {
+            return Err(unavailable());
+        };
+        let media = images::media(&asset)?;
+        if wait.request != expected.request
+            || wait.response != expected.response
+            || outcome.status != OutcomeStatus::Succeeded
+            || outcome.receipt.as_ref() != Some(answer)
+            || outcome.structured.as_ref() != Some(&json!({"status":"selected", "id":id}))
+            || outcome
+                .content
+                .iter()
+                .filter_map(|part| match part {
+                    ResultContent::Media(media) => Some(media),
+                    ResultContent::Text(_) => None,
+                })
+                .ne(std::iter::once(&media))
+        {
+            return Err(unavailable());
+        }
+        reference = Some(media);
+    }
+    reference.ok_or_else(unavailable)
 }
 
 fn recorded_invocation<'a>(
@@ -452,4 +526,165 @@ fn decode<T: serde::de::DeserializeOwned>(schema: &str, value: &Envelope) -> Res
             "library_selection_contract_invalid",
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use agent_kit_core::AttemptId;
+    use agent_kit_core::turn::{JournalAction, JournalChange, OperationRecord, TurnBinding};
+
+    const CATALOG: &str = "d365c5fb-5833-48e9-a081-ae6d52c9b49c";
+
+    struct SelectionFixture(ToolDefinition);
+
+    impl Tool for SelectionFixture {
+        fn definition(&self) -> &ToolDefinition {
+            &self.0
+        }
+        fn validate(&self, arguments: &ToolArguments) -> Result<()> {
+            Query::parse(arguments).map(|_| ())
+        }
+        fn invoke(&self, _: Invocation, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+            unreachable!("fixture writes the selected tool receipt directly")
+        }
+    }
+
+    fn state(turn: &str) -> TurnState {
+        TurnState::new(TurnBinding {
+            session: SessionId::new("fixture-session").unwrap(),
+            turn: TurnId::new(turn).unwrap(),
+            epoch: 1,
+        })
+        .unwrap()
+    }
+
+    fn record_selection(
+        state: &mut TurnState,
+        suffix: &str,
+        owner: &str,
+        matched_receipt: bool,
+    ) -> MediaRef {
+        let id = OperationId::new(format!("design-{suffix}")).unwrap();
+        let attempt = AttemptId::new(format!("attempt-{suffix}")).unwrap();
+        let tool = ToolId::new(TOOL).unwrap();
+        let mut inventory = Inventory::new();
+        inventory
+            .insert(Arc::new(SelectionFixture(ToolDefinition {
+                id: tool.clone(),
+                version: 1,
+                description: "Choose a Library reference".into(),
+                input: InputFormat::Json(json!({"type":"object"})),
+                max_input_bytes: 1024,
+                max_output_bytes: 1024,
+                recovery: RecoveryKind::Reconcile,
+            })))
+            .unwrap();
+        let invocation = inventory
+            .snapshot(std::slice::from_ref(&tool))
+            .unwrap()
+            .prepare(
+                id.clone(),
+                &tool,
+                ToolArguments::Json(json!({"initial_search_query":"fixture"})),
+            )
+            .unwrap()
+            .invocation()
+            .clone();
+        let wait = selection_wait(&invocation).unwrap();
+        let wait_id = wait.id.clone();
+        let asset = serde_json::from_value(json!({
+            "owner": owner,
+            "id": format!("{}fixture-{suffix}", retained_inputs::LIBRARY_SELECTION),
+            "version": 1,
+            "name": images::NAME,
+            "size": 12,
+            "digest": ([7_u8; 32])
+        }))
+        .unwrap();
+        let media = images::media(&asset).unwrap();
+        let answer = encode(
+            ANSWER,
+            1,
+            &Answer::Selected {
+                id: CATALOG.into(),
+                asset,
+            },
+        )
+        .unwrap();
+        let receipt = if matched_receipt {
+            answer.clone()
+        } else {
+            encode(ANSWER, 1, &Answer::Skipped).unwrap()
+        };
+        let actions = vec![
+            JournalAction::prepare(OperationRecord {
+                id: id.clone(),
+                input: OperationInput::Tool(invocation),
+                origin: None,
+                source_call: None,
+                grants: GrantSelection {
+                    authority: AuthorityBinding {
+                        principal: PrincipalId::new("grida-local").unwrap(),
+                        binding: BindingId::new("grida-questions-v1").unwrap(),
+                        scope: ScopeId::new("local-interaction").unwrap(),
+                    },
+                    grants: vec![agent_kit_core::GrantId::new("question").unwrap()],
+                },
+            }),
+            JournalAction::OpenWait(wait),
+            JournalAction::ResolveWait {
+                wait: wait_id,
+                answer,
+            },
+            JournalAction::StartAttempt {
+                operation: id.clone(),
+                attempt: attempt.clone(),
+            },
+            JournalAction::CompleteAttempt {
+                operation: id,
+                attempt,
+                outcome: OperationOutcome::Tool(ToolOutcome {
+                    status: OutcomeStatus::Succeeded,
+                    content: vec![ResultContent::Media(media.clone())],
+                    structured: Some(json!({"status":"selected", "id":CATALOG})),
+                    receipt: Some(receipt),
+                    truncated: false,
+                }),
+            },
+        ];
+        state
+            .apply(
+                JournalChange::new(
+                    ChangeId::new(format!("choice-{suffix}")).unwrap(),
+                    state.binding().clone(),
+                    state.position(),
+                    state.controls().revision,
+                    actions,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        media
+    }
+
+    #[test]
+    fn generation_reference_requires_one_matching_same_turn_selection_and_receipt() {
+        let access = questions::QuestionAccess::new().unwrap();
+        let mut selected = state("selected-turn");
+        let media = record_selection(&mut selected, "first", "fixture-session", true);
+        assert_eq!(
+            generation_reference(&selected, CATALOG, &access).unwrap(),
+            media
+        );
+        assert!(generation_reference(&state("different-turn"), CATALOG, &access).is_err());
+        let mut foreign = state("foreign-selection");
+        record_selection(&mut foreign, "foreign", "other-session", true);
+        assert!(generation_reference(&foreign, CATALOG, &access).is_err());
+        let mut mismatch = state("wrong-receipt");
+        record_selection(&mut mismatch, "mismatch", "fixture-session", false);
+        assert!(generation_reference(&mismatch, CATALOG, &access).is_err());
+        record_selection(&mut selected, "second", "fixture-session", true);
+        assert!(generation_reference(&selected, CATALOG, &access).is_err());
+    }
 }

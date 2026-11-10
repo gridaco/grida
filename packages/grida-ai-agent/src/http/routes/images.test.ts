@@ -153,6 +153,62 @@ describe("POST /images/generate", () => {
     }
   });
 
+  it("lowers a validated retained reference on the captured OpenRouter binding", async () => {
+    const model = "openai/gpt-image-2.5-flare";
+    const payload = {
+      model_id: model,
+      binding_id: model,
+      prompt: "A new version",
+      provider: "openrouter",
+      credential: imageCredential("key"),
+      reference_png: TRANSPARENT_PNG_BASE64,
+    };
+    const { app, request, download } = appWith({
+      keys: { openrouter: "key", vercel: "key" },
+    });
+    const damaged = Buffer.from(TRANSPARENT_PNG_BASE64, "base64");
+    damaged[45] ^= 1;
+    for (const change of [
+      { provider: "vercel" },
+      { binding_id: "another-provider-variant" },
+      { reference_png: "https://example.test/reference.png" },
+      { reference_png: `${TRANSPARENT_PNG_BASE64}\n` },
+      { reference_png: damaged.toString("base64") },
+      { reference_png: TRANSPARENT_PNG_BASE64.slice(0, -8) },
+    ]) {
+      expect(
+        (await post(app, { ...payload, ...change }, RETAINED_IMAGE_TYPE)).status
+      ).toBe(400);
+    }
+    expect(request).not.toHaveBeenCalled();
+    const response = await post(app, payload, RETAINED_IMAGE_TYPE);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      model_id: model,
+      provider_id: "openrouter",
+      stored_media: null,
+    });
+    expect(request).toHaveBeenCalledOnce();
+    const [url, init] = request.mock.calls[0];
+    expect(String(url)).toBe("https://openrouter.ai/api/v1/images");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      model,
+      prompt: payload.prompt,
+      n: 1,
+      input_references: [
+        {
+          type: "image_url",
+          image_url: { url: `data:image/png;base64,${TRANSPARENT_PNG_BASE64}` },
+        },
+      ],
+    });
+    expect(download).not.toHaveBeenCalled();
+    expect((await post(app, payload)).status).toBe(200);
+    expect(
+      JSON.parse(String(request.mock.calls[1][1]?.body))
+    ).not.toHaveProperty("input_references");
+  });
+
   it("returns a safe server failure when credential access breaks during resolution", async () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     try {

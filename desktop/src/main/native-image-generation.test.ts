@@ -6,6 +6,8 @@ const model = "openai/gpt-image-2.5-flare";
 const id = "7ccb8e68-a201-40d9-a793-44de9e6c6fc6";
 const credential = { nonce: id.replaceAll("-", ""), proof: "a".repeat(64) };
 const call = { sessionId: "chat", callId: id, prompt: "An image", credential };
+const png =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
 const item = {
   id,
   file_name: "image-1.png",
@@ -80,6 +82,57 @@ it("distinguishes generation without persistence from a missing or mismatched re
     kind: "uncertain",
   });
   expect(request).toHaveBeenCalledTimes(3);
+});
+
+it("passes one canonical reference only on a captured reference-capable route", async () => {
+  const request = vi.fn<(init: RequestInit) => Promise<Response>>(async () =>
+    Response.json({
+      model_id: model,
+      provider_id: "openrouter",
+      stored_media: item,
+    })
+  );
+  const openrouter = NativeImageGeneration.forByok(
+    "openrouter",
+    "https://openrouter.ai/api/v1",
+    request
+  )!;
+  const vercel = NativeImageGeneration.forByok("vercel", endpoint, request)!;
+  expect(openrouter.supportsReference).toBe(true);
+  expect(vercel.supportsReference).toBe(false);
+  expect(await openrouter.generate(1, { ...call, referencePng: png })).toEqual({
+    kind: "unavailable",
+  });
+  expect(
+    await vercel.generate(1, { ...call, referencePng: png }, true)
+  ).toEqual({
+    kind: "unavailable",
+  });
+  for (const referencePng of [
+    `${png}\n`,
+    `data:image/png;base64,${png}`,
+    Buffer.alloc(256 * 1024 + 1).toString("base64"),
+  ]) {
+    expect(
+      await openrouter.generate(1, { ...call, referencePng }, true)
+    ).toEqual({
+      kind: "unavailable",
+    });
+  }
+  expect(request).not.toHaveBeenCalled();
+  expect(
+    await openrouter.generate(1, { ...call, referencePng: png }, true)
+  ).toMatchObject({ kind: "retained", id });
+  expect(request).toHaveBeenCalledOnce();
+  expect(JSON.parse(String(request.mock.calls[0][0].body))).toEqual({
+    model_id: model,
+    binding_id: model,
+    provider: "openrouter",
+    prompt: call.prompt,
+    n: 1,
+    credential,
+    reference_png: png,
+  });
 });
 
 it("only cancels the current exact request and aborts it on owner close", async () => {
