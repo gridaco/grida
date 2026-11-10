@@ -160,6 +160,8 @@ export type NativeChatImageArtifact = Readonly<{
   bytes: number;
 }>;
 
+export type NativeChatArtifactSaveResult = "saved" | "cancelled" | "failed";
+
 export type NativeChatTurnSummary = Readonly<{
   turnId: string;
   status: NonNullable<NativeChatTurn["status"]>;
@@ -472,6 +474,11 @@ export type DesktopNativeChat = {
     observationId: string,
     artifactId: string
   ): Promise<ArrayBuffer>;
+  saveArtifact?(
+    attachmentId: string,
+    observationId: string,
+    artifactId: string
+  ): Promise<NativeChatArtifactSaveResult>;
   queue?(
     attachmentId: string,
     observationId: string,

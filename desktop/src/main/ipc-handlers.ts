@@ -168,6 +168,16 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         noLink: true,
       });
       return result.response === 1;
+    },
+    async (sender) => {
+      const window = admittedWindow(sender);
+      if (!window) throw new Error("native_chat_artifact_unavailable");
+      const result = await dialog.showSaveDialog(window, {
+        title: "Save cropped PNG",
+        defaultPath: "cropped.png",
+        filters: [{ name: "PNG image", extensions: ["png"] }],
+      });
+      return result.canceled || !result.filePath ? null : result.filePath;
     }
   );
   /**
@@ -338,6 +348,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_READ_ARTIFACT,
     (event, id: string, observation: string, artifact: unknown) =>
       nativeChat.readArtifact(event, id, observation, artifact)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SAVE_ARTIFACT,
+    (event, id: string, observation: string, artifact: unknown) =>
+      nativeChat.saveArtifact(event, id, observation, artifact)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_QUEUE,

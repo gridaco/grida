@@ -13,6 +13,7 @@ import type {
   NativeChatGoalObservation,
   NativeChatGoalReceipt,
   NativeChatImageArtifact,
+  NativeChatArtifactSaveResult,
   NativeChatControlResult,
   NativeChatObservation,
   NativeChatOperatingRegime,
@@ -50,6 +51,7 @@ import {
 } from "./native-agent-configuration";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
+import { NativeAgentArtifactSave } from "./native-agent-artifact-save";
 
 const MAX_ATTACHMENTS = 16;
 const MAX_OBSERVATIONS = 16;
@@ -189,6 +191,7 @@ export class NativeChatIpc {
   private readonly owners = new Map<WebContents, Owner>();
   private readonly startups = new WeakMap<WebContents, Startup>();
   private readonly deleting = new WeakSet<NativeChatSession>();
+  private readonly savingArtifact = new WeakSet<WebContents>();
 
   constructor(
     private readonly editorOrigin: string,
@@ -207,7 +210,10 @@ export class NativeChatIpc {
     private readonly confirmDeletion?: (
       sender: WebContents,
       title: string | null
-    ) => Promise<boolean>
+    ) => Promise<boolean>,
+    private readonly selectArtifactDestination?: (
+      sender: WebContents
+    ) => Promise<string | null>
   ) {}
 
   available(event: IpcMainInvokeEvent): boolean | Promise<boolean> {
@@ -897,39 +903,105 @@ export class NativeChatIpc {
     observationId: string,
     artifactId: unknown
   ): Promise<ArrayBuffer> {
+    return this.captureArtifact(
+      event,
+      attachmentId,
+      observationId,
+      artifactId
+    ).read();
+  }
+
+  async saveArtifact(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string,
+    artifactId: unknown
+  ): Promise<NativeChatArtifactSaveResult> {
+    const select = this.selectArtifactDestination;
+    if (!select) throw new Error("native_chat_artifact_unavailable");
+    const { owner, requireCurrent, read } = this.captureArtifact(
+      event,
+      attachmentId,
+      observationId,
+      artifactId
+    );
+    const { sender } = owner;
+    if (this.savingArtifact.has(sender))
+      throw new Error("native_chat_artifact_busy");
+    this.savingArtifact.add(sender);
+    try {
+      const destination = await select(sender).catch(() => undefined);
+      requireCurrent();
+      if (destination === undefined) return "failed";
+      if (destination === null) return "cancelled";
+      const bytes = await read();
+      try {
+        await NativeAgentArtifactSave.publish(
+          destination,
+          bytes,
+          requireCurrent
+        );
+        return "saved";
+      } catch {
+        requireCurrent();
+        return "failed";
+      }
+    } finally {
+      this.savingArtifact.delete(sender);
+    }
+  }
+
+  private captureArtifact(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: string,
+    artifactId: unknown
+  ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const snapshot = requireObservation(attachment, observationId);
     const turnId = snapshot.latest?.turnId;
     const projection = attachment.artifacts;
     const chat = owner.active.chat;
+    const read = chat.readArtifact;
     const artifact = projection?.items.find((item) => item.id === artifactId);
-    const stillLatest = () =>
-      !attachment.latestObservation?.current &&
-      attachment.latestObservation?.latest?.turnId === turnId;
     if (
-      !chat.readArtifact ||
+      !read ||
       !artifact ||
       !turnId ||
       snapshot.current ||
-      projection?.turnId !== turnId ||
-      !stillLatest()
+      projection?.turnId !== turnId
     )
       throw new Error("native_chat_artifact_unavailable");
-    if (attachment.readingArtifact)
-      throw new Error("native_chat_artifact_busy");
-    attachment.readingArtifact = true;
-    try {
-      const bytes = await chat.readArtifact(
-        attachment.session,
-        snapshot,
-        artifact
-      );
+    const requireCurrent = () => {
       this.revalidate(owner, attachment);
-      if (!stillLatest()) throw new Error("native_chat_artifact_unavailable");
-      return bytes;
-    } finally {
-      attachment.readingArtifact = false;
-    }
+      if (
+        attachment.latestObservation?.current ||
+        attachment.latestObservation?.latest?.turnId !== turnId
+      )
+        throw new Error("native_chat_artifact_unavailable");
+    };
+    requireCurrent();
+    return {
+      owner,
+      requireCurrent,
+      read: async () => {
+        if (attachment.readingArtifact)
+          throw new Error("native_chat_artifact_busy");
+        attachment.readingArtifact = true;
+        try {
+          const bytes = await read.call(
+            chat,
+            attachment.session,
+            snapshot,
+            artifact
+          );
+          requireCurrent();
+          return bytes;
+        } finally {
+          attachment.readingArtifact = false;
+        }
+      },
+    };
   }
 
   async transcript(event: IpcMainInvokeEvent, attachmentId: string) {

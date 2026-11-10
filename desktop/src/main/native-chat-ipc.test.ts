@@ -200,7 +200,8 @@ function setup(
   confirmDeletion?: (
     sender: WebContents,
     title: string | null
-  ) => Promise<boolean>
+  ) => Promise<boolean>,
+  selectArtifactDestination?: (sender: WebContents) => Promise<string | null>
 ) {
   const first = windowAt();
   const second = windowAt();
@@ -438,7 +439,8 @@ function setup(
       (sender) => scopes.get(sender) ?? null,
       undefined,
       confirm,
-      confirmDeletion
+      confirmDeletion,
+      selectArtifactDestination
     ),
     emit: (sessionId: string, update: NativeChatStreamUpdate) => {
       for (const listener of listeners.get(sessionId) ?? []) listener(update);
@@ -840,7 +842,8 @@ describe("native chat IPC", () => {
   });
 
   it("releases only a listed PNG and drops a read when its observed turn changes", async () => {
-    const { ipc, first, second, chat } = setup();
+    const select = vi.fn<(sender: WebContents) => Promise<string | null>>();
+    const { ipc, first, second, chat } = setup(undefined, undefined, select);
     const parent = await ipc.create(first.event);
     const another = await ipc.load(second.event, parent.sessionId);
     const running = await ipc.observe(first.event, parent.attachmentId);
@@ -900,6 +903,27 @@ describe("native chat IPC", () => {
     await expect(readIn("another-crop")).rejects.toThrow(
       "native_chat_artifact_unavailable"
     );
+    const saveIn = (id: unknown = artifact.id) =>
+      ipc.saveArtifact(
+        first.event,
+        parent.attachmentId,
+        settled.observationId,
+        id
+      );
+    await expect(
+      saveIn({ id: artifact.id, path: "/untrusted.png" })
+    ).rejects.toThrow("native_chat_artifact_unavailable");
+    await expect(
+      ipc.saveArtifact(
+        second.event,
+        parent.attachmentId,
+        settled.observationId,
+        artifact.id
+      )
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    expect(select).not.toHaveBeenCalled();
+    select.mockResolvedValueOnce(null);
+    await expect(saveIn()).resolves.toBe("cancelled");
     expect(read).not.toHaveBeenCalled();
     await expect(readIn()).resolves.toBe(bytes);
     expect(read).toHaveBeenCalledExactlyOnceWith(
@@ -909,6 +933,10 @@ describe("native chat IPC", () => {
     );
 
     const late = Promise.withResolvers<ArrayBuffer>();
+    const chooser = Promise.withResolvers<string>();
+    select.mockReturnValueOnce(chooser.promise);
+    const saving = saveIn();
+    await expect(saveIn()).rejects.toThrow("native_chat_artifact_busy");
     read.mockReturnValueOnce(late.promise);
     const pending = readIn();
     await expect(readIn()).rejects.toThrow("native_chat_artifact_busy");
@@ -917,8 +945,11 @@ describe("native chat IPC", () => {
       current: running.snapshot.current,
     });
     await ipc.observe(first.event, parent.attachmentId);
+    chooser.resolve("/not-selected-by-current-frame.png");
     late.resolve(bytes);
     await expect(pending).rejects.toThrow("native_chat_artifact_unavailable");
+    await expect(saving).rejects.toThrow("native_chat_artifact_unavailable");
+    expect(read).toHaveBeenCalledTimes(2);
   });
 
   it("scopes temporary side chats to each parent attachment and endpoint generation", async () => {

@@ -271,7 +271,7 @@ it.runIf(
 it.runIf(
   !!resources && (process.platform === "darwin" || process.platform === "linux")
 )(
-  "opens the exact completed crop through Desktop after restarting the native child",
+  "retries saving the exact completed crop after restarting the native child",
   async () => {
     const root = fs.mkdtempSync(
       path.join(fs.realpathSync(os.tmpdir()), "grida-native-artifact-")
@@ -279,6 +279,10 @@ it.runIf(
     const cwd = path.join(root, "workspace");
     const stateDirectory = path.join(root, "state");
     fs.mkdirSync(cwd, { mode: 0o700 });
+    const exports = path.join(root, "exports");
+    fs.mkdirSync(exports, { mode: 0o700 });
+    let destination = path.join(exports, "existing.png");
+    fs.writeFileSync(destination, "existing file");
     const fixture = await syntheticResponses(true);
     const open = () =>
       NativeAgentChat.start({
@@ -291,8 +295,16 @@ it.runIf(
       });
     const { origin, sender, event } = workspaceFrame();
     let chat: NativeAgentChat | undefined;
-    const ipc = new NativeChatIpc(origin, (candidate) =>
-      candidate === sender && chat ? { workspaceId: "workspace", chat } : null
+    const ipc = new NativeChatIpc(
+      origin,
+      (candidate) =>
+        candidate === sender && chat
+          ? { workspaceId: "workspace", chat }
+          : null,
+      undefined,
+      undefined,
+      undefined,
+      async () => destination
     );
     try {
       chat = await open();
@@ -323,6 +335,23 @@ it.runIf(
       expect(JSON.stringify(fixture.requests[1])).toContain(
         "Saved cropped PNG"
       );
+      const first = await ipc.observe(event, opened.attachmentId);
+      const summary = await ipc.turnSummary(
+        event,
+        opened.attachmentId,
+        first.observationId
+      );
+      const cropId = summary.artifacts![0].id;
+      await expect(
+        ipc.saveArtifact(
+          event,
+          opened.attachmentId,
+          first.observationId,
+          cropId
+        )
+      ).resolves.toBe("failed");
+      expect(fs.readFileSync(destination, "utf8")).toBe("existing file");
+      expect(fs.readdirSync(exports)).toEqual(["existing.png"]);
       await ipc.detach(event, opened.attachmentId);
       await chat.close();
       chat = await open();
@@ -336,7 +365,7 @@ it.runIf(
       );
       expect(result.artifacts).toEqual([
         {
-          id: expect.any(String),
+          id: cropId,
           kind: "image",
           mimeType: "image/png",
           label: "Cropped PNG",
@@ -356,6 +385,12 @@ it.runIf(
       const work = path.join(scopes, fs.readdirSync(scopes)[0], "work");
       const saved = path.join(work, fs.readdirSync(work)[0]);
       expect(Buffer.from(bytes)).toEqual(fs.readFileSync(saved));
+      destination = path.join(exports, "cropped.png");
+      await expect(
+        ipc.saveArtifact(event, reopened.attachmentId, observationId, crop.id)
+      ).resolves.toBe("saved");
+      expect(fs.readFileSync(destination)).toEqual(Buffer.from(bytes));
+      expect(fs.readFileSync(saved)).toEqual(Buffer.from(bytes));
       expect(fs.readdirSync(cwd)).toEqual([]);
       fs.unlinkSync(saved);
       await expect(

@@ -1140,13 +1140,33 @@ it("reads a listed PNG on demand and discards its bytes after switching chats", 
     "observation-chat-a",
     artifact.id
   );
+  expect(controller.canSaveTurnArtifact).toBe(false);
+  const save = vi.fn<NonNullable<DesktopNativeChat["saveArtifact"]>>();
+  bridge.saveArtifact = save;
+  expect(controller.canSaveTurnArtifact).toBe(true);
+  save.mockResolvedValueOnce("failed").mockResolvedValueOnce("saved");
+  await expect(
+    controller.saveTurnArtifact(latest.turnId, artifact.id)
+  ).resolves.toBe("failed");
+  await expect(
+    controller.saveTurnArtifact(latest.turnId, artifact.id)
+  ).resolves.toBe("saved");
+  expect(save.mock.calls).toEqual([
+    ["chat-a", "observation-chat-a", artifact.id],
+    ["chat-a", "observation-chat-a", artifact.id],
+  ]);
 
   const late = Promise.withResolvers<ArrayBuffer>();
+  const lateSave = Promise.withResolvers<"saved">();
+  save.mockReturnValueOnce(lateSave.promise);
+  const saving = controller.saveTurnArtifact(latest.turnId, artifact.id);
   read.mockReturnValueOnce(late.promise);
   const preview = controller.readTurnArtifact(latest.turnId, artifact.id);
   await controller.select("chat-b");
   late.resolve(data);
+  lateSave.resolve("saved");
   await expect(preview).rejects.toThrow("native_chat_artifact_unavailable");
+  await expect(saving).rejects.toThrow("native_chat_artifact_unavailable");
   controller.disconnect();
 });
 

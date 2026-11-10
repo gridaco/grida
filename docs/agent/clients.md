@@ -453,8 +453,11 @@ its own summary. Reopening the chat restores the latest recorded summary.
 
 On a compatible image-enabled profile, ask the agent to crop a retained PNG
 in Act. Open **Turn summary** for the finished turn and choose **Preview cropped
-PNG** to inspect the saved image. Use **Copy image** or **Download image** to
-keep a separate copy. The saved crop lives in private chat storage.
+PNG** to inspect the image kept in private chat storage. Use **Save PNG as…**
+to choose a new file on your computer. If saving fails, choose **Retry save**
+to save the same crop. You can reopen the chat and retry while the crop is
+still available in its latest summary. Existing destination files are preserved.
+The preview also offers **Copy image** and **Download image**.
 
 If the working copy was removed or replaced, the summary still shows the
 recorded result and the preview reports that the image is unavailable.

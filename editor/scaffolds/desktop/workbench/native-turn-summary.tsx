@@ -1,5 +1,6 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type {
+  NativeChatArtifactSaveResult,
   NativeChatImageArtifact,
   NativeChatMessage,
   NativeChatTurnSummary,
@@ -111,14 +112,48 @@ function CropPreview({
     () => controller.readTurnArtifact(turnId, artifact.id),
     [controller, turnId, artifact.id]
   );
+  const [saveStatus, setSaveStatus] = useState<
+    NativeChatArtifactSaveResult | "saving" | "unavailable" | null
+  >(null);
+  const save = async () => {
+    setSaveStatus("saving");
+    try {
+      setSaveStatus(await controller.saveTurnArtifact(turnId, artifact.id));
+    } catch {
+      setSaveStatus("unavailable");
+    }
+  };
   return (
-    <FullscreenImagePreview
-      loadImage={load}
-      alt={artifact.label}
-      downloadName="cropped.png"
-      className="cursor-pointer underline underline-offset-2"
-    >
-      Preview cropped PNG ({artifact.width} × {artifact.height})
-    </FullscreenImagePreview>
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <FullscreenImagePreview
+        loadImage={load}
+        alt={artifact.label}
+        downloadName="cropped.png"
+        className="cursor-pointer underline underline-offset-2"
+      >
+        Preview cropped PNG ({artifact.width} × {artifact.height})
+      </FullscreenImagePreview>
+      {controller.canSaveTurnArtifact && (
+        <button
+          type="button"
+          className="cursor-pointer underline underline-offset-2 disabled:opacity-50"
+          disabled={saveStatus === "saving"}
+          onClick={() => void save()}
+        >
+          {saveStatus === "failed" ? "Retry save" : "Save PNG as…"}
+        </button>
+      )}
+      {saveStatus === "saving" && <span role="status">Saving…</span>}
+      {saveStatus === "saved" && <span role="status">Saved a copy.</span>}
+      {saveStatus === "failed" && (
+        <span role="status">
+          Couldn’t save a copy. The crop is still in this chat. Choose a new
+          file to retry.
+        </span>
+      )}
+      {saveStatus === "unavailable" && (
+        <span role="status">This crop is unavailable to save.</span>
+      )}
+    </div>
   );
 }
