@@ -2,11 +2,12 @@
 
 use super::*;
 use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision};
+use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::{GrantId, ToolId};
 use agent_kit_store_sqlite::driver::{DriverControlPlan, DriverControlRequest};
 use grida_agent_master::goals::{
-    Allowance, Basis, CompletionReview, Continuation, Goal, Objective, Reservation, Status, Usage,
-    tools,
+    Allowance, Basis, ChildWork, ChildWorkObserver, CompletionReview, Continuation, Goal,
+    Objective, Reservation, Status, Usage, inference_attempts, tools,
 };
 use std::num::NonZeroU32;
 
@@ -92,9 +93,7 @@ impl Host {
         request: PromptRequest,
         goal: GoalRequest,
     ) -> Result<DurableSubmission> {
-        if request.effort == Some(EffortPreset::Ultra) {
-            return Err(problem(ErrorKind::Unsupported, "goal_effort_unavailable"));
-        }
+        let effort = request.effort.unwrap_or(EffortPreset::Standard);
         validate_prompt_parts(&request.parts)?;
         Goal::start_with_review(
             request.id.clone(),
@@ -114,6 +113,11 @@ impl Host {
                 || request
                     .operating_regime
                     .is_some_and(|regime| regime != stored.operating_regime)
+                || stored
+                    .effort
+                    .as_ref()
+                    .map_or(EffortPreset::Standard, EffortPolicy::preset)
+                    != effort
                 || (stored.configuration_permission == crate::ConfigurationPermission::Change)
                     != (request.configuration_permission == crate::ConfigurationPermission::Change)
             {
@@ -136,9 +140,18 @@ impl Host {
         self.check_execution(&view)?;
         require_goal_start(&view)?;
         self.check_ready_capacity(&request.session).await?;
+        let mut request = request;
+        request.effort = Some(effort);
         let mut policy = self.submission_policy(&request, false)?;
         policy.allow_host_tools = false;
-        policy.effort = None;
+        if policy.effort.as_ref().is_some_and(|effort| {
+            goal.allowance.inference_steps.get() <= effort.reserved_child_generation_steps()
+        }) {
+            return Err(problem(
+                ErrorKind::LimitExceeded,
+                "goal_child_allowance_unavailable",
+            ));
+        }
         let mut input = self
             .capture_input(&view, request.id, request.parts, policy)
             .await?;
@@ -198,11 +211,80 @@ impl Host {
             if view.driver_state.value().is_none() {
                 return Err(problem(ErrorKind::Unavailable, "goal_missing"));
             }
+            host.reconcile_goal_child(&view).await?;
             host.check_ready_capacity(&session).await?;
             host.kick_queue(session).await;
             Ok(())
         })
         .await
+    }
+
+    async fn reconcile_goal_child(&self, view: &SessionView) -> Result<()> {
+        let Some(value) = view.driver_state.value() else {
+            return Ok(());
+        };
+        let mut goal = Goal::decode(value)?;
+        let Some(work) = goal
+            .reservation()
+            .filter(|work| work.uncertain_steps.is_some() && work.child_inference_steps.is_some())
+        else {
+            return Ok(());
+        };
+        if view.current.is_some() {
+            return Ok(());
+        }
+        let turn = work.turn.clone();
+        let Some(parent) = self
+            .store
+            .inspect_turn_with(view.session.clone(), turn.clone(), |state| {
+                Ok((state
+                    .outcome()
+                    .is_some_and(|outcome| outcome.status != OutcomeStatus::Uncertain)
+                    && state.operations().values().all(|operation| {
+                        operation.outcome().is_some() && !operation.is_uncertain()
+                    }))
+                .then(|| state.clone()))
+            })
+            .await?
+        else {
+            return Ok(());
+        };
+        let ChildWork::Settled { observed_steps } = sponsorship::GoalChildWork(self.store.clone())
+            .observe(&parent)
+            .await
+        else {
+            return Ok(());
+        };
+        goal.reconcile_child_work(&turn, inference_attempts(&parent)?, observed_steps)?;
+        let value = goal.encode()?;
+        let request = Fingerprint::of(&("goal-child-account", &view.session, &turn))?;
+        self.store
+            .control_driver_state(
+                DriverControlRequest {
+                    id: ChangeId::new(
+                        request
+                            .bytes()
+                            .iter()
+                            .map(|byte| format!("{byte:02x}"))
+                            .collect::<String>(),
+                    )?,
+                    session: view.session.clone(),
+                    expected_revision: view.revision,
+                    expected_state: view.driver_state.revision(),
+                    intent: encode("grida.agent.goal.child-account", 1, &turn)?,
+                },
+                move |_, current| {
+                    if current.is_some() {
+                        return Err(problem(ErrorKind::Conflict, "goal_work_reserved"));
+                    }
+                    Ok(DriverControlPlan {
+                        value: Some(value),
+                        directive: None,
+                    })
+                },
+            )
+            .await?;
+        Ok(())
     }
 
     pub(super) async fn goal_continuation(&self, view: &SessionView) -> Result<Option<Submission>> {
@@ -220,6 +302,11 @@ impl Host {
             self.goal_origin(&view.session, &continuation.basis).await?;
         if !automatic {
             return Ok(None);
+        }
+        if captured.effort.as_ref().is_some_and(|effort| {
+            goal.remaining().inference_steps <= effort.reserved_child_generation_steps()
+        }) {
+            captured.effort = None;
         }
         let id = continuation.input_id(&view.session)?;
         captured.parts.clear();
@@ -294,6 +381,16 @@ impl Host {
                         return Err(problem(
                             ErrorKind::Conflict,
                             "goal_control_requires_owned_turn",
+                        ));
+                    }
+                    if current.is_some()
+                        && goal
+                            .reservation()
+                            .is_some_and(|work| work.child_inference_steps.is_some())
+                    {
+                        return Err(problem(
+                            ErrorKind::Conflict,
+                            "goal_use_task_controls_for_funded_review",
                         ));
                     }
                     let directive = match decision {
@@ -433,6 +530,7 @@ pub(super) fn claim_update(
     turn: &TurnId,
     request: &GoalInput,
     steps: u32,
+    effort: Option<&EffortPolicy>,
 ) -> Result<DriverStateChange> {
     require_idle(view)?;
     let mut goal = match request {
@@ -460,9 +558,16 @@ pub(super) fn claim_update(
             goal
         }
     };
-    let steps = NonZeroU32::new(steps)
+    let child = effort.and_then(|policy| NonZeroU32::new(policy.reserved_child_generation_steps()));
+    let steps = effort
+        .map_or(Some(steps), |policy| {
+            policy
+                .parent_generation_steps()
+                .checked_add(policy.reserved_child_generation_steps())
+        })
+        .and_then(NonZeroU32::new)
         .ok_or_else(|| problem(ErrorKind::InvalidInput, "invalid_master_limits"))?;
-    goal.reserve(&goal.basis().clone(), turn.clone(), steps)?;
+    goal.reserve_with_child(&goal.basis().clone(), turn.clone(), steps, child)?;
     Ok(DriverStateChange {
         expected: view.driver_state.revision(),
         value: Some(goal.encode()?),

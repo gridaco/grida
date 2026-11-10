@@ -451,6 +451,23 @@ an active goal cancels its reserved turn without discarding its uncertainty.
 Clear an active or blocked goal before replacing an earlier message in the
 same chat. A separate fork carries no goal authorization.
 
+For a funded review, the trusted private launch must support subagents and
+the client must negotiate `co.grida/session/effort` version 1. Goal Start
+accepts optional `effort` (`standard` or `ultra`), defaulting to `standard`.
+Ultra requires at least three total inference steps. Its active reservation
+includes a two-step child share in `reservation.child_inference_steps`.
+Automatic continuation with fewer than three steps remaining uses Standard
+and keeps the remaining Goal allowance. Reusing an accepted input ID requires
+the same effort. While a funded turn owns work, use the ordinary task
+Pause, Resume, or Stop operations. Goal-specific state controls return
+`goal_use_task_controls_for_funded_review` in that case.
+
+If a review is unsettled when the parent finishes, Goal inspection keeps the
+held reservation and `uncertain_steps` records the attempts observed so far.
+Goal Recover can account for a late settled review once both journals are
+definite. It leaves the original turn account intact and does not apply its
+earlier proposal or advance the goal automatically.
+
 To use person-confirmed completion, negotiate
 `co.grida/goal/confirm-completion` version 1 when starting the goal. Goal
 inspection may then include `review` with a status and the candidate's

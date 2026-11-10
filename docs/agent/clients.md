@@ -752,6 +752,13 @@ A trusted headless launch can independently verify one selected file criterion
 from the complete bytes recorded by `read_file`. The goal retains the exact
 verification from that turn. [Configure an observed-file criterion](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#verify-a-goals-observed-file-bytes)
 
+A private headless client can also select **Ultra** for a goal. One independent
+review shares the goal's inference allowance. Later automatic work proceeds
+directly if only one or two steps remain. Use the task's Pause, Resume, or
+Stop while the funded turn is active. If the review finishes later, Recover
+can record its settled usage and release the held allowance. Resume the goal
+explicitly to continue after that reconciliation.
+
 In Desktop, **Stop** ends the current turn and retains the goal's state.
 Clear an active or blocked goal before replacing an earlier message in the
 same chat. A fork starts independently.

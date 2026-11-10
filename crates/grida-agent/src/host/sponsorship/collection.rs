@@ -18,7 +18,7 @@ use agent_kit_sessions::{SessionStore, TurnDisposition, TurnView};
 use agent_kit_store_sqlite::SqliteStore;
 use grida_agent_master::effort::COLLECT_REVIEW;
 use grida_agent_master::read_account;
-use grida_agent_master::subagents::sponsored_identity;
+use grida_agent_master::subagents::{INFERENCE_STEPS_PER_ASSIGNMENT, sponsored_identity};
 use serde::Serialize;
 use serde_json::json;
 use std::sync::Arc;
@@ -64,7 +64,7 @@ impl CollectReview {
         })
     }
 
-    async fn read(&self) -> Result<Option<TurnView>> {
+    pub(super) async fn read(&self) -> Result<Option<TurnView>> {
         let (view, accepted) = match self
             .store
             .inspect_with_input(self.child.clone(), ChangeId::new(CHILD_INPUT)?)
@@ -97,6 +97,12 @@ impl CollectReview {
             return Err(related_changed());
         }
         let stored: StoredPrompt = decode_input(&input)?;
+        if stored.goal.is_some()
+            || stored.effort.is_some()
+            || stored.max_steps != Some(INFERENCE_STEPS_PER_ASSIGNMENT)
+        {
+            return Err(related_changed());
+        }
         let [PromptPart::Text { text }] = stored.parts.as_slice() else {
             return Err(related_changed());
         };

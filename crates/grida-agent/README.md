@@ -540,6 +540,16 @@ owned scheduler. A claim and its reservation commit together. Only reserved
 turns receive the goal tools. See the
 [agent client guide](../../docs/agent/clients.md#work-toward-a-persistent-goal).
 
+With `serve --stdio --subagents` and a compatible provider, a private ACP
+client can negotiate effort and pass `"effort":"ultra"` on Goal Start. The
+goal needs at least three inference steps. Each eligible turn reserves two
+for one text-only reviewer within the goal's existing allowance. The parent
+and reviewer charge their recorded attempts against that allowance. Use
+the ordinary task Pause, Resume, and Stop controls while the funded turn
+owns work. If the review is still unsettled when the parent finishes, Goal
+Recover can account for it once its outcome is known. See the
+[Goal client contract](../../packages/grida-ai-agent/docs/rust-client-protocol.md#persistent-goal-operations).
+
 An opted-in private ACP submission can schedule one wake-up for its own task.
 The native host owns the timer and uses the ordinary task scheduler to claim
 continuation. Closing the host releases its timers while preserving their

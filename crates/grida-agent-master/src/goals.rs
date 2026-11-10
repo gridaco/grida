@@ -3,9 +3,10 @@
 pub(crate) mod settlement;
 pub mod tools;
 
+use agent_kit_core::turn::{OperationInput, TurnState};
 use agent_kit_core::{
-    ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, Result, SchemaId, SessionId,
-    ToolCallId, TurnId,
+    BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, Result, SchemaId,
+    SessionId, ToolCallId, TurnId,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -87,7 +88,34 @@ pub struct Reservation {
     /// Reported steps so far if the previous outcome was uncertain.
     pub uncertain_steps: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub child_inference_steps: Option<NonZeroU32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     objective_fingerprint: Option<Fingerprint>,
+}
+
+/// A host's observation of the exact funded child slot. Counts come from
+/// recorded generation attempts, independent of provider usage reporting.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChildWork {
+    Settled { observed_steps: u32 },
+    Unsettled { observed_steps: u32 },
+}
+
+pub trait ChildWorkObserver: Send + Sync {
+    fn observe<'a>(&'a self, parent: &'a TurnState) -> BoxFuture<'a, ChildWork>;
+}
+
+pub fn inference_attempts(state: &TurnState) -> Result<u32> {
+    state
+        .operations()
+        .values()
+        .filter(|operation| matches!(operation.record.input, OperationInput::Inference(_)))
+        .try_fold(0_u32, |total, operation| {
+            u32::try_from(operation.attempts.len())
+                .ok()
+                .and_then(|count| total.checked_add(count))
+                .ok_or_else(|| problem(ErrorKind::LimitExceeded, "goal_step_account_limit"))
+        })
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -456,6 +484,18 @@ impl Goal {
         turn: TurnId,
         requested_steps: NonZeroU32,
     ) -> Result<Reservation> {
+        self.reserve_with_child(expected, turn, requested_steps, None)
+    }
+
+    /// The child share is included in the same reservation, and at least one
+    /// step must remain for the owning turn.
+    pub fn reserve_with_child(
+        &mut self,
+        expected: &Basis,
+        turn: TurnId,
+        requested_steps: NonZeroU32,
+        child_inference_steps: Option<NonZeroU32>,
+    ) -> Result<Reservation> {
         self.require_basis(expected)?;
         if self.state.status == Status::Exhausted {
             return Err(problem(
@@ -477,11 +517,18 @@ impl Goal {
                 "goal_allowance_exhausted",
             ));
         };
+        if child_inference_steps.is_some_and(|child| child >= inference_steps) {
+            return Err(problem(
+                ErrorKind::LimitExceeded,
+                "goal_child_allowance_unavailable",
+            ));
+        }
         let reservation = Reservation {
             turn,
             basis: expected.clone(),
             inference_steps,
             uncertain_steps: None,
+            child_inference_steps,
             objective_fingerprint: Some(Fingerprint::of(&self.state.objective)?),
         };
         self.state.reservation = Some(reservation.clone());
@@ -548,6 +595,42 @@ impl Goal {
                 }
                 self.mark_exhausted();
             }
+        }
+        Ok(())
+    }
+
+    /// Release a retained funded reservation after both exact turns can be
+    /// accounted. Recovery cannot adopt a prior proposal or start new work.
+    pub fn reconcile_child_work(
+        &mut self,
+        turn: &TurnId,
+        parent_steps: u32,
+        child_steps: u32,
+    ) -> Result<()> {
+        let work = self
+            .reservation()
+            .filter(|work| &work.turn == turn && work.uncertain_steps.is_some())
+            .ok_or_else(|| problem(ErrorKind::Conflict, "goal_reservation_mismatch"))?;
+        let child_limit = work
+            .child_inference_steps
+            .ok_or_else(|| problem(ErrorKind::Conflict, "goal_child_allowance_unavailable"))?
+            .get();
+        if child_steps > child_limit || parent_steps > work.inference_steps.get() - child_limit {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "goal_step_account_mismatch",
+            ));
+        }
+        self.account(
+            turn,
+            WorkOutcome::Settled {
+                inference_steps: parent_steps + child_steps,
+                report: None,
+                verified_evidence: &BTreeSet::new(),
+            },
+        )?;
+        if self.state.status == Status::Active {
+            self.state.status = Status::Blocked(Blocker::NoProgress);
         }
         Ok(())
     }
@@ -647,6 +730,9 @@ impl Goal {
                 || value
                     .uncertain_steps
                     .is_some_and(|steps| steps > value.inference_steps.get())
+                || value
+                    .child_inference_steps
+                    .is_some_and(|child| child >= value.inference_steps)
                 || value.inference_steps.get()
                     > state
                         .allowance

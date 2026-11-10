@@ -1182,6 +1182,7 @@ impl Host {
                                 turn,
                                 goal,
                                 prepared.config.max_steps,
+                                prepared.effort.as_ref(),
                             )
                         })
                         .transpose()?,
@@ -1452,7 +1453,9 @@ impl Host {
             ));
         }
         if let Some(effort) = prepared.effort {
-            master = master.with_effort(effort)?;
+            master = master
+                .with_effort(effort)?
+                .with_goal_child_work(Arc::new(sponsorship::GoalChildWork(self.store.clone())));
         }
         if prepared.goal.is_some()
             && let Some(permissions) = &permission_scope

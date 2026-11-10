@@ -1,6 +1,9 @@
 //! GRIDA-SEC-004 — parent controls fence the exact funded child slot.
 
 mod collection;
+mod funding;
+
+pub(super) use funding::GoalChildWork;
 
 use super::*;
 use agent_kit_core::driver_state::DriverStateRevision;
@@ -526,7 +529,6 @@ impl Host {
         let mut captured: StoredPrompt = decode_input(input)?;
         if input.payload.version() != 2
             || config.subagent.is_some()
-            || captured.goal.is_some()
             || captured.subagent.is_some()
             || captured
                 .effort
@@ -538,6 +540,25 @@ impl Host {
                 ErrorKind::Unsupported,
                 "sponsored_subagent_source_input",
             ));
+        }
+        if captured.goal.is_some() {
+            let state = view.driver_state.value().ok_or_else(sponsored_slot_used)?;
+            let goal = grida_agent_master::goals::Goal::decode(state)?;
+            if goal.paused()
+                || goal.status() != grida_agent_master::goals::Status::Active
+                || !goal.reservation().is_some_and(|work| {
+                    work.turn == source.binding.turn
+                        && &work.basis == goal.basis()
+                        && work.child_inference_steps.is_some_and(|steps| {
+                            steps.get() == subagents::INFERENCE_STEPS_PER_ASSIGNMENT
+                        })
+                })
+            {
+                return Err(problem(
+                    ErrorKind::Conflict,
+                    "goal_child_allowance_unavailable",
+                ));
+            }
         }
         let profile = Profile::sponsored(
             source.binding.session.clone(),
@@ -558,6 +579,7 @@ impl Host {
         }];
         captured.max_steps = Some(subagents::INFERENCE_STEPS_PER_ASSIGNMENT);
         captured.effort = None;
+        captured.goal = None;
         captured.questions = false;
         captured.allow_wakeups = false;
         captured.configuration_permission = crate::ConfigurationPermission::Disabled;

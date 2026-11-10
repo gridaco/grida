@@ -61,6 +61,10 @@ Act, model choice and per-request output limits remain independent. A retained
 Ultra continuation requires the original policy and a matching live offer to
 continue. Stop can preserve the recorded results without the offer. Goal work
 with a parent-only reservation cannot draw on a separate child allowance.
+An Ultra Goal reservation divides the same inference allowance between the
+parent and one funded review. Settlement charges their recorded attempts
+once. An unsettled review retains the reservation until both turns can be
+accounted.
 
 Completion accounts expose typed output-limit, refusal, and step-limit reasons
 for client adapters. Provider failure classifications remain available in the

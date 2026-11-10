@@ -1,6 +1,6 @@
 use super::{
-    CriterionEvidence, Goal, ProgressAccount, Report, SCHEMA, Status, VerifiedCriterion,
-    WorkOutcome, problem, tools,
+    ChildWork, CriterionEvidence, Goal, ProgressAccount, Report, SCHEMA, Status, VerifiedCriterion,
+    WorkOutcome, inference_attempts, problem, tools,
 };
 use agent_kit_core::driver_state::DriverStateChange;
 use agent_kit_core::messages::OutcomeStatus;
@@ -10,22 +10,21 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) type Verifier = dyn Fn(&str, &OperationState) -> bool + Send + Sync;
 
-pub(crate) fn step_limit(state: &TurnState, configured: u32, reserves_child: bool) -> Result<u32> {
-    let goal = work_goal(state)?;
-    if goal.is_some() && reserves_child {
+pub(crate) fn step_limit(state: &TurnState, configured: u32, child_steps: u32) -> Result<u32> {
+    let Some(goal) = work_goal(state)? else {
+        return Ok(configured);
+    };
+    let reservation = goal.reservation().expect("reserved work");
+    let child = reservation
+        .child_inference_steps
+        .map_or(0, |steps| steps.get());
+    if child != child_steps && !state.controls().cancelled {
         return Err(problem(
             ErrorKind::Unsupported,
             "goal_child_allowance_unavailable",
         ));
     }
-    Ok(goal.map_or(configured, |goal| {
-        configured.min(
-            goal.reservation()
-                .expect("reserved work")
-                .inference_steps
-                .get(),
-        )
-    }))
+    Ok(configured.min(reservation.inference_steps.get() - child))
 }
 
 /// One eligible call per criterion for the current reserved work. These hints
@@ -69,25 +68,43 @@ pub(crate) fn prepare(
     state: &TurnState,
     status: OutcomeStatus,
     verifier: Option<&Verifier>,
+    child: Option<ChildWork>,
 ) -> Result<Option<(DriverStateChange, ProgressAccount)>> {
     let Some(mut goal) = work_goal(state)? else {
         return Ok(None);
     };
     let reservation = goal.reservation().expect("reserved work");
     let turn = &state.binding().turn;
-    let inference_steps = state
-        .operations()
-        .values()
-        .filter(|operation| matches!(operation.record.input, OperationInput::Inference(_)))
-        .try_fold(0_u32, |total, operation| {
-            u32::try_from(operation.attempts.len())
-                .ok()
-                .and_then(|count| total.checked_add(count))
-                .ok_or_else(|| problem(ErrorKind::LimitExceeded, "goal_step_account_limit"))
-        })?;
+    let parent_steps = inference_attempts(state)?;
+    let parent_limit = reservation.inference_steps.get()
+        - reservation
+            .child_inference_steps
+            .map_or(0, |steps| steps.get());
+    if parent_steps > parent_limit {
+        return Err(problem(
+            ErrorKind::InvalidState,
+            "goal_step_account_mismatch",
+        ));
+    }
+    let (child_steps, child_unsettled) = match reservation.child_inference_steps {
+        None => (0, false),
+        Some(limit) => match child {
+            Some(ChildWork::Settled { observed_steps }) if observed_steps <= limit.get() => {
+                (observed_steps, false)
+            }
+            Some(ChildWork::Unsettled { observed_steps }) if observed_steps <= limit.get() => {
+                (observed_steps, true)
+            }
+            _ => (0, true),
+        },
+    };
+    let inference_steps = parent_steps
+        .checked_add(child_steps)
+        .ok_or_else(|| problem(ErrorKind::LimitExceeded, "goal_step_account_limit"))?;
     let mut verified = BTreeMap::new();
     let confirmed: BTreeSet<_>;
-    let outcome = if status == OutcomeStatus::Uncertain
+    let outcome = if child_unsettled
+        || status == OutcomeStatus::Uncertain
         || state
             .operations()
             .values()
@@ -148,7 +165,7 @@ pub(crate) fn prepare(
     )))
 }
 
-fn work_goal(state: &TurnState) -> Result<Option<Goal>> {
+pub(crate) fn work_goal(state: &TurnState) -> Result<Option<Goal>> {
     let Some(envelope) = state
         .driver_state()
         .value()

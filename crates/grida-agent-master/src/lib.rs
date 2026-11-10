@@ -155,6 +155,7 @@ pub struct Master {
     input_limit: Option<NonZeroU64>,
     effort: Option<effort::Policy>,
     goal_verifier: Option<Box<goals::settlement::Verifier>>,
+    goal_child_work: Option<Arc<dyn goals::ChildWorkObserver>>,
     completion_checks: Option<CompletionChecksExecution>,
     approval_reviewer: Option<Arc<dyn approval_review::Reviewer>>,
 }
@@ -240,6 +241,7 @@ impl Master {
             input_limit: None,
             effort: None,
             goal_verifier: None,
+            goal_child_work: None,
             completion_checks: None,
             approval_reviewer: None,
         })
@@ -307,13 +309,22 @@ impl Master {
         self
     }
 
+    /// Observe recorded use of a captured Goal reservation's child share.
+    /// A missing or unsettled observation holds the reservation.
+    pub fn with_goal_child_work(mut self, observer: Arc<dyn goals::ChildWorkObserver>) -> Self {
+        self.goal_child_work = Some(observer);
+        self
+    }
+
     pub async fn run(&self, mut turn: Turn, input: Vec<Message>) -> Result<MasterOutcome> {
         let max_steps = {
             let view = turn.view();
             goals::settlement::step_limit(
                 &view.state,
                 self.config.max_steps,
-                self.effort.is_some() && !view.state.controls().cancelled,
+                self.effort
+                    .as_ref()
+                    .map_or(0, effort::Policy::reserved_child_generation_steps),
             )?
         };
         let reviewer = self.approval_reviewer.as_ref().filter(|_| max_steps > 1);
@@ -1098,10 +1109,24 @@ impl Master {
             account.completion_checks = review.checks;
             outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
         }
+        let child = match (
+            &self.goal_child_work,
+            goals::settlement::work_goal(&basis.state)?,
+        ) {
+            (Some(observer), Some(goal))
+                if goal
+                    .reservation()
+                    .is_some_and(|work| work.child_inference_steps.is_some()) =>
+            {
+                Some(observer.observe(&basis.state).await)
+            }
+            _ => None,
+        };
         let goal = goals::settlement::prepare(
             &basis.state,
             outcome.status,
             self.goal_verifier.as_deref(),
+            child,
         )?;
         let state_change = match goal {
             Some((change, goal)) => {

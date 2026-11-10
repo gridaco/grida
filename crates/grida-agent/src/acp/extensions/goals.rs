@@ -22,6 +22,7 @@ struct Start {
     prompt: Vec<ContentBlock>,
     goal: GoalRequest,
     operating_regime: Option<crate::OperatingRegime>,
+    effort: Option<crate::EffortPreset>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -106,7 +107,7 @@ pub(super) fn handlers(
                                     &start.1,
                                     request.operating_regime,
                                 )?,
-                                effort: None,
+                                effort: effort(&start.1, request.effort)?,
                             },
                             goal,
                         )
