@@ -160,11 +160,78 @@ export function NativeAgentPane({
       data-testid="workspace-native-chat"
       className="flex min-h-0 flex-1 flex-col"
     >
+      {(state.profiles || state.profileError) && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pt-2 text-xs">
+          {state.profiles && (
+            <select
+              aria-label="Model connection"
+              className="min-w-0 flex-1 truncate rounded border bg-background px-2 py-1"
+              value={
+                state.profiles.active
+                  ? `saved:${state.profiles.active}`
+                  : "default"
+              }
+              disabled={state.profileBusy || state.acting}
+              onChange={(event) => {
+                const value = event.currentTarget.value;
+                if (value === "default")
+                  void controller.selectProfile({ kind: "default" });
+                else {
+                  const [kind, id] = value.split(":");
+                  if ((kind === "new" || kind === "saved") && id)
+                    void controller.selectProfile({ kind, id });
+                }
+              }}
+            >
+              <option value="default">Default connection</option>
+              {state.profiles.saved.length > 0 && (
+                <optgroup label="Saved chats by model">
+                  {state.profiles.saved.map(
+                    ({ id, connection, model, available }) => (
+                      <option
+                        key={id}
+                        value={`saved:${id}`}
+                        disabled={!available}
+                      >
+                        {connection} · {model}
+                        {available ? "" : " (unavailable)"}
+                      </option>
+                    )
+                  )}
+                </optgroup>
+              )}
+              {state.profiles.choices.length > 0 && (
+                <optgroup label="New chat with…">
+                  {state.profiles.choices.map(({ id, connection, model }) => (
+                    <option key={id} value={`new:${id}`}>
+                      {connection} · {model}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={() => void controller.readProfiles()}
+          >
+            Refresh models
+          </Button>
+          {state.profileError && (
+            <p role="alert" className="basis-full text-destructive">
+              {state.profileError}
+            </p>
+          )}
+        </div>
+      )}
       <div className="flex shrink-0 items-center gap-2 px-3 py-2">
         <select
           aria-label="Chat"
           className="min-w-0 flex-1 truncate rounded border bg-background px-2 py-1 text-xs"
           value={state.selected ?? ""}
+          disabled={state.profileBusy}
           onChange={(event) =>
             void controller.select(event.currentTarget.value || null)
           }
@@ -835,7 +902,7 @@ export function NativeAgentPane({
           }
           submissionScope={state.scope}
           draftRef={draft}
-          onSubmit={(text) => controller.submit(text)}
+          onSubmit={(text) => controller.submit(text, state.scope)}
           onStop={() => void controller.control("stop")}
           toolbarStart={
             <>

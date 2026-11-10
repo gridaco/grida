@@ -169,15 +169,40 @@ export class NativeAgentCutover {
     );
   }
 
-  async startWorkspace(workspaceId: string, launch: Launch): Promise<Ready> {
-    const canonicalCwd = path.isAbsolute(launch.cwd)
-      ? await fs.realpath(launch.cwd).catch(() => null)
+  async workspaceDirectory(
+    workspaceId: string,
+    cwd: string,
+    prepare = false
+  ): Promise<string> {
+    const canonicalCwd = path.isAbsolute(cwd)
+      ? await fs.realpath(cwd).catch(() => null)
       : null;
     if (
       !/^[A-Za-z0-9_-]{1,128}$/.test(workspaceId) ||
-      (launch.workspace !== undefined && launch.workspace.id !== workspaceId) ||
-      canonicalCwd !== launch.cwd ||
-      overlaps(launch.cwd, this.stateDirectory)
+      canonicalCwd !== cwd ||
+      overlaps(cwd, this.stateDirectory)
+    )
+      throw new Error("native_chat_workspace_invalid");
+    const workspaces = path.join(this.stateDirectory, WORKSPACES_DIRECTORY);
+    const key = createHash("sha256")
+      .update(JSON.stringify([workspaceId, cwd]))
+      .digest("hex");
+    const directory = path.join(workspaces, key);
+    if (prepare) {
+      await ensureState(workspaces);
+      await ensureState(directory);
+    }
+    return directory;
+  }
+
+  async startWorkspace(
+    workspaceId: string,
+    launch: Launch,
+    profileId?: string
+  ): Promise<Ready> {
+    if (
+      (launch.workspace && launch.workspace.id !== workspaceId) ||
+      (profileId !== undefined && !DIGEST.test(profileId))
     )
       throw new Error("native_chat_workspace_invalid");
     if (
@@ -188,12 +213,17 @@ export class NativeAgentCutover {
       )
     )
       throw new Error("native_chat_cutover_state_overlap");
-    const workspaces = path.join(this.stateDirectory, WORKSPACES_DIRECTORY);
-    const key = createHash("sha256")
-      .update(JSON.stringify([workspaceId, launch.cwd]))
-      .digest("hex");
-    const stateDirectory = path.join(workspaces, key);
-    await ensureState(workspaces);
+    const directory = await this.workspaceDirectory(
+      workspaceId,
+      launch.cwd,
+      true
+    );
+    let stateDirectory = directory;
+    if (profileId) {
+      const profiles = path.join(directory, "profiles");
+      await ensureState(profiles);
+      stateDirectory = path.join(profiles, profileId);
+    }
     const chat = await NativeAgentChat.start({ ...launch, stateDirectory });
     try {
       await this.markReady();

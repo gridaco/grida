@@ -66,6 +66,22 @@ export type NativeChatPage = Readonly<{
   nextCursor: string | null;
 }>;
 
+export type NativeChatProfileChoice = Readonly<{
+  id: string;
+  connection: string;
+  model: string;
+}>;
+
+export type NativeChatProfileCatalog = Readonly<{
+  active: string | null;
+  choices: readonly NativeChatProfileChoice[];
+  saved: readonly (NativeChatProfileChoice & { available: boolean })[];
+}>;
+
+export type NativeChatProfileSelection =
+  | Readonly<{ kind: "default" }>
+  | Readonly<{ kind: "new" | "saved"; id: string }>;
+
 export type NativeChatCatalogEntry = Readonly<{
   sessionId: string;
   revision: number;
@@ -425,6 +441,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
    */
   status?(start?: boolean): Promise<NativeChatReadiness>;
   list(cursor?: string | null): Promise<NativeChatPage>;
+  profiles?(): Promise<NativeChatProfileCatalog | null>;
+  selectProfile?(selection: NativeChatProfileSelection): Promise<void>;
   listArchived?(cursor?: string | null): Promise<NativeChatPage>;
   catalogEntry?(attachmentId: string): Promise<NativeChatCatalogEntry>;
   organize?(

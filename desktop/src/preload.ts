@@ -494,6 +494,9 @@ const bridge: DesktopBridge = {
     status: (start) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),
     list: (cursor) => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
+    profiles: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_PROFILES),
+    selectProfile: (selection) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE, selection),
     listArchived: (cursor) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST_ARCHIVED, cursor),
     catalogEntry: (attachmentId) =>

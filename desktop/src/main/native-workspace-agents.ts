@@ -14,6 +14,10 @@ type ProviderLaunch = Readonly<{
   launch: Omit<NativeAgentChatLaunch, "stateDirectory" | "cwd">;
   release?: () => void;
 }>;
+type ChatProfile = Readonly<{
+  id: string;
+  prepare(signal: AbortSignal): Promise<ProviderLaunch>;
+}>;
 type Owner = {
   active: ActiveNativeChat & { chat: NativeAgentChat };
   release?: () => void;
@@ -38,16 +42,21 @@ export class NativeWorkspaceAgents {
     ) => Promise<ProviderLaunch>
   ) {}
 
-  current(workspaceId: string): ActiveNativeChat | null {
+  current(workspaceId: string, profileId?: string): ActiveNativeChat | null {
     if (this.stopping.signal.aborted) return null;
-    const active = this.slots.get(workspaceId)?.owner?.active;
+    const active = this.slots.get(slotKey(workspaceId, profileId))?.owner
+      ?.active;
     return active?.chat.connected ? active : null;
   }
 
-  async open(workspace: Project): Promise<ActiveNativeChat> {
+  async open(
+    workspace: Project,
+    profile?: ChatProfile
+  ): Promise<ActiveNativeChat> {
     if (this.stopping.signal.aborted) throw closing();
     const { id, root } = workspace;
-    const existing = this.slots.get(id);
+    const key = slotKey(id, profile?.id);
+    const existing = this.slots.get(key);
     if (existing) {
       if (existing.root !== root)
         throw new Error("native_workspace_root_changed");
@@ -71,7 +80,7 @@ export class NativeWorkspaceAgents {
           existing.owner.release?.();
         }
       }
-      return await this.start({ id, root });
+      return await this.start({ id, root }, profile);
     });
     const visible = opened.then((owner) => {
       if (this.stopping.signal.aborted) throw closing();
@@ -79,8 +88,8 @@ export class NativeWorkspaceAgents {
       return owner.active;
     });
     const slot: Slot = { root, opened, visible };
-    this.slots.set(id, slot);
-    void opened.catch((error: unknown) => this.retireSlot(id, slot, error));
+    this.slots.set(key, slot);
+    void opened.catch((error: unknown) => this.retireSlot(key, slot, error));
     return visible;
   }
 
@@ -91,15 +100,20 @@ export class NativeWorkspaceAgents {
     return this.closed;
   }
 
-  private async start(workspace: Project): Promise<Owner> {
+  private async start(
+    workspace: Project,
+    profile?: ChatProfile
+  ): Promise<Owner> {
     if (this.stopping.signal.aborted) throw closing();
-    const candidate = await this.prepare(workspace, this.stopping.signal);
+    const candidate = await (profile
+      ? profile.prepare(this.stopping.signal)
+      : this.prepare(workspace, this.stopping.signal));
     try {
       if (this.stopping.signal.aborted) throw closing();
-      const { chat } = await this.cutover.startWorkspace(workspace.id, {
-        ...candidate.launch,
-        cwd: workspace.root,
-      });
+      const launch = { ...candidate.launch, cwd: workspace.root };
+      const { chat } = profile
+        ? await this.cutover.startWorkspace(workspace.id, launch, profile.id)
+        : await this.cutover.startWorkspace(workspace.id, launch);
       return {
         active: Object.freeze({ workspaceId: workspace.id, chat }),
         release: candidate.release,
@@ -157,4 +171,8 @@ export class NativeWorkspaceAgents {
 
 function closing() {
   return new Error("native_workspace_closing");
+}
+
+function slotKey(workspaceId: string, profileId?: string): string {
+  return profileId ? JSON.stringify([workspaceId, profileId]) : workspaceId;
 }

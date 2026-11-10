@@ -20,6 +20,8 @@ import type {
   NativeChatOperatingRegime,
   NativeChatEffort,
   NativeChatPage,
+  NativeChatProfileCatalog,
+  NativeChatProfileSelection,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
   NativeChatQueueAction,
@@ -63,6 +65,9 @@ export type NativeChatView = Readonly<{
   catalogLoading: boolean;
   catalogError: string | null;
   catalogArchived: boolean;
+  profiles: NativeChatProfileCatalog | null;
+  profileBusy: boolean;
+  profileError: string | null;
   catalogEntry: NativeChatCatalogEntry | null;
   catalogEntryError: string | null;
   catalogChanging: boolean;
@@ -176,6 +181,9 @@ const EMPTY: NativeChatView = Object.freeze({
   catalogLoading: false,
   catalogError: null,
   catalogArchived: false,
+  profiles: null,
+  profileBusy: false,
+  profileError: null,
   catalogEntry: null,
   catalogEntryError: null,
   catalogChanging: false,
@@ -236,6 +244,8 @@ export class NativeChatController {
   private catalog: NativeChatPage | null = null;
   private listing?: Promise<NativeChatPage>;
   private recents: readonly string[] = [];
+  private profileId: string | null = null;
+  private profileRead?: object;
 
   constructor(
     private readonly bridge: DesktopNativeChat,
@@ -324,8 +334,11 @@ export class NativeChatController {
       catalogLoading: false,
       catalogError: null,
       catalogArchived: false,
+      profileBusy: false,
+      profileError: null,
     });
     void this.listChats();
+    void this.readProfiles();
     void this.select(initial ?? saved.selected);
   }
 
@@ -333,6 +346,7 @@ export class NativeChatController {
     const previous = this.scope;
     this.scope = undefined;
     this.catalogConnection = undefined;
+    this.profileRead = undefined;
     this.queueRelease(previous);
   }
 
@@ -376,6 +390,68 @@ export class NativeChatController {
       if (owns()) this.update({ catalogError: "Couldn't list saved chats." });
     } finally {
       if (owns()) this.update({ catalogLoading: false });
+    }
+  }
+
+  async readProfiles(): Promise<void> {
+    const connection = this.catalogConnection;
+    if (!connection || !this.bridge.profiles) return;
+    const request = {};
+    this.profileRead = request;
+    const owns = () =>
+      this.catalogConnection === connection && this.profileRead === request;
+    try {
+      const profiles = await this.bridge.profiles();
+      if (owns()) this.update({ profiles, profileError: null });
+    } catch {
+      if (owns())
+        this.update({ profileError: "Couldn't load model connections." });
+    }
+  }
+
+  async selectProfile(selection: NativeChatProfileSelection): Promise<void> {
+    const connection = this.catalogConnection;
+    if (
+      !connection ||
+      !this.bridge.selectProfile ||
+      this.view.profileBusy ||
+      this.view.acting
+    )
+      return;
+    this.profileRead = undefined;
+    this.update({ profileBusy: true, profileError: null });
+    try {
+      await this.bridge.selectProfile(selection);
+      if (this.catalogConnection !== connection) return;
+      this.profileId = selection.kind === "default" ? null : selection.id;
+      this.catalogConnection = {};
+      this.catalog = null;
+      const saved = this.restore();
+      this.recents = saved.sessions;
+      this.update({
+        ...(this.view.profiles && {
+          profiles: { ...this.view.profiles, active: this.profileId },
+        }),
+        sessions: this.sessionChoices(),
+        catalogCursor: null,
+        nextCatalogCursor: null,
+        catalogLoading: false,
+        catalogError: null,
+        catalogArchived: false,
+        profileBusy: false,
+      });
+      void this.listChats();
+      void this.readProfiles();
+      await this.select(selection.kind === "new" ? null : saved.selected);
+    } catch {
+      if (this.catalogConnection === connection)
+        this.update({
+          profileError:
+            "This model connection is unavailable. Check its saved settings.",
+        });
+    } finally {
+      if (this.catalogConnection === connection)
+        this.update({ profileBusy: false });
     }
   }
 
@@ -474,6 +550,7 @@ export class NativeChatController {
     return (
       !!this.scope &&
       !this.view.loading &&
+      !this.view.profileBusy &&
       !this.view.acting &&
       !this.view.commandRunning &&
       !this.view.revisionDraft &&
@@ -498,6 +575,7 @@ export class NativeChatController {
       !!this.scope &&
       this.view.imageInput &&
       !this.view.loading &&
+      !this.view.profileBusy &&
       !this.view.acting &&
       !this.view.steering &&
       !this.view.reviewConfiguration &&
@@ -1211,12 +1289,14 @@ export class NativeChatController {
       this.update({ effort });
   }
 
-  async submit(text: string): Promise<void> {
+  async submit(text: string, scopeId = this.view.scope): Promise<void> {
+    const scope = this.scope;
+    if (!scope || scope.id !== scopeId || this.view.profileBusy)
+      throw new Error("native_chat_not_ready");
     const literal = text.trim();
     if (literal === "/compact" || literal === "/fork")
       return this.runCommand(literal === "/compact" ? "compact" : "fork");
-    const scope = this.scope;
-    if (!scope || !this.canSubmit || !text.trim())
+    if (!this.canSubmit || !text.trim())
       throw new Error("native_chat_not_ready");
     if (this.view.steering) return this.submitSteering(scope, text);
     const mode = this.needsQueue ? "enqueue" : "submit";
@@ -2749,11 +2829,10 @@ export class NativeChatController {
   }
 
   private restore(): { selected: string | null; sessions: string[] } {
+    const key = this.selectionMemoryKey();
     try {
       const value = JSON.parse(
-        this.memoryKey
-          ? (this.memory?.getItem(this.memoryKey) ?? "null")
-          : "null"
+        key ? (this.memory?.getItem(key) ?? "null") : "null"
       );
       if (value && Array.isArray(value.sessions)) {
         const sessions = value.sessions
@@ -2774,10 +2853,11 @@ export class NativeChatController {
   }
 
   private save(): void {
+    const key = this.selectionMemoryKey();
     try {
-      if (this.memoryKey)
+      if (key)
         this.memory?.setItem(
-          this.memoryKey,
+          key,
           JSON.stringify({
             selected: this.view.selected,
             sessions: this.recents,
@@ -2786,6 +2866,11 @@ export class NativeChatController {
     } catch {
       /* Browser storage may be disabled. */
     }
+  }
+
+  private selectionMemoryKey(): string | undefined {
+    if (!this.memoryKey || !this.profileId) return this.memoryKey;
+    return `${this.memoryKey}.profile.${this.profileId}`;
   }
 }
 

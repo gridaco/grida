@@ -165,6 +165,14 @@ the first version that understands the receipt. An invalid or incomplete profile
 stops startup before Electron initializes the ordinary browser profile. Enrollment
 starts an isolated Gateway profile.
 
+In the packaged native workspace pane, **Model connection** can start a new
+chat on an approved saved compatible endpoint and reopen its own saved chat
+list. Chats keep the model connection they started with. The workspace's
+active context-limit setting applies to new inputs across its connections.
+Up to eight workspace and connection workers can be live per Desktop owner.
+Changing the viewed connection keeps previous workers and their work active.
+Desktop closes those workers on quit or account change.
+
 For a managed legacy-to-native deployment, a packaged macOS arm64 Stable
 predecessor built with `GRIDA_MANAGED_LEGACY_PREDECESSOR=1` instead enrolls a
 separate kind of profile at that same isolated location. It holds the source

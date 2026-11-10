@@ -641,6 +641,7 @@ app.on("ready", async () => {
         mcp,
         openExternal: (url: string) => shell.openExternal(url),
         workspaceCatalogRoot: path.dirname(workspaceCatalog.directory),
+        selectableProfiles: strictRetainedMedia,
       };
       nativeDesktopAgent = NativeDesktopProfile.managedCutover()
         ? await NativeDesktopAgent.prepareExisting(
@@ -760,9 +761,16 @@ app.on("ready", async () => {
     publish_workspace_surfaces: (event, snapshot) =>
       nativeEditorMcp?.publish(event, snapshot) ?? Promise.resolve(false),
     ...(native && {
-      resolve_native_chat: (_window, workspaceId) =>
-        native.current(workspaceId),
+      resolve_native_chat: (_window, workspaceId, profileId) =>
+        native.current(workspaceId, profileId),
       ensure_native_chat: (workspaceId) => native.ensure(workspaceId),
+      native_chat_profiles: native.selectableProfiles
+        ? {
+            list: (workspaceId) => native.profiles(workspaceId),
+            select: (workspaceId, selection, requireCurrent) =>
+              native.selectProfile(workspaceId, selection, requireCurrent),
+          }
+        : undefined,
       native_chatgpt_oauth: native.chatgptOAuth,
     }),
     on_onboarding_complete: async ({ window, workspace_id: workspaceId }) => {

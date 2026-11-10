@@ -971,6 +971,13 @@ lazy reads, read-only mutation, and symlink escape refusal.
   exact workspace state root and generation. It serializes source and active
   revisions through the existing writer lock. Each worker captures the active
   revision for new input. A pending file edit does not change accepted work.
+  The [model selector](desktop/src/main/native-chat-profiles.ts) accepts only
+  opaque IDs in the admitted workspace. Main resolves the current approved
+  saved endpoint and exact model before starting a separate chat worker.
+  The private profile record contains display labels and semantic IDs. It
+  retains no endpoint URL or credential bytes. A changed connection cannot
+  reopen history under a different owner. Switching models invalidates the
+  requesting frame's previous attachments and leaves other owners intact.
   Native startup accepts only a start flag. Main resolves the workspace from
   the admitted route and rechecks that scope before returning readiness.
   Navigation invalidates an outstanding reply. A failed native startup reports

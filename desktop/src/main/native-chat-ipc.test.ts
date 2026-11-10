@@ -525,6 +525,69 @@ function setup(
 }
 
 describe("native chat IPC", () => {
+  it("switches only the admitted frame between exact chat owners", async () => {
+    const { first, second, chat } = setup();
+    const id = "a".repeat(64);
+    const alternate = {
+      ...chat,
+      async create() {
+        return { id: "alternate" };
+      },
+    };
+    const pending = Promise.withResolvers<void>();
+    let delay = false;
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      (_sender, workspaceId, profile) => ({
+        workspaceId,
+        chat: profile === id ? alternate : chat,
+      }),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        list: async () => ({ choices: [], saved: [] }),
+        select: async (_workspace, _selection, requireCurrent) => {
+          if (delay) await pending.promise;
+          requireCurrent();
+        },
+      }
+    );
+    const old = await ipc.create(first.event);
+    const other = await ipc.create(second.event);
+    await ipc.selectProfile(first.event, { kind: "new", id });
+    await expect(ipc.profiles(first.event)).resolves.toMatchObject({
+      active: id,
+    });
+    await expect(ipc.profiles(second.event)).resolves.toMatchObject({
+      active: null,
+    });
+    await expect(ipc.create(first.event)).resolves.toMatchObject({
+      sessionId: "alternate",
+    });
+    await expect(ipc.observe(first.event, old.attachmentId)).rejects.toThrow(
+      "native_chat_attachment_unavailable"
+    );
+    await expect(
+      ipc.observe(second.event, other.attachmentId)
+    ).resolves.toMatchObject({
+      snapshot: { sessionId: other.sessionId },
+    });
+    await expect(
+      ipc.selectProfile(first.event, {
+        kind: "saved",
+        id,
+        endpoint: "untrusted",
+      })
+    ).rejects.toThrow("native_chat_profile_selection_invalid");
+    delay = true;
+    const stale = ipc.selectProfile(first.event, { kind: "default" });
+    first.frame.url = `${ORIGIN}/desktop/settings`;
+    pending.resolve();
+    await expect(stale).rejects.toThrow("native_chat_scope_changed");
+  });
+
   it("reviews an exact child count and reuses its basis only for an unverified delete", async () => {
     const confirm = vi.fn<
       (

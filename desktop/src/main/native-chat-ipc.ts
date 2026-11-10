@@ -24,6 +24,8 @@ import type {
   NativeChatObservation,
   NativeChatOperatingRegime,
   NativeChatPage,
+  NativeChatProfileCatalog,
+  NativeChatProfileSelection,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
   NativeChatQueueChange,
@@ -62,6 +64,7 @@ import {
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
 import { RetainedFileExport } from "./retained-file-export";
+import { NativeChatProfiles } from "./native-chat-profiles";
 
 const MAX_ATTACHMENTS = 16;
 const MAX_OBSERVATIONS = 16;
@@ -209,18 +212,40 @@ type Startup = {
   release(): void;
 };
 
+export type NativeChatProfileOwner = Readonly<{
+  list(workspaceId: string): Promise<Omit<NativeChatProfileCatalog, "active">>;
+  select(
+    workspaceId: string,
+    selection: NativeChatProfileSelection,
+    requireCurrent: () => void
+  ): Promise<void>;
+}>;
+
+type SelectedProfile = Readonly<{
+  id: string;
+  frame: WebFrameMain;
+  workspaceId: string;
+  release(): void;
+}>;
+
 export class NativeChatIpc {
   private readonly owners = new Map<WebContents, Owner>();
   private readonly startups = new WeakMap<WebContents, Startup>();
   private readonly deleting = new WeakSet<NativeChatSession>();
   private readonly savingArtifact = new WeakSet<WebContents>();
+  private readonly selectedProfiles = new WeakMap<
+    WebContents,
+    SelectedProfile
+  >();
+  private readonly selectingProfile = new WeakSet<WebContents>();
   private readonly svgTextReplies = new NativeEditorSvgTextReplies();
 
   constructor(
     private readonly editorOrigin: string,
     private readonly resolve: (
       sender: WebContents,
-      workspaceId: string
+      workspaceId: string,
+      profileId?: string
     ) => ActiveNativeChat | null,
     private readonly startup?: {
       admits(sender: WebContents): boolean;
@@ -237,7 +262,8 @@ export class NativeChatIpc {
     ) => Promise<boolean>,
     private readonly selectArtifactDestination?: (
       sender: WebContents
-    ) => Promise<string | null>
+    ) => Promise<string | null>,
+    private readonly profilesOwner?: NativeChatProfileOwner
   ) {}
 
   available(event: IpcMainInvokeEvent): boolean | Promise<boolean> {
@@ -257,8 +283,7 @@ export class NativeChatIpc {
       throw new Error("native_chat_start_invalid");
     const workspaceId = this.workspaceId(sender, frame);
     if (!frame || !workspaceId) throw new Error("native_chat_scope_changed");
-    if (this.resolve(sender, workspaceId)?.workspaceId === workspaceId)
-      return "native-ready";
+    if (this.scope(sender, frame)) return "native-ready";
     const startup = this.startup;
     if (!startup) return "legacy";
     if (!start) return "native-starting";
@@ -267,11 +292,13 @@ export class NativeChatIpc {
     if (existing?.frame === frame && existing.workspaceId === workspaceId)
       return existing.result;
     existing?.release();
+    const profile = this.profile(sender, frame, workspaceId);
 
     const requireCurrent = () => {
       if (
         this.startups.get(sender) !== pending ||
-        this.workspaceId(sender, frame) !== workspaceId
+        this.workspaceId(sender, frame) !== workspaceId ||
+        this.profile(sender, frame, workspaceId) !== profile
       )
         throw new Error("native_chat_scope_changed");
     };
@@ -288,7 +315,13 @@ export class NativeChatIpc {
         .then(async () => {
           requireCurrent();
           try {
-            await startup.ensure(workspaceId);
+            if (profile && this.profilesOwner)
+              await this.profilesOwner.select(
+                workspaceId,
+                { kind: "saved", id: profile.id },
+                requireCurrent
+              );
+            else await startup.ensure(workspaceId);
           } catch (error) {
             requireCurrent();
             // Forward only known recovery states. Startup errors can contain
@@ -305,7 +338,7 @@ export class NativeChatIpc {
             }
           }
           requireCurrent();
-          return this.resolve(sender, workspaceId)?.workspaceId === workspaceId
+          return this.scope(sender, frame)
             ? "native-ready"
             : "native-unavailable";
         })
@@ -331,6 +364,83 @@ export class NativeChatIpc {
       return page;
     } finally {
       owner.listing = false;
+    }
+  }
+
+  async profiles({
+    sender,
+    senderFrame: frame,
+  }: IpcMainInvokeEvent): Promise<NativeChatProfileCatalog | null> {
+    const owner = this.profilesOwner;
+    if (!owner) return null;
+    const workspaceId = this.workspaceId(sender, frame);
+    if (!frame || !workspaceId) throw new Error("native_chat_scope_changed");
+    const profile = this.profile(sender, frame, workspaceId);
+    let admitted = true;
+    const stopWatching = ipc_sender.watchNavigation(sender, () => {
+      admitted = false;
+    });
+    try {
+      const result = await owner.list(workspaceId);
+      if (
+        !admitted ||
+        this.workspaceId(sender, frame) !== workspaceId ||
+        this.profile(sender, frame, workspaceId) !== profile
+      )
+        throw new Error("native_chat_scope_changed");
+      return { ...result, active: profile?.id ?? null };
+    } finally {
+      stopWatching();
+    }
+  }
+
+  async selectProfile(
+    { sender, senderFrame: frame }: IpcMainInvokeEvent,
+    selection: unknown
+  ): Promise<void> {
+    const owner = this.profilesOwner;
+    const workspaceId = this.workspaceId(sender, frame);
+    if (!owner || !frame || !workspaceId)
+      throw new Error("native_chat_profiles_unavailable");
+    const chosen = chatProfileSelection(selection);
+    if (this.selectingProfile.has(sender))
+      throw new Error("native_chat_profile_selection_busy");
+    this.selectingProfile.add(sender);
+    let admitted = true;
+    const stopWatching = ipc_sender.watchNavigation(sender, () => {
+      admitted = false;
+    });
+    const requireCurrent = () => {
+      if (!admitted || this.workspaceId(sender, frame) !== workspaceId)
+        throw new Error("native_chat_scope_changed");
+    };
+    try {
+      await owner.select(workspaceId, chosen, requireCurrent);
+      requireCurrent();
+      const id = chosen.kind === "default" ? undefined : chosen.id;
+      if (this.resolve(sender, workspaceId, id)?.workspaceId !== workspaceId)
+        throw new Error("native_chat_profile_unavailable");
+      const previous = this.profile(sender, frame, workspaceId);
+      if (previous?.id === id) return;
+      this.owners.get(sender)?.release();
+      this.startups.get(sender)?.release();
+      previous?.release();
+      if (!id) return;
+      const selected: SelectedProfile = {
+        id,
+        frame,
+        workspaceId,
+        release: () => {
+          if (this.selectedProfiles.get(sender) !== selected) return;
+          this.selectedProfiles.delete(sender);
+          stopSelected();
+        },
+      };
+      const stopSelected = ipc_sender.watchNavigation(sender, selected.release);
+      this.selectedProfiles.set(sender, selected);
+    } finally {
+      stopWatching();
+      this.selectingProfile.delete(sender);
     }
   }
 
@@ -1889,8 +1999,23 @@ export class NativeChatIpc {
   ): ActiveNativeChat | null {
     const id = this.workspaceId(sender, frame);
     if (!id) return null;
-    const active = this.resolve(sender, id);
+    const active = this.resolve(
+      sender,
+      id,
+      this.profile(sender, frame, id)?.id
+    );
     return active?.workspaceId === id ? active : null;
+  }
+
+  private profile(
+    sender: WebContents,
+    frame: WebFrameMain | null,
+    workspaceId: string
+  ) {
+    const profile = this.selectedProfiles.get(sender);
+    return profile?.frame === frame && profile.workspaceId === workspaceId
+      ? profile
+      : undefined;
   }
 
   private workspaceId(
@@ -1912,6 +2037,21 @@ export class NativeChatIpc {
     const [id, duplicate] = url.searchParams.getAll("id");
     return id && id.length <= 1024 && duplicate === undefined ? id : null;
   }
+}
+
+function chatProfileSelection(value: unknown): NativeChatProfileSelection {
+  if (value && typeof value === "object") {
+    const selection = value as { kind?: unknown; id?: unknown };
+    const keys = Object.keys(value).length;
+    if (keys === 1 && selection.kind === "default") return { kind: "default" };
+    if (
+      keys === 2 &&
+      (selection.kind === "new" || selection.kind === "saved") &&
+      NativeChatProfiles.validId(selection.id)
+    )
+      return { kind: selection.kind, id: selection.id };
+  }
+  throw new Error("native_chat_profile_selection_invalid");
 }
 
 function sameActive(

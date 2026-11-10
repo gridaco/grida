@@ -8,11 +8,25 @@ format: md
 # Choose models and understand usage
 
 The model connection determines which inputs and tools are available in a
-native workspace chat. A managed Desktop profile uses the Grida Gateway.
+native workspace chat. Grida Gateway is the default in a managed Desktop profile.
 The isolated native preview can use a saved OpenRouter or Vercel key on
 macOS and Linux, or an approved compatible endpoint. On macOS and Linux,
 the endpoint can use a key saved under its own ID.
 [Configure a native Desktop profile](https://github.com/gridaco/grida/blob/main/desktop/README.md#distributions)
+
+## Start a chat with a saved model
+
+In a managed native workspace on macOS with Apple silicon, save and approve a
+compatible endpoint in Desktop settings. Once the workspace chat is ready,
+open **Model connection** and choose a registered model under **New chat
+with…**. Use **Refresh models** after changing the saved connection.
+
+Each chat keeps its original model connection. **Saved chats by model** reopens
+the chat list for that connection, and **Default connection** returns to the default
+list. Switching lists leaves existing work and pending questions in their
+original chats. All connections in the workspace share its context-limit setting.
+Removing a connection or changing its endpoint can make its saved chats
+unavailable. Restore the original approved connection to reopen them.
 
 ## Recover a connection
 

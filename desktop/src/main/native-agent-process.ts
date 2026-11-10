@@ -55,6 +55,7 @@ export type NativeAgentLaunch = {
   model: string;
   credentialHome?: string;
   configuredEndpointKey?: string;
+  workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
   providerNetwork?: NativeProviderNetwork;
   gatewayScope?: string;
   subscriptionScope?: string;
@@ -252,6 +253,8 @@ export class NativeAgentProcess {
   }
 
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
+    if (options.workspaceConfiguration && !options.providerNetwork)
+      throw new Error("native_workspace_configuration_requires_supervision");
     if (options.subagents && !options.gatewayScope)
       throw new Error("native_agent_subagents_gateway_required");
     if (
@@ -326,6 +329,14 @@ export class NativeAgentProcess {
     if (options.credentialHome)
       args.push("--credential-home", options.credentialHome);
     if (providerEgress) args.push("--supervised-provider");
+    if (options.workspaceConfiguration) {
+      args.push(
+        "--workspace-configuration",
+        options.workspaceConfiguration.directory,
+        "--workspace-configuration-epoch",
+        options.workspaceConfiguration.epoch
+      );
+    }
     if (options.configuredEndpointKey !== undefined)
       args.push(
         "--supervised-configured-endpoint-key",

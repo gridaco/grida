@@ -1988,6 +1988,70 @@ function message(id: string, content: string): NativeChatMessage {
 }
 
 describe("Native workspace chat controller", () => {
+  it("keeps saved chats and renderer observations scoped to the selected model owner", async () => {
+    const { bridge, running, updates, controller } = fixture();
+    let profile: string | null = null;
+    const id = "b".repeat(64);
+    let unavailable = false;
+    let allowSelection!: () => void;
+    const selectionReady = new Promise<void>((resolve) => {
+      allowSelection = resolve;
+    });
+    running.add("default-chat");
+    bridge.profiles = async () => ({
+      active: profile,
+      choices: [{ id, connection: "Local", model: "Fixture" }],
+      saved: [
+        { id, connection: "Local", model: "Fixture", available: !unavailable },
+      ],
+    });
+    bridge.selectProfile = async (selection) => {
+      if (unavailable && selection.kind !== "default")
+        throw new Error("unavailable");
+      if (selection.kind === "new") await selectionReady;
+      profile = selection.kind === "default" ? null : selection.id;
+    };
+    bridge.list = async () => ({
+      sessionIds: [profile === null ? "default-chat" : "alternate-chat"],
+      nextCursor: null,
+    });
+    try {
+      controller.connect("default-chat");
+      await vi.waitFor(() => expect(updates.has("default-chat")).toBe(true));
+      const oldUpdate = updates.get("default-chat")!;
+      const oldScope = controller.read().scope;
+      const selecting = controller.selectProfile({ kind: "new", id });
+      expect(controller.canSubmit).toBe(false);
+      await expect(controller.submit("Wrong owner", oldScope)).rejects.toThrow(
+        "native_chat_not_ready"
+      );
+      allowSelection();
+      await selecting;
+      await expect(
+        controller.submit("Late old composer", oldScope)
+      ).rejects.toThrow("native_chat_not_ready");
+      await vi.waitFor(() =>
+        expect(controller.read().sessions).toEqual(["alternate-chat"])
+      );
+      expect(controller.read().selected).toBeNull();
+      oldUpdate(text("default-chat", "late old text", 0));
+      expect(controller.read().messages).toEqual([]);
+      await controller.select("alternate-chat");
+      expect(controller.read().selected).toBe("alternate-chat");
+      await controller.selectProfile({ kind: "default" });
+      await vi.waitFor(() =>
+        expect(controller.read().sessions).toEqual(["default-chat"])
+      );
+      await controller.select("default-chat");
+      unavailable = true;
+      await controller.selectProfile({ kind: "saved", id });
+      expect(controller.read().selected).toBe("default-chat");
+      expect(controller.read().profileError).toMatch(/unavailable/);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
   it("projects UTF-8 offsets, duplicate chunks, and a final replacement without repeating text", async () => {
     const { controller, running, updates } = fixture();
     running.add("a");

@@ -90,10 +90,12 @@ type RegisterIpcHandlersOptions = {
   resolve_document_window?: (id: string) => BrowserWindow | undefined;
   resolve_native_chat?: (
     window: BrowserWindow,
-    workspaceId: string
+    workspaceId: string,
+    profileId?: string
   ) => ActiveNativeChat | null;
   /** Present when this main process has selected native chat mode. */
   ensure_native_chat?: (workspaceId: string) => Promise<void>;
+  native_chat_profiles?: import("./native-chat-ipc").NativeChatProfileOwner;
   publish_workspace_surfaces?: (
     event: IpcMainInvokeEvent,
     snapshot: unknown
@@ -129,10 +131,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   };
   const nativeChat = new NativeChatIpc(
     EDITOR_ORIGIN,
-    (sender, workspaceId) => {
+    (sender, workspaceId, profileId) => {
       const window = admittedWindow(sender);
       return window
-        ? (options.resolve_native_chat?.(window, workspaceId) ?? null)
+        ? (options.resolve_native_chat?.(window, workspaceId, profileId) ??
+            null)
         : null;
     },
     options.ensure_native_chat && {
@@ -190,7 +193,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         filters: [{ name: "PNG image", extensions: ["png"] }],
       });
       return result.canceled || !result.filePath ? null : result.filePath;
-    }
+    },
+    options.native_chat_profiles
   );
   /**
    * GRIDA-SEC-004 / GRIDA-SEC-005 — every native IPC invoke must pass both
@@ -270,6 +274,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_LIST, (event, cursor?: string | null) =>
     nativeChat.list(event, cursor)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_PROFILES, (event) =>
+    nativeChat.profiles(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
+    (event, selection: unknown) => nativeChat.selectProfile(event, selection)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_LIST_ARCHIVED,
