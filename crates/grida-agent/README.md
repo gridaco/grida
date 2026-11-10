@@ -108,10 +108,11 @@ resuming those tasks. Stop can still settle them when the check is unavailable.
 
 On a supported native command host, a trusted `--permission-profile` may also
 declare one `beforeCompletion` command for Act turns. The primary directory
-must already grant `commandRead: "allow"`. The reviewed executable must have a
-canonical absolute path outside the workspace and be covered by the declared
-read-only runtime paths. The profile records its SHA-256 as 32 byte values.
-This is the shape of the optional profile field.
+must already grant `commandRead: "allow"`. Use a canonical system executable
+directly under `/bin` or `/usr/bin`, covered by the declared read-only runtime
+paths. The host must run unprivileged and must be able to verify ownership and
+ACLs for the executable and its ancestors. The profile records the executable's
+SHA-256 as 32 byte values. This is the shape of the optional profile field.
 
 ```text
 beforeCompletion

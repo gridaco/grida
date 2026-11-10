@@ -195,7 +195,8 @@ impl Sandbox {
 }
 
 impl PreparedProcess {
-    /// Verify the reviewed digest against the executable bound by preparation.
+    /// Verify system executable custody and the reviewed digest against the
+    /// file bound by preparation. Ordinary commands do not use this check.
     pub fn verify_executable(&self, executable: &TrustedExecutable) -> Result<()> {
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         return self.native.verify_executable(executable);

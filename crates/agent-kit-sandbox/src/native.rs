@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 mod process;
+mod reviewed;
 
 const MAX_PATHS: usize = 128;
 const MAX_INPUT: usize = 1024 * 1024;
@@ -149,16 +150,19 @@ impl Trusted {
     }
 
     fn check(&self) -> Result<()> {
-        check_executable(&self.bound, &self.executable)
+        check_executable(&self.bound, &self.executable, open_executable(&self.bound)?)
     }
 }
 
-fn check_executable(bound: &Bound, executable: &TrustedExecutable) -> Result<()> {
-    let file = OpenOptions::new()
+fn open_executable(bound: &Bound) -> Result<File> {
+    OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW)
         .open(bound.path())
-        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_launcher_missing"))?;
+        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_launcher_missing"))
+}
+
+fn check_executable(bound: &Bound, executable: &TrustedExecutable, file: File) -> Result<()> {
     let metadata = file
         .metadata()
         .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_launcher_missing"))?;
@@ -522,14 +526,17 @@ pub(super) use process::Running;
 
 impl Prepared {
     pub(super) fn verify_executable(&self, executable: &TrustedExecutable) -> Result<()> {
+        let changed = || refused(ErrorKind::Conflict, "reviewed_executable_changed");
         let bound = self
             .anchors
             .get(1)
             .ok_or_else(|| refused(ErrorKind::InvalidState, "sandbox_capture_process_required"))?;
         if bound.path() != executable.path {
-            return Err(refused(ErrorKind::Conflict, "sandbox_executable_changed"));
+            return Err(changed());
         }
-        check_executable(bound, executable)
+        let file = open_executable(bound).map_err(|_| changed())?;
+        reviewed::require_system_installation(bound.path(), &file)?;
+        check_executable(bound, executable, file).map_err(|_| changed())
     }
 
     pub(super) fn capture_fingerprint(&self) -> Result<Fingerprint> {

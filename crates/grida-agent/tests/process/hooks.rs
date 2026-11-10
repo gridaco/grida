@@ -5,6 +5,7 @@ use super::lifecycle::{prompt_request, task_basis};
 use super::*;
 use sha2::{Digest, Sha256};
 use std::fs;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::PathBuf;
 
 const CHECK: &str = "require-completion-text";
@@ -127,6 +128,55 @@ async fn configured_completion_command_records_only_its_reviewed_decision() {
         assert!(endpoint.requests.try_recv().is_err());
         assert!(fs::read_dir(temporary).unwrap().next().is_none());
     }
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn a_matching_digest_cannot_authorize_a_user_owned_hook_program() {
+    let fixture = Fixture::new(true);
+    let directory = fixture.profile.parent().unwrap().join("reviewed-program");
+    fs::create_dir(&directory).unwrap();
+    let program = directory.join("check");
+    fs::copy("/usr/bin/printf", &program).unwrap();
+    fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    assert_ne!(fs::metadata(&program).unwrap().uid(), 0);
+    let temporary = hook(
+        &fixture,
+        program.to_str().unwrap(),
+        &["%s", r#"{"decision":"allow"}"#],
+        "required",
+        false,
+    );
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["command"]["runtimePaths"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!(directory));
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    let mut endpoint = Endpoint::start(vec![Reply::Finished("Fixture answer.")]).await;
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .args(["--prompt", "Prepare the answer."])
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let results = records(&output.stdout);
+    let evidence = &results[1]["account"]["completion_checks"][0];
+    assert_eq!(evidence["status"], "failed", "{results:?}");
+    assert_eq!(
+        evidence["reason"],
+        "reviewed_executable_custody_unavailable"
+    );
+    assert!(fs::read_dir(temporary).unwrap().next().is_none());
+    endpoint.request().await;
     endpoint.done().await;
 }
 

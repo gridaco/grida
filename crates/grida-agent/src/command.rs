@@ -597,9 +597,7 @@ async fn execute(
                 spawn(prepared, stop)
             }
             ProcessAdmission::Reviewed(executable, spawn) => {
-                prepared
-                    .verify_executable(&executable)
-                    .map_err(|error| Error::new(error.kind, "reviewed_executable_changed"))?;
+                prepared.verify_executable(&executable)?;
                 spawn(prepared, stop)
             }
         }

@@ -75,9 +75,11 @@ have their existing owners and are excluded from this initial schema.
 The [hook behavior contract](https://grida.co/docs/wg/ai/agent/hooks) defines
 execution boundaries. The native host currently accepts one reviewed
 `beforeCompletion` command in its trusted launch permission profile. Its
-definition binds a canonical executable and digest, literal arguments, mode,
-timeout and the captured read-only command scope. The command runs only for
-Act work. Plan leaves it disabled.
+definition binds a canonical system executable and digest, literal arguments,
+mode, timeout and the captured read-only command scope. An unprivileged host
+verifies ownership and ACLs on the executable and its ancestors before launch.
+User-owned commands require a separate executable custody contract. The command
+runs only for Act work. Plan leaves it disabled.
 
 Review event names, exact matchers, command/executable binding, source and
 revision, scope, timeout, output/context bounds, required-check behavior, and
