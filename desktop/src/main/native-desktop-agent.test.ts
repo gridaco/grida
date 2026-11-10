@@ -2,6 +2,7 @@
 import { AuthStore, SecretsStore } from "@grida/daemon/server";
 import { AGENT_DEFAULT_TIER } from "@grida/agent/tiers";
 import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -66,6 +67,213 @@ beforeEach(() => {
   sidecar.nativeAgentGatewayConnection.mockClear();
   sidecar.listGatewayModels.mockResolvedValue([]);
 });
+
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "uses the compatible output limit for new chats and reopens the previous owner",
+  async () => {
+    const base = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-compatible-chat-")
+    );
+    const source = {
+      userDataPath: path.join(base, "agent"),
+      desktopUserDataPath: path.join(base, "browser"),
+      scratchBase: path.join(base, "scratch"),
+      providerHome: path.join(base, "providers"),
+      mediaRoot: path.join(base, "media"),
+    };
+    const root = path.join(base, "workspace");
+    const config = {
+      id: "local",
+      base_url: "http://127.0.0.1:11434/v1",
+      models: [{ id: "fixture" }],
+    };
+    const requests: Record<string, unknown>[] = [];
+    const prepare: NativeProviderNetwork["prepare"] = (target, headers) => {
+      expect(target).toBe(config.base_url + "/chat/completions");
+      expect(headers.get("authorization")).toBeNull();
+      return async (body) => {
+        requests.push(JSON.parse(body.toString()));
+        return new Response(
+          'data: {"id":"fixture","choices":[{"index":0,"delta":{"content":"Local endpoint answered."},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+          { headers: { "content-type": "text/event-stream" } }
+        );
+      };
+    };
+    const oldId = createHash("sha256")
+      .update(
+        JSON.stringify([
+          "desktop-compatible-chat-v1",
+          config.id,
+          "openai-compatible",
+          config.base_url,
+          "anonymous",
+          "fixture",
+        ])
+      )
+      .digest("hex");
+    const launch = async () => {
+      const { NativeDesktopAgent } = await import("./native-desktop-agent");
+      return NativeDesktopAgent.prepareFresh(
+        new DesktopAccountSession({
+          base_url: "https://editor.example.test",
+          fetch: vi.fn<typeof fetch>(),
+        }),
+        resources!,
+        {
+          provider: "gateway",
+          openExternal: async () => {},
+          selectableProfiles: true,
+        }
+      );
+    };
+    let agent: Awaited<ReturnType<typeof launch>> | undefined;
+    try {
+      await Promise.all(
+        [root, source.userDataPath, source.desktopUserDataPath].map(
+          (directory) => fs.mkdir(directory, { mode: 0o700 })
+        )
+      );
+      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.listProviderEndpoints.mockResolvedValue([config]);
+      sidecar.nativeBuiltInByok.mockRejectedValue(new Error("no saved key"));
+      sidecar.nativeConfiguredEndpoint.mockImplementation((id, model) =>
+        NativeProviderSelection.configuredEndpoint(id, model, {
+          list: async () => [config],
+          hasKey: async () => false,
+          network: async () => ({ prepare }),
+        })
+      );
+      const workspaces = new NativeWorkspaceCatalog({
+        browserData: source.desktopUserDataPath,
+        projectsRoot: path.join(base, "projects"),
+        protectedPaths: [source.userDataPath, source.providerHome],
+      });
+      const workspace = await workspaces.openSelected(root);
+      sidecar.findWorkspace.mockImplementation((id) => workspaces.find(id));
+      const { NativeChatProfiles } = await import("./native-chat-profiles");
+      const { NativeAgentCutover } = await import("./native-agent-cutover");
+      const cutover = await NativeAgentCutover.prepareFresh();
+      const directory = await cutover.workspaceDirectory(
+        workspace.id,
+        root,
+        true
+      );
+      await NativeChatProfiles.remember(
+        directory,
+        {
+          id: oldId,
+          providerId: config.id,
+          modelId: "fixture",
+          connection: config.id,
+          model: "fixture",
+        },
+        () => {}
+      );
+      const { chat } = await cutover.startWorkspace(
+        workspace.id,
+        {
+          ...(await sidecar.nativeConfiguredEndpoint(config.id)),
+          cwd: root,
+          resourcesPath: resources!,
+          workspaceConfiguration: { directory, epoch: randomUUID() },
+          workspace: {
+            id: workspace.id,
+            primary: { id: "project", name: "Project", path: root },
+            additionalReadRoots: [],
+            protectedPaths: [...cutover.protectedPaths],
+          },
+        },
+        oldId
+      );
+      let savedId: string;
+      try {
+        const session = await chat.create();
+        savedId = session.id;
+        await chat.submit(session, "original", "Use the local model.");
+        await vi.waitFor(async () =>
+          expect((await chat.observe(session)).latest?.status).toBe("succeeded")
+        );
+      } finally {
+        await chat.close();
+      }
+
+      vi.resetModules();
+      agent = await launch();
+      const { choices, saved } = await agent.profiles(workspace.id);
+      expect(saved).toEqual([
+        expect.objectContaining({
+          id: oldId,
+          connection: "local (earlier chats)",
+          available: true,
+        }),
+      ]);
+      expect(choices).toHaveLength(1);
+      const [{ id: newId }] = choices;
+      expect(newId).not.toBe(oldId);
+      await agent.selectProfile(
+        workspace.id,
+        { kind: "saved", id: oldId },
+        () => {}
+      );
+      const oldChat = agent.current(workspace.id, oldId)!.chat;
+      const restored = await oldChat.load(savedId);
+      expect(
+        (await oldChat.transcript(restored)).map(({ text }) => text)
+      ).toContain("Local endpoint answered.");
+      expect(requests).toHaveLength(1);
+      await oldChat.submit(
+        restored,
+        "continued",
+        "Keep the original connection."
+      );
+      await vi.waitFor(async () =>
+        expect((await oldChat.observe(restored)).latest?.status).toBe(
+          "succeeded"
+        )
+      );
+      await agent.selectProfile(
+        workspace.id,
+        { kind: "new", id: newId },
+        () => {}
+      );
+      const newChat = agent.current(workspace.id, newId)!.chat;
+      expect((await agent.profiles(workspace.id)).saved).toEqual([
+        expect.objectContaining({
+          id: oldId,
+          connection: "local (earlier chats)",
+        }),
+        expect.objectContaining({ id: newId, connection: "local" }),
+      ]);
+      expect((await newChat.list()).sessionIds).toEqual([]);
+      const session = await newChat.create();
+      await newChat.submit(
+        session,
+        "compatible",
+        "Use the compatible output limit."
+      );
+      await vi.waitFor(async () =>
+        expect((await newChat.observe(session)).latest?.status).toBe(
+          "succeeded"
+        )
+      );
+      expect(
+        requests.map(({ max_completion_tokens, max_tokens }) => [
+          max_completion_tokens,
+          max_tokens,
+        ])
+      ).toEqual([
+        [4096, undefined],
+        [4096, undefined],
+        [undefined, 4096],
+      ]);
+      expect(sidecar.nativeAgentGatewayConnection).not.toHaveBeenCalled();
+    } finally {
+      await agent?.close();
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  },
+  25_000
+);
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
   "opens a discovered Gateway model under its original account scope and output limit",

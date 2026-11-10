@@ -1023,6 +1023,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   The separate worker verifies the opaque binding against the exact model,
   origin, account and organization of its own scoped grant. It uses the
   existing fixed Gateway chat route.
+  Configured endpoint profiles also distinguish the captured output-limit
+  field. An existing profile reopens under its original field, and a new
+  profile keeps the same endpoint and custody checks when it uses
+  `max_tokens`.
   The private profile record contains display labels and semantic IDs. It
   retains no endpoint URL or credential bytes. A changed connection cannot
   reopen history under a different owner. Switching models invalidates the

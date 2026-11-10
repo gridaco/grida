@@ -14,6 +14,10 @@ macOS and Linux, or an approved compatible endpoint. On macOS and Linux,
 the endpoint can use a key saved under its own ID.
 [Configure a native Desktop profile](https://github.com/gridaco/grida/blob/main/desktop/README.md#distributions)
 
+Native chat accepts plain HTTP on `localhost` and numeric loopback addresses.
+Use HTTPS for an endpoint on another device, even if you approved its HTTP
+address in an earlier Desktop version.
+
 ## Start a chat with a saved model
 
 In a managed native workspace on macOS with Apple silicon, wait for workspace
@@ -22,6 +26,10 @@ with…**. Grida lists its current tool-capable Gateway text models when discove
 is available. Add an OpenRouter or Vercel AI Gateway key, or save and approve a
 compatible endpoint in Desktop settings, to see those models too. Use
 **Refresh models** after changing a connection.
+
+When you select a configured compatible endpoint under **New chat with…**,
+the request uses `max_tokens`, including for Ollama. The saved **earlier chats**
+entry keeps the previous request format.
 
 Each chat keeps its original model connection. **Saved chats by model** reopens
 the chat list for that connection, and **Default connection** returns to the default

@@ -13,6 +13,7 @@ import {
 } from "@grida/agent";
 import { catalog } from "@grida/ai/catalogue";
 import type { NativeChatProfileChoice } from "@grida/desktop-bridge";
+import type { NativeAgentLaunch } from "./native-agent-process";
 import { NativeProviderSelection } from "./native-provider-selection";
 
 const FILENAME = "chat-profiles.json";
@@ -24,7 +25,8 @@ const MAX_ENDPOINTS = 16;
 const GATEWAY_OUTPUT_LIMIT = 4_096;
 type Launch = Awaited<
   ReturnType<typeof NativeProviderSelection.configuredEndpoint>
->;
+> &
+  Pick<NativeAgentLaunch, "compatibleOutputLimitField">;
 type Resolve = (providerId: string, modelId?: string) => Promise<Launch>;
 
 export namespace NativeChatProfiles {
@@ -45,7 +47,9 @@ export namespace NativeChatProfiles {
         JSON.stringify([
           builtIn
             ? "desktop-builtin-byok-chat-v1"
-            : "desktop-compatible-chat-v1",
+            : launch.compatibleOutputLimitField === "max-tokens"
+              ? "desktop-compatible-max-tokens-chat-v1"
+              : "desktop-compatible-chat-v1",
           providerId,
           launch.provider,
           base.href,
@@ -54,6 +58,10 @@ export namespace NativeChatProfiles {
         ])
       )
       .digest("hex");
+  }
+
+  export function configuredLaunch(launch: Launch): Launch {
+    return { ...launch, compatibleOutputLimitField: "max-tokens" };
   }
 
   export function gatewayBinding(scope: string, modelId: string): string {
@@ -123,20 +131,24 @@ export namespace NativeChatProfiles {
   }
 
   /** Model settings supply choices; the existing native resolver decides eligibility. */
-  export async function choices(
+  export async function configuredChoices(
     endpoints: readonly EndpointProviderConfig[],
     resolve: Resolve
-  ): Promise<Saved[]> {
+  ): Promise<{ choices: Saved[]; previousIds: string[] }> {
     const choices: Saved[] = [];
+    const previousIds: string[] = [];
     for (const endpoint of endpoints.slice(0, MAX_ENDPOINTS)) {
       if (!isValidEndpointProviderId(endpoint.id)) continue;
       const eligible = await resolve(endpoint.id).catch(() => null);
       if (!eligible || eligible.endpoint !== endpoint.base_url) continue;
       for (const model of endpoint.models) {
-        if (choices.length >= MAX_CHOICES) return choices;
+        if (choices.length >= MAX_CHOICES) return { choices, previousIds };
         if (!modelId(model.id)) continue;
+        const launch = { ...eligible, model: model.id };
+        // The previous owner remains available only through its saved receipt.
+        previousIds.push(binding(endpoint.id, launch));
         choices.push({
-          id: binding(endpoint.id, { ...eligible, model: model.id }),
+          id: binding(endpoint.id, configuredLaunch(launch)),
           providerId: endpoint.id,
           modelId: model.id,
           connection: label(endpoint.label, endpoint.id),
@@ -144,7 +156,7 @@ export namespace NativeChatProfiles {
         });
       }
     }
-    return choices;
+    return { choices, previousIds };
   }
 
   export async function read(directory: string): Promise<Saved[]> {

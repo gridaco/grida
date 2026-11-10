@@ -307,18 +307,25 @@ export class NativeDesktopAgent {
           workspace.id,
           workspace.root
         );
-        const [choices, saved] = await Promise.all([
+        const [{ choices, previousIds }, saved] = await Promise.all([
           this.availableProfiles(workspace.id),
           NativeChatProfiles.read(directory),
         ]);
         requireCurrent();
         const available = new Set(choices.map(({ id }) => id));
+        const earlier = new Set(previousIds);
         return {
           choices: choices.map(publicProfile),
-          saved: saved.map((profile) => ({
-            ...publicProfile(profile),
-            available: available.has(profile.id),
-          })),
+          saved: saved.map((profile) => {
+            const previous = earlier.has(profile.id);
+            return {
+              ...publicProfile(profile),
+              ...(previous && {
+                connection: `${profile.connection} (earlier chats)`,
+              }),
+              available: previous || available.has(profile.id),
+            };
+          }),
         };
       }
     );
@@ -355,7 +362,7 @@ export class NativeDesktopAgent {
     );
     const profiles =
       selection.kind === "new"
-        ? await this.availableProfiles(workspace.id)
+        ? (await this.availableProfiles(workspace.id)).choices
         : await NativeChatProfiles.read(directory);
     const profile = profiles.find(({ id }) => id === selection.id);
     if (!profile) throw new Error("native_chat_profile_unavailable");
@@ -368,17 +375,24 @@ export class NativeDesktopAgent {
       );
       return;
     }
-    const launchProfile = NativeProviderSelection.isBuiltInByok(
-      profile.providerId
-    )
+    const builtIn = NativeProviderSelection.isBuiltInByok(profile.providerId);
+    const launchProfile = builtIn
       ? agentSidecarClient.nativeBuiltInByok
       : agentSidecarClient.nativeConfiguredEndpoint;
     const resolve = async () => {
       const launch = await launchProfile(profile.providerId, profile.modelId);
       check();
-      if (NativeChatProfiles.binding(profile.providerId, launch) !== profile.id)
-        throw new Error("native_chat_profile_changed");
-      return launch;
+      if (NativeChatProfiles.binding(profile.providerId, launch) === profile.id)
+        return launch;
+      if (!builtIn) {
+        const configured = NativeChatProfiles.configuredLaunch(launch);
+        if (
+          NativeChatProfiles.binding(profile.providerId, configured) ===
+          profile.id
+        )
+          return configured;
+      }
+      throw new Error("native_chat_profile_changed");
     };
     await resolve();
     if (selection.kind === "new")
@@ -492,7 +506,7 @@ export class NativeDesktopAgent {
       agentSidecarClient
         .listProviderEndpoints()
         .then((endpoints) =>
-          NativeChatProfiles.choices(
+          NativeChatProfiles.configuredChoices(
             endpoints,
             agentSidecarClient.nativeConfiguredEndpoint
           )
@@ -510,13 +524,16 @@ export class NativeDesktopAgent {
             .catch(() => [])
         : [],
     ]);
-    return [
-      ...(gatewayScope === this.owners?.gatewayScope(workspaceId)
-        ? gateway
-        : []),
-      ...builtIn,
-      ...configured,
-    ];
+    return {
+      choices: [
+        ...(gatewayScope === this.owners?.gatewayScope(workspaceId)
+          ? gateway
+          : []),
+        ...builtIn,
+        ...configured.choices,
+      ],
+      previousIds: configured.previousIds,
+    };
   }
 
   private async withWorkspace<T>(

@@ -56,6 +56,7 @@ export type NativeAgentLaunch = {
   endpoint: string;
   model: string;
   maxOutputTokens?: number;
+  compatibleOutputLimitField?: "max-tokens";
   credentialHome?: string;
   configuredEndpointKey?: string;
   workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
@@ -278,6 +279,17 @@ export class NativeAgentProcess {
         options.maxOutputTokens > 65_536)
     )
       throw new Error("native_agent_output_limit_invalid");
+    if (
+      options.compatibleOutputLimitField !== undefined &&
+      (options.compatibleOutputLimitField !== "max-tokens" ||
+        options.provider !== "openai-compatible" ||
+        !options.providerNetwork ||
+        (options.credentialHome !== undefined &&
+          options.configuredEndpointKey === undefined) ||
+        options.gatewayScope !== undefined ||
+        options.subscriptionScope !== undefined)
+    )
+      throw new Error("native_agent_compatible_output_limit_invalid");
     if (options.workspaceConfiguration && !options.providerNetwork)
       throw new Error("native_workspace_configuration_requires_supervision");
     if (options.subagents && !options.gatewayScope)
@@ -354,6 +366,11 @@ export class NativeAgentProcess {
     ];
     if (options.maxOutputTokens !== undefined)
       args.push("--max-output-tokens", String(options.maxOutputTokens));
+    if (options.compatibleOutputLimitField !== undefined)
+      args.push(
+        "--compatible-output-limit-field",
+        options.compatibleOutputLimitField
+      );
     if (options.credentialHome)
       args.push("--credential-home", options.credentialHome);
     if (providerEgress) args.push("--supervised-provider");
