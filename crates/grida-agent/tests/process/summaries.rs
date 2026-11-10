@@ -115,6 +115,21 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
             "The model declined the request.",
         ),
         (
+            Reply::OversizedEvent,
+            "failed",
+            "The provider response exceeded the agent's size limit. Ask for a shorter response.",
+        ),
+        (
+            Reply::OversizedEvent,
+            "failed",
+            "The provider response exceeded the agent's size limit. Ask for a shorter response.",
+        ),
+        (
+            Reply::Finished("Recovered after oversized responses."),
+            "succeeded",
+            "Recovered after oversized responses.",
+        ),
+        (
             Reply::RawHttp(format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: 1048576\r\nConnection: close\r\n\r\n{partial}"
             )),

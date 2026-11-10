@@ -88,6 +88,7 @@ struct Endpoint {
     url: String,
     requests: mpsc::UnboundedReceiver<Value>,
     task: tokio::task::JoinHandle<()>,
+    wait: Duration,
 }
 
 enum Reply {
@@ -99,6 +100,8 @@ enum Reply {
     },
     #[cfg(unix)]
     RawHttp(String),
+    #[cfg(unix)]
+    OversizedEvent,
     Hold(&'static str),
     Stop(&'static str),
     #[cfg(unix)]
@@ -131,6 +134,15 @@ impl Endpoint {
         replies: Vec<Reply>,
         credential: Option<&'static str>,
     ) -> Self {
+        Self::start_protocol_with_wait(protocol, replies, credential, WAIT).await
+    }
+
+    async fn start_protocol_with_wait(
+        protocol: ProviderProtocol,
+        replies: Vec<Reply>,
+        credential: Option<&'static str>,
+        wait: Duration,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let version = if protocol == ProviderProtocol::Gemini {
             "v1beta"
@@ -142,7 +154,7 @@ impl Endpoint {
         let task = tokio::spawn(async move {
             let mut connections = tokio::task::JoinSet::new();
             for reply in replies {
-                let (stream, _) = timeout(WAIT, listener.accept()).await.unwrap().unwrap();
+                let (stream, _) = timeout(wait, listener.accept()).await.unwrap().unwrap();
                 let sent = sent.clone();
                 connections.spawn(async move {
                     fixture_request(stream, &sent, reply, protocol, credential).await;
@@ -156,11 +168,15 @@ impl Endpoint {
             url,
             requests,
             task,
+            wait,
         }
     }
 
     async fn request(&mut self) -> Value {
-        timeout(WAIT, self.requests.recv()).await.unwrap().unwrap()
+        timeout(self.wait, self.requests.recv())
+            .await
+            .unwrap()
+            .unwrap()
     }
 
     async fn done(self) {
@@ -331,6 +347,8 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         Reply::RateLimited { .. } => unreachable!("rate limits use an HTTP error response"),
         #[cfg(unix)]
         Reply::RawHttp(_) => unreachable!("raw responses include their own HTTP headers"),
+        #[cfg(unix)]
+        Reply::OversizedEvent => return format!("data: {}", "x".repeat(256 * 1024 + 1)),
         #[cfg(unix)]
         Reply::Tool(name, arguments) => {
             if protocol == ProviderProtocol::Responses {

@@ -587,86 +587,86 @@ impl Master {
                 );
                 retrying = continuation.retry.is_some();
             }
-            let outcome =
-                if current.state.controls().cancelled {
-                    Some(self.cancelled_outcome(&turn, continuation.step).await?)
-                } else if uncertain {
-                    Some(self.account(
+            let outcome = if current.state.controls().cancelled {
+                Some(self.cancelled_outcome(&turn, continuation.step).await?)
+            } else if uncertain {
+                Some(self.account(
+                    &turn,
+                    OutcomeStatus::Uncertain,
+                    continuation.step,
+                    "An operation has an unconfirmed outcome.",
+                    None,
+                    step.inference.failure.as_ref(),
+                )?)
+            } else if interrupted_by_pause || retrying {
+                None
+            } else {
+                match step.inference.status {
+                    InferenceStatus::Completed if step.tools.is_empty() => {
+                        let text = answer(&step.inference.messages);
+                        Some(self.account(
+                            &turn,
+                            OutcomeStatus::Succeeded,
+                            continuation.step,
+                            &text,
+                            None,
+                            step.inference.failure.as_ref(),
+                        )?)
+                    }
+                    InferenceStatus::Completed => None,
+                    InferenceStatus::Interrupted if continuation.interrupted => None,
+                    InferenceStatus::Interrupted => Some(self.account(
                         &turn,
                         OutcomeStatus::Uncertain,
                         continuation.step,
-                        "An operation has an unconfirmed outcome.",
+                        inference_failure_text(&step.inference),
                         None,
                         step.inference.failure.as_ref(),
-                    )?)
-                } else if interrupted_by_pause || retrying {
-                    None
-                } else {
-                    match step.inference.status {
-                        InferenceStatus::Completed if step.tools.is_empty() => {
-                            let text = answer(&step.inference.messages);
-                            Some(self.account(
-                                &turn,
-                                OutcomeStatus::Succeeded,
-                                continuation.step,
-                                &text,
-                                None,
-                                step.inference.failure.as_ref(),
-                            )?)
-                        }
-                        InferenceStatus::Completed => None,
-                        InferenceStatus::Interrupted if continuation.interrupted => None,
-                        InferenceStatus::Interrupted => Some(self.account(
+                    )?),
+                    InferenceStatus::Limited
+                        if step.inference.failure.as_ref().is_some_and(|failure| {
+                            failure.kind == FailureKind::ContextLimit
+                                || host_response_limit(failure)
+                        }) =>
+                    {
+                        Some(self.account(
                             &turn,
-                            OutcomeStatus::Uncertain,
+                            OutcomeStatus::Failed,
                             continuation.step,
                             inference_failure_text(&step.inference),
                             None,
                             step.inference.failure.as_ref(),
-                        )?),
-                        InferenceStatus::Limited
-                            if step.inference.failure.as_ref().is_some_and(|failure| {
-                                failure.kind == FailureKind::ContextLimit
-                            }) =>
-                        {
-                            Some(self.account(
-                                &turn,
-                                OutcomeStatus::Failed,
-                                continuation.step,
-                                inference_failure_text(&step.inference),
-                                None,
-                                step.inference.failure.as_ref(),
-                            )?)
-                        }
-                        InferenceStatus::Limited => Some(self.account(
-                            &turn,
-                            OutcomeStatus::Failed,
-                            continuation.step,
-                            "The model reached its output limit. Ask for a shorter response.",
-                            Some(StopReason::OutputLimit),
-                            step.inference.failure.as_ref(),
-                        )?),
-                        InferenceStatus::Refused => Some(self.account(
-                            &turn,
-                            OutcomeStatus::Failed,
-                            continuation.step,
-                            "The model declined the request.",
-                            Some(StopReason::Refused),
-                            step.inference.failure.as_ref(),
-                        )?),
-                        InferenceStatus::Failed => {
-                            let failure = step.inference.failure.as_ref();
-                            Some(self.account(
-                                &turn,
-                                OutcomeStatus::Failed,
-                                continuation.step,
-                                inference_failure_text(&step.inference),
-                                None,
-                                failure,
-                            )?)
-                        }
+                        )?)
                     }
-                };
+                    InferenceStatus::Limited => Some(self.account(
+                        &turn,
+                        OutcomeStatus::Failed,
+                        continuation.step,
+                        "The model reached its output limit. Ask for a shorter response.",
+                        Some(StopReason::OutputLimit),
+                        step.inference.failure.as_ref(),
+                    )?),
+                    InferenceStatus::Refused => Some(self.account(
+                        &turn,
+                        OutcomeStatus::Failed,
+                        continuation.step,
+                        "The model declined the request.",
+                        Some(StopReason::Refused),
+                        step.inference.failure.as_ref(),
+                    )?),
+                    InferenceStatus::Failed => {
+                        let failure = step.inference.failure.as_ref();
+                        Some(self.account(
+                            &turn,
+                            OutcomeStatus::Failed,
+                            continuation.step,
+                            inference_failure_text(&step.inference),
+                            None,
+                            failure,
+                        )?)
+                    }
+                }
+            };
             continuation.request = None;
             continuation.request_generation = 0;
             continuation.interrupted = false;
@@ -1166,6 +1166,14 @@ fn decode<T: serde::de::DeserializeOwned>(schema: &str, envelope: &Envelope) -> 
         .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid_master_state"))
 }
 
+fn host_response_limit(failure: &InferenceFailure) -> bool {
+    failure.kind == FailureKind::OutputLimit
+        && matches!(
+            failure.code.as_str(),
+            "event_byte_limit" | "response_byte_limit"
+        )
+}
+
 fn inference_failure_text(inference: &InferenceOutcome) -> &'static str {
     if inference.status == InferenceStatus::Interrupted {
         return "The provider did not confirm the result. Review any partial work before trying again.";
@@ -1173,6 +1181,9 @@ fn inference_failure_text(inference: &InferenceOutcome) -> &'static str {
     let Some(failure) = &inference.failure else {
         return "The model request failed.";
     };
+    if host_response_limit(failure) {
+        return "The provider response exceeded the agent's size limit. Ask for a shorter response.";
+    }
     match (failure.kind, failure.code.as_str()) {
         (FailureKind::Configuration, "retained_image_unavailable") => {
             "The retained PNG is unavailable. Start a new chat and attach the original PNG again."

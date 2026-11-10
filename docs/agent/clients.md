@@ -517,6 +517,9 @@ When a required completion check fails or its outcome cannot be verified,
 the summary reports that result and keeps the earlier reply and recorded
 work available for review.
 
+If a provider response exceeds the agent's size limit, the summary explains
+why the turn ended. You can send another message in the same chat.
+
 Token counts describe the model requests made during that turn. A partial
 count has incomplete coverage, and the summary identifies requests with
 unknown counts. Cached input and reasoning output can overlap other token

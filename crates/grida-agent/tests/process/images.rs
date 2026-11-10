@@ -923,36 +923,42 @@ async fn a_failed_final_response_retains_partial_crops_and_discloses_the_listing
     let root = TempDir::new().unwrap();
     let state = root.path().join("state");
     let workspace = TempDir::new().unwrap();
-    let mut body = String::new();
-    for index in 0..8 {
-        let item = json!({
-            "type":"response.output_item.done", "output_index":index,
-            "item":{"type":"function_call","id":format!("crop-{index}"),
-                "call_id":format!("crop-call-{index}"),"name":"crop_retained_image",
-                "arguments":r#"{"x":0,"y":0,"width":1,"height":1}"#,"status":"completed"}
-        });
-        write!(body, "data: {item}\n\n").unwrap();
-    }
-    let done = json!({"type":"response.completed", "response":{"status":"completed"}});
-    write!(body, "data: {done}\n\n").unwrap();
-    let response = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-        body.len()
-    );
-    let mut endpoint = Endpoint::start_protocol(
+    // Each crop checks real scratch ACLs. Keep the fixture's provider waits
+    // independent of a large burst of filesystem checks in the parallel suite.
+    let crop_batch = |first| {
+        let mut body = String::new();
+        for index in 0..3 {
+            let id = first + index;
+            let item = json!({
+                "type":"response.output_item.done", "output_index":index,
+                "item":{"type":"function_call","id":format!("crop-{id}"),
+                    "call_id":format!("crop-call-{id}"),"name":"crop_retained_image",
+                    "arguments":r#"{"x":0,"y":0,"width":1,"height":1}"#,"status":"completed"}
+            });
+            write!(body, "data: {item}\n\n").unwrap();
+        }
+        let done = json!({"type":"response.completed", "response":{"status":"completed"}});
+        write!(body, "data: {done}\n\n").unwrap();
+        Reply::RawHttp(format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        ))
+    };
+    let mut endpoint = Endpoint::start_protocol_with_wait(
         ProviderProtocol::Responses,
         vec![
-            Reply::RawHttp(response),
-            Reply::Tool(
-                "crop_retained_image",
-                r#"{"x":0,"y":0,"width":1,"height":1}"#,
-            ),
+            crop_batch(0),
+            crop_batch(3),
+            crop_batch(6),
             Reply::RawHttp(
                 "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                     .into(),
             ),
         ],
         Some(TEST_CREDENTIAL),
+        // A multi-crop batch can still be in scratch checks when the
+        // ordinary provider fixture deadline expires under concurrent I/O.
+        WAIT * 3,
     )
     .await;
     let mut client = stdio(&state, &endpoint.url, IMAGE_MODEL);
@@ -972,9 +978,9 @@ async fn a_failed_final_response_retains_partial_crops_and_discloses_the_listing
         )
         .await;
     assert_eq!(accepted["result"]["inputId"], "partial-crops", "{accepted}");
-    endpoint.request().await;
-    endpoint.request().await;
-    endpoint.request().await;
+    for _ in 0..4 {
+        endpoint.request().await;
+    }
     let latest = settled(&mut client, session).await;
     let turn = latest["latest"]["turnId"].as_str().unwrap();
     let before = crop_summary(&mut client, session, turn).await;
