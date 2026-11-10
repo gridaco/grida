@@ -205,6 +205,7 @@ const docs = [
     collapsed: true,
     link: { type: "doc", id: "agent/index" },
     items: [
+      "agent/getting-started",
       "agent/permissions",
       "agent/models-and-usage",
       "agent/settings",

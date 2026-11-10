@@ -59,8 +59,15 @@ fn command() -> Command {
                         .long("cwd")
                         .value_name("DIRECTORY")
                         .value_parser(value_parser!(PathBuf))
-                        .required_unless_present("permission-profile")
-                        .help("Working directory. Defaults to the trusted permission profile's primary."),
+                        .required_unless_present_any(["permission-profile", "input-png"])
+                        .help("Working directory. Defaults to the trusted profile's primary or a private attachment context."),
+                )
+                .arg(
+                    Arg::new("input-png")
+                        .long("input-png")
+                        .value_name("FILE")
+                        .value_parser(value_parser!(PathBuf))
+                        .help("Attach one explicitly selected PNG to the prompt"),
                 )
                 .arg(Arg::new("session").long("session").value_name("SESSION_ID"))
                 .arg(Arg::new("effort").long("effort").value_parser(["standard", "ultra"])
@@ -461,14 +468,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         })
         .transpose()?;
     let run_cwd = if name == "run" {
-        Some(match args.get_one::<PathBuf>("cwd") {
-            Some(cwd) => cwd.clone(),
-            None => permissions
-                .as_ref()
-                .expect("permission profile required without cwd")
-                .primary_directory()?
-                .to_owned(),
-        })
+        match (args.get_one::<PathBuf>("cwd"), permissions.as_ref()) {
+            (Some(cwd), _) => Some(cwd.clone()),
+            (None, Some(profile)) => Some(profile.primary_directory()?.to_owned()),
+            (None, None) => None,
+        }
     } else {
         None
     };
@@ -596,12 +600,16 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     process::run(
         &host,
         RunOptions {
-            cwd: run_cwd.expect("validated run directory"),
+            cwd: match run_cwd {
+                Some(cwd) => cwd,
+                None => process::attachment_context(state_dir)?,
+            },
             session: args
                 .get_one::<String>("session")
                 .map(SessionId::new)
                 .transpose()?,
             prompt: args.get_one::<String>("prompt").cloned(),
+            input_png: args.get_one::<PathBuf>("input-png").cloned(),
             skills: args
                 .get_many::<String>("skill")
                 .into_iter()

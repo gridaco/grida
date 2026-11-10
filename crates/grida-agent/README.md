@@ -24,6 +24,23 @@ target/debug/grida-agent serve --stdio --state-dir "$GRIDA_AGENT_STATE" \
   --credential-env OPENAI_API_KEY
 ```
 
+On macOS and Linux, `run --input-png FILE` can attach one local PNG up to
+256 KiB on an image-capable profile. Omit `--cwd` and `--permission-profile`
+to work without a project grant. The host retains the selected bytes and
+keeps image edits in private scratch.
+
+```sh
+target/debug/grida-agent run --state-dir "$GRIDA_AGENT_STATE" \
+  --provider responses --endpoint "$GRIDA_AGENT_ENDPOINT" --model gpt-5.4 \
+  --credential-env OPENAI_API_KEY --input-png "$GRIDA_SELECTED_PNG" \
+  --prompt 'Crop the image to the requested area.'
+```
+
+A private ACP client can reopen that run with the same state directory,
+provider and session ID. Use the absolute path to the state directory's
+`attachment-context` as the ACP working directory, then read its settled
+turn summary and any listed artifacts.
+
 Select a provider protocol, base URL, and model. HTTPS is accepted for remote
 providers. HTTP is limited to numeric loopback addresses or `localhost`,
 which resolves to loopback without DNS.
@@ -38,8 +55,8 @@ which resolves to loopback without DNS.
 Use `--credential-env NAME` to select a key from the host environment.
 Anonymous endpoints work when no credential source is selected.
 On macOS and Linux, `--credential-home DIRECTORY` uses the existing
-private Grida provider store in an explicit absolute directory. Stored keys
-are restricted to the reviewed vendor base URLs in the table and to
+private Grida provider store in an explicit absolute directory. Direct stored
+keys are restricted to the reviewed vendor base URLs in the table and to
 `https://openrouter.ai/api/v1` and `https://ai-gateway.vercel.sh/v1` for the
 compatible protocol. Custom destinations can use an explicitly selected
 environment key. Each dispatch revalidates the captured credential and sends

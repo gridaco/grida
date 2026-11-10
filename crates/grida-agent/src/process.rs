@@ -5,7 +5,8 @@ pub mod external;
 
 use crate::acp::{self, ListenOptions};
 use crate::host::{
-    AcceptedRun, Host, PromptPart, PromptRequest, RunResult, change_id, validate_prompt_parts,
+    AcceptedRun, Host, ImageUpload, PromptPart, PromptRequest, RunResult, change_id,
+    validate_prompt_parts,
 };
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::{Error, ErrorKind, Result, SessionId};
@@ -13,7 +14,7 @@ use grida_agent_master::read_account;
 use serde::Serialize;
 use serde_json::json;
 use std::future::Future;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -26,9 +27,47 @@ pub struct RunOptions {
     pub cwd: PathBuf,
     pub session: Option<SessionId>,
     pub prompt: Option<String>,
+    pub input_png: Option<PathBuf>,
     pub skills: Vec<crate::skills::SkillReference>,
     pub questions: bool,
     pub timeout: Duration,
+}
+
+/// ACP session identity still requires an absolute directory. This private,
+/// empty identity gives attachment-only work no project directory grant.
+pub fn attachment_context(state_dir: &Path) -> Result<PathBuf> {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        use std::fs::{self, DirBuilder};
+        use std::os::unix::fs::DirBuilderExt;
+
+        let unavailable = || problem(ErrorKind::Unavailable, "attachment_context_unavailable");
+        let state = state_dir.canonicalize().map_err(|_| unavailable())?;
+        crate::scratch::check_private_directory(&state)?;
+        let directory = state.join("attachment-context");
+        match DirBuilder::new().mode(0o700).create(&directory) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(_) => return Err(unavailable()),
+        }
+        crate::scratch::check_private_directory(&directory)?;
+        if fs::read_dir(&directory)
+            .map_err(|_| unavailable())?
+            .next()
+            .is_some()
+        {
+            return Err(problem(ErrorKind::Conflict, "attachment_context_not_empty"));
+        }
+        Ok(directory)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = state_dir;
+        Err(problem(
+            ErrorKind::Unsupported,
+            "attachment_storage_unsupported",
+        ))
+    }
 }
 
 /// Run one task, write its structured records, and drain the owned host.
@@ -196,13 +235,22 @@ async fn admit_run(host: &Host, options: RunOptions) -> Result<AcceptedRun> {
     if prompt.trim().is_empty() {
         return Err(problem(ErrorKind::InvalidInput, "empty_prompt"));
     }
+    let mut parts = vec![PromptPart::Text { text: prompt }];
+    if let Some(path) = options.input_png {
+        if !host.accepts_images() {
+            return Err(problem(ErrorKind::Unsupported, "image_input_unavailable"));
+        }
+        let image = tokio::task::spawn_blocking(move || ImageUpload::read_selected_png(&path))
+            .await
+            .map_err(|_| problem(ErrorKind::Unavailable, "selected_image_unavailable"))??;
+        parts.push(PromptPart::Image { image });
+    }
     let session = if let Some(session) = options.session {
         host.load_session(session.clone(), options.cwd).await?;
         session
     } else {
         host.new_session(options.cwd).await?
     };
-    let mut parts = vec![PromptPart::Text { text: prompt }];
     parts.extend(
         options
             .skills

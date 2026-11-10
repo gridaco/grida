@@ -51,6 +51,10 @@ impl ImageUpload {
             return Err(image_too_large());
         }
         let bytes = STANDARD.decode(data).map_err(|_| invalid_png())?;
+        Self::from_png(bytes)
+    }
+
+    fn from_png(bytes: Vec<u8>) -> Result<Self> {
         if bytes.len() > MAX_IMAGE_BYTES {
             return Err(image_too_large());
         }
@@ -59,6 +63,57 @@ impl ImageUpload {
             digest: Sha256::digest(&bytes).into(),
             bytes,
         })
+    }
+
+    pub(crate) fn read_selected_png(path: &Path) -> Result<Self> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        {
+            use rustix::fs::{Mode, OFlags, open};
+            use std::fs::File;
+            use std::io::Read;
+            use std::os::unix::fs::MetadataExt;
+
+            let unavailable = || problem(ErrorKind::Unavailable, "selected_image_unavailable");
+            let opened = open(
+                path,
+                OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
+                Mode::empty(),
+            )
+            .map_err(|_| unavailable())?;
+            let mut file = File::from(opened);
+            let before = file.metadata().map_err(|_| unavailable())?;
+            if !before.is_file() || before.nlink() != 1 {
+                return Err(unavailable());
+            }
+            if before.len() > MAX_IMAGE_BYTES as u64 {
+                return Err(image_too_large());
+            }
+            let mut bytes = Vec::new();
+            (&mut file)
+                .take(MAX_IMAGE_BYTES as u64 + 1)
+                .read_to_end(&mut bytes)
+                .map_err(|_| unavailable())?;
+            let after = file.metadata().map_err(|_| unavailable())?;
+            if after.len() != bytes.len() as u64
+                || before.len() != after.len()
+                || before.mtime() != after.mtime()
+                || before.mtime_nsec() != after.mtime_nsec()
+                || before.ctime() != after.ctime()
+                || before.ctime_nsec() != after.ctime_nsec()
+                || after.nlink() != 1
+            {
+                return Err(problem(ErrorKind::Conflict, "selected_image_changed"));
+            }
+            Self::from_png(bytes)
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = path;
+            Err(problem(
+                ErrorKind::Unsupported,
+                "attachment_storage_unsupported",
+            ))
+        }
     }
 
     pub(super) fn matches(&self, asset: &AssetRef) -> bool {

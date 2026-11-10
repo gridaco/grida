@@ -18,7 +18,7 @@ it. Available controls and inputs vary with the connection.
    for your build. [Choose models and understand usage](./models-and-usage.md)
 2. Give the agent an objective and name the files or tabs that matter.
    Choose **Plan** to investigate and propose a change, or **Act** to do
-   the work under the chat's permissions.
+   the work under the chat's permissions. [Start with files and folders](./getting-started.md)
 3. Review requests for additional access as they appear. To change the
    direction of work, send a correction to the current turn. Queue a
    message when it belongs in the next turn. [Understand permissions](./permissions.md)

@@ -10,6 +10,159 @@ const IMAGE_MODEL: &str = "gpt-5.4";
 const ARTIFACTS: &str = "co.grida/session/artifacts";
 
 #[tokio::test]
+async fn embedded_run_edits_an_explicit_png_without_a_project_and_reopens_its_result() {
+    let root = TempDir::new().unwrap();
+    let state = root.path().join("state");
+    let project = TempDir::new().unwrap();
+    let selected = project.path().join("original.png");
+    let original = encode_png(2, 1, &[255, 0, 0, 0, 255, 0]);
+    std::fs::write(&selected, &original).unwrap();
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Responses,
+        vec![
+            Reply::Tool(
+                "crop_retained_image",
+                r#"{"x":1,"y":0,"width":1,"height":1}"#,
+            ),
+            Reply::Finished("The cropped copy is ready."),
+        ],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let output = timeout(
+        WAIT,
+        embedded_image_run(&state, &endpoint.url, IMAGE_MODEL, &selected)
+            .current_dir(project.path())
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let output = records(&output.stdout);
+    assert_eq!(output[1]["disposition"], "succeeded");
+    let session = output[0]["session_id"].as_str().unwrap();
+    let turn = output[0]["turn_id"].as_str().unwrap();
+    let request = endpoint.request().await;
+    assert!(!request.to_string().contains(selected.to_str().unwrap()));
+    assert!(request.to_string().contains(&format!(
+        "data:image/png;base64,{}",
+        STANDARD.encode(&original)
+    )));
+    let tools = request["tools"].as_array().unwrap();
+    assert!(
+        tools
+            .iter()
+            .any(|tool| tool["name"] == "crop_retained_image")
+    );
+    assert!(
+        tools
+            .iter()
+            .all(|tool| !matches!(tool["name"].as_str(), Some("read_file" | "run_command")))
+    );
+    assert_eq!(
+        last_tool_result(endpoint.request().await)["status"],
+        "succeeded"
+    );
+    assert_eq!(std::fs::read(&selected).unwrap(), original);
+    assert_eq!(std::fs::read_dir(project.path()).unwrap().count(), 1);
+    let context = state.join("attachment-context").canonicalize().unwrap();
+    assert_eq!(std::fs::read_dir(&context).unwrap().count(), 0);
+
+    let mut reopened = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    reopened.request("initialize", artifact_initialize()).await;
+    let loaded = reopened
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":context,"mcpServers":[]}),
+        )
+        .await;
+    assert!(loaded.get("error").is_none(), "{loaded}");
+    let summary = crop_summary(&mut reopened, session, turn).await;
+    let artifact = &summary["result"]["artifacts"][0];
+    assert_eq!(artifact["width"], 1);
+    assert_eq!(artifact["height"], 1);
+    let preview = read_crop(
+        &mut reopened,
+        session,
+        turn,
+        artifact["id"].as_str().unwrap(),
+    )
+    .await;
+    let bytes = STANDARD
+        .decode(preview["result"]["data"].as_str().unwrap())
+        .unwrap();
+    let mut image = png::Decoder::new(std::io::Cursor::new(bytes))
+        .read_info()
+        .unwrap();
+    let mut pixels = vec![0; image.output_buffer_size().unwrap()];
+    let frame = image.next_frame(&mut pixels).unwrap();
+    let pixels = &pixels[..frame.buffer_size()];
+    assert!(
+        pixels == [0, 255, 0] || pixels == [0, 255, 0, 255],
+        "{pixels:?}"
+    );
+    reopened.close().await;
+    assert!(endpoint.requests.try_recv().is_err());
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn embedded_run_refuses_unavailable_or_unsupported_png_before_acceptance() {
+    let root = TempDir::new().unwrap();
+    let state = root.path().join("state");
+    let real = root.path().join("original.png");
+    let alias = root.path().join("alias.png");
+    let oversized = root.path().join("oversized.png");
+    std::fs::write(&real, png([0, 255, 0])).unwrap();
+    std::os::unix::fs::symlink(&real, &alias).unwrap();
+    std::fs::write(&oversized, vec![0_u8; 256 * 1024 + 1]).unwrap();
+    let endpoint =
+        Endpoint::start_protocol(ProviderProtocol::Responses, vec![], Some(TEST_CREDENTIAL)).await;
+    for (path, model, error) in [
+        (&alias, IMAGE_MODEL, "selected_image_unavailable"),
+        (&oversized, IMAGE_MODEL, "image_size_limit"),
+        (&real, "fixture-text-only", "image_input_unavailable"),
+    ] {
+        let output = timeout(
+            WAIT,
+            embedded_image_run(&state, &endpoint.url, model, path).output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(!output.status.success());
+        assert!(output.stdout.is_empty());
+        assert!(stderr.contains(error), "{stderr}");
+        assert!(!stderr.contains(path.to_str().unwrap()), "{stderr}");
+    }
+    assert!(!state.join("retained-inputs").exists());
+    endpoint.done().await;
+}
+
+fn embedded_image_run(state: &Path, endpoint: &str, model: &str, path: &Path) -> Command {
+    let mut process = executable();
+    process
+        .args(["run", "--provider", "responses", "--state-dir"])
+        .arg(state)
+        .args(["--endpoint", endpoint, "--model", model, "--input-png"])
+        .arg(path)
+        .args([
+            "--credential-env",
+            "GRIDA_AGENT_PROCESS_TEST_KEY",
+            "--prompt",
+            "Crop the selected PNG.",
+        ])
+        .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL);
+    process
+}
+
+#[tokio::test]
 async fn deleting_a_crop_chat_reclaims_its_private_files_and_recovers_after_interruption() {
     use agent_kit_core::Fingerprint;
     use agent_kit_sessions::SessionRevision;

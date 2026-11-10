@@ -520,6 +520,11 @@ connection. Retrying an unconfirmed send with the same draft keeps the original
 input identity. To change a queued image, remove the queued message and submit
 a new one.
 
+On macOS and Linux, a source-built `grida-agent run` can take one local PNG
+through `--input-png` on a compatible image profile. Omit the workspace
+directory and permission profile to process the image without a project.
+Image edits use a retained working copy. [Run locally with a PNG](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-locally)
+
 On macOS and Linux, the isolated native Desktop preview supports PNG input
 with **GPT-5.6 Terra** and a saved OpenRouter key. Select it at launch with
 `--native-chat-provider=openrouter --native-chat-model=openai/gpt-5.6-terra`.
