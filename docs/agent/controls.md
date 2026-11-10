@@ -35,6 +35,8 @@ its approval controls. [Understand agent permissions](./permissions.md)
 
 Changes already made can remain in the workspace. Check **Turn summary**
 for the outcome, any partial work, and items that need review.
+An interrupted provider request can still have incurred a charge. Its final
+settlement depends on the provider's recorded result.
 [Inspect and save results](./results.md)
 
 ## Return to background work

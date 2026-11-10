@@ -19,6 +19,7 @@ import {
   requestThroughSession,
   responseFromIncoming,
 } from "./agent-network-host";
+import { NativeProviderEgress } from "./native-provider-egress";
 
 describe("AgentNetworkHost", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -512,6 +513,80 @@ describe("AgentNetworkHost", () => {
     expect(harness.fatal).not.toHaveBeenCalled();
     harness.host.close();
   });
+
+  it.each([
+    { action: "cancel", status: "interrupted", abortCalls: 1 },
+    { action: "complete", status: "end", abortCalls: 0 },
+  ] as const)(
+    "can $action a native provider response after Chromium closes its request object",
+    async ({ action, status, abortCalls }) => {
+      const incoming = Object.assign(new PassThrough(), {
+        rawHeaders: ["content-type", "text/event-stream"],
+        statusCode: 200,
+        statusMessage: "OK",
+      });
+      const request = Object.assign(new EventEmitter(), {
+        abort: vi.fn<() => void>(() => {
+          incoming.destroy();
+        }),
+        setHeader: vi.fn<(name: string, value: string) => void>(),
+        end: vi.fn<() => void>(() => {
+          request.emit("close");
+        }),
+      });
+      vi.mocked(net.request).mockReturnValue(request as never);
+      vi.mocked(session.fromPartition).mockReturnValue({
+        setProxy: vi.fn<(config: unknown) => Promise<void>>(),
+      } as never);
+      const authority = new AgentNetworkAuthority("https://grida.co");
+      const network = await AgentNetworkHost.nativeProviderNetwork(
+        authority,
+        "provider:built-in"
+      );
+      const endpoint = "https://openrouter.ai/api/v1";
+      const egress = new NativeProviderEgress(
+        network,
+        "openai-compatible",
+        endpoint,
+        "fixture"
+      );
+      const id = "f78fb11f-4e95-4c02-a315-3bcfd15bc536";
+      try {
+        await expect(
+          egress.exchange({
+            id,
+            action: "open",
+            target: endpoint + "/chat/completions",
+            headers: [
+              ["content-type", "application/json"],
+              ["accept", "text/event-stream"],
+            ],
+            timeoutMs: 1000,
+            maxResponseBytes: 1024,
+            initial: Buffer.from("{}").toString("base64"),
+          })
+        ).resolves.toEqual({ status: "accepted" });
+        const dispatch = egress.exchange({ id, action: "dispatch" });
+        expect(request.end).toHaveBeenCalledTimes(1);
+        request.emit("response", incoming);
+        await expect(dispatch).resolves.toMatchObject({ status: "ready" });
+        const chunk = Buffer.from("data: first\n\n");
+        incoming.write(chunk);
+        await expect(egress.exchange({ id, action: "read" })).resolves.toEqual({
+          status: "chunk",
+          data: chunk.toString("base64"),
+        });
+
+        const held = egress.exchange({ id, action: "read" });
+        if (action === "cancel") egress.cancel({ id });
+        else incoming.end();
+        await expect(held).resolves.toEqual({ status });
+        expect(request.abort).toHaveBeenCalledTimes(abortCalls);
+      } finally {
+        egress.close();
+      }
+    }
+  );
 
   it("aborts and drains a late response after interactive proxy auth", async () => {
     const request = Object.assign(new EventEmitter(), {

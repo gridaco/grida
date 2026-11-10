@@ -3,7 +3,7 @@
 // GRIDA-GG: token — destination-authorized requests through the private Chromium session.
 import { isIP } from "node:net";
 import { randomUUID } from "node:crypto";
-import { Readable, type Writable } from "node:stream";
+import { finished, Readable, type Writable } from "node:stream";
 import { net, session, type IncomingMessage, type Session } from "electron";
 import type {
   ShellExecutionScope,
@@ -1268,18 +1268,23 @@ export function requestThroughSession(
       if ("response" in result) resolve(result.response);
       else reject(result.error);
     };
+    const clearAbort = () => signal?.removeEventListener("abort", abort);
     const abort = () => {
+      clearAbort();
       request.abort();
       settle({ error: abortError(signal?.reason) });
     };
     signal?.addEventListener("abort", abort, { once: true });
-    request.once("close", () => signal?.removeEventListener("abort", abort));
-    request.once("error", (error) => settle({ error }));
+    request.once("error", (error) => {
+      clearAbort();
+      settle({ error });
+    });
     request.once("login", (_authInfo, callback) => {
       // Stored/integrated proxy credentials are handled by Chromium before
       // this event. Desktop has no credential-prompt contract yet, so an
       // interactive challenge fails closed instead of borrowing renderer UI
       // or persisting a proxy password in the provider session.
+      clearAbort();
       request.abort();
       settle({ error: proxyAuthenticationError() });
       callback();
@@ -1287,6 +1292,7 @@ export function requestThroughSession(
     request.once(
       "redirect",
       (status, _method, redirectUrl, responseHeaderRecord) => {
+        clearAbort();
         try {
           const headers = headersFromRecord(responseHeaderRecord);
           if (!headers.has("location")) headers.set("location", redirectUrl);
@@ -1306,16 +1312,27 @@ export function requestThroughSession(
       }
     );
     request.once("response", (incoming) => {
+      const readable = incoming as unknown as Readable;
       if (settled) {
         // A transport may deliver a queued response event after an abort.
         // Never construct an unread streaming Response after the promise has
         // already failed (notably the interactive-proxy-auth path above).
-        (incoming as unknown as Readable).destroy();
+        readable.destroy();
         return;
       }
       try {
-        settle({ response: responseFromIncoming(incoming, init.method) });
+        const response = responseFromIncoming(incoming, init.method);
+        if (signal) {
+          // Chromium can close ClientRequest before delivering the response.
+          // Keep cancellation attached until the upstream body terminates.
+          const unwatch = finished(readable, () => {
+            clearAbort();
+            unwatch();
+          });
+        }
+        settle({ response });
       } catch (error) {
+        clearAbort();
         request.abort();
         settle({ error: asError(error) });
       }
@@ -1328,6 +1345,7 @@ export function requestThroughSession(
       const body = requestBodyBuffer(init.body);
       request.end(body.length > 0 ? body : undefined);
     } catch (error) {
+      clearAbort();
       request.abort();
       settle({ error: asError(error) });
     }
