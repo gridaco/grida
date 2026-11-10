@@ -204,6 +204,22 @@ export class NativeDesktopAgent {
     );
   }
 
+  get hasLegacyChatArchive(): boolean {
+    return !this.closed && this.cutover.archive !== null;
+  }
+
+  async revealLegacyChatArchive(
+    reveal: (directory: string) => void
+  ): Promise<void> {
+    if (!this.hasLegacyChatArchive)
+      throw new Error("legacy_chat_archive_unavailable");
+    const generation = this.accountGeneration;
+    await this.cutover.revealLegacyChatArchive((directory) => {
+      if (!this.closed && generation === this.accountGeneration)
+        reveal(directory);
+    });
+  }
+
   current(workspaceId: string, profileId?: string) {
     if (this.workspaceActivity.get(workspaceId)?.retired) return null;
     return this.owners?.current(workspaceId, profileId) ?? null;

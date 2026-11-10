@@ -314,6 +314,10 @@ the public updater, and the supervisor checks before scratch cleanup and child
 launch, including retries. This stop applies to compatibility media-only startup
 as well. The deployment owner must still exclude earlier binaries and drain
 running workers before taking custody of the source.
+After an admitted handoff, the native File menu can reveal the exact retained
+archive. Main re-verifies the bound archive and checks current workbench
+admission before asking the OS to reveal it. The renderer receives no archive
+path or file access through this action.
 
 Shared image, video, audio and 3D operations and provider HTTP belong to
 [`@grida/ai`](packages/grida-ai/README.md). The tenant supplies narrow key/token

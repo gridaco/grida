@@ -171,6 +171,17 @@ const windowAdmission = {
       : open_handoff.isSupportedFile(filePath) &&
         nativeDocumentOwner(filePath) !== undefined,
   native_workspaces: () => nativeFileWorkspaces,
+  legacy_chat_archive: {
+    available: () => nativeDesktopAgent?.hasLegacyChatArchive ?? false,
+    reveal: async () => {
+      const owner = nativeDesktopAgent;
+      if (!owner || !entryWindow?.isMain) return;
+      await owner.revealLegacyChatArchive((directory) => {
+        if (owner === nativeDesktopAgent && entryWindow?.isMain)
+          shell.showItemInFolder(directory);
+      });
+    },
+  },
   register: (window: BrowserWindow) => {
     if (entryWindow) return entryWindow.registerSecondary(window);
     window.close();

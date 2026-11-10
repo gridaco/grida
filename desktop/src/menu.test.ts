@@ -25,7 +25,8 @@ const fixture = vi.hoisted(() => ({
 
 vi.mock("electron", () => ({
   Menu: {
-    getApplicationMenu: () => null,
+    getApplicationMenu: () =>
+      fixture.template.length ? fixture.template : null,
     buildFromTemplate: (template: MenuItemConstructorOptions[]) => template,
     setApplicationMenu: (template: MenuItemConstructorOptions[]) => {
       fixture.template = template;
@@ -55,8 +56,48 @@ import { rebuild_application_menu } from "./menu";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  fixture.template = [];
   fixture.list.mockResolvedValue([]);
   fixture.sidecarReady = true;
+});
+
+it("offers native archive recovery only for an admitted archive and handles verification failure", async () => {
+  let admitted = true;
+  let available = false;
+  const reveal = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+  const admission = {
+    can_open: () => admitted,
+    register: () => true,
+    focus_entry: () => {},
+    legacy_chat_archive: { available: () => available, reveal },
+  };
+  const app = { name: "Grida fixture" } as App;
+  const rebuild = () =>
+    rebuild_application_menu(app, {} as Shell, { windowAdmission: admission });
+  const archiveItem = () => fileMenuItem("Show Previous Chat Archive");
+
+  await rebuild();
+  expect(archiveItem()).toBeUndefined();
+  available = true;
+  await rebuild();
+  const item = archiveItem();
+  click(item);
+  expect(reveal).toHaveBeenCalledExactlyOnceWith();
+
+  reveal.mockRejectedValueOnce(new Error("private failure"));
+  click(item);
+  await vi.waitFor(() =>
+    expect(fixture.error).toHaveBeenCalledExactlyOnceWith(
+      "Couldn't show the previous chat archive",
+      "The saved archive could not be verified."
+    )
+  );
+
+  admitted = false;
+  click(item);
+  expect(reveal).toHaveBeenCalledTimes(2);
+  await rebuild();
+  expect(archiveItem()).toBeUndefined();
 });
 
 it("waits for a recent root to reopen and refuses a replaced root", async () => {

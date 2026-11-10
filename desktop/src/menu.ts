@@ -28,6 +28,10 @@ export type DesktopWindowAdmission = {
   native_workspaces?: () =>
     | Pick<NativeWorkspaceCatalog, "list" | "openSelected" | "reopen">
     | undefined;
+  legacy_chat_archive?: {
+    available: () => boolean;
+    reveal: () => Promise<void>;
+  };
   register: (window: BrowserWindow) => boolean;
   focus_entry: () => void;
 };
@@ -372,6 +376,9 @@ async function rebuild_application_menu_locked(
   if (!ready) recents = [];
   const signature = [
     ready ? "ready" : "gated",
+    ready && opts?.windowAdmission?.legacy_chat_archive?.available()
+      ? "archive"
+      : "no archive",
     ...recents.map((w) => w.id),
   ].join("\u0000");
   if (signature === last_recent_signature && Menu.getApplicationMenu()) return;
@@ -603,6 +610,8 @@ export default function create_menu(
   }
 ) {
   const default_menu = create_default_menu(app, shell, opts?.windowAdmission);
+  const admission = opts?.windowAdmission;
+  const archive = admission?.legacy_chat_archive;
   // Minimal File menu. An extension-keyed registry (one entry per
   // openable file type) is the next iteration when modules other than
   // `.svg` / `.grida` land.
@@ -687,6 +696,22 @@ export default function create_menu(
               ? opts.recent
               : [{ label: "No Recent Projects", enabled: false }],
         },
+        ...(admission?.can_open() && archive?.available()
+          ? [
+              {
+                label: "Show Previous Chat Archive",
+                click: () => {
+                  if (!admission.can_open()) return;
+                  void archive.reveal().catch(() => {
+                    dialog.showErrorBox(
+                      "Couldn't show the previous chat archive",
+                      "The saved archive could not be verified."
+                    );
+                  });
+                },
+              },
+            ]
+          : []),
         // Cross-platform shortcut to Settings. macOS gets the same
         // entry under the app menu (above) per platform convention,
         // but Cmd/Ctrl+, is the universal expectation — keep it here

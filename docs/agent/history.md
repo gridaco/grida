@@ -26,6 +26,12 @@ it again or choose **Restore chat** to return it to the active list. When
 **Delete chat** is available, it removes the chat’s private data. Saved project
 files and independent forks stay in place.
 
+## Find your previous chat archive
+
+After a verified handoff to native chats, choose **File → Show Previous Chat
+Archive** to find the saved copy in your file browser. Desktop verifies the
+archive before opening its location. New conversations have their own history.
+
 ## Try a different direction
 
 - Send **`/fork`** on its own to make a separate chat from the latest committed

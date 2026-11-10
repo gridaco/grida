@@ -192,6 +192,48 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     expect(fs.existsSync(test.nativeState)).toBe(false);
   });
 
+  it("reveals only the retired archive after fresh verification and preserves failed recovery", async () => {
+    const test = await fixture();
+    const reveal = vi.fn<(directory: string) => void>();
+    const fresh = await test.NativeAgentCutover.prepareFresh();
+    await expect(fresh.revealLegacyChatArchive(reveal)).rejects.toThrow(
+      "legacy_chat_archive_unavailable"
+    );
+    expect(reveal).not.toHaveBeenCalled();
+
+    const retired = await fixture();
+    writeLegacy(retired.database, retired.scratchBase);
+    const prepared = await retired.prepare();
+    const archive = prepared.archive!;
+    const checkpoint = fs.readFileSync(retired.checkpoint);
+    const sealedSource = fs.readFileSync(retired.database);
+    await prepared.revealLegacyChatArchive(reveal);
+    expect(reveal).toHaveBeenCalledExactlyOnceWith(archive.directory);
+
+    const input = path.join(
+      archive.directory,
+      "scratch",
+      "ses_fixture",
+      "note.txt"
+    );
+    fs.writeFileSync(input, "five");
+    await expect(prepared.revealLegacyChatArchive(reveal)).rejects.toThrow(
+      "invalid_receipt"
+    );
+    fs.writeFileSync(input, "four");
+    fs.renameSync(archive.directory, `${archive.directory}-moved`);
+    await expect(prepared.revealLegacyChatArchive(reveal)).rejects.toThrow(
+      "Legacy chat archive"
+    );
+    fs.symlinkSync(`${archive.directory}-moved`, archive.directory);
+    await expect(prepared.revealLegacyChatArchive(reveal)).rejects.toThrow(
+      "Legacy chat archive"
+    );
+    expect(reveal).toHaveBeenCalledOnce();
+    expect(fs.readFileSync(retired.checkpoint)).toEqual(checkpoint);
+    expect(fs.readFileSync(retired.database)).toEqual(sealedSource);
+  });
+
   it("preserves a verified archive when the native executable is unavailable and resumes interrupted publication", async () => {
     const test = await fixture();
     writeLegacy(test.database, test.scratchBase);

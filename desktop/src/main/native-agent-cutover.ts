@@ -64,7 +64,8 @@ export class NativeAgentCutover {
     private readonly checkpoint: Checkpoint,
     readonly archive: Ready["archive"],
     readonly protectedPaths: readonly string[],
-    private readonly verifyCutoff?: () => Promise<void>
+    private readonly verifyCutoff?: () => Promise<void>,
+    private readonly legacyArchive?: LegacyChatArchive
   ) {}
 
   /** Verify the shared legacy cutoff before starting any workspace engine. */
@@ -181,8 +182,22 @@ export class NativeAgentCutover {
         ? async () => {
             await verifyCutoff(checkpoint);
           }
-        : undefined
+        : undefined,
+      archive
     );
+  }
+
+  async revealLegacyChatArchive(
+    reveal: (directory: string) => void
+  ): Promise<void> {
+    const { archiveId } = this.checkpoint;
+    const directory = this.archive?.directory;
+    if (!archiveId || !directory || !this.legacyArchive)
+      throw new Error("legacy_chat_archive_unavailable");
+    const verified = await this.legacyArchive.verify(archiveId);
+    if (verified.directory !== directory)
+      throw new Error("legacy_chat_archive_unavailable");
+    reveal(verified.directory);
   }
 
   async workspaceDirectory(
