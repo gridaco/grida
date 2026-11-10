@@ -151,6 +151,11 @@ updates, and cancel their active turn. A loaded session replays committed text
 before the load response. A prompt response follows its streamed updates and
 verified turn outcome.
 
+In Zed, add a custom External Agent with the absolute path to `grida-agent`
+as the command and the arguments from the example above. Start a chat from
+the Agent Panel's new-thread menu. Zed 1.21.0 on macOS was verified opening a
+session and displaying a completed text reply through ACP stdio. [Zed custom agents](https://zed.dev/docs/ai/external-agents#custom-agents)
+
 Use `session/list` to discover saved chats for an absolute workspace `cwd`.
 Follow `nextCursor` with the same workspace to get the next page. The list
 shows chat identities in newest-created order. Choose a chat and call
