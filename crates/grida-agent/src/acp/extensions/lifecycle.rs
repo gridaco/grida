@@ -96,7 +96,7 @@ struct ResumeQueue(QueueBasis);
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
 #[serde(rename_all = "camelCase")]
-struct QueueResponse {
+pub(super) struct QueueResponse {
     session_id: SessionId,
     request_id: ChangeId,
     session_revision: SessionRevision,

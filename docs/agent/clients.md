@@ -248,6 +248,17 @@ Each WebSocket text message carries one ACP JSON-RPC object. Closing a client
 connection detaches its observers while the host continues its accepted work.
 Stopping the service requests suspension of the work it owns.
 
+## Run a confined command
+
+Source-built native hosts can run finite commands on macOS and Linux when
+the launcher supplies a reviewed permission profile and native helper.
+The command runs with the selected directory access and a separate temporary
+scope. Network access is denied. Plan keeps the command tool unavailable.
+
+When a command needs approval, a negotiated private reviewer can decide the
+exact pending invocation. Stop retains the observed outcome and reports
+uncertainty if the host cannot verify process cleanup. [Native permission profile](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#filesystem-services)
+
 ## Connect a local MCP client
 
 The standalone tool host serves MCP without opening a chat or contacting a
@@ -306,19 +317,21 @@ target/debug/grida-agent serve --stdio --subagents \
 ```
 
 During initialization, negotiate version 1 for `co.grida/subagent/create`,
-`assign`, `inspect`, `pause`, `resume`, `steer`, and `stop` separately.
-Attach to the parent and finish an Act turn.
+`assign`, `inspect`, `pause`, `resume`, `steer`, `stop`, `resume-queue`,
+and `withdraw` separately. Attach to the parent and finish an Act turn.
 
 1. Create the child with a display name, a creation request ID, and an
    allowance of one to eight work turns. Retain the returned child ID.
 2. Assign text using the child ID, the settled parent turn ID, and a new
    input ID. The child uses its own conversation history and receives no
-   workspace tools. When it is idle, assign a follow-up using the same child
-   ID and a new input ID.
+   workspace tools. Assign follow-ups with the same child ID and new input
+   IDs. They wait in order within the child's remaining allowance.
 3. Inspect a particular input to read the result from its original child
    turn. Use Pause to suspend that turn, Steer to add a correction, and
    Resume to continue it. After restart, attach to the same parent and use
-   the retained child and input IDs. Use Stop to end the assignment.
+   the retained child and input IDs. Stop ends the assignment and holds its
+   queue. Use Resume Queue to start the next assignment, or withdraw a queued
+   assignment to free its place.
 
 Retry creation or assignment with the same ID and fields to recover its
 receipt. New assignments allow up to two generation steps. A continuation

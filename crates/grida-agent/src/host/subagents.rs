@@ -9,6 +9,8 @@ pub struct SubagentInspection {
     pub name: String,
     pub allocation: Allocation,
     pub revision: SessionRevision,
+    pub admission_paused: bool,
+    pub queued: Vec<ChangeId>,
     pub current: Option<TurnView>,
     pub latest: Option<TurnView>,
     pub assignment: Option<SubagentWork>,
@@ -57,6 +59,7 @@ impl Host {
     ) -> Result<SessionId> {
         self.owned_control(move |host| async move {
             host.require_subagents()?;
+            let _admission = host.configuration_admission.lock().await;
             let view = host.store.inspect(parent.clone()).await?;
             host.check_execution(&view)?;
             let mut configuration = session_configuration(&view)?;
@@ -120,7 +123,12 @@ impl Host {
                     "subagent_assignment_identity_reused",
                 ));
             }
-            if previous.disposition == InputDisposition::Queued {
+            if previous.disposition == InputDisposition::Queued
+                && self.check_execution(&view).is_ok()
+                && profile
+                    .require_authority(&self.execution()?.authority.inference.authority)
+                    .is_ok()
+            {
                 self.kick_queue(child.clone()).await;
             }
             return self.subagent_work(&child, previous, stored).await;
@@ -128,11 +136,10 @@ impl Host {
 
         self.check_execution(&view)?;
         profile.require_authority(&self.execution()?.authority.inference.authority)?;
-        if view.current.is_some() || !view.queued.is_empty() || view.admission_paused {
-            return Err(problem(ErrorKind::Conflict, "subagent_busy"));
-        }
         let allocation = profile.allocation(&view.driver_state)?;
-        if allocation.reserved == allocation.work_turns {
+        if usize::from(allocation.reserved) + view.queued.len()
+            >= usize::from(allocation.work_turns)
+        {
             return Err(problem(
                 ErrorKind::LimitExceeded,
                 "subagent_allocation_exhausted",
@@ -140,7 +147,9 @@ impl Host {
         }
         self.validate_subagent_sponsor(&parent, &parent_turn)
             .await?;
-        self.check_ready_capacity(&child).await?;
+        if view.current.is_none() && !view.admission_paused {
+            self.check_ready_capacity(&child).await?;
+        }
         let submission = self
             .capture_input(
                 &view,
@@ -226,6 +235,12 @@ impl Host {
             name: profile.name().to_owned(),
             allocation: profile.allocation(&view.driver_state)?,
             revision: view.revision,
+            admission_paused: view.admission_paused,
+            queued: view
+                .queued
+                .into_iter()
+                .map(|input| input.input.id)
+                .collect(),
             current: view.current,
             latest: view.latest,
             assignment,
@@ -300,16 +315,29 @@ impl Host {
         .await
     }
 
-    /// Cancel the exact child turn. No other assignment can be queued while
-    /// this child is busy, so a later explicit assignment can reuse it.
+    /// Stop the active assignment and close advancement of its queue.
     pub async fn stop_subagent(
         &self,
         parent: SessionId,
         control: TurnControl,
     ) -> Result<ControlReceipt> {
+        self.child_for_control(&parent, &control.session).await?;
+        let stopped = self
+            .stop(
+                control.session.clone(),
+                control.turn.clone(),
+                control.request.clone(),
+                control.expected_session,
+                control.expected_control,
+            )
+            .await;
+        if !matches!(&stopped, Err(error) if error.code == "request_identity_reused") {
+            return stopped;
+        }
+        // A retained receipt may predate queued child assignments. This
+        // request already has a receipt, so the fallback can only replay it.
         self.owned_control(move |host| async move {
-            host.child_for_control(&parent, &control.session).await?;
-            let receipt = host
+            let previous = host
                 .store
                 .control(ControlRequest {
                     id: control.request,
@@ -323,9 +351,35 @@ impl Host {
                 })
                 .await?;
             host.kick_stopped(control.session, control.turn).await;
-            Ok(receipt)
+            Ok(previous)
         })
         .await
+    }
+
+    pub async fn resume_subagent_queue(
+        &self,
+        parent: SessionId,
+        child: SessionId,
+        request: ChangeId,
+        expected: SessionRevision,
+    ) -> Result<ControlReceipt> {
+        self.child_for_control(&parent, &child)
+            .await?
+            .require_authority(&self.execution()?.authority.inference.authority)?;
+        self.resume_queue(child, request, expected).await
+    }
+
+    pub async fn withdraw_subagent_input(
+        &self,
+        parent: SessionId,
+        child: SessionId,
+        request: ChangeId,
+        expected: SessionRevision,
+        input: ChangeId,
+    ) -> Result<ControlReceipt> {
+        self.child_for_control(&parent, &child).await?;
+        self.edit_queue(child, request, expected, QueueEdit::Withdraw { input })
+            .await
     }
 
     async fn child_for_control(&self, parent: &SessionId, child: &SessionId) -> Result<Profile> {

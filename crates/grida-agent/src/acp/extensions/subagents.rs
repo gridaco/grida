@@ -11,11 +11,23 @@ const STOP: &str = "co.grida/subagent/stop";
 const PAUSE: &str = "co.grida/subagent/pause";
 const RESUME: &str = "co.grida/subagent/resume";
 const STEER: &str = "co.grida/subagent/steer";
+const RESUME_QUEUE: &str = "co.grida/subagent/resume-queue";
+const WITHDRAW: &str = "co.grida/subagent/withdraw";
 
 pub(super) fn capabilities(available: bool) -> impl Iterator<Item = &'static str> {
-    [CREATE, ASSIGN, INSPECT, STOP, PAUSE, RESUME, STEER]
-        .into_iter()
-        .filter(move |_| available)
+    [
+        CREATE,
+        ASSIGN,
+        INSPECT,
+        STOP,
+        PAUSE,
+        RESUME,
+        STEER,
+        RESUME_QUEUE,
+        WITHDRAW,
+    ]
+    .into_iter()
+    .filter(move |_| available)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -108,6 +120,28 @@ struct SteerChild {
     instructions: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ChildQueue {
+    parent_session_id: SessionId,
+    child_id: SessionId,
+    request_id: ChangeId,
+    expected_session_revision: SessionRevision,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/subagent/resume-queue", response = lifecycle::QueueResponse)]
+#[serde(transparent)]
+struct ResumeQueue(ChildQueue);
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/subagent/withdraw", response = lifecycle::QueueResponse)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Withdraw {
+    queue: ChildQueue,
+    input_id: ChangeId,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
 #[serde(rename_all = "camelCase")]
 struct Inspection {
@@ -116,6 +150,8 @@ struct Inspection {
     name: String,
     allocation: Allocation,
     session_revision: SessionRevision,
+    admission_paused: bool,
+    queued_input_ids: Vec<ChangeId>,
     current: Option<TurnSummary>,
     latest: Option<TurnSummary>,
     assignment: Option<Assignment>,
@@ -130,6 +166,8 @@ impl From<SubagentInspection> for Inspection {
             name: view.name,
             allocation: view.allocation,
             session_revision: view.revision,
+            admission_paused: view.admission_paused,
+            queued_input_ids: view.queued,
             current: view.current.map(TurnSummary::from),
             latest: view.latest.map(TurnSummary::from),
             assignment: view
@@ -177,6 +215,8 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
     let stop = (host.clone(), sessions.clone());
     let pause = (host.clone(), sessions.clone());
     let resume = (host.clone(), sessions.clone());
+    let steer = (host.clone(), sessions.clone());
+    let resume_queue = (host.clone(), sessions.clone());
     RequestRoutes::default()
         .on_receive_request(
             async move |request: Create, responder, _| {
@@ -307,10 +347,11 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
         .on_receive_request(
             async move |request: SteerChild, responder, _| {
                 let result = async {
-                    require(&sessions, STEER, Some(&request.task.parent_session_id))?;
+                    require(&steer.1, STEER, Some(&request.task.parent_session_id))?;
                     let turn = request.task.turn_id.clone();
                     let (parent, control) = request.task.into_control();
-                    let receipt = host
+                    let receipt = steer
+                        .0
                         .steer_subagent(
                             parent,
                             control,
@@ -320,6 +361,52 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         .await
                         .map_err(host_error)?;
                     turn_receipt(receipt, turn)
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |ResumeQueue(queue): ResumeQueue, responder, _| {
+                let result = async {
+                    require(
+                        &resume_queue.1,
+                        RESUME_QUEUE,
+                        Some(&queue.parent_session_id),
+                    )?;
+                    resume_queue
+                        .0
+                        .resume_subagent_queue(
+                            queue.parent_session_id,
+                            queue.child_id,
+                            queue.request_id,
+                            queue.expected_session_revision,
+                        )
+                        .await
+                        .map(lifecycle::QueueResponse::from)
+                        .map_err(host_error)
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: Withdraw, responder, _| {
+                let result = async {
+                    let queue = request.queue;
+                    require(&sessions, WITHDRAW, Some(&queue.parent_session_id))?;
+                    host.withdraw_subagent_input(
+                        queue.parent_session_id,
+                        queue.child_id,
+                        queue.request_id,
+                        queue.expected_session_revision,
+                        request.input_id,
+                    )
+                    .await
+                    .map(lifecycle::QueueResponse::from)
+                    .map_err(host_error)
                 }
                 .await;
                 responder.respond_with_result(result)

@@ -10,7 +10,19 @@ const STOP: &str = "_co.grida/subagent/stop";
 const PAUSE: &str = "_co.grida/subagent/pause";
 const RESUME: &str = "_co.grida/subagent/resume";
 const STEER: &str = "_co.grida/subagent/steer";
-const CAPABILITIES: [&str; 7] = [CREATE, ASSIGN, INSPECT, STOP, PAUSE, RESUME, STEER];
+const RESUME_QUEUE: &str = "_co.grida/subagent/resume-queue";
+const WITHDRAW: &str = "_co.grida/subagent/withdraw";
+const CAPABILITIES: [&str; 9] = [
+    CREATE,
+    ASSIGN,
+    INSPECT,
+    STOP,
+    PAUSE,
+    RESUME,
+    STEER,
+    RESUME_QUEUE,
+    WITHDRAW,
+];
 
 async fn serve(state: &Path, endpoint: &str) -> PrivateStdio {
     serve_with_key(state, endpoint, TEST_CREDENTIAL).await
@@ -142,6 +154,13 @@ fn resume_basis(view: &Value, parent: &str, child: &str, request: &str) -> Value
         "task":child_basis(view,parent,child,request),
         "expectedEpoch":view["current"]["epoch"],
         "expectedJournalPosition":view["current"]["journalPosition"],
+    })
+}
+
+fn queue_basis(view: &Value, parent: &str, child: &str, request: &str) -> Value {
+    json!({
+        "parentSessionId":parent,"childId":child,"requestId":request,
+        "expectedSessionRevision":view["sessionRevision"],
     })
 }
 
@@ -406,7 +425,7 @@ async fn paused_child_accepts_exact_steering_and_resumes_the_same_assignment_aft
 }
 
 #[tokio::test]
-async fn stopped_child_keeps_its_reserved_work_and_allows_a_separate_follow_up() {
+async fn child_queue_survives_restart_and_stays_held_after_stop() {
     let temporary = TempDir::new().unwrap();
     let workspace = TempDir::new().unwrap();
     let state = temporary.path().join("state");
@@ -432,7 +451,7 @@ async fn stopped_child_keeps_its_reserved_work_and_allows_a_separate_follow_up()
     let accepted = first.request(ASSIGN, first_input.clone()).await;
     assert!(accepted.get("error").is_none(), "{accepted}");
     provider.request().await;
-    let denied = first
+    let queued = first
         .request(
             ASSIGN,
             assign(
@@ -444,7 +463,23 @@ async fn stopped_child_keeps_its_reserved_work_and_allows_a_separate_follow_up()
             ),
         )
         .await;
-    assert_eq!(denied["error"]["data"], "subagent_busy");
+    assert_eq!(
+        queued["result"]["disposition"]["kind"], "queued",
+        "{queued}"
+    );
+    let over_limit = first
+        .request(
+            ASSIGN,
+            assign(
+                &parent,
+                &child,
+                &parent_turn,
+                "extra",
+                "Outside the allowance.",
+            ),
+        )
+        .await;
+    assert_eq!(over_limit["error"]["data"], "subagent_allocation_exhausted");
     first.close().await;
 
     let mut second = serve(&state, &provider.url).await;
@@ -452,6 +487,7 @@ async fn stopped_child_keeps_its_reserved_work_and_allows_a_separate_follow_up()
     let pending = inspect(&mut second, &parent, &child, "first").await;
     assert_eq!(pending["current"]["disposition"], "suspended");
     assert_eq!(pending["allocation"]["reserved"], 1);
+    assert_eq!(pending["queuedInputIds"], json!(["later"]));
     let stop = child_basis(&pending, &parent, &child, "stop-first");
     let stopped = second.request(STOP, stop.clone()).await;
     assert!(stopped.get("error").is_none(), "{stopped}");
@@ -461,6 +497,8 @@ async fn stopped_child_keeps_its_reserved_work_and_allows_a_separate_follow_up()
     .await;
     assert_eq!(cancelled["assignment"]["result"]["status"], "cancelled");
     assert_eq!(cancelled["allocation"]["reserved"], 1);
+    assert_eq!(cancelled["admissionPaused"], true);
+    assert_eq!(cancelled["queuedInputIds"], json!(["later"]));
     assert_eq!(
         second.request(STOP, stop).await["result"],
         stopped["result"]
@@ -468,6 +506,20 @@ async fn stopped_child_keeps_its_reserved_work_and_allows_a_separate_follow_up()
     assert_eq!(
         second.request(ASSIGN, first_input).await["result"],
         cancelled["assignment"]
+    );
+    let withdraw = json!({
+        "queue":queue_basis(&cancelled,&parent,&child,"withdraw-later"),
+        "inputId":"later",
+    });
+    let removed = second.request(WITHDRAW, withdraw.clone()).await;
+    assert!(removed.get("error").is_none(), "{removed}");
+    assert_eq!(
+        second.request(WITHDRAW, withdraw).await["result"],
+        removed["result"]
+    );
+    assert_eq!(
+        inspect(&mut second, &parent, &child, "later").await["assignment"]["disposition"]["kind"],
+        "withdrawn",
     );
     let accepted = second
         .request(
@@ -482,6 +534,17 @@ async fn stopped_child_keeps_its_reserved_work_and_allows_a_separate_follow_up()
         )
         .await;
     assert!(accepted.get("error").is_none(), "{accepted}");
+    let held = inspect(&mut second, &parent, &child, "follow-up").await;
+    assert_eq!(held["queuedInputIds"], json!(["follow-up"]));
+    assert_eq!(held["admissionPaused"], true);
+    assert!(provider.requests.try_recv().is_err());
+    let resume = queue_basis(&held, &parent, &child, "release-child-queue");
+    let resumed = second.request(RESUME_QUEUE, resume.clone()).await;
+    assert!(resumed.get("error").is_none(), "{resumed}");
+    assert_eq!(
+        second.request(RESUME_QUEUE, resume).await["result"],
+        resumed["result"]
+    );
     provider.request().await;
     let completed = wait_for(&mut second, &parent, &child, "follow-up", |view| {
         view["assignment"]["disposition"]["kind"] == "completed"
@@ -493,6 +556,83 @@ async fn stopped_child_keeps_its_reserved_work_and_allows_a_separate_follow_up()
         "A separate follow-up."
     );
     second.close().await;
+    provider.done().await;
+}
+
+#[tokio::test]
+async fn stop_replays_a_retained_child_cancellation_from_before_queue_controls() {
+    use agent_kit_core::turn::ControlDirective;
+    use agent_kit_core::{ChangeId, SessionId};
+    use agent_kit_sessions::{ControlRequest, SessionControl, SessionStore};
+    use agent_kit_store_sqlite::SqliteStore;
+
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let mut provider = Endpoint::start(vec![
+        Reply::Finished("Parent completed."),
+        Reply::Hold("Partial child finding."),
+    ])
+    .await;
+    let mut client = serve(&state, &provider.url).await;
+    let parent = new_session(&mut client, workspace.path()).await;
+    let parent_turn = settle_parent(&mut client, &parent).await;
+    provider.request().await;
+    let created = client.request(CREATE, create(&parent)).await;
+    let child = created["result"]["childId"].as_str().unwrap().to_owned();
+    let accepted = client
+        .request(
+            ASSIGN,
+            assign(&parent, &child, &parent_turn, "first", "Investigate."),
+        )
+        .await;
+    assert!(accepted.get("error").is_none(), "{accepted}");
+    provider.request().await;
+    client.close().await;
+
+    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let child_id = SessionId::new(child.clone()).unwrap();
+    let paused = store.inspect(child_id.clone()).await.unwrap();
+    let turn = paused.current.unwrap();
+    let old_receipt = store
+        .control(ControlRequest {
+            id: ChangeId::new("earlier-stop").unwrap(),
+            session: child_id,
+            expected_revision: paused.revision,
+            action: SessionControl::Turn {
+                turn: turn.binding.turn.clone(),
+                expected: turn.controls.revision,
+                directive: ControlDirective::Cancel,
+            },
+        })
+        .await
+        .unwrap();
+    drop(store);
+
+    let mut reopened = serve(&state, &provider.url).await;
+    load_parent(&mut reopened, &parent, workspace.path()).await;
+    let replay = reopened
+        .request(
+            STOP,
+            json!({
+                "parentSessionId":parent,"childId":child,"turnId":turn.binding.turn,
+                "requestId":"earlier-stop","expectedSessionRevision":paused.revision,
+                "expectedControlRevision":turn.controls.revision,
+            }),
+        )
+        .await;
+    assert_eq!(
+        replay["result"]["sessionRevision"], old_receipt.revision.0,
+        "{replay}"
+    );
+    let settled = wait_for(&mut reopened, &parent, &child, "first", |view| {
+        view["assignment"]["disposition"]["kind"] == "completed"
+    })
+    .await;
+    assert_eq!(settled["assignment"]["result"]["status"], "cancelled");
+    assert_eq!(settled["admissionPaused"], false);
+    assert!(provider.requests.try_recv().is_err());
+    reopened.close().await;
     provider.done().await;
 }
 
