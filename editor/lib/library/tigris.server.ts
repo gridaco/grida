@@ -136,11 +136,14 @@ export class LibraryTigris {
           { abortSignal: signal }
         );
         signal.throwIfAborted();
+        // Other producers may omit checksum metadata; verify stored bytes below.
         if (
           head.ContentLength !== bytes.length ||
           head.ContentType !== mimetype ||
-          head.ChecksumType !== "FULL_OBJECT" ||
-          head.ChecksumSHA256 !== expected
+          (head.ChecksumType !== undefined &&
+            head.ChecksumType !== "FULL_OBJECT") ||
+          (head.ChecksumSHA256 !== undefined &&
+            head.ChecksumSHA256 !== expected)
         ) {
           throw new Error(
             "Library Tigris object does not match its content address"

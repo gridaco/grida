@@ -206,7 +206,7 @@ describe("LibraryTigris", () => {
     expect(objects.get(path)).toBe(object);
   });
 
-  it("fails closed when an existing key contains different bytes", async () => {
+  it("rejects a conflicting advertised SHA-256 checksum", async () => {
     await store.upload(bytes, "image/png");
     objects.get(key())!.checksum = createHash("sha256")
       .update("wrong")
@@ -216,12 +216,51 @@ describe("LibraryTigris", () => {
     );
   });
 
-  it("requires a full SHA checksum rather than trusting presence, size or an ETag", async () => {
+  it("adopts an existing object without checksum metadata after verifying its bytes", async () => {
+    const object: Stored = {
+      body: bytes,
+      mime: "image/png",
+      cache: "public, max-age=31536000, immutable",
+    };
+    objects.set(key(), object);
+
+    await expect(store.upload(bytes, "image/png")).resolves.toEqual({
+      path: key().slice("/library/".length),
+      sha256: LibraryCAS.sha256Hex(bytes),
+    });
+    expect(requests.map((request) => request.method)).toEqual([
+      "PUT",
+      "HEAD",
+      "GET",
+    ]);
+    expect(objects.get(key())).toBe(object);
+  });
+
+  it("rejects an advertised checksum type that does not describe the full object", async () => {
     await store.upload(bytes, "image/png");
-    delete objects.get(key())!.checksum;
+    objects.get(key())!.checksumType = "COMPOSITE";
     await expect(store.upload(bytes, "image/png")).rejects.toThrow(
       "content address"
     );
+  });
+
+  it("rejects different stored bytes when checksum metadata is absent", async () => {
+    const object: Stored = {
+      body: Buffer.alloc(bytes.length, 0),
+      mime: "image/png",
+      cache: "public, max-age=31536000, immutable",
+    };
+    objects.set(key(), object);
+
+    await expect(store.upload(bytes, "image/png")).rejects.toThrow(
+      "content address"
+    );
+    expect(requests.map((request) => request.method)).toEqual([
+      "PUT",
+      "HEAD",
+      "GET",
+    ]);
+    expect(objects.get(key())).toBe(object);
   });
 
   it("rejects different stored bytes even when HEAD echoes the expected checksum", async () => {
