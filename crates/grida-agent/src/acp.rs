@@ -1,6 +1,8 @@
 //! Stable ACP v1 over a supervised, bounded stdio connection.
 
 mod extensions;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub mod external;
 mod live;
 mod observation;
 mod projection;

@@ -464,6 +464,25 @@ and server-initiated input. It projects text and structured output and
 leaves resource links unopened. Embedded callers can compose the same adapter
 with `mcp_client::McpClient::connect` and `Host::with_mcp_client`.
 
+## Embed a confined ACP peer
+
+A trusted Rust embedding running on Tokio on macOS or Linux can use
+`grida_agent::acp::external::ExternalAcpDriver` with
+`agent_kit_sessions::Sessions` and its existing store. This profile runs one
+text turn in a fresh, owned ACP v1 stdio process. The launcher selects the
+reviewed system executable, pinned digest, exact arguments, read and runtime
+roots, and a deadline. The driver requires a read-only workspace scope, sends
+no inherited credentials or MCP servers, and denies peer requests for
+permissions, files, or terminals. The native sandbox denies networking.
+
+Use `driver.configuration()` when creating the session and
+`ExternalAcpDriver::submission` when accepting the identified prompt. The
+driver rechecks the same turn grant before launch and before prompt dispatch.
+Stop sends cancellation to the peer and waits for bounded local cleanup
+evidence. A retained handoff without a verified receipt settles as uncertain
+on recovery. A Pause before handoff can resume the same input. A new turn
+opens a new peer process.
+
 ## Run named child work from a private launcher
 
 Use `serve --stdio --subagents` with an Act launch. The trusted launcher can
