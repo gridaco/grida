@@ -32,10 +32,7 @@ export class NativeWorkspaceReads {
     owner: AbortSignal
   ): Promise<WorkspaceReadFileResult | WorkspaceReadFileBytesResult> {
     const scope = { id: workspaceId };
-    const filename = relativePath(scope, relative);
-    if (!relative) throw pathError(scope, relative, "path-not-relative");
-    if (filename === "." || filename.endsWith("/"))
-      throw pathError(scope, relative, "not-a-file");
+    const filename = workspaceFilePath(workspaceId, relative);
     const max =
       kind === "text"
         ? workspaceFs.MAX_FILE_BYTES
@@ -132,6 +129,18 @@ export class NativeWorkspaceReads {
       throw error;
     }
   }
+}
+
+export function workspaceFilePath(
+  workspaceId: string,
+  relative: string
+): string {
+  const scope = { id: workspaceId };
+  const filename = relativePath(scope, relative);
+  if (!relative) throw pathError(scope, relative, "path-not-relative");
+  if (filename === "." || filename.endsWith("/"))
+    throw pathError(scope, relative, "not-a-file");
+  return filename;
 }
 
 function relativePath(scope: { id: string }, value: string): string {

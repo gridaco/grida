@@ -40,6 +40,7 @@ import {
 import { NativeProviderSelection } from "./native-provider-selection";
 import type { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import { NativeWorkspaceReads } from "./native-workspace-reads";
+import { NativeWorkspaceWrites } from "./native-workspace-writes";
 import { nativeWorkspaceMedia } from "./workspace-media-access";
 import { EDITOR_BASE_URL } from "../env";
 import { AgentTransport } from "@grida/agent/transport";
@@ -57,6 +58,7 @@ const REFERER = `${EDITOR_ORIGIN}/desktop`;
 export namespace agentSidecarClient {
   let catalog: NativeWorkspaceCatalog | undefined;
   let nativeReads: NativeWorkspaceReads | undefined;
+  let nativeWrites: NativeWorkspaceWrites | undefined;
 
   export function setWorkspaceCatalog(owner: NativeWorkspaceCatalog): void {
     if (catalog) throw new Error("workspace_catalog_already_bound");
@@ -165,6 +167,39 @@ export namespace agentSidecarClient {
     if (!workers) return undefined;
     if (!catalog) throw new Error("workspace_read_catalog_unavailable");
     return (nativeReads ??= new NativeWorkspaceReads(catalog, workers));
+  }
+
+  export async function writeWorkspaceFile(
+    id: string,
+    relative: string,
+    content: string,
+    expectedMtime: number | undefined,
+    signal: AbortSignal,
+    check: () => void
+  ) {
+    const workers = nativeWorkspaceMedia();
+    if (workers) {
+      if (!catalog) throw new Error("workspace_write_catalog_unavailable");
+      const writes = (nativeWrites ??= new NativeWorkspaceWrites(
+        catalog,
+        workers
+      ));
+      return await writes.save(
+        id,
+        relative,
+        content,
+        expectedMtime,
+        signal,
+        check
+      );
+    }
+    check();
+    return await client().workspaces.write_file(
+      id,
+      relative,
+      content,
+      expectedMtime
+    );
   }
 
   /** Main-owned endpoint operations keep native grant approval and the

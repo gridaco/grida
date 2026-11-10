@@ -32,7 +32,7 @@ it.runIf(
     process.platform === "darwin" &&
     process.arch === "arm64"
 )(
-  "reads editor files without a sidecar and preserves the fractional write precondition",
+  "lists, reads and saves editor files without a sidecar and preserves the fractional write precondition",
   async () => {
     const root = await fs.realpath(
       await fs.mkdtemp(path.join(os.tmpdir(), "grida-workspace-reads-"))
@@ -65,6 +65,15 @@ it.runIf(
         agentSidecarClient.readWorkspaceFile(saved.id, file, kind, signal);
       const list = (directory: string) =>
         agentSidecarClient.readWorkspaceDirectory(saved.id, directory, signal);
+      const save = (file: string, content: string, expected?: number) =>
+        agentSidecarClient.writeWorkspaceFile(
+          saved.id,
+          file,
+          content,
+          expected,
+          signal,
+          () => {}
+        );
 
       const authored = Buffer.from("\uFEFFdraft");
       await fs.writeFile(draft, authored);
@@ -78,19 +87,31 @@ it.runIf(
         size: authored.length,
         mtime,
       });
+      const changed = await save(
+        "draft.txt",
+        "edited\r\nRésumé\r\n",
+        text.mtime
+      );
+      expect(changed.mtime).toBe((await fs.stat(draft)).mtimeMs);
+      expect(await fs.readFile(draft)).toEqual(
+        Buffer.from("edited\r\nRésumé\r\n")
+      );
+      await expect(save("draft.txt", "stale", text.mtime)).rejects.toThrow(
+        "modified-since"
+      );
+      await expect(read("draft.txt", "text")).resolves.toMatchObject({
+        content: "edited\r\nRésumé\r\n",
+      });
+      const resaved = await save("draft.txt", "saved again", changed.mtime);
       await expect(
-        workspaceFs.writeFile(saved, "draft.txt", "edited", {
-          expected_mtime: text.mtime,
+        workspaceFs.writeFile(saved, "draft.txt", "compatible", {
+          expected_mtime: resaved.mtime,
         })
       ).resolves.toMatchObject({ mtime: expect.any(Number) });
-      await expect(
-        workspaceFs.writeFile(saved, "draft.txt", "stale", {
-          expected_mtime: text.mtime,
-        })
-      ).rejects.toThrow("modified-since");
-      await expect(read("draft.txt", "text")).resolves.toMatchObject({
-        content: "edited",
+      await expect(save("draft.txt", "forced")).resolves.toMatchObject({
+        mtime: expect.any(Number),
       });
+      expect(await fs.readFile(draft, "utf8")).toBe("forced");
 
       await fs.writeFile(bin, Buffer.from([0x41, 0, 0x42]));
       await expect(read("binary.txt", "text")).rejects.toThrow("file-not-utf8");
@@ -157,6 +178,30 @@ it.runIf(
       await expect(list("outside-dir")).rejects.toThrow(
         /workspace_path_outside_root|path_authority_unavailable/
       );
+      await save("alias/new/deep.txt", "contained");
+      expect(
+        await fs.readFile(path.join(project, "decks/new/deep.txt"), "utf8")
+      ).toBe("contained");
+      expect(
+        (await fs.stat(path.join(project, "decks/new/deep.txt"))).mode & 0o777
+      ).toBe(0o644 & ~process.umask());
+      await expect(save("outside-dir/escaped.txt", "denied")).rejects.toThrow(
+        /workspace_path_outside_root|path_authority_unavailable/
+      );
+      await expect(save("escape.txt", "denied")).rejects.toThrow("not-a-file");
+      expect(
+        (await fs.lstat(path.join(project, "escape.txt"))).isSymbolicLink()
+      ).toBe(true);
+      expect(await fs.readdir(outsideDirectory)).toEqual([]);
+      expect(await fs.readFile(outside, "utf8")).toBe("must not be read");
+      const largerThanReadCap = "a".repeat(1024 * 1024 + 9);
+      await save("large-authored.txt", largerThanReadCap);
+      expect(
+        (await fs.stat(path.join(project, "large-authored.txt"))).size
+      ).toBe(largerThanReadCap.length);
+      await expect(
+        save("too-large.txt", "a".repeat(64 * 1024 * 1024 + 1))
+      ).rejects.toThrow("workspace_write_limit");
 
       // Revocation after the worker exits with bytes still prevents publication.
       const fileGrant = vi.fn<NativeWorkspaceCatalog["fileGrant"]>((id) =>

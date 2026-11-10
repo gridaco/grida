@@ -161,10 +161,12 @@ browser directory. Set `GRIDA_AGENT_USER_DATA` to a separate sibling directory
 under the same owner-only root in the system temporary directory. Chat uses a
 separate native store for each registered workspace. Main owns the workspace
 catalog. On packaged macOS arm64 builds, directory listings, buffered editor
-reads and media Range reads use the confined native file worker. A directory
-listing either returns all entries within its bound or reports a limit error.
-The buffered reader preserves the modification time used by the editor's
-stale-write check. The retained sidecar serves writes, endpoint settings and media.
+reads and media Range reads use the confined read worker. A directory listing
+either returns all entries within its bound or reports a limit error. Workspace
+saves use a separate confined writer with the same fractional modification-time
+check and explicit force overwrite. Saves accept up to 64 MiB of UTF-8 and
+refuse to replace symbolic or hard links. Standalone documents, endpoint settings
+and media still use the retained sidecar.
 This profile requires an empty legacy chat source and defaults to the Grida
 account's Gateway connection.
 

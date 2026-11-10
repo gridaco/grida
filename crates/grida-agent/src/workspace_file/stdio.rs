@@ -1,4 +1,4 @@
-//! GRIDA-SEC-004 / GRIDA-SEC-014 — one registered-root read on private pipes.
+//! GRIDA-SEC-004 / GRIDA-SEC-014 — one registered-root file operation on private pipes.
 
 use super::*;
 use crate::file_tools::FileAuthority;
@@ -22,6 +22,19 @@ struct OpenRequest {
     include_modified: bool,
     #[serde(default)]
     list_directory: bool,
+    write: Option<SaveRequest>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SaveRequest {
+    length: usize,
+    expected_mtime: Option<String>,
+}
+
+#[derive(Serialize)]
+struct Saved {
+    mtime: f64,
 }
 
 #[derive(Deserialize)]
@@ -58,7 +71,7 @@ struct Span {
     length: String,
 }
 
-/// Serve one read on the trusted owner's inherited pipes. The caller owns
+/// Serve one file operation on the trusted owner's inherited pipes. The caller owns
 /// registration, its current grant, process containment, and cancellation.
 pub fn serve_stdio() -> Result<()> {
     let stdin = io::stdin();
@@ -66,7 +79,9 @@ pub fn serve_stdio() -> Result<()> {
     let stdout = io::stdout();
     let mut output = stdout.lock();
     let request = frame::<OpenRequest>(&mut input)?.ok_or_else(invalid_frame)?;
-    if request.list_directory && request.include_modified {
+    if (request.list_directory && request.include_modified)
+        || (request.write.is_some() && (request.list_directory || request.include_modified))
+    {
         return Err(invalid_frame());
     }
     let directory = BindingId::new("registered-workspace")?;
@@ -98,10 +113,61 @@ pub fn serve_stdio() -> Result<()> {
         ));
     }
     let authority = FileAuthority {
-        grants: [DirectoryGrant::bind(&snapshot, &directory, true, false)?].into(),
+        grants: [DirectoryGrant::bind(
+            &snapshot,
+            &directory,
+            true,
+            request.write.is_some(),
+        )?]
+        .into(),
         workspace: snapshot.clone(),
         protected,
     };
+    if let Some(write) = request.write {
+        if write.length > super::write::MAX_WRITE_BYTES {
+            return Err(Error::new(
+                ErrorKind::LimitExceeded,
+                "workspace_write_limit",
+            ));
+        }
+        // Parse the exact decimal representation of the client number.
+        // The JSON decoder's default float path can round by one ULP.
+        let expected_mtime = write
+            .expected_mtime
+            .as_deref()
+            .map(|value| {
+                value
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|mtime| mtime.is_finite())
+                    .ok_or_else(invalid_frame)
+            })
+            .transpose()?;
+        let mut content = vec![0; write.length];
+        input
+            .read_exact(&mut content)
+            .map_err(|_| invalid_frame())?;
+        if !input.fill_buf().map_err(|_| invalid_frame())?.is_empty() {
+            return Err(invalid_frame());
+        }
+        std::str::from_utf8(&content)
+            .map_err(|_| Error::new(ErrorKind::InvalidInput, "workspace_write_utf8"))?;
+        let mtime = super::write::save(
+            &authority,
+            &directory,
+            &request.path,
+            &content,
+            expected_mtime,
+        )?;
+        return serde_json::to_writer(&mut output, &Saved { mtime })
+            .map_err(|_| output_failed())
+            .and_then(|()| {
+                output
+                    .write_all(b"\n")
+                    .and_then(|()| output.flush())
+                    .map_err(|_| output_failed())
+            });
+    }
     if request.list_directory {
         let listing = super::directory::list(&authority, &directory, &request.path)?;
         return output
@@ -153,8 +219,7 @@ fn milliseconds(time: SystemTime) -> f64 {
     };
     let seconds = nanoseconds.div_euclid(1_000_000_000);
     let nanos = nanoseconds.rem_euclid(1_000_000_000);
-    // Match Node's stat.mtimeMs, including the fractional part used by writes.
-    seconds as f64 * 1_000.0 + nanos as f64 / 1_000_000.0
+    node_mtime_ms(seconds, nanos)
 }
 
 fn frame<T: for<'de> Deserialize<'de>>(input: &mut impl BufRead) -> Result<Option<T>> {

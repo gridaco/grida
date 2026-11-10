@@ -914,7 +914,8 @@ const bridge: DesktopBridge = {
         .map(encodeURIComponent)
         .join("/")}`,
     write_file: (workspaceId, relPath, content, expectedMtime) =>
-      agentClient.workspaces.write_file(
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_WRITE,
         workspaceId,
         relPath,
         content,

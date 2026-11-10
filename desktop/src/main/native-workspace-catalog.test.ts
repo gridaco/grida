@@ -5,6 +5,61 @@ import path from "node:path";
 import { expect, it } from "vitest";
 import { createMediaDaemon } from "@grida/agent/media-server";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
+import { WorkspaceWriteUnverified } from "./workspace-file-worker";
+
+it.runIf(process.platform !== "win32")(
+  "holds Forget until an admitted save has drained",
+  async () => {
+    const root = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), "grida-workspace-save-forget-"))
+    );
+    const browserData = path.join(root, "browser");
+    const project = path.join(root, "project");
+    try {
+      for (const directory of [browserData, project])
+        await fs.mkdir(directory, { mode: 0o700 });
+      const catalog = new NativeWorkspaceCatalog({
+        browserData,
+        projectsRoot: path.join(root, "projects"),
+        protectedPaths: [],
+      });
+      const selected = await catalog.openSelected(project);
+      const started = Promise.withResolvers<void>();
+      const done = Promise.withResolvers<void>();
+      const events: string[] = [];
+      const save = catalog.withWriteGrant(selected.id, async () => {
+        started.resolve();
+        await done.promise;
+        events.push("saved");
+      });
+      await started.promise;
+      const forgotten = catalog.forget(selected.id).then(() => {
+        events.push("forgotten");
+      });
+      done.resolve();
+      await Promise.all([save, forgotten]);
+      expect(events).toEqual(["saved", "forgotten"]);
+      expect(await catalog.find(selected.id)).toBeNull();
+
+      await catalog.openSelected(project);
+      const exit = Promise.withResolvers<{ code: number | null }>();
+      await expect(
+        catalog.withWriteGrant(selected.id, async () => {
+          throw new WorkspaceWriteUnverified(exit.promise);
+        })
+      ).rejects.toThrow("workspace_write_unverified");
+      await expect(catalog.forget(selected.id)).rejects.toThrow(
+        "workspace_write_unverified"
+      );
+      expect(await catalog.find(selected.id)).toMatchObject({ root: project });
+      exit.resolve({ code: null });
+      await catalog.forget(selected.id);
+      expect(await catalog.find(selected.id)).toBeNull();
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  }
+);
 
 it.runIf(process.platform !== "win32")(
   "opens only trusted or already registered folders and shares the current scope with file routes",

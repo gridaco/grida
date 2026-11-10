@@ -382,8 +382,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SUBMIT_WAKEUP,
-    (event, id: string, input: string, text: string) =>
-      nativeChat.submitWithWakeup(event, id, input, text)
+    (event, id: string, input: string, text: string, effort?: unknown) =>
+      nativeChat.submitWithWakeup(event, id, input, text, effort)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SCHEDULED_WAKEUP,
@@ -580,42 +580,92 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         (kind !== "text" && kind !== "bytes" && kind !== "directory")
       )
         throw new Error("workspace_read_invalid");
-      const { sender, senderFrame: frame } = event;
-      const window = BrowserWindow.fromWebContents(sender);
-      if (!window || !frame || frame !== sender.mainFrame)
-        throw new Error("workspace_read_unavailable");
-      const controller = new AbortController();
-      const unwatch = ipc_sender.watchNavigation(sender, () =>
-        controller.abort()
-      );
-      try {
-        const result =
+      return await workspaceRequest(
+        event,
+        "workspace_read_unavailable",
+        async (signal) =>
           kind === "directory"
             ? await agentSidecarClient.readWorkspaceDirectory(
                 id,
                 relative,
-                controller.signal
+                signal
               )
             : await agentSidecarClient.readWorkspaceFile(
                 id,
                 relative,
                 kind,
-                controller.signal
-              );
-        if (
-          controller.signal.aborted ||
-          sender.isDestroyed() ||
-          frame !== sender.mainFrame ||
-          options.resolve_ipc_role(window) !== "main" ||
-          !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN)
-        )
-          throw new Error("workspace_read_unavailable");
-        return result;
-      } finally {
-        unwatch();
-      }
+                signal
+              )
+      );
     }
   );
+  guarded(
+    IPC_CHANNELS.WORKSPACE_WRITE,
+    async (
+      event,
+      id: unknown,
+      relative: unknown,
+      content: unknown,
+      expectedMtime: unknown
+    ) => {
+      if (
+        !workspaceIdValue(id) ||
+        typeof relative !== "string" ||
+        Buffer.byteLength(relative) > 4096 ||
+        typeof content !== "string" ||
+        (expectedMtime !== undefined &&
+          (typeof expectedMtime !== "number" ||
+            !Number.isFinite(expectedMtime)))
+      )
+        throw new Error("workspace_write_invalid");
+      return await workspaceRequest(
+        event,
+        "workspace_write_unavailable",
+        (signal, check) =>
+          agentSidecarClient.writeWorkspaceFile(
+            id,
+            relative,
+            content,
+            expectedMtime,
+            signal,
+            check
+          )
+      );
+    }
+  );
+
+  async function workspaceRequest<T>(
+    event: IpcMainInvokeEvent,
+    unavailable: string,
+    run: (signal: AbortSignal, check: () => void) => Promise<T>
+  ): Promise<T> {
+    const { sender, senderFrame: frame } = event;
+    const window = BrowserWindow.fromWebContents(sender);
+    const controller = new AbortController();
+    const check = () => {
+      if (
+        controller.signal.aborted ||
+        !window ||
+        !frame ||
+        sender.isDestroyed() ||
+        frame !== sender.mainFrame ||
+        options.resolve_ipc_role(window) !== "main" ||
+        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN)
+      )
+        throw new Error(unavailable);
+    };
+    check();
+    const unwatch = ipc_sender.watchNavigation(sender, () =>
+      controller.abort()
+    );
+    try {
+      const result = await run(controller.signal, check);
+      check();
+      return result;
+    } finally {
+      unwatch();
+    }
+  }
 
   const chatgptOAuth = options.native_chatgpt_oauth ?? legacyChatgptOAuth;
   guarded(IPC_CHANNELS.CHATGPT_CONNECT, () => chatgptOAuth.connect());

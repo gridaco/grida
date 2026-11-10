@@ -8,7 +8,11 @@ import {
   type Workspace,
   type WorkspaceDirectoryIdentity,
 } from "@grida/daemon/server";
-import { WorkspaceMediaRegistry } from "./workspace-media-registry";
+import {
+  WorkspaceMediaRegistry,
+  type WorkspaceMediaGrant,
+} from "./workspace-media-registry";
+import { WorkspaceWriteUnverified } from "./workspace-file-worker";
 
 const MAX_OPERATIONS = 32;
 
@@ -28,6 +32,7 @@ export class NativeWorkspaceCatalog {
   private pending: Promise<unknown> = Promise.resolve();
   private pendingCount = 0;
   private defaultCaptured = false;
+  private readonly undrainedWrites = new Set<Promise<unknown>>();
 
   constructor(private readonly options: Options) {
     this.directory = NativeWorkspaceCatalog.directoryFor(options.browserData);
@@ -60,6 +65,7 @@ export class NativeWorkspaceCatalog {
 
   list(): Promise<Workspace[]> {
     return this.run(async () => {
+      this.requireDrainedWrites();
       const defaultWorkspace = await this.registry.ensureDefault();
       if (defaultWorkspace && !this.defaultCaptured) {
         await this.capture(defaultWorkspace);
@@ -85,6 +91,7 @@ export class NativeWorkspaceCatalog {
 
   create(name?: string): Promise<Workspace> {
     return this.run(async () => {
+      this.requireDrainedWrites();
       const workspace = await this.mutate(() =>
         this.registry.createProject({ name })
       );
@@ -97,7 +104,10 @@ export class NativeWorkspaceCatalog {
   }
 
   forget(id: string): Promise<void> {
-    return this.run(() => this.mutate(() => this.registry.forget(id)));
+    return this.run(() => {
+      this.requireDrainedWrites();
+      return this.mutate(() => this.registry.forget(id));
+    });
   }
 
   find(id: string): Promise<Workspace | null> {
@@ -115,22 +125,51 @@ export class NativeWorkspaceCatalog {
 
   /** Buffered reads may use the exact committed directory across restarts. */
   fileGrant(id: string) {
+    return this.run(() => this.resolveFileGrant(id));
+  }
+
+  /** Hold catalog publication until the admitted writer has settled. */
+  withWriteGrant<T>(
+    id: string,
+    write: (grant: WorkspaceMediaGrant) => Promise<T>
+  ): Promise<T> {
     return this.run(async () => {
-      const bound = await this.reader.resolve(id);
-      if (!bound) throw unavailable();
-      return {
-        workspaceId: bound.workspace.id,
-        root: bound.workspace.root,
-        identity: bound.identity,
-        protected: this.scopes.protectedMetadataPaths(),
-      };
+      this.requireDrainedWrites();
+      const grant = await this.resolveFileGrant(id);
+      try {
+        return await write(grant);
+      } catch (error) {
+        if (error instanceof WorkspaceWriteUnverified && error.exited) {
+          const exited = error.exited;
+          this.undrainedWrites.add(exited);
+          void exited.then(() => this.undrainedWrites.delete(exited));
+        }
+        throw error;
+      }
     });
+  }
+
+  private async resolveFileGrant(id: string): Promise<WorkspaceMediaGrant> {
+    const bound = await this.reader.resolve(id);
+    if (!bound) throw unavailable();
+    return {
+      workspaceId: bound.workspace.id,
+      root: bound.workspace.root,
+      identity: bound.identity,
+      protected: this.scopes.protectedMetadataPaths(),
+    };
+  }
+
+  private requireDrainedWrites(): void {
+    if (this.undrainedWrites.size)
+      throw new Error("workspace_write_unverified");
   }
 
   private async openRoot(
     root: string,
     priorIdentity?: WorkspaceDirectoryIdentity
   ): Promise<Workspace> {
+    this.requireDrainedWrites();
     return this.scopes.register(root, async (canonical, identity) => {
       const workspace = await this.mutate(() =>
         this.registry.open(canonical, priorIdentity ?? identity)

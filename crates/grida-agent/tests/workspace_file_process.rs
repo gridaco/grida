@@ -89,6 +89,136 @@ async fn list(root: &Path, path: &str) -> std::process::Output {
     complete(child).await
 }
 
+async fn save(
+    command: Command,
+    root: &Path,
+    path: &str,
+    bytes: &[u8],
+    expected_mtime: Option<f64>,
+) -> std::process::Output {
+    let mut child = launch(command);
+    let mut request = request(root, path);
+    let mut write = json!({"length":bytes.len()});
+    if let Some(expected) = expected_mtime {
+        write["expectedMtime"] = json!(expected.to_string());
+    }
+    request["write"] = write;
+    let mut input = child.stdin.take().unwrap();
+    send(&mut input, request).await;
+    input.write_all(bytes).await.unwrap();
+    drop(input);
+    complete(child).await
+}
+
+#[tokio::test]
+async fn private_writer_replaces_exact_utf8_and_refuses_a_stale_or_deleted_target() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    let file = root.join("draft.txt");
+    fs::write(&file, b"before").unwrap();
+    let handle = fs::File::options().write(true).open(&file).unwrap();
+    handle
+        .set_times(
+            fs::FileTimes::new()
+                .set_modified(UNIX_EPOCH + Duration::new(1_794_291_981, 825_364_300)),
+        )
+        .unwrap();
+    let stat = handle.metadata().unwrap();
+    let before = stat.mtime() as f64 * 1_000.0 + stat.mtime_nsec() as f64 / 1_000_000.0;
+    let bytes = "\u{feff}one\r\nRésumé\r\n".as_bytes();
+    let saved = save(worker(), &root, "draft.txt", bytes, Some(before)).await;
+    assert!(saved.status.success(), "{:?}", saved.stderr);
+    let stat = fs::metadata(&file).unwrap();
+    assert_ne!(stat.ino(), handle.metadata().unwrap().ino());
+    let mtime = stat.mtime() as f64 * 1_000.0 + stat.mtime_nsec() as f64 / 1_000_000.0;
+    let returned = std::str::from_utf8(&saved.stdout)
+        .unwrap()
+        .trim()
+        .strip_prefix("{\"mtime\":")
+        .unwrap()
+        .strip_suffix('}')
+        .unwrap()
+        .parse::<f64>()
+        .unwrap();
+    assert_eq!(returned, mtime);
+    assert_eq!(fs::read(&file).unwrap(), bytes);
+    let saved_again = save(worker(), &root, "draft.txt", bytes, Some(returned)).await;
+    assert!(saved_again.status.success(), "{:?}", saved_again.stderr);
+    let stale = save(worker(), &root, "draft.txt", b"stale", Some(before)).await;
+    assert!(!stale.status.success());
+    assert!(String::from_utf8_lossy(&stale.stderr).contains("workspace_write_modified_since"));
+    assert_eq!(fs::read(&file).unwrap(), bytes);
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+    fs::remove_file(&file).unwrap();
+    let deleted = save(worker(), &root, "draft.txt", b"stale", Some(mtime)).await;
+    assert!(!deleted.status.success());
+    assert!(String::from_utf8_lossy(&deleted.stderr).contains("workspace_write_modified_since"));
+    assert!(!file.exists());
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+}
+
+#[tokio::test]
+async fn private_writer_creates_contained_parents_and_refuses_final_links() {
+    let temp = tempfile::tempdir().unwrap();
+    let base = temp.path().canonicalize().unwrap();
+    let root = base.join("workspace");
+    let real = root.join("real");
+    let outside = base.join("outside");
+    for directory in [&root, &real, &outside] {
+        fs::create_dir(directory).unwrap();
+    }
+    std::os::unix::fs::symlink(&real, root.join("alias")).unwrap();
+    std::os::unix::fs::symlink(&outside, root.join("escape")).unwrap();
+    let made = save(worker(), &root, "alias/nested/draft.txt", b"draft", None).await;
+    assert!(made.status.success(), "{:?}", made.stderr);
+    assert_eq!(fs::read(real.join("nested/draft.txt")).unwrap(), b"draft");
+    let forced = save(worker(), &root, "alias/nested/draft.txt", b"forced", None).await;
+    assert!(forced.status.success(), "{:?}", forced.stderr);
+    assert_eq!(fs::read(real.join("nested/draft.txt")).unwrap(), b"forced");
+    std::os::unix::fs::symlink(real.join("nested/draft.txt"), root.join("link.txt")).unwrap();
+    let link = save(worker(), &root, "link.txt", b"replacement", None).await;
+    assert!(!link.status.success());
+    assert!(String::from_utf8_lossy(&link.stderr).contains("workspace_write_type_unsupported"));
+    assert!(
+        fs::symlink_metadata(root.join("link.txt"))
+            .unwrap()
+            .is_symlink()
+    );
+    assert_eq!(fs::read(real.join("nested/draft.txt")).unwrap(), b"forced");
+    let escape = save(worker(), &root, "escape/new/file.txt", b"outside", None).await;
+    assert!(!escape.status.success());
+    assert_eq!(fs::read_dir(outside).unwrap().count(), 0);
+}
+
+#[tokio::test]
+async fn private_writer_checks_the_complete_bounded_utf8_body_before_mutating() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    for (length, bytes, code) in [
+        (2, b"x".as_slice(), "workspace_file_frame_invalid"),
+        (1, b"xy".as_slice(), "workspace_file_frame_invalid"),
+        (1, b"\xff".as_slice(), "workspace_write_utf8"),
+        (
+            64 * 1024 * 1024 + 1,
+            b"".as_slice(),
+            "workspace_write_limit",
+        ),
+    ] {
+        let mut request = request(&root, "new/ignored.txt");
+        request["write"] = json!({"length":length});
+        let mut child = launch(worker());
+        let mut input = child.stdin.take().unwrap();
+        send(&mut input, request).await;
+        input.write_all(bytes).await.unwrap();
+        drop(input);
+        let refused = complete(child).await;
+        assert!(!refused.status.success());
+        assert!(refused.stdout.is_empty());
+        assert!(String::from_utf8_lossy(&refused.stderr).contains(code));
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+    }
+}
+
 #[tokio::test]
 async fn private_worker_lists_exact_directory_without_following_child_links() {
     let temp = tempfile::tempdir().unwrap();
@@ -328,4 +458,10 @@ async fn private_worker_reads_a_registered_root_under_a_read_only_kernel_scope()
     let denied = complete(child).await;
     assert!(!denied.status.success());
     assert!(denied.stdout.is_empty());
+
+    let refused_write = save(sandbox(), &root, "sample.mp4", b"write attempt", None).await;
+    assert!(!refused_write.status.success());
+    assert!(refused_write.stdout.is_empty());
+    assert_eq!(fs::read(root.join("sample.mp4")).unwrap(), b"test span");
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
 }

@@ -298,7 +298,7 @@ The second input contains decimal string
 `offset` and `length`, followed on stdout by exactly that byte span on success.
 The owning client supplies live process controls and any kernel launch profile.
 The process rejects unproven hard links, mounts, and paths outside the granted
-directory. The existing Desktop HTTP route still owns Range and MIME handling.
+directory. Desktop owns Range and MIME handling.
 
 A first input with `listDirectory: true` instead lists one directory. An empty
 `path` selects the registered root. The worker reports immediate names and
@@ -306,6 +306,17 @@ entry kinds as one JSON line and exits. Directory entries are classified
 without following child symlinks. A listing above 8,192 entries or 2 MiB
 returns a limit error before writing any output. The client owns display
 filtering, path presentation, and sorting.
+
+A first input with `write: { length, expectedMtime? }` instead saves one
+regular file. The optional time is decimal text for an exact floating-point
+round trip. The request is followed by exactly `length` raw UTF-8 bytes and EOF. The
+bound is 64 MiB. The owner launches this operation with a separate kernel
+write scope. The worker creates contained parents, stages in the pinned
+destination directory, and atomically renames after checking any supplied
+fractional modification time. Omitting `expectedMtime` is an explicit
+overwrite. A missing target with a supplied time is a conflict. An external
+writer can still change the target between that last check and rename.
+Success returns `{"mtime":…}` after checking the published inode.
 
 The workspace and scratch modules provide host-owned filesystem building blocks.
 Workspace membership records named roots and a primary default. Independent

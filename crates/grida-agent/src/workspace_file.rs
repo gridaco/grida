@@ -2,6 +2,7 @@
 
 mod directory;
 mod stdio;
+mod write;
 pub use stdio::serve_stdio;
 
 use crate::file_tools::{CurrentFileAuthority, open_root_file, validate_path, verify_open_path};
@@ -15,6 +16,11 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 const CHUNK_BYTES: usize = 64 * 1024;
+
+fn node_mtime_ms(seconds: i128, nanos: i128) -> f64 {
+    // Node's stat.mtimeMs, including the fraction used by save preconditions.
+    seconds as f64 * 1_000.0 + nanos as f64 / 1_000_000.0
+}
 
 /// Metadata and a byte reader from the same descriptor.
 pub struct OpenedWorkspaceFile {

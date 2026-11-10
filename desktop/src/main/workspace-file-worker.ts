@@ -1,4 +1,4 @@
-// GRIDA-SEC-004 / GRIDA-SEC-014 — one exact read-only workspace under Seatbelt.
+// GRIDA-SEC-004 / GRIDA-SEC-014 — one exact workspace file operation under Seatbelt.
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -15,9 +15,16 @@ const MAX_HEADER_BYTES = 128;
 const MAX_DIRECTORY_BYTES = 2 * 1024 * 1024;
 const MAX_DIRECTORY_ENTRIES = 8192;
 const START_TIMEOUT_MS = 5_000;
+const WRITE_TIMEOUT_MS = 30_000;
 const CLOSE_TIMEOUT_MS = 2_000;
 
 type Exit = { code: number | null };
+type FileRequest = {
+  path: string;
+  includeModified?: true;
+  listDirectory?: true;
+  write?: { length: number; expectedMtime?: string };
+};
 type DirectoryEntry = Pick<WorkspaceFsEntry, "name" | "kind">;
 type Worker = {
   child: ChildProcessWithoutNullStreams;
@@ -26,6 +33,12 @@ type Worker = {
   output: AsyncIterator<Buffer>;
   diagnostic: () => string;
 };
+
+export class WorkspaceWriteUnverified extends Error {
+  constructor(readonly exited?: Promise<Exit>) {
+    super("workspace_write_unverified");
+  }
+}
 
 export class WorkspaceFileWorkers {
   private readonly active = new Set<ChildProcessWithoutNullStreams>();
@@ -128,10 +141,70 @@ export class WorkspaceFileWorkers {
     }
   }
 
+  async write(
+    grant: WorkspaceMediaGrant,
+    relative: string,
+    content: Buffer,
+    expectedMtime: number | undefined,
+    signal: AbortSignal,
+    check: () => void
+  ): Promise<{ mtime: number }> {
+    const request = frame(grant, {
+      path: relative,
+      write: {
+        length: content.length,
+        expectedMtime: expectedMtime?.toString(),
+      },
+    });
+    const { child, abort, exited, output, diagnostic } = await this.launch(
+      grant,
+      request,
+      signal,
+      check
+    );
+    const deadline = setTimeout(abort, WRITE_TIMEOUT_MS);
+    try {
+      child.stdin.write(request);
+      child.stdin.end(content);
+      const response = await readJsonFrame(output, MAX_HEADER_BYTES);
+      if (!(await output.next()).done) throw unavailable();
+      await verifyExit(exited, abort);
+      if (
+        !response ||
+        typeof response !== "object" ||
+        Object.keys(response).length !== 1 ||
+        !("mtime" in response) ||
+        typeof response.mtime !== "number" ||
+        !Number.isFinite(response.mtime)
+      )
+        throw unavailable();
+      return { mtime: response.mtime };
+    } catch {
+      abort();
+      const closed = await exitWithin(exited);
+      const code = workerCode(diagnostic());
+      if (closed && code && definitiveWriteErrors.has(code)) {
+        if (code === "workspace_write_modified_since")
+          throw new WorkspaceMediaError(409, "modified-since");
+        if (code === "workspace_write_type_unsupported")
+          throw new WorkspaceMediaError(400, "not-a-file");
+        if (code === "workspace_write_limit")
+          throw new WorkspaceMediaError(413, code);
+        if (code === "workspace_write_failed")
+          throw new WorkspaceMediaError(500, code);
+        throw workerError(diagnostic(), new WorkspaceMediaError(400, code));
+      }
+      throw new WorkspaceWriteUnverified(closed ? undefined : exited);
+    } finally {
+      clearTimeout(deadline);
+    }
+  }
+
   private async launch(
     grant: WorkspaceMediaGrant,
     request: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    admitWrite?: () => void
   ): Promise<Worker> {
     if (signal.aborted) throw cancelled();
     if (Buffer.byteLength(request) > 32 * 1024)
@@ -141,9 +214,14 @@ export class WorkspaceFileWorkers {
       throw new WorkspaceMediaError(503, "workspace_media_worker_capacity");
     }
     if (signal.aborted) throw cancelled();
+    admitWrite?.();
     const child = spawn(
       "/usr/bin/sandbox-exec",
-      [...sandboxArguments(executable, grant), executable, "workspace-file"],
+      [
+        ...sandboxArguments(executable, grant, admitWrite !== undefined),
+        executable,
+        "workspace-file",
+      ],
       {
         cwd: grant.root,
         env: {},
@@ -152,7 +230,8 @@ export class WorkspaceFileWorkers {
     );
     this.active.add(child);
     const abort = () => terminate(child);
-    signal.addEventListener("abort", abort, { once: true });
+    // A dispatched write is owned by Main until this exact child exits.
+    if (!admitWrite) signal.addEventListener("abort", abort, { once: true });
     const exited = new Promise<Exit>((resolve) =>
       child.once("close", (code) => {
         signal.removeEventListener("abort", abort);
@@ -161,7 +240,9 @@ export class WorkspaceFileWorkers {
       })
     );
     child.on("error", () => {});
-    child.stdin.on("error", abort);
+    child.stdin.on("error", () => {
+      if (!admitWrite) abort();
+    });
     let diagnostic = "";
     child.stderr.on("data", (chunk: Buffer) => {
       diagnostic += chunk
@@ -183,10 +264,7 @@ export class WorkspaceFileWorkers {
   }
 }
 
-function frame(
-  grant: WorkspaceMediaGrant,
-  request: { path: string; includeModified?: true; listDirectory?: true }
-): string {
+function frame(grant: WorkspaceMediaGrant, request: FileRequest): string {
   return JSON.stringify({ ...grant, ...request }) + "\n";
 }
 
@@ -347,7 +425,11 @@ async function installedAgent(resourcesPath: string) {
   return executable;
 }
 
-function sandboxArguments(executable: string, grant: WorkspaceMediaGrant) {
+function sandboxArguments(
+  executable: string,
+  grant: WorkspaceMediaGrant,
+  write: boolean
+) {
   const rules = [
     "(version 1)",
     "(deny default)",
@@ -359,6 +441,10 @@ function sandboxArguments(executable: string, grant: WorkspaceMediaGrant) {
     '(allow file-read* file-write-data (literal "/dev/null"))',
     '(allow sysctl-read (sysctl-name "hw.logicalcpu") (sysctl-name "hw.activecpu") (sysctl-name "hw.pagesize") (sysctl-name "hw.pagesize_compat"))',
   ];
+  if (write)
+    rules.push(
+      '(allow file-write* (require-all (subpath (param "ROOT")) (require-not (literal (param "ROOT")))))'
+    );
   const args = ["-D", `EXE=${executable}`, "-D", `ROOT=${grant.root}`];
   grant.protected.forEach((target, index) => {
     const key = `P${index}`;
@@ -369,6 +455,27 @@ function sandboxArguments(executable: string, grant: WorkspaceMediaGrant) {
   });
   return [...args, "-p", rules.join("\n")];
 }
+
+const definitiveWriteErrors = new Set([
+  "workspace_write_modified_since",
+  "workspace_write_type_unsupported",
+  "workspace_write_failed",
+  "workspace_write_limit",
+  "workspace_write_utf8",
+  "workspace_file_frame_invalid",
+  "workspace_directory_changed",
+  "workspace_path_outside_root",
+  "workspace_directory_unavailable",
+  "protected_root_overlap",
+  "path_authority_unavailable",
+  "file_unavailable",
+  "file_type_unsupported",
+  "file_symlink_unsupported",
+  "file_relative_path_invalid",
+  "file_mount_unsupported",
+  "file_path_changed",
+  "workspace_path_changed",
+]);
 
 function workerError(diagnostic: string, error: unknown) {
   const code = workerCode(diagnostic);
