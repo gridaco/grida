@@ -349,6 +349,7 @@ export type NativeChatGoalRequest = Readonly<{
   criteria: readonly string[];
   allowance: NativeChatGoalUsage;
   automatic: boolean;
+  operatingRegime?: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   namedChildId?: string;
   allowWakeup?: true;
@@ -367,7 +368,7 @@ export type NativeChatGoalStatus =
     };
 
 export type NativeChatGoal = Readonly<
-  Omit<NativeChatGoalRequest, "allowWakeup"> & {
+  Omit<NativeChatGoalRequest, "allowWakeup" | "operatingRegime"> & {
     goalId: string;
     state: NativeChatGoalStatus;
     paused: boolean;

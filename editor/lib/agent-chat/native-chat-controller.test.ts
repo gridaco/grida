@@ -1168,7 +1168,7 @@ it("retries steering exactly after a lost reply and never falls through to the q
   controller.disconnect();
 });
 
-it.each(["standard", "ultra", "scheduled standard"] as const)(
+it.each(["standard", "ultra", "scheduled standard", "standard plan"] as const)(
   "starts a %s goal only on explicit acceptance and reuses its exact input on retry",
   async (effort) => {
     const { bridge, controller } = fixture();
@@ -1229,14 +1229,21 @@ it.each(["standard", "ultra", "scheduled standard"] as const)(
       bridge.controlWakeup =
         vi.fn<NonNullable<DesktopNativeChat["controlWakeup"]>>();
     }
+    const regime = effort === "standard plan" ? "plan" : "act";
+    bridge.submitInRegime =
+      vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
     await controller.select("chat-a");
+    controller.selectOperatingRegime(regime);
     expect(controller.read().goalEffortAvailable).toBe(effort === "ultra");
     expect(start).not.toHaveBeenCalled();
     expect(await controller.startGoal(request)).toBe(false);
     expect(controller.read().error).toContain("Your draft is still here");
     expect(await controller.startGoal(request)).toBe(true);
     expect(start.mock.calls[1]).toEqual(start.mock.calls[0]);
-    expect(start.mock.calls[0][2]).toEqual(request);
+    expect(start.mock.calls[0][2]).toEqual({
+      ...request,
+      operatingRegime: regime,
+    });
     expect(controller.read().goal?.goal?.state).toEqual({ status: "active" });
     expect(
       controller.read().observation?.snapshot.pendingGoalId

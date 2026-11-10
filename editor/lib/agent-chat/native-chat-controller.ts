@@ -1417,7 +1417,9 @@ export class NativeChatController {
           (goal.paused || goal.state.status === "blocked");
   }
 
-  async startGoal(request: NativeChatGoalRequest): Promise<boolean> {
+  async startGoal(
+    request: Omit<NativeChatGoalRequest, "operatingRegime">
+  ): Promise<boolean> {
     const scope = this.scope;
     if (!scope || !this.canStartGoal || !this.bridge.startGoal) return false;
     const problem = goalRequestProblem(request, this.view);
@@ -1425,7 +1427,11 @@ export class NativeChatController {
       this.update({ error: problem });
       return false;
     }
-    const key = JSON.stringify(request);
+    const payload: NativeChatGoalRequest = {
+      ...request,
+      operatingRegime: this.view.operatingRegime,
+    };
+    const key = JSON.stringify(payload);
     const pending =
       scope.pendingGoalStart?.key === key
         ? scope.pendingGoalStart
@@ -1438,7 +1444,7 @@ export class NativeChatController {
       const receipt = await this.bridge.startGoal(
         attachment.attachmentId,
         pending.inputId,
-        request
+        payload
       );
       if (
         receipt.disposition === "withdrawn" ||
@@ -3724,6 +3730,8 @@ function goalRequestProblem(
 ): string | null {
   if (request.allowWakeup && request.effort === "ultra")
     return "Choose Standard effort to allow a scheduled goal check-in.";
+  if (request.allowWakeup && view.operatingRegime !== "act")
+    return "Choose Act to allow a scheduled goal check-in.";
   if (request.allowWakeup && !view.wakeupsAvailable)
     return "Scheduled goal check-ins are unavailable on this connection.";
   if (request.effort === "ultra" && !view.goalEffortAvailable)

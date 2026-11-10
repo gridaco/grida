@@ -29,6 +29,8 @@ The turn summary records whether the agent collected that reviewer’s findings.
 
 1. In an idle chat with an empty queue, choose **Add goal**. Enter the
    objective, the criteria for completion, and the work allowance.
+   Choose **Plan** or **Act** in the chat's mode selector before starting.
+   The goal keeps that mode for its later work.
 2. Select **Continue automatically within these limits** if the agent can
    reserve further work as it progresses. Then choose **Start goal**. The goal
    can pause for input or stop when its allowance runs out.
@@ -57,8 +59,8 @@ later turns. Each funded assignment shares the Goal’s review allowance and
 uses one assignment from the subagent’s own allowance. An unavailable
 reviewer leaves the review unassigned.
 
-Standard goals on supported connections can schedule a check-in during their
-first turn. [Schedule a follow-up](./scheduled-work.md)
+Standard Act goals on supported connections can schedule a check-in during
+their first turn. [Schedule a follow-up](./scheduled-work.md)
 
 Private native clients can also use reviewed automatic verification.
 [Use goals from a native client](./clients.md#work-toward-a-persistent-goal)

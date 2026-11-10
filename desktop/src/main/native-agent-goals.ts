@@ -47,6 +47,10 @@ export class NativeAgentGoals {
   private static readRequest(value: unknown): NativeChatGoalRequest {
     const input = object(value);
     const allowance = object(input.allowance);
+    const operatingRegime =
+      input.operatingRegime === undefined
+        ? undefined
+        : member(input.operatingRegime, ["act", "plan"] as const);
     const effort =
       input.effort === undefined
         ? undefined
@@ -59,6 +63,7 @@ export class NativeAgentGoals {
     if (
       Object.keys(input).length !==
         4 +
+          Number(operatingRegime !== undefined) +
           Number(effort !== undefined) +
           Number(allowWakeup) +
           Number(namedChildId !== undefined) ||
@@ -73,6 +78,7 @@ export class NativeAgentGoals {
         inferenceSteps: number(allowance.inferenceSteps, 1, MAX_U32),
       },
       automatic: flag(input.automatic),
+      ...(operatingRegime && { operatingRegime }),
       ...(effort && { effort }),
       ...(namedChildId && { namedChildId }),
       ...(allowWakeup && { allowWakeup: true }),
@@ -112,22 +118,35 @@ export class NativeAgentGoals {
       criteria,
       allowance,
       automatic,
+      operatingRegime,
       effort,
       allowWakeup,
       namedChildId,
     } = NativeAgentGoals.readRequest(request);
-    if (allowWakeup && (!capabilities.wakeups || effort === "ultra"))
+    if (
+      allowWakeup &&
+      (!capabilities.wakeups ||
+        effort === "ultra" ||
+        operatingRegime === "plan")
+    )
       throw new Error("native_chat_goal_wakeup_unavailable");
     if (effort === "ultra" && !capabilities.fundedReview)
       throw new Error("native_chat_goal_effort_unavailable");
-    if (namedChildId && (effort !== "ultra" || !capabilities.namedChild))
+    if (
+      namedChildId &&
+      (effort !== "ultra" ||
+        !capabilities.namedChild ||
+        operatingRegime === "plan")
+    )
       throw new Error("native_chat_goal_named_child_unavailable");
+    const regime =
+      operatingRegime ?? (allowWakeup || namedChildId ? "act" : undefined);
     return this.request("_co.grida/goal/start", {
       sessionId,
       inputId,
       prompt: [{ type: "text", text: objective }],
       ...(effort === "ultra" && { effort }),
-      ...((allowWakeup || namedChildId) && { operatingRegime: "act" }),
+      ...(regime && { operatingRegime: regime }),
       ...(allowWakeup && { allowWakeups: true }),
       goal: {
         objective: { description: objective, criteria },

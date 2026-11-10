@@ -41,7 +41,10 @@ export function NativeGoalPanel({
   const canManageWork = goalTurn || goal?.automatic;
   const fundedTurn = goalTurn && !!goal?.reservation?.reviewInferenceSteps;
   const canStart = controller.canStartGoal;
-  const canAllowWakeup = view.wakeupsAvailable && effort === "standard";
+  const canAllowWakeup =
+    view.wakeupsAvailable &&
+    effort === "standard" &&
+    view.operatingRegime === "act";
   const namedReviewers =
     effort === "ultra" &&
     view.operatingRegime === "act" &&
@@ -225,6 +228,9 @@ export function NativeGoalPanel({
       )}
       {adding ? (
         <form className="space-y-2" onSubmit={submit}>
+          <p className="text-muted-foreground">
+            {view.operatingRegime === "plan" ? "Plan goal" : "Act goal"}
+          </p>
           <label className="block space-y-1">
             <span>Objective</span>
             <Textarea

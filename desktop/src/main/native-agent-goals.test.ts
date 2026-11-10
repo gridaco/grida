@@ -40,6 +40,22 @@ it("binds a named reviewer only to a negotiated Ultra Goal start", async () => {
       capabilities
     )
   ).toThrow("native_chat_goal_named_child_unavailable");
+  expect(() =>
+    goals.start(
+      "session",
+      "input",
+      { ...named, operatingRegime: "plan" },
+      capabilities
+    )
+  ).toThrow("native_chat_goal_named_child_unavailable");
+  expect(() =>
+    goals.start(
+      "session",
+      "input",
+      { ...REQUEST, operatingRegime: "plan", allowWakeup: true },
+      capabilities
+    )
+  ).toThrow("native_chat_goal_wakeup_unavailable");
   expect(request).not.toHaveBeenCalled();
   await goals.start("session", "input", named, capabilities);
   expect(request).toHaveBeenCalledExactlyOnceWith(
@@ -442,7 +458,7 @@ it.runIf(Boolean(packaged))(
 );
 
 it.runIf(Boolean(packaged))(
-  "starts an explicit goal, retains a pause across restart, and reports unverified work truthfully",
+  "retains a Plan goal across exact retry, pause and restart, and reports unverified work truthfully",
   async () => {
     const root = fs.mkdtempSync(
       path.join(fs.realpathSync(os.tmpdir()), "grida-goals-")
@@ -490,18 +506,26 @@ it.runIf(Boolean(packaged))(
       ).rejects.toThrow("native_chat_goal_invalid");
       expect(endpoint.requests).toHaveLength(0);
 
+      const planned = { ...REQUEST, operatingRegime: "plan" } as const;
       const accepted = await ipc.startGoal(
         event,
         attachmentId,
         "first-goal",
-        REQUEST
+        planned
       );
       expect(accepted.disposition).toBe("queued");
       await vi.waitFor(() => expect(endpoint.requests).toHaveLength(1));
+      expect(endpoint.requests[0]).toContain("Plan is active.");
       expect(
-        (await ipc.startGoal(event, attachmentId, "first-goal", REQUEST))
+        (await ipc.startGoal(event, attachmentId, "first-goal", planned))
           .inputPosition
       ).toBe(accepted.inputPosition);
+      await expect(
+        ipc.startGoal(event, attachmentId, "first-goal", {
+          ...planned,
+          operatingRegime: "act",
+        })
+      ).rejects.toThrow("input_identity_reused");
       const running = await goal();
       const turnId = running.goal?.reservation?.turnId;
       expect(running.goal).toEqual(
@@ -549,6 +573,7 @@ it.runIf(Boolean(packaged))(
       });
       expect(resumed.turnId).toBe(turnId);
       await vi.waitFor(() => expect(endpoint.requests).toHaveLength(2));
+      expect(endpoint.requests[1]).toContain("Plan is active.");
       const stoppedTurn = await snapshot();
       await ipc.control(event, attachmentId, {
         observationId: stoppedTurn.observationId,
@@ -569,6 +594,7 @@ it.runIf(Boolean(packaged))(
       attachmentId = (await ipc.create(event)).attachmentId;
       await ipc.startGoal(event, attachmentId, "second-goal", REQUEST);
       await vi.waitFor(() => expect(endpoint.requests).toHaveLength(4));
+      expect(endpoint.requests[2]).not.toContain("Plan is active.");
       const blocked = await vi.waitFor(async () => {
         const inspected = await goal();
         expect(inspected.goal?.state).toEqual({
