@@ -1,9 +1,10 @@
 // GRIDA-SEC-006 — the account-scoped bearer stays in the main connector.
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { expect, it, vi } from "vitest";
 import type {
@@ -75,6 +76,9 @@ it("injects only the current scoped bearer into the fixed Gateway chat request",
   expect(owner.prepare.mock.calls[0][1].get("authorization")).toBe(
     "Bearer synthetic.fixture.initial"
   );
+  expect(owner.prepare.mock.calls[0][1].get("x-grida-billing-receipt")).toBe(
+    "1"
+  );
   expect(owner.dispatch).toHaveBeenCalledTimes(1);
   live = false;
   expect(await request(body, new AbortController().signal)).toBeNull();
@@ -137,6 +141,164 @@ it("does not dispatch after a scope change, a cancelled request, or close during
 });
 
 const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
+it.skipIf(!resourcesPath)(
+  "retains only the exact Gateway billing receipt across native restart",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-gateway-receipt-")
+    );
+    const cwd = path.join(root, "workspace");
+    const stateDirectory = path.join(root, "state");
+    const genericDirectory = path.join(root, "generic");
+    await fs.mkdir(cwd, { mode: 0o700 });
+    const owner = fixture();
+    const connection = await NativeGatewayConnection.open(owner.options);
+    const { gatewayScope, ...generic } = connection.launch("fixture");
+    const scope = [
+      ...createHash("sha256")
+        .update(
+          JSON.stringify(["supervised-gg-chat-scope-v1", origin, gatewayScope])
+        )
+        .digest(),
+    ];
+    const observations = [
+      { request_id: "req_settled", status: "settled", charged_mills: "0.125" },
+      { request_id: "req_pending", status: "pending", charged_mills: null },
+      { request_id: "req_other", status: "settled", charged_mills: "7" },
+      { request_id: "req_zero", status: "settled", charged_mills: "0" },
+      { request_id: "req_generic", status: "settled", charged_mills: "9" },
+    ];
+    const requestIds = [
+      "req_settled",
+      "req_pending",
+      "req_mismatch",
+      "req_zero",
+      "req_generic",
+    ];
+    let calls = 0;
+    owner.dispatch.mockImplementation(async () => {
+      const index = calls++;
+      const frame = {
+        id: "fixture-completion",
+        choices: [
+          {
+            index: 0,
+            delta: { content: "Fixture answer." },
+            finish_reason: "stop",
+          },
+        ],
+        grida_billing: { version: 1, ...observations[index] },
+      };
+      return new Response(
+        `data: ${JSON.stringify(frame)}\n\ndata: [DONE]\n\n`,
+        {
+          headers: {
+            "content-type": "text/event-stream",
+            "x-request-id": requestIds[index],
+          },
+        }
+      );
+    });
+    const open = (directory: string, trusted: boolean) =>
+      NativeAgentProcess.start({
+        ...(trusted ? { ...generic, gatewayScope } : generic),
+        resourcesPath: resourcesPath!,
+        stateDirectory: directory,
+      });
+    const receipts = (directory: string, session: string) => {
+      const db = new DatabaseSync(path.join(directory, "runtime.sqlite"), {
+        readOnly: true,
+      });
+      try {
+        const rows = db
+          .prepare(
+            "SELECT CAST(snapshot AS TEXT) AS snapshot FROM turns WHERE session = ? ORDER BY ordinal"
+          )
+          .all(session);
+        return rows.map(({ snapshot }) => {
+          const turn = JSON.parse(String(snapshot));
+          type Receipt = { schema: string; bytes: number[] };
+          const operations = Object.values(turn.operations) as Array<{
+            attempts: Array<{
+              outcome: {
+                value: { receipt: Receipt; terminal_receipt?: Receipt };
+              };
+            }>;
+          }>;
+          const { receipt, terminal_receipt } =
+            operations[0].attempts[0].outcome.value;
+          expect(receipt.schema).toBe("http.request-id");
+          if (
+            terminal_receipt &&
+            terminal_receipt.schema !== "grida.gateway.billing-receipt"
+          )
+            throw new Error("unexpected terminal receipt schema");
+          return [
+            Buffer.from(receipt.bytes).toString("utf8"),
+            terminal_receipt
+              ? JSON.parse(Buffer.from(terminal_receipt.bytes).toString("utf8"))
+              : null,
+          ];
+        });
+      } finally {
+        db.close();
+      }
+    };
+    const start = async (agent: NativeAgentProcess) =>
+      (await agent.request("session/new", {
+        cwd,
+        mcpServers: [],
+      })) as { sessionId: string };
+    const prompt = (agent: NativeAgentProcess, sessionId: string) =>
+      agent.request("session/prompt", {
+        sessionId,
+        prompt: [{ type: "text", text: "Fixture prompt" }],
+      });
+    let agent: NativeAgentProcess | undefined;
+    try {
+      agent = await open(stateDirectory, true);
+      const { sessionId } = await start(agent);
+      for (let index = 0; index < 4; index++) {
+        await expect(prompt(agent, sessionId)).resolves.toMatchObject({
+          stopReason: "end_turn",
+        });
+      }
+      await agent.close();
+      const expected = [
+        ["req_settled", { ...observations[0], scope }],
+        ["req_pending", { ...observations[1], scope }],
+        ["req_mismatch", null],
+        ["req_zero", { ...observations[3], scope }],
+      ];
+      expect(receipts(stateDirectory, sessionId)).toEqual(expected);
+      agent = await open(stateDirectory, true);
+      await agent.request("session/load", { sessionId, cwd, mcpServers: [] });
+      await agent.close();
+      expect(receipts(stateDirectory, sessionId)).toEqual(expected);
+      expect(calls).toBe(4);
+
+      agent = await open(genericDirectory, false);
+      const genericSession = await start(agent);
+      await expect(
+        prompt(agent, genericSession.sessionId)
+      ).resolves.toMatchObject({ stopReason: "end_turn" });
+      await agent.close();
+      expect(receipts(genericDirectory, genericSession.sessionId)).toEqual([
+        ["req_generic", null],
+      ]);
+      expect(calls).toBe(5);
+    } finally {
+      try {
+        await agent?.close();
+      } finally {
+        connection.close();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  },
+  20_000
+);
+
 it.skipIf(!resourcesPath)(
   "funds one Goal review on the same Gateway allowance and accounts for it after restart",
   async () => {

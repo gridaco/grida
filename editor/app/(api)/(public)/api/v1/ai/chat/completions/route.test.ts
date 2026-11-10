@@ -51,6 +51,7 @@ const h = vi.hoisted(() => ({
   denied: false,
   retryAfter: null as number | null,
   downstreamLimit: false,
+  upstreamRequestId: null as string | null,
 }));
 
 vi.mock("@/lib/platform/product-consumer", () => ({
@@ -83,7 +84,7 @@ vi.mock("@/lib/ai/gateway-product", async (orig) => {
   const real = await orig<typeof import("@/lib/ai/gateway-product")>();
   const fakeLanguageModel = (modelId: string) => ({
     specificationVersion: "v3" as const,
-    provider: "fake-gg",
+    provider: "gg",
     modelId,
     supportedUrls: {},
     doGenerate: async (options: unknown) => {
@@ -98,6 +99,9 @@ vi.mock("@/lib/ai/gateway-product", async (orig) => {
         throw new real.GatewayProductError(429, "fixture_rate_limit");
       const parts = h.parts as never[];
       return {
+        response: h.upstreamRequestId
+          ? { headers: { "x-request-id": h.upstreamRequestId } }
+          : undefined,
         stream: new ReadableStream({
           start(controller) {
             for (const part of parts) controller.enqueue(part);
@@ -173,6 +177,7 @@ beforeEach(() => {
   h.denied = false;
   h.retryAfter = null;
   h.downstreamLimit = false;
+  h.upstreamRequestId = null;
   mockedAdmission.mockReset();
   mockedCompletion.mockReset();
   mockedAdmission.mockImplementation(async (context) => ({
@@ -225,6 +230,94 @@ const TOOLS: LanguageModelV3CallOptions["tools"] = [
 ];
 
 describe("POST /api/v1/ai/chat/completions (contract)", () => {
+  it.each([
+    {
+      optIn: true,
+      id: "req_chat",
+      status: "settled",
+      amount: "0.125",
+      expected: "settled",
+    },
+    {
+      optIn: true,
+      id: "req_chat",
+      status: "unrecognized",
+      amount: "0",
+      expected: "pending",
+    },
+    {
+      optIn: true,
+      id: "req_other",
+      status: "settled",
+      amount: "0.125",
+      expected: undefined,
+    },
+    {
+      optIn: false,
+      id: "req_chat",
+      status: "settled",
+      amount: "0.125",
+      expected: undefined,
+    },
+  ])(
+    "projects only opted-in, correlated Gateway billing evidence (%j)",
+    async ({ optIn, id, status, amount, expected }) => {
+      h.upstreamRequestId = "req_chat";
+      h.parts = [
+        {
+          type: "finish",
+          finishReason: { unified: "stop", raw: "stop" },
+          usage: USAGE,
+          providerMetadata: {
+            gg: { requestId: id, billingStatus: status, chargedMills: amount },
+          },
+        },
+      ] satisfies LanguageModelV3StreamPart[];
+      const response = await POST(
+        new Request("http://grida.test/api/v1/ai/chat/completions", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${await mintedToken()}`,
+            "content-type": "application/json",
+            ...(optIn && { "x-grida-billing-receipt": "1" }),
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [{ role: "user", content: "fixture" }],
+            stream: true,
+            stream_options: { include_usage: true },
+          }),
+        })
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-request-id")).toBe(
+        optIn ? "req_chat" : null
+      );
+      const stream = await response.text();
+      expect(stream.endsWith("data: [DONE]\n\n")).toBe(true);
+      const frames = stream
+        .split("\n\n")
+        .filter((part) => part.startsWith("data: {"))
+        .map((part) => JSON.parse(part.slice(6)));
+      expect(frames.find((frame) => frame.usage)?.usage.prompt_tokens).toBe(
+        100
+      );
+      expect(
+        frames.find((frame) => frame.choices[0]?.finish_reason === "stop")
+          ?.grida_billing
+      ).toEqual(
+        expected
+          ? {
+              version: 1,
+              request_id: "req_chat",
+              status: expected,
+              charged_mills: expected === "settled" ? amount : null,
+            }
+          : undefined
+      );
+    }
+  );
+
   it("separates the pre-dispatch throttle from a downstream 429", async () => {
     const token = await mintedToken();
     const request = (body: string) =>

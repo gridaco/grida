@@ -88,6 +88,7 @@ export class NativeGatewayConnection implements NativeProviderNetwork {
         return null;
       const authorized = new Headers(headers);
       authorized.set("authorization", `Bearer ${grant.token}`);
+      authorized.set("x-grida-billing-receipt", "1");
       let dispatch;
       try {
         dispatch = this.network.prepare(this.target, authorized);

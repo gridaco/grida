@@ -80,16 +80,29 @@ export async function POST(request: Request) {
 
     // GG admission completes inside doStream before any SSE bytes are written.
     // A blocked organization still receives the native error response.
-    const { stream } = await model.doStream(callOptions);
+    const { stream, response } = await model.doStream(callOptions);
+    const upstreamRequestId =
+      model.provider === "gg" &&
+      request.headers.get("x-grida-billing-receipt") === "1"
+        ? new Headers(response?.headers).get("x-request-id")
+        : null;
+    const gatewayRequestId =
+      upstreamRequestId && /^req_[A-Za-z0-9_-]{1,124}$/.test(upstreamRequestId)
+        ? upstreamRequestId
+        : undefined;
     return new Response(
       stream.pipeThrough(
-        streamEncoder(req.model, { includeUsage: decoded.includeUsage })
+        streamEncoder(req.model, {
+          includeUsage: decoded.includeUsage,
+          gatewayRequestId,
+        })
       ),
       {
         headers: {
           "content-type": "text/event-stream; charset=utf-8",
           "cache-control": "no-store",
           "x-accel-buffering": "no",
+          ...(gatewayRequestId && { "x-request-id": gatewayRequestId }),
         },
       }
     );

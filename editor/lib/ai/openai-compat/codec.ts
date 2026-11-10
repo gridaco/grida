@@ -43,6 +43,7 @@ import type {
   ChatCompletionChunk,
   ChatCompletionRequest,
   ChatCompletionResponse,
+  GatewayBillingReceipt,
   WireFinishReason,
   WireResponseToolCall,
   WireUsage,
@@ -373,7 +374,7 @@ function chunkId(): string {
  */
 export function streamEncoder(
   modelId: string,
-  opts: { includeUsage: boolean }
+  opts: { includeUsage: boolean; gatewayRequestId?: string }
 ): TransformStream<LanguageModelV3StreamPart, Uint8Array> {
   const textEncoder = new TextEncoder();
   const id = chunkId();
@@ -384,6 +385,7 @@ export function streamEncoder(
   let finish: {
     reason: LanguageModelV3FinishReason;
     usage: LanguageModelV3Usage;
+    billing?: GatewayBillingReceipt;
   } | null = null;
   const toolIndexById = new Map<string, number>();
 
@@ -477,7 +479,11 @@ export function streamEncoder(
           break;
         }
         case "finish":
-          finish = { reason: part.finishReason, usage: part.usage };
+          finish = {
+            reason: part.finishReason,
+            usage: part.usage,
+            billing: gatewayBillingReceipt(part, opts.gatewayRequestId),
+          };
           break;
         case "error": {
           errored = true;
@@ -510,6 +516,7 @@ export function streamEncoder(
             object: "chat.completion.chunk",
             created,
             model: modelId,
+            ...(finish.billing && { grida_billing: finish.billing }),
             choices: [
               {
                 index: 0,
@@ -536,4 +543,32 @@ export function streamEncoder(
       controller.enqueue(textEncoder.encode("data: [DONE]\n\n"));
     },
   });
+}
+
+function gatewayBillingReceipt(
+  part: Extract<LanguageModelV3StreamPart, { type: "finish" }>,
+  requestId: string | undefined
+): GatewayBillingReceipt | undefined {
+  const observation = part.providerMetadata?.gg;
+  if (!requestId || observation?.requestId !== requestId) return;
+  const amount = observation.chargedMills;
+  if (
+    observation.billingStatus === "settled" &&
+    typeof amount === "string" &&
+    amount.length <= 64 &&
+    /^\d+(?:\.\d+)?$/.test(amount)
+  ) {
+    return {
+      version: 1,
+      request_id: requestId,
+      status: "settled",
+      charged_mills: amount,
+    };
+  }
+  return {
+    version: 1,
+    request_id: requestId,
+    status: "pending",
+    charged_mills: null,
+  };
 }

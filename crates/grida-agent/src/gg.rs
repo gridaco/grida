@@ -3,15 +3,17 @@
 use agent_kit_core::authority::AuthorityBinding;
 use agent_kit_core::inference::{ProviderBinding, RequestControl};
 use agent_kit_core::{
-    BindingId, BoxFuture, CancellationToken, Error, ErrorKind, Fingerprint, PrincipalId,
-    ProviderId, Result, ScopeId,
+    BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint, PrincipalId,
+    ProviderId, Result, SchemaId, ScopeId,
 };
 use agent_kit_providers::{
-    StreamingTransport, TransportFailure, TransportOperation, TransportRequest, TransportResponse,
+    StreamingTransport, TerminalReceiptDecoder, TransportFailure, TransportOperation,
+    TransportRequest, TransportResponse,
 };
 use grida_auth::{GgGrant, GgGrantScope};
 use reqwest::Url;
 use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::watch;
@@ -121,6 +123,92 @@ impl StreamingTransport for SupervisedGg {
                 .await
         })
     }
+
+    fn terminal_receipt_decoder(&self) -> Option<Arc<TerminalReceiptDecoder>> {
+        let scope = self.scope;
+        Some(Arc::new(move |request, frame| {
+            gateway_billing_receipt(scope, request, frame)
+        }))
+    }
+}
+
+#[derive(Deserialize)]
+struct GatewayBillingFrame {
+    grida_billing: GatewayBillingObservation,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GatewayBillingObservation {
+    version: u32,
+    request_id: String,
+    status: GatewayBillingStatus,
+    charged_mills: serde_json::Value,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum GatewayBillingStatus {
+    Pending,
+    Settled,
+}
+
+fn gateway_billing_receipt(
+    scope: Fingerprint,
+    request: &Envelope,
+    frame: &[u8],
+) -> Option<Envelope> {
+    if request.schema().as_str() != "http.request-id" || request.version() != 1 {
+        return None;
+    }
+    let request_id = std::str::from_utf8(request.bytes()).ok()?;
+    let suffix = request_id.strip_prefix("req_")?;
+    if suffix.is_empty()
+        || suffix.len() > 124
+        || !suffix
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
+        return None;
+    }
+    let observation = serde_json::from_slice::<GatewayBillingFrame>(frame)
+        .ok()?
+        .grida_billing;
+    if observation.version != 1 || observation.request_id != request_id {
+        return None;
+    }
+    let amount = match (&observation.status, &observation.charged_mills) {
+        (GatewayBillingStatus::Pending, serde_json::Value::Null) => None,
+        (GatewayBillingStatus::Settled, serde_json::Value::String(value))
+            if valid_decimal(value) =>
+        {
+            Some(value)
+        }
+        _ => return None,
+    };
+    Envelope::new(
+        SchemaId::new("grida.gateway.billing-receipt").ok()?,
+        1,
+        serde_json::to_vec(&serde_json::json!({
+            "scope": scope,
+            "request_id": request_id,
+            "status": observation.status,
+            "charged_mills": amount,
+        }))
+        .ok()?,
+    )
+    .ok()
+}
+
+fn valid_decimal(value: &str) -> bool {
+    fn digits(value: &str) -> bool {
+        !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
+    }
+    value.len() <= 64
+        && value.split_once('.').map_or_else(
+            || digits(value),
+            |(whole, part)| digits(whole) && digits(part),
+        )
 }
 
 /// The account owner mints within the verified scope and completes any

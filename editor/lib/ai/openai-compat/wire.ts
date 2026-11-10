@@ -136,6 +136,14 @@ export type WireUsage = {
   completion_tokens_details?: { reasoning_tokens: number };
 };
 
+export type GatewayBillingReceipt = {
+  version: 1;
+  request_id: string;
+} & (
+  | { status: "pending"; charged_mills: null }
+  | { status: "settled"; charged_mills: string }
+);
+
 export type WireResponseToolCall = {
   id: string;
   type: "function";
@@ -171,6 +179,7 @@ export type ChatCompletionChunk = {
   object: "chat.completion.chunk";
   created: number;
   model: string;
+  grida_billing?: GatewayBillingReceipt;
   choices: Array<{
     index: 0;
     delta: {

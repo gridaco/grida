@@ -15,8 +15,15 @@ import type { ProductBilling } from "@/lib/platform/product-billing";
 vi.mock("@/lib/ai/openai-compat/limits", () => ({
   allowAiRequest: async () => ({ success: true }),
 }));
+vi.mock("@/lib/ai/openai-compat/hosted-models", () => ({
+  isHostedTextModel: async (id: string) => id === "anthropic/claude-sonnet-5",
+}));
 
-import type { LanguageModelV3, LanguageModelV3Usage } from "@ai-sdk/provider";
+import type {
+  LanguageModelV3,
+  LanguageModelV3StreamPart,
+  LanguageModelV3Usage,
+} from "@ai-sdk/provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 const h = vi.hoisted(() => ({
@@ -57,7 +64,27 @@ vi.mock("@/lib/ai/models", async (orig) => {
       };
     },
     doStream: async () => {
-      throw new Error("unused");
+      h.calls += 1;
+      return {
+        response: { headers: { "x-request-id": "req_bare" } },
+        stream: new ReadableStream<LanguageModelV3StreamPart>({
+          start(controller) {
+            controller.enqueue({
+              type: "finish",
+              finishReason: { unified: "stop", raw: "stop" },
+              usage: USAGE,
+              providerMetadata: {
+                gg: {
+                  requestId: "req_bare",
+                  billingStatus: "settled",
+                  chargedMills: "9",
+                },
+              },
+            });
+            controller.close();
+          },
+        }),
+      };
     },
   });
   return {
@@ -128,5 +155,30 @@ describe("BYOK carve-out on /api/v1/ai/chat/completions", () => {
       (err: unknown) => (err as { statusCode?: number }).statusCode === 401
     );
     expect(h.calls).toBe(0);
+  });
+
+  it("withholds Gateway billing evidence from the bare model", async () => {
+    const { token } = await signGgToken("user-1", 7);
+    const response = await POST(
+      new Request("http://grida.test/api/v1/ai/chat/completions", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          "x-grida-billing-receipt": "1",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: "user", content: "fixture" }],
+          stream: true,
+        }),
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.has("x-request-id")).toBe(false);
+    const stream = await response.text();
+    expect(stream).not.toContain("grida_billing");
+    expect(stream.endsWith("data: [DONE]\n\n")).toBe(true);
+    expect(h.calls).toBe(1);
   });
 });

@@ -2066,6 +2066,14 @@ levels into one.
    organization. The connector adds the bearer only to the fixed chat route
    through the dedicated provider session. The child receives no bearer or
    account cookie through that connection.
+   The connector requests Gateway billing evidence on that same chat POST.
+   The [chat route](<editor/app/(api)/(public)/api/v1/ai/chat/completions/route.ts>)
+   emits a terminal observation only for an authenticated Gateway execution
+   with a matching job request ID. The [native Gateway adapter](crates/grida-agent/src/gg.rs)
+   checks that identity against the observed response header and binds the
+   evidence to the captured scope. Pending observations carry no amount.
+   The early request ID remains available on cancellation, and generic
+   compatible endpoints have no Gateway receipt decoder.
    Independent native hosts keep their own account custody under GRIDA-SEC-010.
    The fixed exchange delivers a frozen GG grant only to a construction-time
    trusted synchronous memory sink; its public result contains only org/expiry

@@ -168,9 +168,16 @@ describe("trusted GG product adapter", () => {
           providerOptions: opts,
         }
       );
+      const gatewayRequestId = new Headers(result.response?.headers).get(
+        "x-request-id"
+      );
+      expect(gatewayRequestId).toBe(requestId);
       const encoded = await new Response(
         result.stream.pipeThrough(
-          streamEncoder("openai/gpt-5.6-luna", { includeUsage: true })
+          streamEncoder("openai/gpt-5.6-luna", {
+            includeUsage: true,
+            gatewayRequestId: gatewayRequestId ?? undefined,
+          })
         )
       ).text();
       expect(encoded.endsWith("data: [DONE]\n\n")).toBe(true);
@@ -182,6 +189,9 @@ describe("trusted GG product adapter", () => {
           .map((frame) => JSON.parse(frame.slice(6)).usage)
           .filter((value) => value !== undefined)
       ).toStrictEqual(expected);
+      expect(
+        frames.find((frame) => frame.includes('"grida_billing"'))
+      ).toContain('"charged_mills":"0.25"');
       expect(submitted).toHaveLength(1);
     }
   );
