@@ -39,6 +39,7 @@ import {
   type AgentSidecarInfo,
 } from "./agent-sidecar-supervisor";
 import { NativeProviderSelection } from "./native-provider-selection";
+import { nativeWorkspaceMedia } from "./workspace-media-access";
 import { EDITOR_BASE_URL } from "../env";
 import { AgentTransport } from "@grida/agent/transport";
 import type { Workspace } from "@grida/daemon";
@@ -86,11 +87,17 @@ export namespace agentSidecarClient {
    * calls this) so the welcome window can `bridge.workspaces.list()` and
    * surface it without re-doing the dialog dance.
    *
-   * Returns the resolved `Workspace` — `root` may differ from `rootPath`
-   * if the agent server expanded to a containing git repo.
+   * Native media captures the exact directory selected by Main. The
+   * compatibility registry still owns the workspace metadata.
    */
   export async function openWorkspace(rootPath: string): Promise<Workspace> {
-    return await client().workspaces.open(rootPath);
+    const transport = client();
+    const media = nativeWorkspaceMedia();
+    return media
+      ? await media.registry.register(rootPath, (root) =>
+          transport.workspaces.open(root)
+        )
+      : await transport.workspaces.open(rootPath);
   }
 
   export async function listWorkspaces(): Promise<Workspace[]> {

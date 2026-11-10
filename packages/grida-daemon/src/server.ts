@@ -47,6 +47,10 @@ export { ProtectedRoots } from "./protected-roots";
 export { WorkspaceRegistry, type Workspace } from "./workspaces";
 export { workspaceFs } from "./workspaces/fs";
 export {
+  workspaceFileResponse,
+  type WorkspaceFileBody,
+} from "./http/workspace-file-response";
+export {
   SCAN_MAX_DEPTH,
   SCAN_MAX_FILES,
   isIgnoredScanDir,

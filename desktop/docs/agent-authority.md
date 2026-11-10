@@ -392,7 +392,8 @@ replacement of legacy settings custody requires separate admission.
 
 Desktop keeps its existing SRT launch while the editor uses the sidecar's
 file, recents, and workspace routes. Open-file registration, workspace
-registration and lookup, and ranged workspace media still use that owner.
+registration and lookup still use that owner. Compatibility profiles also
+stream ranged workspace media through it.
 Main's workspace Trash helper covers one path-checked native operation.
 Moving file I/O out of the compatibility process requires equivalent
 per-workspace containment and the existing exact registered-handle checks.
@@ -402,10 +403,20 @@ stream an exact byte span from the descriptor used for metadata. It checks
 the registered directory's native identity and protected roots, then
 confirms the open file remains in scope before delivering each chunk.
 In-root symbolic aliases can resolve to regular files. Hard links without
-proven scope and cross-device targets are refused. The private worker can
-run under an exact read-only Seatbelt profile. Desktop route adoption also
-requires a live registry owner and the existing Range and cancellation
-semantics.
+proven scope and cross-device targets are refused. On the packaged macOS
+arm64 native chat profile, Main captures the directory identity when the user
+opens a workspace through a trusted Desktop action. Reopen a saved workspace
+through **Open Folder** to admit its preview files after restarting Desktop.
+A changed directory also requires an explicit reopen. The native media route
+requires a current registration and streams through a bounded pool of
+read-only Seatbelt workers. It preserves Range seeking and cancels the
+corresponding worker when the viewer cancels a request. A refused native read
+ends the request.
+
+Set `GRIDA_DESKTOP_TEST_NATIVE_RESOURCES` to the canonical packaged Resources
+directory containing `native-agent/grida-agent` and run
+`pnpm --dir desktop exec vitest run src/main/workspace-media-protocol.test.ts`
+to exercise the route with real Seatbelt workers on macOS arm64.
 
 The packaged native fixture uses synthetic provider responses and verifies
 retained media, shared custody, transferred sockets, and clean shutdown.
