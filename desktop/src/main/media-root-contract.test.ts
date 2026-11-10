@@ -109,6 +109,6 @@ describe("durable media root contract", () => {
   });
 
   it("uses native path semantics for the current platform", () => {
-    expect(path.isAbsolute(DesktopMediaRoot.current)).toBe(true);
+    expect(path.isAbsolute(DesktopMediaRoot.current())).toBe(true);
   });
 });

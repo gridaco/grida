@@ -153,7 +153,18 @@ and the media-only service remains separately startable. The coordinator has
 macOS and Linux storage support. Windows cutover requires separate ACL-aware
 verification. Stable and Insiders can share the old store under separate app
 locks, so activation also needs shared-source writer custody across editions.
-The standard Desktop startup still uses its existing composition.
+Standard Desktop startup keeps its existing composition for unenrolled profiles.
+
+An approved managed macOS arm64 Stable build can enroll a fresh native profile.
+The build-time setting `GRIDA_MANAGED_NATIVE_FIRST=1` authorizes creating
+`Grida Native` under Electron's application-data directory. A private receipt
+binds its browser, agent, media, project and temporary directories. Subsequent
+Stable builds that support the receipt open the same profile through normal
+startup and updates. Managed deployment must keep installed versions at or above
+the first version that understands the receipt. An invalid or incomplete profile
+stops startup before Electron initializes the ordinary browser profile. Enrollment
+starts an isolated Gateway profile. Existing chat archives still require the
+separate legacy writer and archive checks.
 
 For a disposable native chat run, launch a development or Insiders build
 with `--native-chat` and `--user-data-dir` set to a precreated owner-only

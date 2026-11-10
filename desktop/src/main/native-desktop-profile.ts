@@ -1,24 +1,76 @@
-// GRIDA-SEC-004 / GRIDA-SEC-005 — isolated development profile for native chat.
+// GRIDA-SEC-004 / GRIDA-SEC-005 — isolated Desktop profiles for native chat.
+import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { App } from "electron";
 import { ProtectedRoots } from "@grida/daemon/server";
 import { home } from "@grida/home";
+import { defaultScratchBase } from "@grida/agent/sandbox";
+import { NativeFirstProfile } from "./native-first-profile";
 
 export namespace NativeDesktopProfile {
   export type Provider = "gateway" | "chatgpt";
+  type HostApp = Pick<App, "getPath" | "setPath"> & {
+    commandLine: Pick<App["commandLine"], "getSwitchValue">;
+  };
   const admitted = new WeakMap<Pick<App, "getPath">, ProtectedRoots>();
+  let first: NativeFirstProfile.Paths | undefined;
+
+  /** Runs before Electron chooses the browser/session store and instance lock. */
+  export function prepareFirst(app: HostApp, allowBirth: boolean): void {
+    if (first) throw invalidProfile();
+    const supported =
+      process.platform === "darwin" &&
+      process.arch === "arm64" &&
+      !app.commandLine.getSwitchValue("user-data-dir") &&
+      !process.env.GRIDA_AGENT_USER_DATA &&
+      !process.argv.some(
+        (arg) =>
+          arg === "--disable-agent" ||
+          arg === "--native-chat" ||
+          arg.startsWith("--native-chat-") ||
+          arg === "--user-data-dir" ||
+          arg.startsWith("--user-data-dir=")
+      );
+    let protectedLegacy: ProtectedRoots | undefined;
+    const scope = NativeFirstProfile.open(
+      app.getPath("appData"),
+      () =>
+        (protectedLegacy ??= captureLegacyRoots(
+          app,
+          realpathSync.native(app.getPath("temp"))
+        )),
+      { supported, allowBirth }
+    );
+    if (!scope || !protectedLegacy) return;
+    app.setPath("userData", scope.browser);
+    app.setPath("sessionData", scope.browser);
+    app.setPath("temp", scope.temp);
+    app.setPath("documents", scope.projects);
+    admitted.set(app, protectedLegacy);
+    first = scope;
+  }
+
+  export function firstSelected(): boolean {
+    return first !== undefined;
+  }
+
+  export function agentData(): string | undefined {
+    return first?.agent ?? process.env.GRIDA_AGENT_USER_DATA;
+  }
 
   export function selected(): boolean {
     return (
-      process.argv.includes("--native-chat") &&
-      !process.argv.includes("--disable-agent") &&
-      (process.defaultApp === true ||
-        (typeof INSIDERS !== "undefined" && INSIDERS === 1))
+      first !== undefined ||
+      (process.argv.includes("--native-chat") &&
+        !process.argv.includes("--disable-agent") &&
+        (process.defaultApp === true ||
+          (typeof INSIDERS !== "undefined" && INSIDERS === 1)))
     );
   }
 
   export function mediaRoot(): string | undefined {
+    if (first) return first.media;
     const agentData = process.env.GRIDA_AGENT_USER_DATA;
     return selected() && agentData && path.isAbsolute(agentData)
       ? path.join(path.dirname(agentData), "media")
@@ -32,11 +84,25 @@ export namespace NativeDesktopProfile {
     return roots;
   }
 
-  export async function configure(
-    app: Pick<App, "getPath" | "setPath"> & {
-      commandLine: Pick<App["commandLine"], "getSwitchValue">;
+  export async function configure(app: HostApp): Promise<Provider> {
+    if (first) {
+      const scope = NativeFirstProfile.open(
+        app.getPath("appData"),
+        () => legacyRoots(app),
+        {
+          supported: true,
+          allowBirth: false,
+        }
+      );
+      if (
+        !scope ||
+        scope.root !== first.root ||
+        app.getPath("userData") !== first.browser ||
+        app.getPath("sessionData") !== first.browser
+      )
+        throw invalidProfile();
+      return "gateway";
     }
-  ): Promise<Provider> {
     const agentData = process.env.GRIDA_AGENT_USER_DATA;
     const browserData = app.commandLine.getSwitchValue("user-data-dir");
     if (
@@ -81,7 +147,7 @@ export namespace NativeDesktopProfile {
       reserved.has(path.basename(browserData).toLowerCase())
     )
       throw invalidProfile();
-    const protectedLegacy = await captureLegacyRoots(app, systemTemp);
+    const protectedLegacy = captureLegacyRoots(app, systemTemp);
     if (protectedLegacy.overlaps(root)) throw invalidProfile();
     await checkDirectory(root);
     const browser = await checkDirectory(browserData);
@@ -110,17 +176,16 @@ export namespace NativeDesktopProfile {
     return provider;
   }
 
-  async function captureLegacyRoots(
+  function captureLegacyRoots(
     app: Pick<App, "getPath">,
     systemTemp: string
-  ): Promise<ProtectedRoots> {
+  ): ProtectedRoots {
     const userHome = app.getPath("home");
     const appData = app.getPath("appData");
     const gridaHomes = [
       path.join(userHome, ".grida"),
       home.dir({ home: userHome }),
     ];
-    const { defaultScratchBase } = await import("@grida/agent/sandbox");
     const roots = [
       ...gridaHomes,
       ...gridaHomes.map((directory) =>

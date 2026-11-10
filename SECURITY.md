@@ -1276,6 +1276,12 @@ Today:
   and write scope. The [file registry](packages/grida-daemon/src/files/registry.ts)
   rechecks those exclusions for retained document IDs and refuses hard-linked
   files in this profile. The exclusions use known launch paths.
+- The [managed first profile](desktop/src/main/native-first-profile.ts) is an
+  owner-only directory with an exact receipt for its isolated data roots. Only
+  an explicitly enabled Stable build can create it. Selector-aware Stable
+  startup verifies the receipt and sets both Electron storage paths before
+  readiness or sidecar ownership. Unverified enrollment terminates before
+  readiness. Managed deployment enforces a selector-aware minimum version.
 - The [Desktop cold-start coordinator](desktop/src/main/native-agent-cutover.ts) takes its source from the primary app's [sidecar supervisor](desktop/src/main/agent-sidecar-supervisor.ts). The supervisor seals itself before any legacy chat launch. Its [retained sidecar composition](desktop/src/sidecar/daemon.ts) provides media and configured endpoint settings without a chat or command tenant. Existing-data preparation requires trusted writer admission and refuses dirty claims, an absent source, or unfinished managed commands. Recovery reverifies the archive bound to the source seal and reconciles the shared retirement and local receipt. Each native store binds the selected workspace identity and canonical root in a private directory. Native readiness requires the ACP handshake and a fresh check of the source seal and archive. Stable and Insiders can share a legacy store under separate app locks, so current Main only admits isolated fresh profiles. [Fixtures](desktop/src/main/native-agent-cutover.test.ts) exercise refused admission, archive failure, interrupted publication, and workspace isolation with real native processes.
 - Historical scratch supplied to the coordinator must match the exact source
   and primary scratch identities. The cutoff binds the chosen candidate on

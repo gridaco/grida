@@ -81,14 +81,6 @@ const legacyChatgptOAuth = createChatGptOAuthCoordinator({
     await shell.openExternal(url);
   },
 });
-const mediaHost = new DesktopMediaHost({
-  root: DesktopMediaRoot.current,
-  reveal: (nativePath) => shell.showItemInFolder(nativePath),
-  openFolder: async (nativePath) => {
-    const error = await shell.openPath(nativePath);
-    if (error) throw new Error("native folder open failed");
-  },
-});
 
 type RegisterIpcHandlersOptions = {
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
@@ -117,6 +109,14 @@ type RegisterIpcHandlersOptions = {
 };
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
+  const mediaHost = new DesktopMediaHost({
+    root: DesktopMediaRoot.current(),
+    reveal: (nativePath) => shell.showItemInFolder(nativePath),
+    openFolder: async (nativePath) => {
+      const error = await shell.openPath(nativePath);
+      if (error) throw new Error("native folder open failed");
+    },
+  });
   const recentFiles = options.recent_files ?? agentSidecarClient.recent;
   const admittedWindow = (sender: WebContents) => {
     const window = BrowserWindow.fromWebContents(sender);

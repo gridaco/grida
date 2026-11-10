@@ -9,7 +9,7 @@ import create_menu, {
   rebuild_application_menu,
 } from "./menu";
 import { open_document_window } from "./window";
-import { DEEP_LINK_SCHEME, EDITOR_BASE_URL } from "./env";
+import { DEEP_LINK_SCHEME, EDITOR_BASE_URL, IS_INSIDERS } from "./env";
 import {
   RUNTIME_APP_NAME,
   USE_DEV_INSIDERS_BRANDING,
@@ -89,6 +89,15 @@ app.commandLine.appendSwitch("js-flags", "--expose-gc");
 // #endregion chrome flags
 
 app.setName(RUNTIME_APP_NAME);
+if (app.isPackaged && !IS_INSIDERS) {
+  try {
+    NativeDesktopProfile.prepareFirst(app, MANAGED_NATIVE_FIRST === 1);
+  } catch {
+    console.error("[grida] The managed Desktop profile could not be verified.");
+    // Waiting for ready would let Chromium initialize the default profile.
+    app.exit(1);
+  }
+}
 // GRIDA-SEC-005 / #955 — register this build's channel-specific deep-link scheme
 // (`grida-dev` for local builds, `grida` for production) so dev and an installed
 // production Grida don't fight over one scheme. On macOS the reliable, declarative
@@ -568,7 +577,8 @@ app.on("ready", async () => {
 
   // Keep a disposable profile on the build it was launched to exercise.
   const nativeProfile = NativeDesktopProfile.selected();
-  if (!nativeProfile) updateElectronApp({ notifyUser: true });
+  if (!nativeProfile || NativeDesktopProfile.firstSelected())
+    updateElectronApp({ notifyUser: true });
 
   if (USE_DEV_INSIDERS_BRANDING && process.platform === "darwin") {
     app.dock?.setIcon(create_runtime_app_icon());

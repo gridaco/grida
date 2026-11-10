@@ -140,11 +140,11 @@ export class AgentSidecarSupervisor {
   // separate from Electron's app.getPath("userData") browser profile; the
   // app-managed media root below is resolved and sandboxed independently.
   private readonly user_data_path =
-    process.env.GRIDA_AGENT_USER_DATA ?? home.join("agent");
+    NativeDesktopProfile.agentData() ?? home.join("agent");
   // GRIDA-SEC-014 — one path fact for custody, sidecar argv and command denies.
   private readonly provider_home =
-    process.env.GRIDA_AGENT_USER_DATA ?? home.dir();
-  private readonly media_root = DesktopMediaRoot.current;
+    NativeDesktopProfile.agentData() ?? home.dir();
+  private readonly media_root = DesktopMediaRoot.current();
 
   // Durable sidecar log (~/.grida/agent/logs/sidecar.log) — the on-disk
   // trace a packaged-app incident needs (the console is gone by the time
@@ -973,42 +973,46 @@ function shellQuote(s: string): string {
 }
 
 // Host launch configuration only; never a renderer-controlled capability.
-const supervisor = new AgentSidecarSupervisor({
-  agent: !process.argv.includes("--disable-agent"),
-});
+let supervisor: AgentSidecarSupervisor | undefined;
+
+function sidecar(): AgentSidecarSupervisor {
+  return (supervisor ??= new AgentSidecarSupervisor({
+    agent: !process.argv.includes("--disable-agent"),
+  }));
+}
 
 export function startAgentSidecar(
   workspaceCatalog?: string
 ): Promise<AgentSidecarInfo> {
-  return supervisor.start(workspaceCatalog);
+  return sidecar().start(workspaceCatalog);
 }
 
 export function startOwnedLegacyWriter(): Promise<OwnedLegacyWriter> {
-  return supervisor.startOwnedLegacyWriter();
+  return sidecar().startOwnedLegacyWriter();
 }
 
 export function sealLegacyChatForColdStart() {
-  return supervisor.sealLegacyChatForColdStart();
+  return sidecar().sealLegacyChatForColdStart();
 }
 
 export function getAgentSidecarInfo(): AgentSidecarInfo | null {
-  return supervisor.getInfo();
+  return supervisor?.getInfo() ?? null;
 }
 
 export function getAgentSidecarMode(): AgentSidecarMode | null {
-  return supervisor.getMode();
+  return supervisor?.getMode() ?? null;
 }
 
 export function nativeAgentEndpointNetwork(id: string, baseUrl: string) {
-  return supervisor.nativeEndpointNetwork(id, baseUrl);
+  return sidecar().nativeEndpointNetwork(id, baseUrl);
 }
 
 export function nativeAgentByokSettings() {
-  return supervisor.nativeByokSettings();
+  return sidecar().nativeByokSettings();
 }
 
 export function nativeAgentSubscriptionSettings() {
-  return supervisor.nativeSubscriptionSettings();
+  return sidecar().nativeSubscriptionSettings();
 }
 
 export function nativeAgentGatewayConnection(
@@ -1016,33 +1020,33 @@ export function nativeAgentGatewayConnection(
   organizationId?: number,
   signal?: AbortSignal
 ) {
-  return supervisor.nativeGatewayConnection(account, organizationId, signal);
+  return sidecar().nativeGatewayConnection(account, organizationId, signal);
 }
 
 export function stopAgentSidecar() {
-  supervisor.stop();
+  supervisor?.stop();
 }
 
 export async function approveAgentProviderEndpoint(
   id: string,
   baseUrl: string
 ): Promise<void> {
-  await supervisor.approveProviderEndpoint(id, baseUrl);
+  await sidecar().approveProviderEndpoint(id, baseUrl);
 }
 
 export async function revokeAgentProviderEndpoint(id: string): Promise<void> {
-  await supervisor.revokeProviderEndpoint(id);
+  await sidecar().revokeProviderEndpoint(id);
 }
 
 export async function withTemporaryAgentProviderEndpoint<T>(
   baseUrl: string,
   operation: () => Promise<T>
 ): Promise<T> {
-  return await supervisor.withTemporaryProviderEndpoint(baseUrl, operation);
+  return await sidecar().withTemporaryProviderEndpoint(baseUrl, operation);
 }
 
 export async function describeAgentProviderEndpoint(
   baseUrl: string
 ): Promise<{ origin: string; route: string }> {
-  return await supervisor.describeProviderEndpoint(baseUrl);
+  return await sidecar().describeProviderEndpoint(baseUrl);
 }

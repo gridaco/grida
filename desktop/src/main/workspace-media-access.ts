@@ -27,7 +27,7 @@ export function nativeWorkspaceMedia() {
 
 /** Initialized by Main after acquiring the native profile's instance lock. */
 export function nativeWorkspaceCatalog() {
-  const agentData = process.env.GRIDA_AGENT_USER_DATA;
+  const agentData = NativeDesktopProfile.agentData();
   if (!agentData || !path.isAbsolute(agentData))
     throw new Error("workspace_catalog_profile_invalid");
   const { filesystem } = buildDaemonSandboxPolicy({
@@ -42,7 +42,7 @@ export function nativeWorkspaceCatalog() {
       ...NativeDesktopProfile.legacyRoots(app).metadataPaths(),
       agentData,
       app.getPath("temp"),
-      DesktopMediaRoot.current,
+      DesktopMediaRoot.current(),
       ...(app.isPackaged ? [path.dirname(process.resourcesPath)] : []),
     ],
   });
