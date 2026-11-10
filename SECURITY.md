@@ -1495,6 +1495,12 @@ Today:
   cover retirement and uncertain writes. The [preload](desktop/src/preload.ts)
   advertises its local file capability only at the route with the ID assigned
   to that window by Main.
+  The [private document identity store](desktop/src/main/native-document-identities.ts)
+  verifies a bounded receipt for the selected path digest and exact file and
+  parent identities. Main advances the key after a verified save and checks the
+  live file and window owner before returning it. An unverified replacement
+  cannot inherit the previous key. File access stays with the exact document
+  worker.
 - The [native Open Recent menu](desktop/src/menu.ts) and [recent projects palette](editor/scaffolds/desktop/home/recent-projects-command.tsx)
   reopen a saved project through the existing catalog before navigating.
   A replaced folder requires a fresh native picker selection. [Menu](desktop/src/menu.test.ts)
@@ -3647,6 +3653,7 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [exact document worker](crates/grida-agent/src/workspace_file/document.rs),
   [document isolation tests](desktop/src/main/selected-document-worker.test.ts),
   [standalone file owner](desktop/src/main/native-document-files.ts),
+  [selected document identity receipts](desktop/src/main/native-document-identities.ts),
   [standalone file owner tests](desktop/src/main/native-document-files.test.ts),
   [private retained inputs](crates/grida-agent/src/scratch.rs),
   [native retained-input owner](crates/grida-agent/src/host/retained_inputs.rs),

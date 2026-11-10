@@ -6,6 +6,7 @@ import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import { ProtectedRoots } from "@grida/daemon/server";
 import type { FileReadResult, FileWriteResult } from "../bridge/contract";
+import { NativeDocumentIdentities } from "./native-document-identities";
 import {
   type DocumentFileGrant,
   type WorkspaceFileWorkers,
@@ -17,11 +18,14 @@ const MAX_ACTIVE_DOCUMENTS = 2;
 const MAX_STRING_LENGTH = bufferLimits.MAX_STRING_LENGTH;
 const DOCUMENT_TIMEOUT_MS = 30_000;
 
+type DocumentOperation = "read" | "write";
+
 type Entry = {
   readonly id: string;
   grant: DocumentFileGrant;
   mtime?: number;
-  active: boolean;
+  operation?: DocumentOperation;
+  resolvingIdentity?: Promise<string>;
   retired: boolean;
 };
 
@@ -33,6 +37,7 @@ export class NativeDocumentFiles {
   private readonly byId = new Map<string, Entry>();
   private readonly byPath = new Map<string, Entry>();
   private readonly denials: ProtectedRoots;
+  private readonly identities?: NativeDocumentIdentities;
   private active = 0;
 
   constructor(
@@ -41,9 +46,17 @@ export class NativeDocumentFiles {
     private readonly workers: Pick<
       WorkspaceFileWorkers,
       "openDocument" | "saveDocument"
-    >
+    >,
+    identityDirectory?: string
   ) {
-    this.denials = new ProtectedRoots(protectedPaths);
+    this.denials = new ProtectedRoots(
+      identityDirectory
+        ? [...protectedPaths, identityDirectory]
+        : protectedPaths
+    );
+    this.identities = identityDirectory
+      ? new NativeDocumentIdentities(identityDirectory)
+      : undefined;
   }
 
   /** Only Main's OS and native picker entrypoints select paths. */
@@ -65,7 +78,6 @@ export class NativeDocumentFiles {
     const entry: Entry = {
       id: randomUUID(),
       grant,
-      active: false,
       retired: false,
     };
     this.byId.set(entry.id, entry);
@@ -77,7 +89,7 @@ export class NativeDocumentFiles {
     const entry = this.byId.get(id);
     if (!entry) return;
     entry.retired = true;
-    if (!entry.active) this.forget(entry);
+    this.forgetRetired(entry);
   }
 
   invalidate(id: string): void {
@@ -85,8 +97,40 @@ export class NativeDocumentFiles {
     if (entry) entry.mtime = undefined;
   }
 
+  /** Resolve only the current native selection to an opaque durable chat key. */
+  async chatIdentity(id: string, owner: Owner): Promise<string> {
+    const identities = this.identities;
+    if (!identities) throw unavailable();
+    const entry = this.selected(id, owner);
+    const { grant } = entry;
+    const check = async () => {
+      owner.signal.throwIfAborted();
+      const current = await this.capture(grant.path);
+      owner.signal.throwIfAborted();
+      owner.check();
+      if (entry.retired) throw unavailable();
+      if (entry.operation === "write") throw busy();
+      if (entry.grant !== grant || !sameGrant(grant, current)) throw changed();
+    };
+    try {
+      await check();
+      // A chat probe can coexist with the SVG load. A concurrent save owns
+      // the selected document and advances only after this receipt settles.
+      const key = await (entry.resolvingIdentity ??= identities
+        .resolve(grant)
+        .finally(() => {
+          entry.resolvingIdentity = undefined;
+          this.forgetRetired(entry);
+        }));
+      await check();
+      return key;
+    } catch (error) {
+      throw publicError(error);
+    }
+  }
+
   async read(id: string, owner: Owner): Promise<FileReadResult> {
-    const entry = this.begin(id, owner);
+    const entry = this.begin(id, owner, "read");
     const { grant } = entry;
     const signal = AbortSignal.any([
       owner.signal,
@@ -128,7 +172,7 @@ export class NativeDocumentFiles {
   ): Promise<FileWriteResult> {
     if (typeof content !== "string")
       throw new DocumentError("The document text is invalid.");
-    const entry = this.begin(id, owner);
+    const entry = this.begin(id, owner, "write");
     const { grant, mtime } = entry;
     let draining = false;
     try {
@@ -145,6 +189,17 @@ export class NativeDocumentFiles {
       );
       entry.grant = { ...grant, identity: saved.identity };
       entry.mtime = owner.signal.aborted ? undefined : saved.mtime;
+      if (this.identities) {
+        try {
+          await entry.resolvingIdentity?.catch(() => {});
+          const current = await this.capture(grant.path);
+          if (sameGrant(entry.grant, current))
+            await this.identities.advance(grant, current);
+        } catch {
+          // A verified document save stays successful. Only a receipt
+          // matching the current file can restore the previous chat key.
+        }
+      }
       return { mtime: saved.mtime };
     } catch (error) {
       if (error instanceof WorkspaceWriteUnverified) {
@@ -160,23 +215,29 @@ export class NativeDocumentFiles {
     }
   }
 
-  private begin(id: string, owner: Owner): Entry {
+  private selected(id: string, owner: Owner): Entry {
     owner.check();
     const entry = this.byId.get(id);
     if (!entry || entry.retired) throw unavailable();
-    if (entry.active || this.active >= MAX_ACTIVE_DOCUMENTS) throw busy();
-    entry.active = true;
+    return entry;
+  }
+
+  private begin(id: string, owner: Owner, operation: DocumentOperation): Entry {
+    const entry = this.selected(id, owner);
+    if (entry.operation || this.active >= MAX_ACTIVE_DOCUMENTS) throw busy();
+    entry.operation = operation;
     this.active++;
     return entry;
   }
 
   private finish(entry: Entry): void {
-    entry.active = false;
+    entry.operation = undefined;
     this.active--;
-    if (entry.retired) this.forget(entry);
+    this.forgetRetired(entry);
   }
 
-  private forget(entry: Entry): void {
+  private forgetRetired(entry: Entry): void {
+    if (!entry.retired || entry.operation || entry.resolvingIdentity) return;
     this.byId.delete(entry.id);
     this.byPath.delete(entry.grant.path);
   }
