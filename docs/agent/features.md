@@ -1,6 +1,6 @@
 ---
 title: Agent Features
-description: Current Grida agent capabilities and the proposed contract for its Rust rebuild.
+description: Grida Agent capabilities, expected behavior, and availability by client and connection.
 keywords: [agent, features, skills, ultra, pause, steering, branching]
 format: md
 tags: [ai, agent-system]
@@ -8,50 +8,29 @@ tags: [ai, agent-system]
 
 # Agent Features
 
-This catalog owns the agent's feature inventory, minimum product promises, and
-supported scope. It separates the current Grida implementation from the proposed
-Rust rebuild so existing capabilities and unfinished work remain visible.
-The current column covers the shared agent package and its Desktop wiring, with
-external-driver differences called out where relevant.
+This catalog records what each Grida Agent capability does, the outcome it
+should preserve, and the limits that affect use. The current column names
+legacy or native behavior where they differ. Native Desktop availability
+depends on the build and selected connection. The source-built host supports
+headless runs and ACP clients as described in the [client guide](./clients.md).
 
-The source-built Rust host supports bounded text tasks, durable controls,
-questions, configuration tools, branching, earlier-message revision, and
-explicit compaction. A trusted permission profile can enable native file and
-command tools, with approval for additional access through private supervising
-ACP. A supported Responses model can receive a retained PNG through private
-stdio ACP and crop it in a private working copy. The standalone MCP host exposes
-the headless presentation result. An opted-in private ACP task can schedule a
-one-shot wake-up, with explicit recovery after host restart.
-These entrypoints and their availability are described in the
-[client guide](./clients.md). Desktop acceptance remains separate.
+**Partial** identifies narrower availability or behavior. **Deferred** marks
+a deliberate scope limit. **Open** marks a capability whose product behavior
+still needs a decision. Linked scenarios and tests record the evidence behind
+the described behavior. Release availability follows the named build and client.
 
-Each feature records the current fact, the intended user outcome, and any limit
-that changes what a person can rely on. The linked behavior
-expands the user situation and expected outcome. Tests provide evidence for those
-claims, with their exercised scope recorded separately.
-
-**Source baseline — 2026-11-09, [219f40bcd157][baseline].** Current findings describe
-code and entrypoint wiring. They have not been verified against a released build
-in this review. Present means the described path exists. Partial identifies a
-narrower implementation than the proposed behavior. Absent means the reviewed
-native implementation has no corresponding feature path.
-
-**Rebuild status — implementation in progress.** Retain, extend, and add describe the target
-contract. Every rebuild entry still needs implementation and acceptance evidence.
-Deferred and Open identify an explicit scope limit or an undecided product feature.
-
-Desktop cutover starts a fresh native chat store and archives prior chat data.
-The native history features apply to conversations created by the new runtime.
+Where Desktop switches to the native runtime, it archives prior chat data and
+starts a fresh store. Native history features apply to chats created there.
 
 ## Feature catalog
 
-| Feature                      | Current Grida implementation                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Rebuild contract                                                                                                                                                                                           | Behavior                                                                                                      |
+| Feature                      | Current Grida implementation                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Product expectation                                                                                                                                                                                        | Behavior                                                                                                      |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Task input                   | Partial. Native Desktop accepts one selected file for inspection or one PNG for image work on a compatible connection. The message and selected bytes are accepted together. Existing workspace references remain a separate input path. [Attach a file](./clients.md#attach-a-file-for-inspection), [PNG](./clients.md#attach-a-png-to-a-message)                                                                                                                               | Accept supported material durably once. Keep supplied items identifiable and show any omitted or unusable material before acting.                                                                          | [Input](../wg/ai/agent/experience.md#give-it-a-task)                                                          |
 | Projects and folders         | Partial. Native headless runs support named directories and a primary through a trusted profile. Desktop has one workspace root. Read-only folder references also work without one. [Native clients](./clients.md#work-with-selected-folders), [references][directory-scopes]                                                                                                                                                                                                    | Group named directories with a primary default. Show each action's destination and check access separately for every root.                                                                                 | [Projects](../wg/ai/agent/experience.md#work-with-project-folders)                                            |
 | Slash commands               | Present. Workspace and standalone chat expose `/compact` and `/fork`. The native Desktop pane lists commands its host supports and routes them through the same chat controls. [Guide](./clients.md#use-a-chat-command), [source][commands]                                                                                                                                                                                                                                      | Keep commands discoverable and preserve their meaning across client surfaces.                                                                                                                              | [Commands](../wg/ai/agent/experience.md#use-commands-and-select-skills)                                       |
 | Skills and instructions      | Partial. Workspace `/` selects skills and `@` files. Project instructions load automatically. Skills can override bundled names, and loaded content is cached. [Selection][skills-ui], [loading][runtime], [precedence][skill-tests]                                                                                                                                                                                                                                             | Retain explicit selection and inspectable instruction sources. Make scope, overrides, refresh, and missing sources clear across continuation.                                                              | [Skills](../wg/ai/agent/experience.md#use-the-material-i-gave-it)                                             |
-| Models and providers         | Existing hosts offer hosted, BYOK, subscription and custom providers. The native preview supports saved provider keys on macOS and Linux and approved compatible endpoints. Managed native workspaces can start a new chat with an approved compatible endpoint, OpenRouter, or Vercel AI Gateway. Each chat stays with its original connection. An unavailable selection leaves that connection closed. [Choose a model](./models-and-usage.md#start-a-chat-with-a-saved-model) | Retain setup/removal and visible readiness. Respect selections, disclose fallbacks, and provide bounded, interruptible retries with specific sign-in, quota, and connection failures.                      | [Connections](../wg/ai/agent/experience.md#know-which-features-are-available)                                 |
+| Models and providers         | Existing hosts offer hosted, BYOK, subscription and custom providers. The native preview supports saved provider keys on macOS and Linux and approved compatible endpoints. Managed native workspaces can start a new chat with an approved compatible endpoint, OpenRouter, or Vercel AI Gateway. Each chat stays with its original connection. An unavailable selection leaves that connection closed. [Choose a model](./models-and-usage.md#start-a-chat-with-a-saved-model) | Honor the selected connection and explain sign-in, quota, and connection failures. Use bounded, interruptible retries when the provider verifies it rejected the request before execution.                 | [Connections](../wg/ai/agent/experience.md#know-which-features-are-available)                                 |
 | Configuration                | Partial. Native Desktop inspects the workspace context limit and supports reviewed changes where the provider can count requests exactly. [Native clients](./clients.md#set-the-context-input-limit)                                                                                                                                                                                                                                                                             | Let people inspect, explain, change, and reset supported settings through the agent or UI, with scope, provenance, validation, and activation timing. Initial fields require individual review.            | [Settings](../wg/ai/agent/experience.md#change-how-the-agent-works)                                           |
 | Hooks                        | Partial. The native host records the final-text check or a reviewed read-only Act completion command. Required failures block completion. [Native clients](./clients.md#require-a-completion-check)                                                                                                                                                                                                                                                                              | Add inspectable lifecycle commands for context, tool checks, and completion verification. Required-check failures block their action. Preserve completed effects and respect Stop, Pause, and task limits. | [Hooks](../wg/ai/agent/experience.md#automate-lifecycle-checks)                                               |
 | Usage and costs              | Partial. Native turn summaries show provider-reported token counts and mark incomplete or unavailable counts. Legacy Desktop shows estimated context use and base cost. [Turn summary](./clients.md#read-a-turn-summary), [meter][usage-meter], [pricing tests][usage-tests]                                                                                                                                                                                                     | Label estimates clearly, distinguish charges from estimates, and explain exhausted allowances and credit-related failures.                                                                                 | [Usage](../wg/ai/agent/experience.md#understand-usage-and-cost)                                               |
@@ -152,7 +131,6 @@ These are required working mechanisms behind the features above.
   feature's promise remains in its canonical description until the product
   behavior itself changes.
 
-[baseline]: https://github.com/gridaco/grida/tree/219f40bcd1579d07b0742f63671875c4939bc0d5
 [commands]: https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/editor/scaffolds/desktop/workbench/agent-pane.tsx
 [skills-ui]: https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/editor/scaffolds/desktop/shared/use-workspace-composer-catalog.ts
 [runtime]: https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/packages/grida-ai-agent/src/runtime/index.ts
