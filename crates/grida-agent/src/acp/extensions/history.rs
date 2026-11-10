@@ -2,14 +2,16 @@
 //! GRIDA-SEC-004 binds access to an attached source session.
 
 use super::*;
-use crate::host::{ConversationDerivation, HistoryPage, HistoryQuery};
+use crate::host::{ConversationDerivation, HistoryPage, HistoryQuery, RevisionTarget};
+use agent_kit_core::MessageId;
 use agent_kit_store_sqlite::history::HistoryBasis;
 use grida_agent_master::conversation_seed::ConversationAnchor;
 
 const HISTORY: &str = "co.grida/session/history";
 pub(super) const FORK: &str = "co.grida/session/fork";
 const REVISE: &str = "co.grida/session/revise";
-pub(super) const CAPABILITIES: [&str; 3] = [HISTORY, FORK, REVISE];
+const REVISION_TARGET: &str = "co.grida/session/revision-target";
+pub(super) const CAPABILITIES: [&str; 4] = [HISTORY, FORK, REVISE, REVISION_TARGET];
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/session/history", response = HistoryResponse)]
@@ -43,6 +45,19 @@ struct ForkResponse {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/session/revision-target", response = RevisionTargetResponse)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ReadRevisionTarget {
+    session_id: SessionId,
+    message_id: MessageId,
+    expected_session_revision: SessionRevision,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+#[serde(transparent)]
+struct RevisionTargetResponse(RevisionTarget);
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/session/revise", response = ReviseResponse)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Revise {
@@ -70,6 +85,7 @@ struct ReviseResponse {
 pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>) -> RequestRoutes {
     let history = (host.clone(), sessions.clone());
     let fork = (host.clone(), sessions.clone());
+    let target = (host.clone(), sessions.clone());
     RequestRoutes::default()
         .on_receive_request(
             async move |request: History, responder, _| {
@@ -109,6 +125,26 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         .await
                         .map_err(host_error)?;
                     Ok(ForkResponse { session_id })
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: ReadRevisionTarget, responder, _| {
+                let result = async {
+                    require(&target.1, REVISION_TARGET, Some(&request.session_id))?;
+                    target
+                        .0
+                        .revision_target(
+                            request.session_id,
+                            request.message_id,
+                            request.expected_session_revision,
+                        )
+                        .await
+                        .map(RevisionTargetResponse)
+                        .map_err(host_error)
                 }
                 .await;
                 responder.respond_with_result(result)

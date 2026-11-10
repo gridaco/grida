@@ -21,6 +21,7 @@ pub use catalog::SessionCatalog;
 pub(crate) use catalog::is_archived;
 pub use compaction::{CompactRequest, CompactionReport, CompactionStatus};
 pub use goals::{GoalAction, GoalControl, GoalInspection, GoalRequest, GoalView};
+pub(crate) use history::RevisionTarget;
 pub use history::{ConversationDerivation, HistoryPage, HistoryQuery};
 pub(crate) use image_tools::CropArtifact;
 pub use images::ImageUpload;

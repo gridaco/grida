@@ -186,6 +186,7 @@ admission nor cancellation.
 | `approvals`                              | `sessionId`, `turnId`. Read pending approval requests and their wait IDs with the current control revision.                                                                 |
 | `answer-approval`                        | Flat task basis plus `waitId` and `decision`. Commit a decision for the exact recorded action. Available on private supervising stdio.                                      |
 | `history`                                | `sessionId`, optional `view`, `offset`, and `expectedHistory`. Read visible message anchors, previews, and any seed lineage.                                                |
+| `revision-target`                        | `sessionId`, visible `messageId`, and `expectedSessionRevision`. Read the original editable text, exact current basis and anchor, and subsequent visible message count.     |
 | `fork`                                   | `sessionId`, `requestId`, `expectedHistory`, and `anchor`. Return the independent `sessionId` for a committed prefix through that message.                                  |
 | `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `allowConfigurationChanges`. Return the installed view and accepted input. |
 | `compact`                                | `sessionId`, `requestId`, and optional `recover`. Run or inspect one retained context compaction. Return its status and available usage/failure evidence.                   |
@@ -214,6 +215,12 @@ writes. A changed basis requires a fresh history read. Anchors are
 scoped to the selected view and carry either a local turn and message ID or an
 inherited message ID. `view` can read an earlier retained view. Standard session
 load replays the current view in the same causal order.
+
+An attached client that negotiates `revision-target` can open an edit from an
+exact visible message ID in the current view. The reply binds the complete
+original text to that revision and history basis. It requires an ordinary
+retained text-only submission. Structured inputs and material inherited from
+another chat have no editable target through this operation.
 
 A fork leaves source ownership unchanged and starts with no active work. Load
 its returned ID with the same workspace to attach it. An earlier-message revision

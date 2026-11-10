@@ -7,8 +7,8 @@ use agent_kit_store_sqlite::history::{
     SeededSession,
 };
 use grida_agent_master::conversation_seed::{
-    ConversationAnchor, ConversationCut, ConversationSeed, ConversationSource, SeedOmissions,
-    is_editable_user,
+    ConversationAnchor, ConversationCut, ConversationSeed, ConversationSource, SeedEntry,
+    SeedOmissions, is_editable_user,
 };
 use grida_agent_master::history::project;
 
@@ -49,6 +49,21 @@ pub struct HistoryLineage {
     pub source: ConversationSource,
     pub cut: ConversationCut,
     pub omissions: SeedOmissions,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RevisionTarget {
+    session_revision: SessionRevision,
+    basis: HistoryBasis,
+    anchor: ConversationAnchor,
+    text: String,
+    subsequent_messages: usize,
+}
+
+enum RevisionOrigin<'a> {
+    Inherited(&'a SeedEntry),
+    Turn(&'a TurnId),
 }
 
 pub struct ConversationDerivation {
@@ -183,6 +198,130 @@ impl Host {
             latest_anchor,
             seed: lineage,
         })
+    }
+
+    pub(crate) async fn revision_target(
+        &self,
+        session: SessionId,
+        message_id: MessageId,
+        expected_revision: SessionRevision,
+    ) -> Result<RevisionTarget> {
+        let retained = self
+            .store
+            .retained_history_with(session.clone(), HistorySelection::Current, project)
+            .await?;
+        if expected_revision != retained.session_revision {
+            return Err(problem(ErrorKind::Conflict, "stale_session_revision"));
+        }
+        let inherited = decode_seed(retained.seed)?;
+        let inherited_messages = inherited.iter().flat_map(|seed| {
+            seed.provenance()
+                .entries
+                .iter()
+                .filter(|entry| entry.message.is_some())
+                .zip(seed.records())
+                .map(|(entry, HistoryRecord::Message(message))| {
+                    (message, RevisionOrigin::Inherited(entry))
+                })
+        });
+        let local = retained.records.iter().map(|item| {
+            let HistoryRecord::Message(message) = &item.record;
+            (message, RevisionOrigin::Turn(&item.turn))
+        });
+        let mut selected = None;
+        let mut subsequent_messages = 0;
+        for (message, origin) in inherited_messages.chain(local) {
+            if !visible_message(message) {
+                continue;
+            }
+            if message.id == message_id {
+                if selected.replace((message, origin)).is_some() {
+                    return Err(problem(ErrorKind::Conflict, "history_anchor_ambiguous"));
+                }
+            } else if selected.is_some() {
+                subsequent_messages += 1;
+            }
+        }
+        let (message, origin) =
+            selected.ok_or_else(|| problem(ErrorKind::Unavailable, "history_anchor_missing"))?;
+        if !is_editable_user(message) {
+            return Err(revision_target_unavailable());
+        }
+        let (anchor, turn, original) = match origin {
+            RevisionOrigin::Inherited(entry)
+                if entry.editable
+                    && entry.origin.session == session
+                    && entry.omissions.is_empty() =>
+            {
+                (
+                    ConversationAnchor::Inherited {
+                        message: message.id.clone(),
+                    },
+                    &entry.origin.turn,
+                    &entry.origin.message,
+                )
+            }
+            RevisionOrigin::Inherited(_) => return Err(revision_target_unavailable()),
+            RevisionOrigin::Turn(turn) => (
+                ConversationAnchor::Turn {
+                    turn: turn.clone(),
+                    message: message.id.clone(),
+                },
+                turn,
+                &message.id,
+            ),
+        };
+        let text = self
+            .original_text(session, turn.clone(), original, message)
+            .await?;
+        Ok(RevisionTarget {
+            session_revision: retained.session_revision,
+            basis: retained.basis,
+            anchor,
+            text,
+            subsequent_messages,
+        })
+    }
+
+    async fn original_text(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+        original: &MessageId,
+        visible: &Message,
+    ) -> Result<String> {
+        for input in self.store.turn_submissions(session, turn).await? {
+            if input.payload.schema().as_str() != INPUT_SCHEMA || input.payload.version() != 2 {
+                continue;
+            }
+            let stored: StoredPrompt = decode_input(&input)?;
+            if stored.goal.is_some()
+                || stored.subagent.is_some()
+                || !stored
+                    .parts
+                    .iter()
+                    .all(|part| matches!(part, PromptPart::Text { .. }))
+            {
+                continue;
+            }
+            let messages = prompt_input(&input.id, &stored.parts)?;
+            if !matches!(messages.as_slice(), [message] if &message.id == original && message.content == visible.content)
+            {
+                continue;
+            }
+            let text: String = stored
+                .parts
+                .into_iter()
+                .filter_map(|part| match part {
+                    PromptPart::Text { text } => Some(text),
+                    _ => None,
+                })
+                .collect();
+            if !text.trim().is_empty() {
+                return Ok(text);
+            }
+        }
+        Err(revision_target_unavailable())
     }
 
     pub async fn fork_session(
@@ -413,6 +552,13 @@ fn visible_message(message: &Message) -> bool {
             matches!(part, Content::Text(text) if !text.is_empty())
                 || matches!(part, Content::Media(media) if is_retained_image(media))
         })
+}
+
+fn revision_target_unavailable() -> Error {
+    problem(
+        ErrorKind::Unsupported,
+        "history_revision_target_unavailable",
+    )
 }
 
 fn latest_anchor(history: &RetainedHistory) -> Option<ConversationAnchor> {

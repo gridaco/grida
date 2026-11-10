@@ -13,16 +13,18 @@ async fn client(url: &str, history: bool) -> SharedSocket {
         .await
         .unwrap();
     let mut capabilities = extension_initialize();
-    if !history {
-        let meta = capabilities["clientCapabilities"]["_meta"]
-            .as_object_mut()
-            .unwrap();
+    let meta = capabilities["clientCapabilities"]["_meta"]
+        .as_object_mut()
+        .unwrap();
+    if history {
+        meta.insert("co.grida/session/revision-target".into(), 1.into());
+    } else {
         for suffix in ["history", "fork", "revise"] {
             meta.remove(&format!("co.grida/session/{suffix}"));
         }
     }
     let response = ws_rpc(&mut socket, 1, "initialize", capabilities).await;
-    for suffix in ["history", "fork", "revise"] {
+    for suffix in ["history", "fork", "revise", "revision-target"] {
         assert_eq!(
             response["result"]["agentCapabilities"]["_meta"][format!("co.grida/session/{suffix}")],
             1
@@ -48,6 +50,25 @@ async fn page(socket: &mut SharedSocket, session: &str, view: Option<Value>) -> 
         .get("result")
         .unwrap_or_else(|| panic!("{response}"))
         .clone()
+}
+
+async fn revision_target(
+    socket: &mut SharedSocket,
+    session: &str,
+    page: &Value,
+    message: usize,
+) -> Value {
+    ws_rpc(
+        socket,
+        201,
+        "_co.grida/session/revision-target",
+        json!({
+            "sessionId":session,
+            "expectedSessionRevision":page["sessionRevision"],
+            "messageId":page["messages"][message]["anchor"]["message"],
+        }),
+    )
+    .await
 }
 
 fn previews(page: &Value) -> Vec<&str> {
@@ -239,9 +260,12 @@ async fn a_fork_captures_committed_live_history_without_starting_or_stopping_wor
             "Correction after partial answer"
         ]
     );
+    let destination_page = page(&mut socket, &destination, None).await;
+    assert_eq!(previews(&destination_page), ["Initial request"]);
+    let inherited = revision_target(&mut socket, &destination, &destination_page, 0).await;
     assert_eq!(
-        previews(&page(&mut socket, &destination, None).await),
-        ["Initial request"]
+        inherited["error"]["data"],
+        "history_revision_target_unavailable"
     );
 
     drop(socket);
@@ -302,7 +326,12 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
     let (host, url) = shared_server(&state, &endpoint.url).await;
     let mut socket = client(&url, true).await;
     let session = create(&mut socket, workspace.path()).await;
-    for (id, text) in [(3, "First input"), (4, "Second input"), (5, "Third input")] {
+    let original = "Second input with the complete original wording. ".repeat(16);
+    for (id, text) in [
+        (3, "First input"),
+        (4, original.as_str()),
+        (5, "Third input"),
+    ] {
         if id < 5 {
             let mut request =
                 prompt_request(&session, if id == 3 { "first" } else { "second" }, text);
@@ -339,7 +368,10 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
                 id,
                 "session/prompt",
                 json!({
-                    "sessionId":session,"prompt":[{"type":"text","text":text}],
+                    "sessionId":session,"prompt":[
+                        {"type":"text","text":text},
+                        {"type":"resource_link","uri":"fixture://linked-context","name":"Fixture reference"}
+                    ],
                 }),
                 "session_prompt_in_progress",
             )
@@ -349,20 +381,39 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
         }
     }
     let old = page(&mut socket, &session, None).await;
+    let old_previews = previews(&old);
     assert_eq!(
-        previews(&old),
+        &old_previews[..4],
         [
             "First input",
             "First answer",
-            "Second input",
+            &original[..256],
             "Second answer",
-            "Third input",
-            "Third answer"
         ]
     );
+    assert!(old_previews[4].starts_with("Third input"));
+    assert!(old_previews[4].contains("fixture://linked-context"));
+    assert_eq!(old_previews[5], "Third answer");
+    let target = revision_target(&mut socket, &session, &old, 2).await;
+    assert_eq!(target["result"]["text"], original);
+    assert_eq!(target["result"]["sessionRevision"], old["sessionRevision"]);
+    assert_eq!(target["result"]["basis"], old["basis"]);
+    assert_eq!(target["result"]["anchor"], old["messages"][2]["anchor"]);
+    assert_eq!(target["result"]["subsequentMessages"], 3);
+    for ineligible in [1, 4] {
+        let denied = revision_target(&mut socket, &session, &old, ineligible).await;
+        assert_eq!(
+            denied["error"]["data"],
+            "history_revision_target_unavailable"
+        );
+    }
+    let mut unattached = client(&url, true).await;
+    let denied = revision_target(&mut unattached, &session, &old, 2).await;
+    assert_eq!(denied["error"]["data"], "session_setup_required");
+    drop(unattached);
     let revision = json!({
-        "sessionId":session,"requestId":"edit-second","expectedSessionRevision":old["sessionRevision"],
-        "expectedHistory":old["basis"],"anchor":old["messages"][2]["anchor"],
+        "sessionId":session,"requestId":"edit-second","expectedSessionRevision":target["result"]["sessionRevision"],
+        "expectedHistory":target["result"]["basis"],"anchor":target["result"]["anchor"],
         "replacementInputId":"replacement","prompt":[{"type":"text","text":"Revised second input"}],
     });
     let changed = ws_rpc(&mut socket, 6, "_co.grida/session/revise", revision.clone()).await;
@@ -403,6 +454,11 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
     })
     .await;
     let current = page(&mut socket, &session, None).await;
+    let stale = revision_target(&mut socket, &session, &old, 2).await;
+    assert_eq!(stale["error"]["data"], "stale_session_revision");
+    let inherited = revision_target(&mut socket, &session, &current, 0).await;
+    assert_eq!(inherited["result"]["text"], "First input", "{inherited}");
+    assert_eq!(inherited["result"]["anchor"]["kind"], "inherited");
     assert_eq!(current["seed"]["omissions"]["toolCalls"], 1);
     assert_eq!(current["seed"]["omissions"]["toolResults"], 1);
     assert_eq!(
