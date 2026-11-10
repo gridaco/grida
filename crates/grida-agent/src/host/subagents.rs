@@ -1,6 +1,7 @@
 //! GRIDA-SEC-004 — parent-scoped, independently authorized child assignments.
 
 use super::*;
+use agent_kit_store_sqlite::InputObservation;
 use grida_agent_master::subagents::{self, Allocation, Assignment, Profile};
 
 pub struct SubagentInspection {
@@ -107,10 +108,15 @@ impl Host {
             instructions,
         } = assignment;
         let _admission = self.configuration_admission.lock().await;
-        let (view, profile) = self.subagent_view(&parent, child.clone()).await?;
+        let (view, previous) = self
+            .store
+            .inspect_with_input(child.clone(), input.clone())
+            .await
+            .map_err(child_observation_error)?;
+        let profile = child_profile(&parent, &view)?;
         let parts = vec![PromptPart::Text { text: instructions }];
-        if let Some(previous) = self.store.input(child.clone(), input.clone()).await? {
-            let stored: StoredPrompt = decode_input(&previous.input)?;
+        if let Some(previous) = previous {
+            let stored: StoredPrompt = decode_input(&previous.input.input)?;
             if !images::same_prompt(&stored.parts, &parts)
                 || stored
                     .subagent
@@ -123,7 +129,7 @@ impl Host {
                     "subagent_assignment_identity_reused",
                 ));
             }
-            if previous.disposition == InputDisposition::Queued
+            if previous.input.disposition == InputDisposition::Queued
                 && self.check_execution(&view).is_ok()
                 && profile
                     .require_authority(&self.execution()?.authority.inference.authority)
@@ -131,7 +137,7 @@ impl Host {
             {
                 self.kick_queue(child.clone()).await;
             }
-            return self.subagent_work(&child, previous, stored).await;
+            return subagent_work(previous, stored);
         }
 
         self.check_execution(&view)?;
@@ -214,20 +220,24 @@ impl Host {
         input: Option<ChangeId>,
     ) -> Result<SubagentInspection> {
         self.require_subagents()?;
-        let (view, profile) = self.subagent_view(&parent, child.clone()).await?;
-        let assignment = match input {
+        let (view, profile, assignment) = match input {
             Some(input) => {
-                let accepted = self
+                let (view, accepted) = self
                     .store
-                    .input(child.clone(), input)
-                    .await?
-                    .ok_or_else(|| {
-                        problem(ErrorKind::Unavailable, "subagent_assignment_unavailable")
-                    })?;
-                let stored: StoredPrompt = decode_input(&accepted.input)?;
-                Some(self.subagent_work(&child, accepted, stored).await?)
+                    .inspect_with_input(child.clone(), input)
+                    .await
+                    .map_err(child_observation_error)?;
+                let profile = child_profile(&parent, &view)?;
+                let accepted = accepted.ok_or_else(|| {
+                    problem(ErrorKind::Unavailable, "subagent_assignment_unavailable")
+                })?;
+                let stored: StoredPrompt = decode_input(&accepted.input.input)?;
+                (view, profile, Some(subagent_work(accepted, stored)?))
             }
-            None => None,
+            None => {
+                let (view, profile) = self.subagent_view(&parent, child.clone()).await?;
+                (view, profile, None)
+            }
         };
         Ok(SubagentInspection {
             parent,
@@ -244,33 +254,6 @@ impl Host {
             current: view.current,
             latest: view.latest,
             assignment,
-        })
-    }
-
-    async fn subagent_work(
-        &self,
-        child: &SessionId,
-        accepted: agent_kit_sessions::InputView,
-        stored: StoredPrompt,
-    ) -> Result<SubagentWork> {
-        let assignment = stored
-            .subagent
-            .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_missing"))?;
-        let max_generation_steps = stored
-            .max_steps
-            .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_limit_missing"))?;
-        let turn = match &accepted.disposition {
-            InputDisposition::Claimed { turn } | InputDisposition::Completed { turn } => {
-                Some(self.store.inspect_turn(child.clone(), turn.clone()).await?)
-            }
-            _ => None,
-        };
-        Ok(SubagentWork {
-            input: accepted.input.id,
-            parent_turn: assignment.parent_turn,
-            max_generation_steps,
-            disposition: accepted.disposition,
-            turn,
         })
     }
 
@@ -401,17 +384,43 @@ impl Host {
         parent: &SessionId,
         child: SessionId,
     ) -> Result<(SessionView, Profile)> {
-        let view = self.store.inspect(child).await.map_err(|error| {
-            if error.code == "session_missing" {
-                problem(ErrorKind::Unavailable, "subagent_unavailable")
-            } else {
-                error
-            }
-        })?;
-        let profile = session_configuration(&view)?
-            .subagent
-            .filter(|profile| profile.parent() == parent)
-            .ok_or_else(|| problem(ErrorKind::Unavailable, "subagent_unavailable"))?;
+        let view = self
+            .store
+            .inspect(child)
+            .await
+            .map_err(child_observation_error)?;
+        let profile = child_profile(parent, &view)?;
         Ok((view, profile))
     }
+}
+
+fn child_observation_error(error: Error) -> Error {
+    if error.code == "session_missing" {
+        problem(ErrorKind::Unavailable, "subagent_unavailable")
+    } else {
+        error
+    }
+}
+
+fn child_profile(parent: &SessionId, view: &SessionView) -> Result<Profile> {
+    session_configuration(view)?
+        .subagent
+        .filter(|profile| profile.parent() == parent)
+        .ok_or_else(|| problem(ErrorKind::Unavailable, "subagent_unavailable"))
+}
+
+fn subagent_work(accepted: InputObservation, stored: StoredPrompt) -> Result<SubagentWork> {
+    let assignment = stored
+        .subagent
+        .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_missing"))?;
+    let max_generation_steps = stored
+        .max_steps
+        .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_limit_missing"))?;
+    Ok(SubagentWork {
+        input: accepted.input.input.id,
+        parent_turn: assignment.parent_turn,
+        max_generation_steps,
+        disposition: accepted.input.disposition,
+        turn: accepted.turn,
+    })
 }

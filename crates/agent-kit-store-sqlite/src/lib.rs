@@ -125,6 +125,12 @@ pub struct SqliteStore {
     inner: Arc<Inner>,
 }
 
+/// An input and its associated turn read from the same committed state.
+pub struct InputObservation {
+    pub input: InputView,
+    pub turn: Option<TurnView>,
+}
+
 struct Inner {
     connection: Mutex<Connection>,
     owners: Mutex<BTreeMap<(SessionId, TurnId), Weak<()>>>,
@@ -325,6 +331,30 @@ impl SqliteStore {
         execute(Arc::clone(&self.inner), move |_, connection| {
             load_session(connection, &session)?;
             find_input(connection, &session, &input)
+        })
+        .await
+    }
+
+    /// Observe a session and optionally one input and its turn under the same lock.
+    pub async fn inspect_with_input(
+        &self,
+        session: SessionId,
+        input: ChangeId,
+    ) -> Result<(SessionView, Option<InputObservation>)> {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            let input = find_input(connection, &session, &input)?
+                .map(|input| {
+                    let turn = match &input.disposition {
+                        InputDisposition::Claimed { turn }
+                        | InputDisposition::Completed { turn } => {
+                            Some(turn_view(inner, &load_turn(connection, &session, turn)?)?)
+                        }
+                        _ => None,
+                    };
+                    Ok(InputObservation { input, turn })
+                })
+                .transpose()?;
+            Ok((session_view(inner, connection, session)?, input))
         })
         .await
     }
@@ -780,51 +810,7 @@ impl SessionStore for SqliteStore {
 
     fn inspect(&self, session_id: SessionId) -> BoxFuture<'_, Result<SessionView>> {
         execute(Arc::clone(&self.inner), move |inner, connection| {
-            let session = load_session(connection, &session_id)?;
-            let mut statement = connection.prepare(
-                "SELECT id FROM submissions WHERE session=?1 AND queue_order IS NOT NULL ORDER BY queue_order",
-            ).map_err(database_error)?;
-            let ids = statement
-                .query_map([session_id.as_str()], |row| row.get::<_, String>(0))
-                .map_err(database_error)?
-                .collect::<std::result::Result<Vec<_>, _>>()
-                .map_err(database_error)?;
-            let queued = ids
-                .into_iter()
-                .map(|id| load_input(connection, &session_id, &ChangeId::new(id)?))
-                .collect::<Result<Vec<_>>>()?;
-            let current = session
-                .active_turn
-                .as_ref()
-                .map(|id| {
-                    load_turn(connection, &session_id, id)
-                        .and_then(|state| turn_view(inner, &state))
-                })
-                .transpose()?;
-            let latest_id: Option<String> = connection
-                .query_row(
-                    "SELECT id FROM turns WHERE session=?1 ORDER BY ordinal DESC LIMIT 1",
-                    [session_id.as_str()],
-                    |row| row.get(0),
-                )
-                .optional()
-                .map_err(database_error)?;
-            let latest = latest_id
-                .map(|id| {
-                    load_turn(connection, &session_id, &TurnId::new(id)?)
-                        .and_then(|state| turn_view(inner, &state))
-                })
-                .transpose()?;
-            Ok(SessionView {
-                session: session_id,
-                revision: session.revision,
-                configuration: session.configuration,
-                driver_state: session.driver_state,
-                admission_paused: session.paused,
-                queued,
-                current,
-                latest,
-            })
+            session_view(inner, connection, session_id)
         })
     }
 
@@ -1369,6 +1355,55 @@ fn reorder_queue(
             .map_err(database_error)?;
     }
     Ok(())
+}
+
+fn session_view(
+    inner: &Inner,
+    connection: &Connection,
+    session_id: SessionId,
+) -> Result<SessionView> {
+    let session = load_session(connection, &session_id)?;
+    let mut statement = connection.prepare(
+        "SELECT id FROM submissions WHERE session=?1 AND queue_order IS NOT NULL ORDER BY queue_order",
+    ).map_err(database_error)?;
+    let ids = statement
+        .query_map([session_id.as_str()], |row| row.get::<_, String>(0))
+        .map_err(database_error)?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(database_error)?;
+    let queued = ids
+        .into_iter()
+        .map(|id| load_input(connection, &session_id, &ChangeId::new(id)?))
+        .collect::<Result<Vec<_>>>()?;
+    let current = session
+        .active_turn
+        .as_ref()
+        .map(|id| load_turn(connection, &session_id, id).and_then(|state| turn_view(inner, &state)))
+        .transpose()?;
+    let latest_id: Option<String> = connection
+        .query_row(
+            "SELECT id FROM turns WHERE session=?1 ORDER BY ordinal DESC LIMIT 1",
+            [session_id.as_str()],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(database_error)?;
+    let latest = latest_id
+        .map(|id| {
+            load_turn(connection, &session_id, &TurnId::new(id)?)
+                .and_then(|state| turn_view(inner, &state))
+        })
+        .transpose()?;
+    Ok(SessionView {
+        session: session_id,
+        revision: session.revision,
+        configuration: session.configuration,
+        driver_state: session.driver_state,
+        admission_paused: session.paused,
+        queued,
+        current,
+        latest,
+    })
 }
 
 fn load_input(connection: &Connection, session: &SessionId, id: &ChangeId) -> Result<InputView> {

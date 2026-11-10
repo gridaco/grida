@@ -496,6 +496,7 @@ async fn child_queue_survives_restart_and_stays_held_after_stop() {
     })
     .await;
     assert_eq!(cancelled["assignment"]["result"]["status"], "cancelled");
+    assert!(cancelled["current"].is_null());
     assert_eq!(cancelled["allocation"]["reserved"], 1);
     assert_eq!(cancelled["admissionPaused"], true);
     assert_eq!(cancelled["queuedInputIds"], json!(["later"]));

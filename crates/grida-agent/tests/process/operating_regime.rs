@@ -156,7 +156,26 @@ async fn plan_withholds_settings_writes_and_preserves_its_scope_through_a_queue_
     let mut act = prompt_request(session, "approved-act", "Apply the planned change.");
     act["allowConfigurationChanges"] = true.into();
     act["operatingRegime"] = "act".into();
-    let accepted = ws_rpc(&mut socket, 6, "_co.grida/session/submit", act).await;
+    // Settlement can precede the host releasing the worker's execution slot.
+    let (request_id, accepted) = timeout(Duration::from_secs(2), async {
+        let mut request_id = 6;
+        loop {
+            let response = ws_rpc(
+                &mut socket,
+                request_id,
+                "_co.grida/session/submit",
+                act.clone(),
+            )
+            .await;
+            if response["error"]["data"] != "session_prompt_in_progress" {
+                break (request_id, response);
+            }
+            request_id += 1;
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the settled Plan must release its execution slot");
     assert!(accepted.get("error").is_none(), "{accepted}");
     let request = endpoint.request().await;
     assert!(
@@ -174,7 +193,13 @@ async fn plan_withholds_settings_writes_and_preserves_its_scope_through_a_queue_
         snapshot["current"].is_null()
     })
     .await;
-    let after = ws_rpc(&mut socket, 7, "_co.grida/config/inspect", json!({})).await;
+    let after = ws_rpc(
+        &mut socket,
+        request_id + 1,
+        "_co.grida/config/inspect",
+        json!({}),
+    )
+    .await;
     assert_eq!(
         after["result"]["active"]["defaults"]["context"]["max_input_tokens"],
         64000
