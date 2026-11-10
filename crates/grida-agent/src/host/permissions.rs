@@ -32,6 +32,7 @@ pub(super) struct ToolAuthority {
     wakeups: Option<Arc<wakeups::WakeupAccess>>,
     completion: Option<Arc<completion_checks::CompletionAccess>>,
     host_tools: Option<Arc<host_tools::TurnTools>>,
+    delegation: Option<Arc<sponsorship::DelegationAccess>>,
 }
 
 impl ToolAuthority {
@@ -42,12 +43,14 @@ impl ToolAuthority {
         wakeups: Option<Arc<wakeups::WakeupAccess>>,
         completion: Option<Arc<completion_checks::CompletionAccess>>,
         host_tools: Option<Arc<host_tools::TurnTools>>,
+        delegation: Option<Arc<sponsorship::DelegationAccess>>,
     ) -> Option<Arc<Self>> {
         if permissions.is_none()
             && image.is_none()
             && wakeups.is_none()
             && completion.is_none()
             && host_tools.is_none()
+            && delegation.is_none()
         {
             return None;
         }
@@ -58,12 +61,20 @@ impl ToolAuthority {
             wakeups,
             completion,
             host_tools,
+            delegation,
         }))
     }
 }
 
 impl AuthorityValidator for ToolAuthority {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
+        if self
+            .delegation
+            .as_ref()
+            .is_some_and(|scope| scope.accepts(&request.selection))
+        {
+            return Box::pin(async { Ok(()) });
+        }
         if self
             .completion
             .as_ref()
@@ -109,6 +120,13 @@ impl ToolGate for ToolAuthority {
         admission: ToolAdmission,
         context: AdmissionContext,
     ) -> BoxFuture<'_, Result<ToolDecision>> {
+        if let Some(delegation) = self
+            .delegation
+            .as_ref()
+            .filter(|scope| scope.accepts(&admission.grants))
+        {
+            return delegation.decide(admission, context);
+        }
         if let Some(completion) = self
             .completion
             .as_ref()

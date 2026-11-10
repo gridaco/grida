@@ -6,6 +6,7 @@ use grida_agent::process::{self, RunOptions};
 use grida_agent::{
     CompatibleOutputLimitField, OperatingRegime, ProviderOptions, ProviderProtocol, acp, mcp,
 };
+use grida_agent_master::effort::Preset as EffortPreset;
 use serde_json::json;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -62,6 +63,8 @@ fn command() -> Command {
                         .help("Working directory. Defaults to the trusted permission profile's primary."),
                 )
                 .arg(Arg::new("session").long("session").value_name("SESSION_ID"))
+                .arg(Arg::new("effort").long("effort").value_parser(["standard", "ultra"])
+                    .default_value("standard").help("Select bounded agent effort independently of Plan or Act."))
                 .arg(
                     Arg::new("questions")
                         .long("questions")
@@ -504,8 +507,17 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         (None, _, _) => Host::open(state_dir, Some(provider))?,
     };
     let host = host.with_operating_regime(regime);
-    let host = if subagents {
+    let ultra = name == "run"
+        && args
+            .get_one::<String>("effort")
+            .is_some_and(|value| value == "ultra");
+    let host = if subagents || ultra {
         host.with_subagents()
+    } else {
+        host
+    };
+    let host = if ultra {
+        host.with_effort(EffortPreset::Ultra)?
     } else {
         host
     };

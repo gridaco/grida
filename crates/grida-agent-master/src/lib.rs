@@ -88,6 +88,8 @@ pub struct Account {
     #[serde(default)]
     pub inference_usage: usage::InferenceUsage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub independent_review: Option<effort::ReviewEvidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal: Option<goals::ProgressAccount>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub completion_checks: Vec<hooks::CheckEvidence>,
@@ -963,6 +965,12 @@ impl Master {
                     }),
                     inference_failure: inference_failure.cloned(),
                     inference_usage: usage::InferenceUsage::from_turn(&view.state)?,
+                    independent_review: self
+                        .effort
+                        .as_ref()
+                        .map(|effort| effort.review_evidence(&view.state))
+                        .transpose()?
+                        .flatten(),
                     goal: None,
                     completion_checks: Vec::new(),
                 },

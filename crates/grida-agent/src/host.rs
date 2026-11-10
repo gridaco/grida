@@ -70,6 +70,7 @@ use agent_kit_sessions::{
 };
 use agent_kit_store_sqlite::{OperationClaim, OperationPairReceipt, SqliteStore};
 use grida_agent_master::configuration::SettingChange;
+use grida_agent_master::effort::{Policy as EffortPolicy, Preset as EffortPreset};
 use grida_agent_master::hooks::CompletionChecks;
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome, OperatingRegime};
 use serde::{Deserialize, Serialize};
@@ -113,6 +114,7 @@ pub struct Host {
     host_tools: Option<Arc<host_tools::HostTools>>,
     pub(crate) editor_surfaces: crate::editor_surfaces::EditorSurfaces,
     subagents_enabled: bool,
+    effort: EffortPreset,
     operating_regime: OperatingRegime,
     require_completion_text: bool,
     side_context: Option<Arc<grida_agent_master::side_context::SideContext>>,
@@ -265,6 +267,8 @@ struct StoredPrompt {
     configuration: ConfigurationSnapshot,
     max_output_tokens: Option<u64>,
     max_steps: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    effort: Option<EffortPolicy>,
     model: Option<agent_kit_core::ModelId>,
     authority: Option<CapturedAuthority>,
     #[serde(default, skip_serializing_if = "OperatingRegime::is_act")]
@@ -312,6 +316,7 @@ struct SubmissionPolicy {
     editor_presentation: bool,
     operating_regime: OperatingRegime,
     subagent: Option<grida_agent_master::subagents::Assignment>,
+    effort: Option<EffortPolicy>,
 }
 
 enum InputAuthority {
@@ -378,6 +383,7 @@ enum TurnWork {
 
 struct PreparedInput {
     config: MasterConfig,
+    effort: Option<EffortPolicy>,
     subagent: bool,
     operating_regime: OperatingRegime,
     messages: Vec<Message>,
@@ -560,6 +566,7 @@ impl Host {
             host_tools: None,
             editor_surfaces: Default::default(),
             subagents_enabled: false,
+            effort: EffortPreset::Standard,
             operating_regime: OperatingRegime::default(),
             require_completion_text: false,
             side_context: None,
@@ -1125,6 +1132,7 @@ impl Host {
             ClaimOutcome::Acquired(claim) => claim,
             ClaimOutcome::Existing(_) => return Ok(None),
         };
+        let cancellation_only = prepared.is_none();
         let mut prepared = match prepared {
             Some(prepared) => prepared,
             None => {
@@ -1202,6 +1210,9 @@ impl Host {
             .take()
             .map(|owner| owner.bind(claim.lease.binding()))
             .transpose()?;
+        let delegation = (!cancellation_only && prepared.effort.is_some())
+            .then(|| sponsorship::DelegationAccess::bind(self, claim.lease.binding()))
+            .transpose()?;
         let tool_authority = permissions::ToolAuthority::bind(
             execution.authorization.clone(),
             permission_scope.clone(),
@@ -1209,6 +1220,7 @@ impl Host {
             wakeups.clone(),
             completion.clone(),
             host_tools.clone(),
+            delegation.clone(),
         );
         let goal_authority = if prepared.goal.is_some() {
             let (validator, gate): (Arc<dyn AuthorityValidator>, Arc<dyn ToolGate>) =
@@ -1290,6 +1302,9 @@ impl Host {
         if let Some(goal) = goal_authority {
             goal.insert(&mut inventory, &mut authority.tools)?;
         }
+        if let Some(delegation) = &delegation {
+            delegation.insert(operations.clone(), &mut inventory, &mut authority.tools)?;
+        }
         let selected = authority.tools.keys().cloned().collect::<Vec<_>>();
         if self.side_context.is_some() && !selected.is_empty() {
             return Err(problem(
@@ -1298,6 +1313,9 @@ impl Host {
             ));
         }
         let tools = inventory.snapshot(&selected)?;
+        if !closing && let Some(delegation) = &delegation {
+            delegation.reconcile(&operations, &tools).await?;
+        }
         if !closing && prepared.questions {
             execution.questions.reconcile(&operations, &tools).await?;
         }
@@ -1327,6 +1345,9 @@ impl Host {
         )?
         .with_history(prior)
         .with_input_limit(prepared.limit);
+        if let Some(effort) = prepared.effort {
+            master = master.with_effort(effort)?;
+        }
         if let Some(checks) = prepared.completion_checks {
             let (inventory, grants) = match completion {
                 Some(completion) => (completion.inventory()?, completion.grants()),
@@ -1420,6 +1441,7 @@ impl Host {
             editor_presentation: false,
             operating_regime,
             subagent: None,
+            effort: self.capture_effort()?,
         })
     }
 
@@ -1439,6 +1461,7 @@ impl Host {
             editor_presentation,
             operating_regime,
             subagent,
+            effort,
         } = policy;
         if !operating_regime.is_act() && allow_wakeups {
             return Err(problem(ErrorKind::Unsupported, "plan_wakeups_unavailable"));
@@ -1517,6 +1540,7 @@ impl Host {
                     } else {
                         execution.config.max_steps
                     }),
+                    effort,
                     model: Some(execution.config.model.clone()),
                     authority: Some(CapturedAuthority {
                         principal: execution.authority.inference.authority.principal.clone(),
@@ -1563,6 +1587,7 @@ impl Host {
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
         let mut host_tools = None;
         let mut subagent = false;
+        let mut effort = None;
         let (
             messages,
             operating_regime,
@@ -1595,13 +1620,23 @@ impl Host {
             }
             2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
+                effort = stored.effort.clone();
+                if !cancellation_only && effort.is_some() && !self.sponsorship_available() {
+                    return Err(problem(ErrorKind::Unsupported, "delegation_unavailable"));
+                }
                 subagent = stored.subagent.is_some();
                 if let Some(assignment) = &stored.subagent {
                     let profile = subagent_profile.ok_or_else(|| {
                         problem(ErrorKind::InvalidState, "subagent_assignment_mismatch")
                     })?;
                     profile.require_assignment(assignment, !stored.operating_regime.is_act())?;
-                    if !cancellation_only && !self.subagents_available() {
+                    if !cancellation_only
+                        && !(if profile.sponsorship().is_some() {
+                            self.sponsorship_available()
+                        } else {
+                            self.subagents_available()
+                        })
+                    {
                         return Err(problem(ErrorKind::Unsupported, "subagents_unavailable"));
                     }
                     if stored.questions
@@ -1614,6 +1649,7 @@ impl Host {
                         || stored.editor_presentation
                         || stored.guidance.is_some()
                         || stored.goal.is_some()
+                        || stored.effort.is_some()
                         || stored.completion_checks.is_some()
                         || !matches!(
                             stored.max_steps,
@@ -1759,6 +1795,7 @@ impl Host {
         }
         Ok(PreparedInput {
             config,
+            effort,
             subagent,
             operating_regime,
             messages,

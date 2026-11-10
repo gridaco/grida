@@ -1,20 +1,28 @@
 //! GRIDA-SEC-004 — parent controls fence the exact funded child slot.
 
+mod collection;
+
 use super::*;
 use agent_kit_core::driver_state::DriverStateRevision;
 use agent_kit_core::inference::InputFormat;
-use agent_kit_core::messages::ToolArguments;
-use agent_kit_core::tools::{RecoveryKind, ToolDefinition};
+use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
+use agent_kit_core::tools::{
+    InventorySnapshot, Invocation, InvocationContext, InvocationRecovery, RecoveryKind, Tool,
+    ToolDefinition, ToolOutcome,
+};
 use agent_kit_core::turn::{OperationInput, TurnBinding};
 use agent_kit_core::{GrantId, ToolId};
+use agent_kit_runtime::TurnOperations;
 use agent_kit_store_sqlite::{
     OperationClaimSource, OperationPairControl, OperationPairReceipt, OperationRelatedControl,
     ResumeCompanion,
 };
+use grida_agent_master::effort::COLLECT_REVIEW;
 use grida_agent_master::subagents::{
     self, Assignment, PauseCause, Profile, Sponsorship, sponsored_identity,
 };
 use serde_json::json;
+use std::num::NonZeroU32;
 
 const DELEGATE: &str = "delegate_review";
 const CHILD_INPUT: &str = "sponsored-assignment";
@@ -94,17 +102,266 @@ fn delegation_definition() -> Result<ToolDefinition> {
 fn delegation_grant(binding: &TurnBinding) -> Result<GrantSelection> {
     let digest = Fingerprint::of(&(&binding.session, &binding.turn))?;
     let id = uuid::Uuid::from_bytes(digest.bytes()[..16].try_into().expect("fingerprint prefix"));
+    delegation_selection(BindingId::new(format!("delegation/{id}"))?, DELEGATE)
+}
+
+fn delegation_selection(binding: BindingId, grant: &str) -> Result<GrantSelection> {
     Ok(GrantSelection {
         authority: AuthorityBinding {
             principal: PrincipalId::new("grida-local")?,
-            binding: BindingId::new(format!("delegation/{id}"))?,
+            binding,
             scope: ScopeId::new("sponsored-subagent")?,
         },
-        grants: vec![GrantId::new(DELEGATE)?],
+        grants: vec![GrantId::new(grant)?],
     })
 }
 
+pub(super) struct DelegationAccess {
+    host: Host,
+    binding: TurnBinding,
+    start: GrantSelection,
+    collect: GrantSelection,
+}
+
+impl DelegationAccess {
+    pub(super) fn bind(host: &Host, binding: &TurnBinding) -> Result<Arc<Self>> {
+        let start = delegation_grant(binding)?;
+        let collect = delegation_selection(start.authority.binding.clone(), COLLECT_REVIEW)?;
+        Ok(Arc::new(Self {
+            host: host.clone(),
+            binding: binding.clone(),
+            start,
+            collect,
+        }))
+    }
+
+    pub(super) fn accepts(&self, selection: &GrantSelection) -> bool {
+        *selection == self.start || *selection == self.collect
+    }
+
+    pub(super) fn insert(
+        self: &Arc<Self>,
+        operations: TurnOperations,
+        inventory: &mut Inventory,
+        grants: &mut BTreeMap<ToolId, GrantSelection>,
+    ) -> Result<()> {
+        let start = delegation_definition()?;
+        let collect =
+            collection::CollectReview::new(self.host.store.clone(), self.binding.clone())?;
+        grants.insert(start.id.clone(), self.start.clone());
+        grants.insert(collect.definition().id.clone(), self.collect.clone());
+        inventory.insert(Arc::new(DelegationTool {
+            access: self.clone(),
+            operations,
+            definition: start,
+        }))?;
+        inventory.insert(Arc::new(collect))
+    }
+
+    pub(super) async fn reconcile(
+        &self,
+        operations: &TurnOperations,
+        tools: &InventorySnapshot,
+    ) -> Result<()> {
+        let view = operations.view();
+        for (id, operation) in view.state.operations() {
+            if self.accepts(&operation.record.grants)
+                && (operation.is_running() || operation.is_uncertain())
+                && let Err(error) = operations.reconcile_tool(id.clone(), tools.clone()).await
+                && operations.view().state.controls().admits_work()
+            {
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ToolGate for DelegationAccess {
+    fn decide(
+        &self,
+        admission: ToolAdmission,
+        context: AdmissionContext,
+    ) -> BoxFuture<'_, Result<ToolDecision>> {
+        Box::pin(async move {
+            let definition = if admission.grants == self.start {
+                delegation_definition()?
+            } else if admission.grants == self.collect {
+                collection::definition()?
+            } else {
+                return Err(delegation_unavailable());
+            };
+            if context.operations.view().state.binding() != &self.binding
+                || admission.invocation.definition() != &definition
+            {
+                return Err(delegation_unavailable());
+            }
+            Ok(ToolDecision::Permit)
+        })
+    }
+}
+
+struct DelegationTool {
+    access: Arc<DelegationAccess>,
+    operations: TurnOperations,
+    definition: ToolDefinition,
+}
+
+impl DelegationTool {
+    fn source(
+        &self,
+        invocation: &Invocation,
+        context: &InvocationContext,
+    ) -> Result<OperationClaimSource> {
+        let view = self.operations.view();
+        if view.state.binding() != &self.access.binding || context.cancellation.is_cancelled() {
+            return Err(delegation_unavailable());
+        }
+        Ok(OperationClaimSource {
+            binding: self.access.binding.clone(),
+            control: view.state.controls().revision,
+            operation: invocation.id().clone(),
+            attempt: context.attempt.clone(),
+            action: invocation.fingerprint(),
+        })
+    }
+}
+
+impl Tool for DelegationTool {
+    fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+
+    fn validate(&self, arguments: &ToolArguments) -> Result<()> {
+        subagents::validate_assignment(assignment_text(arguments)?)
+    }
+
+    fn invoke(
+        &self,
+        invocation: Invocation,
+        context: InvocationContext,
+    ) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async move {
+            let result = async {
+                let source = self.source(&invocation, &context)?;
+                let slot = sponsored_identity(&source.binding.session, &source.binding.turn)?;
+                self.access
+                    .host
+                    .start_sponsored_child(
+                        source,
+                        assignment_text(invocation.arguments())?.to_owned(),
+                    )
+                    .await?;
+                Ok::<_, Error>(slot)
+            }
+            .await;
+            match result {
+                Ok(slot) => started(slot),
+                Err(error) if error.kind == ErrorKind::Uncertain => ToolOutcome::uncertain(),
+                Err(error) => ToolOutcome::failed(&error.code),
+            }
+        })
+    }
+
+    fn recover(
+        &self,
+        recovery: InvocationRecovery,
+        context: InvocationContext,
+    ) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async move {
+            let result = async {
+                let source = self.source(&recovery.invocation, &context)?;
+                let instructions = assignment_text(recovery.invocation.arguments())?;
+                let slot = sponsored_identity(&source.binding.session, &source.binding.turn)?;
+                self.access
+                    .host
+                    .verify_delegation(&source, instructions)
+                    .await?;
+                let work = self
+                    .access
+                    .host
+                    .sponsored_work(&source, &slot, instructions, true)
+                    .await?;
+                Ok::<_, Error>(work.map(|_| slot))
+            }
+            .await;
+            match result {
+                Ok(Some(slot)) => started(slot),
+                Ok(None) => ToolOutcome::failed("sponsored_subagent_not_started"),
+                Err(_) => ToolOutcome::uncertain(),
+            }
+        })
+    }
+}
+
+fn assignment_text(arguments: &ToolArguments) -> Result<&str> {
+    let ToolArguments::Json(value) = arguments else {
+        return Err(delegation_unavailable());
+    };
+    value
+        .as_object()
+        .filter(|object| object.len() == 1)
+        .and_then(|object| object.get("instructions"))
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| problem(ErrorKind::InvalidInput, "invalid_subagent_assignment"))
+}
+
+fn started(slot: SessionId) -> ToolOutcome {
+    ToolOutcome {
+        status: OutcomeStatus::Succeeded,
+        content: vec![ResultContent::Text("The independent reviewer started. Continue useful work, then call collect_review for its findings.".into())],
+        structured: Some(json!({"child": slot, "status": "started"})),
+        receipt: None,
+        truncated: false,
+    }
+}
+
+fn delegation_unavailable() -> Error {
+    problem(ErrorKind::Unsupported, "delegation_unavailable")
+}
+
 impl Host {
+    /// Select the default product effort for new inputs on this trusted host.
+    pub fn with_effort(mut self, preset: EffortPreset) -> Result<Self> {
+        self.effort = preset;
+        self.capture_effort()?;
+        Ok(self)
+    }
+
+    pub(super) fn sponsorship_available(&self) -> bool {
+        self.subagents_enabled
+            && self.side_context.is_none()
+            && self.execution.as_ref().is_some_and(|execution| {
+                execution.config.max_output_tokens.is_some()
+                    && execution
+                        .provider
+                        .capabilities(&execution.config.model)
+                        .is_ok_and(|model| model.json_tools)
+            })
+    }
+
+    pub(super) fn capture_effort(&self) -> Result<Option<EffortPolicy>> {
+        if self.effort == EffortPreset::Standard {
+            return Ok(None);
+        }
+        if !self.sponsorship_available() {
+            return Err(delegation_unavailable());
+        }
+        let limit = || problem(ErrorKind::LimitExceeded, "effort_allowance_unavailable");
+        let standard = NonZeroU32::new(self.execution()?.config.max_steps).ok_or_else(limit)?;
+        // Reserve two more parent decisions and a separate two-step child.
+        let total = standard
+            .checked_add(2 + subagents::INFERENCE_STEPS_PER_ASSIGNMENT)
+            .ok_or_else(limit)?;
+        let grant = delegation_selection(BindingId::new("delegation/capture")?, DELEGATE)?;
+        Ok(Some(EffortPolicy::capture(
+            self.effort,
+            standard,
+            total,
+            Some((&delegation_definition()?.offer()?, &grant)),
+        )?))
+    }
+
     /// Start the one child funded by an already admitted local delegation
     /// operation. The caller supplies that operation's exact attempt and
     /// control basis. Repeating a retained start observes the original child.
@@ -113,13 +370,16 @@ impl Host {
         source: OperationClaimSource,
         instructions: String,
     ) -> Result<SubagentWork> {
-        if !self.subagents_available() {
+        if !self.sponsorship_available() {
             return Err(problem(ErrorKind::Unsupported, "subagents_unavailable"));
         }
         subagents::validate_assignment(&instructions)?;
         self.verify_delegation(&source, &instructions).await?;
         let slot = sponsored_identity(&source.binding.session, &source.binding.turn)?;
-        if let Some(work) = self.sponsored_work(&source, &slot, &instructions).await? {
+        if let Some(work) = self
+            .sponsored_work(&source, &slot, &instructions, false)
+            .await?
+        {
             return Ok(work);
         }
         let request = self
@@ -143,7 +403,10 @@ impl Host {
                 .map(|_| ()),
             Err(error) => Err(error),
         };
-        if let Some(work) = self.sponsored_work(&source, &slot, &instructions).await? {
+        if let Some(work) = self
+            .sponsored_work(&source, &slot, &instructions, false)
+            .await?
+        {
             return Ok(work);
         }
         admitted?;
@@ -194,6 +457,7 @@ impl Host {
         source: &OperationClaimSource,
         slot: &SessionId,
         instructions: &str,
+        recovery: bool,
     ) -> Result<Option<SubagentWork>> {
         let input = ChangeId::new(CHILD_INPUT)?;
         let (view, accepted) = match self
@@ -208,28 +472,35 @@ impl Host {
         let profile = session_configuration(&view)?
             .subagent
             .ok_or_else(sponsored_slot_used)?;
-        let admission = Fingerprint::of(source)?;
-        if profile.parent() != &source.binding.session
-            || !profile.sponsorship().is_some_and(|sponsor| {
-                sponsor.parent_turn == source.binding.turn
-                    && sponsor.operation == source.operation
-                    && sponsor.admission == Some(admission)
+        let sponsor = profile
+            .sponsorship()
+            .filter(|sponsor| {
+                profile.parent() == &source.binding.session
+                    && sponsor.parent_turn == source.binding.turn
             })
+            .ok_or_else(sponsored_slot_used)?;
+        let accepted = accepted.ok_or_else(sponsored_slot_used)?;
+        let stored: StoredPrompt = decode_input(&accepted.input.input)?;
+        if recovery {
+            if sponsor.admission.is_none() || sponsor.attempt.is_none() {
+                return Err(sponsored_slot_used());
+            }
+            if sponsor.operation != source.operation
+                || sponsor.attempt.as_ref() != Some(&source.attempt)
+            {
+                return Ok(None);
+            }
+        } else if sponsor.operation != source.operation
+            || sponsor.admission != Some(Fingerprint::of(source)?)
         {
             return Err(sponsored_slot_used());
         }
-        let accepted = accepted.ok_or_else(sponsored_slot_used)?;
-        let stored: StoredPrompt = decode_input(&accepted.input.input)?;
         if !matches!(stored.parts.as_slice(), [PromptPart::Text {text}] if text == instructions) {
             return Err(sponsored_slot_used());
         }
-        let observation = self
-            .inspect_subagent(source.binding.session.clone(), slot.clone(), Some(input))
-            .await?;
-        observation
-            .assignment
+        self.subagent_work(slot.clone(), accepted, stored)
+            .await
             .map(Some)
-            .ok_or_else(sponsored_slot_used)
     }
 
     async fn sponsored_claim(
@@ -257,6 +528,10 @@ impl Host {
             || config.subagent.is_some()
             || captured.goal.is_some()
             || captured.subagent.is_some()
+            || captured
+                .effort
+                .as_ref()
+                .is_none_or(|effort| effort.preset() != EffortPreset::Ultra)
             || captured.max_output_tokens.is_none()
         {
             return Err(problem(
@@ -271,6 +546,7 @@ impl Host {
                 parent_turn: source.binding.turn.clone(),
                 operation: source.operation.clone(),
                 admission: Some(Fingerprint::of(&source)?),
+                attempt: Some(source.attempt.clone()),
             },
             &execution.authority.inference.authority,
         )?;
@@ -281,6 +557,7 @@ impl Host {
             text: instructions.to_owned(),
         }];
         captured.max_steps = Some(subagents::INFERENCE_STEPS_PER_ASSIGNMENT);
+        captured.effort = None;
         captured.questions = false;
         captured.allow_wakeups = false;
         captured.configuration_permission = crate::ConfigurationPermission::Disabled;
@@ -399,7 +676,7 @@ impl Host {
             }
             let related = self.sponsored_control(&request, turn, &slot, stop).await?;
             if matches!(related, OperationRelatedControl::Absent { .. })
-                && !self.subagents_available()
+                && !self.sponsorship_available()
             {
                 return self.ordinary_control(request).await;
             }
@@ -499,7 +776,7 @@ impl Host {
         let (change, pause) =
             profile.set_sponsored_pause(&child.driver_state, PauseCause::Ancestor, false)?;
         let ready = !pause.effective();
-        if ready && !self.subagents_available() {
+        if ready && !self.sponsorship_available() {
             return Err(problem(ErrorKind::Unsupported, "subagents_unavailable"));
         }
         let related = OperationRelatedControl::Apply {
@@ -549,7 +826,7 @@ impl Host {
         let Some(receipt) = self.store.resume_receipt(request).await? else {
             return Ok(None);
         };
-        if self.subagents_available()
+        if self.sponsorship_available()
             && let Some(related) = &receipt.related
         {
             let wake = SponsoredWake::from_receipt(related)?;
@@ -744,7 +1021,7 @@ mod tests {
         }
     }
 
-    async fn capture_delegation(
+    pub(super) async fn capture_delegation(
         host: &Host,
         cwd: &Path,
         regime: OperatingRegime,
@@ -768,6 +1045,12 @@ mod tests {
                     editor_presentation: false,
                     operating_regime: regime,
                     subagent: None,
+                    effort: host
+                        .clone()
+                        .with_effort(EffortPreset::Ultra)
+                        .unwrap()
+                        .capture_effort()
+                        .unwrap(),
                 },
             )
             .await
@@ -1429,6 +1712,7 @@ mod tests {
                 parent_turn: parent_turn.clone(),
                 operation: operation.clone(),
                 admission: None,
+                attempt: None,
             },
             &grant.authority,
         )

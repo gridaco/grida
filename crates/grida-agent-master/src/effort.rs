@@ -3,12 +3,24 @@
 use crate::subagents::INFERENCE_STEPS_PER_ASSIGNMENT;
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::inference::{InputFormat, ModelCapabilities, ToolOffer};
+use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::tools::InventorySnapshot;
-use agent_kit_core::{Error, ErrorKind, Fingerprint, PrincipalId, Result, ScopeId, ToolId};
+use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnState};
+use agent_kit_core::{
+    Error, ErrorKind, Fingerprint, PrincipalId, Result, ScopeId, SessionId, ToolId,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::num::NonZeroU32;
+
+pub const COLLECT_REVIEW: &str = "collect_review";
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewEvidence {
+    pub child: SessionId,
+    pub findings_collected: bool,
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -93,6 +105,58 @@ impl Policy {
             .map_or(0, |child| child.generation_steps)
     }
 
+    pub(super) fn review_evidence(&self, state: &TurnState) -> Result<Option<ReviewEvidence>> {
+        let Some(delegation) = &self.delegation else {
+            return Ok(None);
+        };
+        let outcomes = || {
+            state.operations().values().filter_map(|operation| {
+                let OperationInput::Tool(invocation) = &operation.record.input else {
+                    return None;
+                };
+                let Some(OperationOutcome::Tool(outcome)) = operation.outcome() else {
+                    return None;
+                };
+                if outcome.status != OutcomeStatus::Succeeded {
+                    return None;
+                }
+                Some((
+                    invocation.definition(),
+                    &operation.record.grants.authority,
+                    outcome.structured.as_ref()?,
+                ))
+            })
+        };
+        for (tool, authority, result) in outcomes() {
+            if tool.id != delegation.tool
+                || tool.offer()?.fingerprint != delegation.definition
+                || authority.principal != delegation.principal
+                || authority.scope != delegation.scope
+                || result["status"] != "started"
+            {
+                continue;
+            }
+            let Some(child) = result["child"].as_str() else {
+                continue;
+            };
+            let findings_collected = outcomes().any(|(tool, collection_authority, result)| {
+                tool.id.as_str() == COLLECT_REVIEW
+                    && authority == collection_authority
+                    && result["child"] == child
+                    && result["disposition"] == "settled"
+                    && result["status"] == "succeeded"
+                    && result["findings"]
+                        .as_str()
+                        .is_some_and(|text| !text.trim().is_empty())
+            });
+            return Ok(Some(ReviewEvidence {
+                child: SessionId::new(child)?,
+                findings_collected,
+            }));
+        }
+        Ok(None)
+    }
+
     pub(super) fn verify_offer(
         &self,
         inventory: &InventorySnapshot,
@@ -134,7 +198,7 @@ impl Policy {
             }
             write!(
                 config.instructions,
-                "Ultra effort is active. Look early for independent investigation, alternatives, or verification that could improve the result. Use {} to delegate one bounded assignment when it would help. State its objective and expected evidence, continue useful work yourself, and integrate or qualify the findings before finishing. Keep the active operating mode and grants. In Plan, delegate investigation or review only. Finish directly when independent work would add little value.",
+                "Ultra effort is active. Look early for independent investigation, alternatives, or verification that could improve the result. Use {} to delegate one bounded assignment when it would help. State its objective and expected evidence, then continue useful work yourself. If you delegate, use the review result tool before finishing. Integrate verified findings and identify pending or uncertain review work. Keep the active operating mode and grants. In Plan, delegate investigation or review only. Finish directly when independent work would add little value.",
                 child.tool
             )
             .expect("writing to a string cannot fail");

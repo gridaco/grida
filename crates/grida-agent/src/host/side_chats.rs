@@ -69,6 +69,7 @@ impl Host {
             host_tools: None,
             editor_surfaces: Default::default(),
             subagents_enabled: false,
+            effort: EffortPreset::Standard,
             operating_regime: OperatingRegime::Act,
             require_completion_text: false,
             side_context: Some(context.clone()),

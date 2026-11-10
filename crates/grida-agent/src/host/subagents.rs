@@ -244,6 +244,7 @@ impl Host {
                     subagent: Some(Assignment {
                         parent_turn: parent_turn.clone(),
                     }),
+                    effort: None,
                 },
             )
             .await?;
@@ -336,7 +337,7 @@ impl Host {
         })
     }
 
-    async fn subagent_work(
+    pub(super) async fn subagent_work(
         &self,
         child: SessionId,
         accepted: InputObservation,

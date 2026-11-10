@@ -139,6 +139,22 @@ accepted Plan inputs keep their limits through queue edits and restart. A host
 launched in Plan can inspect or stop retained Act work. Continuing that work
 requires an Act launch.
 
+### Choose how much effort a task gets
+
+`run --effort standard` uses the ordinary task allowance and is the default.
+Use `run --effort ultra` when an independent review could help. Ultra gives
+the main agent more room to work and can start one separate reviewer while it
+continues. The reviewer receives a text assignment without access to the
+parent's tools or chat history. The agent can collect a verified finding or
+see that the review is still pending or uncertain.
+The finished record identifies the reviewer and records whether its verified
+findings were collected.
+
+Ultra is available in Plan and Act on the source-built host. It requires a
+model with JSON tool calls and a provider that supports a bounded output.
+For compatible Chat Completions endpoints, select the output limit field the
+endpoint accepts using `--compatible-output-limit-field`.
+
 ### Require a completion check
 
 Use `--require-completion-text` on `run` or `serve` to require final answer

@@ -302,14 +302,18 @@ impl Host {
                         original_settings
                             .map_or(self.operating_regime, |settings| settings.operating_regime)
                     };
-                    let capture = original
+                    let stored = original
                         .filter(|input| input.payload.version() == 2)
                         .map(decode_input::<StoredPrompt>)
-                        .transpose()?
-                        .and_then(|stored| stored.host_tools_capture);
-                    if let Some(capture) = &capture {
+                        .transpose()?;
+                    let capture = stored
+                        .as_ref()
+                        .and_then(|input| input.host_tools_capture.as_ref());
+                    if let Some(capture) = capture {
                         self.retained_host_tools(capture)?;
                     }
+                    let allow_host_tools = capture.is_some();
+                    let effort = stored.and_then(|input| input.effort);
                     self.capture_input(
                         &view,
                         replacement,
@@ -318,11 +322,12 @@ impl Host {
                             questions,
                             configuration_permission,
                             allow_wakeups: false,
-                            allow_host_tools: capture.is_some(),
+                            allow_host_tools,
                             editor_endpoint: None,
                             editor_presentation: false,
                             operating_regime,
                             subagent: None,
+                            effort,
                         },
                     )
                     .await?

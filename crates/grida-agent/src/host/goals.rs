@@ -124,6 +124,7 @@ impl Host {
         self.check_ready_capacity(&request.session).await?;
         let mut policy = self.submission_policy(&request, false)?;
         policy.allow_host_tools = false;
+        policy.effort = None;
         let mut input = self
             .capture_input(&view, request.id, request.parts, policy)
             .await?;

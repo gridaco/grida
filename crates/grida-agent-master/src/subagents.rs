@@ -3,8 +3,8 @@
 use agent_kit_core::authority::AuthorityBinding;
 use agent_kit_core::driver_state::{DriverStateChange, DriverStateSnapshot};
 use agent_kit_core::{
-    ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, PrincipalId, Result, SchemaId,
-    ScopeId, SessionId, TurnId,
+    AttemptId, ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, PrincipalId, Result,
+    SchemaId, ScopeId, SessionId, TurnId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +35,8 @@ pub struct Sponsorship {
     pub operation: OperationId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub admission: Option<Fingerprint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempt: Option<AttemptId>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -300,6 +302,7 @@ mod tests {
             parent_turn: turn.clone(),
             operation: OperationId::new(operation).unwrap(),
             admission: None,
+            attempt: None,
         };
         let owner = authority("owner", "initial");
         let first =
@@ -359,6 +362,7 @@ mod tests {
                 parent_turn: TurnId::new("turn").unwrap(),
                 operation: OperationId::new("operation").unwrap(),
                 admission: None,
+                attempt: None,
             },
             &authority("owner", "binding"),
         )

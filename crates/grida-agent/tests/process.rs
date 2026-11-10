@@ -31,6 +31,9 @@ mod configuration_tools;
 #[path = "process/deletion.rs"]
 mod deletion;
 #[cfg(unix)]
+#[path = "process/effort.rs"]
+mod effort;
+#[cfg(unix)]
 #[path = "process/goals.rs"]
 mod goals;
 #[cfg(unix)]
@@ -102,6 +105,8 @@ enum Reply {
     Question(&'static str),
     #[cfg(unix)]
     Tool(&'static str, &'static str),
+    #[cfg(unix)]
+    Choose(Box<dyn FnOnce(&Value) -> Reply + Send>),
     #[cfg(unix)]
     QuestionThenHold(tokio::sync::oneshot::Receiver<()>),
     #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -225,8 +230,13 @@ async fn fixture_request(
     }
     let mut request = vec![0; length.unwrap()];
     stream.read_exact(&mut request).await.unwrap();
-    sent.send(serde_json::from_slice(&request).unwrap())
-        .unwrap();
+    let request = serde_json::from_slice(&request).unwrap();
+    #[cfg(unix)]
+    let reply = match reply {
+        Reply::Choose(choose) => choose(&request),
+        other => other,
+    };
+    sent.send(request).unwrap();
     #[cfg(unix)]
     if let Reply::RawHttp(response) = reply {
         assert!(response.len() <= 16 * 1024, "oversized fixture response");
@@ -357,7 +367,7 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
             (text, Some("stop"))
         }
         #[cfg(unix)]
-        Reply::Release(..) | Reply::QuestionThenHold(_) => {
+        Reply::Release(..) | Reply::QuestionThenHold(_) | Reply::Choose(_) => {
             unreachable!("fixture releases the response before encoding")
         }
     };
