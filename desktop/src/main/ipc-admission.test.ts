@@ -77,15 +77,28 @@ describe("ipc_admission", () => {
     }
   });
 
-  it("admits native chat only on the exact main workspace route", () => {
+  it("admits native chat on the exact workspace or a producer-checked root deck", () => {
     expect(
       allowedFor("main", "/desktop/workspace").filter((channel) =>
         nativeChat.includes(channel)
       )
     ).toEqual(nativeChat);
+    const deck = allowedFor("main", "/desktop/file");
+    expect(deck).toContain(IPC_CHANNELS.NATIVE_CHAT_STATUS);
+    expect(deck).toContain(IPC_CHANNELS.NATIVE_CHAT_SUBMIT);
+    for (const channel of [
+      IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
+      IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
+      IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
+      IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+      ...nativeExternal,
+    ]) {
+      expect(deck).not.toContain(channel);
+    }
     for (const route of [
       "/desktop",
       "/desktop/settings",
+      "/desktop/file/extra",
       "/desktop/workspace/extra",
     ]) {
       expect(

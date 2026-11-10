@@ -532,6 +532,96 @@ function setup(
 }
 
 describe("native chat IPC", () => {
+  it("keeps root deck attachments on the same registered root and exact frame", async () => {
+    const { chat, emit, listeners } = setup();
+    const workspaceId = "eac20941e6a410aa";
+    const deck = `${ORIGIN}/desktop/file?id=${workspaceId}`;
+    const first = windowAt(deck);
+    const second = windowAt(`${deck}&path=nested.canvas`);
+    const identity = { device: "1", inode: "2", birthTimeNs: "3" };
+    let grant = {
+      workspaceId,
+      root: "/fixture/deck",
+      identity,
+      protected: [],
+    };
+    const resolve = vi.fn<(id: string) => Promise<typeof grant>>(
+      async () => grant
+    );
+    let started = false;
+    const ensure = vi.fn<(id: string) => Promise<void>>(async () => {
+      started = true;
+    });
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      () =>
+        started ? { workspaceId, directoryIdentity: identity, chat } : null,
+      { admits: () => true, ensure },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      resolve
+    );
+    const inDeck = <T>(invoke: () => T) => ipc.deckRequest(first.event, invoke);
+    await expect(
+      ipc.deckRequest(second.event, () => ipc.status(second.event, true))
+    ).rejects.toThrow("native_chat_scope_changed");
+    expect(resolve).not.toHaveBeenCalled();
+    expect(ensure).not.toHaveBeenCalled();
+    await expect(ipc.status(first.event, true)).rejects.toThrow(
+      "native_chat_scope_changed"
+    );
+    await expect(inDeck(() => ipc.status(first.event))).resolves.toBe(
+      "native-starting"
+    );
+    await expect(inDeck(() => ipc.status(first.event, true))).resolves.toBe(
+      "native-ready"
+    );
+    expect(ensure).toHaveBeenCalledExactlyOnceWith(workspaceId);
+    const opened = await inDeck(() => ipc.create(first.event));
+    const subscription = randomUUID();
+    await inDeck(() =>
+      ipc.subscribe(first.event, opened.attachmentId, subscription)
+    );
+    emit(opened.sessionId, UPDATE);
+    expect(first.frame.send).toHaveBeenCalledTimes(1);
+
+    const done =
+      Promise.withResolvers<Awaited<ReturnType<typeof chat.transcript>>>();
+    vi.spyOn(chat, "transcript").mockReturnValueOnce(done.promise);
+    const reading = inDeck(() =>
+      ipc.transcript(first.event, opened.attachmentId)
+    );
+    await vi.waitFor(() => expect(chat.transcript).toHaveBeenCalledTimes(1));
+    grant = { ...grant, identity: { ...identity, inode: "4" } };
+    done.resolve([]);
+    await expect(reading).rejects.toThrow("native_chat_scope_changed");
+    expect(listeners.get(opened.sessionId)?.size).toBe(0);
+    await expect(inDeck(() => ipc.create(first.event))).rejects.toThrow(
+      "native_chat_unavailable"
+    );
+
+    grant = { ...grant, identity };
+    ipc.revokeDeck(workspaceId);
+    const newer = await inDeck(() => ipc.create(first.event));
+    first.frame.url = `${ORIGIN}/desktop/workspace?id=${workspaceId}`;
+    await expect(
+      ipc.transcript(first.event, newer.attachmentId)
+    ).rejects.toThrow("native_chat_scope_changed");
+    await expect(ipc.create(first.event)).resolves.toMatchObject({
+      sessionId: expect.any(String),
+    });
+  });
+
+  it("reports compatibility only for a legacy host's exact root deck route", async () => {
+    const legacy = new NativeChatIpc(ORIGIN, () => null);
+    const first = windowAt(`${ORIGIN}/desktop/file?id=eac20941e6a410aa`);
+    await expect(
+      legacy.deckRequest(first.event, () => legacy.status(first.event, true))
+    ).resolves.toBe("legacy");
+  });
+
   it("switches only the admitted frame between exact chat owners", async () => {
     const { first, second, chat } = setup();
     const id = "a".repeat(64);

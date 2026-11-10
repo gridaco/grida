@@ -63,6 +63,7 @@ import { DesktopMediaHost } from "./media-host";
 import { DesktopMediaRoot } from "./media-root";
 import { NativeChatIpc, type ActiveNativeChat } from "./native-chat-ipc";
 import type { NativeDocumentFiles } from "./native-document-files";
+import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 import { NativeExternalRunIpc } from "./native-external-run-ipc";
 import type { NativeExternalRuns } from "./native-external-runs";
 
@@ -97,6 +98,7 @@ type RegisterIpcHandlersOptions = {
   ) => ActiveNativeChat | null;
   /** Present when this main process has selected native chat mode. */
   ensure_native_chat?: (workspaceId: string) => Promise<void>;
+  resolve_native_deck?: (workspaceId: string) => Promise<WorkspaceMediaGrant>;
   native_external_agent?: NativeExternalRuns;
   native_chat_profiles?: import("./native-chat-ipc").NativeChatProfileOwner;
   publish_workspace_surfaces?: (
@@ -197,7 +199,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       });
       return result.canceled || !result.filePath ? null : result.filePath;
     },
-    options.native_chat_profiles
+    options.native_chat_profiles,
+    options.resolve_native_deck
   );
   const externalAgent = new NativeExternalRunIpc(
     EDITOR_ORIGIN,
@@ -234,7 +237,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         );
         throw new Error(`IPC ${channel} denied`);
       }
-      return handler(event, ...(args as A));
+      const invoke = () => handler(event, ...(args as A));
+      return pathname === "/desktop/file" && ipc_admission.isDeckChat(channel)
+        ? nativeChat.deckRequest(event, invoke)
+        : invoke();
     });
   }
 
@@ -667,9 +673,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       return agentSidecarClient.pinWorkspace(id, pinned);
     }
   );
-  guarded(IPC_CHANNELS.WORKSPACE_FORGET, (_event, id: unknown) => {
+  guarded(IPC_CHANNELS.WORKSPACE_FORGET, async (_event, id: unknown) => {
     if (!workspaceIdValue(id)) throw new Error("workspace_id_invalid");
-    return agentSidecarClient.forgetWorkspace(id);
+    nativeChat.revokeDeck(id);
+    await agentSidecarClient.forgetWorkspace(id);
+    nativeChat.revokeDeck(id);
   });
   guarded(
     IPC_CHANNELS.WORKSPACE_READ,

@@ -934,11 +934,19 @@ lazy reads, read-only mutation, and symlink escape refusal.
   [development profile](desktop/src/main/native-desktop-profile.ts) requires
   separate canonical browser and agent directories under an owner-only
   temporary root. Existing legacy chat data or scratch refuses that launch.
-- [Native chat IPC](desktop/src/main/native-chat-ipc.ts) is available only to
-  the current top-level workspace frame under the existing authenticated
-  window guard. Its attachments and observed control revisions are issued in
-  main. A copied handle or workspace URL alone confers no access. Navigation
-  invalidates the frame's attachments and observation delivery. The
+- [Native chat IPC](desktop/src/main/native-chat-ipc.ts) is available to
+  the current top-level workspace frame or a verified root deck frame under
+  the existing authenticated window guard. The [native workspace catalog](desktop/src/main/native-workspace-catalog.ts)
+  verifies the registered directory and the root deck marker or an implicit
+  `.canvas` root. Main rechecks the deck frame and directory generation before
+  a request and before returning its result. A deck shares the worker for its
+  exact registered directory generation. The standalone document and nested
+  deck routes confer no native chat authority. Workbench editor endpoints
+  and external-agent commands remain scoped to the workbench route.
+  Attachments and observed control revisions are issued in Main. A copied
+  handle or workspace URL alone confers no access. Navigation invalidates
+  the frame's attachments and observation delivery. Forget also revokes the
+  deck binding. The
   [preload](desktop/src/preload.ts) forwards bounded text and resync payloads
   through the [typed bridge](packages/grida-desktop-bridge/src/native-chat.ts).
   [IPC fixtures](desktop/src/main/native-chat-ipc.test.ts) exercise frame and

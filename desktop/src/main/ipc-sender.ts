@@ -30,6 +30,15 @@ export namespace ipc_sender {
     );
   }
 
+  export function rootDeckId(raw: string | undefined): string | null {
+    const url = parse(raw);
+    if (url?.pathname !== "/desktop/file" || url.hash) return null;
+    const id = url.searchParams.get("id");
+    return url.searchParams.size === 1 && id && /^[a-f0-9]{16}$/.test(id)
+      ? id
+      : null;
+  }
+
   export function diagnostic(raw: string | undefined): string {
     if (!raw) return "<no frame>";
     const url = parse(raw);

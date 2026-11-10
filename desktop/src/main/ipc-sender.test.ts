@@ -2,6 +2,25 @@
 import { describe, expect, it } from "vitest";
 import { ipc_sender } from "./ipc-sender";
 
+it("accepts only a single canonical workspace ID on the root deck route", () => {
+  const id = "eac20941e6a410aa";
+  const origin = "https://grida.co";
+  const route = `${origin}/desktop/file?id=${id}`;
+  expect(ipc_sender.rootDeckId(route)).toBe(id);
+  for (const invalid of [
+    `${route}&id=${id}`,
+    `${route}&docId=file`,
+    `${route}&path=`,
+    `${route}&path=nested.canvas`,
+    `${route}#fragment`,
+    `${route}&session=other`,
+    `${origin}/desktop/file?id=wrong`,
+    `${origin}/desktop/workspace?id=${id}`,
+  ]) {
+    expect(ipc_sender.rootDeckId(invalid)).toBeNull();
+  }
+});
+
 it("pins the standalone document route to one exact document query", () => {
   const origin = "https://fixture.invalid";
   expect(ipc_sender.isDocument(`${origin}/desktop/file?docId=a`, "a")).toBe(

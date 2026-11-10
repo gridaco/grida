@@ -216,7 +216,11 @@ ipcRenderer.on(
       update: NativeChatUpdate;
     }
   ) => {
-    if (location.pathname !== "/desktop/workspace") return;
+    if (
+      location.pathname !== "/desktop/workspace" &&
+      location.pathname !== "/desktop/file"
+    )
+      return;
     const subscriber = nativeChatHandlers.get(payload.subscriptionId);
     if (!subscriber || subscriber.attachmentId !== payload.attachmentId) return;
     if (payload.update.kind === "closed")
@@ -497,6 +501,7 @@ const bridge: DesktopBridge = {
   },
 
   nativeChat: {
+    deck: true,
     available: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE),
     status: (start) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),

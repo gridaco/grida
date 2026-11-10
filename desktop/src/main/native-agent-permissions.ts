@@ -2,7 +2,10 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { atomicWrite } from "@grida/daemon/server";
+import {
+  atomicWrite,
+  type WorkspaceDirectoryIdentity,
+} from "@grida/daemon/server";
 
 const SNAPSHOT = "co.grida/session/snapshot";
 const APPROVALS = "co.grida/session/approvals";
@@ -13,7 +16,12 @@ const MAX_PATH_BYTES = 4096;
 const MAX_QUERY_BYTES = 128;
 type ReadTool = (typeof READ_TOOLS)[number];
 
-type Directory = Readonly<{ id: string; name: string; path: string }>;
+type Directory = Readonly<{
+  id: string;
+  name: string;
+  path: string;
+  identity?: WorkspaceDirectoryIdentity;
+}>;
 
 /** Selected by main from native workspace and folder-selection authority. */
 export type NativeWorkspaceSelection = Readonly<{
@@ -234,11 +242,16 @@ async function captureDirectory(directory: Directory) {
     throw invalidProfile();
   const root = await fs.realpath(directory.path);
   const metadata = await fs.lstat(root, { bigint: true });
+  const expected = directory.identity;
   if (
     root !== directory.path ||
     !metadata.isDirectory() ||
     root === path.parse(root).root ||
-    metadata.birthtimeNs <= 0n
+    metadata.birthtimeNs <= 0n ||
+    (expected &&
+      (String(metadata.dev) !== expected.device ||
+        String(metadata.ino) !== expected.inode ||
+        String(metadata.birthtimeNs) !== expected.birthTimeNs))
   )
     throw invalidProfile();
   const generation = digest(

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { AGENT_DEFAULT_TIER } from "@grida/agent/tiers";
 import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import type { Workspace } from "@grida/daemon";
+import type { WorkspaceDirectoryIdentity } from "@grida/daemon/server";
 import type { NativeChatProfileSelection } from "@grida/desktop-bridge";
 import { CHATGPT_SUBSCRIPTION_CONFIG } from "../chatgpt-configuration";
 import type { DesktopAccountSession } from "./account-session";
@@ -25,6 +26,7 @@ import type { NativeDesktopProfile } from "./native-desktop-profile";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeProviderSelection } from "./native-provider-selection";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
+import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 
 const DRAIN_TIMEOUT_MS = 35_000;
 type Subscription = Readonly<{
@@ -36,6 +38,7 @@ type LaunchOptions = Readonly<{
   provider: NativeDesktopProfile.Provider;
   openExternal: (url: string) => Promise<void>;
   workspaceCatalogRoot?: string;
+  workspaceGrant?: (id: string) => Promise<WorkspaceMediaGrant>;
   mcp?: NativeMcpLaunch;
   selectableProfiles?: boolean;
 }>;
@@ -63,6 +66,7 @@ export class NativeDesktopAgent {
     private readonly resourcesPath: string,
     private readonly subscription?: Subscription,
     private readonly workspaceCatalogRoot?: string,
+    private readonly workspaceGrant?: LaunchOptions["workspaceGrant"],
     private readonly mcp?: NativeMcpLaunch,
     private readonly provider: NativeDesktopProfile.Provider = "gateway",
     readonly selectableProfiles = false
@@ -160,6 +164,7 @@ export class NativeDesktopAgent {
       resourcesPath,
       subscription,
       options?.workspaceCatalogRoot,
+      options?.workspaceGrant,
       options?.mcp,
       options?.provider,
       options?.selectableProfiles
@@ -295,7 +300,10 @@ export class NativeDesktopAgent {
     };
     if (this.accountDrain) await this.accountDrain;
     requireCurrent();
-    const workspace = await agentSidecarClient.findWorkspace(workspaceId);
+    const grant = await this.workspaceGrant?.(workspaceId);
+    const workspace = grant
+      ? { id: grant.workspaceId, root: grant.root, identity: grant.identity }
+      : await agentSidecarClient.findWorkspace(workspaceId);
     requireCurrent();
     if (!workspace) throw new Error("native_workspace_not_registered");
     return { workspace, requireCurrent };
@@ -371,7 +379,13 @@ export class NativeDesktopAgent {
   }
 
   private async workspaceLaunch(
-    { id, root }: Pick<Workspace, "id" | "root">,
+    {
+      id,
+      root,
+      identity,
+    }: Pick<Workspace, "id" | "root"> & {
+      identity?: WorkspaceDirectoryIdentity;
+    },
     provider: Awaited<
       ReturnType<NativeDesktopAgent["prepareProvider"]>
     >["provider"]
@@ -388,7 +402,12 @@ export class NativeDesktopAgent {
       resourcesPath: this.resourcesPath,
       workspace: {
         id,
-        primary: { id: "project", name: "Project", path: root },
+        primary: {
+          id: "project",
+          name: "Project",
+          path: root,
+          ...(identity && { identity }),
+        },
         additionalReadRoots: [],
         protectedPaths: this.workspaceCatalogRoot
           ? [...this.cutover.protectedPaths, this.workspaceCatalogRoot]

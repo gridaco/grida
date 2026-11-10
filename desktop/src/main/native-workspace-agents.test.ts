@@ -120,6 +120,23 @@ function fixture() {
   return { launch: { ...launch, stateDirectory }, workspace, owners, release };
 }
 
+it("keeps a live native worker bound to its selected directory generation", async () => {
+  const { workspace, owners } = fixture();
+  const ready = child(1, { closeOnEof: true });
+  spawn.mockReturnValueOnce(ready.handle);
+  const identity = { device: "1", inode: "2", birthTimeNs: "3" };
+  try {
+    const active = await owners.open({ ...workspace, identity });
+    expect(active.directoryIdentity).toEqual(identity);
+    await expect(
+      owners.open({ ...workspace, identity: { ...identity, inode: "4" } })
+    ).rejects.toThrow("native_workspace_root_changed");
+    expect(spawn).toHaveBeenCalledTimes(1);
+  } finally {
+    await owners.close();
+  }
+});
+
 it("quarantines a failed launch until its exact child and pipes close", async () => {
   const { workspace, owners, release } = fixture();
   const stale = child(2);

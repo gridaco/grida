@@ -452,6 +452,8 @@ export type NativeChatUpdate =
 
 /** Available only for a main-selected native chat in the current workspace. */
 export type DesktopNativeChat = Partial<NativeSubagentClient> & {
+  /** This host also accepts native chat requests from an admitted root deck. */
+  readonly deck?: true;
   available(): Promise<boolean>;
   /**
    * Starts the admitted workspace when requested and native mode is selected.

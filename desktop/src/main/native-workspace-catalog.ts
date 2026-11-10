@@ -216,6 +216,30 @@ export class NativeWorkspaceCatalog {
     return this.run(() => this.resolveFileGrant(id));
   }
 
+  /** Resolve a root deck through the committed native workspace catalog. */
+  rootDeck(id: string): Promise<WorkspaceMediaGrant> {
+    return this.run(async () => {
+      const grant = await this.resolveFileGrant(id);
+      const marker = await fs
+        .lstat(path.join(grant.root, ".canvas.json"), { bigint: true })
+        .catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return null;
+          throw error;
+        });
+      const root = await fs.lstat(grant.root, { bigint: true });
+      if (
+        !root.isDirectory() ||
+        !matchesIdentity(root, grant.identity) ||
+        (await fs.realpath(grant.root)) !== grant.root ||
+        (marker
+          ? !marker.isFile() || marker.nlink !== 1n || marker.dev !== root.dev
+          : path.extname(grant.root).toLowerCase() !== ".canvas")
+      )
+        throw unavailable();
+      return grant;
+    });
+  }
+
   /** Hold catalog publication until the admitted writer has settled. */
   withWriteGrant<T>(
     id: string,
@@ -315,6 +339,17 @@ export class NativeWorkspaceCatalog {
       throw error;
     }
   }
+}
+
+function matchesIdentity(
+  metadata: BigIntStats,
+  identity: WorkspaceDirectoryIdentity
+): boolean {
+  return (
+    String(metadata.dev) === identity.device &&
+    String(metadata.ino) === identity.inode &&
+    String(metadata.birthtimeNs) === identity.birthTimeNs
+  );
 }
 
 async function assertPrivateDirectory(directory: string) {

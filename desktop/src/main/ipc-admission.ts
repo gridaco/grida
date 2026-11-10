@@ -33,6 +33,13 @@ const TOOLS_ONLY_CHANNELS = new Set<IpcChannel>([
   IPC_CHANNELS.MEDIA_OPEN_FOLDER,
 ]);
 
+const WORKBENCH_CHAT_CHANNELS = new Set<IpcChannel>([
+  IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+]);
+
 /**
  * Closed IPC allowlist for non-main entry roles.
  *
@@ -42,6 +49,13 @@ const TOOLS_ONLY_CHANNELS = new Set<IpcChannel>([
  * in {@link DesktopEntryWindow.ipcRoleFor} and never reach this policy.
  */
 export namespace ipc_admission {
+  export function isDeckChat(channel: IpcChannel): boolean {
+    return (
+      channel.startsWith("grida:native-chat:") &&
+      !WORKBENCH_CHAT_CHANNELS.has(channel)
+    );
+  }
+
   export function allows({
     role,
     channel,
@@ -72,8 +86,13 @@ export namespace ipc_admission {
         ) {
           return pathname === "/desktop/file";
         }
+        if (channel.startsWith("grida:native-chat:")) {
+          return (
+            pathname === "/desktop/workspace" ||
+            (pathname === "/desktop/file" && isDeckChat(channel))
+          );
+        }
         if (
-          channel.startsWith("grida:native-chat:") ||
           channel.startsWith("grida:native-external:") ||
           channel === IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES
         ) {

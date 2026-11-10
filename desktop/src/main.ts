@@ -657,6 +657,7 @@ app.on("ready", async () => {
         mcp,
         openExternal: (url: string) => shell.openExternal(url),
         workspaceCatalogRoot: path.dirname(workspaceCatalog.directory),
+        workspaceGrant: workspaceCatalog.fileGrant.bind(workspaceCatalog),
         selectableProfiles: strictRetainedMedia,
       };
       nativeDesktopAgent = NativeDesktopProfile.managedCutover()
@@ -800,6 +801,7 @@ app.on("ready", async () => {
       resolve_native_chat: (_window, workspaceId, profileId) =>
         native.current(workspaceId, profileId),
       ensure_native_chat: (workspaceId) => native.ensure(workspaceId),
+      resolve_native_deck: workspaceCatalog?.rootDeck.bind(workspaceCatalog),
       native_chat_profiles: native.selectableProfiles
         ? {
             list: (workspaceId) => native.profiles(workspaceId),

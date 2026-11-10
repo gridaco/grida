@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 — main owns workspace process and provider lifetimes.
 import type { Workspace } from "@grida/daemon";
+import type { WorkspaceDirectoryIdentity } from "@grida/daemon/server";
 import type {
   NativeAgentChat,
   NativeAgentChatLaunch,
@@ -9,7 +10,9 @@ import { NativeAgentTerminationPending } from "./native-agent-process";
 import type { ActiveNativeChat } from "./native-chat-ipc";
 
 const MAX_LIVE_WORKSPACES = 8;
-type Project = Pick<Workspace, "id" | "root">;
+type Project = Pick<Workspace, "id" | "root"> & {
+  identity?: WorkspaceDirectoryIdentity;
+};
 type ProviderLaunch = Readonly<{
   launch: Omit<NativeAgentChatLaunch, "stateDirectory" | "cwd">;
   release?: () => void;
@@ -23,7 +26,7 @@ type Owner = {
   release?: () => void;
 };
 type Slot = {
-  root: string;
+  workspace: Project;
   opened: Promise<Owner>;
   visible: Promise<ActiveNativeChat>;
   owner?: Owner;
@@ -54,13 +57,18 @@ export class NativeWorkspaceAgents {
     profile?: ChatProfile
   ): Promise<ActiveNativeChat> {
     if (this.stopping.signal.aborted) throw closing();
-    const { id, root } = workspace;
+    const { id } = workspace;
     const key = slotKey(id, profile?.id);
     const existing = this.slots.get(key);
     if (existing) {
-      if (existing.root !== root)
-        throw new Error("native_workspace_root_changed");
       const chat = existing.owner?.active.chat;
+      if (
+        existing.workspace.root !== workspace.root ||
+        (!chat?.hasExited &&
+          JSON.stringify(existing.workspace.identity) !==
+            JSON.stringify(workspace.identity))
+      )
+        throw new Error("native_workspace_root_changed");
       if (!chat || chat.connected) return existing.visible;
       if (!chat.hasExited)
         throw new Error("native_workspace_disconnect_pending");
@@ -80,14 +88,14 @@ export class NativeWorkspaceAgents {
           existing.owner.release?.();
         }
       }
-      return await this.start({ id, root }, profile);
+      return await this.start(workspace, profile);
     });
     const visible = opened.then((owner) => {
       if (this.stopping.signal.aborted) throw closing();
       slot.owner = owner;
       return owner.active;
     });
-    const slot: Slot = { root, opened, visible };
+    const slot: Slot = { workspace, opened, visible };
     this.slots.set(key, slot);
     void opened.catch((error: unknown) => this.retireSlot(key, slot, error));
     return visible;
@@ -115,7 +123,11 @@ export class NativeWorkspaceAgents {
         ? await this.cutover.startWorkspace(workspace.id, launch, profile.id)
         : await this.cutover.startWorkspace(workspace.id, launch);
       return {
-        active: Object.freeze({ workspaceId: workspace.id, chat }),
+        active: Object.freeze({
+          workspaceId: workspace.id,
+          ...(workspace.identity && { directoryIdentity: workspace.identity }),
+          chat,
+        }),
         release: candidate.release,
       };
     } catch (error) {

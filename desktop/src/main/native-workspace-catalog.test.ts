@@ -8,6 +8,64 @@ import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import { WorkspaceWriteUnverified } from "./workspace-file-worker";
 
 it.runIf(process.platform !== "win32")(
+  "admits a root deck only through its committed physical directory",
+  async () => {
+    const root = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), "grida-root-deck-"))
+    );
+    const browserData = path.join(root, "browser");
+    const project = path.join(root, "selected");
+    const bundle = path.join(root, "Empty.CANVAS");
+    const marker = path.join(project, ".canvas.json");
+    try {
+      for (const directory of [browserData, project, bundle])
+        await fs.mkdir(directory, { mode: 0o700 });
+      const catalog = new NativeWorkspaceCatalog({
+        browserData,
+        projectsRoot: path.join(root, "projects"),
+        protectedPaths: [],
+      });
+      const selected = await catalog.openSelected(project);
+      const empty = await catalog.openSelected(bundle);
+      await expect(catalog.rootDeck(selected.id)).rejects.toThrow(
+        "workspace_not_registered"
+      );
+      await expect(catalog.rootDeck(empty.id)).resolves.toMatchObject({
+        root: bundle,
+      });
+      await fs.symlink(path.join(bundle, ".canvas.json"), marker);
+      await expect(catalog.rootDeck(selected.id)).rejects.toThrow(
+        "workspace_not_registered"
+      );
+      await fs.unlink(marker);
+      await fs.writeFile(marker, "{}");
+      const original = await catalog.rootDeck(selected.id);
+      await fs.writeFile(marker + ".save", "{}");
+      await fs.rename(marker + ".save", marker);
+      await expect(catalog.rootDeck(selected.id)).resolves.toEqual(original);
+
+      await fs.rename(project, project + "-previous");
+      await fs.mkdir(project, { mode: 0o700 });
+      await fs.writeFile(marker, "{}");
+      await expect(catalog.rootDeck(selected.id)).rejects.toThrow(
+        "workspace_not_registered"
+      );
+      const reselected = await catalog.openSelected(project);
+      expect(reselected.id).toBe(selected.id);
+      expect((await catalog.rootDeck(reselected.id)).identity).not.toEqual(
+        original.identity
+      );
+      await catalog.forget(reselected.id);
+      await expect(catalog.rootDeck(reselected.id)).rejects.toThrow(
+        "workspace_not_registered"
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  }
+);
+
+it.runIf(process.platform !== "win32")(
   "keeps external scratch reserved and preserves registration when external cleanup is unverified",
   async () => {
     const root = await fs.realpath(
