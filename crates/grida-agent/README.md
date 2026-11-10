@@ -150,6 +150,54 @@ cleanup and uncertain outcomes keep their original attempt identity.
 `inspect` reads the latest and current persisted turn state without provider
 configuration. Use it after the process that owns the state directory exits.
 
+### Check a workspace manifest
+
+This example accepts a `design-manifest.txt` in the primary directory when it
+contains exactly one line, `format=1`. Generate the `beforeCompletion` value
+using the canonical path and digest on the host that will run it.
+
+```sh
+python3 - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+
+program = Path("/usr/bin/awk").resolve(strict=True)
+check = r'''
+NR == 1 && $0 == "format=1" { valid = 1 }
+END {
+    if (valid && NR == 1) print "{\"decision\":\"allow\"}"
+    else print "{\"decision\":\"deny\",\"reason\":\"Expected one format=1 line in design-manifest.txt.\"}"
+}
+'''
+print(json.dumps({
+    "executable": {"path": str(program), "sha256": list(hashlib.sha256(program.read_bytes()).digest())},
+    "arguments": [check, "design-manifest.txt"],
+    "mode": "required",
+    "timeoutMs": 5000,
+}, indent=2))
+PY
+```
+
+Add the value to a reviewed launch profile as `beforeCompletion`. Keep the
+profile owner-only and outside the workspace. Review `commandRead: "allow"`
+on the primary directory and include the executable in the reviewed runtime
+paths. Set `command.hooksOnly` to keep general commands unavailable to the
+model. Launch the same profile with `run` or `serve`.
+
+```sh
+target/debug/grida-agent run --state-dir "$GRIDA_AGENT_STATE" \
+  --permission-profile "$GRIDA_AGENT_PERMISSION_PROFILE" \
+  --endpoint "$GRIDA_AGENT_ENDPOINT" --model "$GRIDA_AGENT_MODEL" \
+  --credential-env OPENAI_API_KEY --prompt "Summarize the proposed design."
+```
+
+Use `"mode": "observe"` to record the check without requiring it to pass.
+Read `account.completion_checks` in the finished JSON record. A command that
+hits its deadline or output limit records that reason and preserves any
+uncertainty about the command's outcome. The command's raw streams stay out
+of the account.
+
 ## ACP stdio
 
 The host handles `initialize`, `session/new`, `session/list`, `session/load`,

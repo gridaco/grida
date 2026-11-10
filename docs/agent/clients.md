@@ -178,7 +178,9 @@ profile to keep general commands unavailable to the model. A required check
 blocks completion when it rejects or fails. An observational check records
 its result and leaves the completion decision in place. Resume uses the
 selected definition and preserves any uncertain result from an interrupted
-command for review. [Native launch profile](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md)
+command for review. The headless completion account distinguishes a reported
+rejection from a command that hit its deadline or output limit.
+[Workspace manifest example](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#check-a-workspace-manifest)
 
 ## Use your Grida login
 

@@ -11,6 +11,13 @@ use std::path::PathBuf;
 const CHECK: &str = "require-completion-text";
 const FLAG: &str = "--require-completion-text";
 const COMMAND_CHECK: &str = "before-completion-command";
+const MANIFEST_CHECK: &str = r#"
+    NR == 1 && $0 == "format=1" { valid = 1 }
+    END {
+        if (valid && NR == 1) print "{\"decision\":\"allow\"}"
+        else print "{\"decision\":\"deny\",\"reason\":\"Expected one format=1 line in design-manifest.txt.\"}"
+    }
+"#;
 const HEARTBEAT: &str = r#"
     exec 3>"$TMPDIR/heartbeat"
     while :; do printf . >&3; /bin/sleep 0.04; done
@@ -30,6 +37,12 @@ fn hook(fixture: &Fixture, path: &str, arguments: &[&str], mode: &str, changed: 
     });
     fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
     PathBuf::from(profile["command"]["temporaryParent"].as_str().unwrap())
+}
+
+fn set_hook_timeout(fixture: &Fixture, timeout_ms: u32) {
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["beforeCompletion"]["timeoutMs"] = timeout_ms.into();
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
 }
 
 fn select_hooks_only(fixture: &Fixture, enabled: bool) {
@@ -137,6 +150,128 @@ async fn configured_completion_command_records_only_its_reviewed_decision() {
         assert!(!request.to_string().contains("before_completion_command"));
         assert!(endpoint.requests.try_recv().is_err());
         assert!(fs::read_dir(temporary).unwrap().next().is_none());
+    }
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn configured_completion_command_checks_the_real_primary_workspace() {
+    let cases = [
+        ("format=1\n", "required", 0, "allowed"),
+        ("format=2\n", "required", 1, "denied"),
+        ("format=1\nunexpected\n", "observe", 0, "denied"),
+    ];
+    let mut endpoint = Endpoint::start(
+        cases
+            .iter()
+            .map(|_| Reply::Finished("The manifest is ready for review."))
+            .collect(),
+    )
+    .await;
+    for (contents, mode, exit, decision) in cases {
+        let fixture = Fixture::new(true);
+        let manifest = fixture.primary.join("design-manifest.txt");
+        fs::write(&manifest, contents).unwrap();
+        let temporary = hook(
+            &fixture,
+            "/usr/bin/awk",
+            &[MANIFEST_CHECK, "design-manifest.txt"],
+            mode,
+            false,
+        );
+        select_hooks_only(&fixture, true);
+        let output = timeout(
+            WAIT,
+            fixture
+                .process(&endpoint.url, "run")
+                .args(["--prompt", "Summarize the proposed design."])
+                .output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let results = records(&output.stdout);
+        assert_eq!(
+            output.status.code(),
+            Some(exit),
+            "{results:?} {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let check = &results[1]["account"]["completion_checks"][0];
+        assert_eq!(check["check"], COMMAND_CHECK);
+        assert_eq!(check["status"], decision, "{results:?}");
+        assert!(check["operation"].is_string());
+        if decision == "denied" {
+            assert_eq!(
+                check["reason"],
+                "Expected one format=1 line in design-manifest.txt."
+            );
+        }
+        assert_eq!(fs::read_to_string(&manifest).unwrap(), contents);
+        assert!(fs::read_dir(temporary).unwrap().next().is_none());
+        let request = endpoint.request().await;
+        assert!(!request.to_string().contains("design-manifest.txt"));
+        assert!(!request.to_string().contains("before_completion_command"));
+        assert!(!request.to_string().contains("run_command"));
+    }
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn completion_command_retains_observed_limits_without_exposing_output() {
+    let cases: [(&str, &[&str], u32, &str); 2] = [
+        ("/bin/sleep", &["10"], 1_500, "completion_hook_timed_out"),
+        (
+            "/usr/bin/printf",
+            &["untrusted-output:%5000s", ""],
+            20_000,
+            "completion_hook_output_limit",
+        ),
+    ];
+    let mut endpoint = Endpoint::start(
+        cases
+            .iter()
+            .map(|_| Reply::Finished("Fixture answer."))
+            .collect(),
+    )
+    .await;
+    for (program, arguments, timeout_ms, reason) in cases {
+        let fixture = Fixture::new(true);
+        let temporary = hook(&fixture, program, arguments, "required", false);
+        set_hook_timeout(&fixture, timeout_ms);
+        select_hooks_only(&fixture, true);
+        let output = timeout(
+            WAIT,
+            fixture
+                .process(&endpoint.url, "run")
+                .args(["--prompt", "Prepare the answer."])
+                .output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let results = records(&output.stdout);
+        let account = &results[1]["account"];
+        let check = &account["completion_checks"][0];
+        assert_eq!(
+            check["reason"],
+            reason,
+            "{results:?} {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let (exit, disposition) = match check["status"].as_str() {
+            Some("failed") => (1, "failed"),
+            Some("uncertain") => (5, "uncertain"),
+            _ => panic!("unexpected completion check: {check}"),
+        };
+        assert_eq!(results[1]["disposition"], disposition);
+        assert_eq!(output.status.code(), Some(exit));
+        assert_eq!(account["failure"]["code"], "completion_check_blocked");
+        assert!(!account.to_string().contains("untrusted-output"));
+        assert!(fs::read_dir(temporary).unwrap().next().is_none());
+        endpoint.request().await;
     }
     endpoint.done().await;
 }

@@ -4,14 +4,14 @@ use super::*;
 use crate::command::{CommandTool, project_process};
 use crate::permissions::{CompletionHook, TurnPermissions};
 use agent_kit_core::inference::InputFormat;
-use agent_kit_core::messages::{OutcomeStatus, ToolArguments};
+use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
 use agent_kit_core::tools::{
     InventorySnapshot, Invocation, InvocationContext, RecoveryKind, Tool, ToolDefinition,
     ToolOutcome,
 };
 use agent_kit_core::turn::TurnBinding;
 use agent_kit_core::{GrantId, ToolId};
-use agent_kit_sandbox::ProcessEvidence;
+use agent_kit_sandbox::{ProcessEvidence, StopReason};
 use grida_agent_master::hooks::{
     CheckInvocation, CheckMode, CompletionCheck, CompletionChecks, HandlerReply,
 };
@@ -260,10 +260,22 @@ impl Tool for CompletionHandler {
 }
 
 fn project_completion(evidence: ProcessEvidence, maximum: usize) -> (ToolOutcome, bool) {
+    let limit = match evidence.stopped {
+        Some(StopReason::Deadline) => Some("completion_hook_timed_out"),
+        Some(StopReason::OutputLimit) => Some("completion_hook_output_limit"),
+        _ => None,
+    };
     let reply = (!evidence.output_truncated)
         .then(|| serde_json::from_slice::<HandlerReply>(&evidence.stdout).ok())
         .flatten();
     let (mut outcome, verified) = project_process(evidence, maximum, false);
+    if matches!(
+        outcome.status,
+        OutcomeStatus::Failed | OutcomeStatus::Uncertain
+    ) && let Some(limit) = limit
+    {
+        outcome.content.push(ResultContent::Text(limit.into()));
+    }
     outcome.structured = if outcome.status == OutcomeStatus::Succeeded {
         reply.and_then(|reply| serde_json::to_value(reply).ok())
     } else {

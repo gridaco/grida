@@ -386,15 +386,18 @@ fn project_reply(outcome: &ToolOutcome) -> (CheckStatus, Option<String>) {
             }
         }
         OutcomeStatus::Succeeded => (CheckStatus::InvalidReply, None),
-        OutcomeStatus::Failed => (
-            CheckStatus::Failed,
+        OutcomeStatus::Failed | OutcomeStatus::Uncertain => (
+            if outcome.status == OutcomeStatus::Failed {
+                CheckStatus::Failed
+            } else {
+                CheckStatus::Uncertain
+            },
             outcome.content.first().and_then(|part| match part {
                 ResultContent::Text(reason) => safe_code(reason),
                 _ => None,
             }),
         ),
         OutcomeStatus::Cancelled => (CheckStatus::Cancelled, None),
-        OutcomeStatus::Uncertain => (CheckStatus::Uncertain, None),
     }
 }
 
