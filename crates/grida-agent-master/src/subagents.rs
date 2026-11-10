@@ -3,12 +3,13 @@
 use agent_kit_core::authority::AuthorityBinding;
 use agent_kit_core::driver_state::{DriverStateChange, DriverStateSnapshot};
 use agent_kit_core::{
-    ChangeId, Envelope, Error, ErrorKind, Fingerprint, PrincipalId, Result, SchemaId, ScopeId,
-    SessionId, TurnId,
+    ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, PrincipalId, Result, SchemaId,
+    ScopeId, SessionId, TurnId,
 };
 use serde::{Deserialize, Serialize};
 
 const ALLOCATION_SCHEMA: &str = "grida.agent.subagent.allocation";
+const SPONSORED_ALLOCATION_SCHEMA: &str = "grida.agent.subagent.sponsored-allocation";
 const MAX_WORK_TURNS: u8 = 8;
 const MAX_NAME_BYTES: usize = 128;
 pub const MAX_ASSIGNMENT_BYTES: usize = 64 * 1024;
@@ -23,6 +24,34 @@ pub struct Profile {
     work_turns: u8,
     principal: PrincipalId,
     scope: ScopeId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sponsorship: Option<Sponsorship>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Sponsorship {
+    pub parent_turn: TurnId,
+    pub operation: OperationId,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PauseCause {
+    Independent,
+    Ancestor,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SponsoredPause {
+    independent: bool,
+    ancestor: bool,
+}
+
+impl SponsoredPause {
+    pub fn effective(self) -> bool {
+        self.independent || self.ancestor
+    }
 }
 
 impl Profile {
@@ -38,8 +67,20 @@ impl Profile {
             work_turns,
             principal: authority.principal.clone(),
             scope: authority.scope.clone(),
+            sponsorship: None,
         };
         profile.validate()?;
+        Ok(profile)
+    }
+
+    pub fn sponsored(
+        parent: SessionId,
+        name: String,
+        sponsorship: Sponsorship,
+        authority: &AuthorityBinding,
+    ) -> Result<Self> {
+        let mut profile = Self::new(parent, name, 1, authority)?;
+        profile.sponsorship = Some(sponsorship);
         Ok(profile)
     }
 
@@ -49,6 +90,7 @@ impl Profile {
             || self.name.len() > MAX_NAME_BYTES
             || self.name.chars().any(char::is_control)
             || !(1..=MAX_WORK_TURNS).contains(&self.work_turns)
+            || (self.sponsorship.is_some() && self.work_turns != 1)
         {
             return Err(problem(ErrorKind::InvalidInput, "invalid_subagent_profile"));
         }
@@ -63,6 +105,20 @@ impl Profile {
         &self.name
     }
 
+    pub fn sponsorship(&self) -> Option<&Sponsorship> {
+        self.sponsorship.as_ref()
+    }
+
+    pub fn require_assignment(&self, assignment: &Assignment, plan: bool) -> Result<()> {
+        self.validate()?;
+        if self.sponsorship.as_ref().map_or(plan, |sponsor| {
+            sponsor.parent_turn != assignment.parent_turn
+        }) {
+            return Err(problem(ErrorKind::InvalidInput, "invalid_subagent_sponsor"));
+        }
+        Ok(())
+    }
+
     pub fn require_authority(&self, current: &AuthorityBinding) -> Result<()> {
         if self.principal != current.principal || self.scope != current.scope {
             return Err(problem(ErrorKind::Conflict, "subagent_authority_changed"));
@@ -70,15 +126,30 @@ impl Profile {
         Ok(())
     }
 
-    /// The creation request determines identity. Changing its profile still
-    /// conflicts with the originally recorded creation.
+    /// A manual child is identified by its creation request. Sponsored work
+    /// uses the parent's single turn slot.
     pub fn identity(&self, request: &ChangeId) -> Result<SessionId> {
+        if let Some(sponsor) = &self.sponsorship {
+            return sponsored_identity(&self.parent, &sponsor.parent_turn);
+        }
         let digest = Fingerprint::of(&("grida-subagent", &self.parent, request))?;
         SessionId::new(format!("subagent/{}", crate::hex(digest)))
     }
 
     pub fn allocation(&self, state: &DriverStateSnapshot) -> Result<Allocation> {
         self.validate()?;
+        if self.sponsorship.is_some() {
+            let reserved = if state.is_initial() {
+                0
+            } else {
+                self.sponsored_pause(state)?;
+                1
+            };
+            return Ok(Allocation {
+                work_turns: 1,
+                reserved,
+            });
+        }
         let invalid = || problem(ErrorKind::InvalidState, "invalid_subagent_allocation");
         let reserved = match state.value() {
             None if state.is_initial() => 0,
@@ -106,6 +177,9 @@ impl Profile {
                 "subagent_allocation_exhausted",
             ));
         }
+        if self.sponsorship.is_some() {
+            return sponsored_change(state, SponsoredPause::default());
+        }
         let next = serde_json::to_vec(&(allocation.reserved + 1))
             .map_err(|_| problem(ErrorKind::InvalidState, "invalid_subagent_allocation"))?;
         Ok(DriverStateChange {
@@ -113,6 +187,64 @@ impl Profile {
             value: Some(Envelope::new(SchemaId::new(ALLOCATION_SCHEMA)?, 1, next)?),
         })
     }
+
+    pub fn sponsored_pause(&self, state: &DriverStateSnapshot) -> Result<SponsoredPause> {
+        self.validate()?;
+        let value = state
+            .value()
+            .filter(|value| {
+                self.sponsorship.is_some()
+                    && state.revision().0 > 0
+                    && value.schema().as_str() == SPONSORED_ALLOCATION_SCHEMA
+                    && value.version() == 1
+            })
+            .ok_or_else(invalid_sponsored_allocation)?;
+        serde_json::from_slice(value.bytes()).map_err(|_| invalid_sponsored_allocation())
+    }
+
+    /// Retain one pause cause while preserving the other and the work allowance.
+    /// The caller commits this change with the exact active-turn control.
+    pub fn set_sponsored_pause(
+        &self,
+        state: &DriverStateSnapshot,
+        cause: PauseCause,
+        paused: bool,
+    ) -> Result<(DriverStateChange, SponsoredPause)> {
+        let mut next = self.sponsored_pause(state)?;
+        match cause {
+            PauseCause::Independent => next.independent = paused,
+            PauseCause::Ancestor => next.ancestor = paused,
+        }
+        Ok((sponsored_change(state, next)?, next))
+    }
+}
+
+/// The parent turn owns one slot, independently of which tool call reserves it.
+pub fn sponsored_identity(parent: &SessionId, turn: &TurnId) -> Result<SessionId> {
+    let digest = Fingerprint::of(&("grida-sponsored-subagent", parent, turn))?;
+    SessionId::new(format!("subagent/{}", crate::hex(digest)))
+}
+
+fn sponsored_change(
+    state: &DriverStateSnapshot,
+    pause: SponsoredPause,
+) -> Result<DriverStateChange> {
+    let bytes = serde_json::to_vec(&pause).map_err(|_| invalid_sponsored_allocation())?;
+    Ok(DriverStateChange {
+        expected: state.revision(),
+        value: Some(Envelope::new(
+            SchemaId::new(SPONSORED_ALLOCATION_SCHEMA)?,
+            1,
+            bytes,
+        )?),
+    })
+}
+
+fn invalid_sponsored_allocation() -> Error {
+    problem(
+        ErrorKind::InvalidState,
+        "invalid_sponsored_subagent_allocation",
+    )
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -151,6 +283,101 @@ mod tests {
             principal: PrincipalId::new(principal).unwrap(),
             binding: BindingId::new(binding).unwrap(),
             scope: ScopeId::new("provider").unwrap(),
+        }
+    }
+
+    #[test]
+    fn one_sponsored_slot_per_parent_turn_preserves_exact_assignment_authority() {
+        let parent = SessionId::new("parent").unwrap();
+        let turn = TurnId::new("review").unwrap();
+        let sponsor = |operation: &str| Sponsorship {
+            parent_turn: turn.clone(),
+            operation: OperationId::new(operation).unwrap(),
+        };
+        let owner = authority("owner", "initial");
+        let first =
+            Profile::sponsored(parent.clone(), "Review".into(), sponsor("first"), &owner).unwrap();
+        let repeated = Profile::sponsored(
+            parent.clone(),
+            "Alternate".into(),
+            sponsor("different"),
+            &owner,
+        )
+        .unwrap();
+        assert_eq!(
+            first.identity(&ChangeId::new("first").unwrap()).unwrap(),
+            repeated
+                .identity(&ChangeId::new("alternate").unwrap())
+                .unwrap()
+        );
+        assert_ne!(first.sponsorship(), repeated.sponsorship());
+        assert_ne!(
+            sponsored_identity(&parent, &turn).unwrap(),
+            sponsored_identity(&parent, &TurnId::new("other-turn").unwrap()).unwrap(),
+        );
+        let assignment = Assignment { parent_turn: turn };
+        assert!(first.require_assignment(&assignment, true).is_ok());
+        assert!(first.require_assignment(&assignment, false).is_ok());
+        assert!(
+            first
+                .require_assignment(
+                    &Assignment {
+                        parent_turn: TurnId::new("other-turn").unwrap()
+                    },
+                    false
+                )
+                .is_err()
+        );
+        let manual = Profile::new(parent, "Manual review".into(), 1, &owner).unwrap();
+        assert!(manual.require_assignment(&assignment, false).is_ok());
+        assert!(manual.require_assignment(&assignment, true).is_err());
+        assert!(
+            first
+                .require_authority(&authority("replacement", "new"))
+                .is_err()
+        );
+        assert!(
+            first
+                .require_authority(&authority("owner", "renewed"))
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn retained_pause_causes_do_not_refund_sponsored_work() {
+        let profile = Profile::sponsored(
+            SessionId::new("parent").unwrap(),
+            "Review".into(),
+            Sponsorship {
+                parent_turn: TurnId::new("turn").unwrap(),
+                operation: OperationId::new("operation").unwrap(),
+            },
+            &authority("owner", "binding"),
+        )
+        .unwrap();
+        let mut state = DriverStateSnapshot::default();
+        assert_eq!(profile.allocation(&state).unwrap().reserved, 0);
+        state.apply(profile.reserve(&state).unwrap()).unwrap();
+        assert!(!profile.sponsored_pause(&state).unwrap().effective());
+        for (cause, paused, effective) in [
+            (PauseCause::Ancestor, true, true),
+            (PauseCause::Independent, true, true),
+            (PauseCause::Ancestor, false, true),
+            (PauseCause::Independent, false, false),
+        ] {
+            let (change, next) = profile.set_sponsored_pause(&state, cause, paused).unwrap();
+            assert_eq!(next.effective(), effective);
+            state.apply(change).unwrap();
+            state = serde_json::from_slice(&serde_json::to_vec(&state).unwrap()).unwrap();
+            assert_eq!(
+                profile.sponsored_pause(&state).unwrap().effective(),
+                effective
+            );
+            assert_eq!(profile.allocation(&state).unwrap().reserved, 1);
+            assert_eq!(
+                profile.reserve(&state).unwrap_err().code,
+                "subagent_allocation_exhausted"
+            );
         }
     }
 

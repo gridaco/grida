@@ -15,6 +15,7 @@ mod permissions;
 mod questions;
 pub(crate) mod side_chats;
 mod skills;
+mod sponsorship;
 mod subagents;
 mod wakeups;
 pub use catalog::SessionCatalog;
@@ -1001,7 +1002,13 @@ impl Host {
         let prepared = input
             .as_ref()
             .map(|input| {
-                self.prepare_input(execution, session, input, InputAuthority::RequireCaptured)
+                self.prepare_input(
+                    execution,
+                    session,
+                    input,
+                    subagent.as_ref(),
+                    InputAuthority::RequireCaptured,
+                )
             })
             .transpose()?;
         if prepared
@@ -1077,8 +1084,14 @@ impl Host {
                     .map_err(|_| {
                         problem(ErrorKind::Uncertain, "retained_input_selection_invalid")
                     })?;
-                self.prepare_input(execution, session, input, InputAuthority::CancellationOnly)
-                    .map_err(|_| problem(ErrorKind::Uncertain, "retained_input_unavailable"))?
+                self.prepare_input(
+                    execution,
+                    session,
+                    input,
+                    subagent.as_ref(),
+                    InputAuthority::CancellationOnly,
+                )
+                .map_err(|_| problem(ErrorKind::Uncertain, "retained_input_unavailable"))?
             }
         };
         if let Some(profile) = &subagent {
@@ -1492,6 +1505,7 @@ impl Host {
         execution: &Execution,
         session: &SessionId,
         input: &Submission,
+        subagent_profile: Option<&grida_agent_master::subagents::Profile>,
         authority: InputAuthority,
     ) -> Result<PreparedInput> {
         let mut config = execution.config.clone();
@@ -1539,17 +1553,22 @@ impl Host {
             2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
                 subagent = stored.subagent.is_some();
-                if subagent {
+                if let Some(assignment) = &stored.subagent {
+                    let profile = subagent_profile.ok_or_else(|| {
+                        problem(ErrorKind::InvalidState, "subagent_assignment_mismatch")
+                    })?;
+                    profile.require_assignment(assignment, !stored.operating_regime.is_act())?;
                     if !cancellation_only && !self.subagents_available() {
                         return Err(problem(ErrorKind::Unsupported, "subagents_unavailable"));
                     }
                     if stored.questions
                         || stored.allow_wakeups
-                        || !stored.operating_regime.is_act()
                         || stored.configuration_permission
                             != crate::ConfigurationPermission::Disabled
                         || stored.permission_capture.is_some()
                         || stored.host_tools_capture.is_some()
+                        || stored.editor_endpoint.is_some()
+                        || stored.editor_presentation
                         || stored.guidance.is_some()
                         || stored.goal.is_some()
                         || stored.completion_checks.is_some()
@@ -1918,8 +1937,7 @@ impl Host {
     ) -> Result<ControlReceipt> {
         self.owned_control(move |host| async move {
             let receipt = host
-                .store
-                .control(ControlRequest {
+                .control_sponsorship(ControlRequest {
                     id: request,
                     session: session.clone(),
                     expected_revision: expected_session,
