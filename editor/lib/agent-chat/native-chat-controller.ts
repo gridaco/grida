@@ -323,7 +323,7 @@ export class NativeChatController {
   private recents: readonly string[] = [];
   private profileId: string | null = null;
   private profileRead?: object;
-  private pendingDefaultFocus?: { sessionId: string };
+  private pendingFocus?: { sessionId: string; profileId?: string };
 
   constructor(
     private readonly bridge: DesktopNativeChat,
@@ -392,9 +392,9 @@ export class NativeChatController {
     };
   };
 
-  connect(initial: string | null): void {
+  connect(initial: string | null, profileId?: string | null): void {
     const saved = this.restore();
-    this.pendingDefaultFocus = undefined;
+    this.pendingFocus = undefined;
     this.catalogConnection = {};
     this.catalog = null;
     this.recents = saved.sessions;
@@ -408,8 +408,12 @@ export class NativeChatController {
       profileBusy: false,
       profileError: null,
     });
-    void this.listChats();
     void this.readProfiles();
+    if (initial && profileId !== null && profileId !== undefined) {
+      void this.focusChat(initial, profileId);
+      return;
+    }
+    void this.listChats();
     void this.select(initial ?? saved.selected);
   }
 
@@ -418,7 +422,7 @@ export class NativeChatController {
     this.scope = undefined;
     this.catalogConnection = undefined;
     this.profileRead = undefined;
-    this.pendingDefaultFocus = undefined;
+    this.pendingFocus = undefined;
     this.queueRelease(previous);
   }
 
@@ -481,14 +485,18 @@ export class NativeChatController {
     }
   }
 
-  async focusDefaultChat(sessionId: string): Promise<void> {
+  async focusChat(sessionId: string, profileId?: string): Promise<void> {
     if (!this.catalogConnection) return;
-    const request = { sessionId };
-    this.pendingDefaultFocus = request;
-    await this.applyDefaultFocus(request);
+    if (profileId !== undefined && !/^[a-f0-9]{64}$/.test(profileId)) {
+      this.update({ profileError: "This model connection is unavailable." });
+      return;
+    }
+    const request = { sessionId, profileId };
+    this.pendingFocus = request;
+    await this.applyFocus(request);
   }
 
-  private defaultFocusBlocked(): boolean {
+  private focusBlocked(): boolean {
     return (
       this.view.profileBusy ||
       this.view.acting ||
@@ -497,14 +505,20 @@ export class NativeChatController {
     );
   }
 
-  private async applyDefaultFocus(request: {
+  private async applyFocus(request: {
     sessionId: string;
+    profileId?: string;
   }): Promise<void> {
-    if (this.pendingDefaultFocus !== request || this.defaultFocusBlocked())
-      return;
-    this.pendingDefaultFocus = undefined;
-    if (this.profileId || this.view.profiles?.active) {
-      await this.selectProfile({ kind: "default" }, request.sessionId);
+    if (this.pendingFocus !== request || this.focusBlocked()) return;
+    this.pendingFocus = undefined;
+    const active = this.view.profiles?.active ?? this.profileId;
+    if ((request.profileId ?? null) !== active) {
+      await this.selectProfile(
+        request.profileId
+          ? { kind: "saved", id: request.profileId }
+          : { kind: "default" },
+        request.sessionId
+      );
       return;
     }
     await this.select(request.sessionId);
@@ -3476,12 +3490,12 @@ export class NativeChatController {
   }
 
   private update(change: Partial<NativeChatView>): void {
-    const focus = this.pendingDefaultFocus;
-    const wasBlocked = focus && this.defaultFocusBlocked();
+    const focus = this.pendingFocus;
+    const wasBlocked = focus && this.focusBlocked();
     this.view = { ...this.view, ...change };
     for (const listener of this.listeners) listener();
-    if (focus && wasBlocked && !this.defaultFocusBlocked())
-      queueMicrotask(() => void this.applyDefaultFocus(focus));
+    if (focus && wasBlocked && !this.focusBlocked())
+      queueMicrotask(() => void this.applyFocus(focus));
   }
 
   private sessionChoices(entry = this.view.catalogEntry): readonly string[] {

@@ -9,6 +9,7 @@ import path from "node:path";
 import { beforeEach, expect, it, vi } from "vitest";
 import { CHATGPT_RESPONSES_URL } from "../chatgpt-configuration";
 import { DesktopAccountSession } from "./account-session";
+import type { NativeChatLifecycle } from "./native-agent-chat";
 import { NativeAgentProcess } from "./native-agent-process";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import { NativeProviderSelection } from "./native-provider-selection";
@@ -595,6 +596,15 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     let organization = 17;
     let mints = 0;
     const requests: unknown[] = [];
+    const onLifecycle =
+      vi.fn<
+        (
+          workspaceId: string,
+          notice: NativeChatLifecycle,
+          current: () => boolean,
+          profileId?: string
+        ) => void
+      >();
     const prepare: NativeProviderNetwork["prepare"] = (target, headers) => {
       expect(target).toBe(origin + "/api/v1/ai/chat/completions");
       expect(headers.get("authorization")).toBe("Bearer fixture.gg.key");
@@ -670,6 +680,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
             provider: "gateway",
             openExternal: async () => {},
             selectableProfiles: true,
+            onLifecycle,
           }
         );
       };
@@ -712,7 +723,22 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         }),
       ]);
 
+      await vi.waitFor(() =>
+        expect(onLifecycle).toHaveBeenCalledExactlyOnceWith(
+          workspace.id,
+          expect.objectContaining({
+            kind: "settled",
+            status: "succeeded",
+            sessionId: session.id,
+          }),
+          expect.any(Function),
+          id
+        )
+      );
+      const current = onLifecycle.mock.calls[0]![2];
+      expect(current()).toBe(true);
       await agent.close();
+      expect(current()).toBe(false);
       vi.resetModules();
       agent = await launch();
       await agent.selectProfile(workspace.id, { kind: "saved", id }, () => {});
@@ -722,6 +748,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         (await restored.transcript(saved)).map(({ text }) => text)
       ).toContain("Alternate model answered.");
       expect(requests).toHaveLength(1);
+      expect(onLifecycle).toHaveBeenCalledTimes(1);
 
       sidecar.listGatewayModels.mockResolvedValueOnce([]);
       await expect(

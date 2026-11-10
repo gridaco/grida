@@ -65,7 +65,8 @@ type LaunchOptions = Readonly<{
   onLifecycle?: (
     workspaceId: string,
     event: NativeChatLifecycle,
-    current: () => boolean
+    current: () => boolean,
+    profileId?: string
   ) => void;
 }>;
 
@@ -447,7 +448,15 @@ export class NativeDesktopAgent {
         const current = await resolve();
         signal.throwIfAborted();
         return {
-          launch: await this.workspaceLaunch(workspace, current),
+          launch: {
+            ...(await this.workspaceLaunch(workspace, current)),
+            onLifecycle: this.workspaceLifecycle(
+              workspace.id,
+              owners,
+              signal,
+              profile.id
+            ),
+          },
         };
       },
     });
@@ -507,6 +516,12 @@ export class NativeDesktopAgent {
               ...launch,
               maxOutputTokens,
               mcp: this.mcp?.forWorkspace(workspace.root),
+              onLifecycle: this.workspaceLifecycle(
+                workspace.id,
+                owners,
+                signal,
+                profile.id
+              ),
             },
             release,
           };
@@ -672,8 +687,6 @@ export class NativeDesktopAgent {
   }
 
   private newOwners(): NativeWorkspaceAgents {
-    const accountGeneration = this.accountGeneration;
-    const notify = this.onLifecycle;
     const owners: NativeWorkspaceAgents = new NativeWorkspaceAgents(
       this.cutover,
       async (workspace, signal) => {
@@ -698,18 +711,9 @@ export class NativeDesktopAgent {
               mcp: workspace.nestedDeck
                 ? undefined
                 : this.mcp?.forWorkspace(workspace.root),
-              onLifecycle:
-                !notify || workspace.nestedDeck
-                  ? undefined
-                  : (event, attached) => {
-                      const current = () =>
-                        attached() &&
-                        !signal.aborted &&
-                        this.accountGeneration === accountGeneration &&
-                        this.owners === owners &&
-                        this.current(workspace.id) !== null;
-                      if (current()) notify(workspace.id, event, current);
-                    },
+              onLifecycle: workspace.nestedDeck
+                ? undefined
+                : this.workspaceLifecycle(workspace.id, owners, signal),
             },
             release,
           };
@@ -720,6 +724,26 @@ export class NativeDesktopAgent {
       }
     );
     return owners;
+  }
+
+  private workspaceLifecycle(
+    workspaceId: string,
+    owners: NativeWorkspaceAgents,
+    signal: AbortSignal,
+    profileId?: string
+  ) {
+    const notify = this.onLifecycle;
+    if (!notify) return;
+    const accountGeneration = this.accountGeneration;
+    return (event: NativeChatLifecycle, connected: () => boolean) => {
+      const current = () =>
+        connected() &&
+        !signal.aborted &&
+        this.accountGeneration === accountGeneration &&
+        this.owners === owners &&
+        this.current(workspaceId, profileId) !== null;
+      if (current()) notify(workspaceId, event, current, profileId);
+    };
   }
 
   private async workspaceLaunch(

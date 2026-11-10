@@ -39,9 +39,9 @@ for the outcome, any partial work, and items that need review.
 
 ## Return to background work
 
-With system notifications enabled, Desktop can tell you when a default
-workspace chat finishes or needs access approval while its window is
-away from focus. Click the notification to bring the workspace forward.
-When the chat pane is ready, it opens the matching chat. If a connection is
-changing or an attachment is still in the composer, the chat opens after that
-clears.
+With system notifications enabled, Desktop can tell you when a native
+workspace chat finishes or needs access approval while its window is out of
+focus. Click the notification to reopen the matching chat on its original model
+connection. If a connection is changing or an attachment is still in the
+composer, the chat opens after that clears. If the original connection is
+unavailable, Desktop reports that before opening the chat.

@@ -70,7 +70,8 @@ type AgentNotificationNavigation = {
 function attendSession(
   sessionId: string,
   session: agent_notifications.SessionFacts | null,
-  navigation: AgentNotificationNavigation
+  navigation: AgentNotificationNavigation,
+  profileId?: string
 ) {
   if (!navigation.can_open()) {
     navigation.focus_entry();
@@ -88,6 +89,7 @@ function attendSession(
     target.focus();
     target.webContents.send(IPC_CHANNELS.AGENT_FOCUS_SESSION, {
       session_id: sessionId,
+      ...(profileId && { profile_id: profileId }),
     });
     return;
   }
@@ -97,6 +99,7 @@ function attendSession(
       base_url: EDITOR_BASE_URL,
       workspace_id: session.workspace_id,
       session_id: sessionId,
+      ...(profileId && { profile_id: profileId }),
     });
     navigation.register(window);
     return;
@@ -156,7 +159,8 @@ export function notifyNativeChat(
   workspaceId: string,
   event: NativeChatLifecycle,
   navigation: AgentNotificationNavigation,
-  current: () => boolean
+  current: () => boolean,
+  profileId?: string
 ): void {
   if (!navigation.can_open() || !current()) return;
   const facts = { title: null, workspace_id: workspaceId };
@@ -165,7 +169,8 @@ export function notifyNativeChat(
   const decision = agent_notifications.decideNative(event);
   if (decision)
     showNotification(decision, () => {
-      if (current()) attendSession(event.sessionId, facts, navigation);
+      if (current())
+        attendSession(event.sessionId, facts, navigation, profileId);
     });
 }
 

@@ -562,6 +562,7 @@ export function open_workspace_window({
   base_url: baseUrl,
   workspace_id: workspaceId,
   session_id: sessionId,
+  profile_id: profileId,
 }: {
   app: App;
   base_url: string;
@@ -573,11 +574,18 @@ export function open_workspace_window({
    * listener yet; the agent pane reads the param once on mount.
    */
   session_id?: string;
+  /** Saved native model connection that owns the requested session. */
+  profile_id?: string;
 }) {
-  const session = sessionId ? `&session=${encodeURIComponent(sessionId)}` : "";
+  const query = new URLSearchParams({ id: workspaceId });
+  if (sessionId) query.set("session", sessionId);
+  const profile =
+    sessionId && profileId
+      ? `#chat-profile=${encodeURIComponent(profileId)}`
+      : "";
   return create_desktop_window({
     base_url: baseUrl,
-    urlPath: `/desktop/workspace?id=${encodeURIComponent(workspaceId)}${session}`,
+    urlPath: `/desktop/workspace?${query}${profile}`,
     additionalArguments: buildDesktopArguments({ app }),
   });
 }

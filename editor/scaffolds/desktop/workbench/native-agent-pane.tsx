@@ -186,8 +186,8 @@ export function NativeAgentPane({
     controller.read
   );
   const mentions = useWorkspaceFileMentions(workspaceId);
-  useDesktopAgentFocusSession((sessionId) => {
-    if (workspaceId) void controller.focusDefaultChat(sessionId);
+  useDesktopAgentFocusSession((sessionId, profileId) => {
+    if (workspaceId) void controller.focusChat(sessionId, profileId);
   });
   const catalog = useMemo(
     () => ({ commands: NO_COMMANDS, mentions }),
@@ -203,9 +203,13 @@ export function NativeAgentPane({
   } | null>(null);
   const side = state.sideChat;
   useEffect(() => {
-    controller.connect(initialSession);
+    const profile =
+      workspaceId && initialSession
+        ? new URLSearchParams(window.location.hash.slice(1)).get("chat-profile")
+        : null;
+    controller.connect(initialSession, profile);
     return () => controller.disconnect();
-  }, [controller, initialSession]);
+  }, [controller, initialSession, workspaceId]);
   const snapshot = state.observation?.snapshot;
   const editHistory = controller.canReviseHistory && !state.revisionDraft;
   const turn = snapshot?.current;

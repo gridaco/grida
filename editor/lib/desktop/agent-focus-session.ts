@@ -21,19 +21,24 @@ export const DESKTOP_AGENT_FOCUS_SESSION_EVENT = "grida:agent:focus-session";
  * The callback is ref-held so a re-render never re-subscribes.
  */
 export function useDesktopAgentFocusSession(
-  onFocusSession: (sessionId: string) => void
+  onFocusSession: (sessionId: string, profileId?: string) => void
 ): void {
   const callbackRef = useRef(onFocusSession);
   callbackRef.current = onFocusSession;
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<unknown>).detail as
-        | { session_id?: unknown }
+        | { session_id?: unknown; profile_id?: unknown }
         | undefined;
       const id = detail?.session_id;
-      if (typeof id === "string" && id.length > 0) {
-        callbackRef.current(id);
-      }
+      const profile = detail?.profile_id;
+      if (typeof id !== "string" || id.length === 0) return;
+      if (
+        profile !== undefined &&
+        (typeof profile !== "string" || !/^[a-f0-9]{64}$/.test(profile))
+      )
+        return;
+      callbackRef.current(id, profile);
     };
     window.addEventListener(DESKTOP_AGENT_FOCUS_SESSION_EVENT, handler);
     return () => {

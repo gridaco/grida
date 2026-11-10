@@ -2862,7 +2862,7 @@ describe("Native workspace chat controller", () => {
       await controller.select("alternate-chat");
       expect(controller.read().selected).toBe("alternate-chat");
       running.add("background-chat");
-      await controller.focusDefaultChat("background-chat");
+      await controller.focusChat("background-chat");
       expect(profile).toBeNull();
       expect(controller.read().selected).toBe("background-chat");
       expect(updates.has("background-chat")).toBe(true);
@@ -2907,8 +2907,8 @@ describe("Native workspace chat controller", () => {
         await vi.waitFor(() => expect(controller.read().loading).toBe(false));
         const selected = controller.selectProfile({ kind: "new", id });
         expect(controller.read().profileBusy).toBe(true);
-        await controller.focusDefaultChat("background-first");
-        await controller.focusDefaultChat("background-latest");
+        await controller.focusChat("background-first");
+        await controller.focusChat("background-latest");
         expect(loaded.mock.calls).toEqual([["current"]]);
         if (closes) controller.disconnect();
         switching.resolve();
@@ -2931,6 +2931,49 @@ describe("Native workspace chat controller", () => {
       }
     }
   );
+
+  it("attaches a reopened workspace directly to the notification's saved connection", async () => {
+    const { bridge, controller } = fixture();
+    const first = "b".repeat(64);
+    const second = "d".repeat(64);
+    const selectProfile =
+      vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>();
+    bridge.selectProfile = selectProfile;
+    const load = bridge.load.bind(bridge);
+    const loaded = vi
+      .spyOn(bridge, "load")
+      .mockImplementation(async (sessionId) => {
+        expect(selectProfile).toHaveBeenLastCalledWith({
+          kind: "saved",
+          id: sessionId === "first-chat" ? first : second,
+        });
+        return await load(sessionId);
+      });
+    try {
+      controller.connect("first-chat", first);
+      await vi.waitFor(() =>
+        expect(controller.read()).toMatchObject({
+          selected: "first-chat",
+          loading: false,
+        })
+      );
+      await controller.focusChat("second-chat", second);
+      expect(controller.read()).toMatchObject({
+        selected: "second-chat",
+        loading: false,
+      });
+      expect(loaded.mock.calls).toEqual([["first-chat"], ["second-chat"]]);
+      selectProfile.mockRejectedValueOnce(new Error("unavailable"));
+      await controller.focusChat("withdrawn-chat", first);
+      expect(controller.read()).toMatchObject({
+        selected: "second-chat",
+        profileError: expect.stringMatching(/unavailable/),
+      });
+      expect(loaded).toHaveBeenCalledTimes(2);
+    } finally {
+      controller.disconnect();
+    }
+  });
 
   it("projects UTF-8 offsets, duplicate chunks, and a final replacement without repeating text", async () => {
     const { controller, running, updates } = fixture();

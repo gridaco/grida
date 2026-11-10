@@ -54,6 +54,20 @@ beforeEach(() => {
   host.click = undefined;
 });
 
+it("keeps the saved model connection when reopening a workspace from a notification", () => {
+  const nav = navigation();
+  const profileId = "b".repeat(64);
+  notifyNativeChat(workspaceId, event, nav, () => true, profileId);
+  host.click!();
+  expect(host.open).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      workspace_id: workspaceId,
+      session_id: event.sessionId,
+      profile_id: profileId,
+    })
+  );
+});
+
 it("opens the exact saved chat on notification click and withdraws a retired click", () => {
   const nav = navigation();
   const opened = {};
@@ -124,4 +138,11 @@ it("suppresses watched work and user cancellation, and sends only the chat ID wh
     session_id: event.sessionId,
   });
   expect(host.open).not.toHaveBeenCalled();
+  const profileId = "d".repeat(64);
+  notifyNativeChat(workspaceId, event, nav, () => true, profileId);
+  host.click!();
+  expect(send).toHaveBeenLastCalledWith("grida:agent:focus-session", {
+    session_id: event.sessionId,
+    profile_id: profileId,
+  });
 });

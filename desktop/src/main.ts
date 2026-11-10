@@ -723,8 +723,16 @@ app.on("ready", async () => {
           onLifecycle: (
             workspaceId: string,
             event: NativeChatLifecycle,
-            current: () => boolean
-          ) => notifyNativeChat(workspaceId, event, windowAdmission, current),
+            current: () => boolean,
+            profileId?: string
+          ) =>
+            notifyNativeChat(
+              workspaceId,
+              event,
+              windowAdmission,
+              current,
+              profileId
+            ),
           openExternal: (url: string) => shell.openExternal(url),
           workspaceCatalogRoot: path.dirname(catalog.directory),
           workspaceGrant: catalog.fileGrant.bind(catalog),
