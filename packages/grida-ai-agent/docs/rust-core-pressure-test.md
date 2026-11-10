@@ -132,8 +132,22 @@ It verifies the original bytes at the provider adapter and refuses an unsupporte
 send before the text or image enters the chat. The
 [draft recovery cases](../../../editor/lib/agent-chat/native-chat-controller.test.ts)
 cover keeping the draft on a rejected replacement and reusing its input identity
-when the outcome is unknown. A distribution with image input enabled still needs
-the composed workbench and native-provider qualification.
+when the outcome is unknown.
+
+The unsigned macOS ARM64 native Desktop preview at `85b6cf526` exercised
+the rendered workbench, packaged preload, Main, and the native child together.
+With a saved OpenRouter GPT-5.6 Terra profile, two files named `same.png`
+reached the synthetic provider with their respective original bytes. A
+simulated loss of PNG capability kept the text and attachment in the mounted
+composer and left the current question visible. After capability recovery, a
+lost acceptance reply was retried with the same queued input ID. Answering the
+original question released that follow-up for exactly one inference.
+
+Relaunching the same preview profile on Vercel removed PNG availability and
+sent no work. Relaunching on the original OpenRouter profile reopened an existing
+pending question and accepted its answer once. This verifies the supported
+one-PNG path with synthetic upstream responses. Live provider execution and
+the legacy pending-approval scenario retain separate evidence requirements.
 
 ### Implementation-plan requirements
 
