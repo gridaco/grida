@@ -588,6 +588,7 @@ impl Host {
         captured.host_tools_capture = None;
         captured.desktop_image_generation = None;
         captured.allow_image_reference = false;
+        captured.allow_attachment_reference = false;
         captured.allow_image_placement = false;
         captured.editor_endpoint = None;
         captured.editor_presentation = false;

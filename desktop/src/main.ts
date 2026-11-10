@@ -61,10 +61,9 @@ import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 import { NativeDocumentFiles } from "./main/native-document-files";
 import { ipc_sender } from "./main/ipc-sender";
 import { DesktopMediaRoot } from "./main/media-root";
-import {
-  NativeImagePlacement,
-  type ImagePlacementReview,
-} from "./main/native-image-placement";
+import { NativeImagePlacement } from "./main/native-image-placement";
+import type { ImageReferenceReview } from "./main/native-image-generation";
+import { NativeWorkspaceReview } from "./main/native-workspace-review";
 
 // GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
 // handler, NOT here at module top. It must run AFTER `open-file` has fired:
@@ -150,69 +149,10 @@ registerWorkspaceMediaScheme();
 // main. Auxiliary document/settings/workspace windows are admitted and
 // registered through this controller only after it reaches `main`.
 let entryWindow: DesktopEntryWindow | null = null;
-let reviewingWorkspaceImage = false;
-
-const approveWorkspaceImage: ImagePlacementReview = async ({
-  workspace,
-  relative,
-  signal: requestSignal,
-}) => {
-  const window = BrowserWindow.getFocusedWindow();
-  if (!window || window.isDestroyed() || reviewingWorkspaceImage)
-    return { kind: "unavailable" };
-  const sender = window.webContents;
-  if (sender.isDestroyed()) return { kind: "unavailable" };
-  const frame = sender.mainFrame;
-  const href = frame.url;
-  const url = URL.parse(href);
-  if (
-    !url ||
-    url.origin !== new URL(EDITOR_BASE_URL).origin ||
-    url.pathname !== "/desktop/workspace" ||
-    url.searchParams.getAll("id").length !== 1 ||
-    url.searchParams.get("id") !== workspace.workspaceId
-  )
-    return { kind: "unavailable" };
-
-  const navigation = new AbortController();
-  const signal = AbortSignal.any([requestSignal, navigation.signal]);
-  const check = () => {
-    signal.throwIfAborted();
-    if (
-      window.isDestroyed() ||
-      sender.isDestroyed() ||
-      sender.isLoadingMainFrame() ||
-      entryWindow?.ipcRoleFor(window) !== "main" ||
-      sender.mainFrame !== frame ||
-      frame.url !== href
-    )
-      throw new Error("workspace_image_review_unavailable");
-  };
-  const close = ipc_sender.watchNavigation(sender, () => navigation.abort());
-  let approved = false;
-  reviewingWorkspaceImage = true;
-  try {
-    check();
-    const { response } = await dialog.showMessageBox(window, {
-      type: "question",
-      message: "Place this generated image in the workspace?",
-      detail: path.join(workspace.root, relative),
-      buttons: ["Cancel", "Place image"],
-      defaultId: 0,
-      cancelId: 0,
-      signal,
-    });
-    check();
-    if (response !== 1) return { kind: "declined" };
-    approved = true;
-    return { kind: "approved", check, signal, close };
-  } catch {
-    return { kind: "unavailable" };
-  } finally {
-    reviewingWorkspaceImage = false;
-    if (!approved) close();
-  }
-};
+const workspaceReview = new NativeWorkspaceReview(
+  new URL(EDITOR_BASE_URL).origin,
+  (window) => entryWindow?.ipcRoleFor(window) === "main"
+);
 let nativeDesktopAgent: NativeDesktopAgent | undefined;
 let nativeDocuments: NativeDocumentFiles | undefined;
 let nativeFileWorkspaces: NativeWorkspaceCatalog | undefined;
@@ -774,9 +714,22 @@ app.on("ready", async () => {
                     catalog,
                     workers: documentWorkers,
                     media,
-                    review: approveWorkspaceImage,
+                    review: ({ workspace, relative, signal }) =>
+                      workspaceReview.confirm(workspace.workspaceId, signal, {
+                        message: "Place this generated image in the workspace?",
+                        detail: path.join(workspace.root, relative),
+                        accept: "Place image",
+                      }),
                   })
               : undefined,
+          reviewImageReference:
+            (workspaceId: string): ImageReferenceReview =>
+            ({ signal, model }) =>
+              workspaceReview.confirm(workspaceId, signal, {
+                message: "Send the attached PNG to OpenRouter?",
+                detail: `OpenRouter will receive the PNG attached to this turn to generate an image with ${model}.`,
+                accept: "Send PNG",
+              }),
           selectableProfiles: strictRetainedMedia,
         };
         nativeDesktopAgent = NativeDesktopProfile.managedCutover()

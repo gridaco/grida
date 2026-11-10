@@ -5,15 +5,16 @@ import os from "node:os";
 import path from "node:path";
 import type { MediaStore } from "@grida/daemon/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import {
-  NativeImagePlacement,
-  type ImagePlacementReview,
-} from "./native-image-placement";
+import { NativeImagePlacement } from "./native-image-placement";
 import {
   WorkspaceWriteUnverified,
   type WorkspaceFileWorkers,
 } from "./workspace-file-worker";
 import type { NativeWorkspaceCatalog } from "./native-workspace-catalog";
+
+type ImagePlacementReview = ConstructorParameters<
+  typeof NativeImagePlacement
+>[1]["review"];
 
 let directory: string;
 let root: string;

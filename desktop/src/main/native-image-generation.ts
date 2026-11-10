@@ -2,10 +2,15 @@
 import { createHash } from "node:crypto";
 import type { ImageGenerateRequest } from "@grida/agent";
 import { catalog } from "@grida/ai/catalogue";
+import type { WorkspaceReviewReceipt } from "./native-workspace-review";
 
 type Provider = "openrouter" | "vercel";
 type Request = (init: RequestInit) => Promise<Response>;
 type CredentialProof = { nonce: string; proof: string };
+export type ImageReferenceReview = (input: {
+  model: string;
+  signal: AbortSignal;
+}) => Promise<WorkspaceReviewReceipt>;
 type Reply =
   | {
       kind: "retained";
@@ -14,7 +19,13 @@ type Reply =
       bytes: number;
       sha256?: string;
     }
-  | { kind: "unavailable" | "generated_unretained" | "uncertain" };
+  | {
+      kind:
+        | "unavailable"
+        | "generated_unretained"
+        | "reference_declined"
+        | "uncertain";
+    };
 
 const ID = /^[A-Za-z0-9_.:@/-]{1,256}$/;
 const MEDIA_ID =
@@ -40,6 +51,7 @@ export class NativeImageGeneration {
   static readonly capability = "co.grida/media/generate-image";
   static readonly method = `_${this.capability}`;
   static readonly referenceCapability = "co.grida/media/image-reference";
+  static readonly attachmentCapability = "co.grida/media/attachment-reference";
   readonly binding: string;
   private readonly calls = new Set<string>();
   private readonly lifetime = new AbortController();
@@ -99,11 +111,20 @@ export class NativeImageGeneration {
     id: number | string,
     value: unknown,
     referenceNegotiated = false,
-    placementNegotiated = false
+    placementNegotiated = false,
+    reviewReference?: ImageReferenceReview
   ): Promise<Reply> {
     const params = record(value);
     if (!params) return { kind: "unavailable" };
-    const { sessionId, callId, prompt, background, referencePng } = params;
+    const {
+      sessionId,
+      callId,
+      prompt,
+      background,
+      referencePng,
+      referenceOrigin,
+    } = params;
+    const attachment = referenceOrigin === "attachment";
     const credential = credentialProof(params.credential);
     if (
       this.lifetime.signal.aborted ||
@@ -113,7 +134,8 @@ export class NativeImageGeneration {
       Object.keys(params).length !==
         4 +
           Number(background !== undefined) +
-          Number(referencePng !== undefined) ||
+          Number(referencePng !== undefined) +
+          Number(referenceOrigin !== undefined) ||
       typeof sessionId !== "string" ||
       !ID.test(sessionId) ||
       typeof callId !== "string" ||
@@ -121,8 +143,10 @@ export class NativeImageGeneration {
       typeof prompt !== "string" ||
       !prompt.trim() ||
       Buffer.byteLength(prompt) > MAX_PROMPT_BYTES ||
+      (referenceOrigin !== undefined &&
+        (!attachment || !reviewReference || referencePng === undefined)) ||
       (referencePng !== undefined &&
-        (!referenceNegotiated ||
+        ((!attachment && !referenceNegotiated) ||
           !this.supportsReference ||
           !isBoundedPng(referencePng))) ||
       (background !== undefined &&
@@ -139,7 +163,7 @@ export class NativeImageGeneration {
     const abort = new AbortController();
     this.active = { id, abort };
     this.calls.add(identity);
-    const signal = AbortSignal.any([
+    const requestSignal = AbortSignal.any([
       this.lifetime.signal,
       abort.signal,
       AbortSignal.timeout(DEADLINE_MS),
@@ -160,7 +184,28 @@ export class NativeImageGeneration {
       ...(typeof referencePng === "string" && { reference_png: referencePng }),
       ...(placementNegotiated && { receipt_sha256: true }),
     };
+    let approval:
+      | Extract<WorkspaceReviewReceipt, { kind: "approved" }>
+      | undefined;
+    let dispatched = false;
     try {
+      requestSignal.throwIfAborted();
+      if (attachment && reviewReference) {
+        const reviewed = await reviewReference({
+          model: this.model,
+          signal: requestSignal,
+        });
+        if (reviewed.kind === "approved") approval = reviewed;
+        requestSignal.throwIfAborted();
+        if (reviewed.kind === "declined") return { kind: "reference_declined" };
+        if (reviewed.kind !== "approved") return { kind: "unavailable" };
+        reviewed.check();
+      }
+      const signal = approval
+        ? AbortSignal.any([requestSignal, approval.signal])
+        : requestSignal;
+      signal.throwIfAborted();
+      dispatched = true;
       const response = await this.request({
         method: "POST",
         headers: {
@@ -201,8 +246,9 @@ export class NativeImageGeneration {
           typeof result.sha256 === "string" && { sha256: result.sha256 }),
       };
     } catch {
-      return { kind: "uncertain" };
+      return { kind: dispatched ? "uncertain" : "unavailable" };
     } finally {
+      approval?.close();
       this.active = undefined;
     }
   }

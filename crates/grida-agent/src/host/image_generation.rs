@@ -1,10 +1,11 @@
 //! GRIDA-SEC-004 — paid image generation stays with the captured Desktop owner.
 
 use super::{
-    Credential, Execution, Host, host_tools::HostTools, problem, questions::QuestionAccess,
-    retained_inputs::RetainedInputs,
+    Credential, Execution, Host, PromptPart, host_tools::HostTools, problem,
+    questions::QuestionAccess, retained_inputs::RetainedInputs,
 };
 use crate::http::HttpTransport;
+use crate::scratch::AssetRef;
 use crate::tool_host::{
     CapabilityCall, CapabilityDefinition, CapabilityEffect, CapabilityExecutor, CapabilityReply,
     ToolHost,
@@ -32,6 +33,7 @@ pub(super) use placement::TOOL as PLACE_TOOL;
 
 pub(crate) const CAPABILITY: &str = "co.grida/media/generate-image";
 pub(crate) const REFERENCE_CAPABILITY: &str = "co.grida/media/image-reference";
+pub(crate) const ATTACHMENT_CAPABILITY: &str = "co.grida/media/attachment-reference";
 pub(super) const TOOL: &str = "generate_image";
 pub(super) const PRINCIPAL: &str = "desktop-image-generation";
 const MAX_PROMPT_BYTES: usize = 8 * 1024;
@@ -40,6 +42,28 @@ const TEXT_VERSION: u32 = 1;
 const REFERENCE_VERSION: u32 = 2;
 const PLACEABLE_TEXT_VERSION: u32 = 3;
 const PLACEABLE_REFERENCE_VERSION: u32 = 4;
+const ATTACHMENT_VERSION: u32 = 5;
+const BOTH_REFERENCES_VERSION: u32 = 6;
+const PLACEABLE_ATTACHMENT_VERSION: u32 = 7;
+const PLACEABLE_BOTH_REFERENCES_VERSION: u32 = 8;
+
+pub(super) fn attached_image<'a>(
+    parts: &'a [PromptPart],
+    owner: &SessionId,
+) -> Option<&'a AssetRef> {
+    let mut attachments = parts.iter().filter_map(|part| match part {
+        PromptPart::RetainedImage { asset } => Some(asset),
+        _ => None,
+    });
+    let asset = attachments.next()?;
+    (attachments.next().is_none()
+        && asset.owner() == owner
+        && asset.id().as_str().starts_with("input/")
+        && asset.name() == super::images::NAME
+        && asset.version() == 1
+        && (1..=super::images::MAX_IMAGE_BYTES as u64).contains(&asset.size()))
+    .then_some(asset)
+}
 
 fn generation_operation(state: &TurnState, operation: &OperationState) -> Option<u32> {
     let OperationInput::Tool(invocation) = &operation.record.input else {
@@ -48,10 +72,7 @@ fn generation_operation(state: &TurnState, operation: &OperationState) -> Option
     let grants = &operation.record.grants;
     let version = invocation.definition().version;
     (invocation.definition().id.as_str() == TOOL
-        && matches!(
-            version,
-            TEXT_VERSION | REFERENCE_VERSION | PLACEABLE_TEXT_VERSION | PLACEABLE_REFERENCE_VERSION
-        )
+        && (TEXT_VERSION..=PLACEABLE_BOTH_REFERENCES_VERSION).contains(&version)
         && grants.authority.principal.as_str() == PRINCIPAL
         && grants.authority.scope.as_str() == state.binding().turn.as_str()
         && matches!(grants.grants.as_slice(), [grant] if grant.as_str() == TOOL)
@@ -111,12 +132,14 @@ struct DesktopConnection {
     client: ConnectionTo<Client>,
     references: bool,
     placement: bool,
+    attachment_references: bool,
 }
 
 pub(super) struct Prepared {
     owner: DesktopImageGeneration,
     references: bool,
     placement: bool,
+    attachment: Option<AssetRef>,
 }
 
 impl Prepared {
@@ -139,9 +162,24 @@ impl Prepared {
         } else {
             None
         };
-        let tool = self
-            .owner
-            .tool_host(turn, reference, self.placement.then_some(store))?;
+        let attachment = self
+            .attachment
+            .map(|asset| {
+                if asset.owner() != &turn.session {
+                    return Err(attachment_unavailable());
+                }
+                Ok(AttachmentScope {
+                    asset,
+                    storage: execution
+                        .retained_inputs
+                        .clone()
+                        .ok_or_else(attachment_unavailable)?,
+                })
+            })
+            .transpose()?;
+        let tool =
+            self.owner
+                .tool_host(turn, reference, attachment, self.placement.then_some(store))?;
         Ok(Arc::new(HostTools::image_generation(
             tool,
             self.owner.binding,
@@ -151,6 +189,17 @@ impl Prepared {
 }
 
 impl Host {
+    pub(crate) fn supports_attachment_reference(&self) -> bool {
+        self.execution()
+            .ok()
+            .zip(self.desktop_image_generation.as_ref())
+            .is_some_and(|(execution, owner)| {
+                owner
+                    .transport
+                    .accepts_compatible_png(&execution.config.model)
+            })
+    }
+
     /// Bind image generation to the trusted supervisor's exact media profile.
     pub fn with_desktop_image_generation(mut self, binding: &str) -> Result<Self> {
         let Credential::Http(transport) = &self.execution()?.authorization.credential else {
@@ -180,11 +229,18 @@ impl Host {
 }
 
 impl DesktopImageGeneration {
-    pub(crate) fn attach(&self, client: ConnectionTo<Client>, references: bool, placement: bool) {
+    pub(crate) fn attach(
+        &self,
+        client: ConnectionTo<Client>,
+        references: bool,
+        placement: bool,
+        attachment_references: bool,
+    ) {
         *self.connection.lock().unwrap() = Some(DesktopConnection {
             client,
             references,
             placement,
+            attachment_references,
         });
     }
 
@@ -213,7 +269,20 @@ impl DesktopImageGeneration {
             .is_some_and(|connection| connection.placement)
     }
 
-    pub(super) fn prepare(&self, references: bool, placement: bool) -> Result<Prepared> {
+    pub(super) fn attachment_references(&self) -> bool {
+        self.connection
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|connection| connection.attachment_references)
+    }
+
+    pub(super) fn prepare(
+        &self,
+        references: bool,
+        placement: bool,
+        attachment: Option<AssetRef>,
+    ) -> Result<Prepared> {
         if references && !self.references() {
             return Err(reference_unavailable());
         }
@@ -223,10 +292,14 @@ impl DesktopImageGeneration {
                 "retained_image_placement_unavailable",
             ));
         }
+        if attachment.is_some() && !self.attachment_references() {
+            return Err(attachment_unavailable());
+        }
         Ok(Prepared {
             owner: self.clone(),
             references,
             placement,
+            attachment,
         })
     }
 
@@ -234,6 +307,7 @@ impl DesktopImageGeneration {
         &self,
         turn: &TurnBinding,
         reference: Option<ReferenceScope>,
+        attachment: Option<AttachmentScope>,
         placement_store: Option<Arc<SqliteStore>>,
     ) -> Result<ToolHost> {
         let mut properties = json!({
@@ -247,34 +321,54 @@ impl DesktopImageGeneration {
             properties["library_reference_id"] = json!({"type":"string", "format":"uuid", "description":"The catalog ID of one Library image the user selected earlier in this turn."});
             description.push_str(" Use library_reference_id only for a Library image the user selected in this turn.");
         }
+        if attachment.is_some() {
+            properties["attached_image"] = json!({"type":"boolean", "const":true, "description":"Use the image attached to this submission. Desktop asks before sending it to the image provider."});
+            description.push_str(" Set attached_image to true to request generation using the image attached to this submission. If the user declines, ask before another attempt or generating without it.");
+            if reference.is_some() {
+                description.push_str(" Choose attached_image or library_reference_id, never both.");
+            }
+        }
         let placement = placement_store.is_some();
         if placement {
             description.push_str(" To place a retained image in the workspace, use place_generated_image with its media ID and source turn.");
         }
+        let mut input_schema = json!({
+            "type": "object",
+            "properties": properties,
+            "required": ["prompt"],
+            "additionalProperties": false
+        });
+        if reference.is_some() && attachment.is_some() {
+            input_schema["not"] = json!({"required":["attached_image", "library_reference_id"]});
+        }
+        let mut statuses = vec!["retained", "generated_unretained"];
+        if attachment.is_some() {
+            statuses.push("reference_declined");
+        }
         let definition = CapabilityDefinition {
             tool: ToolDefinition {
                 id: ToolId::new(TOOL)?,
-                version: match (reference.is_some(), placement) {
-                    (false, false) => TEXT_VERSION,
-                    (true, false) => REFERENCE_VERSION,
-                    (false, true) => PLACEABLE_TEXT_VERSION,
-                    (true, true) => PLACEABLE_REFERENCE_VERSION,
+                version: match (reference.is_some(), placement, attachment.is_some()) {
+                    (false, false, false) => TEXT_VERSION,
+                    (true, false, false) => REFERENCE_VERSION,
+                    (false, true, false) => PLACEABLE_TEXT_VERSION,
+                    (true, true, false) => PLACEABLE_REFERENCE_VERSION,
+                    (false, false, true) => ATTACHMENT_VERSION,
+                    (true, false, true) => BOTH_REFERENCES_VERSION,
+                    (false, true, true) => PLACEABLE_ATTACHMENT_VERSION,
+                    (true, true, true) => PLACEABLE_BOTH_REFERENCES_VERSION,
                 },
                 description,
-                input: InputFormat::Json(json!({
-                    "type": "object",
-                    "properties": properties,
-                    "required": ["prompt"],
-                    "additionalProperties": false
-                })),
-                max_input_bytes: MAX_PROMPT_BYTES * 6 + 128,
+                input: InputFormat::Json(input_schema),
+                max_input_bytes: MAX_PROMPT_BYTES * 6
+                    + if attachment.is_some() { 256 } else { 128 },
                 max_output_bytes: if placement { 4096 } else { 1024 },
                 recovery: RecoveryKind::Unavailable,
             },
             output_schema: json!({
                 "type": "object",
                 "properties": {
-                    "status": {"enum": ["retained", "generated_unretained"]},
+                    "status": {"enum": statuses},
                     "id": {"type": "string"},
                     "media_type": {"type": "string"},
                     "bytes": {"type": "integer"}
@@ -288,6 +382,7 @@ impl DesktopImageGeneration {
             session: turn.session.clone(),
             owner: self.clone(),
             reference,
+            attachment,
             placement_turn: placement.then(|| turn.turn.clone()),
         }) as Arc<dyn CapabilityExecutor>;
         let mut tools = vec![(definition, executor)];
@@ -312,10 +407,11 @@ struct Arguments {
     prompt: String,
     background: Option<Background>,
     library_reference_id: Option<String>,
+    attached_image: Option<bool>,
 }
 
 impl Arguments {
-    fn parse(value: &Value, references: bool) -> Result<Self> {
+    fn parse(value: &Value, references: bool, attachment: bool) -> Result<Self> {
         let invalid = || {
             problem(
                 ErrorKind::InvalidInput,
@@ -330,6 +426,10 @@ impl Arguments {
                     || !args.library_reference_id.as_ref().is_some_and(|id| {
                         Uuid::parse_str(id).is_ok_and(|uuid| uuid.to_string() == *id)
                     })))
+            || (value.get("attached_image").is_some()
+                && (!attachment
+                    || args.attached_image != Some(true)
+                    || args.library_reference_id.is_some()))
         {
             return Err(invalid());
         }
@@ -349,6 +449,14 @@ struct Request {
     credential: CredentialWitness,
     #[serde(skip_serializing_if = "Option::is_none")]
     reference_png: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reference_origin: Option<ReferenceOrigin>,
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum ReferenceOrigin {
+    Attachment,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -381,11 +489,12 @@ enum Reply {
     },
     Unavailable,
     GeneratedUnretained,
+    ReferenceDeclined,
     Uncertain,
 }
 
 impl Reply {
-    fn outcome(self, placement_turn: Option<&TurnId>) -> ToolOutcome {
+    fn outcome(self, placement_turn: Option<&TurnId>, attachment: bool) -> ToolOutcome {
         match self {
             Self::Retained {
                 id,
@@ -426,8 +535,13 @@ impl Reply {
                 receipt: None,
                 truncated: false,
             },
+            Self::ReferenceDeclined if attachment => {
+                let mut outcome = ToolOutcome::failed("The user declined sending the attached image to the image provider. Ask before attempting generation again or generating without it.");
+                outcome.structured = Some(json!({"status":"reference_declined"}));
+                outcome
+            }
             Self::Unavailable => ToolOutcome::failed("desktop_image_generation_unavailable"),
-            Self::Uncertain | Self::Retained { .. } => ToolOutcome::uncertain(),
+            Self::Uncertain | Self::ReferenceDeclined | Self::Retained { .. } => ToolOutcome::uncertain(),
         }
     }
 }
@@ -436,6 +550,7 @@ struct GenerateImage {
     session: SessionId,
     owner: DesktopImageGeneration,
     reference: Option<ReferenceScope>,
+    attachment: Option<AttachmentScope>,
     placement_turn: Option<TurnId>,
 }
 
@@ -444,6 +559,36 @@ struct ReferenceScope {
     turn: TurnBinding,
     storage: Arc<RetainedInputs>,
     access: Arc<QuestionAccess>,
+}
+
+struct AttachmentScope {
+    asset: AssetRef,
+    storage: Arc<RetainedInputs>,
+}
+
+fn attachment_unavailable() -> agent_kit_core::Error {
+    problem(
+        ErrorKind::Unavailable,
+        "image_generation_attachment_unavailable",
+    )
+}
+
+impl AttachmentScope {
+    async fn read(&self) -> Result<String> {
+        read_png(self.storage.clone(), super::images::media(&self.asset)?).await
+    }
+}
+
+async fn read_png(
+    storage: Arc<RetainedInputs>,
+    media: agent_kit_core::messages::MediaRef,
+) -> Result<String> {
+    let bytes = tokio::task::spawn_blocking(move || {
+        storage.resolve(&media, super::images::MAX_IMAGE_BYTES)
+    })
+    .await
+    .map_err(|_| reference_unavailable())??;
+    Ok(STANDARD.encode(bytes))
 }
 
 fn reference_unavailable() -> agent_kit_core::Error {
@@ -473,24 +618,27 @@ impl ReferenceScope {
                 },
             )
             .await?;
-        let storage = self.storage.clone();
-        let bytes = tokio::task::spawn_blocking(move || {
-            storage.resolve(&media, super::images::MAX_IMAGE_BYTES)
-        })
-        .await
-        .map_err(|_| reference_unavailable())??;
-        Ok(STANDARD.encode(bytes))
+        read_png(self.storage.clone(), media).await
     }
 }
 
 impl CapabilityExecutor for GenerateImage {
     fn validate(&self, arguments: &Value) -> Result<()> {
-        Arguments::parse(arguments, self.reference.is_some()).map(|_| ())
+        Arguments::parse(
+            arguments,
+            self.reference.is_some(),
+            self.attachment.is_some(),
+        )
+        .map(|_| ())
     }
 
     fn invoke(&self, call: CapabilityCall) -> BoxFuture<'_, CapabilityReply> {
         Box::pin(async move {
-            let outcome = match Arguments::parse(&call.arguments, self.reference.is_some()) {
+            let outcome = match Arguments::parse(
+                &call.arguments,
+                self.reference.is_some(),
+                self.attachment.is_some(),
+            ) {
                 Ok(arguments) => self.generate(&call, arguments).await,
                 Err(error) => ToolOutcome::failed(&error.code),
             };
@@ -504,7 +652,21 @@ impl CapabilityExecutor for GenerateImage {
 
 impl GenerateImage {
     async fn generate(&self, call: &CapabilityCall, arguments: Arguments) -> ToolOutcome {
-        let reference_png = if let Some(id) = arguments.library_reference_id {
+        let attachment = arguments.attached_image == Some(true);
+        let reference_png = if attachment {
+            let Some(scope) = &self.attachment else {
+                return ToolOutcome::failed("image_generation_attachment_unavailable");
+            };
+            let resolved = tokio::select! {
+                biased;
+                () = call.cancellation.cancelled() => Err(attachment_unavailable()),
+                result = scope.read() => result,
+            };
+            match resolved {
+                Ok(png) => Some(png),
+                Err(_) => return ToolOutcome::failed("image_generation_attachment_unavailable"),
+            }
+        } else if let Some(id) = arguments.library_reference_id {
             let Some(scope) = &self.reference else {
                 return ToolOutcome::failed("image_generation_reference_unavailable");
             };
@@ -538,7 +700,9 @@ impl GenerateImage {
             .unwrap()
             .as_ref()
             .filter(|connection| {
-                (reference_png.is_none() || connection.references)
+                (reference_png.is_none()
+                    || (attachment && connection.attachment_references)
+                    || (!attachment && connection.references))
                     && (self.placement_turn.is_none() || connection.placement)
             })
             .map(|connection| connection.client.clone());
@@ -552,12 +716,13 @@ impl GenerateImage {
             background: arguments.background,
             credential: CredentialWitness { nonce, proof },
             reference_png,
+            reference_origin: attachment.then_some(ReferenceOrigin::Attachment),
         };
         tokio::select! {
             biased;
             () = call.cancellation.cancelled() => ToolOutcome::uncertain(),
             reply = connection.send_request(request).block_task() => {
-                reply.map_or_else(|_| ToolOutcome::uncertain(), |reply| reply.outcome(self.placement_turn.as_ref()))
+                reply.map_or_else(|_| ToolOutcome::uncertain(), |reply| reply.outcome(self.placement_turn.as_ref(), attachment))
             }
         }
     }
@@ -572,6 +737,7 @@ mod tests {
         let accepted = Arguments::parse(
             &json!({"prompt":"Build a tile", "background":"transparent"}),
             false,
+            false,
         )
         .unwrap();
         let request = Request {
@@ -584,6 +750,7 @@ mod tests {
                 proof: "b".repeat(64),
             },
             reference_png: None,
+            reference_origin: None,
         };
         assert_eq!(
             serde_json::to_value(request).unwrap(),
@@ -596,7 +763,7 @@ mod tests {
             json!({"prompt":"Build a tile", "model":"other"}),
             json!({"prompt":"Build a tile", "references":["/tmp/reference.png"]}),
         ] {
-            assert!(Arguments::parse(&input, false).is_err());
+            assert!(Arguments::parse(&input, false, false).is_err());
         }
     }
 
@@ -604,9 +771,9 @@ mod tests {
     fn reference_requires_negotiated_authority_and_a_canonical_catalog_id() {
         let id = "d365c5fb-5833-48e9-a081-ae6d52c9b49c";
         let args = json!({"prompt":"Use this selected image", "library_reference_id":id});
-        assert!(Arguments::parse(&args, false).is_err());
+        assert!(Arguments::parse(&args, false, false).is_err());
         assert_eq!(
-            Arguments::parse(&args, true)
+            Arguments::parse(&args, true, false)
                 .unwrap()
                 .library_reference_id
                 .as_deref(),
@@ -619,8 +786,48 @@ mod tests {
             json!("/workspace/image.png"),
         ] {
             let args = json!({"prompt":"Use this selected image", "library_reference_id":invalid});
-            assert!(Arguments::parse(&args, true).is_err());
+            assert!(Arguments::parse(&args, true, false).is_err());
         }
+    }
+
+    #[test]
+    fn attachment_reference_requires_the_exact_current_input_and_explicit_source_choice() {
+        let session = SessionId::new("fixture-session").unwrap();
+        let asset: AssetRef = serde_json::from_value(json!({
+            "owner":session, "id":"input/fixture", "name":super::super::images::NAME,
+            "version":1, "size":128, "digest":([7_u8;32]),
+        }))
+        .unwrap();
+        let part = || PromptPart::RetainedImage {
+            asset: asset.clone(),
+        };
+        assert_eq!(attached_image(&[part()], &session), Some(&asset));
+        assert!(attached_image(&[part(), part()], &session).is_none());
+        assert!(attached_image(&[part()], &SessionId::new("foreign").unwrap()).is_none());
+        let use_attachment = json!({"prompt":"Use this attached image", "attached_image":true});
+        assert!(Arguments::parse(&use_attachment, false, true).is_ok());
+        assert!(Arguments::parse(&use_attachment, true, false).is_err());
+        for extra in [
+            json!({"attached_image":false}),
+            json!({"attached_image":null}),
+            json!({"attached_image":true, "library_reference_id":"d365c5fb-5833-48e9-a081-ae6d52c9b49c"}),
+        ] {
+            let mut args = json!({"prompt":"Use this attached image"});
+            args.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            assert!(Arguments::parse(&args, true, true).is_err());
+        }
+        let denial = Reply::ReferenceDeclined.outcome(None, true);
+        assert_eq!(denial.status, OutcomeStatus::Failed);
+        assert_eq!(
+            denial.structured,
+            Some(json!({"status":"reference_declined"}))
+        );
+        assert_eq!(
+            Reply::ReferenceDeclined.outcome(None, false).status,
+            OutcomeStatus::Uncertain
+        );
     }
 
     #[test]
@@ -630,7 +837,7 @@ mod tests {
             json!({"kind":"retained", "id":id, "mediaType":"image/png", "bytes":128}),
         )
         .unwrap()
-        .outcome(None);
+        .outcome(None, false);
         assert_eq!(accepted.status, OutcomeStatus::Succeeded);
         assert_eq!(
             accepted.structured,
@@ -638,7 +845,7 @@ mod tests {
         );
         let unretained = serde_json::from_value::<Reply>(json!({"kind":"generated_unretained"}))
             .unwrap()
-            .outcome(None);
+            .outcome(None, false);
         assert_eq!(unretained.status, OutcomeStatus::Uncertain);
         assert_eq!(
             unretained.structured,
@@ -653,7 +860,7 @@ mod tests {
             assert_eq!(
                 serde_json::from_value::<Reply>(reply)
                     .unwrap()
-                    .outcome(None)
+                    .outcome(None, false)
                     .status,
                 OutcomeStatus::Uncertain
             );

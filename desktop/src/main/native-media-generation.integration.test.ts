@@ -372,6 +372,152 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
   75_000
 );
 
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "sends only a reviewed PNG attached to the active generation turn",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-image-attachment-proof-")
+    );
+    const credentialHome = path.join(root, "credentials");
+    const cwd = path.join(root, "workspace");
+    const requests: Record<string, unknown>[] = [];
+    const media = vi.fn<(init: RequestInit) => Promise<Response>>(
+      async (init) => {
+        const body = JSON.parse(String(init.body));
+        expect(body.reference_png).toBe(referencePng);
+        return Response.json({
+          model_id: body.model_id,
+          provider_id: body.provider,
+          stored_media: {
+            id: mediaId,
+            file_name: "image-1.png",
+            media_type: "image/png",
+            byte_size: 120,
+            created_at: 1,
+          },
+        });
+      }
+    );
+    let reviews = 0;
+    let owner: NativeAgentChat | undefined;
+    try {
+      await Promise.all(
+        [credentialHome, cwd].map((directory) =>
+          fs.mkdir(directory, { mode: 0o700 })
+        )
+      );
+      const secrets = new SecretsStore(new AuthStore(root), credentialHome);
+      await secrets.set("openrouter", credential);
+      const start = async () =>
+        NativeAgentChat.start({
+          ...(await NativeProviderSelection.builtInByok("openrouter", model, {
+            credentialHome,
+            hasKey: (id) => secrets.has(id),
+            imageRequest: media,
+            network: async () => ({
+              prepare: () => async (body) => {
+                requests.push(JSON.parse(body.toString()));
+                if ([1, 3, 5].includes(requests.length))
+                  return toolCompletion("generate_image", {
+                    prompt,
+                    attached_image: true,
+                  });
+                return completion({ content: "Finished." }, "stop");
+              },
+            }),
+          })),
+          resourcesPath: resources!,
+          stateDirectory: path.join(root, "state"),
+          cwd,
+          workspace: {
+            id: "attachment-reference-workspace",
+            primary: { id: "primary", name: "Workspace", path: cwd },
+            additionalReadRoots: [],
+            protectedPaths: [credentialHome],
+          },
+          async reviewImageReference({ signal }) {
+            if (++reviews === 1) return { kind: "declined" };
+            return {
+              kind: "approved",
+              signal,
+              check: () => signal.throwIfAborted(),
+              close: () => {},
+            };
+          },
+        });
+      const attached = {
+        action: "submit",
+        text: "Generate an image based on the attached PNG.",
+        operatingRegime: "act",
+        png: Uint8Array.from(Buffer.from(referencePng, "base64")).buffer,
+      };
+
+      const first = await start();
+      owner = first;
+      const deniedChat = await first.create();
+      const denied = await first.submitImage(deniedChat, {
+        ...attached,
+        inputId: "deny-transfer",
+      });
+      await settled(first, deniedChat, denied.turnId);
+      expect(reviews).toBe(1);
+      expect(media).not.toHaveBeenCalled();
+      expect(JSON.stringify(requests[0].tools)).toContain("attached_image");
+      expect(JSON.stringify(requests[1].messages)).toContain(
+        "reference_declined"
+      );
+
+      const acceptedChat = await first.create();
+      const accepted = await first.submitImage(acceptedChat, {
+        ...attached,
+        inputId: "approve-transfer",
+      });
+      await settled(first, acceptedChat, accepted.turnId);
+      expect(reviews).toBe(2);
+      expect(media).toHaveBeenCalledOnce();
+
+      await first.close();
+      owner = undefined;
+      const reopened = await start();
+      owner = reopened;
+      const restored = await reopened.load(acceptedChat.id);
+      await settled(reopened, restored, accepted.turnId);
+      expect(requests).toHaveLength(4);
+      const stale = await reopened.submit(
+        restored,
+        "stale-attachment",
+        "Try to use the PNG from the last turn.",
+        "act"
+      );
+      await settled(reopened, restored, stale.turnId);
+      expect(JSON.stringify(requests[4].tools)).not.toContain("attached_image");
+      expect(reviews).toBe(2);
+      expect(media).toHaveBeenCalledOnce();
+    } finally {
+      try {
+        await owner?.close();
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  },
+  45_000
+);
+
+async function settled(
+  chat: NativeAgentChat,
+  session: Awaited<ReturnType<NativeAgentChat["create"]>>,
+  turnId: string | null
+) {
+  if (!turnId) throw new Error("fixture submission was not claimed");
+  await vi.waitFor(async () => {
+    expect((await chat.observe(session)).latest).toMatchObject({
+      turnId,
+      status: "succeeded",
+    });
+  }, poll);
+}
+
 function toolCompletion(name: string, args: object): Response {
   return completion(
     {

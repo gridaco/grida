@@ -329,6 +329,8 @@ struct StoredPrompt {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_image_reference: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    allow_attachment_reference: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_image_placement: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     editor_endpoint: Option<BindingId>,
@@ -1809,6 +1811,12 @@ impl Host {
         } else {
             parts
         };
+        let allow_attachment_reference = desktop_image_generation.is_some()
+            && self
+                .desktop_image_generation
+                .as_ref()
+                .is_some_and(image_generation::DesktopImageGeneration::attachment_references)
+            && image_generation::attached_image(&parts, &session.session).is_some();
         Ok(Submission {
             id,
             payload: encode(
@@ -1838,6 +1846,7 @@ impl Host {
                     host_tools_capture,
                     desktop_image_generation,
                     allow_image_reference,
+                    allow_attachment_reference,
                     allow_image_placement,
                     editor_endpoint,
                     editor_presentation,
@@ -1954,6 +1963,7 @@ impl Host {
                         || stored.host_tools_capture.is_some()
                         || stored.desktop_image_generation.is_some()
                         || stored.allow_image_reference
+                        || stored.allow_attachment_reference
                         || stored.allow_image_placement
                         || stored.editor_endpoint.is_some()
                         || stored.editor_presentation
@@ -2059,12 +2069,28 @@ impl Host {
                                 "retained_image_generation_binding_unavailable",
                             )
                         })?;
-                    image_generation = Some(
-                        owner
-                            .prepare(stored.allow_image_reference, stored.allow_image_placement)?,
-                    );
+                    let attachment = stored
+                        .allow_attachment_reference
+                        .then(|| {
+                            image_generation::attached_image(&stored.parts, session)
+                                .cloned()
+                                .ok_or_else(|| {
+                                    problem(
+                                        ErrorKind::InvalidState,
+                                        "invalid_attachment_reference_scope",
+                                    )
+                                })
+                        })
+                        .transpose()?;
+                    image_generation = Some(owner.prepare(
+                        stored.allow_image_reference,
+                        stored.allow_image_placement,
+                        attachment,
+                    )?);
                 } else if !cancellation_only
-                    && (stored.allow_image_reference || stored.allow_image_placement)
+                    && (stored.allow_image_reference
+                        || stored.allow_image_placement
+                        || stored.allow_attachment_reference)
                 {
                     return Err(problem(
                         ErrorKind::InvalidState,

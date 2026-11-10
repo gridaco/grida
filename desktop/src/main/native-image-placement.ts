@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { MediaStore } from "@grida/daemon/server";
 import type { NativeWorkspaceCatalog } from "./native-workspace-catalog";
+import type { WorkspaceReviewReceipt } from "./native-workspace-review";
 import {
   WorkspaceWriteUnverified,
   type WorkspaceFileWorkers,
@@ -11,19 +12,11 @@ import {
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 
 type Workspace = Pick<WorkspaceMediaGrant, "workspaceId" | "root" | "identity">;
-export type ImagePlacementReview = (input: {
+type ImagePlacementReview = (input: {
   workspace: Workspace;
   relative: string;
   signal: AbortSignal;
-}) => Promise<
-  | {
-      kind: "approved";
-      check: () => void;
-      signal: AbortSignal;
-      close: () => void;
-    }
-  | { kind: "declined" | "unavailable" }
->;
+}) => Promise<WorkspaceReviewReceipt>;
 type Dependencies = {
   catalog: Pick<NativeWorkspaceCatalog, "fileGrant" | "withWriteGrant">;
   workers: Pick<WorkspaceFileWorkers, "publish">;
@@ -87,7 +80,7 @@ export class NativeImagePlacement {
     this.active = { id, abort };
     const signal = AbortSignal.any([this.lifetime.signal, abort.signal]);
     let approval:
-      | Extract<Awaited<ReturnType<ImagePlacementReview>>, { kind: "approved" }>
+      | Extract<WorkspaceReviewReceipt, { kind: "approved" }>
       | undefined;
     try {
       const first = await this.deps.catalog.fileGrant(

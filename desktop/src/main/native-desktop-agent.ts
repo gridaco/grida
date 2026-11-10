@@ -26,6 +26,7 @@ import type { NativeChatGptHost } from "./native-chatgpt-host";
 import { NativeChatProfiles } from "./native-chat-profiles";
 import type { NativeDesktopProfile } from "./native-desktop-profile";
 import type { NativeImagePlacement } from "./native-image-placement";
+import type { ImageReferenceReview } from "./native-image-generation";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeProviderSelection } from "./native-provider-selection";
 import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
@@ -56,6 +57,7 @@ type LaunchOptions = Readonly<{
   imagePlacement?: (
     workspace: Pick<WorkspaceMediaGrant, "workspaceId" | "root" | "identity">
   ) => NativeImagePlacement;
+  reviewImageReference?: (workspaceId: string) => ImageReferenceReview;
   mcp?: NativeMcpLaunch;
   selectableProfiles?: boolean;
   onLifecycle?: (
@@ -94,7 +96,8 @@ export class NativeDesktopAgent {
     private readonly provider: NativeDesktopProfile.Provider = "gateway",
     readonly selectableProfiles = false,
     private readonly onLifecycle?: LaunchOptions["onLifecycle"],
-    private readonly imagePlacement?: LaunchOptions["imagePlacement"]
+    private readonly imagePlacement?: LaunchOptions["imagePlacement"],
+    private readonly reviewImageReference?: LaunchOptions["reviewImageReference"]
   ) {
     if (subscription) {
       const { oauth } = subscription;
@@ -194,7 +197,8 @@ export class NativeDesktopAgent {
       options?.provider,
       options?.selectableProfiles,
       options?.onLifecycle,
-      options?.imagePlacement
+      options?.imagePlacement,
+      options?.reviewImageReference
     );
   }
 
@@ -702,15 +706,19 @@ export class NativeDesktopAgent {
             epoch: this.configurationEpoch,
           }
         : undefined;
+    const imageTools =
+      "imageGeneration" in provider &&
+      provider.imageGeneration &&
+      identity &&
+      !nestedProtectedPaths;
     return {
       ...provider,
-      imagePlacement:
-        "imageGeneration" in provider &&
-        provider.imageGeneration &&
-        identity &&
-        !nestedProtectedPaths
-          ? this.imagePlacement?.({ workspaceId: id, root, identity })
-          : undefined,
+      imagePlacement: imageTools
+        ? this.imagePlacement?.({ workspaceId: id, root, identity })
+        : undefined,
+      reviewImageReference: imageTools
+        ? this.reviewImageReference?.(id)
+        : undefined,
       workspaceConfiguration,
       resourcesPath: this.resourcesPath,
       workspace: {

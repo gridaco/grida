@@ -83,7 +83,12 @@ fn source_artifact(state: &TurnState, id: &str) -> Result<Artifact> {
     let mut candidates = state.operations().values().filter_map(|operation| {
         if !matches!(
             generation_operation(state, operation),
-            Some(PLACEABLE_TEXT_VERSION | PLACEABLE_REFERENCE_VERSION)
+            Some(
+                PLACEABLE_TEXT_VERSION
+                    | PLACEABLE_REFERENCE_VERSION
+                    | PLACEABLE_ATTACHMENT_VERSION
+                    | PLACEABLE_BOTH_REFERENCES_VERSION
+            )
         ) {
             return None;
         }
@@ -368,7 +373,7 @@ mod tests {
             bytes: 128,
             sha256: Some(digest.clone()),
         };
-        let mut result = reply.clone().outcome(Some(&turn));
+        let mut result = reply.clone().outcome(Some(&turn), false);
         assert_eq!(result.status, OutcomeStatus::Succeeded);
         assert_eq!(
             result.structured.as_ref().unwrap()["source_turn_id"],
@@ -396,6 +401,6 @@ mod tests {
             digest
         );
         assert!(Artifact::from_outcome(&result, &TurnId::new("wrong-turn").unwrap()).is_none());
-        assert_eq!(reply.outcome(None).receipt, None);
+        assert_eq!(reply.outcome(None, false).receipt, None);
     }
 }

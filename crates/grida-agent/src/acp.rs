@@ -248,13 +248,21 @@ async fn serve_connection(
                         let place = request.client_capabilities.meta.as_ref()
                             .and_then(|meta| meta.get(placement))
                             .and_then(serde_json::Value::as_u64) == Some(1);
-                        generation.attach(connection.clone(), references, place);
+                        let attachment = crate::host::image_generation::ATTACHMENT_CAPABILITY;
+                        let attachments = initialized_host.supports_attachment_reference()
+                            && request.client_capabilities.meta.as_ref()
+                                .and_then(|meta| meta.get(attachment))
+                                .and_then(serde_json::Value::as_u64) == Some(1);
+                        generation.attach(connection.clone(), references, place, attachments);
                         advertised.insert(capability.into(), 1.into());
                         if references {
                             advertised.insert(reference.into(), 1.into());
                         }
                         if place {
                             advertised.insert(placement.into(), 1.into());
+                        }
+                        if attachments {
+                            advertised.insert(attachment.into(), 1.into());
                         }
                     }
                     let capability = crate::editor_surfaces::CAPABILITY;

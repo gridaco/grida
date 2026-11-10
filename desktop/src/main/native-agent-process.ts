@@ -11,7 +11,10 @@ import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeAgentRevisions } from "./native-agent-revisions";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeAgentGoals } from "./native-agent-goals";
-import { NativeImageGeneration } from "./native-image-generation";
+import {
+  NativeImageGeneration,
+  type ImageReferenceReview,
+} from "./native-image-generation";
 import { NativeImagePlacement } from "./native-image-placement";
 import {
   NativeEditorSurfaceEndpoints,
@@ -75,6 +78,7 @@ export type NativeAgentLaunch = {
   workspace?: NativeWorkspaceSelection;
   imageGeneration?: NativeImageGeneration;
   imagePlacement?: NativeImagePlacement;
+  reviewImageReference?: ImageReferenceReview;
   capabilities?: Readonly<Record<string, 1>>;
   onSessionUpdate?: (params: unknown) => void;
 };
@@ -119,6 +123,7 @@ export class NativeAgentProcess {
   private imageInput = false;
   private imageReference = false;
   private imagePlacementEnabled = false;
+  private imageAttachmentEnabled = false;
   private librarySelection = false;
   private fileInput = false;
   private agentEffort = false;
@@ -148,7 +153,8 @@ export class NativeAgentProcess {
     askRoots?: ReadonlyMap<string, string>,
     private readonly providerEgress?: NativeProviderEgress,
     private readonly imageGeneration?: NativeImageGeneration,
-    private readonly imagePlacement?: NativeImagePlacement
+    private readonly imagePlacement?: NativeImagePlacement,
+    private readonly reviewImageReference?: ImageReferenceReview
   ) {
     if (askRoots) {
       this.permissions = new NativeAgentPermissions(
@@ -293,6 +299,9 @@ export class NativeAgentProcess {
       ? options.imageGeneration
       : undefined;
     const imagePlacement = imageGeneration ? options.imagePlacement : undefined;
+    const reviewImageReference = imageGeneration?.supportsReference
+      ? options.reviewImageReference
+      : undefined;
     if (
       imageGeneration &&
       (options.provider !== "openai-compatible" ||
@@ -452,7 +461,8 @@ export class NativeAgentProcess {
       permissionProfile?.askRoots,
       providerEgress,
       imageGeneration,
-      imagePlacement
+      imagePlacement,
+      reviewImageReference
     );
     try {
       const response = object(
@@ -467,6 +477,9 @@ export class NativeAgentProcess {
                   [NativeImageGeneration.referenceCapability]: 1,
                 }),
                 ...(imagePlacement && { [NativeImagePlacement.capability]: 1 }),
+                ...(reviewImageReference && {
+                  [NativeImageGeneration.attachmentCapability]: 1,
+                }),
                 ...NativeAgentCommands.capabilities,
                 ...NativeAgentRevisions.capabilities,
                 [NativeAgentGoals.completionCapability]: 1,
@@ -521,6 +534,10 @@ export class NativeAgentProcess {
       processOwner.imagePlacementEnabled =
         imagePlacement !== undefined &&
         advertised?.[NativeImagePlacement.capability] === 1;
+      processOwner.imageAttachmentEnabled =
+        reviewImageReference !== undefined &&
+        processOwner.imageInput &&
+        advertised?.[NativeImageGeneration.attachmentCapability] === 1;
       processOwner.librarySelection =
         options.workspace !== undefined &&
         processOwner.imageInput &&
@@ -741,7 +758,10 @@ export class NativeAgentProcess {
               id,
               message.params,
               this.imageReference,
-              this.imagePlacementEnabled
+              this.imagePlacementEnabled,
+              this.imageAttachmentEnabled
+                ? this.reviewImageReference
+                : undefined
             )
             .then((result) => {
               if (this.connected) this.write({ jsonrpc: "2.0", id, result });

@@ -495,6 +495,17 @@ chat-owned bytes and sends one bounded `referencePng` to Main. The media
 service verifies the same provider variant and constructs its inline image
 input. A missing or stale selection fails before generation.
 
+The same reviewed profile can negotiate
+`co.grida/media/attachment-reference` version 1 independently. An ordinary
+Act input with one retained PNG offers `attached_image: true` as an
+alternative to a Library reference. The worker resolves the exact
+submission's retained PNG and supplies `referenceOrigin: "attachment"` with
+the bounded reverse request. Main obtains a fresh workbench confirmation
+before the image provider receives the PNG. A declined request returns a
+known failure and keeps the attachment in its original chat. Prior turns,
+generic file attachments and other sessions supply no authority to use a
+PNG for generation.
+
 The private Desktop supervisor can negotiate `co.grida/media/place-image`
 version 1 alongside generation for an admitted workbench. The host captures
 the binding for ordinary Act work. A retained generation on that binding

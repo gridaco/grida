@@ -379,6 +379,7 @@ impl Host {
         captured.allow_library_selection = false;
         captured.desktop_image_generation = None;
         captured.allow_image_reference = false;
+        captured.allow_attachment_reference = false;
         captured.allow_image_placement = false;
         captured.configuration_permission = crate::ConfigurationPermission::Disabled;
         if let Some(permission) = &captured.permission_capture {

@@ -1,5 +1,8 @@
 import { expect, it, vi } from "vitest";
-import { NativeImageGeneration } from "./native-image-generation";
+import {
+  NativeImageGeneration,
+  type ImageReferenceReview,
+} from "./native-image-generation";
 
 const endpoint = "https://ai-gateway.vercel.sh/v1";
 const model = "openai/gpt-image-2.5-flare";
@@ -133,6 +136,73 @@ it("passes one canonical reference only on a captured reference-capable route", 
     credential,
     reference_png: png,
   });
+});
+
+it("sends the attached PNG only after an approved transfer review", async () => {
+  const request = vi.fn<(init: RequestInit) => Promise<Response>>(async () =>
+    Response.json({
+      model_id: model,
+      provider_id: "openrouter",
+      stored_media: item,
+    })
+  );
+  const owner = NativeImageGeneration.forByok(
+    "openrouter",
+    "https://openrouter.ai/api/v1",
+    request
+  )!;
+  const gate = new AbortController();
+  const close = vi.fn<() => void>();
+  const review = vi.fn<ImageReferenceReview>();
+  review.mockResolvedValueOnce({ kind: "declined" }).mockResolvedValue({
+    kind: "approved",
+    signal: gate.signal,
+    check: () => gate.signal.throwIfAborted(),
+    close,
+  });
+  const attached = {
+    ...call,
+    referencePng: png,
+    referenceOrigin: "attachment",
+  };
+  expect(await owner.generate(1, attached, true)).toEqual({
+    kind: "unavailable",
+  });
+  expect(await owner.generate(1, attached, false, false, review)).toEqual({
+    kind: "reference_declined",
+  });
+  expect(request).not.toHaveBeenCalled();
+  expect(
+    await owner.generate(
+      2,
+      { ...attached, callId: "approved" },
+      false,
+      false,
+      review
+    )
+  ).toMatchObject({ kind: "retained", id });
+  expect(review).toHaveBeenCalledWith({
+    model,
+    signal: expect.any(AbortSignal),
+  });
+  expect(request).toHaveBeenCalledOnce();
+  const body = JSON.parse(String(request.mock.calls[0][0].body));
+  expect(body.reference_png).toBe(png);
+  expect(body).not.toHaveProperty("referenceOrigin");
+  expect(close).toHaveBeenCalledOnce();
+
+  gate.abort();
+  expect(
+    await owner.generate(
+      3,
+      { ...attached, callId: "revoked" },
+      false,
+      false,
+      review
+    )
+  ).toEqual({ kind: "unavailable" });
+  expect(request).toHaveBeenCalledOnce();
+  expect(close).toHaveBeenCalledTimes(2);
 });
 
 it("only cancels the current exact request and aborts it on owner close", async () => {
