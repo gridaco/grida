@@ -1639,7 +1639,11 @@ Today:
   selects the reviewed system executable, scope, and helper.
   The [Desktop external run owner](desktop/src/main/native-external-runs.ts)
   accepts a private Linux launch profile, checks the registered directory
-  identity, and pins the bundled helper and system bubblewrap. It records each
+  identity, and pins the helper and system bubblewrap. An installed preview
+  requires an administrator-owned copy matching the packaged helper's
+  digest. The peer's runtime is limited to its reviewed executable and the
+  fixed glibc loader and library roots. The package tree remains protected.
+  Desktop records each
   request identity before dispatch, sends the prompt on private stdin with a
   cleared environment, and keeps replacement blocked until the prior owned
   work has a verified cleanup receipt or evidence it did not dispatch.

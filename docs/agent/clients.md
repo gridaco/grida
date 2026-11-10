@@ -352,15 +352,17 @@ local receipt. [Run a local ACP peer from the CLI](../cli/agent.md#run-a-local-a
 
 ### Use the Local agent preview in Desktop
 
-Installed Linux Desktop packages are still being qualified for this
-workflow.
+The installed Linux Insiders preview has been verified on Debian ARM64.
 
-An explicitly provisioned Linux native preview shows **Local agent** in the
-selected workspace. Open it, enter one text request, and select **Run**. The
-dialog names the reviewed peer and shows its offline, read-only workspace
-access. Closing the dialog leaves the run active. Reopen it to check the
-retained result or select **Stop** for the current run. If a send reply is
-missing, **Retry exact request** keeps the original request identity.
+The Linux Insiders preview uses a reviewed local executable and a helper
+provisioned by an administrator for the installed build.
+[Provision Local agent](https://github.com/gridaco/grida/blob/main/desktop/README.md#provision-local-agent-in-linux-insiders)
+
+Open **Local agent** in the selected workspace, enter one text request, and
+select **Run**. The dialog names the reviewed peer and shows its offline,
+read-only workspace access. Closing the dialog leaves the run active. Reopen it
+to check the retained result or select **Stop** for the current run. If a send
+reply is missing, **Retry exact request** keeps the original request identity.
 Unverified cleanup blocks a replacement run.
 
 ## Run a confined command

@@ -16,7 +16,7 @@ const MAX_PROFILE = 64 * 1024;
 const MAX_PIPE = 1024 * 1024;
 const STOP_MS = 12_000;
 const INSPECT_MS = 5_000;
-const RUNTIME = new Set([
+const DEVELOPMENT_RUNTIME = new Set([
   "/bin",
   "/usr/bin",
   "/lib",
@@ -24,9 +24,12 @@ const RUNTIME = new Set([
   "/usr/lib",
   "/usr/lib64",
 ]);
+const INSTALLED_HELPERS = "/usr/libexec/grida-agent";
+const HELPER_NAME = "agent-kit-sandbox-helper";
 const EXIT = { succeeded: 0, failed: 1, cancelled: 130, uncertain: 5 } as const;
 
 type Pin = Readonly<{ path: string; sha256: readonly number[] }>;
+type GlibcRuntime = Readonly<{ loader: string; libraries: string }>;
 type DirectoryIdentity = WorkspaceMediaGrant["identity"];
 type Profile = Readonly<{
   name: string;
@@ -42,6 +45,7 @@ type Profile = Readonly<{
 type Disposition = NativeExternalRun["disposition"];
 type Options = Readonly<{
   resourcesPath: string;
+  packaged: boolean;
   privateDirectory: string;
   temporaryDirectory: string;
   profileFile: string;
@@ -97,8 +101,10 @@ export class NativeExternalRuns {
   /** Compose only from a trusted launch under the application's single-instance owner. */
   static async open(options: Options): Promise<NativeExternalRuns> {
     if (process.platform !== "linux") throw failure("platform_unsupported");
+    const glibc = options.packaged ? installedGlibc() : undefined;
     const profile = parseProfile(
-      await readPrivate(options.profileFile, MAX_PROFILE)
+      await readPrivate(options.profileFile, MAX_PROFILE),
+      glibc
     );
     const grant = await options.workspace(profile.workspaceId);
     requireWorkspace(profile, grant);
@@ -115,6 +121,13 @@ export class NativeExternalRuns {
       ].some((location) => overlaps(location, options.temporaryDirectory))
     )
       throw failure("profile_invalid");
+    const executable = NativeAgentProcess.executable(options.resourcesPath);
+    const bundledHelper = path.join(path.dirname(executable), HELPER_NAME);
+    const helper = glibc
+      ? await installedHelper(bundledHelper, glibc)
+      : await packagedHelper(bundledHelper);
+    if (glibc && overlaps(grant.root, helper.path))
+      throw failure("profile_invalid");
     await syncDirectory(path.dirname(options.privateDirectory));
     await syncDirectory(path.dirname(options.temporaryDirectory));
     const scope =
@@ -126,10 +139,6 @@ export class NativeExternalRuns {
     const temporary = path.join(options.temporaryDirectory, scope);
     await ensurePrivateDirectory(directory);
     await ensurePrivateDirectory(temporary);
-    const executable = NativeAgentProcess.executable(options.resourcesPath);
-    const helper = await packagedHelper(
-      path.join(path.dirname(executable), "agent-kit-sandbox-helper")
-    );
     return new NativeExternalRuns(
       profile,
       directory,
@@ -555,7 +564,7 @@ function released(result: NativeExternalRun) {
   return result.disposition === "not_dispatched" || result.cleanupVerified;
 }
 
-function parseProfile(source: string | null): Profile {
+function parseProfile(source: string | null, glibc?: GlibcRuntime): Profile {
   const invalid = () => failure("profile_invalid");
   let profile: Record<string, unknown> | undefined;
   try {
@@ -594,6 +603,11 @@ function parseProfile(source: string | null): Profile {
   const executable = pin(profile.executable);
   const bubblewrap = pin(profile.bubblewrap);
   const identity = directoryIdentity(profile.identity);
+  const requiredRuntime =
+    glibc && executable
+      ? [executable.path, glibc.loader, glibc.libraries]
+      : ["/usr/bin"];
+  const allowedRuntime = glibc ? new Set(requiredRuntime) : DEVELOPMENT_RUNTIME;
   if (
     typeof name !== "string" ||
     !name.trim() ||
@@ -612,9 +626,9 @@ function parseProfile(source: string | null): Profile {
     args.some((arg) => typeof arg !== "string" || arg.includes("\0")) ||
     args.reduce((size, arg) => size + Buffer.byteLength(arg), 0) > 8192 ||
     !Array.isArray(runtimePaths) ||
-    !runtimePaths.includes("/usr/bin") ||
+    requiredRuntime.some((location) => !runtimePaths.includes(location)) ||
     new Set(runtimePaths).size !== runtimePaths.length ||
-    runtimePaths.some((entry) => !RUNTIME.has(entry)) ||
+    runtimePaths.some((entry) => !allowedRuntime.has(entry)) ||
     typeof deadlineMs !== "number" ||
     !Number.isSafeInteger(deadlineMs) ||
     deadlineMs < 1 ||
@@ -675,6 +689,71 @@ function pin(value: unknown): Pin | undefined {
   )
     return;
   return { path: row.path, sha256: row.sha256 };
+}
+
+function installedGlibc(): GlibcRuntime {
+  switch (process.arch) {
+    case "arm64":
+      return {
+        loader: "/lib/ld-linux-aarch64.so.1",
+        libraries: "/usr/lib/aarch64-linux-gnu",
+      };
+    case "x64":
+      return {
+        loader: "/lib64/ld-linux-x86-64.so.2",
+        libraries: "/usr/lib/x86_64-linux-gnu",
+      };
+    default:
+      throw failure("platform_unsupported");
+  }
+}
+
+async function installedHelper(
+  bundled: string,
+  glibc: GlibcRuntime
+): Promise<Pin> {
+  const loader = path.join(glibc.libraries, path.basename(glibc.loader));
+  await administratorPath(loader);
+  if ((await fs.realpath(glibc.loader)) !== loader)
+    throw failure("installed_runtime_unavailable");
+
+  // The package tree stays protected. Only the administrator's exact copy
+  // of this package's helper may launch the peer outside that tree.
+  await administratorPath(bundled);
+  const expected = Buffer.from((await packagedHelper(bundled)).sha256);
+  const installed = path.join(
+    INSTALLED_HELPERS,
+    expected.toString("hex"),
+    HELPER_NAME
+  );
+  await administratorPath(installed);
+  const helper = await packagedHelper(installed);
+  if (!expected.equals(Buffer.from(helper.sha256)))
+    throw failure("helper_unavailable");
+  return helper;
+}
+
+async function administratorPath(file: string): Promise<void> {
+  let location = file;
+  for (;;) {
+    const metadata = await fs.lstat(location, { bigint: true });
+    const validKind =
+      location === file
+        ? metadata.isFile() &&
+          (metadata.mode & 0o6000n) === 0n &&
+          (metadata.mode & 0o111n) !== 0n
+        : metadata.isDirectory();
+    if (
+      !validKind ||
+      metadata.uid !== 0n ||
+      metadata.gid !== 0n ||
+      (metadata.mode & 0o022n) !== 0n
+    )
+      throw failure("installed_custody_unavailable");
+    const parent = path.dirname(location);
+    if (parent === location) return;
+    location = parent;
+  }
 }
 
 async function packagedHelper(location: string): Promise<Pin> {

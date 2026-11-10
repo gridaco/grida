@@ -286,6 +286,41 @@ connection. A repeat decision uses the original wait and revision basis.
 This integration supplies read-only tools. Command installation and the
 normal Desktop chat cutover have separate acceptance checks.
 
+### Provision Local agent in Linux Insiders
+
+Use a locally built Insiders Debian package and the isolated native chat
+profile above. Launch once to register the selected workspace, then close
+Desktop. The preview requires a reviewed executable in `/usr/bin` and a
+non-setuid `/usr/bin/bwrap`.
+
+The administrator provisions the helper from that exact installed build:
+
+```sh
+bundled_helper=/usr/lib/grida-insiders/resources/native-agent/agent-kit-sandbox-helper
+helper_digest=$(sha256sum "$bundled_helper" | cut -d ' ' -f 1)
+sudo install -D -o root -g root -m 0755 "$bundled_helper" \
+  "/usr/libexec/grida-agent/$helper_digest/agent-kit-sandbox-helper"
+```
+
+Repeat the provisioning step after installing a build with a different helper
+digest. Desktop verifies both copies and requires administrator custody along
+the helper paths.
+
+Create an owner-only JSON profile with mode `0600` outside the workspace. Use
+`version: 1`, a display `name`, the workspace's `workspaceId`, canonical `root`
+and `identity` (`device`, `inode`, `birthTimeNs`). Read these from the matching
+workspace row (`id`, `root`, `directory_identity`) in
+`workspace-catalog/<SHA-256 of the browser directory path>/workspaces.json`
+under the isolated profile root. Set `executable` and `bubblewrap` to objects
+with `path` and `sha256` (32 digest bytes as numbers), `arguments` to the peer's
+argument list, and `deadlineMs` to a deadline from 1 to 120,000 milliseconds.
+
+On ARM64, set `runtimePaths` to the exact peer executable,
+`/lib/ld-linux-aarch64.so.1`, and `/usr/lib/aarch64-linux-gnu`. The x64 layout
+uses `/lib64/ld-linux-x86-64.so.2` and `/usr/lib/x86_64-linux-gnu`. Launch the
+same isolated profile with `--native-external-acp-profile=/absolute/profile.json`.
+Open **Local agent** in the registered workspace.
+
 We support macOS, Windows, and Linux distributions.
 
 [See All Releases](https://github.com/gridaco/grida/releases/latest)

@@ -765,6 +765,7 @@ app.on("ready", async () => {
             ...access,
             profileFile,
             resourcesPath: process.resourcesPath,
+            packaged: app.isPackaged,
           })
         );
       }
@@ -807,7 +808,7 @@ app.on("ready", async () => {
             ? "Native chat could not start"
             : "Native files could not start",
         externalProfile
-          ? "Check the private launch profile and its registered workspace."
+          ? "Check the private launch profile, registered workspace, and installed sandbox helper."
           : !nativeChatProfile
             ? "The managed file and media profile could not be verified."
             : NativeDesktopProfile.managedCutover()

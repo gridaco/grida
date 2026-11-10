@@ -118,6 +118,7 @@ function fixture() {
   const lookup = vi.fn<() => Promise<WorkspaceMediaGrant>>(async () => grant);
   const options = {
     resourcesPath: resources,
+    packaged: false,
     privateDirectory: state,
     temporaryDirectory: scratch,
     profileFile,
@@ -188,6 +189,20 @@ describe.skipIf(process.platform === "win32")(
       ).toThrow("native_external_profile_invalid");
     });
 
+    it("refuses broad runtime grants for an installed Linux preview", async () => {
+      const test = fixture();
+      linuxProcess();
+      try {
+        await expect(
+          NativeExternalRuns.open({ ...test.options, packaged: true })
+        ).rejects.toThrow("native_external_profile_invalid");
+        expect(test.lookup).not.toHaveBeenCalled();
+        expect(test.launches()).toEqual([]);
+      } finally {
+        test.close();
+      }
+    });
+
     it("uses the native catalog's protected scratch and drains the selected peer before Forget", async () => {
       const test = fixture();
       linuxProcess();
@@ -208,6 +223,7 @@ describe.skipIf(process.platform === "win32")(
               ...access,
               profileFile: test.options.profileFile,
               resourcesPath: test.options.resourcesPath,
+              packaged: false,
             })
           );
         await expect(open()).rejects.toThrow("workspace_not_registered");
