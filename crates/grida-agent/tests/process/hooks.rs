@@ -11,6 +11,10 @@ use std::path::PathBuf;
 const CHECK: &str = "require-completion-text";
 const FLAG: &str = "--require-completion-text";
 const COMMAND_CHECK: &str = "before-completion-command";
+const HEARTBEAT: &str = r#"
+    exec 3>"$TMPDIR/heartbeat"
+    while :; do printf . >&3; /bin/sleep 0.04; done
+"#;
 
 fn hook(fixture: &Fixture, path: &str, arguments: &[&str], mode: &str, changed: bool) -> PathBuf {
     let path = Path::new(path).canonicalize().unwrap();
@@ -280,14 +284,24 @@ async fn interrupting_a_native_hook_cleans_up_and_a_changed_profile_cannot_resum
     .await;
     for (action, changed) in [("stop", false), ("pause", false), ("pause", true)] {
         let fixture = Fixture::new(true);
-        let temporary = hook(&fixture, "/bin/sleep", &["10"], "required", false);
+        let temporary = hook(&fixture, "/bin/sh", &["-c", HEARTBEAT], "required", false);
         let mut command = fixture.process(&endpoint.url, "serve");
         command.arg("--stdio");
         let mut host = connect(command).await;
         let session = start(&mut host, &fixture.primary).await;
         endpoint.request().await;
-        timeout(WAIT, async {
-            while fs::read_dir(&temporary).unwrap().next().is_none() {
+        let heartbeat = timeout(WAIT, async {
+            loop {
+                let active = fs::read_dir(&temporary)
+                    .unwrap()
+                    .flatten()
+                    .find_map(|entry| {
+                        let file = fs::File::open(entry.path().join("heartbeat")).ok()?;
+                        (file.metadata().ok()?.len() >= 2).then_some(file)
+                    });
+                if let Some(active) = active {
+                    break active;
+                }
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         })
@@ -309,15 +323,33 @@ async fn interrupting_a_native_hook_cleans_up_and_a_changed_profile_cannot_resum
             }
         })
         .await;
-        host.close().await;
+        let output = host.finish().await;
+        let diagnostic = String::from_utf8_lossy(&output.stderr);
+        #[cfg(target_os = "macos")]
+        assert!(output.status.success(), "{diagnostic}");
+        #[cfg(target_os = "linux")]
+        {
+            assert_eq!(output.status.code(), Some(5), "{diagnostic}");
+            assert_eq!(diagnostic.trim(), "grida-agent: host_turn_unverified");
+        }
         assert!(fs::read_dir(&temporary).unwrap().next().is_none());
+        // The open descriptor still observes writes after temporary path cleanup.
+        let size = heartbeat.metadata().unwrap().len();
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        assert_eq!(heartbeat.metadata().unwrap().len(), size);
         assert!(endpoint.requests.try_recv().is_err());
         if action == "stop" {
             continue;
         }
 
         if changed {
-            hook(&fixture, "/bin/sleep", &["11"], "required", false);
+            hook(
+                &fixture,
+                "/bin/sh",
+                &["-c", HEARTBEAT, "changed"],
+                "required",
+                false,
+            );
         }
         let mut command = fixture.process(&endpoint.url, "serve");
         command.arg("--stdio");

@@ -201,7 +201,7 @@ impl Stdio {
         serde_json::from_str(&line).unwrap()
     }
 
-    pub(super) async fn close(self) {
+    pub(super) async fn finish(self) -> std::process::Output {
         let Self {
             child,
             stdin,
@@ -211,6 +211,11 @@ impl Stdio {
         drop(stdin);
         let output = finish_child(child).await;
         drop(stdout);
+        output
+    }
+
+    pub(super) async fn close(self) {
+        let output = self.finish().await;
         assert!(
             output.status.success(),
             "{}",
