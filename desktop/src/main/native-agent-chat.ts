@@ -250,6 +250,10 @@ export class NativeAgentChat {
     return this.connected && this.process.acceptsEffort;
   }
 
+  get acceptsGoalEffort(): boolean {
+    return this.connected && this.process.acceptsGoalEffort;
+  }
+
   get acceptsWakeups(): boolean {
     return this.connected && this.process.acceptsWakeups;
   }
@@ -1266,7 +1270,8 @@ export class NativeAgentChat {
     const accepted = await this.goals.start(
       sessionId,
       identity(inputId),
-      request
+      request,
+      this.acceptsGoalEffort
     );
     return acceptance(accepted, sessionId, inputId);
   }
@@ -1279,7 +1284,8 @@ export class NativeAgentChat {
     return this.goals.control(
       this.requireAttached(session),
       inspection,
-      change
+      change,
+      this.acceptsGoalEffort
     );
   }
 

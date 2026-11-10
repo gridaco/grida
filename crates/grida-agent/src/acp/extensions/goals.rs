@@ -11,6 +11,7 @@ const INSPECT: &str = "co.grida/goal/inspect";
 const CONTROL: &str = "co.grida/goal/control";
 const RECOVER: &str = "co.grida/goal/recover";
 const CONFIRM_COMPLETION: &str = "co.grida/goal/confirm-completion";
+pub(super) const FUNDED_REVIEW: &str = "co.grida/goal/funded-review";
 pub(super) const CAPABILITIES: [&str; 5] = [START, INSPECT, CONTROL, RECOVER, CONFIRM_COMPLETION];
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -153,6 +154,9 @@ pub(super) fn handlers(
                     require(&control.1, CONTROL, Some(&request.session_id))?;
                     if matches!(&request.change, GoalAction::ConfirmCompletion { .. }) {
                         require(&control.1, CONFIRM_COMPLETION, None)?;
+                    }
+                    if matches!(&request.change, GoalAction::ReconcileReview { .. }) {
+                        require(&control.1, FUNDED_REVIEW, None)?;
                     }
                     let receipt = control
                         .0

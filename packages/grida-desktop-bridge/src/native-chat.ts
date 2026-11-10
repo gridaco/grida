@@ -330,6 +330,7 @@ export type NativeChatGoalRequest = Readonly<{
   criteria: readonly string[];
   allowance: NativeChatGoalUsage;
   automatic: boolean;
+  effort?: NativeChatEffort;
 }>;
 
 export type NativeChatGoalStatus =
@@ -360,6 +361,7 @@ export type NativeChatGoal = Readonly<
     reservation: Readonly<{
       turnId: string;
       inferenceSteps: number;
+      reviewInferenceSteps?: number;
       uncertain: boolean;
     }> | null;
   }
@@ -374,7 +376,8 @@ export type NativeChatGoalAction =
   | "pause"
   | "resume"
   | "clear"
-  | "confirm_completion";
+  | "confirm_completion"
+  | "reconcile_review";
 
 export type NativeChatGoalControl = Readonly<{
   observationId: string;
@@ -532,6 +535,7 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     editorSvgTargetId?: string
   ): Promise<NativeChatAcceptance>;
   acceptsEffort?(): Promise<boolean>;
+  acceptsGoalEffort?(): Promise<boolean>;
   acceptsPng?(): Promise<boolean>;
   acceptsFile?(): Promise<boolean>;
   acceptsWakeups?(): Promise<boolean>;

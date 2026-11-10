@@ -1352,6 +1352,11 @@ Today:
   current driver-state revision. While a funded turn owns work, the client
   uses the paired task controls for Pause, Resume and Stop. [Process fixtures](crates/grida-agent/tests/process/goals/funding.rs)
   verify allowance, held usage, restart and control behavior.
+- On reviewed Gateway launches, Desktop can offer an Ultra Goal and explicitly
+  reconcile a held review through the [attached Goal inspection](desktop/src/main/native-agent-goals.ts).
+  The negotiated [native control](crates/grida-agent/src/acp/extensions/goals.rs)
+  binds the exact objective basis, revisions and reserved turn to an account-only
+  receipt. A stale inspection or unverified outcome cannot release held steps.
 - The optional [Goal file verifier](crates/grida-agent/src/goal_verification.rs)
   matches one criterion from the trusted launch profile to a complete native
   read under the exact recorded turn grant. The [Master](crates/grida-agent-master/src/goals/settlement.rs)

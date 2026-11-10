@@ -1005,65 +1005,166 @@ it("retries steering exactly after a lost reply and never falls through to the q
   controller.disconnect();
 });
 
-it("starts a goal only on explicit acceptance and reuses its exact input on retry", async () => {
-  const { bridge, controller } = fixture();
-  const request = {
-    objective: "Prepare the export",
-    criteria: ["Verify the output"],
-    allowance: { workTurns: 3, inferenceSteps: 32 },
-    automatic: false,
-  };
-  let goalId: string | null = null;
-  const observe = bridge.observe.bind(bridge);
-  bridge.observe = async (id) => {
-    const observation = await observe(id);
-    return {
-      ...observation,
-      observationId: goalId ? "goal-started" : observation.observationId,
-      snapshot: { ...observation.snapshot, sessionRevision: goalId ? 3 : 2 },
+it.each(["standard", "ultra"] as const)(
+  "starts a %s goal only on explicit acceptance and reuses its exact input on retry",
+  async (effort) => {
+    const { bridge, controller } = fixture();
+    const request = {
+      objective: "Prepare the export",
+      criteria: ["Verify the output"],
+      allowance: { workTurns: 3, inferenceSteps: 32 },
+      automatic: false,
+      ...(effort === "ultra" && { effort }),
     };
-  };
-  bridge.goal = async () =>
-    goalId
-      ? {
-          observationId: "goal-3",
-          goal: {
-            ...request,
-            goalId,
-            state: { status: "active" },
-            paused: false,
-            progress: "Preparing the export",
-            spent: { workTurns: 0, inferenceSteps: 0 },
-            remaining: request.allowance,
-            reservation: null,
-          },
-        }
-      : { observationId: null, goal: null };
-  const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>(
-    async (sessionId, inputId) => {
-      goalId = inputId;
+    let goalId: string | null = null;
+    const observe = bridge.observe.bind(bridge);
+    bridge.observe = async (id) => {
+      const observation = await observe(id);
       return {
-        sessionId,
-        inputId,
-        disposition: "queued",
-        inputPosition: 1,
-        turnId: null,
+        ...observation,
+        observationId: goalId ? "goal-started" : observation.observationId,
+        snapshot: { ...observation.snapshot, sessionRevision: goalId ? 3 : 2 },
       };
-    }
-  );
-  start.mockRejectedValueOnce(new Error("fixture lost reply"));
+    };
+    bridge.goal = async () =>
+      goalId
+        ? {
+            observationId: "goal-3",
+            goal: {
+              ...request,
+              goalId,
+              state: { status: "active" },
+              paused: false,
+              progress: "Preparing the export",
+              spent: { workTurns: 0, inferenceSteps: 0 },
+              remaining: request.allowance,
+              reservation: null,
+            },
+          }
+        : { observationId: null, goal: null };
+    const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>(
+      async (sessionId, inputId) => {
+        goalId = inputId;
+        return {
+          sessionId,
+          inputId,
+          disposition: "queued",
+          inputPosition: 1,
+          turnId: null,
+        };
+      }
+    );
+    start.mockRejectedValueOnce(new Error("fixture lost reply"));
+    bridge.startGoal = start;
+    bridge.acceptsGoalEffort = async () => effort === "ultra";
+    await controller.select("chat-a");
+    expect(controller.read().goalEffortAvailable).toBe(effort === "ultra");
+    expect(start).not.toHaveBeenCalled();
+    expect(await controller.startGoal(request)).toBe(false);
+    expect(controller.read().error).toContain("Your draft is still here");
+    expect(await controller.startGoal(request)).toBe(true);
+    expect(start.mock.calls[1]).toEqual(start.mock.calls[0]);
+    expect(controller.read().goal?.goal?.state).toEqual({ status: "active" });
+    expect(
+      controller.read().observation?.snapshot.pendingGoalId
+    ).toBeUndefined();
+    expect(controller.canStartGoal).toBe(false);
+    controller.disconnect();
+  }
+);
+
+it("refuses Ultra Goal start when the connection has no negotiated Goal effort", async () => {
+  const { bridge, controller } = fixture();
+  bridge.goal = async () => ({ observationId: null, goal: null });
+  const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
   bridge.startGoal = start;
-  await controller.select("chat-a");
-  expect(start).not.toHaveBeenCalled();
-  expect(await controller.startGoal(request)).toBe(false);
-  expect(controller.read().error).toContain("Your draft is still here");
-  expect(await controller.startGoal(request)).toBe(true);
-  expect(start.mock.calls[1]).toEqual(start.mock.calls[0]);
-  expect(controller.read().goal?.goal?.state).toEqual({ status: "active" });
-  expect(controller.read().observation?.snapshot.pendingGoalId).toBeUndefined();
-  expect(controller.canStartGoal).toBe(false);
-  controller.disconnect();
+  try {
+    await controller.select("chat-a");
+    expect(
+      await controller.startGoal({
+        objective: "Check the export",
+        criteria: ["The export opens"],
+        allowance: { workTurns: 1, inferenceSteps: 7 },
+        automatic: false,
+        effort: "ultra",
+      })
+    ).toBe(false);
+    expect(start).not.toHaveBeenCalled();
+  } finally {
+    controller.disconnect();
+  }
 });
+
+it.each(["blocked", "cleared"] as const)(
+  "uses task controls for funded Goal work and accounts for its exact held review when %s",
+  async (heldStatus) => {
+    const { bridge, controller, running } = fixture();
+    const session = "funded";
+    running.add(session);
+    bridge.acceptsGoalEffort = async () => true;
+    bridge.startGoal = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
+    const observe = bridge.observe.bind(bridge);
+    bridge.observe = async (id) => {
+      const observation = await observe(id);
+      return {
+        ...observation,
+        observationId: running.has(id) ? "running" : "held",
+        snapshot: {
+          ...observation.snapshot,
+          sessionRevision: running.has(id) ? 2 : 3,
+        },
+      };
+    };
+    bridge.goal = async () => ({
+      observationId: running.has(session) ? "active-goal" : "held-goal",
+      goal: {
+        goalId: "goal",
+        objective: "Check the export",
+        criteria: ["The export opens"],
+        automatic: true,
+        effort: "ultra",
+        allowance: { workTurns: 2, inferenceSteps: 7 },
+        spent: { workTurns: 0, inferenceSteps: 0 },
+        remaining: { workTurns: 1, inferenceSteps: 0 },
+        paused: false,
+        progress: null,
+        state: running.has(session)
+          ? { status: "active" }
+          : heldStatus === "cleared"
+            ? { status: "cleared" }
+            : { status: "blocked", reason: "uncertain_work" },
+        reservation: {
+          turnId: `turn-${session}`,
+          inferenceSteps: 7,
+          reviewInferenceSteps: 2,
+          uncertain: !running.has(session),
+        },
+      },
+    });
+    const control = vi.fn<NonNullable<DesktopNativeChat["controlGoal"]>>();
+    bridge.controlGoal = control;
+    control.mockRejectedValueOnce(new Error("goal_review_still_held"));
+    try {
+      await controller.select(session);
+      expect(controller.canControlGoal("pause")).toBe(false);
+      expect(controller.canControlGoal("clear")).toBe(false);
+      expect(controller.canControlGoal("reconcile_review")).toBe(false);
+      running.delete(session);
+      await controller.repair();
+      expect(controller.canControlGoal("reconcile_review")).toBe(true);
+      await controller.controlGoal("reconcile_review");
+      expect(controller.read().error).toContain("allowance stays held");
+      await controller.controlGoal("reconcile_review");
+      expect(control.mock.calls[1]).toEqual(control.mock.calls[0]);
+      expect(control.mock.calls[0][1]).toMatchObject({
+        action: "reconcile_review",
+        observationId: "held-goal",
+      });
+    } finally {
+      controller.disconnect();
+    }
+  }
+);
 
 it("reads the pending goal from a reopened chat and withholds text replacement", async () => {
   const { bridge, controller } = fixture();

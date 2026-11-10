@@ -88,6 +88,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_SUBMIT: "grida:native-chat:submit",
   NATIVE_CHAT_ENQUEUE: "grida:native-chat:enqueue",
   NATIVE_CHAT_ACCEPTS_EFFORT: "grida:native-chat:accepts-effort",
+  NATIVE_CHAT_ACCEPTS_GOAL_EFFORT: "grida:native-chat:accepts-goal-effort",
   NATIVE_CHAT_ACCEPTS_PNG: "grida:native-chat:accepts-png",
   NATIVE_CHAT_ACCEPTS_FILE: "grida:native-chat:accepts-file",
   NATIVE_CHAT_ACCEPTS_WAKEUPS: "grida:native-chat:accepts-wakeups",

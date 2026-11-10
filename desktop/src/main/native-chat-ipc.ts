@@ -139,6 +139,7 @@ export type ActiveNativeChat = Readonly<{
         | "readArtifact"
         | "acceptsWakeups"
         | "acceptsEffort"
+        | "acceptsGoalEffort"
         | "submitWithWakeup"
         | "scheduledWakeup"
         | "controlWakeup"
@@ -1018,6 +1019,10 @@ export class NativeChatIpc {
     return this.owner(event).active.chat.acceptsEffort === true;
   }
 
+  acceptsGoalEffort(event: IpcMainInvokeEvent): boolean {
+    return this.owner(event).active.chat.acceptsGoalEffort === true;
+  }
+
   async submitWithWakeup(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -1605,6 +1610,7 @@ export class NativeChatIpc {
       (change.action !== "pause" &&
         change.action !== "resume" &&
         change.action !== "confirm_completion" &&
+        change.action !== "reconcile_review" &&
         change.action !== "clear")
     )
       throw new Error("native_chat_goal_control_invalid");

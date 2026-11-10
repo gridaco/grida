@@ -707,6 +707,8 @@ const bridge: DesktopBridge = {
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
     acceptsEffort: () =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT),
+    acceptsGoalEffort: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_GOAL_EFFORT),
     acceptsPng: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
     acceptsFile: () =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE),

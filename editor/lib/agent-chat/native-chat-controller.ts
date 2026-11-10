@@ -129,6 +129,7 @@ export type NativeChatView = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
   effort: NativeChatEffort;
   effortAvailable: boolean;
+  goalEffortAvailable: boolean;
   goal: NativeChatGoalObservation | null;
   goalReady: boolean;
   loading: boolean;
@@ -175,7 +176,7 @@ type Scope = {
   goalNeedsRefresh?: boolean;
   awaitingGoalId?: string;
   pendingGoalStart?: { key: string; inputId: string };
-  pendingGoalControl?: NativeChatGoalControl;
+  pendingGoalControl?: { change: NativeChatGoalControl; reviewTurn?: string };
   pendingCommand?: { command: NativeChatCommand; requestId: string };
   pendingRevision?: NativeChatRevisionInput;
   replay: boolean;
@@ -250,6 +251,7 @@ const EMPTY: NativeChatView = Object.freeze({
   operatingRegime: "act",
   effort: "standard",
   effortAvailable: false,
+  goalEffortAvailable: false,
   goal: null,
   goalReady: false,
   loading: false,
@@ -548,6 +550,7 @@ export class NativeChatController {
       operatingRegime: "act",
       effort: "standard",
       effortAvailable: false,
+      goalEffortAvailable: false,
       goal: null,
       goalReady: false,
       loading: sessionId !== null,
@@ -713,11 +716,16 @@ export class NativeChatController {
   }
 
   private async readEffortCapability(scope: Scope): Promise<void> {
-    if (!this.bridge.acceptsEffort || !this.bridge.submitInRegime) return;
-    const supported = await this.bridge.acceptsEffort().catch(() => false);
+    const [supported, goalSupported] = await Promise.all([
+      this.bridge.submitInRegime &&
+        this.bridge.acceptsEffort?.().catch(() => false),
+      this.bridge.startGoal &&
+        this.bridge.acceptsGoalEffort?.().catch(() => false),
+    ]);
     if (!this.owns(scope)) return;
     this.update({
       effortAvailable: supported === true,
+      goalEffortAvailable: goalSupported === true,
       ...(supported !== true &&
         this.view.effort === "ultra" && {
           effort: "standard",
@@ -1186,10 +1194,18 @@ export class NativeChatController {
       !this.view.goalReady ||
       this.view.acting ||
       !goal ||
-      goal.state.status === "cleared" ||
       (current && current.turnId !== goal.reservation?.turnId)
     )
       return false;
+    const funded = !!goal.reservation?.reviewInferenceSteps;
+    if (action === "reconcile_review")
+      return (
+        this.view.goalEffortAvailable &&
+        !current &&
+        funded &&
+        !!goal.reservation?.uncertain
+      );
+    if (goal.state.status === "cleared" || (current && funded)) return false;
     if (action === "clear") return true;
     if (action === "confirm_completion")
       return (
@@ -1227,7 +1243,10 @@ export class NativeChatController {
   async startGoal(request: NativeChatGoalRequest): Promise<boolean> {
     const scope = this.scope;
     if (!scope || !this.canStartGoal || !this.bridge.startGoal) return false;
-    const problem = goalRequestProblem(request);
+    const problem =
+      request.effort === "ultra" && !this.view.goalEffortAvailable
+        ? "Ultra is unavailable for goals on this connection."
+        : goalRequestProblem(request);
     if (problem) {
       this.update({ error: problem });
       return false;
@@ -1261,10 +1280,14 @@ export class NativeChatController {
       scope.replay = true;
       await this.refresh(scope);
       return true;
-    } catch {
+    } catch (error) {
       if (this.owns(scope)) {
         this.update({
-          error: "Couldn't confirm the goal start. Your draft is still here.",
+          error:
+            error instanceof Error &&
+            error.message.includes("goal_child_allowance_unavailable")
+              ? "Increase the inference allowance to fund an Ultra review, or choose Standard."
+              : "Couldn't confirm the goal start. Your draft is still here.",
         });
         await this.refresh(scope);
       }
@@ -1284,11 +1307,16 @@ export class NativeChatController {
       !this.canControlGoal(action)
     )
       return;
+    const reviewTurn =
+      action === "reconcile_review"
+        ? this.view.goal?.goal?.reservation?.turnId
+        : undefined;
+    const pending = scope.pendingGoalControl;
     const change =
-      scope.pendingGoalControl?.action === action
-        ? scope.pendingGoalControl
+      pending?.change.action === action && pending.reviewTurn === reviewTurn
+        ? pending.change
         : { action, observationId, requestId: crypto.randomUUID() };
-    scope.pendingGoalControl = change;
+    scope.pendingGoalControl = { change, reviewTurn };
     this.update({ acting: true, error: null });
     try {
       await this.bridge.controlGoal(scope.attachment.attachmentId, change);
@@ -1298,7 +1326,10 @@ export class NativeChatController {
       if (this.owns(scope))
         this.update({
           error:
-            "Couldn't confirm the goal control. Check the goal and try again.",
+            error instanceof Error &&
+            error.message.includes("goal_review_still_held")
+              ? "The review's outcome is still unverified. Its allowance stays held."
+              : "Couldn't confirm the goal control. Check the goal and try again.",
         });
     } finally {
       if (this.owns(scope)) {
@@ -3245,7 +3276,7 @@ function supportsSubagents(
 function revisionChanged(error: unknown): boolean {
   return (
     error instanceof Error &&
-    /stale_session_revision|stale_journal_change|history_position_changed|driver_state_revision_changed|goal_revision_changed|native_chat_(observation_unavailable|queue_changed|goal_observation_unavailable)/.test(
+    /stale_session_revision|stale_journal_change|history_position_changed|driver_state_revision_changed|goal_revision_changed|goal_review_reservation_changed|native_chat_(observation_unavailable|queue_changed|goal_observation_unavailable)/.test(
       error.message
     )
   );

@@ -38,6 +38,7 @@ pub enum GoalAction {
     Resume,
     Revise { objective: Objective },
     ConfirmCompletion { turn: TurnId },
+    ReconcileReview { turn: TurnId },
     Clear,
 }
 
@@ -68,6 +69,8 @@ pub struct GoalView {
     pub status: Status,
     pub paused: bool,
     pub automatic: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort: Option<EffortPreset>,
     pub progress: Option<String>,
     pub allowance: Allowance,
     pub spent: Usage,
@@ -195,13 +198,14 @@ impl Host {
         let view = self.store.inspect(session.clone()).await?;
         let goal = if let Some(value) = view.driver_state.value() {
             let goal = Goal::decode(value)?;
-            let (_, automatic) = self.goal_origin(&session, goal.basis()).await?;
+            let (captured, automatic) = self.goal_origin(&session, goal.basis()).await?;
             Some(GoalView {
                 basis: goal.basis().clone(),
                 objective: goal.objective().clone(),
                 status: goal.status(),
                 paused: goal.paused(),
                 automatic,
+                effort: captured.effort.as_ref().map(EffortPolicy::preset),
                 progress: goal.progress().map(str::to_owned),
                 allowance: goal.allowance(),
                 spent: goal.spent(),
@@ -243,38 +247,11 @@ impl Host {
             return Ok(());
         };
         let mut goal = Goal::decode(value)?;
-        let Some(work) = goal
-            .reservation()
-            .filter(|work| work.uncertain_steps.is_some() && work.child_inference_steps.is_some())
+        let Some((turn, parent_steps, child_steps)) = self.goal_review_usage(view, &goal).await?
         else {
             return Ok(());
         };
-        if view.current.is_some() {
-            return Ok(());
-        }
-        let turn = work.turn.clone();
-        let Some(parent) = self
-            .store
-            .inspect_turn_with(view.session.clone(), turn.clone(), |state| {
-                Ok((state
-                    .outcome()
-                    .is_some_and(|outcome| outcome.status != OutcomeStatus::Uncertain)
-                    && state.operations().values().all(|operation| {
-                        operation.outcome().is_some() && !operation.is_uncertain()
-                    }))
-                .then(|| state.clone()))
-            })
-            .await?
-        else {
-            return Ok(());
-        };
-        let ChildWork::Settled { observed_steps } = sponsorship::GoalChildWork(self.store.clone())
-            .observe(&parent)
-            .await
-        else {
-            return Ok(());
-        };
-        goal.reconcile_child_work(&turn, inference_attempts(&parent)?, observed_steps)?;
+        goal.reconcile_child_work(&turn, parent_steps, child_steps)?;
         let value = goal.encode()?;
         let request = Fingerprint::of(&("goal-child-account", &view.session, &turn))?;
         self.store
@@ -304,6 +281,73 @@ impl Host {
             )
             .await?;
         Ok(())
+    }
+
+    async fn goal_review_usage(
+        &self,
+        view: &SessionView,
+        goal: &Goal,
+    ) -> Result<Option<(TurnId, u32, u32)>> {
+        let Some(work) = goal
+            .reservation()
+            .filter(|work| work.uncertain_steps.is_some() && work.child_inference_steps.is_some())
+        else {
+            return Ok(None);
+        };
+        if view.current.is_some() {
+            return Ok(None);
+        }
+        let turn = work.turn.clone();
+        let Some(parent) = self
+            .store
+            .inspect_turn_with(view.session.clone(), turn.clone(), |state| {
+                Ok((state
+                    .outcome()
+                    .is_some_and(|outcome| outcome.status != OutcomeStatus::Uncertain)
+                    && state.operations().values().all(|operation| {
+                        operation.outcome().is_some() && !operation.is_uncertain()
+                    }))
+                .then(|| state.clone()))
+            })
+            .await?
+        else {
+            return Ok(None);
+        };
+        let ChildWork::Settled { observed_steps } = sponsorship::GoalChildWork(self.store.clone())
+            .observe(&parent)
+            .await
+        else {
+            return Ok(None);
+        };
+        Ok(Some((turn, inference_attempts(&parent)?, observed_steps)))
+    }
+
+    async fn goal_review_for_control(
+        &self,
+        control: &GoalControl,
+        turn: &TurnId,
+    ) -> Result<(u32, u32)> {
+        let view = self.store.inspect(control.session.clone()).await?;
+        let changed = || problem(ErrorKind::Conflict, "goal_review_reservation_changed");
+        if view.revision != control.expected_revision
+            || view.driver_state.revision() != control.expected_state
+        {
+            return Err(changed());
+        }
+        let goal = Goal::decode(view.driver_state.value().ok_or_else(changed)?)?;
+        if goal.basis() != &control.basis
+            || !goal.reservation().is_some_and(|work| {
+                &work.turn == turn
+                    && work.child_inference_steps.is_some()
+                    && work.uncertain_steps.is_some()
+            })
+        {
+            return Err(changed());
+        }
+        self.goal_review_usage(&view, &goal)
+            .await?
+            .map(|(_, parent, child)| (parent, child))
+            .ok_or_else(|| problem(ErrorKind::Unavailable, "goal_review_still_held"))
     }
 
     pub(super) async fn goal_continuation(&self, view: &SessionView) -> Result<Option<Submission>> {
@@ -371,6 +415,14 @@ impl Host {
     }
 
     async fn control_goal_owned(&self, control: GoalControl) -> Result<ControlReceipt> {
+        // Keep lookup errors as part of the decision so the store can replay
+        // an exact accepted control even after its held reservation is gone.
+        let review_usage = match &control.action {
+            GoalAction::ReconcileReview { turn } => {
+                Some(self.goal_review_for_control(&control, turn).await)
+            }
+            _ => None,
+        };
         let session = control.session;
         let basis = control.basis;
         let action = control.action;
@@ -453,6 +505,12 @@ impl Host {
                             goal.confirm_completion(&basis, &turn, request)?;
                             None
                         }
+                        GoalAction::ReconcileReview { turn } => {
+                            let (parent, child) =
+                                review_usage.expect("review reconciliation decision")?;
+                            goal.reconcile_child_work(&turn, parent, child)?;
+                            None
+                        }
                         GoalAction::Clear => {
                             goal.clear(&basis)?;
                             current.map(|_| ControlDirective::Cancel)
@@ -477,7 +535,9 @@ impl Host {
                 self.changed.notify_waiters();
                 self.kick_queue(session).await;
             }
-            GoalAction::Pause | GoalAction::ConfirmCompletion { .. } => {}
+            GoalAction::Pause
+            | GoalAction::ConfirmCompletion { .. }
+            | GoalAction::ReconcileReview { .. } => {}
         }
         Ok(receipt)
     }

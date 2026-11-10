@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { NativeChatGoal, NativeChatTurn } from "@grida/desktop-bridge";
+import type {
+  NativeChatEffort,
+  NativeChatGoal,
+  NativeChatTurn,
+} from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import { Textarea } from "@app/ui/components/textarea";
@@ -26,6 +30,7 @@ export function NativeGoalPanel({
   view: NativeChatView;
 }) {
   const [adding, setAdding] = useState(false);
+  const [effort, setEffort] = useState<NativeChatEffort>("standard");
   const goal = view.goal?.goal;
   const review = goal?.review?.status === "pending" ? goal.review : null;
   const pending = view.observation?.snapshot.pendingGoalId;
@@ -33,6 +38,7 @@ export function NativeGoalPanel({
     !!goal?.reservation &&
     goal.reservation.turnId === view.observation?.snapshot.current?.turnId;
   const canManageWork = goalTurn || goal?.automatic;
+  const fundedTurn = goalTurn && !!goal?.reservation?.reviewInferenceSteps;
   const canStart = controller.canStartGoal;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -49,6 +55,7 @@ export function NativeGoalPanel({
           inferenceSteps: Number(fields.get("inferenceSteps")),
         },
         automatic: fields.has("automatic"),
+        ...(effort === "ultra" && { effort }),
       })
       .then((accepted) => {
         if (accepted) setAdding(false);
@@ -66,7 +73,7 @@ export function NativeGoalPanel({
       {goal && !pending && (
         <>
           <div className="flex items-center justify-between gap-2">
-            <strong>Goal</strong>
+            <strong>{goal.effort === "ultra" ? "Goal · Ultra" : "Goal"}</strong>
             <span role="status" className="text-muted-foreground">
               {goalStatus(goal, view.observation?.snapshot.current)}
             </span>
@@ -127,6 +134,12 @@ export function NativeGoalPanel({
                 {goal.reservation.uncertain ? " · outcome uncertain" : ""}
               </p>
             )}
+            {goal.reservation?.reviewInferenceSteps && (
+              <p>
+                {goal.reservation.reviewInferenceSteps} of the held steps are
+                reserved for independent review.
+              </p>
+            )}
             <p>
               {goal.remaining.workTurns} work turns and{" "}
               {goal.remaining.inferenceSteps} inference steps unreserved
@@ -137,7 +150,13 @@ export function NativeGoalPanel({
                 : "Automatic continuation off"}
             </p>
           </details>
-          {goal.state.status !== "cleared" && (
+          {fundedTurn && (
+            <p className="text-muted-foreground">
+              Use the task’s Pause, Resume, or Stop controls for this funded
+              turn.
+            </p>
+          )}
+          {!fundedTurn && goal.state.status !== "cleared" && (
             <div className="flex flex-wrap gap-1">
               {canManageWork &&
               (goal.paused || goal.state.status === "blocked") ? (
@@ -171,6 +190,16 @@ export function NativeGoalPanel({
                 Clear goal
               </Button>
             </div>
+          )}
+          {controller.canControlGoal("reconcile_review") && (
+            <Button
+              size="xs"
+              type="button"
+              variant="outline"
+              onClick={() => void controller.controlGoal("reconcile_review")}
+            >
+              Refresh held allowance
+            </Button>
           )}
         </>
       )}
@@ -220,6 +249,27 @@ export function NativeGoalPanel({
               />
             </label>
           </div>
+          {(view.goalEffortAvailable || effort === "ultra") && (
+            <label className="flex items-center gap-2">
+              Effort for this goal
+              <select
+                name="effort"
+                className="rounded border bg-background px-1 py-0.5"
+                value={effort}
+                disabled={view.acting}
+                onChange={(event) =>
+                  setEffort(
+                    event.currentTarget.value === "ultra" ? "ultra" : "standard"
+                  )
+                }
+              >
+                <option value="standard">Standard</option>
+                <option value="ultra" disabled={!view.goalEffortAvailable}>
+                  Ultra
+                </option>
+              </select>
+            </label>
+          )}
           <label className="flex items-center gap-2">
             <input name="automatic" type="checkbox" disabled={view.acting} />
             Continue automatically within these limits
@@ -244,7 +294,10 @@ export function NativeGoalPanel({
           type="button"
           size="xs"
           variant="outline"
-          onClick={() => setAdding(true)}
+          onClick={() => {
+            setEffort("standard");
+            setAdding(true);
+          }}
         >
           Add goal
         </Button>

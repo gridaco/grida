@@ -138,6 +138,199 @@ it("does not dispatch after a scope change, a cancelled request, or close during
 
 const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 it.skipIf(!resourcesPath)(
+  "funds one Goal review on the same Gateway allowance and accounts for it after restart",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-goal-funding-")
+    );
+    const cwd = path.join(root, "workspace");
+    await fs.mkdir(cwd, { mode: 0o700 });
+    const owner = fixture();
+    const connection = await NativeGatewayConnection.open(owner.options);
+    const release = Promise.withResolvers<void>();
+    const endpoint = "https://editor.fixture.invalid";
+    const frame = { url: `${endpoint}/desktop/workspace?id=workspace` };
+    const sender = Object.assign(new EventEmitter(), {
+      mainFrame: frame,
+      isDestroyed: () => false,
+      isLoadingMainFrame: () => false,
+    }) as unknown as WebContents;
+    const event = {
+      sender,
+      senderFrame: frame,
+    } as unknown as IpcMainInvokeEvent;
+    const finish = (delta: unknown, reason: "stop" | "tool_calls") =>
+      new Response(
+        `data: ${JSON.stringify({ id: "goal-fixture", choices: [{ index: 0, delta, finish_reason: reason }] })}\n\ndata: [DONE]\n\n`,
+        { headers: { "content-type": "text/event-stream" } }
+      );
+    owner.dispatch.mockImplementation(async (bytes) => {
+      const body = JSON.parse(bytes.toString("utf8"));
+      if (!body.tools) {
+        await release.promise;
+        return finish({ content: "Independent review result." }, "stop");
+      }
+      expect(
+        body.tools.some(
+          (entry: { function: { name: string } }) =>
+            entry.function.name === "goal_report"
+        )
+      ).toBe(true);
+      if (
+        body.messages.some((entry: { role: string }) => entry.role === "tool")
+      ) {
+        return finish({ content: "Parent finished first." }, "stop");
+      }
+      return finish(
+        {
+          tool_calls: [
+            {
+              index: 0,
+              id: "review-call",
+              type: "function",
+              function: {
+                name: "delegate_review",
+                arguments: '{"instructions":"Check the export independently."}',
+              },
+            },
+          ],
+        },
+        "tool_calls"
+      );
+    });
+    let chat: NativeAgentChat | undefined;
+    const open = async () => {
+      const selected = (chat = await NativeAgentChat.start({
+        ...connection.launch("fixture"),
+        subagents: true,
+        resourcesPath: resourcesPath!,
+        stateDirectory: path.join(root, "state"),
+        cwd,
+      }));
+      return new NativeChatIpc(endpoint, (candidate) =>
+        candidate === sender
+          ? { workspaceId: "workspace", chat: selected }
+          : null
+      );
+    };
+    try {
+      let ipc = await open();
+      expect(ipc.acceptsGoalEffort(event)).toBe(true);
+      const initial = await ipc.create(event);
+      const request = {
+        objective: "Check the export",
+        criteria: ["The export opens"],
+        allowance: { workTurns: 2, inferenceSteps: 7 },
+        automatic: true,
+        effort: "ultra",
+      };
+      await expect(
+        ipc.startGoal(event, initial.attachmentId, "funded", {
+          ...request,
+          allowance: { workTurns: 2, inferenceSteps: 2 },
+        })
+      ).rejects.toThrow("goal_child_allowance_unavailable");
+      expect(owner.dispatch).not.toHaveBeenCalled();
+      const accepted = await ipc.startGoal(
+        event,
+        initial.attachmentId,
+        "funded",
+        request
+      );
+      expect(
+        (await ipc.startGoal(event, initial.attachmentId, "funded", request))
+          .inputId
+      ).toBe(accepted.inputId);
+      await expect(
+        ipc.startGoal(event, initial.attachmentId, "funded", {
+          ...request,
+          effort: "standard",
+        })
+      ).rejects.toThrow("input_identity_reused");
+      const inspect = async (attachmentId: string) =>
+        ipc.goal(
+          event,
+          attachmentId,
+          (await ipc.observe(event, attachmentId)).observationId
+        );
+      const held = await vi.waitFor(async () => {
+        const state = await inspect(initial.attachmentId);
+        expect(state.goal?.reservation).toMatchObject({
+          inferenceSteps: 7,
+          reviewInferenceSteps: 2,
+          uncertain: true,
+        });
+        expect(state.goal?.effort).toBe("ultra");
+        return state;
+      });
+      const change = {
+        action: "reconcile_review",
+        observationId: held.observationId,
+        requestId: "early-review",
+      };
+      await expect(
+        ipc.controlGoal(event, initial.attachmentId, change)
+      ).rejects.toThrow("goal_review_still_held");
+      await ipc.controlGoal(event, initial.attachmentId, {
+        ...change,
+        action: "clear",
+        requestId: "clear-held-goal",
+      });
+      expect(owner.dispatch).toHaveBeenCalledTimes(3);
+      release.resolve();
+      const children = await ipc.listSubagents(
+        event,
+        initial.attachmentId,
+        undefined
+      );
+      expect(children.children).toHaveLength(1);
+      await vi.waitFor(async () => {
+        const child = await ipc.inspectSubagent(
+          event,
+          initial.attachmentId,
+          children.children[0].childId,
+          undefined
+        );
+        expect(child.child.assignment?.result?.status).toBe("succeeded");
+      });
+      await chat?.close();
+
+      ipc = await open();
+      const reopened = await ipc.load(event, initial.sessionId);
+      const observed = await inspect(reopened.attachmentId);
+      expect(observed.goal?.reservation).toEqual(held.goal?.reservation);
+      const exact = {
+        ...change,
+        observationId: observed.observationId,
+        requestId: "account-review",
+      };
+      const accounted = await ipc.controlGoal(
+        event,
+        reopened.attachmentId,
+        exact
+      );
+      await expect(
+        ipc.controlGoal(event, reopened.attachmentId, exact)
+      ).resolves.toEqual(accounted);
+      expect((await inspect(reopened.attachmentId)).goal).toMatchObject({
+        effort: "ultra",
+        state: { status: "cleared" },
+        spent: { workTurns: 1, inferenceSteps: 3 },
+        remaining: { workTurns: 1, inferenceSteps: 4 },
+        reservation: null,
+      });
+      expect(owner.dispatch).toHaveBeenCalledTimes(3);
+    } finally {
+      release.resolve();
+      connection.close();
+      await chat?.close();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  },
+  20_000
+);
+
+it.skipIf(!resourcesPath)(
   "retries the first-party admission throttle once and preserves downstream uncertainty",
   async () => {
     const root = await fs.mkdtemp(

@@ -454,6 +454,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT, (event) =>
     nativeChat.acceptsEffort(event)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_GOAL_EFFORT, (event) =>
+    nativeChat.acceptsGoalEffort(event)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG, (event) =>
     nativeChat.acceptsPng(event)
   );

@@ -29,6 +29,7 @@ async fn open(state: &Path, endpoint: &str) -> PrivateStdio {
         "goal/inspect",
         "goal/control",
         "goal/recover",
+        "goal/funded-review",
         "session/effort",
         "subagent/inspect",
     ] {
@@ -37,6 +38,10 @@ async fn open(state: &Path, endpoint: &str) -> PrivateStdio {
     let ready = client.request("initialize", request).await;
     assert_eq!(
         ready["result"]["agentCapabilities"]["_meta"]["co.grida/session/effort"], 1,
+        "{ready}"
+    );
+    assert_eq!(
+        ready["result"]["agentCapabilities"]["_meta"]["co.grida/goal/funded-review"], 1,
         "{ready}"
     );
     client
@@ -203,6 +208,7 @@ async fn late_review_is_held_then_charged_once_across_restart_without_stale_prog
     let select = json!({"sessionId":session});
     let running = read(&mut client, "_co.grida/goal/inspect", select.clone()).await;
     let reservation = &running["goal"]["reservation"];
+    assert_eq!(running["goal"]["effort"], "ultra");
     assert_eq!(reservation["child_inference_steps"], 2);
     assert_eq!(reservation["inference_steps"], 7);
     let child = sponsored_identity(
@@ -237,6 +243,15 @@ async fn late_review_is_held_then_charged_once_across_restart_without_stale_prog
     assert_eq!(held["goal"]["reservation"]["uncertain_steps"], 3);
     assert_eq!(held["goal"]["spent"]["inference_steps"], 0);
     assert_eq!(held["goal"]["remaining"]["inference_steps"], 0);
+    let reconcile = json!({"action":"reconcile_review","turn":reservation["turn"]});
+    let stale_control = control(&held, "settle-held-review", reconcile.clone());
+    let pending = client
+        .request("_co.grida/goal/control", stale_control.clone())
+        .await;
+    assert_eq!(
+        pending["error"]["data"], "goal_review_still_held",
+        "{pending}"
+    );
     read(&mut client, "_co.grida/goal/recover", select.clone()).await;
     assert_eq!(
         read(&mut client, "_co.grida/goal/inspect", select.clone()).await,
@@ -269,7 +284,18 @@ async fn late_review_is_held_then_charged_once_across_restart_without_stale_prog
     .await;
     let retained = read(&mut restarted, "_co.grida/goal/inspect", select.clone()).await;
     assert_eq!(retained["goal"]["reservation"], held["goal"]["reservation"]);
-    read(&mut restarted, "_co.grida/goal/recover", select.clone()).await;
+    assert_eq!(retained["goal"]["effort"], "ultra");
+    let stale = restarted
+        .request("_co.grida/goal/control", stale_control)
+        .await;
+    assert_eq!(stale["error"]["data"], "stale_session_revision", "{stale}");
+    let exact = control(&retained, "account-review", reconcile);
+    let receipt = read(&mut restarted, "_co.grida/goal/control", exact.clone()).await;
+    assert!(receipt["turnId"].is_null());
+    assert_eq!(
+        read(&mut restarted, "_co.grida/goal/control", exact).await,
+        receipt
+    );
     let accounted = read(&mut restarted, "_co.grida/goal/inspect", select.clone()).await;
     assert_eq!(
         accounted["goal"]["spent"],

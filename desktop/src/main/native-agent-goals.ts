@@ -33,6 +33,7 @@ export type NativeGoalInspection = Readonly<{
 
 export class NativeAgentGoals {
   static readonly completionCapability = "co.grida/goal/confirm-completion";
+  static readonly fundedReviewCapability = "co.grida/goal/funded-review";
   private readonly issued = new WeakSet<NativeGoalInspection>();
 
   constructor(
@@ -45,7 +46,14 @@ export class NativeAgentGoals {
   private static readRequest(value: unknown): NativeChatGoalRequest {
     const input = object(value);
     const allowance = object(input.allowance);
-    if (Object.keys(input).length !== 4 || Object.keys(allowance).length !== 2)
+    const effort =
+      input.effort === undefined
+        ? undefined
+        : member(input.effort, ["standard", "ultra"] as const);
+    if (
+      Object.keys(input).length !== (effort === undefined ? 4 : 5) ||
+      Object.keys(allowance).length !== 2
+    )
       throw invalid();
     return {
       objective: text(input.objective, OBJECTIVE_LIMIT),
@@ -55,6 +63,7 @@ export class NativeAgentGoals {
         inferenceSteps: number(allowance.inferenceSteps, 1, MAX_U32),
       },
       automatic: flag(input.automatic),
+      ...(effort && { effort }),
     };
   }
 
@@ -66,20 +75,27 @@ export class NativeAgentGoals {
       criteria: Object.freeze(criteria(objective.criteria)),
       allowance: usage(row.allowance, 1),
       automatic: flag(row.automatic),
+      ...(row.effort === undefined
+        ? {}
+        : { effort: member(row.effort, ["ultra"] as const) }),
     });
   }
 
   start(
     sessionId: string,
     inputId: string,
-    request: unknown
+    request: unknown,
+    fundedReviewAvailable = false
   ): Promise<unknown> {
-    const { objective, criteria, allowance, automatic } =
+    const { objective, criteria, allowance, automatic, effort } =
       NativeAgentGoals.readRequest(request);
+    if (effort === "ultra" && !fundedReviewAvailable)
+      throw new Error("native_chat_goal_effort_unavailable");
     return this.request("_co.grida/goal/start", {
       sessionId,
       inputId,
       prompt: [{ type: "text", text: objective }],
+      ...(effort === "ultra" && { effort }),
       goal: {
         objective: { description: objective, criteria },
         allowance: {
@@ -121,17 +137,24 @@ export class NativeAgentGoals {
     });
     const rawReservation =
       row.reservation === null ? null : object(row.reservation);
-    const uncertainSteps =
-      rawReservation && rawReservation.uncertain_steps !== null
-        ? number(rawReservation.uncertain_steps, 0, MAX_U32)
-        : null;
-    const reservation =
-      rawReservation &&
-      Object.freeze({
+    let reservation: NativeChatGoal["reservation"] = null;
+    if (rawReservation) {
+      const inferenceSteps = number(rawReservation.inference_steps, 1, MAX_U32);
+      const uncertainSteps =
+        rawReservation.uncertain_steps === null
+          ? null
+          : number(rawReservation.uncertain_steps, 0, inferenceSteps);
+      const reviewInferenceSteps =
+        rawReservation.child_inference_steps === undefined
+          ? undefined
+          : number(rawReservation.child_inference_steps, 1, inferenceSteps - 1);
+      reservation = Object.freeze({
         turnId: identity(rawReservation.turn),
-        inferenceSteps: number(rawReservation.inference_steps, 1, MAX_U32),
+        inferenceSteps,
+        ...(reviewInferenceSteps !== undefined && { reviewInferenceSteps }),
         uncertain: uncertainSteps !== null,
       });
+    }
     const status = state(row.status);
     const paused = flag(row.paused);
     const progress =
@@ -172,7 +195,8 @@ export class NativeAgentGoals {
   async control(
     sessionId: string,
     inspection: NativeGoalInspection,
-    change: NativeChatGoalControl
+    change: NativeChatGoalControl,
+    fundedReviewAvailable = false
   ): Promise<NativeChatGoalReceipt> {
     if (
       !this.issued.has(inspection) ||
@@ -186,10 +210,19 @@ export class NativeAgentGoals {
       "resume",
       "clear",
       "confirm_completion",
+      "reconcile_review",
     ] as const);
     const review = inspection.goal?.review;
     if (action === "confirm_completion" && review?.status !== "pending")
       throw new Error("native_chat_goal_completion_review_unavailable");
+    const reservation = inspection.goal?.reservation;
+    if (
+      action === "reconcile_review" &&
+      (!fundedReviewAvailable ||
+        !reservation?.uncertain ||
+        !reservation.reviewInferenceSteps)
+    )
+      throw new Error("native_chat_goal_review_account_unavailable");
     const reply = object(
       await this.request("_co.grida/goal/control", {
         sessionId,
@@ -200,6 +233,7 @@ export class NativeAgentGoals {
         change: {
           action,
           ...(action === "confirm_completion" && { turn: review?.turnId }),
+          ...(action === "reconcile_review" && { turn: reservation?.turnId }),
         },
       })
     );

@@ -496,9 +496,16 @@ Pause, Resume, or Stop operations. Goal-specific state controls return
 
 If a review is unsettled when the parent finishes, Goal inspection keeps the
 held reservation and `uncertain_steps` records the attempts observed so far.
-Goal Recover can account for a late settled review once both journals are
-definite. It leaves the original turn account intact and does not apply its
-earlier proposal or advance the goal automatically.
+Inspection projects `effort: "ultra"` when the original Goal Start captured
+Ultra. A private launch that supports effort can also negotiate
+`co.grida/goal/funded-review` version 1. Use the exact `control` basis and
+`change: {"action":"reconcile_review","turn":"<reserved turn ID>"}` to
+account for an idle held review. It checks both recorded outcomes, preserves
+the original turn account, and returns the same receipt on exact retry.
+If either outcome is still unverified, it returns `goal_review_still_held`
+and keeps the reservation. This control starts no work, including after
+restart or after the goal has been cleared. Goal Recover can also account for
+late settled work for headless clients.
 
 To use person-confirmed completion, negotiate
 `co.grida/goal/confirm-completion` version 1 when starting the goal. Goal

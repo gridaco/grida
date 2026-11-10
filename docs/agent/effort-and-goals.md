@@ -44,6 +44,13 @@ answer against the notes before confirming completion.
 Pause preserves the allowance already held for the task. Stop ends the active
 turn and leaves the goal visible. [Guide and interrupt work](./controls.md)
 
-Private native clients can use reviewed automatic verification, funded Ultra
-review, or an explicit check-in under the supported goal policies.
+When a native workspace Gateway connection offers **Effort for this goal**,
+choose **Ultra** to let one independent review share the goal's inference
+allowance. Use the task's Pause, Resume, or Stop controls during the funded
+turn. If work finishes before the review can be accounted for, the goal keeps
+its held steps. Choose **Refresh held allowance** to account for any settled
+review. That control reads the recorded work and starts no new work.
+
+Private native clients can also use reviewed automatic verification or an
+explicit check-in under the supported goal policies.
 [Use goals from a native client](./clients.md#work-toward-a-persistent-goal)
