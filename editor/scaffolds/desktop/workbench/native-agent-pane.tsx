@@ -956,13 +956,16 @@ export function NativeAgentPane({
       )}
       {bridge.goal && bridge.startGoal && (
         <NativeGoalPanel
-          key={state.scope}
+          key={`goal-${state.scope}`}
           controller={controller}
           view={state}
         />
       )}
       {state.subagents && (
-        <NativeSubagentsPanel key={state.scope} controller={state.subagents} />
+        <NativeSubagentsPanel
+          key={`subagents-${state.scope}`}
+          controller={state.subagents}
+        />
       )}
       <div className="shrink-0 p-3">
         {state.wakeupsAvailable &&
