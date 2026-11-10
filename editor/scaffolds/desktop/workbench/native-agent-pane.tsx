@@ -391,6 +391,11 @@ export function NativeAgentPane({
                 summary={state.turnSummary}
                 messages={state.messages}
                 previewController={bridge.readArtifact ? controller : undefined}
+                onRetry={
+                  state.turnSummary.detailsUnavailable
+                    ? () => controller.retryTurnSummary()
+                    : undefined
+                }
               />
             )}
         </ConversationContent>

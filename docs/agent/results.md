@@ -13,6 +13,10 @@ chat. Open **Preview cropped PNG** and choose **Save PNG as…** to save it to a
 new file. You can retry while the crop is available. For details on what the
 summary includes, see [Read a turn summary](./clients.md#read-a-turn-summary).
 
+If the summary details are unavailable, the chat keeps the recorded turn
+status and transcript. Choose **Retry summary** to read the details for
+that turn again.
+
 ## See an artifact while work continues
 
 In a native workspace chat with live presentation, ask the agent to open

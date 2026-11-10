@@ -1233,6 +1233,79 @@ it("reads one summary per observed terminal turn and drops replies after switchi
   controller.disconnect();
 });
 
+it.each(["rejected read", "mismatched turn"] as const)(
+  "keeps the verified terminal outcome after a %s and can retry details",
+  async (failure) => {
+    const { bridge, controller } = fixture();
+    const submit = vi.spyOn(bridge, "submit");
+    const latest = {
+      turnId: "stopped-turn",
+      epoch: 1,
+      journalPosition: 8,
+      historyPosition: 2,
+      controlRevision: 1,
+      paused: false,
+      cancelled: true,
+      disposition: "settled",
+      status: "cancelled",
+    } as const;
+    const observe = bridge.observe;
+    vi.spyOn(bridge, "observe").mockImplementation(async (id) => {
+      const observation = await observe(id);
+      return {
+        ...observation,
+        snapshot: { ...observation.snapshot, latest },
+      };
+    });
+    const detail = {
+      turnId: latest.turnId,
+      status: latest.status,
+      text: "Work was stopped after the first change.",
+      textTruncated: false,
+      steps: 1,
+      unresolvedOperations: 0,
+      toolActivity: { succeeded: 1, failed: 0, cancelled: 0, unresolved: 0 },
+      checks: [],
+    } satisfies NativeChatTurnSummary;
+    const read = vi.fn<NonNullable<DesktopNativeChat["turnSummary"]>>();
+    if (failure === "rejected read")
+      read.mockRejectedValueOnce(new Error("Private transport detail"));
+    else read.mockResolvedValueOnce({ ...detail, turnId: "other-turn" });
+    const recovered = Promise.withResolvers<NativeChatTurnSummary>();
+    read.mockReturnValueOnce(recovered.promise);
+    bridge.turnSummary = read;
+
+    await controller.select("chat-a");
+    await vi.waitFor(() =>
+      expect(controller.read().turnSummary).toEqual({
+        turnId: latest.turnId,
+        status: latest.status,
+        text: "The turn was stopped.",
+        textTruncated: false,
+        steps: null,
+        unresolvedOperations: null,
+        toolActivity: null,
+        checks: [],
+        detailsUnavailable: true,
+      })
+    );
+    expect(read).toHaveBeenCalledTimes(1);
+    controller.retryTurnSummary();
+    controller.retryTurnSummary();
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(controller.read().turnSummary).toMatchObject({
+      turnId: latest.turnId,
+      detailsUnavailable: true,
+    });
+    recovered.resolve(detail);
+    await vi.waitFor(() =>
+      expect(controller.read().turnSummary).toEqual(detail)
+    );
+    expect(submit).not.toHaveBeenCalled();
+    controller.disconnect();
+  }
+);
+
 it("reads a listed PNG on demand and discards its bytes after switching chats", async () => {
   const { bridge, controller } = fixture();
   const latest = {

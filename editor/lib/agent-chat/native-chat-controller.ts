@@ -47,6 +47,13 @@ const MAX_PNG_BYTES = 256 * 1024;
 const MAX_CONFIGURATION_MESSAGE_BYTES = 1024;
 const utf8 = new TextEncoder();
 
+const TERMINAL_OUTCOME: Record<NativeChatTurnSummary["status"], string> = {
+  succeeded: "The turn finished.",
+  failed: "The turn failed.",
+  cancelled: "The turn was stopped.",
+  uncertain: "The turn ended with unverified work.",
+};
+
 export type NativeChatView = Readonly<{
   scope: number;
   selected: string | null;
@@ -86,7 +93,7 @@ export type NativeChatView = Readonly<{
   contextLimitError: string | null;
   reviewConfiguration: boolean;
   observation: NativeChatObservation | null;
-  turnSummary: NativeChatTurnSummary | null;
+  turnSummary: (NativeChatTurnSummary & { detailsUnavailable?: true }) | null;
   approvals: readonly NativeChatApproval[];
   approvalError: string | null;
   questions: readonly NativeChatQuestion[];
@@ -1923,6 +1930,18 @@ export class NativeChatController {
     }
   }
 
+  retryTurnSummary(): void {
+    const scope = this.scope;
+    if (
+      !scope?.attachment ||
+      !scope.observation ||
+      !scope.summaryRequest?.failed
+    )
+      return;
+    scope.summaryRequest = undefined;
+    this.refreshTurnSummary(scope, scope.attachment, scope.observation);
+  }
+
   async answerApproval(
     reviewId: string,
     decision: NativeChatApprovalDecision
@@ -2390,24 +2409,43 @@ export class NativeChatController {
     const request: NonNullable<Scope["summaryRequest"]> = {
       turnId: latest.turnId,
     };
+    const status = latest.status;
     scope.summaryRequest = request;
-    this.update({ turnSummary: null });
+    if (this.view.turnSummary?.turnId !== latest.turnId)
+      this.update({ turnSummary: null });
+    const ownsRequest = () =>
+      this.owns(scope) && scope.summaryRequest === request;
+    const unavailable = () => {
+      if (!ownsRequest()) return;
+      request.failed = true;
+      this.update({
+        turnSummary: {
+          turnId: latest.turnId,
+          status,
+          text: TERMINAL_OUTCOME[status],
+          textTruncated: false,
+          steps: null,
+          unresolvedOperations: null,
+          toolActivity: null,
+          checks: [],
+          detailsUnavailable: true,
+        },
+      });
+    };
     void this.bridge
       .turnSummary(attachment.attachmentId, observation.observationId)
       .then((turnSummary) => {
-        if (!this.owns(scope) || scope.summaryRequest !== request) return;
+        if (!ownsRequest()) return;
         if (
           turnSummary.turnId !== latest.turnId ||
-          turnSummary.status !== latest.status
+          turnSummary.status !== status
         ) {
-          request.failed = true;
+          unavailable();
           return;
         }
         this.update({ turnSummary });
       })
-      .catch(() => {
-        request.failed = true;
-      });
+      .catch(unavailable);
   }
 
   private async refreshApprovals(

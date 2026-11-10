@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { Button } from "@app/ui/components/button";
 import type {
   NativeChatArtifactSaveResult,
   NativeChatImageArtifact,
@@ -38,10 +39,12 @@ export function NativeTurnSummary({
   summary,
   messages,
   previewController,
+  onRetry,
 }: {
   summary: NativeChatTurnSummary;
   messages: readonly NativeChatMessage[];
   previewController?: NativeChatController;
+  onRetry?: () => void;
 }) {
   const text = summary.text.trim();
   const inTranscript = messages.some(
@@ -71,8 +74,9 @@ export function NativeTurnSummary({
   ].filter(Boolean);
   const showText =
     !!text &&
-    !inTranscript &&
-    (summary.status !== "succeeded" || text !== "The turn finished.");
+    (onRetry ||
+      (!inTranscript &&
+        (summary.status !== "succeeded" || text !== "The turn finished.")));
   const artifacts = previewController ? summary.artifacts : undefined;
   if (
     !showText &&
@@ -93,6 +97,14 @@ export function NativeTurnSummary({
           {text}
           {summary.textTruncated && " (excerpt)"}
         </p>
+      )}
+      {onRetry && (
+        <div className="mt-2 flex items-center gap-2 text-muted-foreground">
+          <span>Summary details are unavailable.</span>
+          <Button type="button" variant="ghost" size="xs" onClick={onRetry}>
+            Retry summary
+          </Button>
+        </div>
       )}
       {details.length > 0 && (
         <p className="mt-2 text-muted-foreground">{details.join(" · ")}</p>
