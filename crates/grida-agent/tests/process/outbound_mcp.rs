@@ -3,12 +3,14 @@
 use super::approvals::Stdio as PrivateStdio;
 use super::lifecycle::{prompt_request, queue_basis, task_basis};
 use super::*;
+use tokio::sync::Notify;
 
 const MCP_TOKEN: &str = "ab0123456789ab0123456789ab0123456789ab0123456789ab0123456789ab01";
 const TOKEN_ENV: &str = "GRIDA_FIXTURE_OUTBOUND_MCP_TOKEN";
 const TOOL: &str = "mcp_grida_surface_open";
 const NATIVE: &str = "surface_open";
 const OPEN_ARGUMENTS: &str = r#"{"path":"/poster.canvas"}"#;
+const TURN_SUMMARY: &str = "co.grida/session/turn-summary";
 
 async fn local_mcp(workspace: &Path) -> (Child, String) {
     let mut child = executable()
@@ -263,8 +265,14 @@ async fn start_private(mut command: Command) -> PrivateStdio {
         .spawn()
         .unwrap();
     let mut client = PrivateStdio::from_child(child);
-    let initialize = client.request("initialize", extension_initialize()).await;
+    let mut capabilities = extension_initialize();
+    capabilities["clientCapabilities"]["_meta"][TURN_SUMMARY] = 1.into();
+    let initialize = client.request("initialize", capabilities).await;
     assert_eq!(initialize["result"]["protocolVersion"], 1);
+    assert_eq!(
+        initialize["result"]["agentCapabilities"]["_meta"][TURN_SUMMARY],
+        1
+    );
     client
 }
 
@@ -468,8 +476,15 @@ async fn stdio_act_lease_cannot_resume_or_edit_its_retained_work_after_restart()
     peer.kill().await.unwrap();
 }
 
-#[tokio::test]
-async fn lost_mcp_result_is_reported_without_redispatch() {
+#[derive(Clone)]
+struct HeldResult {
+    received: Arc<Notify>,
+    release: Arc<Notify>,
+}
+
+async fn independent_mcp(
+    hold: Option<HeldResult>,
+) -> (String, tokio::task::JoinHandle<TcpListener>) {
     use http_body_util::{BodyExt, Full};
     use hyper::body::{Bytes, Incoming};
     use hyper::server::conn::http1;
@@ -478,59 +493,78 @@ async fn lost_mcp_result_is_reported_without_redispatch() {
     use hyper_util::rt::TokioIo;
     use std::convert::Infallible;
 
-    let temporary = TempDir::new().unwrap();
-    let workspace = TempDir::new().unwrap();
     let peer = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = format!("http://{}/mcp", peer.local_addr().unwrap());
     let exchange = tokio::spawn(async move {
         for method in ["server/discover", "tools/list", "tools/call"] {
             let (socket, _) = timeout(WAIT, peer.accept()).await.unwrap().unwrap();
-            let service = service_fn(move |request: Request<Incoming>| async move {
-                assert_eq!(
-                    request.headers()["authorization"],
-                    format!("Bearer {MCP_TOKEN}")
-                );
-                let bytes = request.collect().await.unwrap().to_bytes();
-                let request: Value = serde_json::from_slice(&bytes).unwrap();
-                assert_eq!(request["method"], method);
-                let response = Response::builder().header("connection", "close");
-                if method == "tools/call" {
-                    // The operation was received, but the stream has no final result.
-                    assert_eq!(request["params"]["name"], "surface_open");
-                    return Ok::<_, Infallible>(
-                        response
-                            .header("content-type", "text/event-stream")
-                            .body(Full::new(Bytes::from_static(b": effect accepted\n\n")))
-                            .unwrap(),
+            let held = hold.clone();
+            let service = service_fn(move |request: Request<Incoming>| {
+                let held = held.clone();
+                async move {
+                    assert_eq!(
+                        request.headers()["authorization"],
+                        format!("Bearer {MCP_TOKEN}")
                     );
+                    let bytes = request.collect().await.unwrap().to_bytes();
+                    let request: Value = serde_json::from_slice(&bytes).unwrap();
+                    assert_eq!(request["method"], method);
+                    let response = Response::builder().header("connection", "close");
+                    if method == "tools/call" && held.is_none() {
+                        // The operation was received, but the stream has no final result.
+                        assert_eq!(request["params"]["name"], "surface_open");
+                        return Ok::<_, Infallible>(
+                            response
+                                .header("content-type", "text/event-stream")
+                                .body(Full::new(Bytes::from_static(b": effect accepted\n\n")))
+                                .unwrap(),
+                        );
+                    }
+                    let result = if method == "server/discover" {
+                        json!({
+                            "resultType":"complete","supportedVersions":["2026-07-28"],
+                            "capabilities":{"tools":{}},"ttlMs":0,"cacheScope":"private"
+                        })
+                    } else if method == "tools/list" {
+                        json!({
+                            "resultType":"complete",
+                            "tools":[{"name":"surface_open","inputSchema":{"type":"object"}}]
+                        })
+                    } else {
+                        assert_eq!(request["params"]["name"], "surface_open");
+                        let held = held.unwrap();
+                        held.received.notify_one();
+                        held.release.notified().await;
+                        json!({"resultType":"complete","content":[{"type":"text","text":"Late peer result"}]})
+                    };
+                    let rpc =
+                        json!({"jsonrpc":"2.0","id":request["id"],"result":result}).to_string();
+                    Ok(response
+                        .header("content-type", "application/json")
+                        .body(Full::new(Bytes::from(rpc)))
+                        .unwrap())
                 }
-                let result = if method == "server/discover" {
-                    json!({
-                        "resultType":"complete","supportedVersions":["2026-07-28"],
-                        "capabilities":{"tools":{}},"ttlMs":0,"cacheScope":"private"
-                    })
-                } else {
-                    json!({
-                        "resultType":"complete",
-                        "tools":[{"name":"surface_open","inputSchema":{"type":"object"}}]
-                    })
-                };
-                let rpc = json!({"jsonrpc":"2.0","id":request["id"],"result":result}).to_string();
-                Ok(response
-                    .header("content-type", "application/json")
-                    .body(Full::new(Bytes::from(rpc)))
-                    .unwrap())
             });
-            timeout(
+            let connection = timeout(
                 WAIT,
                 http1::Builder::new().serve_connection(TokioIo::new(socket), service),
             )
             .await
-            .unwrap()
             .unwrap();
+            if method != "tools/call" || hold.is_none() {
+                connection.unwrap();
+            }
         }
         peer
     });
+    (address, exchange)
+}
+
+#[tokio::test]
+async fn lost_mcp_result_is_reported_without_redispatch() {
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let (address, exchange) = independent_mcp(None).await;
     let mut provider = Endpoint::start(vec![Reply::Tool(TOOL, OPEN_ARGUMENTS)]).await;
     let output = timeout(
         WAIT,
@@ -565,5 +599,86 @@ async fn lost_mcp_result_is_reported_without_redispatch() {
             .await
             .is_err()
     );
+    provider.done().await;
+}
+
+#[tokio::test]
+async fn stop_during_an_mcp_call_retains_uncertainty_without_redispatch() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let hold = HeldResult {
+        received: Default::default(),
+        release: Default::default(),
+    };
+    let (address, exchange) = independent_mcp(Some(hold.clone())).await;
+    let mut provider = Endpoint::start(vec![Reply::Tool(TOOL, OPEN_ARGUMENTS)]).await;
+    let mut client = serve(&state, &provider.url, &address).await;
+    let session = new_session(&mut client, workspace.path()).await;
+    let accepted = client
+        .request(
+            "_co.grida/session/submit",
+            prompt_request(&session, "stop-remote", "Present the poster."),
+        )
+        .await;
+    assert_eq!(accepted["result"]["disposition"], "claimed", "{accepted}");
+    let turn = &accepted["result"]["turnId"];
+    assert!(offered(&provider.request().await));
+    timeout(WAIT, hold.received.notified()).await.unwrap();
+    let running = snapshot(&mut client, &session).await;
+    assert_eq!(running["current"]["turnId"], *turn);
+    assert_eq!(running["current"]["disposition"], "running");
+    let stop = client
+        .request(
+            "_co.grida/session/stop",
+            task_basis(&running, &session, "stop-held-call"),
+        )
+        .await;
+    assert!(stop["result"].is_object(), "{stop}");
+    timeout(WAIT, async {
+        loop {
+            let settled = snapshot(&mut client, &session).await;
+            if settled["current"].is_null() {
+                assert_eq!(settled["latest"]["turnId"], *turn);
+                assert_eq!(settled["latest"]["status"], "cancelled");
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    hold.release.notify_one();
+    let peer = timeout(WAIT, exchange).await.unwrap().unwrap();
+    let target = json!({"sessionId":session,"turnId":turn});
+    let summary = client
+        .request("_co.grida/session/turn-summary", target.clone())
+        .await;
+    assert_eq!(summary["result"]["status"], "cancelled", "{summary}");
+    assert_eq!(summary["result"]["unresolvedOperations"], 1, "{summary}");
+    assert!(
+        !summary.to_string().contains("Late peer result"),
+        "{summary}"
+    );
+    client.close().await;
+    let mut reopened = serve_surface(&state, &provider.url, false).await;
+    let loaded = reopened
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    assert!(loaded.get("error").is_none(), "{loaded}");
+    let retained = reopened
+        .request("_co.grida/session/turn-summary", target)
+        .await;
+    assert_eq!(retained["result"], summary["result"]);
+    assert!(
+        timeout(Duration::from_millis(50), peer.accept())
+            .await
+            .is_err()
+    );
+    assert!(provider.requests.try_recv().is_err());
+    reopened.close().await;
     provider.done().await;
 }
