@@ -189,6 +189,15 @@ the same workspace. For an attached chat, read the current title, archive state,
 and revision before renaming, archiving, or restoring. Archiving leaves active
 work running. An archived chat can still be loaded by its ID.
 
+On macOS and Linux, private stdio clients can negotiate
+`co.grida/session/delete` version 1 to permanently remove an eligible saved
+chat. Attach the chat and read both its execution and catalog revisions before
+asking for confirmation. The host requires idle work and refuses chats with
+pending inputs, unresolved execution, an open side chat, an unfinished Goal,
+named subagents, or retained input storage. Authored files and independent
+forks stay available. Retry a lost deletion reply with the original request
+ID, workspace, and revisions.
+
 When a native chat owner is active in Desktop, the workspace **Chat** selector
 shows saved chats in that workspace. Use **Older chats** to browse further or
 **Archived chats** to find an archived chat. Selecting a chat opens its transcript.

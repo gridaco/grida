@@ -449,7 +449,13 @@ fn require_goal_start(view: &SessionView) -> Result<()> {
 }
 
 fn require_no_active_goal(view: &SessionView) -> Result<()> {
-    if let Some(value) = view.driver_state.value() {
+    require_resolved_goal(&view.driver_state)
+}
+
+pub(super) fn require_resolved_goal(
+    state: &agent_kit_core::driver_state::DriverStateSnapshot,
+) -> Result<()> {
+    if let Some(value) = state.value() {
         let goal = Goal::decode(value)?;
         if goal.reservation().is_some()
             || !matches!(goal.status(), Status::Complete | Status::Cleared)

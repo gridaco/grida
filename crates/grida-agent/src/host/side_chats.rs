@@ -61,6 +61,7 @@ impl Host {
         )?);
         let host = Self {
             store: Arc::new(SqliteStore::open_in_memory()?),
+            state_dir: None,
             execution: self.execution.clone(),
             gg_connection: None,
             configuration: self.configuration.clone(),
@@ -247,6 +248,12 @@ struct SideEntry {
 }
 
 impl SideChats {
+    pub(crate) async fn has_open_parent(&self, parent: &SessionId) -> bool {
+        self.state.lock().await.requests.values().any(|entry| {
+            &entry.parent == parent && (entry.chat.is_some() || entry.close_error.is_some())
+        })
+    }
+
     pub(crate) async fn open(
         &self,
         host: &Host,

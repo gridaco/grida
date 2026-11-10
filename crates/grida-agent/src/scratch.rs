@@ -97,6 +97,17 @@ pub struct ScratchScope {
     inner: native::Scope,
 }
 
+/// Check for an exact owner entry without creating a scope or following it.
+pub(crate) fn owner_scope_exists(parent: &Path, base: &str, owner: &SessionId) -> Result<bool> {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    return native::owner_scope_exists(parent, base, owner);
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = (parent, base, owner);
+        Err(unsupported())
+    }
+}
+
 impl ScratchScope {
     /// The host supplies an existing, canonical private base disjoint from
     /// custody and authored workspaces. Only the working copy path is exposed.
@@ -212,6 +223,25 @@ mod native {
     struct Directory {
         path: PathBuf,
         file: File,
+    }
+
+    pub(super) fn owner_scope_exists(parent: &Path, base: &str, owner: &SessionId) -> Result<bool> {
+        validate_absolute(parent)?;
+        let parent = Directory::open(parent)?;
+        let base = match unix::openat(&parent.file, base, directory_flags(), Mode::empty()) {
+            Ok(file) => Directory {
+                path: parent.path.join(base),
+                file: file.into(),
+            },
+            Err(Errno::NOENT) => return Ok(false),
+            Err(error) => return Err(io_failure(error)),
+        };
+        base.validate()?;
+        match unix::statat(&base.file, key(owner)?, AtFlags::SYMLINK_NOFOLLOW) {
+            Ok(_) => Ok(true),
+            Err(Errno::NOENT) => Ok(false),
+            Err(error) => Err(io_failure(error)),
+        }
     }
 
     #[derive(Default)]

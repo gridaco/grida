@@ -2,6 +2,7 @@
 
 mod extensions;
 mod live;
+mod observation;
 mod projection;
 mod transport;
 mod websocket;
@@ -22,6 +23,7 @@ use agent_client_protocol::{
 };
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::{ChangeId, ErrorKind, SessionId, TurnId};
+use observation::Observation;
 use projection::Projection;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
@@ -104,6 +106,9 @@ struct ConnectionSessions {
     initialized: bool,
     attached: BTreeSet<SessionId>,
     active: BTreeMap<SessionId, TurnId>,
+    observing: BTreeMap<SessionId, usize>,
+    catalog_observers: usize,
+    retiring: BTreeSet<SessionId>,
     negotiated: BTreeSet<&'static str>,
     live_started: bool,
 }
@@ -119,10 +124,22 @@ impl ConnectionSessions {
     }
 
     fn ensure_attached(&self, id: &SessionId) -> Result<()> {
+        self.ensure_observable(id)?;
         if !self.attached.contains(id) {
             return Err(unavailable("session_setup_required"));
         }
         Ok(())
+    }
+
+    fn ensure_observable(&self, id: &SessionId) -> Result<()> {
+        if self.retiring.contains(id) {
+            return Err(unavailable("session_deletion_in_progress"));
+        }
+        Ok(())
+    }
+
+    fn can_deliver(&self, id: &SessionId) -> bool {
+        self.attached.contains(id) && !self.retiring.contains(id)
     }
 }
 
@@ -162,7 +179,8 @@ async fn serve_connection(
         .on_receive_request(
             async move |request: InitializeRequest, responder, connection| {
                 let subagents = initialized_host.subagents_available();
-                let mut advertised = extensions::advertised(reviewer, subagents);
+                let deletion = reviewer && initialized_host.deletion_available();
+                let mut advertised = extensions::advertised(reviewer, subagents, deletion);
                 if reviewer {
                     advertised.insert(live::CAPABILITY.into(), 1.into());
                 }
@@ -188,7 +206,8 @@ async fn serve_connection(
                     let mut sessions = initialized_sessions.lock().unwrap();
                     sessions.initialized = true;
                     let meta = request.client_capabilities.meta.as_ref();
-                    sessions.negotiated = extensions::negotiated(meta, reviewer, subagents);
+                    sessions.negotiated =
+                        extensions::negotiated(meta, reviewer, subagents, deletion);
                     if reviewer
                         && !sessions.live_started
                         && meta
@@ -232,6 +251,10 @@ async fn serve_connection(
         )
         .on_receive_request(
             async move |request: ListSessionsRequest, responder, _| {
+                let _observation = match Observation::begin(&list_sessions, None) {
+                    Ok(guard) => guard,
+                    Err(error) => return responder.respond_with_error(error),
+                };
                 let result = async {
                     if !list_sessions.lock().unwrap().initialized {
                         return Err(unavailable("initialize_required"));
@@ -278,9 +301,16 @@ async fn serve_connection(
         )
         .on_receive_request(
             async move |request: LoadSessionRequest, responder, connection| {
+                let id = match session_id(&request.session_id) {
+                    Ok(id) => id,
+                    Err(error) => return responder.respond_with_error(error),
+                };
+                let _observation = match Observation::begin(&load_sessions, Some(&id)) {
+                    Ok(guard) => guard,
+                    Err(error) => return responder.respond_with_error(error),
+                };
                 let result = async {
                     validate_session_setup(&request.mcp_servers, &request.additional_directories)?;
-                    let id = session_id(&request.session_id)?;
                     {
                         let sessions = load_sessions.lock().unwrap();
                         sessions.ensure_capacity(Some(&id))?;
@@ -313,23 +343,33 @@ async fn serve_connection(
         )
         .on_receive_request(
             async move |request: AcpPrompt, responder, connection| {
-                if let Some(command) =
-                    extensions::compaction::command(&prompt_sessions, &request.prompt)
-                {
-                    let session = match session_id(&request.session_id).and_then(|session| {
-                        let sessions = prompt_sessions.lock().unwrap();
-                        sessions.ensure_attached(&session)?;
+                let session = match session_id(&request.session_id) {
+                    Ok(session) => session,
+                    Err(error) => return responder.respond_with_error(error),
+                };
+                let observation = match Observation::begin(&prompt_sessions, Some(&session)) {
+                    Ok(guard) => guard,
+                    Err(error) => return responder.respond_with_error(error),
+                };
+                let attached = {
+                    let sessions = prompt_sessions.lock().unwrap();
+                    sessions.ensure_attached(&session).and_then(|()| {
                         if sessions.active.contains_key(&session) {
                             return Err(unavailable("session_prompt_in_progress"));
                         }
-                        Ok(session)
-                    }) {
-                        Ok(session) => session,
-                        Err(error) => return responder.respond_with_error(error),
-                    };
+                        Ok(())
+                    })
+                };
+                if let Err(error) = attached {
+                    return responder.respond_with_error(error);
+                }
+                if let Some(command) =
+                    extensions::compaction::command(&prompt_sessions, &request.prompt)
+                {
                     let host = prompt_host.clone();
                     let sessions = prompt_sessions.clone();
                     return connection.spawn(async move {
+                        let _observation = observation;
                         let result = extensions::compaction::invoke(
                             &host,
                             &sessions,
@@ -342,14 +382,6 @@ async fn serve_connection(
                     });
                 }
                 let start = async {
-                    let session = session_id(&request.session_id)?;
-                    {
-                        let sessions = prompt_sessions.lock().unwrap();
-                        sessions.ensure_attached(&session)?;
-                        if sessions.active.contains_key(&session) {
-                            return Err(unavailable("session_prompt_in_progress"));
-                        }
-                    }
                     let parts = prompt_parts(request.prompt, image_intake)?;
                     // ACP JSON-RPC IDs correlate requests on one connection. A
                     // distinct host-generated ID identifies each durable input.
@@ -382,6 +414,7 @@ async fn serve_connection(
                     let host = prompt_host.clone();
                     let sessions = prompt_sessions.clone();
                     async move {
+                        let _observation = observation;
                         let cancellation = responder.cancellation();
                         let session = run.session.clone();
                         let mut projection = Projection::new(request.session_id);

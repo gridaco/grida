@@ -213,6 +213,9 @@ impl Work {
         if self.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
         }
+        if self.retiring.contains(&key.0) {
+            return Err(problem(ErrorKind::Conflict, "session_deletion_in_progress"));
+        }
         if self.timers.len() >= MAX_TIMERS && !self.timers.contains_key(key) {
             return Err(problem(ErrorKind::LimitExceeded, "host_wakeup_limit"));
         }

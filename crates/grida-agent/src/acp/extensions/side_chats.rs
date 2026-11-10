@@ -1,6 +1,7 @@
 //! GRIDA-SEC-004 — Side conversations are private to the negotiated client connection.
 
 use super::*;
+use crate::acp::observation::Observation;
 use crate::host::side_chats::{SideAnswer, SideChatView, SideChats};
 
 const OPEN: &str = "co.grida/side-chat/open";
@@ -57,6 +58,10 @@ pub(super) fn handlers(
     RequestRoutes::default()
         .on_receive_request(
             async move |request: Open, responder, _| {
+                let _observation = match Observation::begin(&open.0, Some(&request.session_id)) {
+                    Ok(guard) => guard,
+                    Err(error) => return responder.respond_with_error(error),
+                };
                 let result = async {
                     for key in CAPABILITIES {
                         require(&open.0, key, Some(&request.session_id))?;

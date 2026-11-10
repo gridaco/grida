@@ -95,13 +95,22 @@ impl Delivery {
         connection: &ConnectionTo<Client>,
         notification: SessionNotification,
     ) -> Result<()> {
+        self.send_if(|| {
+            connection.send_notification(notification)?;
+            Ok(true)
+        })
+        .await
+    }
+
+    pub(super) async fn send_if(&self, enqueue: impl FnOnce() -> Result<bool>) -> Result<()> {
         let permit = self
             .updates
             .acquire()
             .await
             .map_err(|_| wire_error("connection_closed"))?;
-        connection.send_notification(notification)?;
-        permit.forget();
+        if enqueue()? {
+            permit.forget();
+        }
         Ok(())
     }
 }
@@ -159,4 +168,39 @@ pub(super) async fn write(
 
 pub(super) fn wire_error(code: &'static str) -> Error {
     Error::new(-32603, code)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::acp::{ConnectionSessions, observation::Retirement};
+    use agent_kit_core::SessionId;
+    use std::sync::{Arc, Mutex};
+
+    #[tokio::test]
+    async fn update_waiting_for_output_capacity_rechecks_the_retired_attachment() {
+        let delivery = Delivery::new();
+        let session = SessionId::new("session").unwrap();
+        let sessions = Arc::new(Mutex::new(ConnectionSessions::default()));
+        sessions.lock().unwrap().attached.insert(session.clone());
+        for _ in 0..MAX_QUEUED_UPDATES {
+            delivery.send_if(|| Ok(true)).await.unwrap();
+        }
+        let update = delivery.send_if(|| {
+            assert!(!sessions.lock().unwrap().can_deliver(&session));
+            Ok(false)
+        });
+        tokio::pin!(update);
+        assert!(
+            tokio::time::timeout(Duration::ZERO, &mut update)
+                .await
+                .is_err()
+        );
+        let fence = Retirement::begin(&sessions, &session).unwrap().unwrap();
+        fence.revoke();
+        drop(fence);
+        delivery.updates.add_permits(1);
+        update.await.unwrap();
+        assert_eq!(delivery.updates.available_permits(), 1);
+    }
 }

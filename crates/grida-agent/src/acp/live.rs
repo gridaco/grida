@@ -22,7 +22,7 @@ pub(super) async fn forward(
         loop {
             match updates.recv().await {
                 Ok(update) => {
-                    if !sessions.lock().unwrap().attached.contains(&update.session) {
+                    if !sessions.lock().unwrap().can_deliver(&update.session) {
                         continue;
                     }
                     let mut offset = update.offset;
@@ -41,7 +41,8 @@ pub(super) async fn forward(
                         send(
                             &connection,
                             &delivery,
-                            update.session.as_str(),
+                            &sessions,
+                            &update.session,
                             chunk,
                             metadata,
                         )
@@ -57,7 +58,8 @@ pub(super) async fn forward(
                         send(
                             &connection,
                             &delivery,
-                            session.as_str(),
+                            &sessions,
+                            &session,
                             ContentChunk::new("".to_owned().into()),
                             json!({"resyncRequired": true}),
                         )
@@ -77,19 +79,29 @@ pub(super) async fn forward(
 async fn send(
     connection: &ConnectionTo<Client>,
     delivery: &Delivery,
-    session: &str,
+    sessions: &Mutex<ConnectionSessions>,
+    session: &agent_kit_core::SessionId,
     chunk: ContentChunk,
     metadata: Value,
 ) -> Result<()> {
     delivery
-        .send(
-            connection,
-            SessionNotification::new(session.to_owned(), SessionUpdate::AgentMessageChunk(chunk))
+        .send_if(|| {
+            let state = sessions.lock().unwrap();
+            if !state.can_deliver(session) {
+                return Ok(false);
+            }
+            connection.send_notification(
+                SessionNotification::new(
+                    session.as_str().to_owned(),
+                    SessionUpdate::AgentMessageChunk(chunk),
+                )
                 .meta(
                     [(CAPABILITY.into(), metadata)]
                         .into_iter()
                         .collect::<agent_client_protocol::v1::schema::Meta>(),
                 ),
-        )
+            )?;
+            Ok(true)
+        })
         .await
 }

@@ -3,6 +3,7 @@
 pub(super) mod approvals;
 mod catalog;
 pub(super) mod compaction;
+mod deletion;
 mod goals;
 mod history;
 mod lifecycle;
@@ -51,8 +52,8 @@ const CAPABILITIES: [&str; 7] = [
     CONFIG_RELOAD,
 ];
 
-pub(super) fn advertised(reviewer: bool, subagents: bool) -> Meta {
-    capability_keys(reviewer, subagents)
+pub(super) fn advertised(reviewer: bool, subagents: bool, delete_chat: bool) -> Meta {
+    capability_keys(reviewer, subagents, delete_chat)
         .map(|key| (key.into(), 1.into()))
         .collect()
 }
@@ -71,13 +72,18 @@ pub(super) fn negotiated(
     meta: Option<&Meta>,
     reviewer: bool,
     subagents: bool,
+    delete_chat: bool,
 ) -> BTreeSet<&'static str> {
-    capability_keys(reviewer, subagents)
+    capability_keys(reviewer, subagents, delete_chat)
         .filter(|key| meta.and_then(|meta| meta.get(*key)).and_then(Value::as_u64) == Some(1))
         .collect()
 }
 
-fn capability_keys(reviewer: bool, subagents: bool) -> impl Iterator<Item = &'static str> {
+fn capability_keys(
+    reviewer: bool,
+    subagents: bool,
+    delete_chat: bool,
+) -> impl Iterator<Item = &'static str> {
     CAPABILITIES
         .into_iter()
         .chain(lifecycle::CAPABILITIES)
@@ -88,6 +94,7 @@ fn capability_keys(reviewer: bool, subagents: bool) -> impl Iterator<Item = &'st
         .chain([skills::CATALOG])
         .chain([summaries::SUMMARY])
         .chain([catalog::ORGANIZE])
+        .chain(delete_chat.then_some(deletion::DELETE))
         .chain(goals::CAPABILITIES)
         .chain(side_chats::capabilities(reviewer))
         .chain(wakeups::capabilities(reviewer))
@@ -331,6 +338,11 @@ pub(super) fn handlers(
         .extend(history::handlers(host.clone(), sessions.clone()))
         .extend(compaction::handlers(host.clone(), sessions.clone()))
         .extend(catalog::handlers(host.clone(), sessions.clone()))
+        .extend(deletion::handlers(
+            host.clone(),
+            sessions.clone(),
+            side_chats.clone(),
+        ))
         .extend(skills::handlers(host.clone(), sessions.clone()))
         .extend(summaries::handlers(host.clone(), sessions.clone()))
         .extend(goals::handlers(

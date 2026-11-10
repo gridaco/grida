@@ -29,6 +29,41 @@ fn ids(page: &CatalogPage) -> Vec<SessionId> {
 }
 
 #[tokio::test]
+async fn upgraded_projection_indexes_previously_hidden_records() {
+    fn earlier(configuration: &Envelope) -> Option<Fingerprint> {
+        if configuration.bytes() == b"b" {
+            None
+        } else {
+            project(configuration)
+        }
+    }
+    let directory = private_directory();
+    let filename = directory.path().join("sessions.sqlite");
+    let store = SqliteStore::open_cataloged(&filename, earlier).unwrap();
+    store.create(create("a-chat", "a")).await.unwrap();
+    store.create(create("b-chat", "b")).await.unwrap();
+    let a = project(&payload("a")).unwrap();
+    let b = project(&payload("b")).unwrap();
+    assert!(store.has_catalog_entries(a).await.unwrap());
+    assert!(!store.has_catalog_entries(b).await.unwrap());
+    drop(store);
+
+    let previous = rusqlite::Connection::open(&filename).unwrap();
+    previous.pragma_update(None, "user_version", 8).unwrap();
+    drop(previous);
+    let store = SqliteStore::open_cataloged(filename, project).unwrap();
+    assert_eq!(
+        ids(&store.list_catalog(a, 0, None).await.unwrap()),
+        [SessionId::new("a-chat").unwrap()]
+    );
+    assert!(store.has_catalog_entries(b).await.unwrap());
+    assert_eq!(
+        ids(&store.list_catalog(b, 0, None).await.unwrap()),
+        [SessionId::new("b-chat").unwrap()]
+    );
+}
+
+#[tokio::test]
 async fn catalog_migration_and_paging_keep_scope_and_creation_order() {
     let directory = private_directory();
     let filename = directory.path().join("sessions.sqlite");

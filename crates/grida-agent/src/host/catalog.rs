@@ -72,12 +72,19 @@ fn bucket(archived: bool) -> u8 {
 
 pub(super) fn configuration_scope(configuration: &Envelope) -> Option<Fingerprint> {
     let config = decode_session_configuration(configuration).ok()?;
-    if !config.cwd.is_absolute() || config.subagent.is_some() {
+    if !config.cwd.is_absolute() {
         return None;
     }
-    workspace_scope(&config.cwd).ok()
+    match config.subagent {
+        Some(child) => child_scope(child.parent()).ok(),
+        None => workspace_scope(&config.cwd).ok(),
+    }
 }
 
-fn workspace_scope(cwd: &Path) -> Result<Fingerprint> {
+pub(super) fn child_scope(parent: &SessionId) -> Result<Fingerprint> {
+    Fingerprint::of(&("grida-session-children-v1", parent))
+}
+
+pub(super) fn workspace_scope(cwd: &Path) -> Result<Fingerprint> {
     Fingerprint::of(&("grida-session-workspace-v1", cwd))
 }

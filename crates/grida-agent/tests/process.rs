@@ -27,6 +27,9 @@ mod compaction;
 #[cfg(unix)]
 #[path = "process/configuration_tools.rs"]
 mod configuration_tools;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/deletion.rs"]
+mod deletion;
 #[cfg(unix)]
 #[path = "process/goals.rs"]
 mod goals;

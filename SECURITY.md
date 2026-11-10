@@ -953,6 +953,15 @@ lazy reads, read-only mutation, and symlink escape refusal.
   execution authority. [Catalog changes](crates/grida-agent/src/acp/extensions/catalog.rs)
   require a negotiated capability, an attached chat, and the observed metadata
   revision. They leave execution, transcripts, and artifacts untouched.
+- [Saved-chat deletion](crates/grida-agent/src/acp/extensions/deletion.rs)
+  requires negotiated private stdio and an attached chat at both observed
+  revisions. An exact scope-bound retry can recover the retirement receipt.
+  The [host](crates/grida-agent/src/host/deletion.rs) excludes outstanding work,
+  owned children, and retained inputs under the existing admission owner.
+  The connection fences transcript replay, live notification delivery, and
+  side chat creation before revoking the deleted attachment. The transaction
+  retires SQLite records and their execution identity. Authored files,
+  independently retained chats, and the legacy archive have separate custody.
 - [Native goal controls](crates/grida-agent/src/acp/extensions/goals.rs) require
   version negotiation and session attachment on the existing ACP perimeter.
   The [goal owner](crates/grida-agent/src/host/goals.rs) conditions each

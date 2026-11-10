@@ -131,6 +131,12 @@ List supplies an absolute workspace `cwd` and returns up to 32 saved session
 identities in newest-created order. Follow `nextCursor` with the same workspace.
 Listing leaves chats detached and reads no transcripts.
 
+On macOS and Linux, negotiate `co.grida/session/delete` version 1 on private
+stdio to delete an eligible idle saved chat. A fresh request binds the
+attached chat, its workspace, and its observed session and catalog revisions.
+Exact retries return the persisted receipt. Chats with pending work or
+dependent retained state remain available until those dependencies are resolved.
+
 Private stdio clients can negotiate the side-chat open, ask, and close
 operations. Each side chat uses temporary state and the selected model with
 no tool access. Its captured background can include the parent's installed

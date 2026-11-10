@@ -1,6 +1,7 @@
 //! Organize attached conversations independently of their execution.
 
 use super::*;
+use crate::acp::observation::Observation;
 use crate::host::is_archived;
 use agent_client_protocol::v1::schema::ListSessionsResponse;
 use agent_kit_store_sqlite::catalog::CatalogEntry;
@@ -63,6 +64,11 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
     RequestRoutes::default()
         .on_receive_request(
             async move |request: Get, responder, _| {
+                let _observation =
+                    match Observation::begin(&get_sessions, Some(&request.session_id)) {
+                        Ok(guard) => guard,
+                        Err(error) => return responder.respond_with_error(error),
+                    };
                 let result = async {
                     require(&get_sessions, ORGANIZE, Some(&request.session_id))?;
                     get_host
@@ -78,6 +84,11 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
         )
         .on_receive_request(
             async move |request: Organize, responder, _| {
+                let _observation =
+                    match Observation::begin(&update_sessions, Some(&request.session_id)) {
+                        Ok(guard) => guard,
+                        Err(error) => return responder.respond_with_error(error),
+                    };
                 let result = async {
                     require(&update_sessions, ORGANIZE, Some(&request.session_id))?;
                     update_host
@@ -98,6 +109,10 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
         )
         .on_receive_request(
             async move |request: ListArchived, responder, _| {
+                let _observation = match Observation::begin(&sessions, None) {
+                    Ok(guard) => guard,
+                    Err(error) => return responder.respond_with_error(error),
+                };
                 let result = async {
                     require(&sessions, ORGANIZE, None)?;
                     let after = request

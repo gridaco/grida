@@ -27,6 +27,9 @@ DROP INDEX session_catalog_scope;
 CREATE INDEX session_catalog_bucket ON session_catalog(scope, bucket, ordinal);
 ";
 
+// The owner's newer projection can classify previously unscoped rows.
+pub(super) const REPROJECT_UNSCOPED: &str = "UPDATE session_catalog SET scope=NULL WHERE scope=X''";
+
 /// Return a stable scope for an immutable configuration this owner recognizes.
 pub type ScopeProjection = fn(&Envelope) -> Option<Fingerprint>;
 
@@ -44,6 +47,20 @@ pub struct CatalogPage {
 }
 
 impl SqliteStore {
+    /// Check an owner-defined scope without reading catalog entries or turns.
+    pub async fn has_catalog_entries(&self, scope: Fingerprint) -> Result<bool> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM session_catalog WHERE scope=?1)",
+                    [scope.bytes().as_slice()],
+                    |row| row.get(0),
+                )
+                .map_err(database_error)
+        })
+        .await
+    }
+
     /// List by newest creation within one scope and owner-selected bucket.
     /// The supplied anchor must belong to that scope. This reads no turns.
     pub async fn list_catalog(

@@ -73,6 +73,10 @@ pub(super) struct Images {
 }
 
 impl Images {
+    pub(super) fn retained_scope_exists(state_dir: &Path, session: &SessionId) -> Result<bool> {
+        crate::scratch::owner_scope_exists(state_dir, "retained-inputs", session)
+    }
+
     pub(super) fn open(state_dir: &Path) -> Result<Self> {
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         {

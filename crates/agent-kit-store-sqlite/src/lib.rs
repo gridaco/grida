@@ -30,7 +30,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
-const SCHEMA_VERSION: i64 = 8;
+const SCHEMA_VERSION: i64 = 9;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -259,7 +259,7 @@ impl SqliteStore {
                 transaction.commit().map_err(database_error)?;
             }
             SCHEMA_VERSION => {}
-            1..=7 => {
+            1..=8 => {
                 let transaction = connection.transaction().map_err(database_error)?;
                 if version == 1 {
                     transaction
@@ -291,8 +291,13 @@ impl SqliteStore {
                         .execute_batch(catalog::ORGANIZATION_SCHEMA)
                         .map_err(database_error)?;
                 }
+                if version <= 7 {
+                    transaction
+                        .execute_batch(deletion::SCHEMA)
+                        .map_err(database_error)?;
+                }
                 transaction
-                    .execute_batch(deletion::SCHEMA)
+                    .execute_batch(catalog::REPROJECT_UNSCOPED)
                     .map_err(database_error)?;
                 transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)

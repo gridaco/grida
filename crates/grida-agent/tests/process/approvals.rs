@@ -176,9 +176,7 @@ impl Stdio {
     pub(super) async fn read_reply(&mut self) -> Value {
         timeout(WAIT, async {
             loop {
-                let mut line = String::new();
-                assert_ne!(self.stdout.read_line(&mut line).await.unwrap(), 0);
-                let response: Value = serde_json::from_str(&line).unwrap();
+                let response = self.read_frame().await;
                 if !response["id"].is_null() {
                     return response;
                 }
@@ -186,6 +184,18 @@ impl Stdio {
         })
         .await
         .unwrap()
+    }
+
+    pub(super) async fn read_frame(&mut self) -> Value {
+        let mut line = String::new();
+        assert_ne!(
+            timeout(WAIT, self.stdout.read_line(&mut line))
+                .await
+                .unwrap()
+                .unwrap(),
+            0
+        );
+        serde_json::from_str(&line).unwrap()
     }
 
     pub(super) async fn close(self) {

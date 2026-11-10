@@ -3,6 +3,7 @@
 mod catalog;
 mod compaction;
 mod completion_checks;
+pub(crate) mod deletion;
 mod goals;
 mod history;
 mod image_tools;
@@ -67,7 +68,7 @@ use grida_agent_master::configuration::SettingChange;
 use grida_agent_master::hooks::CompletionChecks;
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome, OperatingRegime};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -99,6 +100,7 @@ const PROVIDER_LIMITS: StreamLimits = StreamLimits {
 #[derive(Clone)]
 pub struct Host {
     store: Arc<SqliteStore>,
+    state_dir: Option<Arc<Path>>,
     execution: Option<Arc<Execution>>,
     gg_connection: Option<Arc<GgConnection>>,
     configuration: Option<Arc<Configuration>>,
@@ -136,6 +138,7 @@ struct Work {
     closed: bool,
     unverified: bool,
     active: BTreeMap<SessionId, Active>,
+    retiring: BTreeSet<SessionId>,
     ready: VecDeque<ReadyWork>,
     timers: wakeups::TimerOwners,
 }
@@ -167,7 +170,10 @@ impl ReadyWork {
 
 impl Work {
     fn defer(&mut self, ready: ReadyWork) {
-        if self.ready.len() < MAX_READY_SESSIONS && !self.ready.contains(&ready) {
+        if !self.retiring.contains(ready.session())
+            && self.ready.len() < MAX_READY_SESSIONS
+            && !self.ready.contains(&ready)
+        {
             if matches!(ready, ReadyWork::Stop(..)) {
                 self.ready.push_front(ready);
             } else {
@@ -521,8 +527,12 @@ impl Host {
             .transpose()?
             .map(Arc::new);
         let execution = execution.map(|open| open()).transpose()?.map(Arc::new);
+        let state_dir = state_dir
+            .canonicalize()
+            .map_err(|_| problem(ErrorKind::Unavailable, "state_directory_unavailable"))?;
         Ok(Self {
             store,
+            state_dir: Some(state_dir.into()),
             execution,
             gg_connection: None,
             configuration,
@@ -665,6 +675,9 @@ impl Host {
     ) -> Result<LaunchTicket> {
         if work.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
+        }
+        if work.retiring.contains(&session) {
+            return Err(problem(ErrorKind::Conflict, "session_deletion_in_progress"));
         }
         if work.active.len() >= MAX_ACTIVE_RUNS {
             return Err(problem(ErrorKind::LimitExceeded, "active_run_limit"));

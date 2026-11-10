@@ -53,6 +53,22 @@ without another write. On a revision conflict, read the current entry before
 asking the user to reapply the edit. Archiving and restoring preserve chat
 identity and leave execution controls unchanged.
 
+On macOS and Linux, negotiate `co.grida/session/delete` version 1 on private
+stdio. Send `_co.grida/session/delete` with `sessionId`, absolute workspace
+`cwd`, a stable `requestId`, `expectedSessionRevision` from the session
+snapshot, and `expectedCatalogRevision` from the catalog entry. A new
+deletion requires an attachment. On success, the response identifies the
+retired `sessionId` and `requestId`. The exact request can recover its receipt
+after reconnecting without reattaching. The retired identity is unavailable
+for future attachment or execution.
+
+Deletion requires idle, resolved work and an empty queue. A concurrent
+transcript replay or catalog read can require a retry. An open side chat, a
+pending wake-up, an unfinished Goal, named children, retained input storage,
+or unresolved execution evidence blocks deletion. Independent forks retain
+their own copied prefix. Workspace files and the legacy chat archive have
+separate owners.
+
 ## Standard messages and custom UX
 
 Use standard ACP for session setup, prompts, message/thought streams, tool
