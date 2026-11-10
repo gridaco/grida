@@ -81,16 +81,13 @@ export function DesktopFileShell({
   }, [bridge, mode, basePath]);
 
   const { fs, setActiveEditor: bindLegacyEditor } = useActiveEditorAgentFs();
-  const documentSurface = useMemo(
-    () => (docId ? new DocumentSurfaceHost() : undefined),
-    [docId]
-  );
+  const [fileSurface] = useState(() => new DocumentSurfaceHost());
   const setActiveEditor = useCallback(
     (editor: SvgEditor | null) => {
-      documentSurface?.setEditor(editor);
+      fileSurface.setEditor(editor);
       bindLegacyEditor(editor);
     },
-    [documentSurface, bindLegacyEditor]
+    [fileSurface, bindLegacyEditor]
   );
   const currentSurfacePath =
     mode === "doc"
@@ -169,7 +166,11 @@ export function DesktopFileShell({
                   mode === "deck" && !basePath ? workspaceId : undefined
                 }
                 initialSession={null}
-                editorSurfaces={documentSurface}
+                editorSurfaces={
+                  mode === "doc" || nativeChat.deckSvgText
+                    ? fileSurface
+                    : undefined
+                }
                 legacy={legacyChat}
               />
             ) : (
@@ -194,6 +195,11 @@ export function DesktopFileShell({
                 <DesktopCanvasBundleShell
                   workspaceId={workspaceId!}
                   basePath={basePath}
+                  slideSurfaceHost={
+                    nativeChat?.deckSvgText && fileChatAvailable
+                      ? fileSurface
+                      : undefined
+                  }
                 />
               </WorkspaceChangesProvider>
             )}

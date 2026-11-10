@@ -37,13 +37,14 @@ import {
   NativeChatController,
   type NativeChatEditorSurfaces,
 } from "@/lib/agent-chat/native-chat-controller";
-import type { ComposerController } from "@/kits/composer";
+import type { ComposerCatalog, ComposerController } from "@/kits/composer";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
 import {
   AgentComposerInput,
   type ComposerCommandAction,
 } from "../shared/agent-composer-input";
 import { QueuedMessageRows } from "../shared/queued-messages";
+import { useWorkspaceFileMentions } from "../shared/use-workspace-composer-catalog";
 import { NativeGoalPanel } from "./native-goal-panel";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
 import { NativeTurnSummary } from "./native-turn-summary";
@@ -51,7 +52,7 @@ import { NativeContextLimitPanel } from "./native-context-limit-panel";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
 import { NativeSubagentsPanel } from "./native-subagents-panel";
 
-const TEXT_CATALOG = { commands: [], mentions: [] };
+const NO_COMMANDS: ComposerCatalog["commands"] = [];
 const COMMAND_DESCRIPTIONS = {
   compact: "Summarize earlier context while keeping the transcript",
   fork: "Create a separate chat from the latest committed message",
@@ -71,12 +72,14 @@ const selectionMemory = {
 export function NativeAgentPaneGate({
   bridge,
   selectionKey,
+  workspaceId,
   initialSession,
   editorSurfaces,
   legacy,
 }: {
   bridge: DesktopNativeChat;
   selectionKey?: string;
+  workspaceId?: string;
   initialSession: string | null;
   editorSurfaces?: NativeChatEditorSurfaces;
   legacy: ReactNode;
@@ -130,6 +133,7 @@ export function NativeAgentPaneGate({
       key={initialSession}
       bridge={bridge}
       selectionKey={selectionKey}
+      workspaceId={workspaceId}
       initialSession={initialSession}
       editorSurfaces={editorSurfaces}
     />
@@ -149,11 +153,13 @@ const nativeChatUnavailableMessage = {
 export function NativeAgentPane({
   bridge,
   selectionKey,
+  workspaceId,
   initialSession,
   editorSurfaces,
 }: {
   bridge: DesktopNativeChat;
   selectionKey?: string;
+  workspaceId?: string;
   initialSession: string | null;
   editorSurfaces?: NativeChatEditorSurfaces;
 }) {
@@ -171,6 +177,11 @@ export function NativeAgentPane({
     controller.subscribe,
     controller.read,
     controller.read
+  );
+  const mentions = useWorkspaceFileMentions(workspaceId);
+  const catalog = useMemo(
+    () => ({ commands: NO_COMMANDS, mentions }),
+    [mentions]
   );
   const draft = useRef<Pick<ComposerController, "appendText">>(null);
   const pngPicker = useRef<HTMLInputElement>(null);
@@ -1038,7 +1049,7 @@ export function NativeAgentPane({
         )}
         <AgentComposerInput
           key={state.scope}
-          catalog={TEXT_CATALOG}
+          catalog={catalog}
           commandActions={state.commands.map(
             (command): ComposerCommandAction => ({
               id: command,

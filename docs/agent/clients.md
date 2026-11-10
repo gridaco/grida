@@ -564,6 +564,13 @@ attachment and draft. A queued message keeps the same file. To change the
 attachment after queuing, remove the queued message and send a new one. Use
 **Add PNG** for image understanding and cropping on compatible connections.
 
+## Mention a workspace file
+
+In the native workbench, type `@` and search for a file. Choose the relative
+path you want from the suggestions. The mention gives the agent that path.
+When the agent reads it, the workspace's current files and permissions apply.
+Use **Attach file** to supply a private copy with the message.
+
 ## Inspect a local file headlessly
 
 On macOS and Linux, `grida-agent run --input-file FILE` accepts one selected
@@ -575,10 +582,10 @@ Reopening preserves the same file or identifies which copy is unavailable.
 
 ## Edit selected SVG text
 
-Open an SVG in a native Desktop workspace or in a standalone file window that
-offers native chat. Select one plain text element and send an immediate text
-message in **Act** asking the agent to read or replace it. A tab, selection, or
-editor revision change makes the captured target unavailable. Select the text
+Open an SVG or a slide in a Desktop editor that offers native chat. Select one
+plain text element and send an immediate text message in **Act** asking the
+agent to read or replace it. Switching tabs or slides, changing the selection,
+or editing the document makes the captured target unavailable. Select the text
 and send a new message to work on a new target.
 
 The change appears in the SVG editor and can be undone there. Use the editor's

@@ -174,8 +174,11 @@ type AgentPaneContentProps = Omit<AgentPaneProps, "className">;
 
 function AgentPaneRoute(props: AgentPaneContentProps) {
   const bridge = useDesktopBridge();
-  const initialSession = useSearchParams().get("session");
-  if (!bridge) return null;
+  const params = useSearchParams();
+  const initialSession = params.get("session");
+  // The route can still be resolving the next workspace after navigation.
+  if (!bridge || (bridge.nativeChat && params.get("id") !== props.workspace.id))
+    return null;
   return (
     <>
       {bridge.nativeExternalAgent && (
@@ -189,6 +192,7 @@ function AgentPaneRoute(props: AgentPaneContentProps) {
           key={props.workspace.id}
           bridge={bridge.nativeChat}
           selectionKey={props.workspace.id}
+          workspaceId={props.workspace.id}
           initialSession={initialSession}
           editorSurfaces={props.surfaceHost}
           legacy={<AgentPaneContent {...props} />}

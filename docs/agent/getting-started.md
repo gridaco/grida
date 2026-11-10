@@ -9,15 +9,16 @@ format: md
 
 ## Work in a project
 
-Open a folder in Grida Desktop and open its chat pane. Name the file you
-want the agent to use, or select the relevant material in an attached
-editor. Use **Plan** to investigate and **Act** to carry out changes with
+Open a folder in Grida Desktop and open its chat pane. Type `@` to find a
+workspace file, or select relevant material in an attached editor. Use **Plan**
+to investigate and **Act** to carry out changes with
 the tools and access available to the chat. [Understand agent permissions](./permissions.md)
 
 On a Desktop build with native deck chat, open a `.canvas` bundle in its file
 window to start or reopen its chat. Ask about files inside the bundle by name
 while you work in the slide editor. A bundle opened from inside a project has
 its own saved chats and access to files within that bundle.
+[Edit text on the active slide](./clients.md#edit-selected-svg-text)
 
 ## Attach an image
 

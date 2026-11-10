@@ -18,38 +18,47 @@ import type {
   ComposerCommand,
   ComposerMention,
 } from "@/kits/composer";
+import { WorkspaceFileMentions } from "./workspace-file-mentions";
 
-const SKIP_DIRS = new Set([
-  "node_modules",
-  ".git",
-  ".next",
-  "dist",
-  "build",
-  "target",
-  ".turbo",
-  ".cache",
-]);
-const MAX_FILES = 800;
-const MAX_DEPTH = 4;
+const NO_MENTIONS: ComposerMention[] = [];
 const SKILL_DIRS = [".agents/skills", ".claude/skills"];
+
+export function useWorkspaceFileMentions(
+  workspaceId?: string,
+  mode: WorkspaceFileMentions.Mode = "native"
+): ComposerMention[] {
+  const request = useMemo(() => ({ workspaceId, mode }), [workspaceId, mode]);
+  const [loaded, setLoaded] = useState<{
+    request: typeof request;
+    mentions: ComposerMention[];
+  }>();
+  useEffect(() => {
+    const { workspaceId, mode } = request;
+    if (!workspaceId) return;
+    const owner = new AbortController();
+    void WorkspaceFileMentions.list(
+      (path) => bridgeWorkspaces.readdir(workspaceId, path),
+      owner.signal,
+      mode
+    ).then((mentions) => {
+      if (!owner.signal.aborted) setLoaded({ request, mentions });
+    });
+    return () => owner.abort();
+  }, [request]);
+  return loaded?.request === request ? loaded.mentions : NO_MENTIONS;
+}
 
 export function useWorkspaceComposerCatalog(
   workspaceId: string
 ): ComposerCatalog {
-  const [mentions, setMentions] = useState<ComposerMention[]>([]);
+  const mentions = useWorkspaceFileMentions(workspaceId, "compatibility");
   const [commands, setCommands] = useState<ComposerCommand[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      const [files, skills] = await Promise.all([
-        walkFiles(workspaceId),
-        listSkills(workspaceId),
-      ]);
-      if (cancelled) return;
-      setMentions(files);
-      setCommands(skills);
-    })();
+    void listSkills(workspaceId).then((skills) => {
+      if (!cancelled) setCommands(skills);
+    });
     return () => {
       cancelled = true;
     };
@@ -59,41 +68,6 @@ export function useWorkspaceComposerCatalog(
     () => ({ commands, mentions }),
     [commands, mentions]
   );
-}
-
-async function walkFiles(workspaceId: string): Promise<ComposerMention[]> {
-  const out: ComposerMention[] = [];
-  const queue: Array<{ relPath: string; depth: number }> = [
-    { relPath: "", depth: 0 },
-  ];
-  while (queue.length > 0 && out.length < MAX_FILES) {
-    const { relPath, depth } = queue.shift()!;
-    let entries;
-    try {
-      entries = await bridgeWorkspaces.readdir(workspaceId, relPath);
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      if (entry.kind === "directory") {
-        if (SKIP_DIRS.has(entry.name) || entry.name.startsWith(".")) continue;
-        if (depth < MAX_DEPTH) {
-          queue.push({ relPath: entry.rel_path, depth: depth + 1 });
-        }
-      } else if (entry.kind === "file" || entry.kind === "symlink") {
-        out.push({
-          id: entry.rel_path,
-          label: entry.name,
-          kind: "file",
-          path: entry.rel_path,
-          description: entry.rel_path,
-        });
-        if (out.length >= MAX_FILES) break;
-      }
-    }
-  }
-  out.sort((a, b) => a.label.localeCompare(b.label));
-  return out;
 }
 
 async function listSkills(workspaceId: string): Promise<ComposerCommand[]> {

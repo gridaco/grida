@@ -37,6 +37,8 @@ import {
   PathToolbarPosition,
 } from "@/app/(canvas)/svg/_components/path-toolbar";
 import { workspaces as workspacesNs } from "@/lib/desktop/bridge";
+import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
+import type { DocumentSurfaceHost } from "../file/document-surface-host";
 import {
   useWorkspaceChanges,
   useWorkspaceFileRevision,
@@ -51,6 +53,7 @@ export function DesktopCanvasShell({
   workspaceId,
   basePath = "",
   active = true,
+  slideSurfaceHost,
 }: {
   workspaceId: string;
   /** Workspace-relative dir of the `.canvas` bundle; "" when it IS the
@@ -59,6 +62,7 @@ export function DesktopCanvasShell({
   /** False when mounted as a hidden workbench tab — gates Cmd+S so a
    *  background deck doesn't grab the save. Defaults true (standalone). */
   active?: boolean;
+  slideSurfaceHost?: DocumentSurfaceHost;
 }) {
   const [deck] = useState(
     () => new CanvasDeck(workspaceId, workspacesNs, basePath)
@@ -203,6 +207,7 @@ export function DesktopCanvasShell({
             workspaceId={workspaceId}
             slide={activeSlide}
             basePath={basePath}
+            slideSurfaceHost={slideSurfaceHost}
             editable={active}
             thumbnail={activeSlide ? thumbnails[activeSlide.src] : undefined}
             onSaved={() => activeSlide && refresh(activeSlide.src)}
@@ -445,6 +450,7 @@ function ActiveSlide({
   editable,
   thumbnail,
   onSaved,
+  slideSurfaceHost,
 }: {
   workspaceId: string;
   slide: Slide | null;
@@ -456,6 +462,7 @@ function ActiveSlide({
    *  placeholder — the deck strip already has these, so a revisit is instant. */
   thumbnail?: string;
   onSaved: () => void;
+  slideSurfaceHost?: DocumentSurfaceHost;
 }) {
   // The slide file's workspace-relative path (the bundle may sit at `basePath`).
   const relPath = slide
@@ -579,6 +586,7 @@ function ActiveSlide({
     );
   }
 
+  const slidePath = slide && WorkspaceArtifact.toAgentPath(slide.src);
   return (
     <SvgEditorProvider initialSvg={state.content}>
       <SlideSurface
@@ -588,6 +596,11 @@ function ActiveSlide({
         resourceRevision={resourceRevision}
         active={editable}
         onSaved={onSaved}
+        liveText={
+          slideSurfaceHost && slidePath?.toLowerCase().endsWith(".svg")
+            ? { host: slideSurfaceHost, path: slidePath }
+            : undefined
+        }
         prepareContentForEditor={prepareContentForEditor}
         prepareContentForWrite={prepareContentForWrite}
       />

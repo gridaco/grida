@@ -44,3 +44,35 @@ it("withdraws the old text target when the standalone editor changes", () => {
     editor.dispose();
   }
 });
+
+it("keeps the new slide bound when an older editor detaches", () => {
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg"><text id="title">Slide</text></svg>';
+  const first = createSvgEditor({ svg });
+  const second = createSvgEditor({ svg });
+  const host = new DocumentSurfaceHost();
+  const closeFirst = host.bindEditor(first, "/slides/first.svg");
+  try {
+    first.commands.select(
+      [...first.tree().nodes.values()].find((node) => node.name === "title")!.id
+    );
+    const targetId = host.svgText.capture()!;
+    expect(targetId).toBeDefined();
+    const closeSecond = host.bindEditor(second, "/slides/second.svg");
+    closeFirst();
+    expect(host.readEditorSurfaces().active).toBe("/slides/second.svg");
+    expect(
+      host.svgText.invoke({
+        targetId,
+        expiresAtMs: Date.now() + 1000,
+        operation: { kind: "read" },
+      })
+    ).toEqual({ kind: "unavailable" });
+    closeSecond();
+    expect(host.readEditorSurfaces().active).toBeNull();
+  } finally {
+    host.setEditor(null);
+    first.dispose();
+    second.dispose();
+  }
+});
