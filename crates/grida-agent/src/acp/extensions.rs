@@ -82,12 +82,12 @@ fn capability_keys(reviewer: bool) -> impl Iterator<Item = &'static str> {
         .chain([compaction::COMPACT])
         .chain([skills::CATALOG])
         .chain([summaries::SUMMARY])
+        .chain([catalog::ORGANIZE])
         .chain(goals::CAPABILITIES)
         .chain(side_chats::capabilities(reviewer))
         .chain(wakeups::capabilities(reviewer))
 }
 
-        .chain([catalog::ORGANIZE])
 pub(super) fn configuration_permission(
     sessions: &Mutex<ConnectionSessions>,
     allow_changes: bool,
@@ -324,13 +324,13 @@ pub(super) fn handlers(
         ))
         .extend(history::handlers(host.clone(), sessions.clone()))
         .extend(compaction::handlers(host.clone(), sessions.clone()))
+        .extend(catalog::handlers(host.clone(), sessions.clone()))
         .extend(skills::handlers(host.clone(), sessions.clone()))
         .extend(summaries::handlers(host.clone(), sessions.clone()))
         .extend(goals::handlers(
             host.clone(),
             sessions.clone(),
             image_intake,
-        .extend(catalog::handlers(host.clone(), sessions.clone()))
         ))
         .extend(wakeups::handlers(host.clone(), sessions.clone()))
         .extend(side_chats::handlers(
