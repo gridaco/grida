@@ -61,5 +61,8 @@ local ACP client. Select a state directory to keep chats across restarts.
 The client guide covers provider setup, permissions, supported commands,
 and how to inspect a task after it stops. [Connect an agent client](./clients.md)
 
+- [Change agent settings](./settings.md)
+- [Automate lifecycle checks](./hooks.md)
+
 For specific availability or configuration details, see the
 [feature catalog](./features.md) and [agent configuration reference](../reference/agent-configuration.md).

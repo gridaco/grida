@@ -207,10 +207,12 @@ const docs = [
     items: [
       "agent/permissions",
       "agent/models-and-usage",
+      "agent/settings",
       "agent/subagents",
       "agent/scheduled-work",
       "agent/results",
       "agent/clients",
+      "agent/hooks",
       "agent/features",
     ],
   },
