@@ -502,8 +502,12 @@ withdraw it and review a new send.
 When the native Desktop chat advertises image input, choose **Add PNG**,
 select one PNG up to 256 KiB, and write a message before sending. The text
 and image enter the chat together, including when the message joins the
-queue. A failed send preserves the draft for retry. To change a queued
-image, remove the queued message and submit a new one.
+queue. A replacement uses the selected file even when its name matches. If
+the file cannot be read or the connection cannot use PNG input, Grida keeps
+your draft and blocks the send. Replace or remove the PNG, or use a compatible
+connection. Retrying an unconfirmed send with the same draft keeps the original
+input identity. To change a queued image, remove the queued message and submit
+a new one.
 
 This picker was verified with a disposable Responses API GPT-5.4 profile.
 The current native Desktop Gateway and ChatGPT subscription profiles

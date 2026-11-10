@@ -1350,7 +1350,7 @@ it("keeps PNG retries exact and drops replaced or navigated file reads", async (
   const scope = controller.read().scope;
   const previous = Promise.withResolvers<ArrayBuffer>();
   const first = controller.pickPng(scope, {
-    name: "retired.png",
+    name: "chosen.png",
     size: 8,
     arrayBuffer: () => previous.promise,
   });
@@ -1412,6 +1412,133 @@ it("keeps PNG retries exact and drops replaced or navigated file reads", async (
   });
   expect(controller.read().imageDraft).toBeNull();
   expect(controller.read().imageReading).toBe(false);
+  controller.disconnect();
+});
+
+it("uses the latest same-named PNG and blocks a failed replacement", async () => {
+  const { bridge, controller } = fixture();
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>(
+    async (sessionId, input) =>
+      bridge.submit(sessionId, input.inputId, input.text)
+  );
+  const textSend = vi.spyOn(bridge, "submit");
+  bridge.acceptsPng = async () => true;
+  bridge.submitImage = send;
+  await controller.select("chat-a");
+  const scope = controller.read().scope;
+  const png = (pixel: number) => new Uint8Array([137, pixel]).buffer;
+  const choose = (bytes: ArrayBuffer) =>
+    controller.pickPng(scope, {
+      name: "same.png",
+      size: bytes.byteLength,
+      arrayBuffer: async () => bytes,
+    });
+  const first = png(1);
+  const second = png(2);
+  await choose(first);
+  send.mockRejectedValueOnce(new Error("fixture lost image acknowledgement"));
+  await expect(controller.submit("Describe it.")).rejects.toThrow(
+    "fixture lost image acknowledgement"
+  );
+  await controller.pickPng(scope, {
+    name: "same.png",
+    size: second.byteLength,
+    arrayBuffer: async () => {
+      throw new Error("fixture read failure");
+    },
+  });
+  expect(controller.read().imageDraft).toMatchObject({
+    name: "same.png",
+    error: "Couldn't read the selected PNG.",
+  });
+  expect(controller.canSubmit).toBe(false);
+  await expect(controller.submit("Describe it.")).rejects.toThrow(
+    "native_chat_not_ready"
+  );
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(textSend).not.toHaveBeenCalled();
+
+  await choose(second);
+  await controller.submit("Describe it.");
+  expect(send.mock.calls[0]?.[1].png).toBe(first);
+  expect(send.mock.calls[1]?.[1].png).toBe(second);
+  expect(send.mock.calls[0]?.[1].inputId).not.toBe(
+    send.mock.calls[1]?.[1].inputId
+  );
+  controller.disconnect();
+});
+
+it("rechecks PNG capability before sending and only looks up an exact existing receipt after capability loss", async () => {
+  const { bridge, controller } = fixture();
+  let supportsPng = true;
+  const normal = vi.spyOn(bridge, "submit");
+  const receipt = vi.spyOn(bridge, "inputReceipt");
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>();
+  bridge.acceptsPng = async () => supportsPng;
+  bridge.submitImage = send;
+  await controller.select("chat-a");
+  const scope = controller.read().scope;
+  await controller.pickPng(scope, {
+    name: "chosen.png",
+    size: 8,
+    arrayBuffer: async () => new ArrayBuffer(8),
+  });
+  supportsPng = false;
+  await expect(controller.submit("Describe it.")).rejects.toThrow(
+    "image_input_unavailable"
+  );
+  expect(controller.read()).toMatchObject({
+    imageInput: false,
+    imageDraft: { name: "chosen.png" },
+  });
+  expect(controller.canSubmit).toBe(false);
+  expect(send).not.toHaveBeenCalled();
+  expect(receipt).not.toHaveBeenCalled();
+
+  supportsPng = true;
+  await controller.repair();
+  send.mockRejectedValueOnce(new Error("fixture lost image acknowledgement"));
+  await expect(controller.submit("Describe it.")).rejects.toThrow(
+    "fixture lost image acknowledgement"
+  );
+  const inputId = send.mock.calls[0]![1].inputId;
+  expect(receipt).toHaveBeenLastCalledWith("chat-a", inputId);
+
+  supportsPng = false;
+  await controller.repair();
+  expect(controller.read().imageInput).toBe(false);
+  receipt.mockResolvedValueOnce({
+    sessionId: "chat-a",
+    inputId,
+    disposition: "queued",
+    inputPosition: 1,
+    turnId: null,
+  });
+  await controller.submit("Describe it.");
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(receipt.mock.calls).toEqual([
+    ["chat-a", inputId],
+    ["chat-a", inputId],
+  ]);
+  expect(normal).not.toHaveBeenCalled();
+  expect(controller.read().imageDraft).toBeNull();
+  controller.disconnect();
+});
+
+it("ignores an older PNG capability result after a newer refresh", async () => {
+  const { bridge, controller } = fixture();
+  const capability = vi.fn<NonNullable<DesktopNativeChat["acceptsPng"]>>();
+  bridge.acceptsPng = capability.mockResolvedValue(true);
+  bridge.submitImage = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>();
+  await controller.select("chat-a");
+  const old = Promise.withResolvers<boolean>();
+  capability.mockReturnValueOnce(old.promise).mockResolvedValueOnce(false);
+  const refresh = controller.repair();
+  await vi.waitFor(() => expect(capability).toHaveBeenCalledTimes(2));
+  await controller.repair();
+  old.resolve(true);
+  await refresh;
+  expect(controller.read().imageInput).toBe(false);
   controller.disconnect();
 });
 

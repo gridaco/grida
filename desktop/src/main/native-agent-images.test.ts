@@ -114,31 +114,34 @@ function workspaceFrame() {
 it.runIf(
   !!resources && (process.platform === "darwin" || process.platform === "linux")
 )(
-  "queues exact selected PNG bytes through a built Responses child",
+  "keeps distinct PNG inputs in one chat and reads their receipts after a model change",
   async () => {
     const root = fs.mkdtempSync(
       path.join(fs.realpathSync(os.tmpdir()), "grida-native-png-")
     );
     const cwd = path.join(root, "workspace");
+    const stateDirectory = path.join(root, "state");
     fs.mkdirSync(cwd, { mode: 0o700 });
     const fixture = await syntheticResponses();
     const { origin, sender, event } = workspaceFrame();
     let chat: NativeAgentChat | undefined;
     try {
-      chat = await NativeAgentChat.start({
-        resourcesPath: resources!,
-        stateDirectory: path.join(root, "state"),
-        cwd,
-        provider: "responses",
-        endpoint: fixture.endpoint,
-        model: "gpt-5.4",
-      });
+      const start = (model: string) =>
+        NativeAgentChat.start({
+          resourcesPath: resources!,
+          stateDirectory,
+          cwd,
+          provider: "responses",
+          endpoint: fixture.endpoint,
+          model,
+        });
+      chat = await start("gpt-5.4");
       const active = { workspaceId: "workspace", chat };
       const ipc = new NativeChatIpc(origin, (candidate) =>
         candidate === sender ? active : null
       );
       expect(ipc.acceptsPng(event)).toBe(true);
-      const { attachmentId } = await ipc.create(event);
+      const { attachmentId, sessionId } = await ipc.create(event);
       const input: NativeChatImageInput = {
         action: "enqueue",
         inputId: "chosen-png",
@@ -168,6 +171,12 @@ it.runIf(
         })
       ).rejects.toThrow("invalid_png_image");
       expect(fixture.requests).toEqual([]);
+      await expect(
+        ipc.inputReceipt(event, attachmentId, input.inputId)
+      ).rejects.toThrow("input_unavailable");
+      expect(fs.existsSync(path.join(stateDirectory, "retained-inputs"))).toBe(
+        false
+      );
 
       await ipc.submit(
         event,
@@ -240,22 +249,96 @@ it.runIf(
       expect(
         JSON.stringify(await ipc.transcript(event, attachmentId))
       ).toContain("[Retained PNG image]");
-      const newChat = await ipc.create(event);
-      const direct = await ipc.submitImage(event, newChat.attachmentId, {
+      const next: NativeChatImageInput = {
         ...input,
         action: "submit",
+        inputId: "next-png",
+        text: "Describe the next PNG.",
         png: Uint8Array.from(Buffer.from(OTHER_PNG, "base64")).buffer,
-      });
+      };
+      const direct = await ipc.submitImage(event, attachmentId, next);
       expect(direct.disposition).toBe("claimed");
-      await vi.waitFor(() => expect(fixture.requests).toHaveLength(3));
-      expect(JSON.stringify(fixture.requests[2])).toContain(
-        `data:image/png;base64,${OTHER_PNG}`
+      await vi.waitFor(
+        async () => {
+          if (fixture.requests.length === 3) return;
+          const observed = await ipc.observe(event, attachmentId);
+          const summary =
+            observed.snapshot.latest?.turnId === direct.turnId &&
+            observed.snapshot.latest?.disposition === "settled"
+              ? await ipc.turnSummary(
+                  event,
+                  attachmentId,
+                  observed.observationId
+                )
+              : null;
+          throw new Error(
+            `Second PNG request not observed: ${JSON.stringify({ snapshot: observed.snapshot, summary })}`
+          );
+        },
+        { timeout: 12_000 }
       );
+      for (const [message, png] of [
+        [input.text, PNG],
+        [next.text, OTHER_PNG],
+      ]) {
+        expect(fixture.requests[2]).toMatchObject({
+          input: expect.arrayContaining([
+            expect.objectContaining({
+              role: "user",
+              content: [
+                { type: "input_text", text: message },
+                {
+                  type: "input_image",
+                  image_url: `data:image/png;base64,${png}`,
+                  detail: "auto",
+                },
+              ],
+            }),
+          ]),
+        });
+      }
       await vi.waitFor(async () => {
         expect(
-          (await ipc.observe(event, newChat.attachmentId)).snapshot.latest
+          (await ipc.observe(event, attachmentId)).snapshot.latest
         ).toMatchObject({ turnId: direct.turnId, status: "succeeded" });
       });
+      const firstReceipt = await ipc.inputReceipt(
+        event,
+        attachmentId,
+        input.inputId
+      );
+      const secondReceipt = await ipc.inputReceipt(
+        event,
+        attachmentId,
+        next.inputId
+      );
+      expect(secondReceipt.turnId).not.toBe(firstReceipt.turnId);
+
+      await chat.close();
+      chat = await start("gpt-5.4-mini");
+      const activeText = { workspaceId: "workspace", chat };
+      const textOnly = new NativeChatIpc(origin, (candidate) =>
+        candidate === sender ? activeText : null
+      );
+      expect(textOnly.acceptsPng(event)).toBe(false);
+      const reopened = await textOnly.load(event, sessionId);
+      expect(
+        await textOnly.inputReceipt(event, reopened.attachmentId, input.inputId)
+      ).toEqual(firstReceipt);
+      expect(
+        await textOnly.inputReceipt(event, reopened.attachmentId, next.inputId)
+      ).toEqual(secondReceipt);
+      const invalid = { ...next, inputId: "unsupported-png" };
+      await expect(
+        textOnly.submitImage(event, reopened.attachmentId, invalid)
+      ).rejects.toThrow("image_input_unavailable");
+      await expect(
+        textOnly.inputReceipt(event, reopened.attachmentId, invalid.inputId)
+      ).rejects.toThrow("input_unavailable");
+      expect(
+        (await textOnly.observe(event, reopened.attachmentId)).snapshot
+      ).toMatchObject({ current: null, queuedInputs: 0 });
+      expect(fixture.requests).toHaveLength(3);
     } finally {
       try {
         await chat?.close();

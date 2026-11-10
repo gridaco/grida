@@ -74,7 +74,7 @@ export type NativeChatView = Readonly<{
   subagents: NativeSubagentController | null;
   imageInput: boolean;
   imageReading: boolean;
-  imageDraft: Readonly<{ name: string; size: number }> | null;
+  imageDraft: Readonly<{ name: string; size: number; error?: string }> | null;
   wakeupsAvailable: boolean;
   allowWakeup: boolean;
   scheduledWakeup: NativeChatWakeup | null;
@@ -119,6 +119,7 @@ type Scope = {
   subagents?: NativeSubagentController;
   image?: ArrayBuffer;
   imageRead?: object;
+  imageCapabilityRead?: object;
   wakeupRead?: { observationId: string };
   wakeupSettled?: string;
   pendingWakeupContinue?: NativeChatControl;
@@ -425,15 +426,16 @@ export class NativeChatController {
       repairing: false,
       error: null,
     });
-    void this.readImageCapability(scope);
     void this.readEffortCapability(scope);
     void this.readWakeupCapability(scope);
     if (sessionId === null) {
+      void this.readImageCapability(scope);
       this.save();
       return;
     }
     try {
       await this.open(scope);
+      await this.readImageCapability(scope);
       await this.refresh(scope);
     } catch (error) {
       if (this.owns(scope)) {
@@ -455,7 +457,10 @@ export class NativeChatController {
       !this.view.revisionDraft &&
       !this.view.revisionSubmitting &&
       !this.view.imageReading &&
-      (!this.scope.image || this.view.imageInput) &&
+      !this.view.imageDraft?.error &&
+      (!this.scope.image ||
+        this.view.imageInput ||
+        this.scope.pending?.image === this.scope.image) &&
       (this.view.steering
         ? this.canSteer &&
           this.scope.steeringTarget ===
@@ -486,6 +491,7 @@ export class NativeChatController {
     if (!scope || scope.id !== scopeId || !this.canAttachPng) return;
     const read = {};
     scope.imageRead = read;
+    const draft = { name: file.name.slice(0, 256), size: file.size };
     this.update({ imageReading: true, error: null });
     const ownsRead = () => this.owns(scope) && scope.imageRead === read;
     try {
@@ -494,22 +500,26 @@ export class NativeChatController {
       const bytes = await file.arrayBuffer();
       if (!ownsRead()) return;
       if (bytes.byteLength !== file.size) throw new Error("invalid_png_image");
-      const previous = scope.image && new Uint8Array(scope.image);
+      const original = scope.image ?? scope.pending?.image;
+      const previous = original && new Uint8Array(original);
       if (
         previous?.byteLength !== bytes.byteLength ||
         !new Uint8Array(bytes).every((byte, index) => byte === previous[index])
       ) {
         scope.image = bytes;
         if (scope.pending?.image) scope.pending = undefined;
-      }
-      this.update({
-        imageDraft: { name: file.name.slice(0, 256), size: bytes.byteLength },
-      });
+      } else scope.image = original;
+      this.update({ imageDraft: draft });
     } catch (error) {
-      if (ownsRead())
+      if (ownsRead()) {
+        scope.image = undefined;
         this.update({
-          error: describe(error, "Couldn't read the selected PNG."),
+          imageDraft: {
+            ...draft,
+            error: describe(error, "Couldn't read the selected PNG."),
+          },
         });
+      }
     } finally {
       if (ownsRead()) {
         scope.imageRead = undefined;
@@ -527,10 +537,21 @@ export class NativeChatController {
     this.update({ imageDraft: null, imageReading: false, error: null });
   }
 
-  private async readImageCapability(scope: Scope): Promise<void> {
-    if (!this.bridge.acceptsPng || !this.bridge.submitImage) return;
-    const supported = await this.bridge.acceptsPng().catch(() => false);
-    if (this.owns(scope)) this.update({ imageInput: supported === true });
+  private async readImageCapability(scope: Scope): Promise<boolean> {
+    if (!this.bridge.acceptsPng || !this.bridge.submitImage) return false;
+    const attachment = scope.attachment;
+    const read = {};
+    scope.imageCapabilityRead = read;
+    const supported =
+      (await this.bridge.acceptsPng().catch(() => false)) === true;
+    if (
+      !this.owns(scope) ||
+      scope.attachment !== attachment ||
+      scope.imageCapabilityRead !== read
+    )
+      return false;
+    this.update({ imageInput: supported });
+    return supported;
   }
 
   private async readEffortCapability(scope: Scope): Promise<void> {
@@ -572,7 +593,7 @@ export class NativeChatController {
       !this.view.commandRunning &&
       !this.view.steering &&
       !this.view.reviewConfiguration &&
-      !this.scope.image &&
+      !this.view.imageDraft &&
       !this.scope.imageRead &&
       (!this.needsQueue || this.scope.pending?.allowWakeup === true)
     );
@@ -597,7 +618,7 @@ export class NativeChatController {
       !this.view.steering &&
       !this.view.acting &&
       !this.view.allowWakeup &&
-      !this.scope.image &&
+      !this.view.imageDraft &&
       !this.scope.imageRead
     );
   }
@@ -966,7 +987,7 @@ export class NativeChatController {
     const turn = this.view.observation?.snapshot.current;
     return (
       !!this.bridge.steer &&
-      !this.scope?.image &&
+      !this.view.imageDraft &&
       !this.scope?.imageRead &&
       !this.view.reviewConfiguration &&
       !this.view.allowWakeup &&
@@ -1241,9 +1262,12 @@ export class NativeChatController {
         allowWakeup,
         editorSvgTargetId: scope.stopEditorSvgText ? svgTarget : undefined,
       };
-      scope.pending = pending;
       let accepted;
       try {
+        if (pending.image && !(await this.readImageCapability(scope)))
+          throw new Error("image_input_unavailable");
+        this.attachment(scope);
+        scope.pending = pending;
         if (pending.allowWakeup) {
           if (!this.bridge.submitWithWakeup || !this.view.wakeupsAvailable)
             throw new Error("native_chat_wakeup_unavailable");
@@ -1305,8 +1329,13 @@ export class NativeChatController {
         }
       } catch (error) {
         this.attachment(scope);
-        if (pending.reviewConfiguration || pending.allowWakeup) throw error;
-        // A lost acknowledgement does not authorize sending a second input.
+        if (
+          scope.pending !== pending ||
+          pending.reviewConfiguration ||
+          pending.allowWakeup
+        )
+          throw error;
+        // Recover an earlier receipt without authorizing an unsupported resend.
         accepted = await this.bridge
           .inputReceipt(attachment.attachmentId, pending.inputId)
           .catch(() => {
@@ -1339,6 +1368,13 @@ export class NativeChatController {
       )
         scope.pending = undefined;
       if (this.owns(scope)) {
+        if (
+          image &&
+          this.view.imageInput &&
+          error instanceof Error &&
+          error.message.includes("image_input_unavailable")
+        )
+          void this.readImageCapability(scope);
         this.update({
           ...(reviewDeclined && { reviewConfiguration: false }),
           error: describe(
@@ -1370,7 +1406,7 @@ export class NativeChatController {
     }
     if (this.view.commandRunning || this.view.acting)
       throw new Error("native_chat_command_in_progress");
-    if (scope.image || this.view.imageReading) {
+    if (this.view.imageDraft || this.view.imageReading) {
       this.update({
         error: "Remove the pending PNG before using a chat command.",
       });
@@ -1857,7 +1893,6 @@ export class NativeChatController {
     const scope = this.scope;
     if (!scope || (!scope.attachment && !scope.requested)) return;
     scope.replay = true;
-    void this.readImageCapability(scope);
     void this.readEffortCapability(scope);
     scope.wakeupSettled = undefined;
     void this.readWakeupCapability(scope);
@@ -1865,6 +1900,7 @@ export class NativeChatController {
     this.update({ error: null });
     try {
       await this.open(scope);
+      await this.readImageCapability(scope);
       await this.refresh(scope);
     } catch (error) {
       if (this.owns(scope))

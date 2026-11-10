@@ -774,6 +774,12 @@ export function NativeAgentPane({
             </Button>
           </div>
         )}
+        {state.imageDraft && (state.imageDraft.error || !state.imageInput) && (
+          <p role="status" className="text-muted-foreground px-1 pb-1 text-xs">
+            {state.imageDraft.error ??
+              "This connection cannot use the attached PNG. Remove it from this draft or use a compatible connection."}
+          </p>
+        )}
         {(state.commandRunning || state.commandNotice) && (
           <div className="flex items-center gap-2 px-1 pb-1 text-xs">
             <span role="status">
