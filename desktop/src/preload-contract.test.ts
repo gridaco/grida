@@ -65,6 +65,9 @@ describe("Desktop preload agent seam", () => {
       "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_READ, id)"
     );
     expect(preloadSource).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_SAVE_COPY, id)"
+    );
+    expect(preloadSource).toContain(
       "ipcRenderer.invoke(IPC_CHANNELS.MEDIA_REVEAL, id)"
     );
     expect(preloadSource).toContain(

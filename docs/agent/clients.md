@@ -448,6 +448,8 @@ offer text input.
 
 ## Read a turn summary
 
+For the Desktop export workflow, see [Inspect and save results](./results.md).
+
 In the native Desktop workspace pane, open **Turn summary** below the latest
 finished turn when it has additional details. It can show recorded tool
 outcomes, completion checks, and unresolved work. A simple reply serves as

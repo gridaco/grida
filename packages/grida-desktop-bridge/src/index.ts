@@ -236,6 +236,8 @@ export type DesktopMediaReadResult = {
   bytes: ArrayBuffer;
 };
 
+export type DesktopMediaSaveCopyResult = "saved" | "cancelled" | "failed";
+
 export type DesktopBridge = {
   protocol: typeof DESKTOP_BRIDGE_PROTOCOL;
   app: { version: string; platform: string };
@@ -306,6 +308,7 @@ export type DesktopBridge = {
   media?: {
     list: () => Promise<MediaItem[]>;
     read: (id: string) => Promise<DesktopMediaReadResult>;
+    save_copy?: (id: string) => Promise<DesktopMediaSaveCopyResult>;
     reveal: (id: string) => Promise<void>;
     open_folder: () => Promise<void>;
   };

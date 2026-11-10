@@ -72,6 +72,7 @@ import type {
   DesktopBridge,
   ChatGptConnectResult,
   DesktopMediaReadResult,
+  DesktopMediaSaveCopyResult,
   DesktopHostAppId,
   DesktopHostAppInfo,
   MediaItem,
@@ -770,6 +771,10 @@ export namespace mediaLibrary {
     return getDesktopBridge()?.media != null;
   }
 
+  export function canSaveCopy(): boolean {
+    return typeof getDesktopBridge()?.media?.save_copy === "function";
+  }
+
   export async function list(): Promise<MediaItem[]> {
     const bridge = bridgeOrThrow().media;
     if (!bridge) throw new DesktopBridgeMissingError();
@@ -780,6 +785,14 @@ export namespace mediaLibrary {
     const bridge = bridgeOrThrow().media;
     if (!bridge) throw new DesktopBridgeMissingError();
     return await bridge.read(id);
+  }
+
+  export async function saveCopy(
+    id: string
+  ): Promise<DesktopMediaSaveCopyResult> {
+    const bridge = bridgeOrThrow().media;
+    if (!bridge?.save_copy) throw new DesktopBridgeMissingError();
+    return await bridge.save_copy(id);
   }
 
   export async function reveal(id: string): Promise<void> {

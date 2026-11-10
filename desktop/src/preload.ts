@@ -750,6 +750,7 @@ const bridge: DesktopBridge = {
   media: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.MEDIA_LIST),
     read: (id) => ipcRenderer.invoke(IPC_CHANNELS.MEDIA_READ, id),
+    save_copy: (id) => ipcRenderer.invoke(IPC_CHANNELS.MEDIA_SAVE_COPY, id),
     reveal: async (id) => {
       await ipcRenderer.invoke(IPC_CHANNELS.MEDIA_REVEAL, id);
     },

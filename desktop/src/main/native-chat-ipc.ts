@@ -51,7 +51,7 @@ import {
 } from "./native-agent-configuration";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
-import { NativeAgentArtifactSave } from "./native-agent-artifact-save";
+import { RetainedFileExport } from "./retained-file-export";
 
 const MAX_ATTACHMENTS = 16;
 const MAX_OBSERVATIONS = 16;
@@ -260,7 +260,7 @@ export class NativeChatIpc {
       if (this.startups.get(sender) === pending) this.startups.delete(sender);
       stopWatching();
     };
-    const stopWatching = watchNavigation(sender, release);
+    const stopWatching = ipc_sender.watchNavigation(sender, release);
     const pending: Startup = {
       frame,
       workspaceId,
@@ -1061,9 +1061,10 @@ export class NativeChatIpc {
       if (destination === null) return "cancelled";
       const bytes = await read();
       try {
-        await NativeAgentArtifactSave.publish(
+        await RetainedFileExport.publish(
           destination,
-          bytes,
+          ".png",
+          new Uint8Array(bytes),
           requireCurrent
         );
         return "saved";
@@ -1574,7 +1575,7 @@ export class NativeChatIpc {
       },
     };
     this.owners.set(sender, owner);
-    const stopWatching = watchNavigation(sender, owner.release);
+    const stopWatching = ipc_sender.watchNavigation(sender, owner.release);
     return owner;
   }
 
@@ -1723,27 +1724,6 @@ export class NativeChatIpc {
     const [id, duplicate] = url.searchParams.getAll("id");
     return id && id.length <= 1024 && duplicate === undefined ? id : null;
   }
-}
-
-function watchNavigation(sender: WebContents, release: () => void): () => void {
-  const navigating = (details: { isMainFrame: boolean }) => {
-    if (details.isMainFrame) release();
-  };
-  const inPage = (_event: unknown, _url: string, isMainFrame: boolean) => {
-    if (isMainFrame) release();
-  };
-  sender.on("did-start-navigation", navigating);
-  sender.on("did-navigate-in-page", inPage);
-  sender.on("did-navigate", release);
-  sender.once("destroyed", release);
-  sender.once("render-process-gone", release);
-  return () => {
-    sender.off("did-start-navigation", navigating);
-    sender.off("did-navigate-in-page", inPage);
-    sender.off("did-navigate", release);
-    sender.off("destroyed", release);
-    sender.off("render-process-gone", release);
-  };
 }
 
 function sameActive(

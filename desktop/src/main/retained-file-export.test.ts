@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
-import { NativeAgentArtifactSave } from "./native-agent-artifact-save";
+import { RetainedFileExport } from "./retained-file-export";
 
 it("checks current scope after staging and does not leave a partial export", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "grida-save-"));
@@ -14,7 +14,12 @@ it("checks current scope after staging and does not leave a partial export", asy
     });
     requireCurrent.mockImplementationOnce(() => {});
     await expect(
-      NativeAgentArtifactSave.publish(destination, bytes, requireCurrent)
+      RetainedFileExport.publish(
+        destination,
+        ".png",
+        new Uint8Array(bytes),
+        requireCurrent
+      )
     ).rejects.toThrow("scope_changed");
     expect(requireCurrent).toHaveBeenCalledTimes(2);
     expect(await fs.readdir(directory)).toEqual([]);

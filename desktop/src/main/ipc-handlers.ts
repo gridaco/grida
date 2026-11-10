@@ -666,6 +666,43 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   // resolves opaque ids and keeps every native path on this side of IPC.
   guarded(IPC_CHANNELS.MEDIA_LIST, () => mediaHost.list());
   guarded(IPC_CHANNELS.MEDIA_READ, (_event, id: string) => mediaHost.read(id));
+  guarded(IPC_CHANNELS.MEDIA_SAVE_COPY, (event, id: unknown) => {
+    const { sender, senderFrame: frame } = event;
+    const window = admittedWindow(sender);
+    if (!window || !frame || typeof id !== "string")
+      throw new Error("media-save-copy-unavailable");
+    let revoked = false;
+    const requireCurrent = () => {
+      if (
+        revoked ||
+        sender.isDestroyed() ||
+        sender.isLoadingMainFrame() ||
+        frame !== sender.mainFrame ||
+        admittedWindow(sender) !== window ||
+        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        ipc_sender.pathname(frame.url) !== "/desktop/tools"
+      )
+        throw new Error("media-save-copy-unavailable");
+    };
+    requireCurrent();
+    const unwatch = ipc_sender.watchNavigation(sender, () => {
+      revoked = true;
+    });
+    return mediaHost
+      .saveCopy(
+        id,
+        async (fileName, extension) => {
+          const result = await dialog.showSaveDialog(window, {
+            title: "Save a copy",
+            defaultPath: fileName,
+            filters: [{ name: "Media file", extensions: [extension.slice(1)] }],
+          });
+          return result.canceled || !result.filePath ? null : result.filePath;
+        },
+        requireCurrent
+      )
+      .finally(unwatch);
+  });
   guarded(IPC_CHANNELS.MEDIA_REVEAL, async (_event, id: string) => {
     await mediaHost.reveal(id);
   });

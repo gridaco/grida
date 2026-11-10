@@ -4,29 +4,35 @@ import { linkSync, type BigIntStats } from "node:fs";
 import { lstat, open, realpath, unlink } from "node:fs/promises";
 import path from "node:path";
 
-export class NativeAgentArtifactSave {
+export class RetainedFileExport {
+  static extension(fileName: string): string | null {
+    const extension = path.extname(fileName).toLowerCase();
+    return /^\.[a-z0-9]{1,8}$/.test(extension) ? extension : null;
+  }
+
   static async publish(
     destination: string,
-    bytes: ArrayBuffer,
+    extension: string,
+    bytes: Uint8Array,
     requireCurrent: () => void
   ): Promise<void> {
     const name = path.basename(destination);
     if (
       !path.isAbsolute(destination) ||
-      path.extname(name).toLowerCase() !== ".png" ||
+      this.extension(name) !== extension ||
       /[<>:"/\\|?*]/.test(name)
     )
-      throw new Error("native_chat_artifact_destination_invalid");
+      throw new Error("retained_file_destination_invalid");
 
     const directory = await realpath(path.dirname(destination));
     const identity = await lstat(directory, { bigint: true });
     if (!identity.isDirectory())
-      throw new Error("native_chat_artifact_destination_invalid");
-    const staged = path.join(directory, `.grida-crop-${randomUUID()}.tmp`);
+      throw new Error("retained_file_destination_invalid");
+    const staged = path.join(directory, `.grida-export-${randomUUID()}.tmp`);
     requireCurrent();
     const file = await open(staged, "wx", 0o600);
     try {
-      await file.writeFile(new Uint8Array(bytes));
+      await file.writeFile(bytes);
       await file.sync();
       const [currentDirectory, currentFile, openedFile] = await Promise.all([
         lstat(directory, { bigint: true }),
@@ -39,7 +45,7 @@ export class NativeAgentArtifactSave {
         !currentFile.isFile() ||
         !sameFile(openedFile, currentFile)
       )
-        throw new Error("native_chat_artifact_destination_changed");
+        throw new Error("retained_file_destination_changed");
 
       // No renderer navigation can interleave with the final scope check.
       requireCurrent();

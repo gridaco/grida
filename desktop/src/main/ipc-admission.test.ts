@@ -73,6 +73,7 @@ describe("ipc_admission", () => {
     const mediaChannels = [
       IPC_CHANNELS.MEDIA_LIST,
       IPC_CHANNELS.MEDIA_READ,
+      IPC_CHANNELS.MEDIA_SAVE_COPY,
       IPC_CHANNELS.MEDIA_REVEAL,
       IPC_CHANNELS.MEDIA_OPEN_FOLDER,
     ];

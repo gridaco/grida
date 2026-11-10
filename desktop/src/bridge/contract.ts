@@ -120,6 +120,7 @@ export const IPC_CHANNELS = {
   SHELL_SHOW_ITEM_IN_FOLDER: "grida:shell:show-item-in-folder",
   MEDIA_LIST: "grida:media:list",
   MEDIA_READ: "grida:media:read",
+  MEDIA_SAVE_COPY: "grida:media:save-copy",
   MEDIA_REVEAL: "grida:media:reveal",
   MEDIA_OPEN_FOLDER: "grida:media:open-folder",
   HOST_APPS_RESOLVE_PREFERRED: "grida:host-apps:resolve-preferred",

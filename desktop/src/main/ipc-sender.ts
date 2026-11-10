@@ -6,6 +6,7 @@
  * pathname.
  */
 import { URL } from "node:url";
+import type { WebContents } from "electron";
 
 export namespace ipc_sender {
   export function isAllowed(
@@ -29,6 +30,31 @@ export namespace ipc_sender {
       return `<${url.protocol.slice(0, -1)} URL>`;
     }
     return `${url.origin}${url.pathname}`;
+  }
+
+  /** Revoke a retained main-frame capability on navigation or teardown. */
+  export function watchNavigation(
+    sender: WebContents,
+    revoke: () => void
+  ): () => void {
+    const navigating = (details: { isMainFrame: boolean }) => {
+      if (details.isMainFrame) revoke();
+    };
+    const inPage = (_event: unknown, _url: string, isMainFrame: boolean) => {
+      if (isMainFrame) revoke();
+    };
+    sender.on("did-start-navigation", navigating);
+    sender.on("did-navigate-in-page", inPage);
+    sender.on("did-navigate", revoke);
+    sender.once("destroyed", revoke);
+    sender.once("render-process-gone", revoke);
+    return () => {
+      sender.off("did-start-navigation", navigating);
+      sender.off("did-navigate-in-page", inPage);
+      sender.off("did-navigate", revoke);
+      sender.off("destroyed", revoke);
+      sender.off("render-process-gone", revoke);
+    };
   }
 }
 

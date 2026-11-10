@@ -19,6 +19,7 @@ import { AgentNetworkAuthority } from "../main/agent-network-authority";
 import { AgentDaemonSocketHost } from "../main/agent-daemon-socket-host";
 import { LegacyChatArchive } from "../main/legacy-chat-archive";
 import { LegacyChatSourceLease } from "../main/legacy-chat-source-lease";
+import { DesktopMediaHost } from "../main/media-host";
 import { RetainedMediaLaunch } from "../main/retained-media-launch";
 
 const desktop = fileURLToPath(new URL("../..", import.meta.url));
@@ -73,7 +74,7 @@ describe.skipIf(
     }
   });
 
-  it("serves media and provider settings over the existing private handles", async () => {
+  it("serves media over private handles and retries export after sidecar shutdown", async () => {
     const scope = await packagedScope();
     let active: Sidecar | undefined;
     try {
@@ -132,10 +133,17 @@ describe.skipIf(
         prompt: "A door closes",
       });
       expect(sfx.status).toBe(200);
-      await expectReceipt(scope.options.media, (await sfx.json()).stored_media);
+      const generated = await sfx.json();
+      await expectReceipt(scope.options.media, generated.stored_media);
       expect(providerRequests).toBe(1);
       await active.stop();
       active = undefined;
+      await expectExportRetry(
+        scope.root,
+        scope.options.media,
+        generated.stored_media
+      );
+      expect(providerRequests).toBe(1);
       expect(
         JSON.parse(
           await fs.readFile(
@@ -475,6 +483,8 @@ describe("built Desktop media startup", () => {
         })
       );
       await expectReceipt(mediaRoot, generated.stored_media);
+      await expectExportRetry(root, mediaRoot, generated.stored_media);
+      expect(verified).toEqual(["sfx"]);
       expect(
         (
           await active.post("/auth/gg/set", {
@@ -990,4 +1000,48 @@ async function expectReceipt(
     path.join(root, "items", item.id, "content", item.file_name)
   );
   expect(bytes).toEqual(audio);
+}
+
+async function expectExportRetry(
+  root: string,
+  mediaRoot: string,
+  item: { id: string; file_name: string }
+) {
+  const occupied = path.join(root, "occupied.mp3");
+  const destination = path.join(root, "saved.mp3");
+  const sentinel = Buffer.from("existing user file");
+  await fs.writeFile(occupied, sentinel, { mode: 0o600 });
+
+  const openMedia = () =>
+    new DesktopMediaHost({
+      root: mediaRoot,
+      reveal: () => undefined,
+      openFolder: () => undefined,
+    });
+  const requireCurrent = () => undefined;
+  type ChooseDestination = Parameters<DesktopMediaHost["saveCopy"]>[1];
+  const chooseOccupied = vi.fn<ChooseDestination>().mockResolvedValue(occupied);
+  await expect(
+    openMedia().saveCopy(item.id, chooseOccupied, requireCurrent)
+  ).resolves.toBe("failed");
+  expect(chooseOccupied).toHaveBeenCalledExactlyOnceWith(
+    "sound-effect.mp3",
+    ".mp3"
+  );
+  expect(await fs.readFile(occupied)).toEqual(sentinel);
+
+  const reopened = openMedia();
+  await expect(reopened.list()).resolves.toContainEqual(item);
+  const chooseDestination = vi
+    .fn<ChooseDestination>()
+    .mockResolvedValue(destination);
+  await expect(
+    reopened.saveCopy(item.id, chooseDestination, requireCurrent)
+  ).resolves.toBe("saved");
+  expect(chooseDestination).toHaveBeenCalledExactlyOnceWith(
+    "sound-effect.mp3",
+    ".mp3"
+  );
+  expect(await fs.readFile(destination)).toEqual(audio);
+  expect(await fs.readFile(occupied)).toEqual(sentinel);
 }
