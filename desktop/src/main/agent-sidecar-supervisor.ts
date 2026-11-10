@@ -49,6 +49,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { home } from "@grida/home";
+import { ProtectedRoots } from "@grida/daemon/server";
 import { SidecarLogWriter } from "./sidecar-log";
 import { EDITOR_BASE_URL } from "../env";
 import { AgentNetworkAuthority } from "./agent-network-authority";
@@ -113,6 +114,7 @@ export class AgentSidecarSupervisor {
   private legacyLaunchStarted = false;
   private ownedLegacy?: OwnedLegacyGeneration;
   private coldStartSource?: Promise<LegacyChatSource>;
+  private ordinaryNativeChat = false;
   private retainedMedia?: RetainedMediaScope;
   private completedMediaArchive?: Readonly<{ id: string; directory: string }>;
   private retiringMedia?: Promise<void>;
@@ -401,16 +403,20 @@ export class AgentSidecarSupervisor {
   }
 
   /** Select the media-only composition before the old writer can be started. */
-  async sealLegacyChatForColdStart(): Promise<LegacyChatSource> {
+  async sealLegacyChatForColdStart(
+    ordinary = false
+  ): Promise<LegacyChatSource> {
     if (
       !app.hasSingleInstanceLock() ||
       NativeDesktopProfile.mediaOnly() ||
+      (this.coldStartSource && ordinary !== this.ordinaryNativeChat) ||
       this.legacyLaunchStarted ||
       this.isShuttingDown
     ) {
       throw new Error("legacy_chat_cold_start_required");
     }
     this.agentEnabled = false;
+    this.ordinaryNativeChat = ordinary;
     return (this.coldStartSource ??= this.captureCutoverSource());
   }
 
@@ -731,13 +737,36 @@ export class AgentSidecarSupervisor {
       this.legacyStateRoots = [...this.legacyStateRoots, ...custody];
       legacyPolicyRoots = [...legacyPolicyRoots, ...custody];
     }
+    if (this.ordinaryNativeChat && coldSource) {
+      const protectedChat = new ProtectedRoots([
+        coldSource.scratchBase,
+        ...[
+          "sessions.db",
+          "sessions.db-wal",
+          "sessions.db-shm",
+          "sessions.db-journal",
+          "chat-archive",
+          "legacy-chat-ownership",
+        ].map((name) => path.join(coldSource.userDataPath, name)),
+      ]);
+      this.legacyStateRoots = protectedChat.canonicalPaths();
+      legacyPolicyRoots = [
+        ...protectedChat.metadataPaths(),
+        ...this.legacyStateRoots,
+      ];
+    }
     const policy = DesktopAgentSandboxPolicy.build({
       userData: this.user_data_path,
       providerRoot: path.join(this.provider_home, "providers"),
       mediaRoot: this.media_root,
       desktopStateRoot:
         this.ownedLegacy?.desktopUserDataPath ??
-        coldSource?.desktopUserDataPath,
+        (this.ordinaryNativeChat && coldSource
+          ? path.join(
+              coldSource.desktopUserDataPath,
+              NativeDesktopProfile.chatStateDirectory
+            )
+          : coldSource?.desktopUserDataPath),
       legacyStateRoots: legacyPolicyRoots,
       workspaceCatalogRoot: this.workspaceCatalog
         ? path.dirname(this.workspaceCatalog)
@@ -882,6 +911,7 @@ export class AgentSidecarSupervisor {
       `--provider-home=${this.provider_home}`,
       `--media-root=${this.media_root}`,
       `--agent=${mode}`,
+      ...(this.ordinaryNativeChat ? ["--ordinary-native-chat-services=1"] : []),
       ...(this.ownedLegacy ? ["--owned-legacy-writer=1"] : []),
       ...(this.workspaceCatalog
         ? [`--workspace-catalog=${this.workspaceCatalog}`]
@@ -1274,8 +1304,8 @@ export function startOwnedLegacyWriter(): Promise<OwnedLegacyWriter> {
   return sidecar().startOwnedLegacyWriter();
 }
 
-export function sealLegacyChatForColdStart() {
-  return sidecar().sealLegacyChatForColdStart();
+export function sealLegacyChatForColdStart(ordinary = false) {
+  return sidecar().sealLegacyChatForColdStart(ordinary);
 }
 
 export function getAgentSidecarInfo(): AgentSidecarInfo | null {

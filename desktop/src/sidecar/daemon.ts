@@ -17,6 +17,7 @@ export namespace DesktopDaemon {
     prepare_provider_custody?: () => Promise<void>;
     media_root: string;
     retained_media_scope?: boolean;
+    ordinary_native_chat_services?: boolean;
     workspace_catalog?: string;
     protected_file_roots?: readonly string[];
     projects_root?: string;
@@ -49,6 +50,13 @@ export namespace DesktopDaemon {
     if (opts.retained_media_scope && typeof agent === "object") {
       throw new Error("retained_media_scope_invalid");
     }
+    if (
+      opts.ordinary_native_chat_services &&
+      (agent !== "native-chat" ||
+        opts.retained_media_scope ||
+        opts.workspace_catalog)
+    )
+      throw new Error("ordinary_native_chat_services_invalid");
     if (
       Boolean(opts.prepare_provider_custody) !==
       Boolean(opts.retained_media_scope)
@@ -88,7 +96,7 @@ export namespace DesktopDaemon {
               ...shared,
               endpoint_settings: opts.agent === "native-chat",
               capabilities: {
-                recent: false,
+                recent: opts.ordinary_native_chat_services === true,
                 ...(opts.workspace_catalog ? { workspaces: false } : undefined),
                 ...(opts.retained_media_scope
                   ? { files: false, workspaces: false }

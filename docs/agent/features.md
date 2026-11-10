@@ -19,8 +19,9 @@ a deliberate scope limit. **Open** marks a capability whose product behavior
 still needs a decision. Linked scenarios and tests record the evidence behind
 the described behavior. Release availability follows the named build and client.
 
-Where Desktop switches to the native runtime, it archives prior chat data and
-starts a fresh store. Native history features apply to chats created there.
+Native chats use a fresh store. On the ordinary macOS ARM64 path, previous
+chat data stays in place; a verified managed handoff can instead provide an
+archive. Native history features apply to chats created in the new store.
 
 ## Feature catalog
 

@@ -1,5 +1,10 @@
 // GRIDA-SEC-014 — explicit provider-root forwarding and host isolation.
 import { describe, expect, it } from "vitest";
+import { execFile } from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
 import { DesktopAgentSandboxPolicy } from "./agent-sandbox-policy";
 
 describe("DesktopAgentSandboxPolicy", () => {
@@ -64,4 +69,93 @@ describe("DesktopAgentSandboxPolicy", () => {
       })
     ).toThrow("native_desktop_legacy_state_path_not_literal");
   });
+
+  it.runIf(
+    process.platform === "darwin" &&
+      Boolean(process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES)
+  )(
+    "keeps Media nested in the ordinary browser root writable under Seatbelt",
+    async () => {
+      const root = await fs.mkdtemp(
+        path.join(await fs.realpath(os.tmpdir()), "grida-ordinary-seatbelt-")
+      );
+      const browser = path.join(root, "Application Support", "Grida");
+      const mediaRoot = path.join(browser, "Media");
+      const native = path.join(browser, "native-chat");
+      const agent = path.join(root, "agent");
+      const scratch = path.join(root, "scratch");
+      const legacy = path.join(agent, "sessions.db");
+      const { SandboxManager } = await import("@anthropic-ai/sandbox-runtime");
+      try {
+        await Promise.all(
+          [mediaRoot, native, agent, scratch].map((directory) =>
+            fs.mkdir(directory, { recursive: true })
+          )
+        );
+        const protectedFiles = [
+          path.join(native, "runtime.sqlite"),
+          legacy,
+          path.join(scratch, "input.png"),
+        ];
+        await Promise.all(
+          protectedFiles.map((file) => fs.writeFile(file, "retained"))
+        );
+        const output = path.join(mediaRoot, "new.bin");
+        const script = path.join(root, "probe.cjs");
+        await fs.writeFile(
+          script,
+          `
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          fs.writeFileSync(${JSON.stringify(output)}, 'new media');
+          assert.equal(fs.readFileSync(${JSON.stringify(output)}, 'utf8'), 'new media');
+          for (const file of ${JSON.stringify(protectedFiles)}) {
+            assert.throws(() => fs.readFileSync(file), { code: 'EPERM' });
+            assert.throws(() => fs.writeFileSync(file, 'changed'), { code: 'EPERM' });
+          }
+        `
+        );
+        const policy = DesktopAgentSandboxPolicy.build({
+          home: root,
+          userData: agent,
+          mediaRoot,
+          desktopStateRoot: native,
+          legacyStateRoots: [legacy, scratch],
+          ggHost: "grida.co",
+        });
+        await SandboxManager.initialize({
+          network: {
+            allowedDomains: [],
+            deniedDomains: [],
+            allowLocalBinding: false,
+          },
+          filesystem: {
+            denyRead: policy.filesystem.deny_read,
+            allowRead: policy.filesystem.allow_read,
+            denyWrite: policy.filesystem.deny_write,
+            allowWrite: policy.filesystem.allow_write,
+          },
+        });
+        const quote = (value: string) =>
+          "'" + value.replaceAll("'", "'\\''") + "'";
+        const { argv, env } = await SandboxManager.wrapWithSandboxArgv(
+          `${quote(process.execPath)} ${quote(script)}`
+        );
+        await promisify(execFile)(argv[0], argv.slice(1), {
+          env: { ...env, HOME: root, PATH: "/usr/bin:/bin" },
+          timeout: 5000,
+        });
+        expect(await fs.readFile(output, "utf8")).toBe("new media");
+        expect(
+          await Promise.all(
+            protectedFiles.map((file) => fs.readFile(file, "utf8"))
+          )
+        ).toEqual(["retained", "retained", "retained"]);
+      } finally {
+        await SandboxManager.reset();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    },
+    15_000
+  );
 });

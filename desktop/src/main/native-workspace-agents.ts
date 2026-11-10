@@ -13,6 +13,7 @@ const MAX_LIVE_WORKSPACES = 8;
 type Project =
   | (Pick<Workspace, "id" | "root"> & {
       identity?: WorkspaceDirectoryIdentity;
+      requireDirectoryCurrent?: () => void;
       nestedDeck?: {
         parentWorkspaceId: string;
         protectedPaths: readonly string[];
@@ -79,6 +80,11 @@ export class NativeWorkspaceAgents {
     if (this.stopping.signal.aborted) return null;
     const slot = this.slots.get(key);
     if (!slot || slot.stopping.signal.aborted) return null;
+    try {
+      if ("root" in slot.workspace) slot.workspace.requireDirectoryCurrent?.();
+    } catch {
+      return null;
+    }
     const active = slot.owner?.active;
     return active?.chat.connected ? active : null;
   }
@@ -89,6 +95,7 @@ export class NativeWorkspaceAgents {
   ): Promise<ActiveNativeChat> {
     if (this.stopping.signal.aborted) throw closing();
     const { id } = workspace;
+    if ("root" in workspace) workspace.requireDirectoryCurrent?.();
     const nested = "root" in workspace ? workspace.nestedDeck : undefined;
     if (nested && profile) throw new Error("native_chat_profiles_unavailable");
     if (
@@ -109,6 +116,8 @@ export class NativeWorkspaceAgents {
     const existing = this.slots.get(key);
     if (existing) {
       const chat = existing.owner?.active.chat;
+      if ("root" in existing.workspace)
+        existing.workspace.requireDirectoryCurrent?.();
       if (!sameProject(existing.workspace, workspace, chat?.hasExited ?? false))
         throw new Error("native_workspace_root_changed");
       if (!chat || chat.connected) return existing.visible;
@@ -222,6 +231,7 @@ export class NativeWorkspaceAgents {
   ) {
     if ("root" in workspace) {
       if (workspace.nestedDeck) await workspace.nestedDeck.requireCurrent();
+      workspace.requireDirectoryCurrent?.();
       const options = { ...launch, cwd: workspace.root };
       return profile
         ? this.cutover.startWorkspace(workspace.id, options, profile.id)

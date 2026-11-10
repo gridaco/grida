@@ -3,6 +3,7 @@ import { lstatSync, realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { App } from "electron";
+import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
 import { ProtectedRoots } from "@grida/daemon/server";
 import { home } from "@grida/home";
 import { isValidEndpointProviderId } from "@grida/agent";
@@ -10,6 +11,8 @@ import { defaultScratchBase } from "@grida/agent/sandbox";
 import { NativeFirstProfile } from "./native-first-profile";
 
 export namespace NativeDesktopProfile {
+  export const chatStateDirectory = "native-chat";
+
   export type Provider =
     | "gateway"
     | "chatgpt"
@@ -133,6 +136,41 @@ export namespace NativeDesktopProfile {
         (process.defaultApp === true ||
           (typeof INSIDERS !== "undefined" && INSIDERS === 1)))
     );
+  }
+
+  /** Ordinary Stable chat keeps the browser and non-chat service owners in place. */
+  export function ordinaryChat(app: HostApp, packagedStable: boolean): boolean {
+    return (
+      packagedStable &&
+      process.platform === "darwin" &&
+      process.arch === "arm64" &&
+      !first &&
+      !process.env.GRIDA_AGENT_USER_DATA &&
+      !app.commandLine.getSwitchValue("user-data-dir") &&
+      !process.argv.some(
+        (arg) =>
+          arg === "--disable-agent" ||
+          arg === "--native-chat" ||
+          arg.startsWith("--native-chat-") ||
+          arg === "--user-data-dir" ||
+          arg.startsWith("--user-data-dir=")
+      )
+    );
+  }
+
+  export function ordinaryChatProtectedPaths(app: HostApp): readonly string[] {
+    const userHome = app.getPath("home");
+    const { filesystem } = buildDaemonSandboxPolicy({
+      user_data: path.join(home.dir({ home: userHome }), "agent"),
+      home: userHome,
+    });
+    return [
+      ...filesystem.deny_read,
+      ...new ProtectedRoots(
+        legacyCandidates(app, realpathSync.native(app.getPath("temp")))
+      ).metadataPaths(),
+      ...(process.resourcesPath ? [path.dirname(process.resourcesPath)] : []),
+    ];
   }
 
   export function mediaRoot(): string | undefined {

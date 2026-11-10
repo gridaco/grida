@@ -7,6 +7,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import type { App, BrowserWindowConstructorOptions } from "electron";
+import { NativeDesktopProfile } from "./main/native-desktop-profile";
 
 const { browserWindowInstances } = vi.hoisted(() => ({
   browserWindowInstances: [] as Array<{
@@ -62,6 +63,7 @@ import {
   create_desktop_window,
   isAllowedNavigation,
   isSafeExternalUrl,
+  open_canvas_window,
   open_document_window,
   set_desktop_window_presentation,
 } from "./window";
@@ -85,6 +87,21 @@ it("offers a separate preload capability for native document chat", () => {
     "--grida-native-document=selected",
     "--grida-native-document-chat=selected",
   ]);
+});
+
+it("passes the ordinary workspace-only chat scope to a deck window", () => {
+  const selection = vi
+    .spyOn(NativeDesktopProfile, "ordinaryChat")
+    .mockReturnValueOnce(true);
+  const app = { getVersion: () => "1.0.0" } as App;
+  try {
+    open_canvas_window({ app, base_url: BASE, workspace_id: "workspace" });
+    expect(
+      browserWindowInstances.at(-1)?.options.webPreferences?.additionalArguments
+    ).toEqual(["--grida-version=1.0.0", "--grida-native-workspace-chat=1"]);
+  } finally {
+    selection.mockRestore();
+  }
 });
 
 describe("isAllowedNavigation", () => {

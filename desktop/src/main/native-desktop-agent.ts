@@ -1,11 +1,15 @@
 // GRIDA-SEC-004 / GRIDA-SEC-006 / GRIDA-SEC-008 — native Desktop composition.
 // GRIDA-GG: desktop — exact Gateway model and organization for each worker.
 import { randomUUID } from "node:crypto";
+import { lstatSync, realpathSync } from "node:fs";
 import { GG_PROVIDER_ID } from "@grida/agent";
 import { AGENT_DEFAULT_TIER } from "@grida/agent/tiers";
 import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import type { Workspace } from "@grida/daemon";
-import type { WorkspaceDirectoryIdentity } from "@grida/daemon/server";
+import {
+  ProtectedRoots,
+  type WorkspaceDirectoryIdentity,
+} from "@grida/daemon/server";
 import type { NativeChatProfileSelection } from "@grida/desktop-bridge";
 import { CHATGPT_SUBSCRIPTION_CONFIG } from "../chatgpt-configuration";
 import type { DesktopAccountSession } from "./account-session";
@@ -43,6 +47,7 @@ type Subscription = Readonly<{
 type SubscriptionSignOut = ReturnType<ChatGptOAuthCoordinator["signOut"]>;
 type SelectedWorkspace = Pick<Workspace, "id" | "root"> & {
   identity?: WorkspaceDirectoryIdentity;
+  requireDirectoryCurrent?: () => void;
 };
 type WorkspaceActivity = {
   captures: number;
@@ -100,7 +105,8 @@ export class NativeDesktopAgent {
     readonly selectableProfiles = false,
     private readonly onLifecycle?: LaunchOptions["onLifecycle"],
     private readonly imagePlacement?: LaunchOptions["imagePlacement"],
-    private readonly reviewImageReference?: LaunchOptions["reviewImageReference"]
+    private readonly reviewImageReference?: LaunchOptions["reviewImageReference"],
+    private readonly ordinaryWorkspaceChat = false
   ) {
     if (subscription) {
       const { oauth } = subscription;
@@ -158,6 +164,21 @@ export class NativeDesktopAgent {
     );
   }
 
+  static async prepareOrdinary(
+    account: DesktopAccountSession,
+    resourcesPath: string,
+    protectedPaths: readonly string[],
+    options: Pick<LaunchOptions, "openExternal" | "onLifecycle">
+  ) {
+    return this.compose(
+      await NativeAgentCutover.prepareOrdinary(protectedPaths),
+      account,
+      resourcesPath,
+      { ...options, provider: "gateway", selectableProfiles: true },
+      true
+    );
+  }
+
   static async prepareExisting(
     account: DesktopAccountSession,
     resourcesPath: string,
@@ -176,10 +197,11 @@ export class NativeDesktopAgent {
     cutover: NativeAgentCutover,
     account: DesktopAccountSession,
     resourcesPath: string,
-    options?: LaunchOptions
+    options?: LaunchOptions,
+    ordinaryWorkspaceChat = false
   ) {
     let subscription: Subscription | undefined;
-    if (options?.provider === "chatgpt") {
+    if (options && (options.provider === "chatgpt" || ordinaryWorkspaceChat)) {
       const { userDataPath, network } = await nativeAgentSubscriptionSettings();
       const { NativeChatGptHost } = await import("./native-chatgpt-host");
       const host = new NativeChatGptHost(userDataPath, network);
@@ -201,7 +223,8 @@ export class NativeDesktopAgent {
       options?.selectableProfiles,
       options?.onLifecycle,
       options?.imagePlacement,
-      options?.reviewImageReference
+      options?.reviewImageReference,
+      ordinaryWorkspaceChat
     );
   }
 
@@ -626,7 +649,29 @@ export class NativeDesktopAgent {
       requireCurrent();
       if (workspace?.id !== workspaceId)
         throw new Error("native_workspace_not_registered");
-      return await use(workspace, requireCurrent);
+      if (!this.ordinaryWorkspaceChat)
+        return await use(workspace, requireCurrent);
+      const identity = ordinaryDirectoryIdentity(workspace.root);
+      if (
+        new ProtectedRoots(this.cutover.protectedPaths).overlaps(workspace.root)
+      )
+        throw new Error("native_workspace_root_denied");
+      const requireDirectoryCurrent = () => {
+        const current = ordinaryDirectoryIdentity(workspace.root);
+        if (
+          current.device !== identity.device ||
+          current.inode !== identity.inode ||
+          current.birthTimeNs !== identity.birthTimeNs
+        )
+          throw new Error("native_workspace_root_changed");
+      };
+      return await use(
+        { ...workspace, identity, requireDirectoryCurrent },
+        () => {
+          requireCurrent();
+          requireDirectoryCurrent();
+        }
+      );
     } finally {
       activity.captures--;
       if (
@@ -795,7 +840,7 @@ export class NativeDesktopAgent {
 
   private async prepareProvider(signal: AbortSignal) {
     signal.throwIfAborted();
-    if (this.subscription) {
+    if (this.provider === "chatgpt" && this.subscription) {
       return {
         provider: await this.subscription.host.launch(
           CHATGPT_SUBSCRIPTION_CONFIG.default_model_id,
@@ -834,6 +879,22 @@ export class NativeDesktopAgent {
 
 function publicProfile({ id, connection, model }: NativeChatProfiles.Saved) {
   return { id, connection, model };
+}
+
+function ordinaryDirectoryIdentity(root: string): WorkspaceDirectoryIdentity {
+  try {
+    const stat = lstatSync(root, { bigint: true });
+    if (stat.isDirectory() && realpathSync.native(root) === root) {
+      return {
+        device: stat.dev.toString(),
+        inode: stat.ino.toString(),
+        birthTimeNs: stat.birthtimeNs.toString(),
+      };
+    }
+  } catch {
+    // A missing or inaccessible registered directory cannot authorize chat.
+  }
+  throw new Error("native_workspace_root_changed");
 }
 
 async function withinDrainDeadline<T>(operation: Promise<T>): Promise<T> {

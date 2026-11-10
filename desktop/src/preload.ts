@@ -36,6 +36,7 @@ import {
   IPC_CHANNELS,
   NATIVE_DOCUMENT_ARGUMENT,
   NATIVE_DOCUMENT_CHAT_ARGUMENT,
+  NATIVE_WORKSPACE_CHAT_ARGUMENT,
   type ConfirmOptions,
   type DesktopBridge,
   type DesktopHostAppInfo,
@@ -63,6 +64,8 @@ const appVersion = getCliArg("grida-version") ?? "0.0.0";
 const appPlatform = process.platform;
 const nativeDocumentId = getCliArg(NATIVE_DOCUMENT_ARGUMENT);
 const nativeDocumentChatId = getCliArg(NATIVE_DOCUMENT_CHAT_ARGUMENT);
+const nativeWorkspaceChatOnly =
+  getCliArg(NATIVE_WORKSPACE_CHAT_ARGUMENT) === "1";
 
 function isDesktopPath(pathname: string): boolean {
   return (
@@ -523,10 +526,14 @@ const bridge: DesktopBridge = {
   },
 
   nativeChat: {
-    deck: true,
-    nestedDeck: true,
-    deckSvgText: true,
-    ...(selectedDocumentChatRoute() && { document: true as const }),
+    ...(nativeWorkspaceChatOnly
+      ? { workspaceOnly: true as const }
+      : {
+          deck: true as const,
+          nestedDeck: true as const,
+          deckSvgText: true as const,
+          ...(selectedDocumentChatRoute() && { document: true as const }),
+        }),
     available: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE),
     status: (start) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),

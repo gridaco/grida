@@ -127,12 +127,24 @@ if (
   process.exit(1);
 }
 const retainedMediaScope = getCliArg("retained-media-scope");
+const ordinaryNativeChatServices = getCliArg("ordinary-native-chat-services");
 const workspaceCatalog = getCliArg("workspace-catalog");
 if (
   workspaceCatalog !== undefined &&
   (!workspaceCatalog || agentMode !== "native-chat" || !sandboxEnforced)
 ) {
   console.error("[agent-sidecar] fatal: invalid workspace catalog scope");
+  process.exit(1);
+}
+if (
+  ordinaryNativeChatServices !== undefined &&
+  (ordinaryNativeChatServices !== "1" ||
+    agentMode !== "native-chat" ||
+    !sandboxEnforced ||
+    workspaceCatalog !== undefined ||
+    retainedMediaScope !== undefined)
+) {
+  console.error("[agent-sidecar] fatal: invalid ordinary native chat services");
   process.exit(1);
 }
 const legacyRootFlag = "--legacy-state-root=";
@@ -143,7 +155,9 @@ const legacyStateRoots = process.argv
 if (
   legacyStateRoots.length > 0 &&
   (legacyStateRoots.length > 24 ||
-    (!workspaceCatalog && ownedLegacyWriter !== "1") ||
+    (!workspaceCatalog &&
+      ownedLegacyWriter !== "1" &&
+      ordinaryNativeChatServices !== "1") ||
     legacyStateRoots.some(
       (root) => !root.startsWith("/") || Buffer.byteLength(root) > 4096
     ))
@@ -221,6 +235,7 @@ async function main() {
         : undefined,
     media_root: requiredMediaRoot,
     retained_media_scope: retainedMediaScope === "1",
+    ordinary_native_chat_services: ordinaryNativeChatServices === "1",
     workspace_catalog: workspaceCatalog,
     protected_file_roots: legacyStateRoots.length
       ? legacyStateRoots

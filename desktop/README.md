@@ -153,16 +153,19 @@ control receipts. The snapshot confirms suspension or cancellation, and
 Resume targets a verified pause. Reconnecting requires loading the session
 again before submitting or controlling work.
 
-The cold-start coordinator requires the primary Desktop instance to select
-media-only sidecar startup before launching any legacy chat writer. It verifies
-a private archive of the old chat database and its managed scratch, then opens
-a separate `native-chat` store under the Desktop profile. Interrupted startup
-can retry after checking the archive. Native startup failures surface as errors,
-and the media-only service remains separately startable. The coordinator has
-macOS and Linux storage support. Windows cutover requires separate ACL-aware
-verification. Stable and Insiders can share the old store under separate app
-locks, so activation also needs shared-source writer custody across editions.
-Standard Desktop startup keeps its existing composition for unenrolled profiles.
+The cold-start coordinator selects the non-chat sidecar before starting native
+chat. The source selects native workspace chat on ordinary macOS arm64 Stable
+profiles; it uses a
+separate `native-chat` store and leaves the previous chat database and scratch
+in place. Other editions can still modify their shared legacy data and settings.
+File and Deck chat, workspace image placement, and local image references are
+not available through this ordinary workspace-only path. Native startup failures
+surface as errors; retained non-chat services keep their existing owners.
+
+A managed archival handoff verifies a private archive of the old database and
+its managed scratch before opening a separate native store. Interrupted startup
+can retry after checking that archive. This handoff requires shared-source writer
+custody across editions. Windows cutover requires separate ACL-aware verification.
 
 An approved managed macOS arm64 Stable build can enroll a fresh native profile.
 The build-time setting `GRIDA_MANAGED_NATIVE_FIRST=1` authorizes creating

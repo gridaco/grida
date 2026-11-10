@@ -36,6 +36,7 @@ export type {
 
 export const NATIVE_DOCUMENT_ARGUMENT = "grida-native-document";
 export const NATIVE_DOCUMENT_CHAT_ARGUMENT = "grida-native-document-chat";
+export const NATIVE_WORKSPACE_CHAT_ARGUMENT = "grida-native-workspace-chat";
 
 export const IPC_CHANNELS = {
   WINDOW_SET_DOCUMENT_EDITED: "grida:window:set-document-edited",

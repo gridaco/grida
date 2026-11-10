@@ -10,8 +10,10 @@ import path from "node:path";
 import {
   NATIVE_DOCUMENT_ARGUMENT,
   NATIVE_DOCUMENT_CHAT_ARGUMENT,
+  NATIVE_WORKSPACE_CHAT_ARGUMENT,
 } from "./bridge/contract";
 import { attachNavigationEvents } from "./main/ipc-handlers";
+import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { RUNTIME_APP_ICON } from "./branding";
 import { IS_DEV } from "./env";
 
@@ -458,7 +460,15 @@ function buildDesktopArguments({
   app: App;
   extra?: string[];
 }): string[] {
-  return [`--grida-version=${app.getVersion()}`, ...extra];
+  const workspaceChat = NativeDesktopProfile.ordinaryChat(
+    app,
+    app.isPackaged && !(typeof INSIDERS !== "undefined" && INSIDERS === 1)
+  );
+  return [
+    `--grida-version=${app.getVersion()}`,
+    ...(workspaceChat ? [`--${NATIVE_WORKSPACE_CHAT_ARGUMENT}=1`] : []),
+    ...extra,
+  ];
 }
 
 /**

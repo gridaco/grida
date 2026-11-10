@@ -159,7 +159,14 @@ export function DesktopFileShell({
           maxSize={SIDEBAR_MAX_SIZE}
         >
           <aside className="flex h-full w-full flex-col">
-            {nativeChat && fileChatAvailable ? (
+            {nativeChat?.workspaceOnly ? (
+              <p
+                role="status"
+                className="px-3 py-2 text-xs text-muted-foreground"
+              >
+                Chat is available in the workspace workbench.
+              </p>
+            ) : nativeChat && fileChatAvailable ? (
               <NativeAgentPaneGate
                 bridge={nativeChat}
                 selectionKey={

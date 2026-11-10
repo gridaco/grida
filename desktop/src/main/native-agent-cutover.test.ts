@@ -285,6 +285,93 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     expect(fs.existsSync(test.nativeState)).toBe(false);
   });
 
+  it.runIf(Boolean(nativeResources))(
+    "reopens a native chat after a temp-root change without touching ordinary legacy data",
+    async () => {
+      const test = await fixture();
+      writeLegacy(test.database, test.scratchBase);
+      const legacy = new DatabaseSync(test.database);
+      try {
+        legacy.exec(
+          "PRAGMA journal_mode=WAL; INSERT INTO chat_sessions VALUES ('ses_writer');"
+        );
+        const original = path.join(
+          test.scratchBase,
+          "sessions",
+          "ses_fixture",
+          "scratch",
+          "note.txt"
+        );
+        const files = [
+          test.database,
+          test.database + "-wal",
+          test.database + "-shm",
+          original,
+        ];
+        const before = files.map((file) => fs.readFileSync(file));
+        const start = async () => {
+          vi.resetModules();
+          const { NativeAgentCutover } = await import("./native-agent-cutover");
+          const cutover = await NativeAgentCutover.prepareOrdinary([
+            test.legacy,
+          ]);
+          expect(cutover.protectedPaths).toEqual(
+            expect.arrayContaining([
+              test.legacy,
+              defaultScratchBase(test.legacy, electron.temp),
+            ])
+          );
+          return cutover.startWorkspace("work", {
+            ...test.launch,
+            resourcesPath: nativeResources!,
+          });
+        };
+        const first = await start();
+        let sessionId: string;
+        try {
+          expect(first.archive).toBeNull();
+          expect(path.dirname(first.stateDirectory)).toBe(
+            path.join(test.nativeState, "workspaces")
+          );
+          expect((await first.chat.list()).sessionIds).toHaveLength(0);
+          const session = await first.chat.create();
+          sessionId = session.id;
+          expect(sessionId).not.toBe("ses_fixture");
+        } finally {
+          await first.chat.close();
+        }
+        electron.temp = test.child("next-launch-temp");
+        const reopened = await start();
+        try {
+          expect(await reopened.chat.load(sessionId)).toEqual({
+            id: sessionId,
+          });
+          expect(reopened.archive).toBeNull();
+        } finally {
+          await reopened.chat.close();
+        }
+        expect(files.map((file) => fs.readFileSync(file))).toEqual(before);
+        expect(fs.existsSync(test.archiveRoot)).toBe(false);
+        expect(
+          fs.existsSync(LegacyChatSourceLease.controlRoot(test.legacy))
+        ).toBe(false);
+      } finally {
+        legacy.close();
+      }
+    }
+  );
+
+  it("does not use the ordinary path for a managed legacy handoff", async () => {
+    const test = await fixture();
+    fs.mkdirSync(LegacyChatSourceLease.controlRoot(test.legacy), {
+      mode: 0o700,
+    });
+    await expect(test.NativeAgentCutover.prepareOrdinary([])).rejects.toThrow(
+      "native_chat_handoff_required"
+    );
+    expect(fs.existsSync(test.nativeState)).toBe(false);
+  });
+
   it("reveals only the retired archive after fresh verification and preserves failed recovery", async () => {
     const test = await fixture();
     const reveal = vi.fn<(directory: string) => void>();

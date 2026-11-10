@@ -971,6 +971,13 @@ lazy reads, read-only mutation, and symlink escape refusal.
   [development profile](desktop/src/main/native-desktop-profile.ts) requires
   separate canonical browser and agent directories under an owner-only
   temporary root. Existing legacy chat data or scratch refuses that launch.
+  The ordinary workspace-only launch uses a separate native chat store and
+  leaves the previous chat data in place. It refuses existing handoff markers,
+  applies the established home-secret exclusions to native workspace grants,
+  and captures and rechecks the registered directory identity. The retained
+  service sandbox denies native chat and legacy chat/scratch paths while keeping
+  the ordinary Media owner available. Other editions can still write their own
+  legacy data or shared settings; this launch does not assert exclusive custody.
 - [Native chat IPC](desktop/src/main/native-chat-ipc.ts) is available to
   the current top-level workspace, verified deck, or selected SVG frame under
   the existing authenticated window guard. The [native workspace catalog](desktop/src/main/native-workspace-catalog.ts)

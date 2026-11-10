@@ -16,8 +16,9 @@ import {
   NativeAgentChat,
   type NativeAgentChatLaunch,
 } from "./native-agent-chat";
+import { NativeDesktopProfile } from "./native-desktop-profile";
 
-const STATE_DIRECTORY = "native-chat";
+const STATE_DIRECTORY = NativeDesktopProfile.chatStateDirectory;
 const WORKSPACES_DIRECTORY = "workspaces";
 const DOCUMENTS_DIRECTORY = "documents";
 const CHECKPOINT = "cutover.json";
@@ -84,6 +85,13 @@ export class NativeAgentCutover {
     return this.claim();
   }
 
+  /** Start a separate native store beside the ordinary browser profile. */
+  static prepareOrdinary(
+    protectedPaths: readonly string[]
+  ): Promise<NativeAgentCutover> {
+    return this.claim(undefined, [...protectedPaths]);
+  }
+
   static async verifyCompletedMediaOnly(
     source: Awaited<ReturnType<typeof sealLegacyChatForColdStart>>,
     verifyWriterAdmission: LegacyChatWriterAdmission
@@ -118,7 +126,8 @@ export class NativeAgentCutover {
   }
 
   private static async claim(
-    existing?: ExistingCutoff
+    existing?: ExistingCutoff,
+    ordinaryProtectedPaths?: readonly string[]
   ): Promise<NativeAgentCutover> {
     if (process.platform !== "darwin" && process.platform !== "linux")
       throw new Error("native_chat_cutover_platform_unsupported");
@@ -126,7 +135,10 @@ export class NativeAgentCutover {
     if (this.prepared) throw new Error("native_chat_cutover_already_prepared");
     this.preparing = true;
     try {
-      const prepared = await this.prepareSealed(existing);
+      const prepared = await this.prepareSealed(
+        existing,
+        ordinaryProtectedPaths
+      );
       this.prepared = true;
       return prepared;
     } finally {
@@ -135,9 +147,11 @@ export class NativeAgentCutover {
   }
 
   private static async prepareSealed(
-    existing: ExistingCutoff | undefined
+    existing: ExistingCutoff | undefined,
+    ordinaryProtectedPaths: readonly string[] | undefined
   ): Promise<NativeAgentCutover> {
-    const source = await sealLegacyChatForColdStart();
+    const ordinary = ordinaryProtectedPaths !== undefined;
+    const source = await sealLegacyChatForColdStart(ordinary);
     const desktop = await fs.realpath(source.desktopUserDataPath);
     checkDirectory(await fs.lstat(desktop), false);
     const stateDirectory = path.join(desktop, STATE_DIRECTORY);
@@ -163,7 +177,15 @@ export class NativeAgentCutover {
         })
       : undefined;
     const historicalBase = archive?.historicalScratchBase;
-    const basis = [source.userDataPath, source.scratchBase];
+    const basis = ordinary
+      ? [
+          "ordinary-native-chat",
+          desktop,
+          source.userDataPath,
+          source.providerHome,
+          source.mediaRoot,
+        ]
+      : [source.userDataPath, source.scratchBase];
     if (historical && historicalBase) {
       if ([desktop, ...separate].some((root) => overlaps(root, historicalBase)))
         throw new Error("native_chat_cutover_historical_scratch_overlap");
@@ -177,8 +199,16 @@ export class NativeAgentCutover {
       );
       separate.push(historicalBase);
     }
-    if (!existing)
+    if (ordinary) {
+      if (
+        await statIfPresent(
+          LegacyChatSourceLease.controlRoot(source.userDataPath)
+        )
+      )
+        throw new Error("native_chat_handoff_required");
+    } else if (!existing) {
       await requireFreshSource(source.userDataPath, source.scratchBase);
+    }
     const sourceKey = cutoffSourceKey(basis);
     const previous = await readCheckpoint(stateDirectory);
     if (previous && previous.source !== sourceKey)
@@ -208,7 +238,7 @@ export class NativeAgentCutover {
       stateDirectory,
       checkpoint,
       cutoff,
-      Object.freeze([desktop, ...separate]),
+      Object.freeze([desktop, ...separate, ...(ordinaryProtectedPaths ?? [])]),
       verifyCutoff
         ? async () => {
             await verifyCutoff(checkpoint);

@@ -665,6 +665,10 @@ app.on("ready", async () => {
 
   // Keep a disposable profile on the build it was launched to exercise.
   const nativeProfile = NativeDesktopProfile.selected();
+  const ordinaryNativeChat = NativeDesktopProfile.ordinaryChat(
+    app,
+    app.isPackaged && !IS_INSIDERS
+  );
   const nativeChatProfile = nativeProfile && !NativeDesktopProfile.mediaOnly();
   let externalProfile: string | undefined;
   try {
@@ -713,6 +717,13 @@ app.on("ready", async () => {
     fetch: async (url, init) =>
       (await session.defaultSession.fetch(url, init)) as Response,
   });
+  const onNativeLifecycle = (
+    workspaceId: string,
+    event: NativeChatLifecycle,
+    current: () => boolean,
+    profileId?: string
+  ) =>
+    notifyNativeChat(workspaceId, event, windowAdmission, current, profileId);
   let workspaceCatalog: NativeWorkspaceCatalog | undefined;
   if (nativeProfile) {
     try {
@@ -733,19 +744,7 @@ app.on("ready", async () => {
         const options = {
           provider,
           mcp,
-          onLifecycle: (
-            workspaceId: string,
-            event: NativeChatLifecycle,
-            current: () => boolean,
-            profileId?: string
-          ) =>
-            notifyNativeChat(
-              workspaceId,
-              event,
-              windowAdmission,
-              current,
-              profileId
-            ),
+          onLifecycle: onNativeLifecycle,
           openExternal: (url: string) => shell.openExternal(url),
           workspaceCatalogRoot: path.dirname(catalog.directory),
           workspaceGrant: catalog.fileGrant.bind(catalog),
@@ -866,6 +865,26 @@ app.on("ready", async () => {
     }
   } else {
     nativeDocuments = ordinarySelectedSvgFiles();
+    if (ordinaryNativeChat) {
+      try {
+        nativeDesktopAgent = await NativeDesktopAgent.prepareOrdinary(
+          accountSession,
+          process.resourcesPath,
+          NativeDesktopProfile.ordinaryChatProtectedPaths(app),
+          {
+            onLifecycle: onNativeLifecycle,
+            openExternal: (url) => shell.openExternal(url),
+          }
+        );
+      } catch {
+        dialog.showErrorBox(
+          "Native chat could not start",
+          "Grida could not prepare separate chat storage for this Desktop profile."
+        );
+        app.quit();
+        return;
+      }
+    }
   }
   let desktopPreferences: DesktopPreferences;
   try {

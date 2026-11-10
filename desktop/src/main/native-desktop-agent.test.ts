@@ -7,6 +7,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, expect, it, vi } from "vitest";
+import type { App } from "electron";
 import { CHATGPT_RESPONSES_URL } from "../chatgpt-configuration";
 import { DesktopAccountSession } from "./account-session";
 import type { NativeChatLifecycle } from "./native-agent-chat";
@@ -69,6 +70,103 @@ beforeEach(() => {
   sidecar.nativeAgentGatewayConnection.mockClear();
   sidecar.listGatewayModels.mockResolvedValue([]);
 });
+
+it.runIf(Boolean(resources) && process.platform === "darwin")(
+  "refuses a private home root and never reuses a replaced ordinary workspace",
+  async () => {
+    const base = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-ordinary-workspace-")
+    );
+    const root = path.join(base, "workspace");
+    const home = path.join(base, "home");
+    const secret = path.join(home, ".ssh");
+    const source = {
+      userDataPath: path.join(base, "agent"),
+      desktopUserDataPath: path.join(base, "desktop"),
+      scratchBase: path.join(base, "scratch"),
+      providerHome: path.join(base, "providers"),
+      mediaRoot: path.join(base, "media"),
+    };
+    const network = { prepare: () => null };
+    const origin = "https://editor.example.test";
+    const workspace = {
+      id: "work",
+      root,
+      name: "Workspace",
+      opened_at: Date.now(),
+      pinned: false,
+    };
+    let agent: import("./native-desktop-agent").NativeDesktopAgent | undefined;
+    try {
+      await Promise.all(
+        [root, ...Object.values(source)].map((directory) =>
+          fs.mkdir(directory, { mode: 0o700 })
+        )
+      );
+      await fs.mkdir(secret, { recursive: true, mode: 0o700 });
+      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.nativeAgentSubscriptionSettings.mockResolvedValue({
+        userDataPath: source.userDataPath,
+        network,
+      });
+      sidecar.nativeAgentGatewayConnection.mockImplementation((account) =>
+        NativeGatewayConnection.open({ origin, account, network })
+      );
+      sidecar.findWorkspace.mockResolvedValue(workspace);
+      const { NativeDesktopAgent } = await import("./native-desktop-agent");
+      const { NativeDesktopProfile } = await import("./native-desktop-profile");
+      const protectedPaths = NativeDesktopProfile.ordinaryChatProtectedPaths({
+        commandLine: { getSwitchValue: () => "" },
+        setPath: () => {},
+        getPath: (name: Parameters<App["getPath"]>[0]) =>
+          name === "home" ? home : base,
+      });
+      expect(protectedPaths).toEqual(
+        expect.arrayContaining([secret, path.join(home, ".aws")])
+      );
+      agent = await NativeDesktopAgent.prepareOrdinary(
+        new DesktopAccountSession({
+          base_url: origin,
+          fetch: async () =>
+            Response.json({
+              token: "fixture.gg.key",
+              account_subject: "fixture-user",
+              expires_at: new Date(Date.now() + 120_000).toISOString(),
+              organization: { id: 1 },
+            }),
+        }),
+        resources!,
+        protectedPaths,
+        { openExternal: async () => {} }
+      );
+      sidecar.findWorkspace.mockResolvedValueOnce({
+        ...workspace,
+        root: secret,
+      });
+      await expect(agent.ensure(workspace.id)).rejects.toThrow(
+        "native_workspace_root_denied"
+      );
+      expect(sidecar.nativeAgentGatewayConnection).not.toHaveBeenCalled();
+      await agent.ensure(workspace.id);
+      const captured = await fs.lstat(root, { bigint: true });
+      expect(agent.current(workspace.id)?.directoryIdentity).toEqual({
+        device: captured.dev.toString(),
+        inode: captured.ino.toString(),
+        birthTimeNs: captured.birthtimeNs.toString(),
+      });
+      await fs.rename(root, path.join(base, "original-workspace"));
+      await fs.mkdir(root, { mode: 0o700 });
+      expect(agent.current(workspace.id)).toBeNull();
+      await expect(agent.ensure(workspace.id)).rejects.toThrow(
+        "native_workspace_root_changed"
+      );
+      expect(sidecar.nativeAgentGatewayConnection).toHaveBeenCalledTimes(1);
+    } finally {
+      await agent?.close();
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  }
+);
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
   "delivers a selected Library PNG on the approved OpenRouter tool continuation",

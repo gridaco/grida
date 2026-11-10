@@ -117,6 +117,39 @@ describe("Desktop daemon composition", () => {
     expect(mocks.agent).not.toHaveBeenCalled();
   });
 
+  it("preserves ordinary service owners when native chat uses a separate store", async () => {
+    const protected_file_roots = [
+      "/synthetic/state/sessions.db",
+      "/synthetic/scratch",
+    ];
+    await DesktopDaemon.create({
+      ...common,
+      agent: "native-chat",
+      ordinary_native_chat_services: true,
+      protected_file_roots,
+    });
+    expect(mocks.media).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        user_data_path: common.user_data_path,
+        provider_home: common.provider_home,
+        media_root: common.media_root,
+        projects_root: common.projects_root,
+        capabilities: { recent: true },
+        endpoint_settings: true,
+        protected_file_roots,
+      })
+    );
+    expect(mocks.agent).not.toHaveBeenCalled();
+    await expect(
+      DesktopDaemon.create({
+        ...common,
+        agent: "native-chat",
+        ordinary_native_chat_services: true,
+        workspace_catalog: "/synthetic/new-catalog",
+      })
+    ).rejects.toThrow("ordinary_native_chat_services_invalid");
+  });
+
   it("leaves files and recents to Main without enabling endpoints or chat", async () => {
     const prepare = vi.fn<() => Promise<void>>();
     await DesktopDaemon.create({

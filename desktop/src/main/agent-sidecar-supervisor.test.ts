@@ -43,6 +43,7 @@ import { AgentNetworkPolicy } from "../agent-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { RetainedMediaLaunch } from "./retained-media-launch";
 import { LegacyChatSourceLease } from "./legacy-chat-source-lease";
+import { DesktopMediaRoot } from "./media-root";
 import { ensureInitialized, wrap } from "./sandbox/manager";
 
 const supportsCutover =
@@ -148,6 +149,75 @@ describe("AgentSidecarSupervisor recovery", () => {
     );
     supervisor.stop();
   });
+
+  it.runIf(supportsCutover)(
+    "denies the legacy chat files and scratch while serving ordinary native-chat services",
+    async () => {
+      const root = await fs.mkdtemp(
+        path.join(await fs.realpath(os.tmpdir()), "grida-ordinary-services-")
+      );
+      const data = path.join(root, "agent");
+      const browser = path.join(root, "browser");
+      const media = path.join(browser, "Media");
+      const temporary = path.join(root, "temp");
+      try {
+        await Promise.all(
+          [data, media, temporary].map((directory) =>
+            fs.mkdir(directory, { recursive: true })
+          )
+        );
+        vi.stubEnv("GRIDA_AGENT_USER_DATA", data);
+        vi.spyOn(app, "getPath").mockImplementation((name) =>
+          name === "temp" ? temporary : name === "userData" ? browser : root
+        );
+        vi.spyOn(app, "isPackaged", "get").mockReturnValue(false);
+        vi.spyOn(DesktopMediaRoot, "current").mockReturnValue(media);
+        vi.mocked(ensureInitialized).mockClear();
+        const supervisor = new AgentSidecarSupervisor();
+        const source = await supervisor.sealLegacyChatForColdStart(true);
+        const state = supervisor as unknown as {
+          initSandbox(): Promise<void>;
+          scratchBase: string | null;
+          commandHost: unknown;
+        };
+        await state.initSandbox();
+        expect(state.scratchBase).toBeNull();
+        expect(state.commandHost).toBeNull();
+        const protectedChat = [
+          source.scratchBase,
+          path.join(browser, NativeDesktopProfile.chatStateDirectory),
+          ...[
+            "sessions.db",
+            "sessions.db-wal",
+            "sessions.db-shm",
+            "sessions.db-journal",
+            "chat-archive",
+            "legacy-chat-ownership",
+          ].map((name) => path.join(data, name)),
+        ];
+        expect(ensureInitialized).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({
+            filesystem: expect.objectContaining({
+              denyRead: expect.arrayContaining(protectedChat),
+              denyWrite: expect.arrayContaining(protectedChat),
+              allowWrite: expect.arrayContaining([media]),
+            }),
+          })
+        );
+        const filesystem =
+          vi.mocked(ensureInitialized).mock.calls[0]?.[0].filesystem;
+        expect(filesystem?.denyRead).not.toContain(browser);
+        expect(filesystem?.denyWrite).not.toContain(browser);
+        expect(await fs.readdir(temporary)).toEqual([]);
+        await expect(supervisor.sealLegacyChatForColdStart()).rejects.toThrow(
+          "legacy_chat_cold_start_required"
+        );
+        supervisor.stop();
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
 
   it("requires the physical packaged Linux seccomp helper before starting SRT", async () => {
     const resources = await fs.mkdtemp(

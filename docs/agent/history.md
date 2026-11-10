@@ -28,9 +28,15 @@ files and independent forks stay in place.
 
 ## Find your previous chat archive
 
-After a verified handoff to native chats, choose **File → Show Previous Chat
-Archive** to find the saved copy in your file browser. Desktop verifies the
-archive before opening its location. New conversations have their own history.
+On an ordinary macOS ARM64 Desktop installation using native workspace chat,
+new conversations start with their own history. Earlier chat data stays in its
+existing location and does not appear in the native chat selector. This does
+not create an archive or prevent an older installation from changing its own
+data.
+
+If your installation completed a verified archival handoff, choose **File →
+Show Previous Chat Archive** to find the saved copy in your file browser.
+Desktop verifies the archive before opening its location.
 
 ## Try a different direction
 
