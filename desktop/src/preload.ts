@@ -35,6 +35,7 @@ import {
   DESKTOP_BRIDGE_PROTOCOL,
   IPC_CHANNELS,
   NATIVE_DOCUMENT_ARGUMENT,
+  NATIVE_DOCUMENT_CHAT_ARGUMENT,
   type ConfirmOptions,
   type DesktopBridge,
   type DesktopHostAppInfo,
@@ -61,6 +62,7 @@ function getCliArg(name: string): string | undefined {
 const appVersion = getCliArg("grida-version") ?? "0.0.0";
 const appPlatform = process.platform;
 const nativeDocumentId = getCliArg(NATIVE_DOCUMENT_ARGUMENT);
+const nativeDocumentChatId = getCliArg(NATIVE_DOCUMENT_CHAT_ARGUMENT);
 
 function isDesktopPath(pathname: string): boolean {
   return (
@@ -136,12 +138,20 @@ function selectedDocumentRoute(): boolean {
   );
 }
 
+function selectedDocumentChatRoute(): boolean {
+  return (
+    nativeDocumentChatId !== undefined &&
+    nativeDocumentChatId === nativeDocumentId &&
+    selectedDocumentRoute()
+  );
+}
+
 ipcRenderer.on(
   IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
   (_event, value: unknown) => {
     if (
       (location.pathname !== "/desktop/workspace" &&
-        !selectedDocumentRoute()) ||
+        !selectedDocumentChatRoute()) ||
       !value ||
       typeof value !== "object"
     )
@@ -509,12 +519,12 @@ const bridge: DesktopBridge = {
   nativeChat: {
     deck: true,
     nestedDeck: true,
-    ...(selectedDocumentRoute() && { document: true as const }),
+    ...(selectedDocumentChatRoute() && { document: true as const }),
     available: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE),
     status: (start) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),
     list: (cursor) => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
-    ...(!selectedDocumentRoute() && {
+    ...(!selectedDocumentChatRoute() && {
       profiles: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_PROFILES),
       selectProfile: (selection) =>
         ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE, selection),
@@ -643,7 +653,7 @@ const bridge: DesktopBridge = {
           ? revision
           : undefined
       ),
-    ...(!selectedDocumentRoute() && {
+    ...(!selectedDocumentChatRoute() && {
       onEditorSurfaceOpen: (attachmentId, open) => {
         if (
           location.pathname !== "/desktop/workspace" ||
@@ -667,7 +677,8 @@ const bridge: DesktopBridge = {
         typeof invoke !== "function" ||
         nativeSvgTextHandlers.has(attachmentId) ||
         nativeSvgTextHandlers.size >= 16 ||
-        (location.pathname !== "/desktop/workspace" && !selectedDocumentRoute())
+        (location.pathname !== "/desktop/workspace" &&
+          !selectedDocumentChatRoute())
       )
         throw new Error("native_chat_svg_text_unavailable");
       const handler = { href: location.href, invoke };
@@ -753,7 +764,7 @@ const bridge: DesktopBridge = {
         waitId,
         action
       ),
-    ...(!selectedDocumentRoute() && {
+    ...(!selectedDocumentChatRoute() && {
       contextLimit: () =>
         ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT),
       saveContextLimit: (reviewId, limit) =>

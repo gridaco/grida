@@ -7,7 +7,10 @@ import {
   type Rectangle,
 } from "electron";
 import path from "node:path";
-import { NATIVE_DOCUMENT_ARGUMENT } from "./bridge/contract";
+import {
+  NATIVE_DOCUMENT_ARGUMENT,
+  NATIVE_DOCUMENT_CHAT_ARGUMENT,
+} from "./bridge/contract";
 import { attachNavigationEvents } from "./main/ipc-handlers";
 import { RUNTIME_APP_ICON } from "./branding";
 import { IS_DEV } from "./env";
@@ -492,18 +495,27 @@ export function open_document_window({
   base_url: baseUrl,
   doc_id: docId,
   native = false,
+  native_chat: nativeChat = false,
 }: {
   app: App;
   base_url: string;
   doc_id: string;
   native?: boolean;
+  native_chat?: boolean;
 }) {
   return create_desktop_window({
     base_url: baseUrl,
     urlPath: `/desktop/file?docId=${encodeURIComponent(docId)}`,
     additionalArguments: buildDesktopArguments({
       app,
-      extra: native ? [`--${NATIVE_DOCUMENT_ARGUMENT}=${docId}`] : [],
+      extra: native
+        ? [
+            `--${NATIVE_DOCUMENT_ARGUMENT}=${docId}`,
+            ...(nativeChat
+              ? [`--${NATIVE_DOCUMENT_CHAT_ARGUMENT}=${docId}`]
+              : []),
+          ]
+        : [],
     }),
   });
 }

@@ -1,23 +1,67 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — packaged native media scope selection.
 import { app } from "electron";
 import path from "node:path";
+import { defaultScratchBase } from "@grida/agent/sandbox";
 import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
+import { home } from "@grida/home";
 import { DesktopMediaRoot } from "./media-root";
 import { NativeDesktopProfile } from "./native-desktop-profile";
+import { NativeDocumentFiles } from "./native-document-files";
 import { WorkspaceFileWorkers } from "./workspace-file-worker";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 
 let workers: WorkspaceFileWorkers | undefined;
 
 export function nativeWorkspaceMedia() {
+  if (!NativeDesktopProfile.selected() || !nativeFilePlatform()) return;
+  return fileWorkers();
+}
+
+/** Ordinary media-only startup owns selected SVGs without a native chat profile. */
+export function ordinarySelectedSvgFiles() {
   if (
-    !NativeDesktopProfile.selected() ||
-    !app.isPackaged ||
-    process.platform !== "darwin" ||
-    process.arch !== "arm64"
-  ) {
-    return undefined;
-  }
+    !nativeFilePlatform() ||
+    !process.argv.includes("--disable-agent") ||
+    NativeDesktopProfile.firstSelected()
+  )
+    return;
+  const userHome = app.getPath("home");
+  const gridaHome = home.dir();
+  const agentData = path.resolve(
+    NativeDesktopProfile.agentData() ?? path.join(gridaHome, "agent")
+  );
+  const { filesystem } = buildDaemonSandboxPolicy({
+    user_data: agentData,
+    home: userHome,
+  });
+  const temp = app.getPath("temp");
+  return new NativeDocumentFiles(
+    [
+      ...filesystem.deny_read,
+      gridaHome,
+      agentData,
+      app.getPath("userData"),
+      app.getPath("sessionData"),
+      ...[
+        agentData,
+        path.join(gridaHome, "agent"),
+        path.join(userHome, ".grida", "agent"),
+      ].map((directory) => defaultScratchBase(directory, temp)),
+      DesktopMediaRoot.current(),
+      path.dirname(process.resourcesPath),
+    ],
+    userHome,
+    fileWorkers()
+  );
+}
+
+function nativeFilePlatform(): boolean {
+  return (
+    app.isPackaged && process.platform === "darwin" && process.arch === "arm64"
+  );
+}
+
+function fileWorkers(): WorkspaceFileWorkers {
   if (workers) return workers;
   const owner = new WorkspaceFileWorkers(process.resourcesPath);
   workers = owner;

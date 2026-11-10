@@ -8,6 +8,23 @@ const preloadSource = fs.readFileSync(
 );
 
 describe("Desktop preload agent seam", () => {
+  it("keeps native selected-file reads and saves separate from the chat offer", () => {
+    expect(preloadSource).toContain(
+      "files: response.capabilities.files || selectedDocumentRoute()"
+    );
+    expect(preloadSource).toContain(
+      "nativeDocumentChatId === nativeDocumentId"
+    );
+    expect(preloadSource).toContain(
+      "selectedDocumentChatRoute() && { document: true as const }"
+    );
+    expect(preloadSource).toMatch(
+      /nativeDocumentId !== undefined\s*\? ipcRenderer.invoke\(IPC_CHANNELS.DOCUMENT_READ, docId\)/
+    );
+    expect(preloadSource).toMatch(
+      /nativeDocumentId !== undefined\s*\? ipcRenderer.invoke\(IPC_CHANNELS.DOCUMENT_WRITE, docId, content\)/
+    );
+  });
   it("delegates AgentHost HTTP routes to AgentTransport.Client", () => {
     expect(preloadSource).toContain("new AgentTransport.Client");
     expect(preloadSource).not.toContain('"/agent/run"');

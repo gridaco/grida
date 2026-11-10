@@ -51,6 +51,7 @@ import { NativeExternalRuns } from "./main/native-external-runs";
 import {
   nativeWorkspaceCatalog,
   nativeWorkspaceMedia,
+  ordinarySelectedSvgFiles,
 } from "./main/workspace-media-access";
 import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 import { NativeDocumentFiles } from "./main/native-document-files";
@@ -319,8 +320,16 @@ function attach_dirty_close_handler(window: BrowserWindow) {
   });
 }
 
+function nativeDocumentOwner(filePath: string) {
+  if (
+    NativeDesktopProfile.selected() ||
+    path.extname(filePath).toLowerCase() === ".svg"
+  )
+    return nativeDocuments;
+}
+
 async function openDocumentWindowForPath(filePath: string) {
-  const owner = nativeDocuments;
+  const owner = nativeDocumentOwner(filePath);
   if (!owner && !agentSidecarInfo) {
     console.warn("[grida] cannot open file: agent sidecar not ready");
     return;
@@ -364,6 +373,8 @@ async function openDocumentWindowForPath(filePath: string) {
     base_url: EDITOR_BASE_URL,
     doc_id: docId,
     native: owner !== undefined,
+    native_chat:
+      nativeDesktopAgent !== undefined || NativeDesktopProfile.mediaOnly(),
   });
   if (!entryWindow.registerSecondary(window)) {
     owner?.release(docId);
@@ -442,7 +453,7 @@ function handleFilePath(filePath: string) {
     return;
   }
   if (
-    ((!nativeDocuments || isCanvas) && !agentSidecarInfo) ||
+    ((!nativeDocumentOwner(filePath) || isCanvas) && !agentSidecarInfo) ||
     !startup_window.canDispatchLaunchIntent({
       app_ready: app.isReady(),
       entry_main: entryWindow?.isMain ?? false,
@@ -744,6 +755,8 @@ app.on("ready", async () => {
       app.quit();
       return;
     }
+  } else {
+    nativeDocuments = ordinarySelectedSvgFiles();
   }
   let desktopPreferences: DesktopPreferences;
   try {

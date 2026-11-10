@@ -6,9 +6,11 @@
  * `will-redirect` hook): same-origin AND `/desktop` or `/desktop/*` only.
  */
 import { describe, it, expect, vi } from "vitest";
+import type { App, BrowserWindowConstructorOptions } from "electron";
 
 const { browserWindowInstances } = vi.hoisted(() => ({
   browserWindowInstances: [] as Array<{
+    options: BrowserWindowConstructorOptions;
     webContents: {
       handlers: Map<string, (...args: unknown[]) => void>;
       on: ReturnType<typeof vi.fn>;
@@ -33,7 +35,7 @@ vi.mock("electron", () => ({
     once =
       vi.fn<(event: string, handler: (...args: unknown[]) => void) => void>();
 
-    constructor() {
+    constructor(readonly options: BrowserWindowConstructorOptions) {
       browserWindowInstances.push(this);
     }
   },
@@ -60,10 +62,30 @@ import {
   create_desktop_window,
   isAllowedNavigation,
   isSafeExternalUrl,
+  open_document_window,
   set_desktop_window_presentation,
 } from "./window";
 
 const BASE = "https://grida.co";
+
+it("offers a separate preload capability for native document chat", () => {
+  const app = { getVersion: () => "1.0.0" } as App;
+  const common = { app, base_url: BASE, doc_id: "selected", native: true };
+  open_document_window(common);
+  const fileOnly = browserWindowInstances.at(-1)?.options.webPreferences;
+  expect(fileOnly?.additionalArguments).toEqual([
+    "--grida-version=1.0.0",
+    "--grida-native-document=selected",
+  ]);
+  open_document_window({ ...common, native_chat: true });
+  expect(
+    browserWindowInstances.at(-1)?.options.webPreferences?.additionalArguments
+  ).toEqual([
+    "--grida-version=1.0.0",
+    "--grida-native-document=selected",
+    "--grida-native-document-chat=selected",
+  ]);
+});
 
 describe("isAllowedNavigation", () => {
   it.each([
