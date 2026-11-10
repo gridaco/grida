@@ -71,7 +71,44 @@ it.skipIf(process.platform === "win32")(
       await expect(NativeDesktopProfile.configure(app)).rejects.toThrow(
         "native_desktop_profile_invalid"
       );
-      process.argv.pop();
+      for (const [flags, choice] of [
+        [
+          [
+            "--native-chat-provider=openrouter",
+            "--native-chat-model=openai/gpt-5.5",
+          ],
+          { kind: "byok", id: "openrouter", model: "openai/gpt-5.5" },
+        ],
+        [
+          ["--native-chat-provider=endpoint:local"],
+          { kind: "endpoint", id: "local" },
+        ],
+      ] as const) {
+        process.argv = [...argv, "--native-chat", ...flags];
+        await expect(
+          NativeDesktopProfile.configure(app)
+        ).resolves.toMatchObject(choice);
+      }
+      for (const flags of [
+        ["--native-chat-provider=openrouter"],
+        ["--native-chat-provider=endpoint:gg"],
+        [
+          "--native-chat-provider=endpoint:local",
+          "--native-chat-model=a",
+          "--native-chat-model=b",
+        ],
+        ["--native-chat-model=openai/gpt-5.5"],
+      ]) {
+        process.argv = [...argv, "--native-chat", ...flags];
+        await expect(NativeDesktopProfile.configure(app)).rejects.toThrow(
+          "native_desktop_profile_invalid"
+        );
+      }
+      process.argv = [
+        ...argv,
+        "--native-chat",
+        "--native-chat-provider=chatgpt",
+      ];
       vi.stubEnv("GRIDA_HOME", root);
       await expect(NativeDesktopProfile.configure(app)).rejects.toThrow(
         "native_desktop_profile_invalid"

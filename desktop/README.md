@@ -223,6 +223,16 @@ native process starts. Plan prompts cannot use the discovered tools.
 The selected workspace can use the peer's tools alongside its attached editor
 tools in Act. Each source keeps its own binding for the turn.
 
+The isolated native preview can also launch a saved provider selection. Set
+`--native-chat-provider=openrouter` or `--native-chat-provider=vercel` and pass
+`--native-chat-model=<catalogue model ID>`. Add the provider key in Desktop
+settings first. These profiles use shared key custody on macOS and Linux.
+
+For an approved anonymous compatible endpoint, pass
+`--native-chat-provider=endpoint:<saved ID>`. Add `--native-chat-model=<saved model ID>`
+to choose a registered model. Omit it to use the saved default or the first
+registered model. An unavailable selection leaves the workspace chat unopened.
+
 To export a live workspace view to another local agent, place a separate
 64-character hexadecimal bearer in `native-mcp-export.bearer` under
 `--user-data-dir`. Use mode `0600` or `0400` and omit a trailing newline.

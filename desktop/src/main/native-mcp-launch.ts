@@ -1,4 +1,5 @@
 // GRIDA-SEC-004 — one trusted local MCP peer for an exact Desktop workspace.
+import type { NativeDesktopProfile } from "./native-desktop-profile";
 import {
   NativeMcpFiles,
   invalidMcpProfile,
@@ -22,7 +23,7 @@ export class NativeMcpLaunch {
   static async configure(
     argv: readonly string[],
     browserProfile: string,
-    provider: "gateway" | "chatgpt"
+    provider: NativeDesktopProfile.Provider
   ): Promise<NativeMcpLaunch | undefined> {
     const separator = argv.indexOf("--");
     const options = (separator < 0 ? argv : argv.slice(0, separator)).filter(

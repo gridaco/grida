@@ -9,7 +9,15 @@ import { defaultScratchBase } from "@grida/agent/sandbox";
 import { NativeFirstProfile } from "./native-first-profile";
 
 export namespace NativeDesktopProfile {
-  export type Provider = "gateway" | "chatgpt";
+  export type Provider =
+    | "gateway"
+    | "chatgpt"
+    | Readonly<{
+        kind: "byok";
+        id: "openrouter" | "vercel";
+        model: string;
+      }>
+    | Readonly<{ kind: "endpoint"; id: string; model?: string }>;
   type HostApp = Pick<App, "getPath" | "setPath"> & {
     commandLine: Pick<App["commandLine"], "getSwitchValue">;
   };
@@ -147,20 +155,7 @@ export namespace NativeDesktopProfile {
       browserData !== app.getPath("userData")
     )
       throw invalidProfile();
-    const choices = process.argv.filter(
-      (arg) =>
-        arg === "--native-chat-provider" ||
-        arg.startsWith("--native-chat-provider=")
-    );
-    if (
-      choices.length > 1 ||
-      (choices[0] !== undefined &&
-        choices[0] !== "--native-chat-provider=gateway" &&
-        choices[0] !== "--native-chat-provider=chatgpt")
-    )
-      throw invalidProfile();
-    const provider =
-      choices[0] === "--native-chat-provider=chatgpt" ? "chatgpt" : "gateway";
+    const provider = await selectedProvider(process.argv);
     const root = path.dirname(agentData);
     const systemTemp = await fs.realpath(app.getPath("temp"));
     const relative = path.relative(systemTemp, root);
@@ -208,6 +203,36 @@ export namespace NativeDesktopProfile {
     app.setPath("documents", projects);
     admitted.set(app, protectedLegacy);
     return provider;
+  }
+
+  async function selectedProvider(argv: readonly string[]): Promise<Provider> {
+    const separator = argv.indexOf("--");
+    const options = separator < 0 ? argv : argv.slice(0, separator);
+    const provider = option(options, "--native-chat-provider") ?? "gateway";
+    const model = option(options, "--native-chat-model");
+    if (model && !/^[A-Za-z0-9_.:/@-]{1,256}$/.test(model))
+      throw invalidProfile();
+    if ((provider === "gateway" || provider === "chatgpt") && !model)
+      return provider;
+    if ((provider === "openrouter" || provider === "vercel") && model)
+      return { kind: "byok", id: provider, model };
+    if (provider.startsWith("endpoint:")) {
+      const id = provider.slice("endpoint:".length);
+      const { isValidEndpointProviderId } = await import("@grida/agent");
+      if (isValidEndpointProviderId(id)) return { kind: "endpoint", id, model };
+    }
+    throw invalidProfile();
+  }
+
+  function option(argv: readonly string[], name: string): string | undefined {
+    const matches = argv.filter(
+      (arg) => arg === name || arg.startsWith(`${name}=`)
+    );
+    if (matches.length === 0) return;
+    const value = matches[0].slice(name.length + 1);
+    if (matches.length !== 1 || !value || value !== value.trim())
+      throw invalidProfile();
+    return value;
   }
 
   function captureLegacyRoots(

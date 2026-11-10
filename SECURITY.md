@@ -890,6 +890,11 @@ lazy reads, read-only mutation, and symlink escape refusal.
   only that provider's exact Chat Completions route. This launch path is limited
   to shared custody on macOS and Linux. [Process fixtures](desktop/src/main/native-provider-selection.test.ts)
   exercise both stored keys and refusal after credential replacement.
+  The isolated [Desktop profile](desktop/src/main/native-desktop-profile.ts)
+  accepts only a saved provider identity and model choice. The
+  [workspace launcher](desktop/src/main/native-desktop-agent.ts) resolves
+  that selection through Main's settings and grant owners before starting the
+  child. An unavailable selection leaves the workspace unopened.
 - The [Desktop native chat client](desktop/src/main/native-agent-chat.ts)
   fixes the workspace context at startup and accepts session handles issued
   on that ACP connection. Controls use a host observation of the exact

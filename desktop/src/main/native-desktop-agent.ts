@@ -55,7 +55,8 @@ export class NativeDesktopAgent {
     private readonly resourcesPath: string,
     private readonly subscription?: Subscription,
     private readonly workspaceCatalogRoot?: string,
-    private readonly mcp?: NativeMcpLaunch
+    private readonly mcp?: NativeMcpLaunch,
+    private readonly provider: NativeDesktopProfile.Provider = "gateway"
   ) {
     if (subscription) {
       const { oauth } = subscription;
@@ -150,7 +151,8 @@ export class NativeDesktopAgent {
       resourcesPath,
       subscription,
       options?.workspaceCatalogRoot,
-      options?.mcp
+      options?.mcp,
+      options?.provider
     );
   }
 
@@ -243,6 +245,7 @@ export class NativeDesktopAgent {
   }
 
   private async prepareProvider(signal: AbortSignal) {
+    signal.throwIfAborted();
     if (this.subscription) {
       return {
         provider: await this.subscription.host.launch(
@@ -250,6 +253,15 @@ export class NativeDesktopAgent {
           signal
         ),
       };
+    }
+    if (typeof this.provider !== "string") {
+      const { kind, id, model } = this.provider;
+      const provider =
+        kind === "byok"
+          ? await agentSidecarClient.nativeBuiltInByok(id, model)
+          : await agentSidecarClient.nativeConfiguredEndpoint(id, model);
+      signal.throwIfAborted();
+      return { provider };
     }
     const gateway = await nativeAgentGatewayConnection(
       this.account,
