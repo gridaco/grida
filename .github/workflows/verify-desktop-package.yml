@@ -3,14 +3,9 @@ permissions:
 
 name: Verify Desktop Package
 
-# Proves the desktop app PACKAGES correctly on every OS — i.e. the bundles'
-# externalized dependencies are actually shipped — without publishing. The
-# `electron-forge package` step runs the GRIDA-DESKTOP-BUILD-GUARD oracle
-# (desktop/scripts/verify-packaged-bundle.mjs, a postPackage hook) which fails
-# the build if the packaged app would crash on launch with "Cannot find module"
-# or ship packages outside the runtime closure. The same-target native binary
-# must also start, reopen a disposable ACP session, and close cleanly on EOF.
-# No signing/secrets required.
+# Builds unsigned installers on each supported target without publishing.
+# Forge verifies the package's runtime dependency closure and runs the bundled
+# native executable on that target before handing the package to its makers.
 on:
   pull_request:
     paths:
@@ -28,6 +23,7 @@ on:
       - "data/ai/**"
       - "packages/grida-desktop-bridge/**"
       - "packages/grida-home/**"
+      - ".github/workflows/realease-desktop-app.yml"
       - ".github/workflows/verify-desktop-package.yml"
   workflow_dispatch:
 
@@ -36,8 +32,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - image: ubuntu-24.04
+            arch: x64
+          - image: ubuntu-24.04-arm
+            arch: arm64
+          - image: windows-latest
+            arch: x64
+          - image: macos-26
+            arch: arm64
+          - image: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.image }}
     defaults:
       run:
         working-directory: ./desktop
@@ -77,7 +83,5 @@ jobs:
             --filter=@grida/daemon \
             --filter=@grida/home
 
-      - name: Package (runs the GRIDA-DESKTOP-BUILD-GUARD oracle)
-        # The package script builds the locked native payload and Forge
-        # verifies it with the unsigned app. No makers, publish or secrets.
-        run: pnpm run package
+      - name: Verify package and make unsigned installers
+        run: pnpm run make --arch="${{ matrix.arch }}"

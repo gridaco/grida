@@ -14,30 +14,18 @@ const forge = path.join(
   path.dirname(forgeManifest),
   require(forgeManifest).bin["electron-forge"]
 );
-const args = process.argv.slice(2);
-const override = process.env.GRIDA_DESKTOP_NATIVE_ARTIFACTS;
 
-function packageDesktop(artifacts, packageArgs = args) {
-  execFileSync(process.execPath, [forge, "package", ...packageArgs], {
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      ...(artifacts ? { GRIDA_DESKTOP_NATIVE_ARTIFACTS: artifacts } : {}),
-    },
-  });
-}
-
-if (override) {
+export function forgeInvocation(command, args) {
+  assert(command === "package" || command === "make", "Invalid Forge command");
   assert(
-    path.isAbsolute(override),
-    "Native agent artifact root must be absolute"
+    !args.some(
+      (arg) => arg === "--skip-package" || arg.startsWith("--skip-package=")
+    ),
+    "Desktop installers require a fresh verified package"
   );
-  packageDesktop(override);
-} else if (
-  args.some((arg) => ["--help", "-h", "--version", "-V"].includes(arg))
-) {
-  packageDesktop();
-} else {
+  if (args.some((arg) => ["--help", "-h", "--version", "-V"].includes(arg))) {
+    return { args: [command, ...args] };
+  }
   const { values } = parseArgs({
     args,
     options: {
@@ -47,18 +35,50 @@ if (override) {
     strict: false,
     allowPositionals: true,
   });
+  const arch = values.arch ?? process.arch;
+  return {
+    args: [command, ...(values.arch ? [] : ["--arch", arch]), ...args],
+    target: { platform: values.platform ?? process.platform, arch },
+  };
+}
+
+function runForge(args, artifacts) {
+  execFileSync(process.execPath, [forge, ...args], {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      ...(artifacts ? { GRIDA_DESKTOP_NATIVE_ARTIFACTS: artifacts } : {}),
+    },
+  });
+}
+
+function buildDesktop(command, args) {
+  const invocation = forgeInvocation(command, args);
+  if (!invocation.target) return runForge(invocation.args);
+  const override = process.env.GRIDA_DESKTOP_NATIVE_ARTIFACTS;
+  if (override) {
+    assert(
+      path.isAbsolute(override),
+      "Native agent artifact root must be absolute"
+    );
+    return runForge(invocation.args, override);
+  }
   const artifacts = fs.mkdtempSync(
     path.join(os.tmpdir(), "grida-desktop-agent-")
   );
   try {
     buildNativeAgentArtifacts(
       artifacts,
-      values.platform ?? process.platform,
-      values.arch ?? process.arch
+      invocation.target.platform,
+      invocation.target.arch
     );
-    const packageArgs = values.arch ? args : ["--arch", process.arch, ...args];
-    packageDesktop(artifacts, packageArgs);
+    runForge(invocation.args, artifacts);
   } finally {
     fs.rmSync(artifacts, { recursive: true, force: true });
   }
+}
+
+if (import.meta.main) {
+  const [command, ...args] = process.argv.slice(2);
+  buildDesktop(command, args);
 }

@@ -1,8 +1,10 @@
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { ResolvedForgeConfig } from "@electron-forge/shared-types";
 import config from "./forge.config";
 import {
   buildNativeAgentArtifacts,
@@ -97,6 +99,66 @@ describe("Desktop native agent package", () => {
       close: () => fs.rmSync(root, { recursive: true, force: true }),
     };
   }
+
+  it("allows installers only after staging and verifying this package", async () => {
+    const platform = process.platform === "darwin" ? "linux" : "darwin";
+    const arch = "x64";
+    const fixture = stage(platform, arch);
+    const { prePackage, packageAfterCopy, postPackage, preMake } =
+      config.hooks ?? {};
+    if (
+      typeof prePackage !== "function" ||
+      typeof packageAfterCopy !== "function" ||
+      typeof postPackage !== "function" ||
+      typeof preMake !== "function"
+    ) {
+      throw new Error("Desktop packaging hooks are required");
+    }
+    const forge = config as ResolvedForgeConfig;
+    const root = path.dirname(fixture.resources);
+    const outputPath = path.join(root, `Grida-${platform}-${arch}`);
+    const resources = path.join(outputPath, "resources");
+    const app = path.join(root, "app");
+    const build = path.join(app, ".vite", "build");
+    const { createPackage } = createRequire(import.meta.url)(
+      "@electron/asar"
+    ) as {
+      createPackage(source: string, target: string): Promise<void>;
+    };
+    try {
+      vi.stubEnv("GRIDA_DESKTOP_NATIVE_ARTIFACTS", undefined);
+      await expect(prePackage(forge, platform, arch)).rejects.toThrow(
+        "Desktop packaging requires an absolute native artifact root"
+      );
+      await expect(preMake(forge)).rejects.toThrow(
+        "Desktop installers require a fresh verified package"
+      );
+      vi.stubEnv("GRIDA_DESKTOP_NATIVE_ARTIFACTS", fixture.artifacts);
+      await prePackage(forge, platform, arch);
+      fs.mkdirSync(resources, { recursive: true });
+      fs.mkdirSync(build, { recursive: true });
+      fs.writeFileSync(path.join(build, "main.js"), "void 0;");
+      await createPackage(app, path.join(resources, "app.asar"));
+      await packageAfterCopy(
+        forge,
+        path.join(resources, "app"),
+        "",
+        platform,
+        arch
+      );
+      await expect(preMake(forge)).rejects.toThrow(
+        "Desktop installers require a fresh verified package"
+      );
+      await postPackage(forge, { platform, arch, outputPaths: [outputPath] });
+      await expect(preMake(forge)).resolves.toBeUndefined();
+      await expect(preMake(forge)).rejects.toThrow(
+        "Desktop installers require a fresh verified package"
+      );
+    } finally {
+      vi.unstubAllEnvs();
+      fixture.close();
+    }
+  });
 
   it("statically verifies foreign packages without executing their binary", async () => {
     const platform = process.platform === "linux" ? "darwin" : "linux";

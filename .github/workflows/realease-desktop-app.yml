@@ -38,9 +38,13 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - name: linux
-            image: ubuntu-latest
-            arch: x64,arm64
+          # Each job builds and runs the agent for the installer it makes.
+          - name: linux-x64
+            image: ubuntu-24.04
+            arch: x64
+          - name: linux-arm64
+            image: ubuntu-24.04-arm
+            arch: arm64
           - name: windows
             image: windows-latest
             arch: x64
@@ -55,9 +59,6 @@ jobs:
             arch: arm64
             mac_arch: arm64
           - name: macos-intel
-            # GitHub's LAST x86_64 macOS image — retired Aug 2027
-            # (actions/runner-images#13045). When it dies, either Forge 8 GA
-            # has fixed the parallel-arch DMG race or we re-drop Intel.
             image: macos-15-intel
             arch: x64
             mac_arch: x64
@@ -114,6 +115,20 @@ jobs:
             --filter=@grida/agent \
             --filter=@grida/daemon \
             --filter=@grida/home
+
+      - name: Build locked native agent artifacts
+        # Cargo and its dependencies run before importing signing credentials.
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.os.arch }}
+        run: |
+          artifacts="$RUNNER_TEMP/grida-desktop-native"
+          node --input-type=module - "$artifacts" "$TARGET_ARCH" <<'NODE'
+          import { buildNativeAgentArtifacts } from "./scripts/native-agent-package.mjs";
+          const [artifacts, arch] = process.argv.slice(2);
+          buildNativeAgentArtifacts(artifacts, process.platform, arch);
+          NODE
+          printf 'GRIDA_DESKTOP_NATIVE_ARTIFACTS=%s\n' "$artifacts" >> "$GITHUB_ENV"
 
       - name: Import Apple signing certificate
         if: ${{ matrix.os.mac_arch && env.HAS_SIGNING == 'true' }}

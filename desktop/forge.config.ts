@@ -101,6 +101,18 @@ function packageIgnore(file: string): boolean {
   return true; // src, tsconfig, configs — Vite already bundled what's needed
 }
 
+function nativeArtifactRoot(): string {
+  const artifacts = process.env.GRIDA_DESKTOP_NATIVE_ARTIFACTS;
+  if (!artifacts || !path.isAbsolute(artifacts)) {
+    throw new Error(
+      "Desktop packaging requires an absolute native artifact root"
+    );
+  }
+  return artifacts;
+}
+
+let packageVerified = false;
+
 const config: ForgeConfig = {
   packagerConfig: {
     extraResource: [
@@ -175,6 +187,10 @@ const config: ForgeConfig = {
     ],
   },
   hooks: {
+    prePackage: async () => {
+      packageVerified = false;
+      nativeArtifactRoot();
+    },
     packageAfterCopy: async (
       _forgeConfig,
       appPath,
@@ -182,8 +198,7 @@ const config: ForgeConfig = {
       platform,
       arch
     ) => {
-      const artifacts = process.env.GRIDA_DESKTOP_NATIVE_ARTIFACTS;
-      if (!artifacts) return;
+      const artifacts = nativeArtifactRoot();
       const script = path.join(
         __dirname,
         "scripts",
@@ -223,25 +238,29 @@ const config: ForgeConfig = {
     // crashing on a user's machine with "Cannot find module". Runs on
     // package / make / publish, locally and in CI.
     postPackage: async (_forgeConfig, { outputPaths }) => {
+      if (!outputPaths.length) throw new Error("No Desktop package to verify");
       const script = path.join(
         __dirname,
         "scripts",
         "verify-packaged-bundle.mjs"
       );
       for (const outputPath of outputPaths) {
-        const args = [script, outputPath];
-        if (process.env.GRIDA_DESKTOP_NATIVE_ARTIFACTS) {
-          const target = /-(darwin|linux|win32)-(arm64|x64)$/.exec(
-            path.basename(outputPath)
-          );
-          if (!target)
-            throw new Error("Unsupported native agent package target");
-          args.push("--native-agent", target[1], target[2]);
-        }
-        execFileSync(process.execPath, args, {
-          stdio: "inherit",
-        });
+        const target = /-(darwin|linux|win32)-(arm64|x64)$/.exec(
+          path.basename(outputPath)
+        );
+        if (!target) throw new Error("Unsupported native agent package target");
+        execFileSync(
+          process.execPath,
+          [script, outputPath, "--native-agent", target[1], target[2]],
+          { stdio: "inherit" }
+        );
       }
+      packageVerified = true;
+    },
+    preMake: async () => {
+      if (!packageVerified)
+        throw new Error("Desktop installers require a fresh verified package");
+      packageVerified = false;
     },
   },
   makers: [

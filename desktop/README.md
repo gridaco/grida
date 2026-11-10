@@ -122,12 +122,13 @@ adapter still wires the core.
 
 ## Distributions
 
-The local and unsigned CI package entrypoint builds the native agent with the
+The package and installer entrypoints build the native agent with the
 repository's pinned Rust toolchain and locked dependencies. Install the Rust
 toolchain and native linker for your packaging machine, then run:
 
 ```sh
 pnpm --dir desktop package
+pnpm --dir desktop make
 ```
 
 The default build targets the packaging machine's OS and Node architecture.
@@ -139,9 +140,11 @@ require `grida-agent` and `agent-kit-sandbox-helper`. Windows x64 requires
 
 Forge stages the executables in `resources/native-agent` before signing and
 verifies their architecture, names and permissions in the completed package.
-Local Linux binaries use the builder's GNU runtime. Installer and cross-machine
-ABI qualification and chat startup each have separate acceptance checks.
-The installer and publish workflows still use their existing artifact inputs.
+On a matching host it also starts the bundled executable, reopens an ACP chat
+and checks clean shutdown. Cross-target packages receive the static checks.
+Installer makers require a freshly verified package. The distribution and
+unsigned verification jobs each build and run the executable on their target.
+Linux binaries use the builder's GNU runtime.
 
 The main-process chat client creates or loads a session in its selected
 workspace and sends identified text input over ACP. It reads retained input
