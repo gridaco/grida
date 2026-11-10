@@ -57,6 +57,20 @@ pub struct ExternalAcpLaunch {
 #[derive(Clone)]
 pub struct ExternalAcpDriver(Arc<Driver>);
 
+/// Lifecycle guarantees of the selected foreign-driver profile.
+#[derive(Clone, Copy, Debug, Serialize)]
+pub struct ExternalAcpCapabilities {
+    pub kind: &'static str,
+    pub transport: &'static str,
+    pub execution: &'static str,
+    pub workspace_access: &'static str,
+    pub network: &'static str,
+    pub input: &'static str,
+    pub observation: &'static str,
+    pub stop: &'static str,
+    pub recovery: &'static str,
+}
+
 struct Driver {
     sandbox: Arc<Sandbox>,
     launch: ExternalAcpLaunch,
@@ -80,6 +94,20 @@ struct Account<'a> {
 }
 
 impl ExternalAcpDriver {
+    pub fn capabilities(&self) -> ExternalAcpCapabilities {
+        ExternalAcpCapabilities {
+            kind: "external_acp",
+            transport: "acp_v1_stdio",
+            execution: "local_confined_process",
+            workspace_access: "read_only",
+            network: "denied",
+            input: "text",
+            observation: "retained_text_and_outcome",
+            stop: "owned_process",
+            recovery: "local_receipt",
+        }
+    }
+
     pub fn new(
         sandbox: Arc<Sandbox>,
         launch: ExternalAcpLaunch,

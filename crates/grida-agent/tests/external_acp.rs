@@ -642,9 +642,29 @@ async fn headless_external_run_publishes_the_exact_retained_turn() {
     };
     assert_eq!(accepted["kind"], "accepted");
     assert_eq!(finished["kind"], "finished");
-    for key in ["session_id", "turn_id", "input_id", "schema_version"] {
+    for key in [
+        "session_id",
+        "turn_id",
+        "input_id",
+        "schema_version",
+        "driver",
+    ] {
         assert_eq!(accepted[key], finished[key], "{key}");
     }
+    assert_eq!(
+        accepted["driver"],
+        json!({
+            "kind": "external_acp",
+            "transport": "acp_v1_stdio",
+            "execution": "local_confined_process",
+            "workspace_access": "read_only",
+            "network": "denied",
+            "input": "text",
+            "observation": "retained_text_and_outcome",
+            "stop": "owned_process",
+            "recovery": "local_receipt",
+        })
+    );
     assert_eq!(finished["disposition"], "succeeded");
     assert_eq!(finished["account"]["text"], "partial and completed");
     assert_eq!(finished["account"]["peer_session"], "foreign-session");

@@ -109,6 +109,7 @@ pub async fn run(options: RunOptions, signal: impl Future<Output = Result<()>>) 
         "session_id": binding.session,
         "turn_id": binding.turn,
         "input_id": input,
+        "driver": driver.capabilities(),
     });
     let accepted = write_record(&record).await;
     let mut completion = driver.run(claim);

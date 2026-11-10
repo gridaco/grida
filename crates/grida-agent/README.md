@@ -519,8 +519,10 @@ The prompt is UTF-8 and limited to 64 KiB. Use `--prompt` or stdin, and
 `--deadline-ms` to set the run deadline.
 
 The launcher writes the usual `accepted` and `finished` JSON Lines with the
-same session, turn, and input IDs. The external account includes bounded
-peer text and observed cleanup. A process signal requests Stop for the
+same session, turn, and input IDs. Both records declare the driver as a local
+confined ACP process that accepts text, preserves a local receipt, and can
+stop its owned process. The external account includes bounded peer text and
+observed cleanup. A process signal requests Stop for the
 admitted turn. An unconfirmed handoff reports `uncertain` and is not replayed.
 Use `inspect --state-dir DIRECTORY SESSION_ID` to check its retained receipt.
 Each new invocation opens an independent turn and peer process.
