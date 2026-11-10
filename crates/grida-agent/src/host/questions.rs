@@ -47,6 +47,18 @@ impl QuestionAccess {
         Ok(())
     }
 
+    pub(super) fn insert_library(
+        &self,
+        operations: TurnOperations,
+        inventory: &mut Inventory,
+        grants: &mut BTreeMap<ToolId, GrantSelection>,
+    ) -> Result<()> {
+        let tool = library::LibraryTool::new(operations)?;
+        grants.insert(tool.definition().id.clone(), self.selection.clone());
+        inventory.insert(Arc::new(tool))?;
+        Ok(())
+    }
+
     pub(super) async fn reconcile(
         &self,
         operations: &TurnOperations,
@@ -88,20 +100,24 @@ impl ToolGate for QuestionAccess {
         context: AdmissionContext,
     ) -> BoxFuture<'_, Result<ToolDecision>> {
         Box::pin(async move {
-            if !self.accepts(&admission.grants)
-                || !matches!(
-                    admission.invocation.definition().id.as_str(),
-                    "question" | "question_async"
-                )
-            {
+            if !self.accepts(&admission.grants) {
                 return Err(problem(
                     ErrorKind::Unsupported,
                     "tool_execution_unavailable",
                 ));
             }
-            Ok(defer_for_answer(&admission, &context.operations)
-                .await?
-                .unwrap_or(ToolDecision::Permit))
+            match admission.invocation.definition().id.as_str() {
+                "question" | "question_async" => {
+                    Ok(defer_for_answer(&admission, &context.operations)
+                        .await?
+                        .unwrap_or(ToolDecision::Permit))
+                }
+                library::TOOL => library::defer_for_answer(&admission, &context.operations).await,
+                _ => Err(problem(
+                    ErrorKind::Unsupported,
+                    "tool_execution_unavailable",
+                )),
+            }
         })
     }
 }
@@ -221,7 +237,19 @@ impl Host {
         can_wake: bool,
         timer: Option<&agent_kit_core::CancellationToken>,
     ) -> Result<ControlReceipt> {
-        let mut work = self.work.lock().await;
+        let work = self.work.lock().await;
+        self.resolve_interaction_locked(work, control, action, can_wake, timer)
+            .await
+    }
+
+    pub(super) async fn resolve_interaction_locked(
+        &self,
+        mut work: tokio::sync::MutexGuard<'_, Work>,
+        control: TurnControl,
+        action: SessionControl,
+        can_wake: bool,
+        timer: Option<&agent_kit_core::CancellationToken>,
+    ) -> Result<ControlReceipt> {
         if work.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
         }
@@ -279,7 +307,9 @@ impl Host {
                     && state.controls().admits_work()
                     && state.waits().values().all(|wait| !wait.is_pending())
                     && state.waits().values().any(|wait| {
-                        ((is_question(wait) || crate::permissions::is_approval(wait))
+                        ((is_question(wait)
+                            || library::is_selection(wait)
+                            || crate::permissions::is_approval(wait))
                             && wait.answer.is_some())
                             || wakeups::was_delivered(wait)
                     });

@@ -6,6 +6,7 @@ pub(super) mod compaction;
 mod deletion;
 mod goals;
 mod history;
+pub(super) mod library;
 mod lifecycle;
 mod questions;
 mod routes;
@@ -16,7 +17,7 @@ mod summaries;
 mod wakeups;
 
 use super::{ConnectionSessions, host_error, prompt_part, prompt_parts, unavailable};
-use crate::host::{DurableSubmission, Host, InputSettings, PromptRequest};
+use crate::host::{DurableSubmission, Host, InputSettings, PromptRequest, SubmissionContext};
 use agent_client_protocol::v1::schema::{ContentBlock, Meta};
 use agent_client_protocol::{
     Client, Error, HandleDispatchFrom, JsonRpcRequest, JsonRpcResponse, Result, on_receive_request,
@@ -164,6 +165,8 @@ struct Submit {
     allow_configuration_changes: bool,
     #[serde(default)]
     allow_wakeups: bool,
+    #[serde(default)]
+    allow_library_selection: bool,
     operating_regime: Option<crate::OperatingRegime>,
     effort: Option<crate::EffortPreset>,
     editor_endpoint_id: Option<BindingId>,
@@ -422,6 +425,7 @@ pub(super) fn handlers(
             reviewer,
         ))
         .extend(history::handlers(host.clone(), sessions.clone()))
+        .extend(library::handlers(host.clone(), sessions.clone()))
         .extend(compaction::handlers(host.clone(), sessions.clone()))
         .extend(catalog::handlers(host.clone(), sessions.clone()))
         .extend(deletion::handlers(
@@ -449,6 +453,9 @@ pub(super) fn handlers(
                     require(&submit_sessions, SUBMIT, Some(&request.session_id))?;
                     if request.allow_wakeups && !wakeups::available(&submit_sessions) {
                         return Err(unavailable("wakeup_capability_required"));
+                    }
+                    if request.allow_library_selection && !library::available(&submit_sessions) {
+                        return Err(unavailable("library_selection_capability_required"));
                     }
                     if let Some(endpoint) = &request.editor_endpoint_id {
                         require(&submit_sessions, crate::editor_surfaces::CAPABILITY, None)?;
@@ -506,10 +513,13 @@ pub(super) fn handlers(
                                 )?,
                                 effort: effort(&submit_sessions, request.effort)?,
                             },
-                            request.allow_wakeups,
-                            request.editor_endpoint_id,
-                            request.editor_presentation,
-                            request.editor_svg_target_id,
+                            SubmissionContext {
+                                allow_wakeups: request.allow_wakeups,
+                                allow_library_selection: request.allow_library_selection,
+                                editor_endpoint: request.editor_endpoint_id,
+                                editor_presentation: request.editor_presentation,
+                                editor_svg_target: request.editor_svg_target_id,
+                            },
                         )
                         .await
                         .map_err(host_error)?;

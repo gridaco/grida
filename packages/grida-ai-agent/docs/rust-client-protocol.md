@@ -309,6 +309,27 @@ verifies the exact retained bytes before dispatch. A fork or compaction can
 omit earlier image content and records that omission. Image steering, earlier
 message replacement, and shared WebSocket intake are unavailable.
 
+On the private stdio Responses PNG profile, negotiate both
+`co.grida/session/library-selections` and `co.grida/session/answer-library-selection`
+at version 1. An identified Submit with `allowLibrarySelection: true` can
+offer `design_search` for that input. The tool asks the attached client to
+present a Library picker, with the recorded initial query. The client owns
+search, refinement, and access to the selected item.
+
+`_co.grida/session/library-selections` reads pending requests for the attached
+`sessionId` and exact `turnId`, with `controlRevision` and each `waitId` and
+`initialSearchQuery`. `_co.grida/session/answer-library-selection` takes the
+flat task basis, exact `waitId`, and either `{ "kind": "skipped" }` or
+`{ "kind": "selected", "id": "<catalog UUID>", "data": "<base64 PNG>" }`.
+The same PNG bounds and retained quota apply. Send the identical request and
+revision basis to recover its receipt. An explicit Pause still requires Resume.
+The host retains a private image identity and passes the selected pixels to
+the captured provider within that turn. Later turns retain a text description.
+If interruption occurs after the bytes are retained and before the choice is
+committed, the unused copy stays subject to the chat's storage and deletion policy.
+The host receives no Library URL or access grant. Desktop picker integration
+has its own availability gate.
+
 Private stdio clients may negotiate `co.grida/session/selected-file` version 1
 when the host has retained input storage. Identified Submit and Enqueue then
 accept one `selectedFile` with `name` and standard-base64 `data` alongside a

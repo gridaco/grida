@@ -10,6 +10,7 @@ mod history;
 mod host_tools;
 mod image_tools;
 mod images;
+pub(crate) mod library;
 mod lifecycle;
 pub(crate) mod live;
 mod permissions;
@@ -308,6 +309,8 @@ struct StoredPrompt {
     questions: bool,
     #[serde(default)]
     allow_wakeups: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    allow_library_selection: bool,
     #[serde(default)]
     configuration_permission: crate::ConfigurationPermission,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -344,6 +347,7 @@ struct SubmissionPolicy {
     questions: bool,
     configuration_permission: crate::ConfigurationPermission,
     allow_wakeups: bool,
+    allow_library_selection: bool,
     allow_host_tools: bool,
     editor_endpoint: Option<BindingId>,
     editor_presentation: bool,
@@ -439,6 +443,7 @@ struct PreparedInput {
     limit: Option<NonZeroU64>,
     questions: bool,
     allow_wakeups: bool,
+    allow_library_selection: bool,
     configuration_permission: crate::ConfigurationPermission,
     captured: Option<ConfigurationSnapshot>,
     permission_capture: Option<crate::permissions::PermissionCapture>,
@@ -455,6 +460,17 @@ pub struct PendingInteractions {
     pub questions: Questions,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub approvals: Vec<PendingApproval>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) library_selections: Vec<library::PendingSelection>,
+}
+
+#[derive(Default)]
+pub(crate) struct SubmissionContext {
+    pub allow_wakeups: bool,
+    pub allow_library_selection: bool,
+    pub editor_endpoint: Option<BindingId>,
+    pub editor_presentation: bool,
+    pub editor_svg_target: Option<BindingId>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1453,6 +1469,13 @@ impl Host {
                 .questions
                 .insert(operations.clone(), &mut inventory, &mut authority.tools)?;
         }
+        if prepared.allow_library_selection {
+            execution.questions.insert_library(
+                operations.clone(),
+                &mut inventory,
+                &mut authority.tools,
+            )?;
+        }
         if let Some(wakeups) = &wakeups {
             wakeups.insert(operations.clone(), &mut inventory, &mut authority.tools)?;
         }
@@ -1488,7 +1511,7 @@ impl Host {
         if !closing && let Some(delegation) = &delegation {
             delegation.reconcile(&operations, &tools).await?;
         }
-        if !closing && prepared.questions {
+        if !closing && (prepared.questions || prepared.allow_library_selection) {
             execution.questions.reconcile(&operations, &tools).await?;
         }
         if !closing && let Some(wakeups) = &wakeups {
@@ -1636,6 +1659,7 @@ impl Host {
             questions: request.questions,
             configuration_permission: request.configuration_permission,
             allow_wakeups,
+            allow_library_selection: false,
             allow_host_tools: true,
             editor_endpoint: None,
             editor_presentation: false,
@@ -1657,6 +1681,7 @@ impl Host {
             questions,
             configuration_permission,
             allow_wakeups,
+            allow_library_selection,
             allow_host_tools,
             editor_endpoint,
             editor_presentation,
@@ -1672,6 +1697,14 @@ impl Host {
         let execution = self.execution()?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
         let child_work = subagent.is_some();
+        if allow_library_selection
+            && (!execution.workspace_vision || child_work || self.side_context.is_some())
+        {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "library_selection_unavailable",
+            ));
+        }
         if child_work != session_configuration(session)?.subagent.is_some() {
             return Err(problem(
                 ErrorKind::Unsupported,
@@ -1761,6 +1794,7 @@ impl Host {
                     operating_regime,
                     questions,
                     allow_wakeups,
+                    allow_library_selection,
                     configuration_permission,
                     permission_capture,
                     host_tools_capture,
@@ -1808,6 +1842,7 @@ impl Host {
             limit,
             questions,
             allow_wakeups,
+            allow_library_selection,
             configuration_permission,
             captured,
             permission_capture,
@@ -1822,6 +1857,7 @@ impl Host {
                     decode_input(input)?,
                     OperatingRegime::Act,
                     None,
+                    false,
                     false,
                     false,
                     crate::ConfigurationPermission::Disabled,
@@ -1869,6 +1905,7 @@ impl Host {
                     }
                     if stored.questions
                         || stored.allow_wakeups
+                        || stored.allow_library_selection
                         || stored.configuration_permission
                             != crate::ConfigurationPermission::Disabled
                         || stored.permission_capture.is_some()
@@ -1895,6 +1932,15 @@ impl Host {
                     config
                         .instructions
                         .push_str(grida_agent_master::subagents::INSTRUCTIONS);
+                }
+                if !cancellation_only
+                    && stored.allow_library_selection
+                    && !execution.workspace_vision
+                {
+                    return Err(problem(
+                        ErrorKind::Unsupported,
+                        "library_selection_unavailable",
+                    ));
                 }
                 if !cancellation_only
                     && !self.operating_regime.is_act()
@@ -1991,6 +2037,7 @@ impl Host {
                     stored.configuration.defaults.context.max_input_tokens,
                     stored.questions,
                     !cancellation_only && stored.operating_regime.is_act() && stored.allow_wakeups,
+                    !cancellation_only && stored.allow_library_selection,
                     stored
                         .configuration_permission
                         .for_regime(stored.operating_regime),
@@ -2040,6 +2087,7 @@ impl Host {
             limit,
             questions,
             allow_wakeups,
+            allow_library_selection,
             configuration_permission,
             captured,
             permission_capture,
@@ -2172,24 +2220,23 @@ impl Host {
     }
 
     pub async fn submit_prompt(&self, request: PromptRequest) -> Result<DurableSubmission> {
-        self.submit_prompt_with_context(request, false, None, false, None)
+        self.submit_prompt_with_context(request, SubmissionContext::default())
             .await
     }
 
     pub(crate) async fn submit_prompt_with_context(
         &self,
         request: PromptRequest,
-        allow_wakeups: bool,
-        editor_endpoint: Option<BindingId>,
-        editor_presentation: bool,
-        editor_svg_target: Option<BindingId>,
+        context: SubmissionContext,
     ) -> Result<DurableSubmission> {
         validate_prompt_parts(&request.parts)?;
-        if let Some(accepted) = self.existing_submission(&request, allow_wakeups).await? {
+        if let Some(accepted) = self.existing_submission(&request, &context).await? {
             return Ok(accepted);
         }
-        let mut policy = self.submission_policy(&request, allow_wakeups)?;
-        if editor_svg_target.is_some() && (editor_endpoint.is_none() || allow_wakeups) {
+        let mut policy = self.submission_policy(&request, context.allow_wakeups)?;
+        let editor_endpoint = context.editor_endpoint.clone();
+        let editor_svg_target = context.editor_svg_target.clone();
+        if editor_svg_target.is_some() && (editor_endpoint.is_none() || context.allow_wakeups) {
             return Err(problem(
                 ErrorKind::Unsupported,
                 "svg_text_requires_attached_act",
@@ -2210,8 +2257,9 @@ impl Host {
             ));
         }
         policy.editor_endpoint = editor_endpoint;
-        policy.editor_presentation = editor_presentation;
+        policy.editor_presentation = context.editor_presentation;
         policy.editor_svg_target = editor_svg_target;
+        policy.allow_library_selection = context.allow_library_selection;
         let result = async {
             let ticket = self.register_prompt(request.clone(), true, policy).await?;
             prompt_acceptance(ticket.admission).await
@@ -2222,7 +2270,7 @@ impl Host {
             // An acceptance may have committed before the claim or response
             // failed. Re-read its identity and leave unclaimed input queued.
             Err(error) => self
-                .existing_submission(&request, allow_wakeups)
+                .existing_submission(&request, &context)
                 .await?
                 .ok_or(error),
         }
@@ -2231,7 +2279,7 @@ impl Host {
     async fn existing_submission(
         &self,
         request: &PromptRequest,
-        allow_wakeups: bool,
+        context: &SubmissionContext,
     ) -> Result<Option<DurableSubmission>> {
         let Some(view) = self
             .store
@@ -2252,10 +2300,16 @@ impl Host {
                 "submission_operating_regime_changed",
             ));
         }
-        if settings.allow_wakeups != allow_wakeups {
+        if settings.allow_wakeups != context.allow_wakeups {
             return Err(problem(
                 ErrorKind::Conflict,
                 "submission_wakeup_permission_changed",
+            ));
+        }
+        if settings.allow_library_selection != context.allow_library_selection {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "submission_library_selection_changed",
             ));
         }
         let requested = request
@@ -2867,10 +2921,15 @@ async fn drive(
             if state.controls().admits_work() {
                 let questions = questions::pending(&state)?;
                 let approvals = permissions::pending_approvals(&state)?.approvals;
-                if !questions.questions.is_empty() || !approvals.is_empty() {
+                let library_selections = library::pending(&state)?.selections;
+                if !questions.questions.is_empty()
+                    || !approvals.is_empty()
+                    || !library_selections.is_empty()
+                {
                     return Ok(RunResult::InputRequired(PendingInteractions {
                         questions,
                         approvals,
+                        library_selections,
                     }));
                 }
             }

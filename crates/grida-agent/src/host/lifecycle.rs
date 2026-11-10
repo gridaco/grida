@@ -40,6 +40,8 @@ pub struct InputSettings {
     pub questions: bool,
     #[serde(default)]
     pub allow_wakeups: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub allow_library_selection: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal_start: Option<GoalRequest>,
     #[serde(default)]
@@ -88,6 +90,7 @@ impl InputSettings {
                     max_output_tokens: stored.max_output_tokens,
                     questions: stored.questions,
                     allow_wakeups: stored.allow_wakeups,
+                    allow_library_selection: stored.allow_library_selection,
                     goal_start: match stored.goal {
                         Some(goals::GoalInput::Start(goal)) => Some(goal),
                         _ => None,
@@ -164,7 +167,10 @@ impl Host {
     async fn enqueue_owned(&self, request: PromptRequest) -> Result<DurableSubmission> {
         validate_prompt_parts(&request.parts)?;
         let admission = self.configuration_admission.lock().await;
-        if let Some(accepted) = self.existing_submission(&request, false).await? {
+        if let Some(accepted) = self
+            .existing_submission(&request, &SubmissionContext::default())
+            .await?
+        {
             return Ok(accepted);
         }
         if self.work.lock().await.closed {
@@ -296,12 +302,27 @@ impl Host {
                         "queued_goal_requires_withdrawal",
                     ));
                 }
+                if original_settings
+                    .as_ref()
+                    .is_some_and(|settings| settings.allow_library_selection)
+                {
+                    return Err(problem(
+                        ErrorKind::Conflict,
+                        "queued_library_selection_requires_withdrawal",
+                    ));
+                }
                 let replacement = if let Some(previous) = self
                     .store
                     .input(session.clone(), replacement.clone())
                     .await?
                 {
                     check_input(&previous.input, &parts)?;
+                    if InputSettings::for_input(&previous.input)?.allow_library_selection {
+                        return Err(problem(
+                            ErrorKind::Conflict,
+                            "queued_library_selection_requires_withdrawal",
+                        ));
+                    }
                     previous.input
                 } else {
                     let view = self.store.inspect(session.clone()).await?;
@@ -332,6 +353,7 @@ impl Host {
                             questions,
                             configuration_permission,
                             allow_wakeups: false,
+                            allow_library_selection: false,
                             allow_host_tools,
                             editor_endpoint: None,
                             editor_presentation: false,

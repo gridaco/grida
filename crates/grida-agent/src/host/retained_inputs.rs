@@ -9,12 +9,13 @@ use crate::file_tools::ImageCapture;
 use crate::scratch::{AssetRef, ScratchLimits, ScratchScope, WorkingCopyProof, WorkingCopyReceipt};
 use crate::workspace::ProtectedRoots;
 use agent_kit_core::messages::MediaRef;
-use agent_kit_core::{ArtifactId, ChangeId, ErrorKind, Fingerprint, Result, SessionId};
+use agent_kit_core::{ArtifactId, ChangeId, ErrorKind, Fingerprint, Result, SessionId, WaitId};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 const STORAGE: &str = "retained-inputs";
 pub(super) const WORKSPACE_VIEW: &str = "workspace-view/";
+pub(super) const LIBRARY_SELECTION: &str = "library-selection/";
 const LIMITS: ScratchLimits = ScratchLimits {
     max_assets: 16,
     max_asset_bytes: MAX_IMAGE_BYTES as u64,
@@ -72,6 +73,17 @@ impl RetainedInputs {
     ) -> Result<AssetRef> {
         let identity = Fingerprint::of(&(input, upload.digest))?;
         self.retain_png(session, cwd, "input/", identity, &upload.bytes)
+    }
+
+    pub(super) fn retain_library_image(
+        &self,
+        session: &SessionId,
+        cwd: &Path,
+        wait: &WaitId,
+        upload: ImageUpload,
+    ) -> Result<AssetRef> {
+        let identity = Fingerprint::of(&(wait, upload.digest))?;
+        self.retain_png(session, cwd, LIBRARY_SELECTION, identity, &upload.bytes)
     }
 
     pub(super) fn workspace_image_capture(

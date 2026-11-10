@@ -425,7 +425,14 @@ impl Host {
             let new_input = previous.is_none();
             let input = if let Some(previous) = previous {
                 lifecycle::check_input(&previous.input, &replacement.parts)?;
-                InputSettings::for_input(&previous.input)?.require_effort(replacement.effort)?;
+                let settings = InputSettings::for_input(&previous.input)?;
+                if settings.allow_library_selection {
+                    return Err(problem(
+                        ErrorKind::Conflict,
+                        "history_revision_library_selection_unavailable",
+                    ));
+                }
+                settings.require_effort(replacement.effort)?;
                 previous.input
             } else {
                 {
@@ -498,11 +505,12 @@ pub(super) fn context_material(
             .map(|HistoryRecord::Message(mut message)| {
                 for part in &mut message.content {
                     if let Content::ToolResult(result) = part {
-                        // Prior views keep their description. The current turn
+                        // Prior observations keep their description. The current turn
                         // can still replay its verified retained pixels.
                         result.content.retain(|part| {
                             !matches!(part, ResultContent::Media(media)
-                                if media.id.as_str().starts_with(retained_inputs::WORKSPACE_VIEW)
+                                if (media.id.as_str().starts_with(retained_inputs::WORKSPACE_VIEW)
+                                    || media.id.as_str().starts_with(retained_inputs::LIBRARY_SELECTION))
                                     && images::is_retained_image(media))
                         });
                     }

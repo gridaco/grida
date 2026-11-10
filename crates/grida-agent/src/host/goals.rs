@@ -374,6 +374,7 @@ impl Host {
         let id = continuation.input_id(&view.session)?;
         captured.parts.clear();
         captured.allow_wakeups = false;
+        captured.allow_library_selection = false;
         captured.configuration_permission = crate::ConfigurationPermission::Disabled;
         if let Some(permission) = &captured.permission_capture {
             let profile = self

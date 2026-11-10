@@ -237,6 +237,7 @@ impl Host {
                     questions: false,
                     configuration_permission: crate::ConfigurationPermission::Disabled,
                     allow_wakeups: false,
+                    allow_library_selection: false,
                     allow_host_tools: false,
                     editor_endpoint: None,
                     editor_presentation: false,

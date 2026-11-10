@@ -10,6 +10,292 @@ const IMAGE_MODEL: &str = "gpt-5.4";
 const ARTIFACTS: &str = "co.grida/session/artifacts";
 
 #[tokio::test]
+async fn requested_library_selection_survives_restart_and_replays_the_exact_answer() {
+    const LIST: &str = "co.grida/session/library-selections";
+    const ANSWER: &str = "co.grida/session/answer-library-selection";
+    const QUERY: &str = r#"{"initial_search_query":"geometric print"}"#;
+    const SELECTION: &str = "2869f043-e4ee-41bd-8965-1d5b739e0542";
+    let list_method = format!("_{LIST}");
+    let answer_method = format!("_{ANSWER}");
+    let directory = TempDir::new().unwrap();
+    let state = directory.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Responses,
+        vec![
+            Reply::Tool("design_search", QUERY),
+            Reply::Finished("Selected material received."),
+            Reply::Tool("design_search", QUERY),
+            Reply::Finished("Continued without material."),
+            Reply::Finished("Ordinary prompt."),
+        ],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let mut initialize = extension_initialize();
+    initialize["clientCapabilities"]["_meta"][LIST] = 1.into();
+    initialize["clientCapabilities"]["_meta"][ANSWER] = 1.into();
+    let mut first = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    let initialized = first.request("initialize", initialize.clone()).await;
+    assert_eq!(initialized["result"]["agentCapabilities"]["_meta"][LIST], 1);
+    assert_eq!(
+        initialized["result"]["agentCapabilities"]["_meta"][ANSWER],
+        1
+    );
+    let created = first
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let mut prompt =
+        super::lifecycle::prompt_request(session, "select", "Find a visual reference.");
+    prompt["allowLibrarySelection"] = true.into();
+    let started = first
+        .request("_co.grida/session/submit", prompt.clone())
+        .await;
+    let turn = started["result"]["turnId"].as_str().unwrap();
+    let listing = json!({"sessionId":session,"turnId":turn});
+    let offered = endpoint.request().await;
+    assert!(
+        offered["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["name"] == "design_search")
+    );
+    wait_for_library_selection(&mut first, session).await;
+    let pending = first.request(&list_method, listing.clone()).await;
+    let selection = &pending["result"]["selections"][0];
+    assert_eq!(selection["initialSearchQuery"], "geometric print");
+    assert!(selection["waitId"].is_string());
+    first.close().await;
+
+    let load = json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]});
+    let mut partial = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    let mut partial_initialize = initialize.clone();
+    partial_initialize["clientCapabilities"]["_meta"]
+        .as_object_mut()
+        .unwrap()
+        .remove(ANSWER);
+    partial.request("initialize", partial_initialize).await;
+    let loaded = partial.request("session/load", load.clone()).await;
+    assert!(loaded["result"].is_object(), "{loaded}");
+    let unsupported = partial.request(&list_method, listing.clone()).await;
+    assert_eq!(unsupported["error"]["code"], -32601);
+    let unsupported = partial
+        .request("_co.grida/session/submit", prompt.clone())
+        .await;
+    assert_eq!(
+        unsupported["error"]["data"],
+        "library_selection_capability_required"
+    );
+    partial.close().await;
+
+    let mut resumed = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    resumed.request("initialize", initialize.clone()).await;
+    let unattached = resumed.request(&list_method, listing.clone()).await;
+    assert!(unattached["error"].is_object(), "{unattached}");
+    let loaded = resumed.request("session/load", load.clone()).await;
+    assert!(loaded["result"].is_object(), "{loaded}");
+    assert_eq!(
+        resumed.request(&list_method, listing.clone()).await["result"],
+        pending["result"]
+    );
+    let mut altered = prompt;
+    altered["allowLibrarySelection"] = false.into();
+    let changed = resumed.request("_co.grida/session/submit", altered).await;
+    assert_eq!(
+        changed["error"]["data"],
+        "submission_library_selection_changed"
+    );
+    let waiting = snapshot(&mut resumed, session).await;
+    let paused = resumed
+        .request(
+            "_co.grida/session/pause",
+            task_basis(&waiting, session, "pause-before-picking"),
+        )
+        .await;
+    assert!(paused["result"].is_object(), "{paused}");
+    let paused = snapshot(&mut resumed, session).await;
+    let mut answer = task_basis(&paused, session, "choose-reference");
+    let data = STANDARD.encode(png([15, 255, 0]));
+    answer["waitId"] = selection["waitId"].clone();
+    answer["answer"] = json!({"kind":"selected","id":SELECTION,"data":data});
+
+    let mut invalid = answer.clone();
+    invalid["answer"]["data"] = "not-a-png".into();
+    let rejected = resumed.request(&answer_method, invalid).await;
+    assert_eq!(rejected["error"]["data"], "invalid_png_image");
+    let mut wrong = answer.clone();
+    wrong["waitId"] = "library-selection/missing".into();
+    let rejected = resumed.request(&answer_method, wrong).await;
+    assert_eq!(rejected["error"]["data"], "library_selection_unavailable");
+    let mut stale = answer.clone();
+    stale["expectedSessionRevision"] = waiting["sessionRevision"].clone();
+    let rejected = resumed.request(&answer_method, stale).await;
+    assert_eq!(
+        rejected["error"]["data"],
+        "library_selection_no_longer_answerable"
+    );
+    assert!(!state.join("retained-inputs").exists());
+    assert!(endpoint.requests.try_recv().is_err());
+
+    let mut alternative = answer.clone();
+    alternative["requestId"] = "choose-competing-reference".into();
+    alternative["answer"]["data"] = STANDARD.encode(png([0, 15, 255])).into();
+    let id = resumed.send(&answer_method, answer.clone()).await;
+    resumed.send(&answer_method, alternative.clone()).await;
+    let one = resumed.read_reply().await;
+    let two = resumed.read_reply().await;
+    let (accepted, rejected) = if one["result"].is_object() {
+        (one, two)
+    } else {
+        (two, one)
+    };
+    assert!(accepted["result"].is_object(), "{accepted}");
+    assert_eq!(
+        rejected["error"]["data"],
+        "library_selection_no_longer_answerable"
+    );
+    let (answer, mut changed) = if accepted["id"] == id {
+        (answer, alternative)
+    } else {
+        (alternative, answer)
+    };
+    changed["requestId"] = answer["requestId"].clone();
+    let data = answer["answer"]["data"].as_str().unwrap();
+    let sources = std::fs::read_dir(state.join("retained-inputs"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path()
+        .join("sources");
+    assert_eq!(std::fs::read_dir(&sources).unwrap().count(), 1);
+    assert_eq!(
+        resumed.request(&list_method, listing).await["result"]["selections"],
+        json!([])
+    );
+    assert!(endpoint.requests.try_recv().is_err());
+    resumed.close().await;
+
+    let mut recovered = stdio(&state, &endpoint.url, IMAGE_MODEL);
+    recovered.request("initialize", initialize).await;
+    let loaded = recovered.request("session/load", load).await;
+    assert!(loaded["result"].is_object(), "{loaded}");
+    assert_eq!(
+        recovered.request(&answer_method, answer.clone()).await["result"],
+        accepted["result"]
+    );
+    let rejected = recovered.request(&answer_method, changed).await;
+    assert_eq!(
+        rejected["error"]["data"],
+        "library_selection_no_longer_answerable"
+    );
+    assert!(endpoint.requests.try_recv().is_err());
+    let paused = snapshot(&mut recovered, session).await;
+    let resumed = recovered
+        .request(
+            "_co.grida/session/resume",
+            json!({
+                "task":task_basis(&paused,session,"resume-with-reference"),
+                "expectedEpoch":paused["current"]["epoch"],
+                "expectedJournalPosition":paused["current"]["journalPosition"],
+            }),
+        )
+        .await;
+    assert!(resumed["result"].is_object(), "{resumed}");
+
+    let request = endpoint.request().await;
+    let items = request["input"].as_array().unwrap();
+    let original_call = items
+        .iter()
+        .find(|part| part["name"] == "design_search")
+        .unwrap();
+    assert_eq!(original_call["arguments"], QUERY);
+    let output = items
+        .iter()
+        .find(|part| {
+            part["type"] == "function_call_output" && part["call_id"] == original_call["call_id"]
+        })
+        .unwrap();
+    let image_url = format!("data:image/png;base64,{data}");
+    assert!(
+        output["output"].as_array().unwrap().iter().any(
+            |item| item == &json!({"type":"input_image","image_url":image_url,"detail":"auto"})
+        )
+    );
+    let body = request.to_string();
+    assert_eq!(body.matches("data:image/png;base64,").count(), 1);
+    assert!(body.contains(SELECTION));
+    assert!(!body.contains("library-selection/"));
+    assert!(!body.contains("retained-input:"));
+    assert_eq!(
+        settled(&mut recovered, session).await["latest"]["status"],
+        "succeeded"
+    );
+    assert_eq!(
+        recovered.request(&answer_method, answer).await["result"],
+        accepted["result"]
+    );
+    assert!(endpoint.requests.try_recv().is_err());
+
+    let mut next = super::lifecycle::prompt_request(session, "skip", "Find another reference.");
+    next["allowLibrarySelection"] = true.into();
+    let started = recovered.request("_co.grida/session/submit", next).await;
+    let turn = started["result"]["turnId"].as_str().unwrap();
+    assert!(!endpoint.request().await.to_string().contains(&image_url));
+    let waiting = wait_for_library_selection(&mut recovered, session).await;
+    let pending = recovered
+        .request(&list_method, json!({"sessionId":session,"turnId":turn}))
+        .await;
+    let mut skip = task_basis(&waiting, session, "skip-reference");
+    skip["waitId"] = pending["result"]["selections"][0]["waitId"].clone();
+    skip["answer"] = json!({"kind":"skipped"});
+    let skipped = recovered.request(&answer_method, skip).await;
+    assert!(skipped["result"].is_object(), "{skipped}");
+    let request = endpoint.request().await.to_string();
+    assert!(request.contains("The user skipped the Library selection."));
+    assert!(!request.contains("data:image/png;base64,"));
+    assert_eq!(std::fs::read_dir(sources).unwrap().count(), 1);
+    assert_eq!(
+        settled(&mut recovered, session).await["latest"]["status"],
+        "succeeded"
+    );
+
+    let plain = super::lifecycle::prompt_request(session, "plain", "Continue in text.");
+    recovered.request("_co.grida/session/submit", plain).await;
+    let request = endpoint.request().await;
+    assert!(
+        !request["tools"]
+            .as_array()
+            .is_some_and(|tools| tools.iter().any(|tool| tool["name"] == "design_search"))
+    );
+    assert_eq!(
+        settled(&mut recovered, session).await["latest"]["status"],
+        "succeeded"
+    );
+    recovered.close().await;
+    endpoint.done().await;
+}
+
+async fn wait_for_library_selection(client: &mut StdioClient, session: &str) -> Value {
+    timeout(WAIT, async {
+        loop {
+            let state = snapshot(client, session).await;
+            if state["current"]["disposition"] == "suspended" {
+                return state;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
 async fn workspace_view_retains_approved_pixels_without_reading_a_changed_or_denied_source() {
     use std::fs;
     use std::os::unix::fs::{PermissionsExt, symlink};

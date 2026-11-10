@@ -581,6 +581,7 @@ impl Host {
         captured.effort = None;
         captured.goal = None;
         captured.questions = false;
+        captured.allow_library_selection = false;
         captured.allow_wakeups = false;
         captured.configuration_permission = crate::ConfigurationPermission::Disabled;
         captured.permission_capture = None;
@@ -1063,6 +1064,7 @@ mod tests {
                     questions: true,
                     configuration_permission: crate::ConfigurationPermission::Inspect,
                     allow_wakeups: false,
+                    allow_library_selection: false,
                     allow_host_tools: false,
                     editor_endpoint: None,
                     editor_presentation: false,
