@@ -1142,6 +1142,7 @@ fn failed_inference(failure: InferenceFailure) -> InferenceOutcome {
         usage: vec![],
         failure: Some(failure),
         receipt: None,
+        terminal_receipt: None,
     }
 }
 

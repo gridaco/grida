@@ -2174,6 +2174,7 @@ async fn older_reconciliation_invalidates_a_cut_without_moving_its_tail() {
             usage: vec![],
             failure: None,
             receipt: None,
+            terminal_receipt: None,
         })
     };
     commit(

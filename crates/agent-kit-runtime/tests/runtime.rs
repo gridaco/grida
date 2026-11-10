@@ -234,6 +234,7 @@ fn inference_outcome(content: Vec<Content>) -> InferenceOutcome {
         usage: vec![],
         failure: None,
         receipt: None,
+        terminal_receipt: None,
     }
 }
 

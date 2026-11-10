@@ -415,6 +415,7 @@ impl Response {
                 usage: self.usage.finish(final_usage),
                 failure,
                 receipt: self.receipt.take(),
+                terminal_receipt: None,
             }));
     }
 }

@@ -326,6 +326,7 @@ mod tests {
             usage: Vec::new(),
             failure: None,
             receipt: None,
+            terminal_receipt: None,
         }
     }
 

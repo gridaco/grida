@@ -9,8 +9,9 @@ mod wire;
 
 use agent_kit_core::inference::{ProviderBinding, RequestControl};
 use agent_kit_core::messages::MediaRef;
-use agent_kit_core::{BoxFuture, Error, ErrorKind, ModelId, Result};
+use agent_kit_core::{BoxFuture, Envelope, Error, ErrorKind, ModelId, Result};
 use futures_core::stream::BoxStream;
+use std::sync::Arc;
 
 pub use anthropic::Anthropic;
 pub use gemini::{Gemini, GeminiProfile};
@@ -20,6 +21,10 @@ pub use responses::{ReasoningEffort, Responses, ResponsesEndpoint, ResponsesProf
 /// Resolve a host-authorized, immutable image reference to its exact bytes.
 /// This bounded local read runs only when counting or starting a request.
 pub type InputImageResolver = dyn Fn(&MediaRef, usize) -> Result<Vec<u8>> + Send + Sync;
+
+/// A trusted transport's optional projection of its own terminal evidence.
+/// The adapter supplies the observed HTTP receipt and a validated finish frame.
+pub type TerminalReceiptDecoder = dyn Fn(&Envelope, &[u8]) -> Option<Envelope> + Send + Sync;
 
 /// The bound host selects the destination and injects credentials. The body
 /// contains conversation data and deliberately has no Debug implementation.
@@ -65,6 +70,10 @@ pub trait StreamingTransport: Send + Sync {
         request: TransportRequest,
         control: RequestControl,
     ) -> BoxFuture<'_, std::result::Result<TransportResponse, TransportFailure>>;
+
+    fn terminal_receipt_decoder(&self) -> Option<Arc<TerminalReceiptDecoder>> {
+        None
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

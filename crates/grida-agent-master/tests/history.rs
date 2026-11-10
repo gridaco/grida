@@ -159,6 +159,7 @@ fn inference(responses: &[HistoryRecord]) -> OperationOutcome {
         usage: vec![],
         failure: None,
         receipt: None,
+        terminal_receipt: None,
     })
 }
 

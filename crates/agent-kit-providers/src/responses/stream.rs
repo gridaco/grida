@@ -603,6 +603,7 @@ impl Response {
                 usage: self.usage.finish(false),
                 failure,
                 receipt: None,
+                terminal_receipt: None,
             }));
     }
 }

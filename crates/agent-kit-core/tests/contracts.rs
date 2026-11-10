@@ -583,6 +583,7 @@ fn finished_with_usage(usage: Vec<UsageObservation>) -> ProviderEvent {
         usage,
         failure: None,
         receipt: None,
+        terminal_receipt: None,
     })
 }
 
@@ -709,6 +710,7 @@ async fn inference_limit_preserves_terminal_receipt() {
         usage: vec![],
         failure: None,
         receipt: Some(envelope("receipt")),
+        terminal_receipt: None,
     };
     let run = InferenceRun::from_stream(
         InferenceControl {
@@ -1253,6 +1255,7 @@ impl agent_kit_core::inference::Provider for TestProvider {
                 usage: vec![],
                 failure: None,
                 receipt: None,
+                terminal_receipt: None,
             })]))
         }))
     }
@@ -1636,6 +1639,7 @@ async fn inference_factory_receives_the_callers_attempt_identity() {
                 usage: vec![],
                 failure: None,
                 receipt: None,
+                terminal_receipt: None,
             })]))
         },
     );
@@ -1718,6 +1722,43 @@ async fn provider_receipt_survives_cancellation_without_a_progress_event() {
     let result = run.finish().await;
     assert_eq!(result.status, InferenceStatus::Interrupted);
     assert_eq!(result.receipt, Some(receipt));
+    assert_eq!(result.terminal_receipt, None);
+}
+
+#[tokio::test]
+async fn terminal_receipt_is_optional_bounded_and_independent_of_dispatch() {
+    let receipt = envelope("request-id");
+    for size in [8, 8192] {
+        let supplement = Envelope::new(
+            SchemaId::new("terminal-evidence").unwrap(),
+            1,
+            vec![42; size],
+        )
+        .unwrap();
+        let run = InferenceRun::from_stream(inference_control(CancellationToken::new()), |_| {
+            Box::pin(stream::iter([
+                ProviderEvent::Receipt(receipt.clone()),
+                ProviderEvent::Finished(InferenceOutcome {
+                    status: InferenceStatus::Completed,
+                    messages: vec![],
+                    usage: vec![],
+                    failure: None,
+                    receipt: None,
+                    terminal_receipt: Some(supplement.clone()),
+                }),
+            ]))
+        });
+        let result = run.finish().await;
+        assert_eq!(result.status, InferenceStatus::Completed);
+        assert_eq!(result.receipt.as_ref(), Some(&receipt));
+        assert_eq!(result.terminal_receipt, (size == 8).then_some(supplement));
+        let serialized = serde_json::to_value(&result).unwrap();
+        assert_eq!(serialized.get("terminal_receipt").is_some(), size == 8);
+        assert_eq!(
+            serde_json::from_value::<InferenceOutcome>(serialized).unwrap(),
+            result
+        );
+    }
 }
 
 #[test]

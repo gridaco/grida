@@ -211,6 +211,7 @@ impl Provider for ScriptProvider {
                     dispatch: Some(DispatchEvidence::RejectedBeforeExecution),
                 }),
                 receipt: None,
+                terminal_receipt: None,
             };
             return Ok(InferenceRun::from_stream(control, move |_| {
                 Box::pin(stream::iter([ProviderEvent::Finished(outcome)]))
@@ -365,6 +366,7 @@ impl Provider for ScriptProvider {
             usage,
             failure,
             receipt: None,
+            terminal_receipt: None,
         };
         events.push(ProviderEvent::Finished(outcome));
         Ok(InferenceRun::from_stream(control, move |_| {

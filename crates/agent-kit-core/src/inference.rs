@@ -13,6 +13,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU64;
 use std::time::Instant;
 
+const MAX_TERMINAL_RECEIPT_BYTES: usize = 4096;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Modality {
@@ -296,6 +298,10 @@ pub struct InferenceOutcome {
     pub usage: Vec<UsageObservation>,
     pub failure: Option<InferenceFailure>,
     pub receipt: Option<Envelope>,
+    /// Supplementary terminal evidence from the adapter. An invalid or
+    /// oversized supplement does not affect the dispatch receipt or outcome.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal_receipt: Option<Envelope>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -574,6 +580,15 @@ impl InferenceRun {
                             break;
                         }
                     }
+                    let receipt_budget = MAX_TERMINAL_RECEIPT_BYTES.min(
+                        remaining.saturating_sub(size.saturating_add(self.usage.encoded_size())),
+                    );
+                    if outcome.terminal_receipt.as_ref().is_some_and(|receipt| {
+                        receipt.bytes().len() > receipt_budget
+                            || encoded_size(receipt) > receipt_budget
+                    }) {
+                        outcome.terminal_receipt = None;
+                    }
                     outcome.usage = self.usage.take();
                     self.terminal = Some(outcome);
                 }
@@ -618,6 +633,7 @@ impl InferenceRun {
                 dispatch: None,
             }),
             receipt: self.receipt.take(),
+            terminal_receipt: None,
         });
     }
 

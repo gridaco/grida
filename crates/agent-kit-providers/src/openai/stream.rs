@@ -1,7 +1,7 @@
 use crate::StreamLimits;
 use crate::wire::short_identity;
 use crate::wire::{Incoming, RateRejectionEvidence, WireError, WireStream, classify_error};
-use crate::{StreamingTransport, TransportRequest};
+use crate::{StreamingTransport, TerminalReceiptDecoder, TransportRequest};
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
     InferenceUpdate, MeasurementKind, ProviderEvent, UsageObservation,
@@ -26,6 +26,7 @@ pub(super) fn events(
     rate_rejection_evidence: RateRejectionEvidence,
 ) -> BoxStream<'static, ProviderEvent> {
     let source = request.binding.provider.to_string();
+    let receipt_decoder = transport.terminal_receipt_decoder();
     let state = ResponseStream {
         wire: WireStream::new(transport, request, control.clone(), limits)
             .with_rate_rejection_evidence(rate_rejection_evidence),
@@ -37,6 +38,8 @@ pub(super) fn events(
         message_id,
         response_id: None,
         receipt: None,
+        receipt_decoder,
+        terminal_receipt: None,
         text: String::new(),
         reasoning: String::new(),
         refusal: String::new(),
@@ -62,6 +65,8 @@ struct ResponseStream {
     message_id: MessageId,
     response_id: Option<String>,
     receipt: Option<Envelope>,
+    receipt_decoder: Option<Arc<TerminalReceiptDecoder>>,
+    terminal_receipt: Option<Envelope>,
     text: String,
     reasoning: String,
     refusal: String,
@@ -222,6 +227,11 @@ impl ResponseStream {
         let final_usage = chunk.choices.is_empty() && self.finish_reason.is_some();
         if let Some(choice) = chunk.choices.into_iter().next() {
             self.choice(choice)?;
+            if self.finish_reason.is_some()
+                && let (Some(decoder), Some(receipt)) = (&self.receipt_decoder, &self.receipt)
+            {
+                self.terminal_receipt = decoder(receipt, bytes);
+            }
         }
         if let Some(usage) = chunk.usage {
             self.observe_usage(usage, final_usage);
@@ -439,6 +449,11 @@ impl ResponseStream {
                 },
             }]
         };
+        let terminal_receipt = if failure.is_none() {
+            self.terminal_receipt.take()
+        } else {
+            None
+        };
         self.updates
             .push_back(ProviderEvent::Finished(InferenceOutcome {
                 status,
@@ -446,6 +461,7 @@ impl ResponseStream {
                 usage: std::mem::take(&mut self.usage).into_values().collect(),
                 failure,
                 receipt: self.receipt.take(),
+                terminal_receipt,
             }));
     }
 }

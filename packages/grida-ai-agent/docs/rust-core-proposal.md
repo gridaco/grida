@@ -387,14 +387,14 @@ and credential generation. The core retains an opaque binding identity and
 validates compatibility through the host. Grida organization and billing
 policy stay in the concrete host adapter.
 
-| Value              | Required contents                                                                                                                                    |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `InferenceRequest` | Chosen model, exact messages, tool offers, output requirements, selected settings, input provenance                                                  |
-| `PreparedRequest`  | Immutable validated request, capability revision, request fingerprint, provider and principal binding                                                |
-| `ToolOffer`        | Tool identity/version, model-visible name and description, input form/schema, streaming-input support                                                |
-| `InferenceControl` | Cancellation token, attempt deadline, input/output bounds                                                                                            |
-| `InferenceUpdate`  | Text/content deltas, tool-input deltas, usage evidence, replacement-context updates                                                                  |
-| `InferenceOutcome` | Completion/limit/refusal/interruption classification, failure facts and retry advice, complete/partial items, usage, continuation, and known receipt |
+| Value              | Required contents                                                                                                                                                     |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `InferenceRequest` | Chosen model, exact messages, tool offers, output requirements, selected settings, input provenance                                                                   |
+| `PreparedRequest`  | Immutable validated request, capability revision, request fingerprint, provider and principal binding                                                                 |
+| `ToolOffer`        | Tool identity/version, model-visible name and description, input form/schema, streaming-input support                                                                 |
+| `InferenceControl` | Cancellation token, attempt deadline, input/output bounds                                                                                                             |
+| `InferenceUpdate`  | Text/content deltas, tool-input deltas, usage evidence, replacement-context updates                                                                                   |
+| `InferenceOutcome` | Completion/limit/refusal/interruption classification, failure facts and retry advice, complete/partial items, usage, continuation, and dispatch and terminal receipts |
 
 Successful transport completion, a complete model answer, output-limit truncation,
 refusal, and an interrupted stream have distinct classifications. Failure facts
@@ -419,6 +419,12 @@ A later revision replaces the earlier observation for that measurement, includin
 the terminal report. Replay preserves observation identity. Estimated, measured,
 provisional, final, and unknown values stay distinguishable. Retries have separate
 attempt identities. Host adapters supply pricing and authoritative charge records.
+
+An adapter can report an immutable dispatch receipt as soon as it observes
+one. Cancellation preserves that evidence. An observed terminal outcome
+may carry a separate bounded receipt for facts learned at completion.
+The core discards an oversized supplement and preserves the recorded
+dispatch receipt and inference result.
 
 `finish` consumes any remaining updates and validates terminal evidence. An
 unexpected EOF becomes an interrupted outcome. Calling `next` until exhaustion

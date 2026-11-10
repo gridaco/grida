@@ -91,6 +91,7 @@ impl Provider for ScriptProvider {
             usage: vec![],
             failure: None,
             receipt: None,
+            terminal_receipt: None,
         };
         Ok(InferenceRun::from_stream(control, move |_| {
             Box::pin(futures_util::stream::iter([ProviderEvent::Finished(
