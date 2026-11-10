@@ -47,7 +47,12 @@ export type NativeSubagentInspection = Readonly<
 export type NativeSubagentObservation = Readonly<{
   child: NativeSubagentInspection;
   stopObservationId: string | null;
+  turnControls?: readonly NativeSubagentTurnControl["kind"][];
 }>;
+
+export type NativeSubagentTurnControl =
+  | Readonly<{ kind: "pause" | "resume" }>
+  | Readonly<{ kind: "steer"; instructions: string }>;
 
 export type NativeSubagentCreate = Readonly<{
   requestId: string;
@@ -84,5 +89,11 @@ export interface NativeSubagentClient {
     attachmentId: string,
     stopObservationId: string,
     requestId: string
+  ): Promise<void>;
+  controlSubagentTurn?(
+    attachmentId: string,
+    observationId: string,
+    requestId: string,
+    control: NativeSubagentTurnControl
   ): Promise<void>;
 }

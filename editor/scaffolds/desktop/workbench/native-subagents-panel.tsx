@@ -19,6 +19,7 @@ export function NativeSubagentsPanel({
   );
   const child = state.observation?.child;
   const assignment = child?.assignment;
+  const controls = controller.turnControls;
   return (
     <section
       className="shrink-0 border-t px-3 py-2"
@@ -185,6 +186,79 @@ export function NativeSubagentsPanel({
                     >
                       Stop subagent
                     </Button>
+                  )}
+                  {controls.includes("pause") && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      disabled={state.acting}
+                      onClick={() =>
+                        void controller.controlTurn({ kind: "pause" })
+                      }
+                    >
+                      Pause subagent
+                    </Button>
+                  )}
+                  {controls.includes("resume") && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      disabled={state.acting}
+                      onClick={() =>
+                        void controller.controlTurn({ kind: "resume" })
+                      }
+                    >
+                      Resume subagent
+                    </Button>
+                  )}
+                  {controller.canRetryTurnControl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      disabled={state.acting}
+                      onClick={() => void controller.retryTurnControl()}
+                    >
+                      Retry last subagent control
+                    </Button>
+                  )}
+                  {controls.includes("steer") && (
+                    <form
+                      key={assignment.turn?.turnId}
+                      aria-label="Steer the current subagent assignment"
+                      className="grid gap-1"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const form = event.currentTarget;
+                        const instructions = new FormData(form).get("steering");
+                        if (typeof instructions === "string")
+                          void controller
+                            .controlTurn({ kind: "steer", instructions })
+                            .then((accepted) => {
+                              if (accepted) form.reset();
+                            });
+                      }}
+                    >
+                      <Textarea
+                        aria-label="Subagent steering instructions"
+                        name="steering"
+                        required
+                        placeholder="What should change in this assignment?"
+                        className="min-h-14 resize-y text-xs"
+                        readOnly={state.acting}
+                      />
+                      <Button
+                        className="justify-self-end"
+                        type="submit"
+                        variant="outline"
+                        size="xs"
+                        disabled={state.acting}
+                      >
+                        Steer subagent
+                      </Button>
+                    </form>
                   )}
                 </div>
               )}

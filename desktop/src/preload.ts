@@ -437,6 +437,14 @@ const bridge: DesktopBridge = {
         stopObservationId,
         requestId
       ),
+    controlSubagentTurn: (attachmentId, observationId, requestId, control) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CONTROL_SUBAGENT_TURN,
+        attachmentId,
+        observationId,
+        requestId,
+        control
+      ),
     create: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
     load: (sessionId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),

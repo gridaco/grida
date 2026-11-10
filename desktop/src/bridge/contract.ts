@@ -63,6 +63,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_CREATE_SUBAGENT: "grida:native-chat:create-subagent",
   NATIVE_CHAT_ASSIGN_SUBAGENT: "grida:native-chat:assign-subagent",
   NATIVE_CHAT_STOP_SUBAGENT: "grida:native-chat:stop-subagent",
+  NATIVE_CHAT_CONTROL_SUBAGENT_TURN: "grida:native-chat:control-subagent-turn",
   NATIVE_CHAT_CREATE: "grida:native-chat:create",
   NATIVE_CHAT_LOAD: "grida:native-chat:load",
   NATIVE_CHAT_OPEN_SIDE: "grida:native-chat:open-side",

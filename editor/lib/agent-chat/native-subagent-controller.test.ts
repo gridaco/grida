@@ -51,6 +51,75 @@ function observed(
   };
 }
 
+it("retries a steering receipt with its original child and text after observation changes", async () => {
+  const work: NativeSubagentWork = {
+    inputId: "review",
+    parentTurnId: "sponsor",
+    instructionPreview: "Compare both drafts.",
+    instructionTruncated: false,
+    disposition: "claimed",
+    turn: {
+      turnId: "child-turn",
+      disposition: "running",
+      status: null,
+      paused: false,
+      cancelled: false,
+    },
+    result: null,
+  };
+  let token = "before-steer";
+  const control =
+    vi.fn<NonNullable<NativeSubagentClient["controlSubagentTurn"]>>();
+  control.mockImplementationOnce(async () => {
+    token = "after-steer";
+    throw new Error("native_chat_subagent_unverified");
+  });
+  control.mockResolvedValue(undefined);
+  const controller = new NativeSubagentController(
+    {
+      listSubagents: async () => ({
+        children: [{ childId: "child", name: "Reviewer" }],
+        nextAfterChildId: null,
+      }),
+      inspectSubagent: async () => ({
+        ...observed("child", work),
+        stopObservationId: token,
+        turnControls: ["pause", "steer"],
+      }),
+      createSubagent: vi.fn<NativeSubagentClient["createSubagent"]>(),
+      assignSubagent: vi.fn<NativeSubagentClient["assignSubagent"]>(),
+      stopSubagent: vi.fn<NativeSubagentClient["stopSubagent"]>(),
+      controlSubagentTurn: control,
+    },
+    "parent-attachment",
+    () => parent
+  );
+  try {
+    controller.toggle();
+    await vi.waitFor(() =>
+      expect(controller.turnControls).toEqual(["pause", "steer"])
+    );
+    const steering = {
+      kind: "steer",
+      instructions: "Use the newest draft.",
+    } as const;
+    expect(await controller.controlTurn(steering)).toBe(false);
+    expect(controller.read().observation?.stopObservationId).toBe(
+      "after-steer"
+    );
+    expect(controller.canRetryTurnControl).toBe(true);
+    expect(await controller.controlTurn({ kind: "pause" })).toBe(false);
+    expect(await controller.retryTurnControl()).toBe(true);
+    expect(control.mock.calls).toEqual([
+      ["parent-attachment", "before-steer", expect.any(String), steering],
+      control.mock.calls[0],
+    ]);
+    expect(controller.canRetryTurnControl).toBe(false);
+  } finally {
+    controller.dispose();
+  }
+});
+
 it("retries the exact named child and assignment on their parent, then stops the displayed turn", async () => {
   let created = false;
   let parentBasis = parent;

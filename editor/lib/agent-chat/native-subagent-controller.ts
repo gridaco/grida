@@ -3,6 +3,7 @@ import type {
   NativeSubagentClient,
   NativeSubagentEntry,
   NativeSubagentObservation,
+  NativeSubagentTurnControl,
 } from "@grida/desktop-bridge";
 
 const POLL_MS = 650;
@@ -18,6 +19,14 @@ type View = Readonly<{
   listing: boolean;
   acting: boolean;
   error: string | null;
+}>;
+
+type PendingTurnControl = Readonly<{
+  childId: string;
+  turnId: string;
+  token: string;
+  requestId: string;
+  control: NativeSubagentTurnControl;
 }>;
 
 const EMPTY: View = Object.freeze({
@@ -57,6 +66,7 @@ export class NativeSubagentController {
     token: string;
     requestId: string;
   };
+  private pendingTurnControl?: PendingTurnControl;
 
   constructor(
     private readonly client: NativeSubagentClient,
@@ -277,6 +287,79 @@ export class NativeSubagentController {
           throw error;
         }
         this.pendingStop = undefined;
+      }
+    );
+  }
+
+  get turnControls(): readonly NativeSubagentTurnControl["kind"][] {
+    if (!this.client.controlSubagentTurn || this.canRetryTurnControl) return [];
+    return this.view.observation?.turnControls ?? [];
+  }
+
+  get canRetryTurnControl(): boolean {
+    const pending = this.pendingTurnControl;
+    return (
+      !!pending &&
+      pending.childId === this.view.selected &&
+      pending.turnId === this.view.observation?.child.assignment?.turn?.turnId
+    );
+  }
+
+  async controlTurn(control: NativeSubagentTurnControl): Promise<boolean> {
+    const observation = this.view.observation;
+    const childId = this.view.selected;
+    const turnId = observation?.child.current?.turnId;
+    const token = observation?.stopObservationId;
+    if (
+      !token ||
+      !childId ||
+      !turnId ||
+      !this.turnControls.includes(control.kind)
+    )
+      return false;
+    if (
+      control.kind === "steer" &&
+      (!control.instructions.trim() ||
+        utf8.encode(control.instructions).length > 64 * 1024)
+    ) {
+      this.update({ error: "Enter steering instructions of at most 64 KiB." });
+      return false;
+    }
+    return this.sendTurnControl({
+      childId,
+      turnId,
+      token,
+      requestId: crypto.randomUUID(),
+      control,
+    });
+  }
+
+  retryTurnControl(): Promise<boolean> {
+    return this.canRetryTurnControl && this.pendingTurnControl
+      ? this.sendTurnControl(this.pendingTurnControl)
+      : Promise.resolve(false);
+  }
+
+  private sendTurnControl(pending: PendingTurnControl): Promise<boolean> {
+    return this.act(
+      "Couldn't confirm the subagent control. Check the current assignment or retry the same action.",
+      async () => {
+        try {
+          await this.client.controlSubagentTurn!(
+            this.attachmentId,
+            pending.token,
+            pending.requestId,
+            pending.control
+          );
+          this.pendingTurnControl = undefined;
+        } catch (error) {
+          this.pendingTurnControl =
+            error instanceof Error &&
+            error.message.includes("native_chat_subagent_unverified")
+              ? pending
+              : undefined;
+          throw error;
+        }
       }
     );
   }

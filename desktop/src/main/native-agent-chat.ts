@@ -413,7 +413,8 @@ export class NativeAgentChat {
       parent,
       childId,
       inputId,
-      this.subagentScope(parent, check)
+      this.subagentScope(parent, check),
+      this.process.acceptsSubagentTurnControls
     );
   }
 
@@ -464,6 +465,26 @@ export class NativeAgentChat {
       parent,
       observationId,
       requestId,
+      this.subagentScope(parent, check)
+    );
+  }
+
+  controlSubagentTurn(
+    attachment: object,
+    parent: NativeChatSession,
+    observationId: string,
+    requestId: string,
+    control: unknown,
+    check: () => void
+  ) {
+    if (!this.process.acceptsSubagentTurnControls)
+      throw new Error("native_chat_subagent_unavailable");
+    return this.subagents.controlTurn(
+      attachment,
+      parent,
+      observationId,
+      requestId,
+      control,
       this.subagentScope(parent, check)
     );
   }

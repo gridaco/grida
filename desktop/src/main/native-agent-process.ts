@@ -33,6 +33,7 @@ const SUBAGENT_CAPABILITIES = {
   "co.grida/subagent/resume": 1,
   "co.grida/subagent/stop": 1,
 } as const;
+const CHILD_STEERING = "co.grida/subagent/steer";
 
 export type NativeAgentLaunch = {
   resourcesPath: string;
@@ -92,6 +93,7 @@ export class NativeAgentProcess {
   private scheduledWakeups = false;
   private historyRevision = false;
   private namedChildren = false;
+  private childTurnControls = false;
   private artifacts = false;
   private savedChatDeletion = false;
   private editorSurfaces = false;
@@ -163,6 +165,10 @@ export class NativeAgentProcess {
 
   get acceptsSubagents(): boolean {
     return this.connected && this.namedChildren;
+  }
+
+  get acceptsSubagentTurnControls(): boolean {
+    return this.acceptsSubagents && this.childTurnControls;
   }
 
   get acceptsArtifacts(): boolean {
@@ -292,7 +298,10 @@ export class NativeAgentProcess {
                 ...capabilities,
                 ...NativeAgentCommands.capabilities,
                 ...NativeAgentRevisions.capabilities,
-                ...(options.subagents && SUBAGENT_CAPABILITIES),
+                ...(options.subagents && {
+                  ...SUBAGENT_CAPABILITIES,
+                  [CHILD_STEERING]: 1,
+                }),
                 ...NativeAgentWakeups.capabilities,
                 [NativeEditorSurfaceEndpoints.capability]: 1,
                 [NativeAgentArtifacts.capability]: 1,
@@ -328,6 +337,7 @@ export class NativeAgentProcess {
         Object.keys(SUBAGENT_CAPABILITIES).every(
           (key) => advertised?.[key] === 1
         );
+      processOwner.childTurnControls = advertised?.[CHILD_STEERING] === 1;
       for (const key of Object.keys(NativeAgentCommands.capabilities)) {
         if (advertised?.[key] === 1) processOwner.commandCapabilities.add(key);
       }

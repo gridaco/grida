@@ -1092,9 +1092,12 @@ lazy reads, read-only mutation, and symlink escape refusal.
   Main derives the sponsor from the exact attached parent observation and
   retains that sponsor for an exact assignment retry. It checks child, input,
   and turn identities before returning bounded assignment
-  and result text. A frame receives a Stop token only for the displayed
-  assignment's current turn. Another frame or an older result carries no
-  authority to stop newer work. [Launch](desktop/src/main/native-desktop-agent.ts),
+  and result text. A frame receives a control token only for the displayed
+  assignment's current turn. Main keeps the child identity and the session,
+  control, history, and execution revisions behind the token. Pause, Resume,
+  Steer, and Stop revalidate the exact attachment before dispatch and after
+  settlement. An exact retry uses the original request identity and basis.
+  [Launch](desktop/src/main/native-desktop-agent.ts),
   [Main adapter](desktop/src/main/native-agent-subagents.ts),
   [IPC](desktop/src/main/native-chat-ipc.ts),
   [bridge projection](packages/grida-desktop-bridge/src/native-subagents.ts).

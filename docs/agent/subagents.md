@@ -26,7 +26,13 @@ the parent, the panel lists its named subagents and shows the current or most
 recent assignment for the selected child. Choose a queued assignment to
 review its own instructions and status.
 
+Select the current assignment to control its work. **Pause subagent** holds
+that assignment. **Steer subagent** adds a correction to the running or paused
+assignment. Use **Resume subagent** after it pauses to continue the same work.
+For example, pause a review, ask the reviewer to use the latest draft, then
+resume it. When a control result is unconfirmed, **Retry last subagent control**
+resends the same action for the selected assignment.
+
 **Stop subagent** ends the displayed active assignment and holds its queue.
 The [private ACP client guide](./clients.md#assign-work-to-a-named-subagent)
-covers additional controls, including messages, Pause, Steer, Resume,
-and releasing a held queue.
+covers informational messages and releasing a held queue.

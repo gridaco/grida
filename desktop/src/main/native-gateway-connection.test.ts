@@ -595,7 +595,7 @@ it.skipIf(!resourcesPath)(
 );
 
 it.skipIf(!resourcesPath)(
-  "lists, assigns, and stops exact named work through the guarded Desktop bridge",
+  "pauses, steers, resumes, and stops exact named work through the guarded Desktop bridge",
   async () => {
     const root = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-desktop-subagent-")
@@ -604,12 +604,18 @@ it.skipIf(!resourcesPath)(
     await fs.mkdir(cwd, { mode: 0o700 });
     const owner = fixture();
     const connection = await NativeGatewayConnection.open(owner.options);
-    let cancelled = false;
+    let cancellations = 0;
+    const correction = "Use the newer draft.";
     owner.dispatch.mockImplementation(async (body) => {
-      const input = JSON.parse(body.toString()).messages.at(-1).content;
-      const hold = input === "Hold this review.";
-      const text =
-        input === "Review the first draft."
+      const messages = JSON.parse(body.toString()).messages;
+      const input = messages.at(-1).content;
+      const steered = input === correction;
+      const hold =
+        !steered &&
+        (input === "Hold this review." || input === "Stop this review.");
+      const text = steered
+        ? "Review of the newer draft."
+        : input === "Review the first draft."
           ? "First review."
           : "Fixture answer.";
       const chunk = `data: ${JSON.stringify({ id: "fixture", choices: [{ index: 0, delta: { role: "assistant", content: text }, finish_reason: null }] })}\n\n`;
@@ -617,7 +623,7 @@ it.skipIf(!resourcesPath)(
         ? new ReadableStream<Uint8Array>({
             start: (stream) => stream.enqueue(new TextEncoder().encode(chunk)),
             cancel: () => {
-              cancelled = true;
+              cancellations++;
             },
           })
         : chunk +
@@ -670,7 +676,7 @@ it.skipIf(!resourcesPath)(
       const create = {
         requestId: randomUUID(),
         name: "Reviewer",
-        workTurns: 2,
+        workTurns: 3,
       };
       const child = await ipc.createSubagent(first, aid, create);
       await expect(ipc.createSubagent(first, aid, create)).resolves.toEqual(
@@ -713,6 +719,7 @@ it.skipIf(!resourcesPath)(
           held.inputId
         );
         expect(observed.stopObservationId).toEqual(expect.any(String));
+        expect(observed.turnControls).toEqual(["pause", "steer"]);
         return observed;
       });
       const old = await ipc.inspectSubagent(
@@ -722,32 +729,155 @@ it.skipIf(!resourcesPath)(
         completed.inputId
       );
       expect(old.stopObservationId).toBeNull();
+      expect(old.turnControls).toBeUndefined();
       expect(old.child.assignment?.result?.text).toBe("First review.");
       const attached = await ipc.load(second, parent.sessionId);
-      const stopId = randomUUID();
+      const pause = { kind: "pause" };
+      const pauseId = randomUUID();
       await expect(
-        ipc.stopSubagent(
+        ipc.controlSubagentTurn(
+          first,
+          aid,
+          running.stopObservationId!,
+          randomUUID(),
+          {
+            kind: "pause",
+            expectedControlRevision: 0,
+          }
+        )
+      ).rejects.toThrow("native_chat_subagent_invalid_input");
+      await expect(
+        ipc.controlSubagentTurn(
+          first,
+          aid,
+          running.stopObservationId!,
+          randomUUID(),
+          {
+            kind: "resume",
+          }
+        )
+      ).rejects.toThrow("native_chat_subagent_invalid_input");
+      await expect(
+        ipc.controlSubagentTurn(
           second,
           attached.attachmentId,
           running.stopObservationId!,
-          stopId
+          pauseId,
+          pause
         )
       ).rejects.toThrow("native_chat_subagent_observation_unavailable");
-      await ipc.stopSubagent(first, aid, running.stopObservationId!, stopId);
-      await ipc.stopSubagent(first, aid, running.stopObservationId!, stopId);
-      await vi.waitFor(async () => {
-        const ended = await ipc.inspectSubagent(
+      await ipc.controlSubagentTurn(
+        first,
+        aid,
+        running.stopObservationId!,
+        pauseId,
+        pause
+      );
+      await ipc.controlSubagentTurn(
+        first,
+        aid,
+        running.stopObservationId!,
+        pauseId,
+        pause
+      );
+      const paused = await vi.waitFor(async () => {
+        const view = await ipc.inspectSubagent(
           first,
           aid,
           child.childId,
           held.inputId
         );
+        expect(view.child.current).toMatchObject({
+          paused: true,
+          disposition: "suspended",
+        });
+        expect(view.turnControls).toEqual(["resume", "steer"]);
+        expect(cancellations).toBe(1);
+        return view;
+      });
+      const steer = { kind: "steer", instructions: correction };
+      const steerId = randomUUID();
+      await ipc.controlSubagentTurn(
+        first,
+        aid,
+        paused.stopObservationId!,
+        steerId,
+        steer
+      );
+      await ipc.controlSubagentTurn(
+        first,
+        aid,
+        paused.stopObservationId!,
+        steerId,
+        steer
+      );
+      expect(owner.dispatch).toHaveBeenCalledTimes(3);
+      const steered = await ipc.inspectSubagent(
+        first,
+        aid,
+        child.childId,
+        held.inputId
+      );
+      expect(steered.stopObservationId).not.toBe(paused.stopObservationId);
+      const resume = { kind: "resume" };
+      const resumeId = randomUUID();
+      await ipc.controlSubagentTurn(
+        first,
+        aid,
+        steered.stopObservationId!,
+        resumeId,
+        resume
+      );
+      await ipc.controlSubagentTurn(
+        first,
+        aid,
+        steered.stopObservationId!,
+        resumeId,
+        resume
+      );
+      await vi.waitFor(async () => {
+        const view = await ipc.inspectSubagent(
+          first,
+          aid,
+          child.childId,
+          held.inputId
+        );
+        expect(view.child.assignment?.result).toMatchObject({
+          turnId: running.child.current?.turnId,
+          text: "Review of the newer draft.",
+        });
+      });
+      expect(owner.dispatch).toHaveBeenCalledTimes(4);
+
+      const stopping = assign("Stop this review.");
+      await ipc.assignSubagent(first, aid, stopping);
+      const activeStop = await vi.waitFor(async () => {
+        expect(owner.dispatch).toHaveBeenCalledTimes(5);
+        const observed = await ipc.inspectSubagent(
+          first,
+          aid,
+          child.childId,
+          stopping.inputId
+        );
+        expect(observed.stopObservationId).toEqual(expect.any(String));
+        return observed;
+      });
+      const stopId = randomUUID();
+      await ipc.stopSubagent(first, aid, activeStop.stopObservationId!, stopId);
+      await ipc.stopSubagent(first, aid, activeStop.stopObservationId!, stopId);
+      await vi.waitFor(async () => {
+        const ended = await ipc.inspectSubagent(
+          first,
+          aid,
+          child.childId,
+          stopping.inputId
+        );
         expect(ended.child.admissionPaused).toBe(true);
         expect(ended.child.assignment?.disposition).toBe("completed");
         expect(ended.stopObservationId).toBeNull();
-        expect(cancelled).toBe(true);
+        expect(cancellations).toBe(2);
       });
-      expect(owner.dispatch).toHaveBeenCalledTimes(3);
+      expect(owner.dispatch).toHaveBeenCalledTimes(5);
     } finally {
       try {
         await chat?.close();

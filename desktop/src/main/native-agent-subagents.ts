@@ -1,4 +1,4 @@
-// GRIDA-SEC-004 — project exact attached child work and retain Main-owned Stop bases.
+// GRIDA-SEC-004 — child control revisions stay with the exact Main attachment.
 import { randomUUID } from "node:crypto";
 import type {
   NativeChatTurn,
@@ -9,6 +9,7 @@ import type {
   NativeSubagentPage,
   NativeSubagentResult,
   NativeSubagentTurn,
+  NativeSubagentTurnControl,
   NativeSubagentWork,
 } from "@grida/desktop-bridge";
 import type { NativeChatSession } from "./native-agent-chat";
@@ -21,7 +22,7 @@ const MAX_NAME_BYTES = 128;
 const MAX_INSTRUCTIONS_BYTES = 64 * 1024;
 const MAX_PREVIEW_BYTES = 1024;
 const MAX_RESULT_BYTES = 8 * 1024;
-const MAX_STOP_OBSERVATIONS = 16;
+const MAX_TURN_OBSERVATIONS = 16;
 const MAX_SPONSORS = 16;
 const DISPOSITIONS = [
   "queued",
@@ -35,6 +36,7 @@ const UNVERIFIED = new Set([
   "sqlite_commit_unconfirmed",
   "store_task_interrupted",
   "control_worker_interrupted",
+  "admission_worker_interrupted",
   "native_agent_disconnected",
   "native_agent_input_failed",
   "native_agent_output_failed",
@@ -46,12 +48,18 @@ const UNVERIFIED = new Set([
   "native_chat_subagent_invalid_response",
 ]);
 
-type StopBasis = Readonly<{
+type TurnControlBasis = Readonly<{
   parentSessionId: string;
   childId: string;
   turnId: string;
   expectedSessionRevision: number;
   expectedControlRevision: number;
+}>;
+
+type ObservedTurn = Readonly<{
+  parent: NativeChatSession;
+  basis: TurnControlBasis;
+  turn: NativeChatTurn;
 }>;
 
 type Sponsor = Readonly<{
@@ -61,10 +69,7 @@ type Sponsor = Readonly<{
 }>;
 
 export class NativeAgentSubagents {
-  private readonly stops = new WeakMap<
-    object,
-    Map<string, { parent: NativeChatSession; basis: StopBasis }>
-  >();
+  private readonly turns = new WeakMap<object, Map<string, ObservedTurn>>();
   private readonly sponsors = new WeakMap<object, Map<string, Sponsor>>();
 
   constructor(
@@ -126,7 +131,8 @@ export class NativeAgentSubagents {
     parent: NativeChatSession,
     childId: string,
     inputId: string | undefined,
-    check: () => void
+    check: () => void,
+    allowTurnControls = false
   ): Promise<NativeSubagentObservation> {
     if (
       !identity(childId) ||
@@ -178,13 +184,21 @@ export class NativeAgentSubagents {
       current.disposition !== "settled" &&
       !current.cancelled &&
       assignment?.turn?.turnId === current.turnId
-        ? this.rememberStop(attachment, parent, {
-            parentSessionId: parent.id,
-            childId,
-            turnId: current.turnId,
-            expectedSessionRevision: response.sessionRevision,
-            expectedControlRevision: current.controlRevision,
-          })
+        ? this.rememberTurn(
+            attachment,
+            {
+              parent,
+              basis: {
+                parentSessionId: parent.id,
+                childId,
+                turnId: current.turnId,
+                expectedSessionRevision: response.sessionRevision,
+                expectedControlRevision: current.controlRevision,
+              },
+              turn: current,
+            },
+            allowTurnControls
+          )
         : null;
     return {
       child: {
@@ -198,6 +212,11 @@ export class NativeAgentSubagents {
         assignment,
       },
       stopObservationId,
+      ...(allowTurnControls &&
+        stopObservationId &&
+        current && {
+          turnControls: turnControls(current),
+        }),
     };
   }
 
@@ -293,28 +312,78 @@ export class NativeAgentSubagents {
     requestId: string,
     check: () => void
   ): Promise<void> {
-    const observed = this.stops.get(attachment)?.get(observationId);
-    if (observed?.parent !== parent)
-      throw new Error("native_chat_subagent_observation_unavailable");
+    const { basis } = this.observedTurn(attachment, parent, observationId);
     if (!identity(requestId)) throw invalidInput();
-    const basis = observed.basis;
     check();
     await this.change(
       "_co.grida/subagent/stop",
       { ...basis, requestId },
-      (reply) => {
-        if (
-          reply?.sessionId !== basis.childId ||
-          reply.turnId !== basis.turnId ||
-          reply.requestId !== requestId ||
-          !revision(reply.sessionRevision) ||
-          reply.sessionRevision < basis.expectedSessionRevision ||
-          !revision(reply.journalPosition)
-        )
-          throw invalidResponse();
-      }
+      (reply) => verifyTurnReceipt(reply, basis, requestId)
     );
     check();
+  }
+
+  async controlTurn(
+    attachment: object,
+    parent: NativeChatSession,
+    observationId: string,
+    requestId: string,
+    value: unknown,
+    check: () => void
+  ): Promise<void> {
+    const observed = this.observedTurn(attachment, parent, observationId);
+    const control = parseTurnControl(value);
+    if (
+      !identity(requestId) ||
+      !turnControls(observed.turn).includes(control.kind)
+    )
+      throw invalidInput();
+    const { basis, turn } = observed;
+    const task = { ...basis, requestId };
+    check();
+    if (control.kind === "resume") {
+      await this.change(
+        "_co.grida/subagent/resume",
+        {
+          task,
+          expectedEpoch: turn.epoch,
+          expectedJournalPosition: turn.journalPosition,
+        },
+        (reply) => {
+          const resumed = this.turn(reply?.turn);
+          if (
+            reply?.requestId !== requestId ||
+            resumed.turnId !== turn.turnId ||
+            resumed.epoch <= turn.epoch
+          )
+            throw invalidResponse();
+        }
+      );
+    } else {
+      await this.change(
+        `_co.grida/subagent/${control.kind}`,
+        control.kind === "steer"
+          ? {
+              task,
+              expectedHistoryPosition: turn.historyPosition,
+              instructions: control.instructions,
+            }
+          : task,
+        (reply) => verifyTurnReceipt(reply, basis, requestId)
+      );
+    }
+    check();
+  }
+
+  private observedTurn(
+    attachment: object,
+    parent: NativeChatSession,
+    observationId: string
+  ): ObservedTurn {
+    const observed = this.turns.get(attachment)?.get(observationId);
+    if (observed?.parent !== parent)
+      throw new Error("native_chat_subagent_observation_unavailable");
+    return observed;
   }
 
   private work(
@@ -374,13 +443,14 @@ export class NativeAgentSubagents {
     };
   }
 
-  private rememberStop(
+  private rememberTurn(
     attachment: object,
-    parent: NativeChatSession,
-    basis: StopBasis
+    observed: ObservedTurn,
+    exactTurn: boolean
   ): string {
-    let observations = this.stops.get(attachment);
-    if (!observations) this.stops.set(attachment, (observations = new Map()));
+    const { parent, basis, turn } = observed;
+    let observations = this.turns.get(attachment);
+    if (!observations) this.turns.set(attachment, (observations = new Map()));
     for (const [id, previous] of observations) {
       if (
         previous.parent === parent &&
@@ -388,16 +458,18 @@ export class NativeAgentSubagents {
         previous.basis.turnId === basis.turnId &&
         previous.basis.expectedSessionRevision ===
           basis.expectedSessionRevision &&
-        previous.basis.expectedControlRevision === basis.expectedControlRevision
+        previous.basis.expectedControlRevision ===
+          basis.expectedControlRevision &&
+        (!exactTurn || previous.turn.journalPosition === turn.journalPosition)
       )
         return id;
     }
-    if (observations.size >= MAX_STOP_OBSERVATIONS) {
+    if (observations.size >= MAX_TURN_OBSERVATIONS) {
       const oldest = observations.keys().next().value;
       if (oldest) observations.delete(oldest);
     }
     const id = randomUUID();
-    observations.set(id, { parent, basis });
+    observations.set(id, observed);
     return id;
   }
 
@@ -414,6 +486,51 @@ export class NativeAgentSubagents {
       throw error;
     }
   }
+}
+
+function turnControls(
+  turn: NativeChatTurn
+): NativeSubagentTurnControl["kind"][] {
+  if (turn.cancelled || turn.disposition === "settled") return [];
+  if (turn.paused && turn.disposition === "suspended")
+    return ["resume", "steer"];
+  if (!turn.paused && turn.disposition === "running") return ["pause", "steer"];
+  return [];
+}
+
+function parseTurnControl(value: unknown): NativeSubagentTurnControl {
+  const entry = object(value);
+  if (
+    entry &&
+    Object.keys(entry).length === 1 &&
+    (entry.kind === "pause" || entry.kind === "resume")
+  )
+    return { kind: entry.kind };
+  if (
+    entry &&
+    Object.keys(entry).length === 2 &&
+    entry.kind === "steer" &&
+    boundedText(entry.instructions, MAX_INSTRUCTIONS_BYTES) &&
+    entry.instructions.trim()
+  )
+    return { kind: "steer", instructions: entry.instructions };
+  throw invalidInput();
+}
+
+function verifyTurnReceipt(
+  reply: Record<string, unknown> | null,
+  basis: TurnControlBasis,
+  requestId: string
+): void {
+  if (
+    reply?.sessionId !== basis.childId ||
+    reply.turnId !== basis.turnId ||
+    reply.requestId !== requestId ||
+    !revision(reply.sessionRevision) ||
+    reply.sessionRevision < basis.expectedSessionRevision ||
+    !revision(reply.journalPosition)
+  )
+    throw invalidResponse();
 }
 
 function visibleTurn(turn: NativeChatTurn): NativeSubagentTurn {
