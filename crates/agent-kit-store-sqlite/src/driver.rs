@@ -19,6 +19,81 @@ pub struct DriverControlPlan {
 }
 
 impl SqliteStore {
+    /// Derive an opaque state change and commit it with an exact turn directive.
+    /// The decision must be a pure in-memory transform. An exact retry returns
+    /// the original control receipt before consulting state or calling the
+    /// decision. This applies a control without issuing a lease.
+    pub async fn control_turn_with_driver_state(
+        &self,
+        request: ControlRequest,
+        derive: impl FnOnce(&DriverStateSnapshot) -> Result<Option<Envelope>> + Send + 'static,
+    ) -> Result<ControlReceipt> {
+        let SessionControl::Turn {
+            turn,
+            expected,
+            directive,
+        } = &request.action
+        else {
+            return Err(error(
+                ErrorKind::InvalidInput,
+                "driver_state_requires_turn_control",
+            ));
+        };
+        let turn = TurnControl {
+            turn: turn.clone(),
+            expected: *expected,
+            directive: *directive,
+        };
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(database_error)?;
+            let fingerprint = Fingerprint::of(&request)?;
+            if let Some(receipt) = lookup_request(
+                &transaction,
+                &request.session,
+                "control",
+                &request.id,
+                fingerprint,
+            )? {
+                return Ok(receipt);
+            }
+            let session = load_session(&transaction, &request.session)?;
+            require_revision(&session, request.expected_revision)?;
+            if session.active_turn.as_ref() != Some(&turn.turn) {
+                return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
+            }
+            let active = load_turn(&transaction, &request.session, &turn.turn)?;
+            if active.controls().revision != turn.expected {
+                return Err(error(ErrorKind::Conflict, "stale_journal_change"));
+            }
+            if active.driver_state() != &session.driver_state {
+                return Err(error(ErrorKind::Conflict, "driver_state_snapshot_mismatch"));
+            }
+            let action = SessionControl::DriverState {
+                change: DriverStateChange {
+                    expected: session.driver_state.revision(),
+                    value: derive(&session.driver_state)?,
+                },
+                turn: Some(turn),
+            };
+            let control = ControlRequest { action, ..request };
+            let receipt = apply_control(&transaction, &control, session, Some(active))?;
+            save_request(
+                &transaction,
+                &control.session,
+                "control",
+                &control.id,
+                fingerprint,
+                &receipt,
+            )?;
+            transaction.commit().map_err(commit_error)?;
+            inner.changed.notify_waiters();
+            Ok(receipt)
+        })
+        .await
+    }
+
     /// Replay a committed intent before consulting current state. A new intent
     /// runs one bounded in-memory decision and commits the result with any
     /// exact active-turn control. The decision must not perform I/O.

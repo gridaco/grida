@@ -30,6 +30,9 @@ at the observed session revision. A new claim can reserve driver state in the
 same transaction that claims the input and issues ownership.
 Derived driver controls bind an opaque caller intent before computing the new
 state. An exact retry returns the original receipt even after later changes.
+`control_turn_with_driver_state` derives the opaque change from the locked
+snapshot and records the ordinary turn directive under its original request
+identity.
 
 `claim_from_operation` atomically creates a session, accepts its first input,
 reserves its opaque driver state, and claims its first turn. It requires an

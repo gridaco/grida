@@ -367,6 +367,121 @@ async fn claim_destination(store: &SqliteStore, request: OperationClaim) -> Clai
 }
 
 #[tokio::test]
+async fn derived_turn_control_replays_the_original_request_after_related_mutation() {
+    let (_directory, store) = store().await;
+    let (parent, operation) = owning_operation(&store).await;
+    let child = claim_destination(&store, request(operation.clone(), "child")).await;
+    let binding = child.lease.binding();
+    let local = turn_control(&store, binding, "pause-local", ControlDirective::Pause).await;
+    let receipt = store
+        .control_turn_with_driver_state(local.clone(), |state| {
+            assert_eq!(state.revision(), DriverStateRevision(1));
+            Ok(Some(payload("local-blocker")))
+        })
+        .await
+        .unwrap();
+    assert_eq!(receipt.driver_state_revision, Some(DriverStateRevision(2)));
+    let related = OperationPairControl {
+        source: turn_control(
+            &store,
+            parent.lease.binding(),
+            "pause-source",
+            ControlDirective::Pause,
+        )
+        .await,
+        related: OperationRelatedControl::Apply {
+            operation: operation.operation,
+            request: state_control(
+                turn_control(&store, binding, "pause-related", ControlDirective::Pause).await,
+                2,
+                "both-blockers",
+            ),
+        },
+    };
+    store.control_operation_pair(related).await.unwrap();
+    assert_eq!(
+        store
+            .control_turn_with_driver_state(local.clone(), |_| panic!("must not derive again"))
+            .await
+            .unwrap(),
+        receipt,
+    );
+    assert_eq!(
+        store.control_receipt(local.clone()).await.unwrap(),
+        Some(receipt.clone())
+    );
+    assert_eq!(store.control(local.clone()).await.unwrap(), receipt);
+    let mut altered = local;
+    altered.id = change("different-pause");
+    let view = store.inspect(binding.session.clone()).await.unwrap();
+    altered.expected_revision = view.revision;
+    assert_error(
+        store
+            .control_turn_with_driver_state(altered, |_| panic!("stale turn control"))
+            .await,
+        ErrorKind::Conflict,
+        "stale_journal_change",
+    );
+    assert_eq!(view.driver_state.value(), Some(&payload("both-blockers")));
+    assert_eq!(store.inspect(binding.session.clone()).await.unwrap(), view);
+}
+
+#[tokio::test]
+async fn derived_turn_control_and_related_pair_serialize_on_the_destination() {
+    let (_directory, store) = store().await;
+    let (parent, operation) = owning_operation(&store).await;
+    let child = claim_destination(&store, request(operation.clone(), "child")).await;
+    let binding = child.lease.binding();
+    let local = turn_control(&store, binding, "pause-local", ControlDirective::Pause).await;
+    let paired = OperationPairControl {
+        source: turn_control(
+            &store,
+            parent.lease.binding(),
+            "pause-source",
+            ControlDirective::Pause,
+        )
+        .await,
+        related: OperationRelatedControl::Apply {
+            operation: operation.operation,
+            request: state_control(
+                turn_control(&store, binding, "pause-related", ControlDirective::Pause).await,
+                1,
+                "related-blocker",
+            ),
+        },
+    };
+    let (independent, ancestor) = tokio::join!(
+        store.control_turn_with_driver_state(local.clone(), |_| Ok(Some(payload("local-blocker")))),
+        store.control_operation_pair(paired),
+    );
+    let source = store.inspect_turn(session(), turn()).await.unwrap();
+    let destination = store.inspect(binding.session.clone()).await.unwrap();
+    assert!(destination.current.unwrap().controls.paused);
+    assert_eq!(destination.driver_state.revision(), DriverStateRevision(2));
+    match (independent, ancestor) {
+        (Ok(receipt), Err(conflict)) => {
+            assert_eq!(conflict.code, "stale_session_revision");
+            assert!(!source.controls.paused);
+            assert_eq!(
+                destination.driver_state.value(),
+                Some(&payload("local-blocker"))
+            );
+            assert_eq!(store.control_receipt(local).await.unwrap(), Some(receipt));
+        }
+        (Err(conflict), Ok(_)) => {
+            assert_eq!(conflict.code, "stale_session_revision");
+            assert!(source.controls.paused);
+            assert_eq!(
+                destination.driver_state.value(),
+                Some(&payload("related-blocker"))
+            );
+            assert_eq!(store.control_receipt(local).await.unwrap(), None);
+        }
+        _ => panic!("only one control may commit against the same destination revision"),
+    }
+}
+
+#[tokio::test]
 async fn absence_control_and_related_claim_have_one_winner() {
     let (_directory, store) = store().await;
     let (parent, selected) = owning_operation(&store).await;
