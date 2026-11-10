@@ -37,6 +37,16 @@ const READ_FLAGS =
 const FILE_ATTACHMENTS = "data-user_file_attachments";
 const TEMPLATE_SELECTION = "data-user_template_selection";
 
+const SCRATCH_ARCHIVES = ["scratch", "scratch-srt"] as const;
+type ScratchArchive = (typeof SCRATCH_ARCHIVES)[number];
+type ScratchBudget = { entries: number; pathBytes: number };
+type Source = Readonly<{
+  userDataPath: string;
+  scratchBase: string;
+  /** Exact canonical temp root attested from the legacy SRT launch. The
+   * caller also establishes quiescence for this root before capture. */
+  historicalSrtTempRoot?: string;
+}>;
 type FileEvidence = { path: string; size: number; sha256: string };
 type InputCaveat = {
   partId: string;
@@ -44,6 +54,8 @@ type InputCaveat = {
   reason:
     | "missing"
     | "size_changed"
+    | "historical_scratch_candidate"
+    | "scratch_candidates_differ"
     | "invalid_descriptor"
     | "template_scratch_missing"
     | "template_members_unknown";
@@ -75,9 +87,9 @@ type Seal = Readonly<{
  */
 export class LegacyChatArchive {
   private pending: Promise<Receipt | null> | undefined;
-  private readonly source: { userDataPath: string; scratchBase: string };
+  private readonly source: Source;
 
-  constructor(source: { userDataPath: string; scratchBase: string }) {
+  constructor(source: Source) {
     this.source = { ...source };
   }
 
@@ -254,8 +266,29 @@ export class LegacyChatArchive {
       ) {
         throw new ArchiveFailure("unsafe_source");
       }
+      const historicalScratch = await captureHistoricalScratch(
+        this.source,
+        userData,
+        scratch
+      );
       const { sessions } = readDatabase(archivedDb);
-      const copied = scratch ? await copyScratch(scratch, stage, sessions) : [];
+      const budget = { entries: 0, pathBytes: 0 };
+      const copied = scratch
+        ? await copyScratch(scratch, stage, sessions, "scratch", budget)
+        : [];
+      if (historicalScratch) {
+        const historicalFiles = await copyScratch(
+          historicalScratch.directory,
+          stage,
+          sessions,
+          "scratch-srt",
+          budget
+        );
+        const current = await fs.lstat(historicalScratch.directory);
+        if (!sameSnapshot(historicalScratch.stat, current))
+          throw new ArchiveFailure("source_changed");
+        for (const file of historicalFiles) copied.push(file);
+      }
       const manifest = await inspectArchive(stage);
       if (
         JSON.stringify(copied.sort(comparePaths)) !==
@@ -638,18 +671,65 @@ function readDatabase(filename: string) {
   }
 }
 
+async function captureHistoricalScratch(
+  source: Source,
+  userData: string,
+  scratch: string | undefined
+) {
+  const temp = source.historicalSrtTempRoot;
+  if (temp === undefined) return;
+  if (
+    !path.isAbsolute(temp) ||
+    path.resolve(temp) !== temp ||
+    path.dirname(temp) === temp
+  ) {
+    throw new ArchiveFailure("unsafe_source");
+  }
+  const tempStat = await statIfPresent(temp);
+  if (!tempStat) return;
+  if (!tempStat.isDirectory() || (await fs.realpath(temp)) !== temp)
+    throw new ArchiveFailure("unsafe_source");
+
+  // Before Desktop injected a scratch base, the sidecar derived this name
+  // from its exact configured data path and the SRT child's os.tmpdir().
+  const tag = sha256(Buffer.from(path.resolve(source.userDataPath))).slice(
+    0,
+    16
+  );
+  const candidate = path.join(temp, `grida-agent-${tag}`);
+  const otherRoots = [userData, scratch].filter((root) => root !== undefined);
+  if (
+    otherRoots.some(
+      (root) => contains(root, candidate) || contains(candidate, root)
+    )
+  ) {
+    throw new ArchiveFailure("unsafe_source");
+  }
+  const directory = await canonicalDirectory(candidate);
+  if (!directory) return;
+  if (directory !== candidate) throw new ArchiveFailure("unsafe_source");
+  const stat = await fs.lstat(directory);
+  checkSourceDirectory(stat);
+  for (const root of otherRoots) {
+    if (sameIdentity(stat, await fs.lstat(root)))
+      throw new ArchiveFailure("unsafe_source");
+  }
+  return { directory, stat };
+}
+
 async function copyScratch(
   scratch: string,
   stage: string,
-  sessions: Set<string>
+  sessions: Set<string>,
+  section: ScratchArchive,
+  budget: ScratchBudget
 ): Promise<FileEvidence[]> {
   const sessionsRoot = path.join(scratch, "sessions");
   const root = await statIfPresent(sessionsRoot);
   if (!root) return [];
   checkSourceDirectory(root);
-  const destination = path.join(stage, "scratch");
+  const destination = path.join(stage, section);
   await makePrivateDirectory(destination);
-  const budget = { entries: 0, pathBytes: 0 };
   const copied: FileEvidence[] = [];
   for (const id of sessions) {
     const session = path.join(sessionsRoot, id);
@@ -671,7 +751,7 @@ async function copyScratch(
         if (directory) await makePrivateDirectory(output);
         else
           copied.push({
-            path: ["scratch", id, ...relative.split(path.sep)].join("/"),
+            path: [section, id, ...relative.split(path.sep)].join("/"),
             ...(await digestFile(file, output)),
           });
       },
@@ -690,7 +770,7 @@ async function inspectArchive(directory: string): Promise<Manifest> {
   checkPrivateDirectory(await fs.lstat(directory));
   const entries = await fs.opendir(directory);
   for await (const entry of entries) {
-    if (![DB_NAME, "scratch", MANIFEST_NAME].includes(entry.name)) {
+    if (![DB_NAME, MANIFEST_NAME, ...SCRATCH_ARCHIVES].includes(entry.name)) {
       throw new ArchiveFailure("invalid_receipt");
     }
   }
@@ -699,25 +779,22 @@ async function inspectArchive(directory: string): Promise<Manifest> {
     { path: DB_NAME, ...(await digestFile(database, undefined, true)) },
   ];
   const { sqliteVersion, sessions } = readDatabase(database);
-  const scratch = path.join(directory, "scratch");
-  if (await statIfPresent(scratch)) {
-    await walk(
-      scratch,
-      { entries: 0, pathBytes: 0 },
-      0,
-      async (file, relative, isDirectory) => {
-        const [session, ...segments] = relative.split(path.sep);
-        if (!sessions.has(session) || (!isDirectory && segments.length === 0)) {
-          throw new ArchiveFailure("invalid_receipt");
-        }
-        if (isDirectory) checkPrivateDirectory(await fs.lstat(file));
-        else
-          files.push({
-            path: ["scratch", session, ...segments].join("/"),
-            ...(await digestFile(file, undefined, true)),
-          });
+  const budget = { entries: 0, pathBytes: 0 };
+  for (const section of SCRATCH_ARCHIVES) {
+    const scratch = path.join(directory, section);
+    if (!(await statIfPresent(scratch))) continue;
+    await walk(scratch, budget, 0, async (file, relative, isDirectory) => {
+      const [session, ...segments] = relative.split(path.sep);
+      if (!sessions.has(session) || (!isDirectory && segments.length === 0)) {
+        throw new ArchiveFailure("invalid_receipt");
       }
-    );
+      if (isDirectory) checkPrivateDirectory(await fs.lstat(file));
+      else
+        files.push({
+          path: [section, session, ...segments].join("/"),
+          ...(await digestFile(file, undefined, true)),
+        });
+    });
   }
   files.sort(comparePaths);
   const inputCaveats = inspectInputs(database, files, sessions);
@@ -739,11 +816,11 @@ function inspectInputs(
   files: FileEvidence[],
   sessions: Set<string>
 ): InputCaveat[] {
-  const sizes = new Map(files.map(({ path, size }) => [path, size]));
+  const evidence = new Map(files.map((file) => [file.path, file]));
   const scratchSessions = new Set(
-    files.flatMap((file) =>
-      file.path.startsWith("scratch/") ? [file.path.split("/", 3)[1]] : []
-    )
+    files
+      .filter((file) => file.path !== DB_NAME)
+      .map((file) => file.path.split("/", 3)[1])
   );
   const caveats: InputCaveat[] = [];
   const db = new DatabaseSync(database, { readOnly: true });
@@ -806,11 +883,16 @@ function inspectInputs(
           caveats.push({ partId: id, reason: "invalid_descriptor" });
           continue;
         }
-        const actual = sizes.get(`scratch/${session_id}/${name}`);
-        if (actual === undefined)
-          caveats.push({ partId: id, path: name, reason: "missing" });
-        else if (actual !== size)
-          caveats.push({ partId: id, path: name, reason: "size_changed" });
+        const primary = evidence.get(`scratch/${session_id}/${name}`);
+        const historical = evidence.get(`scratch-srt/${session_id}/${name}`);
+        let reason: InputCaveat["reason"] | undefined;
+        if (primary && historical && primary.sha256 !== historical.sha256)
+          reason = "scratch_candidates_differ";
+        else if (!primary && !historical) reason = "missing";
+        else if (primary?.size !== size && historical?.size !== size)
+          reason = "size_changed";
+        else if (!primary) reason = "historical_scratch_candidate";
+        if (reason) caveats.push({ partId: id, path: name, reason });
       }
     }
   } finally {
@@ -878,7 +960,7 @@ function sha256(data: Buffer) {
 
 async function walk(
   directory: string,
-  budget: { entries: number; pathBytes: number },
+  budget: ScratchBudget,
   depth: number,
   visit: (
     file: string,

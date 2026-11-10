@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 — legacy archive fixtures use disposable private roots only.
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { once } from "node:events";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -572,6 +573,139 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
       Buffer.from([0, 1, 2, 3])
     );
     expect(await archive.snapshotQuiesced()).toEqual(receipt);
+  });
+
+  it("preserves a historical SRT candidate separately and reports conflicting bytes", async () => {
+    const { db, root, scratch, scratchBase, userDataPath } = await fixture();
+    createDatabase(db);
+    await fs.mkdir(scratch, { recursive: true, mode: 0o700 });
+    await fs.writeFile(path.join(scratch, "upload.png"), "aaaa");
+    const historicalSrtTempRoot = path.join(await fs.realpath(root), "claude");
+    const tag = createHash("sha256")
+      .update(path.resolve(userDataPath))
+      .digest("hex")
+      .slice(0, 16);
+    const historicalBase = path.join(
+      historicalSrtTempRoot,
+      `grida-agent-${tag}`
+    );
+    const historical = path.join(
+      historicalBase,
+      "sessions",
+      "ses_fixture",
+      "scratch"
+    );
+    await fs.mkdir(historical, { recursive: true, mode: 0o700 });
+    await fs.writeFile(path.join(historical, "upload.png"), "bbbb");
+    await fs.writeFile(path.join(historical, "swept.pdf"), "x".repeat(42));
+    const unrelated = path.join(
+      historicalBase,
+      "sessions",
+      "ses_unrelated",
+      "scratch"
+    );
+    await fs.mkdir(unrelated, { recursive: true, mode: 0o700 });
+    await fs.writeFile(
+      path.join(unrelated, "unrelated.txt"),
+      "outside history"
+    );
+    const archive = new LegacyChatArchive({
+      userDataPath,
+      scratchBase,
+      historicalSrtTempRoot,
+    });
+    const before = await archive.snapshotQuiesced();
+    expect(before?.inputCaveats).toContainEqual({
+      partId: "p_files",
+      path: "upload.png",
+      reason: "scratch_candidates_differ",
+    });
+    expect(before?.inputCaveats).toContainEqual({
+      partId: "p_files",
+      path: "swept.pdf",
+      reason: "historical_scratch_candidate",
+    });
+    const { id, directory } = before!;
+    expect(
+      await fs.readFile(
+        path.join(directory, "scratch/ses_fixture/upload.png"),
+        "utf8"
+      )
+    ).toBe("aaaa");
+    expect(
+      await fs.readFile(
+        path.join(directory, "scratch-srt/ses_fixture/upload.png"),
+        "utf8"
+      )
+    ).toBe("bbbb");
+    expect(await fs.readdir(path.join(directory, "scratch-srt"))).toEqual([
+      "ses_fixture",
+    ]);
+    const seal = {
+      requestId: "retain-candidate",
+      requireReadOnlySource: process.platform === "darwin",
+    };
+    expect(await archive.sealQuiesced(seal)).toEqual(before);
+    const reopened = new LegacyChatArchive({ userDataPath, scratchBase });
+    expect(await reopened.verify(id)).toEqual(before);
+    expect(
+      await reopened.sealQuiesced({
+        ...seal,
+        expectedArchiveId: id,
+      })
+    ).toEqual(before);
+    await fs.writeFile(
+      path.join(directory, "scratch-srt/ses_fixture/upload.png"),
+      "cccc"
+    );
+    await expect(reopened.verify(id)).rejects.toThrow(
+      "Legacy chat archive: invalid_receipt"
+    );
+  });
+
+  it("keeps existing receipts stable when the attested candidate is absent", async () => {
+    const { archive, db, root, scratchBase, userDataPath } = await fixture();
+    createDatabase(db);
+    const historicalSrtTempRoot = path.join(await fs.realpath(root), "empty");
+    await fs.mkdir(historicalSrtTempRoot, { mode: 0o700 });
+    const original = await archive.snapshotQuiesced();
+    expect(
+      await new LegacyChatArchive({
+        userDataPath,
+        scratchBase,
+        historicalSrtTempRoot,
+      }).snapshotQuiesced()
+    ).toEqual(original);
+  });
+
+  it("refuses an overlapping historical scratch root or a symlink candidate", async () => {
+    const { archiveRoot, db, root, scratchBase, userDataPath } =
+      await fixture();
+    createDatabase(db);
+    const historicalSrtTempRoot = path.join(await fs.realpath(root), "claude");
+    const tag = createHash("sha256")
+      .update(path.resolve(userDataPath))
+      .digest("hex")
+      .slice(0, 16);
+    const historical = path.join(historicalSrtTempRoot, `grida-agent-${tag}`);
+    await fs.mkdir(historical, { recursive: true, mode: 0o700 });
+    await expect(
+      new LegacyChatArchive({
+        userDataPath,
+        scratchBase: historical,
+        historicalSrtTempRoot,
+      }).snapshotQuiesced()
+    ).rejects.toThrow("Legacy chat archive: unsafe_source");
+    await fs.rename(historical, scratchBase);
+    await fs.symlink(scratchBase, historical, "dir");
+    await expect(
+      new LegacyChatArchive({
+        userDataPath,
+        scratchBase,
+        historicalSrtTempRoot,
+      }).snapshotQuiesced()
+    ).rejects.toThrow("Legacy chat archive: unsafe_source");
+    expect(await fs.readdir(archiveRoot)).toEqual([]);
   });
 
   it("restarts a partial archive and converges concurrent retries without replacing receipts", async () => {
