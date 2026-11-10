@@ -125,6 +125,16 @@ since been reorganized.
 The rows add concrete observations to existing identity, ownership, input,
 resource, and publication contracts. They do not create more product features.
 
+For R7 and R8, the [native image case](../../../desktop/src/main/native-agent-images.test.ts)
+queues the selected PNG during a running turn, recovers the exact receipt on
+retry, and reopens the receipts for two same-named images under a text-only connection.
+It verifies the original bytes at the provider adapter and refuses an unsupported
+send before the text or image enters the chat. The
+[draft recovery cases](../../../editor/lib/agent-chat/native-chat-controller.test.ts)
+cover keeping the draft on a rejected replacement and reusing its input identity
+when the outcome is unknown. A distribution with image input enabled still needs
+the composed workbench and native-provider qualification.
+
 ### Implementation-plan requirements
 
 Each implementation slice names its affected feature rows and product scenarios.
