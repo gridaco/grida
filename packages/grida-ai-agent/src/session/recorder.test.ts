@@ -196,6 +196,53 @@ describe("createRecorderConsumer", () => {
     expect((messages[0].parts[0].data as { text: string }).text).toBe("x");
   });
 
+  it("records a denied call on its original part, keeping input and approval", async () => {
+    const t1 = createRecorderConsumer({ store, session_id: session.id });
+    await feed(t1, [
+      { type: "start" },
+      {
+        type: "tool-input-available",
+        toolCallId: "tc1",
+        toolName: "run_command",
+        input: { command: "rm" },
+      },
+      { type: "tool-approval-request", toolCallId: "tc1", approvalId: "ap1" },
+    ]);
+    await store.answerApproval(session.id, {
+      tool_call_id: "tc1",
+      approval_id: "ap1",
+      approved: false,
+      reason: "not this file",
+    });
+
+    const t2 = createRecorderConsumer({ store, session_id: session.id });
+    await feed(t2, [
+      { type: "start" },
+      { type: "tool-output-denied", toolCallId: "tc1" },
+    ]);
+
+    const rows = (await store.listMessages(session.id))
+      .flatMap((m) => m.parts)
+      .filter((p) => p.tool_call_id === "tc1");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.type).toBe("tool-run_command");
+    expect(rows[0]!.tool_state).toBe("output-denied");
+    expect(rows[0]!.data).toMatchObject({
+      state: "output-denied",
+      input: { command: "rm" },
+      approval: { id: "ap1", approved: false, reason: "not this file" },
+    });
+  });
+
+  it("ignores a denial for a call it has no part for", async () => {
+    const consumer = createRecorderConsumer({ store, session_id: session.id });
+    await feed(consumer, [
+      { type: "start" },
+      { type: "tool-output-denied", toolCallId: "tc_unknown" },
+    ]);
+    expect(await store.findToolPart(session.id, "tc_unknown")).toBeNull();
+  });
+
   // RFC `permission modes` (Phase 2) — the approval pause/resume splits a tool
   // call across TWO turns: input + name persist in the pausing turn; the
   // execution result streams in the resume turn on a FRESH recorder that never
