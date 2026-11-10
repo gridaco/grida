@@ -85,7 +85,7 @@ describe("Desktop preload agent seam", () => {
     );
     expect(preloadSource).toContain("subscriber.onUpdate(payload.update)");
     expect(preloadSource).toContain(
-      'window.addEventListener("pagehide", () => nativeChatHandlers.clear())'
+      'window.addEventListener("pagehide", clearNativeChatDelivery)'
     );
   });
 });

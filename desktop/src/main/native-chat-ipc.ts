@@ -718,18 +718,32 @@ export class NativeChatIpc {
   publishEditorSurfaces(
     event: IpcMainInvokeEvent,
     attachmentId: string,
-    value: unknown
+    value: unknown,
+    revision?: unknown
   ): void {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const snapshot = NativeEditorSurfaces.parse(value);
-    if (!snapshot) throw new Error("native_chat_editor_surfaces_invalid");
+    if (
+      !snapshot ||
+      (revision !== undefined &&
+        (typeof revision !== "number" ||
+          !Number.isSafeInteger(revision) ||
+          revision < 1))
+    )
+      throw new Error("native_chat_editor_surfaces_invalid");
     if (attachment.editorSurfaces) {
-      attachment.editorSurfaces.update(snapshot);
+      attachment.editorSurfaces.update(snapshot, revision);
     } else {
       attachment.editorSurfaces = owner.active.chat.registerEditorSurfaces?.(
         attachment.session,
         snapshot,
-        () => this.revalidate(owner, attachment)
+        () => this.revalidate(owner, attachment),
+        (request) =>
+          owner.frame.send(IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN, {
+            attachmentId: attachment.id,
+            ...request,
+          }),
+        revision
       );
     }
   }
@@ -749,7 +763,7 @@ export class NativeChatIpc {
       text,
       mode,
       ...(mode === "act" && attachment.editorSurfaces
-        ? ([attachment.editorSurfaces.id] as const)
+        ? ([attachment.editorSurfaces.selection()] as const)
         : [])
     );
     this.revalidate(owner, attachment);
@@ -793,7 +807,7 @@ export class NativeChatIpc {
       inputId,
       text,
       ...(attachment.editorSurfaces
-        ? ([attachment.editorSurfaces.id] as const)
+        ? ([attachment.editorSurfaces.selection()] as const)
         : [])
     );
     this.revalidate(owner, attachment);

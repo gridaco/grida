@@ -320,6 +320,7 @@ impl Host {
                             allow_wakeups: false,
                             allow_host_tools: capture.is_some(),
                             editor_endpoint: None,
+                            editor_presentation: false,
                             operating_regime,
                             subagent: None,
                         },

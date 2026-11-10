@@ -962,6 +962,14 @@ lazy reads, read-only mutation, and symlink escape refusal.
   checks the reply's chat and endpoint identity, and bounds the projected
   workspace-relative paths. The read supplies editor context only and confers
   no file, network, or document-edit authority.
+- Live presentation requires a separately negotiated capability and a
+  subscription from the exact attached workbench. Main dispatches a bounded
+  workspace-relative path to the authorized frame. Its receipt identifies the
+  chat, endpoint, and call. The editor validates the target and the original
+  view before activation. A repeated call can recover its receipt without a
+  second send. An unconfirmed dispatch stays in the turn's evidence. The
+  master permits continuation only for the exact trusted presentation
+  definition and turn grant.
 - The [native text observer](crates/grida-agent/src/acp/live.rs) projects
   assistant text from owned turns on negotiated private stdio. It checks
   attachment before serialization and uses the existing bounded ACP delivery

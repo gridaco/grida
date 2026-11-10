@@ -1,4 +1,4 @@
-//! GRIDA-SEC-004 — live editor observations use the captured Desktop binding.
+//! GRIDA-SEC-004 — live editor capabilities use the captured Desktop binding.
 
 use crate::tool_host::{
     CapabilityCall, CapabilityDefinition, CapabilityEffect, CapabilityExecutor, CapabilityReply,
@@ -10,34 +10,57 @@ use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::tools::{RecoveryKind, ToolDefinition, ToolOutcome};
 use agent_kit_core::{BindingId, BoxFuture, Error, ErrorKind, Result, SessionId, ToolId};
+use grida_agent_master::presentation::{self, MAX_PATH_BYTES};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub(crate) const CAPABILITY: &str = "co.grida/session/editor-surfaces";
+pub(crate) const OPEN_CAPABILITY: &str = "co.grida/session/editor-surface-open";
 pub(crate) const LIST_OPEN: &str = "surface_list_open";
-const MAX_PATH_BYTES: usize = 4096;
 const MAX_OPEN_PATHS: usize = 50;
 const SNAPSHOT_BYTES: usize = 16 * 1024;
-const READ_TIMEOUT: Duration = Duration::from_secs(2);
+const REPLY_TIMEOUT: Duration = Duration::from_secs(2);
 
 #[derive(Clone, Default)]
 pub(crate) struct EditorSurfaces {
-    connection: Arc<Mutex<Option<ConnectionTo<Client>>>>,
+    connection: Arc<Mutex<Option<DesktopConnection>>>,
+}
+
+struct DesktopConnection {
+    client: ConnectionTo<Client>,
+    presentation: bool,
 }
 
 impl EditorSurfaces {
-    pub(crate) fn attach(&self, connection: ConnectionTo<Client>) {
-        *self.connection.lock().unwrap() = Some(connection);
+    pub(crate) fn attach(&self, client: ConnectionTo<Client>, presentation: bool) {
+        *self.connection.lock().unwrap() = Some(DesktopConnection {
+            client,
+            presentation,
+        });
     }
 
     pub(crate) fn detach(&self) {
         self.connection.lock().unwrap().take();
     }
 
-    pub(crate) fn tool_host(&self, session: SessionId, endpoint: BindingId) -> Result<ToolHost> {
-        ToolHost::new([(
+    fn client(&self, needs_presentation: bool) -> Option<ConnectionTo<Client>> {
+        self.connection
+            .lock()
+            .unwrap()
+            .as_ref()
+            .filter(|connection| !needs_presentation || connection.presentation)
+            .map(|connection| connection.client.clone())
+    }
+
+    pub(crate) fn tool_host(
+        &self,
+        session: SessionId,
+        endpoint: BindingId,
+        present: bool,
+    ) -> Result<ToolHost> {
+        let mut capabilities = vec![(
             CapabilityDefinition {
                 tool: ToolDefinition {
                     id: ToolId::new(LIST_OPEN)?,
@@ -66,9 +89,33 @@ impl EditorSurfaces {
             },
             Arc::new(Observe {
                 owner: self.clone(),
-                request: Read { session_id: session, endpoint_id: endpoint },
+                request: Read { session_id: session.clone(), endpoint_id: endpoint.clone() },
             }) as Arc<dyn CapabilityExecutor>,
-        )])
+        )];
+        if present {
+            capabilities.push((
+                CapabilityDefinition {
+                    tool: presentation::definition()?,
+                    output_schema: json!({
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "requested": {"type": "boolean"},
+                            "reason": {"enum": ["dispatched", "editor_unavailable"]}
+                        },
+                        "required": ["path", "requested", "reason"],
+                        "additionalProperties": false
+                    }),
+                    effect: CapabilityEffect::Presentation,
+                },
+                Arc::new(Present {
+                    owner: self.clone(),
+                    session,
+                    endpoint,
+                }),
+            ));
+        }
+        ToolHost::new(capabilities)
     }
 }
 
@@ -94,9 +141,9 @@ impl CapabilityExecutor for Observe {
 
     fn invoke(&self, call: CapabilityCall) -> BoxFuture<'_, CapabilityReply> {
         Box::pin(async move {
-            let connection = self.owner.connection.lock().unwrap().clone();
+            let connection = self.owner.client(false);
             let outcome = if let Some(connection) = connection {
-                let deadline = call.deadline.min(std::time::Instant::now() + READ_TIMEOUT);
+                let deadline = call.deadline.min(Instant::now() + REPLY_TIMEOUT);
                 tokio::select! {
                     biased;
                     _ = call.cancellation.cancelled() => ToolOutcome::uncertain(),
@@ -116,6 +163,118 @@ impl CapabilityExecutor for Observe {
             }
         })
     }
+}
+
+struct Present {
+    owner: EditorSurfaces,
+    session: SessionId,
+    endpoint: BindingId,
+}
+
+impl CapabilityExecutor for Present {
+    fn validate(&self, arguments: &Value) -> Result<()> {
+        presentation_path(arguments).map(|_| ())
+    }
+
+    fn invoke(&self, call: CapabilityCall) -> BoxFuture<'_, CapabilityReply> {
+        Box::pin(async move {
+            let outcome = match presentation_path(&call.arguments) {
+                Ok(path) => self.request(&call, path).await,
+                Err(error) => ToolOutcome::failed(&error.code),
+            };
+            CapabilityReply {
+                binding: call.binding,
+                outcome,
+            }
+        })
+    }
+}
+
+impl Present {
+    async fn request(&self, call: &CapabilityCall, path: &str) -> ToolOutcome {
+        let Some(connection) = self.owner.client(true) else {
+            return presentation_result(path, false);
+        };
+        let deadline = call.deadline.min(Instant::now() + REPLY_TIMEOUT);
+        if call.cancellation.is_cancelled() || deadline <= Instant::now() {
+            return ToolOutcome::failed("editor_presentation_cancelled_before_request");
+        }
+        let request = Open {
+            session_id: self.session.clone(),
+            endpoint_id: self.endpoint.clone(),
+            call_id: call.binding.id.clone(),
+            path: path.to_owned(),
+        };
+        tokio::select! {
+            biased;
+            _ = call.cancellation.cancelled() => ToolOutcome::uncertain(),
+            _ = tokio::time::sleep_until(deadline.into()) => ToolOutcome::uncertain(),
+            reply = connection.send_request(request.clone()).block_task() => {
+                reply.map_or_else(|_| ToolOutcome::uncertain(), |reply| reply.outcome(&request))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/editor/surface-open", response = OpenReceipt)]
+#[serde(rename_all = "camelCase")]
+struct Open {
+    session_id: SessionId,
+    endpoint_id: BindingId,
+    call_id: BindingId,
+    path: String,
+}
+
+impl std::fmt::Debug for Open {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("EditorSurfaceOpen")
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct OpenReceipt {
+    session_id: SessionId,
+    endpoint_id: BindingId,
+    call_id: BindingId,
+    requested: bool,
+}
+
+impl OpenReceipt {
+    fn outcome(self, request: &Open) -> ToolOutcome {
+        if self.session_id != request.session_id
+            || self.endpoint_id != request.endpoint_id
+            || self.call_id != request.call_id
+        {
+            return ToolOutcome::uncertain();
+        }
+        presentation_result(&request.path, self.requested)
+    }
+}
+
+fn presentation_result(path: &str, requested: bool) -> ToolOutcome {
+    ToolOutcome {
+        status: OutcomeStatus::Succeeded,
+        content: Vec::new(),
+        structured: Some(json!({
+            "path": path,
+            "requested": requested,
+            "reason": if requested { "dispatched" } else { "editor_unavailable" }
+        })),
+        receipt: None,
+        truncated: false,
+    }
+}
+
+fn presentation_path(arguments: &Value) -> Result<&str> {
+    arguments
+        .as_object()
+        .filter(|object| object.len() == 1)
+        .and_then(|object| object.get("path"))
+        .and_then(Value::as_str)
+        .filter(|path| valid_path(path))
+        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "invalid_surface_path"))
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -289,5 +448,43 @@ mod tests {
             ToolOutcome::failed("editor_surface_endpoint_unavailable").status
         );
         assert!(result.structured.is_none());
+    }
+
+    #[test]
+    fn presentation_acknowledges_only_the_exact_request() {
+        let read = read();
+        let request = Open {
+            session_id: read.session_id,
+            endpoint_id: read.endpoint_id,
+            call_id: BindingId::new("request").unwrap(),
+            path: "/drafts/poster.canvas".into(),
+        };
+        let receipt = OpenReceipt {
+            session_id: request.session_id.clone(),
+            endpoint_id: request.endpoint_id.clone(),
+            call_id: request.call_id.clone(),
+            requested: true,
+        };
+        let sent = receipt.clone().outcome(&request);
+        assert_eq!(sent.status, OutcomeStatus::Succeeded);
+        assert_eq!(
+            sent.structured,
+            Some(json!({"path": request.path, "requested": true, "reason": "dispatched"}))
+        );
+        let unavailable = OpenReceipt {
+            requested: false,
+            ..receipt.clone()
+        }
+        .outcome(&request);
+        assert_eq!(unavailable.structured.unwrap()["requested"], false);
+        let unrelated = OpenReceipt {
+            call_id: BindingId::new("different-request").unwrap(),
+            ..receipt
+        }
+        .outcome(&request);
+        assert_eq!(unrelated.status, OutcomeStatus::Uncertain);
+        assert!(unrelated.structured.is_none());
+        assert!(presentation_path(&json!({"path":"/drafts/../poster.canvas"})).is_err());
+        assert!(presentation_path(&json!({"path":"/poster.canvas","endpointId":"other"})).is_err());
     }
 }

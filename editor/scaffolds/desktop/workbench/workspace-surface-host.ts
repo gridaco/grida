@@ -24,11 +24,21 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
       id.startsWith("virtual://")
   ) {}
 
-  async open(path: string): Promise<void> {
+  async open(
+    path: string,
+    requireCurrent: () => boolean = () => true
+  ): Promise<void> {
+    if (!requireCurrent()) return;
     const relPath = WorkspaceArtifact.fromAgentPath(path);
     if (relPath === null) return;
     const expectedSnapshot = this.group.getSnapshot();
-    await this.openValidated(relPath, expectedSnapshot);
+    const target = await this.resolveOpenableRelative(relPath);
+    if (
+      target !== null &&
+      requireCurrent() &&
+      this.group.getSnapshot() === expectedSnapshot
+    )
+      this.group.open(target);
   }
 
   /**
@@ -55,26 +65,6 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
           ? requestedActive
           : null,
     });
-  }
-
-  private async openValidated(
-    path: string,
-    expectedSnapshot?: ReturnType<EditorGroup["getSnapshot"]>
-  ): Promise<void> {
-    const relPath = await this.resolveOpenableRelative(path);
-    if (relPath === null) return;
-
-    // Validation crosses the asynchronous Desktop bridge. Any tab mutation in
-    // the meantime is newer navigation and supersedes this auxiliary agent
-    // presentation request. `restoreRelative` independently guards its whole
-    // batch against the same race.
-    if (
-      expectedSnapshot !== undefined &&
-      this.group.getSnapshot() !== expectedSnapshot
-    ) {
-      return;
-    }
-    this.group.open(relPath);
   }
 
   private async resolveOpenableRelative(path: string): Promise<string | null> {

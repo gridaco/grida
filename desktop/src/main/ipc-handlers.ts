@@ -326,8 +326,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
-    (event, attachmentId: string, snapshot: unknown) =>
-      nativeChat.publishEditorSurfaces(event, attachmentId, snapshot)
+    (event, attachmentId: string, snapshot: unknown, revision?: unknown) =>
+      nativeChat.publishEditorSurfaces(event, attachmentId, snapshot, revision)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SUBMIT,

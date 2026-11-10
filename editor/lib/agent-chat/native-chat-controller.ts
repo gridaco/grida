@@ -108,6 +108,8 @@ type Scope = {
   requested: string | null;
   attachment?: NativeChatAttachment;
   stopEditorSurfaceUpdates?: () => void;
+  stopEditorSurfaceOpen?: () => void;
+  editorPresentationRevision?: number;
   sideChat?: NativeSideChatController;
   subagents?: NativeSubagentController;
   image?: ArrayBuffer;
@@ -225,6 +227,7 @@ export class NativeChatController {
     private readonly editorSurfaces?: {
       readEditorSurfaces(): NativeEditorSurfaceSnapshot;
       subscribeToEditorSurfaces(listener: () => void): () => void;
+      open?(path: string, requireCurrent: () => boolean): Promise<void>;
     }
   ) {}
 
@@ -1882,6 +1885,7 @@ export class NativeChatController {
       scope.attachment = attachment;
       if (!this.owns(scope)) return;
       if (this.editorSurfaces && this.bridge.publishEditorSurfaces) {
+        this.subscribeToEditorPresentation(scope, attachment);
         const publish = () => this.publishEditorSurfaces(scope, attachment);
         scope.stopEditorSurfaceUpdates =
           this.editorSurfaces.subscribeToEditorSurfaces(() => void publish());
@@ -1911,6 +1915,7 @@ export class NativeChatController {
   private queueRelease(scope: Scope | undefined): void {
     if (!scope) return;
     clearTimeout(scope.timer);
+    scope.stopEditorSurfaceOpen?.();
     scope.stopEditorSurfaceUpdates?.();
     void scope.sideChat?.close().catch(() => {});
     scope.subagents?.dispose();
@@ -1921,15 +1926,44 @@ export class NativeChatController {
     });
   }
 
+  private subscribeToEditorPresentation(
+    scope: Scope,
+    attachment: NativeChatAttachment
+  ): void {
+    const source = this.editorSurfaces;
+    if (!source?.open || !this.bridge.onEditorSurfaceOpen) return;
+    try {
+      scope.stopEditorSurfaceOpen = this.bridge.onEditorSurfaceOpen(
+        attachment.attachmentId,
+        (request, isCurrent) => {
+          const current = () =>
+            this.owns(scope) &&
+            scope.attachment === attachment &&
+            scope.editorPresentationRevision === request.revision &&
+            Date.now() < request.expiresAtMs &&
+            isCurrent();
+          if (current())
+            void source.open?.(request.path, current).catch(() => {});
+        }
+      );
+      scope.editorPresentationRevision = 0;
+    } catch {
+      // A viewer that cannot subscribe still supplies read-only tab context.
+    }
+  }
+
   private async publishEditorSurfaces(
     scope: Scope,
     attachment: NativeChatAttachment
   ): Promise<void> {
     if (!this.owns(scope) || !this.editorSurfaces) return;
+    const revision = scope.editorPresentationRevision;
+    if (revision !== undefined) scope.editorPresentationRevision = revision + 1;
     await this.bridge
       .publishEditorSurfaces?.(
         attachment.attachmentId,
-        this.editorSurfaces.readEditorSurfaces()
+        this.editorSurfaces.readEditorSurfaces(),
+        ...(revision === undefined ? [] : ([revision + 1] as const))
       )
       .catch(() => {});
   }

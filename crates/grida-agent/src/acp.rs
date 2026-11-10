@@ -186,7 +186,6 @@ async fn serve_connection(
                 let subagents = initialized_host.subagents_available();
                 let deletion = reviewer && initialized_host.deletion_available();
                 let mut advertised = extensions::advertised(reviewer, subagents, deletion);
-                let mut editor_surfaces = false;
                 if reviewer {
                     advertised.insert(live::CAPABILITY.into(), 1.into());
                 }
@@ -217,9 +216,21 @@ async fn serve_connection(
                             .and_then(serde_json::Value::as_u64)
                             == Some(1)
                     {
-                        initialized_host.editor_surfaces.attach(connection.clone());
+                        let open = crate::editor_surfaces::OPEN_CAPABILITY;
+                        let presentation = request
+                            .client_capabilities
+                            .meta
+                            .as_ref()
+                            .and_then(|meta| meta.get(open))
+                            .and_then(serde_json::Value::as_u64)
+                            == Some(1);
+                        initialized_host
+                            .editor_surfaces
+                            .attach(connection.clone(), presentation);
                         advertised.insert(capability.into(), 1.into());
-                        editor_surfaces = true;
+                        if presentation {
+                            advertised.insert(open.into(), 1.into());
+                        }
                     }
                 }
                 let updates = {
@@ -228,11 +239,14 @@ async fn serve_connection(
                     let meta = request.client_capabilities.meta.as_ref();
                     sessions.negotiated =
                         extensions::negotiated(meta, reviewer, subagents, deletion);
-                    if editor_surfaces {
-                        sessions
-                            .negotiated
-                            .insert(crate::editor_surfaces::CAPABILITY);
-                    }
+                    sessions.negotiated.extend(
+                        [
+                            crate::editor_surfaces::CAPABILITY,
+                            crate::editor_surfaces::OPEN_CAPABILITY,
+                        ]
+                        .into_iter()
+                        .filter(|key| advertised.contains_key(*key)),
+                    );
                     if reviewer
                         && !sessions.live_started
                         && meta

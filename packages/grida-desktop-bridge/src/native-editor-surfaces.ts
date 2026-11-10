@@ -4,6 +4,12 @@ export type NativeEditorSurfaceSnapshot = Readonly<{
   truncated: boolean;
 }>;
 
+export type NativeEditorSurfaceOpen = Readonly<{
+  path: string;
+  revision: number;
+  expiresAtMs: number;
+}>;
+
 export namespace NativeEditorSurfaces {
   const MAX_OPEN = 50;
   const MAX_PATH_BYTES = 4096;
@@ -14,7 +20,7 @@ export namespace NativeEditorSurfaces {
     return encoder.encode(value).byteLength;
   }
 
-  function isPath(value: unknown): value is string {
+  export function isPath(value: unknown): value is string {
     return (
       typeof value === "string" &&
       value.length <= MAX_PATH_BYTES &&

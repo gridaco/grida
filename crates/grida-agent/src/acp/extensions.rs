@@ -138,6 +138,8 @@ struct Submit {
     allow_wakeups: bool,
     operating_regime: Option<crate::OperatingRegime>,
     editor_endpoint_id: Option<BindingId>,
+    #[serde(default)]
+    editor_presentation: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -374,6 +376,16 @@ pub(super) fn handlers(
                             return Err(Error::invalid_params());
                         }
                     }
+                    if request.editor_presentation {
+                        require(
+                            &submit_sessions,
+                            crate::editor_surfaces::OPEN_CAPABILITY,
+                            None,
+                        )?;
+                        if request.editor_endpoint_id.is_none() {
+                            return Err(Error::invalid_params());
+                        }
+                    }
                     let parts = prompt_parts(request.prompt, image_intake)?;
                     let accepted = submit_host
                         .submit_prompt_with_context(
@@ -393,6 +405,7 @@ pub(super) fn handlers(
                             },
                             request.allow_wakeups,
                             request.editor_endpoint_id,
+                            request.editor_presentation,
                         )
                         .await
                         .map_err(host_error)?;

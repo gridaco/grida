@@ -15,6 +15,8 @@ import type { NativeProviderNetwork } from "./native-provider-egress";
 import { NativeAgentProcess } from "./native-agent-process";
 import { NativeAgentChat } from "./native-agent-chat";
 import { NativeChatIpc } from "./native-chat-ipc";
+import { IPC_CHANNELS } from "../bridge/contract";
+import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
 
 const origin = "https://grida.test";
 const target = `${origin}/api/v1/ai/chat/completions`;
@@ -135,6 +137,195 @@ it("does not dispatch after a scope change, a cancelled request, or close during
 });
 
 const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
+it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
+  "retains an unconfirmed presentation without repeating the send or stopping artifact work",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-desktop-presentation-")
+    );
+    const cwd = path.join(root, "workspace");
+    await fs.mkdir(cwd, { mode: 0o700 });
+    const owner = fixture();
+    const connection = await NativeGatewayConnection.open(owner.options);
+    const editor = "https://editor.fixture.invalid";
+    const send = vi.fn<(channel: string, payload: unknown) => void>();
+    const frame = { url: `${editor}/desktop/workspace?id=workspace`, send };
+    const contents = Object.assign(new EventEmitter(), {
+      mainFrame: frame,
+      isDestroyed: () => false,
+      isLoadingMainFrame: () => false,
+    });
+    const event = {
+      sender: contents,
+      senderFrame: frame,
+    } as unknown as IpcMainInvokeEvent;
+    const original = NativeEditorSurfaceEndpoints.prototype.open;
+    let lostCallId: string | undefined;
+    const open = vi
+      .spyOn(NativeEditorSurfaceEndpoints.prototype, "open")
+      .mockImplementation(function (this: NativeEditorSurfaceEndpoints, value) {
+        const reply = original.call(this, value);
+        if (!reply?.requested) return reply;
+        const { path } = value as { path: string };
+        if (path === "/unconfirmed.svg")
+          return { ...reply, callId: randomUUID() };
+        if (path === "/lost.svg") lostCallId = reply.callId;
+        return reply;
+      });
+    const channel = NativeAgentProcess.prototype as unknown as {
+      write(message: { result?: { callId?: string } }): void;
+    };
+    const sendFrame = channel.write;
+    let droppedAcks = 0;
+    const write = vi
+      .spyOn(channel, "write")
+      .mockImplementation(function (this: NativeAgentProcess, message) {
+        if (lostCallId && message.result?.callId === lostCallId) {
+          droppedAcks++;
+          return;
+        }
+        sendFrame.call(this, message);
+      });
+    const providerInputs: {
+      messages: { role: string; content: string }[];
+      tools: { function: { name: string } }[];
+    }[] = [];
+    owner.dispatch.mockImplementation(async (body) => {
+      providerInputs.push(JSON.parse(body.toString()));
+      const step = providerInputs.length;
+      const chunk = (delta: unknown, reason: string | null) =>
+        `data: ${JSON.stringify({ id: `presentation-${step}`, choices: [{ index: 0, delta, finish_reason: reason }] })}\n\n`;
+      const reply =
+        step <= 3
+          ? chunk(
+              {
+                role: "assistant",
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: `present-${step}`,
+                    type: "function",
+                    function: {
+                      name: "surface_open",
+                      arguments: JSON.stringify({
+                        path: ["/ready.svg", "/unconfirmed.svg", "/lost.svg"][
+                          step - 1
+                        ],
+                      }),
+                    },
+                  },
+                ],
+              },
+              null
+            ) + chunk({}, "tool_calls")
+          : chunk({ content: "Artifact work finished." }, null) +
+            chunk({}, "stop");
+      return new Response(reply + "data: [DONE]\n\n", {
+        headers: { "content-type": "text/event-stream" },
+      });
+    });
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...connection.launch("fixture"),
+        resourcesPath: resourcesPath!,
+        stateDirectory: path.join(root, "state"),
+        cwd,
+      });
+      const active = { workspaceId: "workspace", chat };
+      const ipc = new NativeChatIpc(
+        editor,
+        (sender) => (sender === event.sender ? active : null),
+        undefined,
+        undefined,
+        async () => true
+      );
+      const attached = await ipc.create(event);
+      const id = attached.attachmentId;
+      ipc.publishEditorSurfaces(
+        event,
+        id,
+        { active: null, open: [], truncated: false },
+        1
+      );
+      const accepted = await ipc.submit(
+        event,
+        id,
+        "present",
+        "Show the artifact.",
+        "act"
+      );
+      const observed = await vi.waitFor(
+        async () => {
+          const observation = await ipc.observe(event, id);
+          expect(observation.snapshot.current).toBeNull();
+          expect(observation.snapshot.latest).toMatchObject({
+            turnId: accepted.turnId,
+            status: "succeeded",
+          });
+          return observation;
+        },
+        { timeout: 8000 }
+      );
+      expect(providerInputs).toHaveLength(4);
+      expect(
+        providerInputs[0].tools.map((tool) => tool.function.name)
+      ).toContain("surface_open");
+      const results = providerInputs[3].messages
+        .filter((message) => message.role === "tool")
+        .map((message) => JSON.parse(message.content));
+      expect(results).toEqual([
+        expect.objectContaining({
+          status: "succeeded",
+          structured: expect.objectContaining({
+            path: "/ready.svg",
+            requested: true,
+          }),
+        }),
+        expect.objectContaining({ status: "uncertain" }),
+        expect.objectContaining({ status: "uncertain" }),
+      ]);
+      expect(send.mock.calls).toEqual(
+        ["/ready.svg", "/unconfirmed.svg", "/lost.svg"].map((path) => [
+          IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
+          {
+            attachmentId: id,
+            path,
+            revision: 1,
+            expiresAtMs: expect.any(Number),
+          },
+        ])
+      );
+      expect(open).toHaveBeenCalledTimes(3);
+      expect(droppedAcks).toBe(1);
+      await expect(
+        ipc.turnSummary(event, id, observed.observationId)
+      ).resolves.toMatchObject({
+        status: "succeeded",
+        text: "Artifact work finished.",
+        unresolvedOperations: 2,
+        toolActivity: { succeeded: 1, unresolved: 2 },
+      });
+      expect(chat.acceptsSavedChatDeletion).toBe(true);
+      const entry = await ipc.catalogEntry(event, id);
+      await expect(
+        ipc.deleteSavedChat(event, id, observed.observationId, entry.revision)
+      ).resolves.toBe(true);
+      expect(send).toHaveBeenCalledTimes(3);
+    } finally {
+      write.mockRestore();
+      open.mockRestore();
+      try {
+        await chat?.close();
+      } finally {
+        connection.close();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  },
+  20_000
+);
+
 it.skipIf(!resourcesPath)(
   "reads the current tabs through one exact workbench attachment and refuses replacement state",
   async () => {

@@ -14,6 +14,7 @@ use agent_kit_core::{
     BindingId, BoxFuture, ErrorKind, Fingerprint, GrantId, PrincipalId, Result, ScopeId, ToolId,
 };
 use agent_kit_runtime::{AdmissionContext, ToolAdmission, ToolDecision, ToolGate};
+use grida_agent_master::presentation;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -113,17 +114,28 @@ impl HostTools {
         } else {
             "local-headless"
         };
-        Self::with_local(mcp, surface, OPEN_SURFACE, lease, principal)
+        Self::with_local(mcp, surface, &[OPEN_SURFACE], lease, principal)
     }
 
-    pub(super) fn editor(surface: ToolHost, lease: BindingId) -> Result<Self> {
-        Self::with_local(None, Some(surface), LIST_OPEN, lease, "live-editor")
+    pub(super) fn editor(surface: ToolHost, lease: BindingId, present: bool) -> Result<Self> {
+        let capabilities: &[&str] = if present {
+            &[LIST_OPEN, presentation::OPEN]
+        } else {
+            &[LIST_OPEN]
+        };
+        Self::with_local(
+            None,
+            Some(surface),
+            capabilities,
+            lease,
+            presentation::PRINCIPAL,
+        )
     }
 
     fn with_local(
         mcp: Option<McpClient>,
         surface: Option<ToolHost>,
-        local_id: &str,
+        local_ids: &[&str],
         lease: BindingId,
         principal: &'static str,
     ) -> Result<Self> {
@@ -134,11 +146,13 @@ impl HostTools {
             .map(McpClient::selected_grants)
             .transpose()?
             .unwrap_or_default();
-        let local = surface
-            .as_ref()
-            .map(|host| host.grant(&ToolId::new(local_id)?))
-            .transpose()?;
-        for grant in selected.into_iter().chain(local) {
+        let local = surface.iter().flat_map(|host| {
+            local_ids
+                .iter()
+                .map(move |id| host.grant(&ToolId::new(*id)?))
+        });
+        for grant in selected.into_iter().map(Ok).chain(local) {
+            let grant = grant?;
             let definition = grant.describe()?;
             let id = definition.tool.id.clone();
             if definitions

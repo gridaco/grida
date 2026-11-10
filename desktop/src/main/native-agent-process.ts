@@ -9,7 +9,10 @@ import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
 import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeAgentRevisions } from "./native-agent-revisions";
-import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
+import {
+  NativeEditorSurfaceEndpoints,
+  type NativeEditorSurfaceDelivery,
+} from "./native-editor-surfaces";
 import {
   NativeAgentPermissions,
   type NativeWorkspaceSelection,
@@ -97,6 +100,7 @@ export class NativeAgentProcess {
   private artifacts = false;
   private savedChatDeletion = false;
   private editorSurfaces = false;
+  private editorSurfaceOpen = false;
   private readonly commandCapabilities = new Set<string>();
   private observedExit = false;
   private shutdown: Promise<void> | undefined;
@@ -304,6 +308,9 @@ export class NativeAgentProcess {
                 }),
                 ...NativeAgentWakeups.capabilities,
                 [NativeEditorSurfaceEndpoints.capability]: 1,
+                ...(providerEgress && {
+                  [NativeEditorSurfaceEndpoints.openCapability]: 1,
+                }),
                 [NativeAgentArtifacts.capability]: 1,
                 ...(requestDeletion && { [NativeAgentDeletion.capability]: 1 }),
               },
@@ -348,6 +355,9 @@ export class NativeAgentProcess {
       processOwner.editorSurfaces =
         providerEgress !== undefined &&
         advertised?.[NativeEditorSurfaceEndpoints.capability] === 1;
+      processOwner.editorSurfaceOpen =
+        processOwner.editorSurfaces &&
+        advertised?.[NativeEditorSurfaceEndpoints.openCapability] === 1;
       processOwner.ready = true;
       return processOwner;
     } catch (error) {
@@ -369,10 +379,18 @@ export class NativeAgentProcess {
   registerEditorSurfaces(
     sessionId: string,
     snapshot: NativeEditorSurfaceSnapshot,
-    requireCurrent: () => void
+    requireCurrent: () => void,
+    deliver: NativeEditorSurfaceDelivery,
+    revision?: number
   ) {
     if (this.connected && this.editorSurfaces)
-      return this.editorEndpoints.register(sessionId, snapshot, requireCurrent);
+      return this.editorEndpoints.register(
+        sessionId,
+        snapshot,
+        requireCurrent,
+        this.editorSurfaceOpen ? deliver : undefined,
+        revision
+      );
   }
 
   private call(
@@ -496,11 +514,16 @@ export class NativeAgentProcess {
           return;
         }
         if (
-          message.method === NativeEditorSurfaceEndpoints.readMethod &&
           this.connected &&
-          this.editorSurfaces
+          this.editorSurfaces &&
+          (message.method === NativeEditorSurfaceEndpoints.readMethod ||
+            (this.editorSurfaceOpen &&
+              message.method === NativeEditorSurfaceEndpoints.openMethod))
         ) {
-          const result = this.editorEndpoints.read(message.params);
+          const result =
+            message.method === NativeEditorSurfaceEndpoints.readMethod
+              ? this.editorEndpoints.read(message.params)
+              : this.editorEndpoints.open(message.params);
           this.write({
             jsonrpc: "2.0",
             id: message.id,

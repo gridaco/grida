@@ -13,6 +13,15 @@ chat. Open **Preview cropped PNG** and choose **Save PNG as…** to save it to a
 new file. You can retry while the crop is available. For details on what the
 summary includes, see [Read a turn summary](./clients.md#read-a-turn-summary).
 
+## See an artifact while work continues
+
+In a native workspace chat with live presentation, ask the agent to open
+an existing artifact. For example, “Open the poster when the first draft
+is ready.” The editor can open the artifact while the agent continues
+working. Switching tabs yourself takes precedence over a pending request.
+The turn summary can show an unconfirmed tool result. Check the editor tab
+to see what opened.
+
 ## Save a copy from Tools
 
 1. Generate a result in **Tools**. When Desktop retains it, the result appears

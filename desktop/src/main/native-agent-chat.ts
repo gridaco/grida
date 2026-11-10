@@ -40,6 +40,10 @@ import type {
   NativeSubagentCreate,
 } from "@grida/desktop-bridge";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
+import type {
+  NativeEditorSurfaceDelivery,
+  NativeEditorSurfaceSelection,
+} from "./native-editor-surfaces";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
 import type { NativeApprovalReview } from "./native-agent-permissions";
 import {
@@ -630,12 +634,16 @@ export class NativeAgentChat {
   registerEditorSurfaces(
     session: NativeChatSession,
     snapshot: NativeEditorSurfaceSnapshot,
-    requireCurrent: () => void
+    requireCurrent: () => void,
+    deliver: NativeEditorSurfaceDelivery,
+    revision?: number
   ) {
     return this.process.registerEditorSurfaces(
       this.requireAttached(session),
       snapshot,
-      requireCurrent
+      requireCurrent,
+      deliver,
+      revision
     );
   }
 
@@ -644,10 +652,10 @@ export class NativeAgentChat {
     inputId: string,
     text: string,
     operatingRegime?: NativeChatOperatingRegime,
-    editorEndpointId?: string
+    editorSurfaces?: NativeEditorSurfaceSelection
   ): Promise<NativeChatAcceptance> {
     return this.send("submit", session, inputId, text, operatingRegime, {
-      editorEndpointId,
+      editorSurfaces,
     });
   }
 
@@ -664,13 +672,13 @@ export class NativeAgentChat {
     session: NativeChatSession,
     inputId: string,
     text: string,
-    editorEndpointId?: string
+    editorSurfaces?: NativeEditorSurfaceSelection
   ): Promise<NativeChatAcceptance> {
     if (!this.acceptsWakeups)
       return Promise.reject(new Error("native_chat_wakeup_unavailable"));
     return this.send("submit", session, inputId, text, "act", {
       allowWakeups: true,
-      editorEndpointId,
+      editorSurfaces,
     });
   }
 
@@ -741,12 +749,12 @@ export class NativeAgentChat {
       image?: ReturnType<typeof pngPrompt>;
       allowConfigurationChanges?: true;
       allowWakeups?: true;
-      editorEndpointId?: string;
+      editorSurfaces?: NativeEditorSurfaceSelection;
     } = {}
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     identity(inputId);
-    const { image, allowConfigurationChanges, allowWakeups, editorEndpointId } =
+    const { image, allowConfigurationChanges, allowWakeups, editorSurfaces } =
       options;
     return acceptance(
       await this.process.request(`_co.grida/session/${mode}`, {
@@ -760,7 +768,7 @@ export class NativeAgentChat {
           operatingRegime === "act" &&
           !image &&
           !allowConfigurationChanges &&
-          editorEndpointId && { editorEndpointId }),
+          editorSurfaces),
       }),
       sessionId,
       inputId

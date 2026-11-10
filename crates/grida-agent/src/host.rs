@@ -282,6 +282,8 @@ struct StoredPrompt {
     host_tools_capture: Option<host_tools::Capture>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     editor_endpoint: Option<BindingId>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    editor_presentation: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     guidance: Option<crate::skills::CapturedGuidance>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -304,6 +306,7 @@ struct SubmissionPolicy {
     allow_wakeups: bool,
     allow_host_tools: bool,
     editor_endpoint: Option<BindingId>,
+    editor_presentation: bool,
     operating_regime: OperatingRegime,
     subagent: Option<grida_agent_master::subagents::Assignment>,
 }
@@ -1358,6 +1361,7 @@ impl Host {
             allow_wakeups,
             allow_host_tools: true,
             editor_endpoint: None,
+            editor_presentation: false,
             operating_regime,
             subagent: None,
         })
@@ -1376,6 +1380,7 @@ impl Host {
             allow_wakeups,
             allow_host_tools,
             editor_endpoint,
+            editor_presentation,
             operating_regime,
             subagent,
         } = policy;
@@ -1468,6 +1473,7 @@ impl Host {
                     permission_capture,
                     host_tools_capture,
                     editor_endpoint,
+                    editor_presentation,
                     guidance,
                     goal: None,
                     subagent,
@@ -1570,6 +1576,12 @@ impl Host {
                     return Err(problem(ErrorKind::Conflict, "retained_act_requires_act"));
                 }
                 stored.operating_regime.apply(&mut config);
+                if stored.editor_presentation {
+                    config.instructions.push_str("\n\n");
+                    config
+                        .instructions
+                        .push_str(grida_agent_master::presentation::INSTRUCTIONS);
+                }
                 if !cancellation_only
                     && stored.operating_regime.is_act()
                     && let Some(capture) = &stored.host_tools_capture
@@ -1589,9 +1601,13 @@ impl Host {
                         ));
                     }
                     host_tools = Some(Arc::new(host_tools::HostTools::editor(
-                        self.editor_surfaces
-                            .tool_host(session.clone(), endpoint.clone())?,
+                        self.editor_surfaces.tool_host(
+                            session.clone(),
+                            endpoint.clone(),
+                            stored.editor_presentation,
+                        )?,
                         endpoint.clone(),
+                        stored.editor_presentation,
                     )?));
                 }
                 authority.validate(
@@ -1795,7 +1811,8 @@ impl Host {
     }
 
     pub async fn submit_prompt(&self, request: PromptRequest) -> Result<DurableSubmission> {
-        self.submit_prompt_with_context(request, false, None).await
+        self.submit_prompt_with_context(request, false, None, false)
+            .await
     }
 
     pub(crate) async fn submit_prompt_with_context(
@@ -1803,6 +1820,7 @@ impl Host {
         request: PromptRequest,
         allow_wakeups: bool,
         editor_endpoint: Option<BindingId>,
+        editor_presentation: bool,
     ) -> Result<DurableSubmission> {
         validate_prompt_parts(&request.parts)?;
         if let Some(accepted) = self.existing_submission(&request, allow_wakeups).await? {
@@ -1825,6 +1843,7 @@ impl Host {
             ));
         }
         policy.editor_endpoint = editor_endpoint;
+        policy.editor_presentation = editor_presentation;
         match self.launch_prompt(request.clone(), true, policy).await {
             Ok(run) => Ok(DurableSubmission {
                 session: run.session,

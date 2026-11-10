@@ -92,6 +92,14 @@ workbench returns an empty view. A detached or replaced workbench is unavailable
 An unverified reply supplies no editor data. The binding grants no filesystem
 access or document mutation.
 
+When the same workbench offers presentation, `surface_open` asks that exact
+frame to open a workspace artifact. Main binds the request to a call identity
+and the frame's last published view. The editor validates the target and
+checks the view again before changing tabs. A dispatch receipt confirms Main
+accepted the send to the captured frame. Observed display requires separate
+evidence. An unconfirmed dispatch remains in the turn's account and leaves
+the model free to continue work. Reopening a chat never replays presentation.
+
 The document tool defines the meaning of its document, selection, and content
 arguments. It returns its own domain result or error. A tool that requires a
 version or other precondition validates it inside the document implementation.

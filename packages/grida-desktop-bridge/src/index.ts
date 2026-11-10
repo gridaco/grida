@@ -66,7 +66,10 @@ import type { DesktopNativeChat } from "./native-chat";
 export type * from "./native-chat";
 export type * from "./native-subagents";
 export { NativeEditorSurfaces } from "./native-editor-surfaces";
-export type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
+export type {
+  NativeEditorSurfaceOpen,
+  NativeEditorSurfaceSnapshot,
+} from "./native-editor-surfaces";
 
 export const DESKTOP_BRIDGE_PROTOCOL = 1 as const;
 

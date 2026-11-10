@@ -139,10 +139,14 @@ fn require_resolved_work(turn: &TurnState) -> Result<()> {
         .outcome()
         .is_some_and(|outcome| outcome.status == OutcomeStatus::Uncertain)
         || turn.waits().values().any(|wait| wait.is_pending())
-        || turn
-            .operations()
-            .values()
-            .any(|operation| operation.outcome().is_none() || operation.is_uncertain())
+        || turn.operations().values().any(|operation| {
+            operation.outcome().is_none()
+                || (operation.is_uncertain()
+                    && !grida_agent_master::presentation::unconfirmed(
+                        operation,
+                        &turn.binding().turn,
+                    ))
+        })
     {
         return Err(problem(
             ErrorKind::Conflict,

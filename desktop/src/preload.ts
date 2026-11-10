@@ -18,6 +18,10 @@
 
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { AgentTransport } from "@grida/agent/transport";
+import {
+  NativeEditorSurfaces,
+  type NativeEditorSurfaceOpen,
+} from "@grida/desktop-bridge";
 import type {
   AgentRunOptions,
   AgentUIMessageChunk,
@@ -97,6 +101,56 @@ const nativeChatHandlers = new Map<
     onUpdate: (update: NativeChatUpdate) => void;
   }
 >();
+const nativeEditorHandlers = new Map<
+  string,
+  {
+    href: string;
+    open(request: NativeEditorSurfaceOpen, isCurrent: () => boolean): void;
+  }
+>();
+
+function clearNativeChatDelivery(): void {
+  nativeChatHandlers.clear();
+  nativeEditorHandlers.clear();
+}
+
+ipcRenderer.on(
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
+  (_event, value: unknown) => {
+    if (
+      location.pathname !== "/desktop/workspace" ||
+      !value ||
+      typeof value !== "object"
+    )
+      return;
+    const { attachmentId, path, revision, expiresAtMs } = value as Record<
+      string,
+      unknown
+    >;
+    if (
+      typeof attachmentId !== "string" ||
+      !NativeEditorSurfaces.isPath(path) ||
+      typeof revision !== "number" ||
+      !Number.isSafeInteger(revision) ||
+      revision < 1 ||
+      typeof expiresAtMs !== "number" ||
+      !Number.isSafeInteger(expiresAtMs) ||
+      expiresAtMs <= Date.now()
+    )
+      return;
+    const handler = nativeEditorHandlers.get(attachmentId);
+    if (!handler || handler.href !== location.href) return;
+    const isCurrent = () =>
+      nativeEditorHandlers.get(attachmentId) === handler &&
+      handler.href === location.href;
+    try {
+      handler.open({ path, revision, expiresAtMs }, isCurrent);
+    } catch {
+      // Presentation is auxiliary and belongs to the subscribed workbench.
+    }
+  }
+);
+
 ipcRenderer.on(
   IPC_CHANNELS.NATIVE_CHAT_UPDATE,
   (
@@ -233,7 +287,7 @@ function installDesktopNavigationGuard(): void {
     assertAllowed(url);
     const before = window.location.href;
     pushState(data, unused, url);
-    if (window.location.href !== before) nativeChatHandlers.clear();
+    if (window.location.href !== before) clearNativeChatDelivery();
   };
 
   const replaceState = window.history.replaceState.bind(window.history);
@@ -241,17 +295,17 @@ function installDesktopNavigationGuard(): void {
     assertAllowed(url);
     const before = window.location.href;
     replaceState(data, unused, url);
-    if (window.location.href !== before) nativeChatHandlers.clear();
+    if (window.location.href !== before) clearNativeChatDelivery();
   };
 
   window.addEventListener("popstate", () => {
-    nativeChatHandlers.clear();
+    clearNativeChatDelivery();
     if (!isDesktopPath(window.location.pathname)) {
       window.location.replace("/desktop/welcome");
     }
   });
-  window.addEventListener("pagehide", () => nativeChatHandlers.clear());
-  window.addEventListener("hashchange", () => nativeChatHandlers.clear());
+  window.addEventListener("pagehide", clearNativeChatDelivery);
+  window.addEventListener("hashchange", clearNativeChatDelivery);
 }
 
 /**
@@ -469,18 +523,38 @@ const bridge: DesktopBridge = {
         openId
       ),
     detach: async (attachmentId) => {
+      nativeEditorHandlers.delete(attachmentId);
       for (const [id, subscriber] of nativeChatHandlers) {
         if (subscriber.attachmentId === attachmentId)
           nativeChatHandlers.delete(id);
       }
       await ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_DETACH, attachmentId);
     },
-    publishEditorSurfaces: (attachmentId, snapshot) =>
+    publishEditorSurfaces: (attachmentId, snapshot, revision) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
         attachmentId,
-        snapshot
+        snapshot,
+        nativeEditorHandlers.get(attachmentId)?.href === location.href
+          ? revision
+          : undefined
       ),
+    onEditorSurfaceOpen: (attachmentId, open) => {
+      if (
+        location.pathname !== "/desktop/workspace" ||
+        !/^[a-f0-9-]{36}$/.test(attachmentId) ||
+        typeof open !== "function" ||
+        nativeEditorHandlers.has(attachmentId) ||
+        nativeEditorHandlers.size >= 16
+      )
+        throw new Error("native_chat_editor_presentation_unavailable");
+      const handler = { href: location.href, open };
+      nativeEditorHandlers.set(attachmentId, handler);
+      return () => {
+        if (nativeEditorHandlers.get(attachmentId) === handler)
+          nativeEditorHandlers.delete(attachmentId);
+      };
+    },
     submit: (attachmentId, inputId, text) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT,

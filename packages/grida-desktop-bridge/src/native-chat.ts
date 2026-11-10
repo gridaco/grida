@@ -1,5 +1,8 @@
 // GRIDA-SEC-004 — renderer-safe native chat projection.
-import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
+import type {
+  NativeEditorSurfaceOpen,
+  NativeEditorSurfaceSnapshot,
+} from "./native-editor-surfaces";
 import type { NativeSubagentClient } from "./native-subagents";
 
 export type NativeChatAttachment = Readonly<{
@@ -439,8 +442,13 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   detach(attachmentId: string): Promise<void>;
   publishEditorSurfaces?(
     attachmentId: string,
-    snapshot: NativeEditorSurfaceSnapshot
+    snapshot: NativeEditorSurfaceSnapshot,
+    presentationRevision?: number
   ): Promise<void>;
+  onEditorSurfaceOpen?(
+    attachmentId: string,
+    open: (request: NativeEditorSurfaceOpen, isCurrent: () => boolean) => void
+  ): () => void;
   submit(
     attachmentId: string,
     inputId: string,

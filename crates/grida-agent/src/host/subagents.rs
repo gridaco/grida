@@ -239,6 +239,7 @@ impl Host {
                     allow_wakeups: false,
                     allow_host_tools: false,
                     editor_endpoint: None,
+                    editor_presentation: false,
                     operating_regime: OperatingRegime::Act,
                     subagent: Some(Assignment {
                         parent_turn: parent_turn.clone(),

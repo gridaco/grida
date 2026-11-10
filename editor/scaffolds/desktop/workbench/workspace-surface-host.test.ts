@@ -94,6 +94,25 @@ describe("WorkspaceSurfaceHost.open", () => {
       active: "user.svg",
     });
   });
+
+  it("requires the original presentation owner before and after path validation", async () => {
+    const entries = Promise.withResolvers<WorkspaceFsEntry[]>();
+    const readdir = vi.fn<WorkspaceArtifact.Readdir>(() => entries.promise);
+    const group = new EditorGroup();
+    const host = new WorkspaceSurfaceHost(readdir, group);
+    let live = false;
+    await host.open("/requested.svg", () => live);
+    expect(readdir).not.toHaveBeenCalled();
+    live = true;
+    const pending = host.open("/requested.svg", () => live);
+    live = false;
+    entries.resolve([
+      { name: "requested.svg", rel_path: "requested.svg", kind: "file" },
+    ]);
+    await pending;
+    expect(readdir).toHaveBeenCalledTimes(1);
+    expect(group.getSnapshot()).toEqual({ tabs: [], active: null });
+  });
 });
 
 describe("WorkspaceSurfaceHost.listOpen", () => {

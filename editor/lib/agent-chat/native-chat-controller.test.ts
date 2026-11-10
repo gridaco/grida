@@ -13,6 +13,7 @@ import type {
   NativeChatTurnSummary,
   NativeChatUpdate,
   NativeChatWakeup,
+  NativeEditorSurfaceOpen,
   NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "./native-chat-controller";
@@ -150,6 +151,65 @@ it("publishes editor updates only while the selected chat attachment is owned", 
     controller.disconnect();
   }
   expect(listeners.size).toBe(0);
+});
+
+it("fences presentation by the current attachment, tab revision, and delivery lifetime", async () => {
+  const { bridge } = fixture();
+  const publish = vi.fn<
+    NonNullable<DesktopNativeChat["publishEditorSurfaces"]>
+  >(async () => {});
+  bridge.publishEditorSurfaces = publish;
+  const unsubscribe = vi.fn<() => void>();
+  let delivery:
+    | ((request: NativeEditorSurfaceOpen, isCurrent: () => boolean) => void)
+    | undefined;
+  bridge.onEditorSurfaceOpen = (attachment, open) => {
+    expect(attachment).toBe("workbench");
+    delivery = open;
+    return unsubscribe;
+  };
+  let change: (() => void) | undefined;
+  const open = vi.fn<
+    (path: string, requireCurrent: () => boolean) => Promise<void>
+  >(async () => {});
+  const snapshot = { active: null, open: [], truncated: false };
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    readEditorSurfaces: () => snapshot,
+    subscribeToEditorSurfaces: (listener) => {
+      change = listener;
+      return () => {};
+    },
+    open,
+  });
+  try {
+    controller.connect("workbench");
+    await vi.waitFor(() =>
+      expect(publish).toHaveBeenCalledExactlyOnceWith("workbench", snapshot, 1)
+    );
+    const request = {
+      path: "/result.svg",
+      revision: 1,
+      expiresAtMs: Date.now() + 5000,
+    };
+    delivery!({ ...request, expiresAtMs: 0 }, () => true);
+    delivery!(request, () => false);
+    expect(open).not.toHaveBeenCalled();
+    delivery!(request, () => true);
+    expect(open).toHaveBeenCalledTimes(1);
+    const current = open.mock.calls[0][1];
+    expect(current()).toBe(true);
+    change!();
+    expect(publish).toHaveBeenLastCalledWith("workbench", snapshot, 2);
+    expect(current()).toBe(false);
+    delivery!(request, () => true);
+    expect(open).toHaveBeenCalledTimes(1);
+    delivery!({ ...request, revision: 2 }, () => true);
+    expect(open).toHaveBeenCalledTimes(2);
+  } finally {
+    controller.disconnect();
+  }
+  expect(unsubscribe).toHaveBeenCalledTimes(1);
+  expect(open.mock.calls[1][1]()).toBe(false);
 });
 
 it("replaces a retry wait when the same turn's new observation clears it", async () => {

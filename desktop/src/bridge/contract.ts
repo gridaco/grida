@@ -72,6 +72,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_DETACH: "grida:native-chat:detach",
   NATIVE_CHAT_PUBLISH_EDITOR_SURFACES:
     "grida:native-chat:publish-editor-surfaces",
+  NATIVE_CHAT_EDITOR_SURFACE_OPEN: "grida:native-chat:editor-surface-open",
   NATIVE_CHAT_SUBMIT: "grida:native-chat:submit",
   NATIVE_CHAT_ENQUEUE: "grida:native-chat:enqueue",
   NATIVE_CHAT_ACCEPTS_PNG: "grida:native-chat:accepts-png",

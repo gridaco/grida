@@ -34,8 +34,13 @@ const UPDATE = {
 it("binds editor observations only to an exact Act text attachment", async () => {
   const { ipc, chat, first, second } = setup();
   const endpoints = new NativeEditorSurfaceEndpoints();
-  chat.registerEditorSurfaces = (session, snapshot, current) =>
-    endpoints.register(session.id, snapshot, current);
+  chat.registerEditorSurfaces = (
+    session,
+    snapshot,
+    current,
+    deliver,
+    revision
+  ) => endpoints.register(session.id, snapshot, current, deliver, revision);
   const submit = vi.spyOn(chat, "submit");
   const enqueue = vi.spyOn(chat, "enqueue");
   const attachment = await ipc.create(first.event);
@@ -51,8 +56,10 @@ it("binds editor observations only to an exact Act text attachment", async () =>
   expect(submit.mock.calls.at(-1)).toHaveLength(4);
   ipc.publishEditorSurfaces(first.event, id, empty);
   await ipc.submit(first.event, id, "act", "Text", "act");
-  const endpointId = submit.mock.calls.at(-1)?.[4];
+  const selection = submit.mock.calls.at(-1)?.[4];
+  const endpointId = selection?.editorEndpointId;
   expect(endpointId).toMatch(/^[a-f0-9-]{36}$/);
+  expect(selection).not.toHaveProperty("editorPresentation");
   const read = { sessionId: attachment.sessionId, endpointId };
   expect(endpoints.read(read)).toEqual({ ...read, available: true, ...empty });
   expect(endpoints.read({ ...read, sessionId: "other" })).toMatchObject({
@@ -62,8 +69,37 @@ it("binds editor observations only to an exact Act text attachment", async () =>
   expect(submit.mock.calls.at(-1)).toHaveLength(4);
   await ipc.enqueue(first.event, id, "queue", "Text", "act");
   expect(enqueue.mock.calls.at(-1)).toHaveLength(4);
+  const unsubscribed = { ...read, callId: randomUUID(), path: "/result.svg" };
+  expect(endpoints.open(unsubscribed)).toMatchObject({ requested: false });
+  ipc.publishEditorSurfaces(first.event, id, empty, 1);
+  await ipc.submit(first.event, id, "act-present", "Text", "act");
+  expect(submit.mock.calls.at(-1)?.[4]).toEqual({
+    editorEndpointId: endpointId,
+    editorPresentation: true,
+  });
+  expect(endpoints.open(unsubscribed)).toMatchObject({ requested: false });
+  const call = { ...read, callId: randomUUID(), path: "/result.svg" };
+  const reply = { ...read, callId: call.callId };
+  expect(endpoints.open(call)).toEqual({ ...reply, requested: true });
+  expect(endpoints.open(call)).toEqual({ ...reply, requested: true });
+  expect(endpoints.open({ ...call, path: "/different.svg" })).toEqual({
+    ...reply,
+    requested: false,
+  });
+  expect(endpoints.open({ ...call, path: "/../escape" })).toBeNull();
+  expect(first.frame.send).toHaveBeenCalledExactlyOnceWith(
+    IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
+    {
+      attachmentId: id,
+      path: "/result.svg",
+      revision: 1,
+      expiresAtMs: expect.any(Number),
+    }
+  );
+  expect(second.frame.send).not.toHaveBeenCalled();
   ipc.detach(first.event, id);
   expect(endpoints.read(read)).toEqual({ ...read, available: false, ...empty });
+  expect(endpoints.open(call)).toEqual({ ...reply, requested: false });
 });
 
 it("keeps an edit review on the current frame and latest observed revision", async () => {
@@ -122,7 +158,9 @@ it("scopes a scheduled check-in and its controls to the attached, observed turn"
   const b = await ipc.load(second.event, "chat-b");
   expect(ipc.acceptsWakeups(first.event)).toBe(false);
   Object.defineProperty(chat, "acceptsWakeups", { value: true });
-  chat.submitWithWakeup = vi.fn<typeof chat.submit>(chat.submit);
+  chat.submitWithWakeup = vi.fn<NonNullable<typeof chat.submitWithWakeup>>(
+    (session, inputId, text) => chat.submit(session, inputId, text)
+  );
   let schedule: NativeChatWakeup = {
     turnId: "turn",
     waitId: "wait",
@@ -1627,7 +1665,10 @@ describe("native chat IPC", () => {
       "utf8"
     );
     for (const key of Object.keys(IPC_CHANNELS).filter(
-      (key) => key.startsWith("NATIVE_CHAT_") && key !== "NATIVE_CHAT_UPDATE"
+      (key) =>
+        key.startsWith("NATIVE_CHAT_") &&
+        key !== "NATIVE_CHAT_UPDATE" &&
+        key !== "NATIVE_CHAT_EDITOR_SURFACE_OPEN"
     )) {
       expect(handlers).toMatch(
         new RegExp(`guarded\\(\\s*IPC_CHANNELS\\.${key}\\b`)

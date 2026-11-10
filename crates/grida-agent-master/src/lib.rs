@@ -7,6 +7,7 @@ pub mod effort;
 pub mod goals;
 pub mod history;
 pub mod hooks;
+pub mod presentation;
 pub mod questions;
 mod retry;
 pub mod side_context;
@@ -553,10 +554,8 @@ impl Master {
                     None => continue,
                 }
             }
-            let uncertain = step.tools.iter().any(|tool| {
-                matches!(&tool.outcome,
-                InvokeOutcome::Complete(outcome) if outcome.status == OutcomeStatus::Uncertain)
-            });
+            let uncertain =
+                presentation::blocks_continuation(&turn, &step_key, &current.state, &step.tools)?;
             let interrupted_by_pause = step.inference.failure.as_ref().is_some_and(|failure| {
                 failure.kind == FailureKind::Cancelled && failure.code == "turn_paused"
             });
