@@ -479,6 +479,9 @@ function setup(
     async transcript() {
       return [];
     },
+    async transcriptPage() {
+      return { view: 0, messages: [], older: null };
+    },
     async stop(session, observed, requestId) {
       return this.pause(session, observed, requestId);
     },

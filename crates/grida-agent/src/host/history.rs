@@ -3,8 +3,8 @@
 
 use super::*;
 use agent_kit_store_sqlite::history::{
-    HistoryBasis, HistoryRevised, HistoryRevision, HistorySeed, HistorySelection, RetainedHistory,
-    SeededSession,
+    HistoryBasis, HistoryRevised, HistoryRevision, HistorySeed, HistorySelection, ReplayCursor,
+    ReplayWindow, RetainedHistory, SeededSession,
 };
 use grida_agent_master::conversation_seed::{
     ConversationAnchor, ConversationCut, ConversationSeed, ConversationSource, SeedEntry,
@@ -81,6 +81,17 @@ pub(super) struct PriorContext {
 }
 
 impl Host {
+    pub(crate) async fn transcript_window(
+        &self,
+        session: SessionId,
+        before: Option<ReplayCursor>,
+        measure: fn(&HistoryRecord) -> usize,
+    ) -> Result<ReplayWindow> {
+        self.store
+            .history_replay_window(session, before, project, measure)
+            .await
+    }
+
     pub(crate) async fn fork_latest(
         &self,
         session: SessionId,

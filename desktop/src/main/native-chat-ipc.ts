@@ -112,6 +112,7 @@ export type ActiveNativeChat = Readonly<{
     | "questions"
     | "answerQuestion"
     | "transcript"
+    | "transcriptPage"
     | "pause"
     | "stop"
     | "resume"
@@ -1449,6 +1450,20 @@ export class NativeChatIpc {
     const messages = await owner.active.chat.transcript(attachment.session);
     this.revalidate(owner, attachment);
     return messages;
+  }
+
+  async transcriptPage(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    before?: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const page = await owner.active.chat.transcriptPage(
+      attachment.session,
+      before
+    );
+    this.revalidate(owner, attachment);
+    return page;
   }
 
   async queue(

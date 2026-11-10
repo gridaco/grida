@@ -110,6 +110,112 @@ async fn load_transcript(socket: &mut SharedSocket, session: &str, cwd: &Path) -
     .unwrap()
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
+    use super::approvals::Stdio as PrivateStdio;
+
+    const CAPABILITY: &str = "co.grida/session/transcript-window";
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let mut endpoint = Endpoint::start(vec![Reply::Finished("Settled answer")]).await;
+    let mut plain = PrivateStdio::from_child(spawn_serve(&state, &endpoint.url));
+    let ready = plain.request("initialize", extension_initialize()).await;
+    assert_eq!(ready["result"]["agentCapabilities"]["_meta"][CAPABILITY], 1);
+    let created = plain
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let session = &created["result"]["sessionId"];
+    let prompt = plain
+        .request(
+            "session/prompt",
+            json!({"sessionId":session,"prompt":[{"type":"text","text":"Saved question"}]}),
+        )
+        .await;
+    assert_eq!(prompt["result"]["stopReason"], "end_turn", "{prompt}");
+    endpoint.request().await;
+    let mut load = json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]});
+    let attach = json!({CAPABILITY:{"kind":"attach"}});
+    let read = json!({CAPABILITY:{"kind":"read","requestId":"page-1"}});
+    load["_meta"] = attach.clone();
+    let denied = plain.request("session/load", load.clone()).await;
+    assert_eq!(
+        denied["error"]["data"],
+        "transcript_window_capability_required"
+    );
+    plain.close().await;
+
+    let mut observer = PrivateStdio::from_child(spawn_serve(&state, &endpoint.url));
+    let mut capabilities = extension_initialize();
+    capabilities["clientCapabilities"]["_meta"][CAPABILITY] = 1.into();
+    let ready = observer.request("initialize", capabilities).await;
+    assert_eq!(ready["result"]["agentCapabilities"]["_meta"][CAPABILITY], 1);
+    load["_meta"] = read.clone();
+    let denied = observer.request("session/load", load.clone()).await;
+    assert_eq!(denied["error"]["data"], "session_setup_required");
+    load["_meta"] = attach;
+    let mut wrong = load.clone();
+    wrong["cwd"] = json!(temporary.path());
+    let denied = observer.request("session/load", wrong).await;
+    assert_eq!(denied["error"]["data"], "session_workspace_mismatch");
+    let id = observer.send("session/load", load.clone()).await;
+    loop {
+        let frame = observer.read_frame().await;
+        if frame["id"] == id {
+            assert!(frame.get("result").is_some(), "{frame}");
+            break;
+        }
+        assert_ne!(
+            frame["params"]["update"]["sessionUpdate"],
+            "user_message_chunk"
+        );
+        assert_ne!(
+            frame["params"]["update"]["sessionUpdate"],
+            "agent_message_chunk"
+        );
+    }
+
+    for correlated in [true, false] {
+        if correlated {
+            load["_meta"] = read.clone();
+        } else {
+            load.as_object_mut().unwrap().remove("_meta");
+        }
+        let id = observer.send("session/load", load.clone()).await;
+        let mut messages = Vec::new();
+        loop {
+            let frame = observer.read_frame().await;
+            if frame["id"] == id {
+                assert!(frame.get("result").is_some(), "{frame}");
+                if correlated {
+                    let receipt = &frame["result"]["_meta"][CAPABILITY];
+                    assert_eq!(receipt["requestId"], "page-1", "{frame}");
+                    assert!(receipt["view"].is_u64());
+                    assert_eq!(receipt.get("older"), Some(&Value::Null));
+                }
+                break;
+            }
+            let params = &frame["params"];
+            if let Some(text) = params["update"]["content"]["text"].as_str() {
+                assert_eq!(frame["method"], "session/update");
+                assert_eq!(params["sessionId"], *session);
+                assert_eq!(
+                    params["_meta"][CAPABILITY]["requestId"].as_str(),
+                    correlated.then_some("page-1"),
+                );
+                messages.push(text.to_owned());
+            }
+        }
+        assert_eq!(messages, ["Saved question", "Settled answer"]);
+    }
+    assert!(endpoint.requests.try_recv().is_err());
+    observer.close().await;
+}
+
 async fn after_owner_release(
     socket: &mut SharedSocket,
     id: u64,

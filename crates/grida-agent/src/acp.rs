@@ -372,18 +372,43 @@ async fn serve_connection(
                 };
                 let result = async {
                     validate_session_setup(&request.mcp_servers, &request.additional_directories)?;
-                    let mut replay = load_host
-                        .open_history_replay(id.clone(), request.cwd)
-                        .await
-                        .map_err(host_error)?;
-                    let mut projection = Projection::new(request.session_id);
-                    while let Some(records) = replay.next().await.map_err(host_error)? {
-                        let messages = records
-                            .into_iter()
-                            .map(|HistoryRecord::Message(message)| message);
-                        projection
-                            .replay(&connection, &load_delivery, messages)
-                            .await?;
+                    let mode = request.meta.as_ref()
+                        .and_then(|meta| meta.get(projection::TRANSCRIPT_WINDOW))
+                        .cloned()
+                        .map(serde_json::from_value::<projection::ReplayRequest>)
+                        .transpose()
+                        .map_err(|_| Error::invalid_params().data("invalid_transcript_window"))?;
+                    if mode.is_some() {
+                        if !load_sessions.lock().unwrap().negotiated.contains(projection::TRANSCRIPT_WINDOW) {
+                            return Err(unavailable("transcript_window_capability_required"));
+                        }
+                        load_host.validate_session_workspace(id.clone(), request.cwd).await.map_err(host_error)?;
+                        if let Some(projection::ReplayRequest::Read { request_id, before }) = mode {
+                            load_sessions.lock().unwrap().ensure_attached(&id)?;
+                            let window = load_host.transcript_window(id.clone(), before, projection::visible_record_bytes).await.map_err(host_error)?;
+                            let mut projection = Projection::new(request.session_id);
+                            projection.correlate_replay(request_id.clone());
+                            let messages = window.records.into_iter().map(|HistoryRecord::Message(message)| message);
+                            projection.replay(&connection, &load_delivery, messages).await?;
+                            return Ok(LoadSessionResponse::new().meta(serde_json::Map::from_iter([(
+                                projection::TRANSCRIPT_WINDOW.into(),
+                                serde_json::json!({"requestId": request_id, "view": window.view, "older": window.older}),
+                            )])));
+                        }
+                    } else {
+                        let mut replay = load_host
+                            .open_history_replay(id.clone(), request.cwd)
+                            .await
+                            .map_err(host_error)?;
+                        let mut projection = Projection::new(request.session_id);
+                        while let Some(records) = replay.next().await.map_err(host_error)? {
+                            let messages = records
+                                .into_iter()
+                                .map(|HistoryRecord::Message(message)| message);
+                            projection
+                                .replay(&connection, &load_delivery, messages)
+                                .await?;
+                        }
                     }
                     extensions::compaction::announce(
                         &load_sessions,

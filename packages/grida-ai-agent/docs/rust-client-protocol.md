@@ -139,6 +139,19 @@ key with value `1` in `clientCapabilities._meta`. Calling an unnegotiated
 extension returns method not found. Attach the session through standard
 `session/new` or `session/load` before using its custom operations.
 
+On private stdio, negotiate `co.grida/session/transcript-window` version 1
+for a bounded transcript. Set that `_meta` key on `session/load` to `{kind: "attach"}`
+to attach without replay. Read an attached chat with `{kind: "read", requestId}`
+at the same `cwd`. Each response carries the same `requestId`, a `view`, and
+an opaque `older` cursor at the same `_meta` key. Standard text chunks for
+that response also carry the `requestId` in `_meta`.
+
+Pass `older` as `before` in a new read to step backward until `older` is null.
+The host delivers each page in chronological order. A page can contain no
+visible messages and still have an older cursor. When a cursor's view or its
+active-turn boundary changes, restart from the latest page. Reading starts
+no work. `session/load` without this metadata retains full ACP replay.
+
 Negotiate `co.grida/session/operating-regime` to send `operatingRegime` as
 `plan` or `act` when submitting, enqueueing, starting a goal, or revising
 history. The host captures the effective choice with the input. Omission uses

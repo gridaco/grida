@@ -31,6 +31,7 @@ const START_TIMEOUT_MS = 10_000;
 const SHUTDOWN_TIMEOUT_MS = 12_000;
 const KILL_TIMEOUT_MS = 2_000;
 const SESSION_EFFORT = "co.grida/session/effort";
+export const TRANSCRIPT_WINDOW = "co.grida/session/transcript-window";
 const SUBAGENT_CAPABILITIES = {
   "co.grida/subagent/list": 1,
   "co.grida/subagent/create": 1,
@@ -109,6 +110,7 @@ export class NativeAgentProcess {
   private agentEffort = false;
   private scheduledWakeups = false;
   private historyRevision = false;
+  private transcriptWindow = false;
   private namedChildren = false;
   private childTurnControls = false;
   private childMessaging = false;
@@ -176,6 +178,10 @@ export class NativeAgentProcess {
 
   get acceptsPng(): boolean {
     return this.connected && this.imageInput;
+  }
+
+  get acceptsTranscriptWindow(): boolean {
+    return this.connected && this.transcriptWindow;
   }
 
   get acceptsFile(): boolean {
@@ -404,6 +410,7 @@ export class NativeAgentProcess {
                 }),
                 [NativeAgentArtifacts.capability]: 1,
                 "co.grida/session/selected-file": 1,
+                [TRANSCRIPT_WINDOW]: 1,
                 ...(requestDeletion && {
                   [NativeAgentDeletion.capability]: 1,
                   [NativeAgentDeletion.previewCapability]: 1,
@@ -422,6 +429,7 @@ export class NativeAgentProcess {
       }
       const agentCapabilities = object(response.agentCapabilities);
       const advertised = object(agentCapabilities?._meta);
+      processOwner.transcriptWindow = advertised?.[TRANSCRIPT_WINDOW] === 1;
       for (const [capability, version] of Object.entries(capabilities)) {
         if (advertised?.[capability] !== version)
           throw new Error("native_agent_capabilities_unavailable");

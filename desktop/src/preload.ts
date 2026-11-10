@@ -842,6 +842,12 @@ const bridge: DesktopBridge = {
       ),
     transcript: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT, attachmentId),
+    transcriptPage: (attachmentId, before) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT_PAGE,
+        attachmentId,
+        before
+      ),
     control: (attachmentId, control) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_CONTROL,

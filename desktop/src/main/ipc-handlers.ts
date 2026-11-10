@@ -560,6 +560,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     nativeChat.transcript(event, id)
   );
   guarded(
+    IPC_CHANNELS.NATIVE_CHAT_TRANSCRIPT_PAGE,
+    (event, id: string, before?: unknown) =>
+      nativeChat.transcriptPage(event, id, before)
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_CONTROL,
     (event, id: string, control: unknown) =>
       nativeChat.control(event, id, control)

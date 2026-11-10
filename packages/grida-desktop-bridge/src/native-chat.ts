@@ -259,6 +259,12 @@ export type NativeChatMessage = Readonly<{
   text: string;
 }>;
 
+export type NativeChatTranscriptPage = Readonly<{
+  view: number;
+  messages: readonly NativeChatMessage[];
+  older: string | null;
+}>;
+
 export type NativeChatAcceptance = Readonly<{
   sessionId: string;
   inputId: string;
@@ -631,6 +637,10 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     answer: NativeChatQuestionAnswer
   ): Promise<NativeChatControlReceipt>;
   transcript(attachmentId: string): Promise<readonly NativeChatMessage[]>;
+  transcriptPage?(
+    attachmentId: string,
+    before?: string
+  ): Promise<NativeChatTranscriptPage>;
   control(
     attachmentId: string,
     control: NativeChatControl

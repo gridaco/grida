@@ -113,6 +113,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_QUESTIONS: "grida:native-chat:questions",
   NATIVE_CHAT_ANSWER_QUESTION: "grida:native-chat:answer-question",
   NATIVE_CHAT_TRANSCRIPT: "grida:native-chat:transcript",
+  NATIVE_CHAT_TRANSCRIPT_PAGE: "grida:native-chat:transcript-page",
   NATIVE_CHAT_CONTROL: "grida:native-chat:control",
   NATIVE_CHAT_SUBSCRIBE: "grida:native-chat:subscribe",
   NATIVE_CHAT_UNSUBSCRIBE: "grida:native-chat:unsubscribe",

@@ -7,17 +7,38 @@ use agent_client_protocol::v1::schema::{
     ContentChunk, SessionId, SessionNotification, SessionUpdate,
 };
 use agent_client_protocol::{Client, Result};
-use agent_kit_core::MessageId;
+use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::InferenceUpdate;
 use agent_kit_core::messages::{Content, Message, Role};
 use agent_kit_core::turn::OperationOutcome;
+use agent_kit_core::{ChangeId, MessageId};
 use agent_kit_runtime::TurnUpdate;
+use agent_kit_store_sqlite::history::ReplayCursor;
+use serde::Deserialize;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 const MAX_CHUNK_BYTES: usize = 8 * 1024;
+pub(super) const TRANSCRIPT_WINDOW: &str = "co.grida/session/transcript-window";
+
+#[derive(Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(super) enum ReplayRequest {
+    Attach,
+    Read {
+        request_id: ChangeId,
+        before: Option<ReplayCursor>,
+    },
+}
 
 pub(super) struct Projection {
     session: SessionId,
+    replay_id: Option<ChangeId>,
     // Compare live deltas with the recorded message before filling in any
     // unstreamed suffix. A disagreement cannot be represented as an append.
     streamed_text: BTreeMap<MessageId, String>,
@@ -27,8 +48,13 @@ impl Projection {
     pub(super) fn new(session: SessionId) -> Self {
         Self {
             session,
+            replay_id: None,
             streamed_text: BTreeMap::new(),
         }
+    }
+
+    pub(super) fn correlate_replay(&mut self, request_id: ChangeId) {
+        self.replay_id = Some(request_id);
     }
 
     pub(super) async fn replay(
@@ -83,18 +109,7 @@ impl Projection {
         if !matches!(message.role, Role::User | Role::Assistant) {
             return Ok(());
         }
-        let text: String = message
-            .content
-            .into_iter()
-            .filter_map(|content| match content {
-                Content::Text(text) => Some(text),
-                Content::Media(media) if crate::host::is_retained_image(&media) => {
-                    Some(crate::host::RETAINED_IMAGE_LABEL.to_owned())
-                }
-                Content::Media(media) => grida_agent_master::retained_file::display(&media),
-                _ => None,
-            })
-            .collect();
+        let text: String = visible_parts(&message).collect();
         let suffix = if let Some(prefix) = self.streamed_text.remove(&message.id) {
             text.strip_prefix(&prefix)
                 .ok_or_else(|| unavailable("session_message_projection_conflict"))?
@@ -122,14 +137,39 @@ impl Projection {
                 Role::Assistant => SessionUpdate::AgentMessageChunk(chunk),
                 _ => return Ok(()),
             };
-            delivery
-                .send(
-                    connection,
-                    SessionNotification::new(self.session.clone(), update),
-                )
-                .await?;
+            let mut notification = SessionNotification::new(self.session.clone(), update);
+            if let Some(request_id) = &self.replay_id {
+                notification = notification.meta(serde_json::Map::from_iter([(
+                    TRANSCRIPT_WINDOW.into(),
+                    serde_json::json!({"requestId": request_id}),
+                )]));
+            }
+            delivery.send(connection, notification).await?;
             text = remaining;
         }
         Ok(())
     }
+}
+
+pub(super) fn visible_record_bytes(record: &HistoryRecord) -> usize {
+    let HistoryRecord::Message(message) = record;
+    visible_parts(message).map(|part| part.len()).sum()
+}
+
+fn visible_parts(message: &Message) -> impl Iterator<Item = Cow<'_, str>> {
+    message.content.iter().filter_map(|content| {
+        if !matches!(message.role, Role::User | Role::Assistant) {
+            return None;
+        }
+        match content {
+            Content::Text(text) => Some(Cow::Borrowed(text.as_str())),
+            Content::Media(media) if crate::host::is_retained_image(media) => {
+                Some(Cow::Borrowed(crate::host::RETAINED_IMAGE_LABEL))
+            }
+            Content::Media(media) => {
+                grida_agent_master::retained_file::display(media).map(Cow::Owned)
+            }
+            _ => None,
+        }
+    })
 }

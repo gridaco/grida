@@ -1412,6 +1412,94 @@ async fn paged_transcript_replay_freezes_the_active_tail_without_a_lease() {
 }
 
 #[tokio::test]
+async fn earlier_replay_windows_keep_the_exact_boundary_as_new_turns_arrive() {
+    let (_directory, store) = store().await;
+    let mut expected = Vec::new();
+    for i in 0..70 {
+        let id = format!("window-turn-{i}");
+        let record = history_message(&id, "recorded text");
+        finish_history_turn(&store, session(), &id, vec![record.clone()]).await;
+        expected.push(record);
+    }
+    let project = |state: &agent_kit_core::turn::TurnState| state.history().records().to_vec();
+    let measure = |_: &HistoryRecord| 13;
+    let latest = store
+        .history_replay_window(session(), None, project, measure)
+        .await
+        .unwrap();
+    assert_eq!(latest.records, expected[38..]);
+    let mut windows = vec![latest.records];
+    let mut older = latest.older;
+    finish_history_turn(
+        &store,
+        session(),
+        "newer",
+        vec![history_message("newer", "outside the window")],
+    )
+    .await;
+    while let Some(cursor) = older {
+        let page = store
+            .history_replay_window(session(), Some(cursor), project, measure)
+            .await
+            .unwrap();
+        assert_eq!(page.view, latest.view);
+        windows.push(page.records);
+        older = page.older;
+    }
+    assert_eq!(
+        windows.into_iter().rev().flatten().collect::<Vec<_>>(),
+        expected
+    );
+}
+
+#[tokio::test]
+async fn an_earlier_window_cannot_mix_changed_records_within_an_active_turn() {
+    let (_directory, store) = store().await;
+    store
+        .submit(session(), submission("window-input", "prompt"))
+        .await
+        .unwrap();
+    let active = claim(&store, "claim-window", vec![change("window-input")]).await;
+    let records = (0..132)
+        .map(|i| history_message(&format!("window-record-{i}"), "text"))
+        .collect::<Vec<_>>();
+    commit(
+        &active,
+        "first",
+        vec![JournalAction::AppendHistory(records.clone())],
+    )
+    .await;
+    let project = |state: &agent_kit_core::turn::TurnState| state.history().records().to_vec();
+    let measure = |_: &HistoryRecord| 4;
+    let latest = store
+        .history_replay_window(session(), None, project, measure)
+        .await
+        .unwrap();
+    assert_eq!(latest.records, records[4..]);
+    let older = store
+        .history_replay_window(session(), latest.older.clone(), project, measure)
+        .await
+        .unwrap();
+    assert_eq!(older.records, records[..4]);
+    assert!(older.older.is_none());
+    commit(
+        &active,
+        "append",
+        vec![JournalAction::AppendHistory(vec![history_message(
+            "late", "late",
+        )])],
+    )
+    .await;
+    assert_error(
+        store
+            .history_replay_window(session(), latest.older, project, measure)
+            .await,
+        ErrorKind::Conflict,
+        "history_replay_window_changed",
+    );
+}
+
+#[tokio::test]
 async fn an_answer_and_its_history_contribution_commit_atomically() {
     let (_directory, store) = store().await;
     store

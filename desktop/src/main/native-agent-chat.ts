@@ -1,5 +1,5 @@
 // GRIDA-SEC-004 — attached native chat controls owned by Electron main.
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type {
@@ -20,6 +20,7 @@ import type {
   NativeChatGoalRequest,
   NativeChatImageArtifact,
   NativeChatMessage,
+  NativeChatTranscriptPage,
   NativeChatOperatingRegime,
   NativeChatPage,
   NativeChatQuestion,
@@ -66,6 +67,7 @@ import {
 } from "./native-agent-side-chats";
 import {
   NativeAgentProcess,
+  TRANSCRIPT_WINDOW,
   type NativeAgentLaunch,
 } from "./native-agent-process";
 
@@ -194,6 +196,7 @@ type TranscriptCapture = {
   messages: Map<string, NativeChatMessage>;
   bytes: number;
   overflow: boolean;
+  requestId?: string;
   result?: Promise<readonly NativeChatMessage[]>;
 };
 
@@ -621,6 +624,9 @@ export class NativeAgentChat {
         sessionId: id,
         cwd: this.cwd,
         mcpServers: [],
+        ...(this.process.acceptsTranscriptWindow && {
+          _meta: { [TRANSCRIPT_WINDOW]: { kind: "attach" } },
+        }),
       })
       .then((reply) => {
         object(reply);
@@ -1318,6 +1324,54 @@ export class NativeAgentChat {
     return capture.result;
   }
 
+  async transcriptPage(
+    session: NativeChatSession,
+    before?: unknown
+  ): Promise<NativeChatTranscriptPage> {
+    const id = this.requireAttached(session);
+    const cursor = before === undefined ? undefined : transcriptCursor(before);
+    if (!this.process.acceptsTranscriptWindow) {
+      if (cursor) throw new Error("native_chat_transcript_window_unavailable");
+      return { view: 0, messages: await this.transcript(session), older: null };
+    }
+    if (this.transcripts.has(id))
+      throw new Error("native_chat_transcript_replay_busy");
+    const requestId = randomUUID();
+    const capture: TranscriptCapture = {
+      messages: new Map(),
+      bytes: 0,
+      overflow: false,
+      requestId,
+    };
+    this.transcripts.set(id, capture);
+    try {
+      const response = object(
+        await this.process.request("session/load", {
+          sessionId: id,
+          cwd: this.cwd,
+          mcpServers: [],
+          _meta: {
+            [TRANSCRIPT_WINDOW]: { kind: "read", requestId, before: cursor },
+          },
+        })
+      );
+      this.requireAttached(session);
+      const page = object(object(response._meta)[TRANSCRIPT_WINDOW]);
+      if (page.requestId !== requestId) throw invalidResponse();
+      if (capture.overflow) throw new Error("native_chat_transcript_too_large");
+      const older =
+        page.older === null ? null : JSON.stringify(object(page.older));
+      if (older !== null) transcriptCursor(older);
+      return {
+        view: revision(page.view),
+        messages: [...capture.messages.values()],
+        older,
+      };
+    } finally {
+      if (this.transcripts.get(id) === capture) this.transcripts.delete(id);
+    }
+  }
+
   async approvals(
     session: NativeChatSession,
     snapshot: NativeChatSnapshot
@@ -1550,7 +1604,12 @@ export class NativeAgentChat {
         ? object(notification._meta)["co.grida/session/updates"]
         : undefined;
       if (meta === undefined) {
-        if (capture)
+        const replay = notification._meta
+          ? object(notification._meta)[TRANSCRIPT_WINDOW]
+          : undefined;
+        const requestId =
+          replay === undefined ? undefined : identity(object(replay).requestId);
+        if (capture && capture.requestId === requestId)
           captureText(capture, identity(update.messageId), role, content.text);
         return;
       }
@@ -1680,6 +1739,16 @@ export class NativeAgentChat {
 
   private requireOpen(): void {
     if (this.closed) throw new Error("native_chat_closed");
+  }
+}
+
+function transcriptCursor(value: unknown): Record<string, unknown> {
+  if (typeof value !== "string" || Buffer.byteLength(value) > 1024)
+    throw new Error("native_chat_transcript_cursor_invalid");
+  try {
+    return object(JSON.parse(value));
+  } catch {
+    throw new Error("native_chat_transcript_cursor_invalid");
   }
 }
 

@@ -30,6 +30,7 @@ import type {
   NativeChatSteer,
   NativeChatReadiness,
   NativeChatTextUpdate,
+  NativeChatTranscriptPage,
   NativeChatTurnSummary,
   NativeChatUpdate,
   NativeChatWakeup,
@@ -89,6 +90,10 @@ export type NativeChatView = Readonly<{
     basis: NativeChatCatalogEntry;
   }> | null;
   messages: readonly NativeChatMessage[];
+  earlierMessages: boolean;
+  canReadEarlier: boolean;
+  readingEarlier: boolean;
+  earlierError: string | null;
   sideChat: NativeSideChatController | null;
   subagents: NativeSubagentController | null;
   imageInput: boolean;
@@ -152,6 +157,9 @@ type Scope = {
   refreshing?: Promise<void>;
   timer?: ReturnType<typeof setTimeout>;
   durable: readonly NativeChatMessage[];
+  recentWindow?: Pick<NativeChatTranscriptPage, "view" | "older">;
+  earlierWindow?: NativeChatTranscriptPage;
+  earlierRead?: object;
   live: Map<string, NativeChatMessage & { turnId: string; bytes: number }>;
   gaps: Set<string>;
   observation: NativeChatObservation | null;
@@ -208,6 +216,10 @@ const EMPTY: NativeChatView = Object.freeze({
   revisionSubmitting: false,
   catalogDraft: null,
   messages: [],
+  earlierMessages: false,
+  canReadEarlier: false,
+  readingEarlier: false,
+  earlierError: null,
   sideChat: null,
   subagents: null,
   imageInput: false,
@@ -502,6 +514,10 @@ export class NativeChatController {
       revisionSubmitting: false,
       catalogDraft: null,
       messages: [],
+      earlierMessages: false,
+      canReadEarlier: false,
+      readingEarlier: false,
+      earlierError: null,
       sideChat: null,
       subagents: null,
       imageInput: false,
@@ -1685,7 +1701,7 @@ export class NativeChatController {
       !this.bridge.prepareRevision ||
       !this.canReviseHistory ||
       this.view.revisionDraft ||
-      !scope.durable.some(
+      !(scope.earlierWindow?.messages ?? scope.durable).some(
         (message) => message.messageId === messageId && message.role === "user"
       )
     )
@@ -1710,6 +1726,64 @@ export class NativeChatController {
     } finally {
       if (this.owns(scope)) this.update({ revisionSubmitting: false });
     }
+  }
+
+  async showEarlierMessages(): Promise<void> {
+    const scope = this.scope;
+    const read = this.bridge.transcriptPage;
+    if (!scope?.attachment || !read || this.view.readingEarlier) return;
+    this.update({ readingEarlier: true, earlierError: null });
+    try {
+      await scope.refreshing;
+      const attachment = this.attachment(scope);
+      const previous = scope.earlierWindow ?? scope.recentWindow;
+      if (!previous?.older) return;
+      const token = {};
+      scope.earlierRead = token;
+      const page = await read.call(
+        this.bridge,
+        attachment.attachmentId,
+        previous.older
+      );
+      if (!this.owns(scope) || scope.earlierRead !== token) return;
+      if (page.view !== previous.view || page.older === previous.older)
+        throw new Error("history_replay_window_changed");
+      scope.earlierWindow = page;
+      this.publishMessages(scope);
+    } catch (error) {
+      if (!this.owns(scope)) return;
+      if (deletedAttachment(error)) this.forgetDeletedChat(scope);
+      else {
+        if (
+          error instanceof Error &&
+          error.message.includes("history_replay_window_changed")
+        ) {
+          scope.earlierWindow = undefined;
+          scope.replay = true;
+          this.publishMessages(scope);
+        }
+        this.update({
+          earlierError: describe(
+            error,
+            "Couldn't load earlier messages. Try again."
+          ),
+        });
+      }
+    } finally {
+      if (this.owns(scope)) {
+        scope.earlierRead = undefined;
+        this.update({ readingEarlier: false });
+        if (scope.replay) void this.refresh(scope);
+      }
+    }
+  }
+
+  showLatestMessages(): void {
+    const scope = this.scope;
+    if (!scope || this.view.readingEarlier) return;
+    scope.earlierWindow = undefined;
+    this.update({ earlierError: null });
+    this.publishMessages(scope);
   }
 
   changeRevisionText(text: string): void {
@@ -2436,10 +2510,22 @@ export class NativeChatController {
           this.refreshGoal(scope, attachment, next),
         ]);
         if (!this.owns(scope)) return;
-        if (!replay) return;
+        if (!replay || scope.earlierRead) return;
         scope.replay = false;
-        const messages = await this.bridge.transcript(attachment.attachmentId);
+        const page = this.bridge.transcriptPage
+          ? await this.bridge.transcriptPage(attachment.attachmentId)
+          : undefined;
+        const messages =
+          page?.messages ??
+          (await this.bridge.transcript(attachment.attachmentId));
         if (!this.owns(scope)) return;
+        if (
+          page &&
+          scope.earlierWindow &&
+          scope.earlierWindow.view !== page.view
+        )
+          scope.earlierWindow = undefined;
+        scope.recentWindow = page && { view: page.view, older: page.older };
         scope.durable = messages;
         const committed = new Set(messages.map((message) => message.messageId));
         const current = next.snapshot.current?.turnId;
@@ -2842,7 +2928,12 @@ export class NativeChatController {
 
   private publishMessages(scope: Scope, repairing = scope.gaps.size > 0): void {
     this.update({
-      messages: [...scope.durable, ...scope.live.values()],
+      messages: scope.earlierWindow?.messages ?? [
+        ...scope.durable,
+        ...scope.live.values(),
+      ],
+      earlierMessages: !!scope.earlierWindow,
+      canReadEarlier: !!(scope.earlierWindow ?? scope.recentWindow)?.older,
       repairing,
     });
   }
@@ -3102,6 +3193,8 @@ function describe(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
   if (error.message.includes("native_chat_transcript_too_large"))
     return "This chat is too large to restore in the workspace pane.";
+  if (error.message.includes("history_replay_window_changed"))
+    return "Chat history changed. Try loading earlier messages again.";
   if (error.message.includes("native_chat_pending_regime_changed"))
     return "Retry this draft in its original mode, or edit it to send a new message.";
   if (error.message.includes("native_chat_pending_effort_changed"))

@@ -420,6 +420,40 @@ export function NativeAgentPane({
       {state.contextLimitOpen && (
         <NativeContextLimitPanel controller={controller} state={state} />
       )}
+      {(state.canReadEarlier ||
+        state.earlierMessages ||
+        state.earlierError) && (
+        <div className="text-muted-foreground flex shrink-0 flex-wrap items-center gap-2 px-3 py-1 text-xs">
+          {state.earlierMessages && <span>Viewing earlier messages</span>}
+          {state.canReadEarlier && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={state.readingEarlier || state.loading}
+              onClick={() => void controller.showEarlierMessages()}
+            >
+              {state.readingEarlier
+                ? "Loading earlier messages…"
+                : "Earlier messages"}
+            </Button>
+          )}
+          {state.earlierMessages && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={state.readingEarlier}
+              onClick={() => controller.showLatestMessages()}
+            >
+              Back to latest
+            </Button>
+          )}
+          {state.earlierError && (
+            <span role="status">{state.earlierError}</span>
+          )}
+        </div>
+      )}
       <Conversation
         className="min-h-0 flex-1"
         initial="instant"
@@ -445,6 +479,7 @@ export function NativeAgentPane({
             />
           ))}
           {running &&
+            !state.earlierMessages &&
             !retrying &&
             state.messages.at(-1)?.role !== "assistant" && (
               <PendingTurnIndicator />

@@ -8,7 +8,9 @@ use super::{
 };
 use agent_kit_core::history::{History, HistoryPosition, HistoryRecord};
 use agent_kit_core::turn::{JournalPosition, TurnState};
-use agent_kit_core::{ChangeId, Envelope, ErrorKind, Fingerprint, Result, SessionId, TurnId};
+use agent_kit_core::{
+    ChangeId, Envelope, Error, ErrorKind, Fingerprint, Result, SessionId, TurnId,
+};
 use agent_kit_sessions::{Acceptance, CreateSession, SessionCreated, SessionRevision, Submission};
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
@@ -97,6 +99,41 @@ pub struct HistoryRevised {
 type TurnProjection<'a> = dyn Fn(&TurnState) -> Vec<HistoryRecord> + 'a;
 
 const REPLAY_PAGE_TURNS: i64 = 32;
+const REPLAY_WINDOW_RECORDS: usize = 128;
+const REPLAY_WINDOW_BYTES: usize = 256 * 1024;
+const MAX_REPLAY_RECORD_BYTES: usize = 1024 * 1024;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReplayCursor {
+    view: SessionRevision,
+    boundary: ReplayBoundary,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum ReplayBoundary {
+    Turn {
+        ordinal: i64,
+        cut: Option<ReplayCut>,
+    },
+    Seed {
+        before: usize,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReplayCut {
+    before: usize,
+    position: JournalPosition,
+}
+
+pub struct ReplayWindow {
+    pub view: SessionRevision,
+    pub records: Vec<HistoryRecord>,
+    pub older: Option<ReplayCursor>,
+}
 
 /// A captured transcript interval. Settled turns are read in bounded pages;
 /// the mutable active turn is projected when the interval is opened.
@@ -130,6 +167,84 @@ impl HistoryReplay {
 }
 
 impl SqliteStore {
+    /// Read a bounded window of the current view from newest to oldest.
+    /// Both callbacks run under the store lock. `measure` returns the size of
+    /// the public record, or zero when the consumer does not display it.
+    pub async fn history_replay_window(
+        &self,
+        session: SessionId,
+        cursor: Option<ReplayCursor>,
+        project: fn(&TurnState) -> Vec<HistoryRecord>,
+        measure: fn(&HistoryRecord) -> usize,
+    ) -> Result<ReplayWindow> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            load_session(connection, &session)?;
+            let (view, _) = select_view(connection, &session, HistorySelection::Current)?;
+            if cursor.as_ref().is_some_and(|cursor| cursor.view != view.id) {
+                return Err(replay_changed());
+            }
+            let mut window = ReverseWindow::default();
+            let boundary = cursor.map(|cursor| cursor.boundary);
+            if !matches!(&boundary, Some(ReplayBoundary::Seed { .. })) {
+                let end = view.end.unwrap_or(i64::MAX);
+                let (upper, mut cut) = match &boundary {
+                    Some(ReplayBoundary::Turn { ordinal, cut })
+                        if *ordinal > view.after && *ordinal <= end => (*ordinal, cut.clone()),
+                    Some(ReplayBoundary::Turn { .. }) => return Err(replay_changed()),
+                    _ => (end, None),
+                };
+                let mut query = connection
+                    .prepare(
+                        "SELECT ordinal,id,snapshot FROM turns WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
+                         ORDER BY ordinal DESC LIMIT ?4",
+                    )
+                    .map_err(database_error)?;
+                let mut rows = query
+                    .query(params![session.as_str(), view.after, upper, REPLAY_PAGE_TURNS + 1])
+                    .map_err(database_error)?;
+                let mut scanned_turns = 0;
+                let mut scanned_bytes = 0;
+                while let Some(row) = rows.next().map_err(database_error)? {
+                    let ordinal: i64 = row.get(0).map_err(database_error)?;
+                    let snapshot = row.get_ref(2).map_err(database_error)?.as_blob()
+                        .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
+                    if scanned_turns == REPLAY_PAGE_TURNS
+                        || (scanned_turns > 0 && scanned_bytes + snapshot.len() > MAX_HISTORY_BYTES)
+                    {
+                        return Ok(window.finish(view.id, Some(ReplayBoundary::Turn { ordinal, cut: None })));
+                    }
+                    let turn = TurnId::new(row.get::<_, String>(1).map_err(database_error)?)?;
+                    let state = decode_turn(snapshot, &session, &turn)?;
+                    let position = state.position();
+                    let records = project(&state);
+                    let before = match cut.take() {
+                        Some(cut) if ordinal == upper && cut.position == position => Some(cut.before),
+                        Some(_) => return Err(replay_changed()),
+                        None => None,
+                    };
+                    if let Some(before) = window.collect(records, before, measure)? {
+                        return Ok(window.finish(view.id, Some(ReplayBoundary::Turn {
+                            ordinal, cut: Some(ReplayCut { before, position }),
+                        })));
+                    }
+                    scanned_turns += 1;
+                    scanned_bytes += snapshot.len();
+                }
+                if cut.is_some() {
+                    return Err(replay_changed());
+                }
+            }
+            let before = match boundary {
+                Some(ReplayBoundary::Seed { before }) => Some(before),
+                _ => None,
+            };
+            let seed = view.seed.map_or_else(Vec::new, |seed| seed.records);
+            let older = window.collect(seed, before, measure)?.map(|before| ReplayBoundary::Seed { before });
+            Ok(window.finish(view.id, older))
+        })
+        .await
+    }
+
     /// Capture the current view for observation without taking a turn lease.
     /// The projection must be pure and keep settled history stable through
     /// operation reconciliation.
@@ -329,6 +444,59 @@ impl SqliteStore {
         })
         .await
     }
+}
+
+#[derive(Default)]
+struct ReverseWindow {
+    records: Vec<HistoryRecord>,
+    bytes: usize,
+}
+
+impl ReverseWindow {
+    fn collect(
+        &mut self,
+        mut records: Vec<HistoryRecord>,
+        before: Option<usize>,
+        measure: fn(&HistoryRecord) -> usize,
+    ) -> Result<Option<usize>> {
+        if let Some(before) = before {
+            if before == 0 || before > records.len() {
+                return Err(replay_changed());
+            }
+            records.truncate(before);
+        }
+        while let Some(record) = records.pop() {
+            let bytes = measure(&record);
+            if bytes == 0 {
+                continue;
+            }
+            if !self.records.is_empty()
+                && (self.records.len() == REPLAY_WINDOW_RECORDS
+                    || self.bytes.saturating_add(bytes) > REPLAY_WINDOW_BYTES)
+            {
+                return Ok(Some(records.len() + 1));
+            }
+            if bytes > MAX_REPLAY_RECORD_BYTES {
+                return Err(projection_limit());
+            }
+            self.bytes += bytes;
+            self.records.push(record);
+        }
+        Ok(None)
+    }
+
+    fn finish(mut self, view: SessionRevision, older: Option<ReplayBoundary>) -> ReplayWindow {
+        self.records.reverse();
+        ReplayWindow {
+            view,
+            records: self.records,
+            older: older.map(|boundary| ReplayCursor { view, boundary }),
+        }
+    }
+}
+
+fn replay_changed() -> Error {
+    error(ErrorKind::Conflict, "history_replay_window_changed")
 }
 
 pub(super) fn require_basis(current: &HistoryBasis, expected: &HistoryBasis) -> Result<()> {

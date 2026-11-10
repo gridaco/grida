@@ -9,6 +9,7 @@ import type {
   NativeChatPage,
   NativeChatRevisionInput,
   NativeChatRevisionReceipt,
+  NativeChatTranscriptPage,
   NativeChatTurn,
   NativeChatTurnSummary,
   NativeChatUpdate,
@@ -111,6 +112,56 @@ function fixture() {
     controller: new NativeChatController(bridge),
   };
 }
+
+it("reads bounded earlier messages and ignores a page from a previous chat", async () => {
+  const { bridge, controller } = fixture();
+  const page = (
+    text: string,
+    older: string | null
+  ): NativeChatTranscriptPage => ({
+    view: 1,
+    messages: [{ messageId: text, role: "assistant", text }],
+    older,
+  });
+  const delayed = Promise.withResolvers<NativeChatTranscriptPage>();
+  const read = vi.fn<NonNullable<DesktopNativeChat["transcriptPage"]>>();
+  read.mockResolvedValueOnce(page("latest-a", "older-a"));
+  read.mockResolvedValueOnce(page("earlier-a", null));
+  read.mockReturnValueOnce(delayed.promise);
+  read.mockResolvedValueOnce(page("latest-b", null));
+  bridge.transcriptPage = read;
+  await controller.select("chat-a");
+  expect(controller.read()).toMatchObject({
+    messages: [{ text: "latest-a" }],
+    canReadEarlier: true,
+    earlierMessages: false,
+  });
+  await controller.showEarlierMessages();
+  expect(read).toHaveBeenNthCalledWith(2, "chat-a", "older-a");
+  expect(controller.read()).toMatchObject({
+    messages: [{ text: "earlier-a" }],
+    canReadEarlier: false,
+    earlierMessages: true,
+  });
+  controller.showLatestMessages();
+  expect(controller.read()).toMatchObject({
+    messages: [{ text: "latest-a" }],
+    canReadEarlier: true,
+    earlierMessages: false,
+  });
+  const waiting = controller.showEarlierMessages();
+  await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(3));
+  await controller.select("chat-b");
+  delayed.resolve(page("late-a", "other-a"));
+  await waiting;
+  expect(controller.read()).toMatchObject({
+    messages: [{ text: "latest-b" }],
+    canReadEarlier: false,
+    earlierMessages: false,
+    readingEarlier: false,
+  });
+  controller.disconnect();
+});
 
 it("publishes editor updates only while the selected chat attachment is owned", async () => {
   const { bridge } = fixture();

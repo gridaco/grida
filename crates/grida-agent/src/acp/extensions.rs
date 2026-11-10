@@ -125,6 +125,7 @@ fn capability_keys(
         .chain(subagents::capabilities(reviewer && subagents))
         .chain((reviewer && effort).then_some(EFFORT))
         .chain((reviewer && files).then_some(FILE_INTAKE))
+        .chain(reviewer.then_some(super::projection::TRANSCRIPT_WINDOW))
 }
 
 pub(super) fn configuration_permission(
