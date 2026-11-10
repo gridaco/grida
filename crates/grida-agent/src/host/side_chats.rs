@@ -66,6 +66,7 @@ impl Host {
             configuration: self.configuration.clone(),
             permissions: None,
             mcp_tools: None,
+            subagents_enabled: false,
             operating_regime: OperatingRegime::Act,
             require_completion_text: false,
             side_context: Some(context.clone()),

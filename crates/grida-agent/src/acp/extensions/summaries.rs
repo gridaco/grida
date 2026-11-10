@@ -18,7 +18,7 @@ struct SummaryRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
 #[serde(rename_all = "camelCase")]
-struct SummaryResponse {
+pub(super) struct SummaryResponse {
     turn_id: TurnId,
     status: OutcomeStatus,
     text: String,
@@ -30,7 +30,7 @@ struct SummaryResponse {
 }
 
 impl SummaryResponse {
-    fn from_outcome(turn_id: TurnId, outcome: TurnOutcome) -> Self {
+    pub(super) fn from_outcome(turn_id: TurnId, outcome: &TurnOutcome) -> Self {
         let account = outcome
             .account
             .as_ref()
@@ -75,7 +75,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     .settled_outcome(request.session_id, request.turn_id.clone())
                     .await
                     .map_err(host_error)?;
-                Ok(SummaryResponse::from_outcome(request.turn_id, outcome))
+                Ok(SummaryResponse::from_outcome(request.turn_id, &outcome))
             }
             .await;
             responder.respond_with_result(result)

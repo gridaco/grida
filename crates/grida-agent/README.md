@@ -391,3 +391,36 @@ It excludes tools requiring parameter headers, external schema references,
 and server-initiated input. It projects text and structured output and
 leaves resource links unopened. Embedded callers can compose the same adapter
 with `mcp_client::McpClient::connect` and `Host::with_mcp_client`.
+
+## Run named child work from a private launcher
+
+Use `serve --stdio --subagents` with a direct provider and an Act launch.
+During ACP initialization, negotiate version 1 separately for
+`co.grida/subagent/create`, `assign`, `inspect`, and `stop`. Callers
+attach to the parent through the ordinary session API. Children have their
+own stable IDs and history and are absent from ordinary chat listing and load.
+
+- Create supplies `parentSessionId`, `requestId`, `name`, and
+  `workTurns` from 1 through 8. Repeating the creation returns its original
+  `childId`. Names are display labels.
+- Assign supplies `parentSessionId`, `childId`, `parentTurnId`,
+  `inputId`, and text `instructions`. The parent turn must have settled
+  in Act. A child accepts one outstanding assignment. An explicit follow-up
+  reuses its prior child context.
+- Inspect supplies the parent and child IDs and an optional `inputId`.
+  That input selects its original turn and retained result, even after
+  follow-up work. Inspection never starts work.
+- Stop supplies the parent and child IDs, child `turnId`, a fresh
+  `requestId`, and the observed `expectedSessionRevision` and
+  `expectedControlRevision`. This lets a restarted launcher settle
+  interrupted child work before assigning something new.
+
+The launcher explicitly allocates the child allowance. A claim reserves one
+work turn, including interrupted work. Each assignment can request one text
+generation with the selected output-token allowance. The child receives its
+own history and the supplied instructions. It has no workspace tools, MCP, goals,
+scheduled work, or model-driven delegation. The settled parent turn provides
+attribution. Reuse after restart requires the original verified provider
+principal and scope. A launch without protected credential continuity can
+inspect or stop retained work. Shared funding and active parent-tree
+controls belong to a separate delegation composition.

@@ -14,6 +14,7 @@ mod permissions;
 mod questions;
 pub(crate) mod side_chats;
 mod skills;
+mod subagents;
 mod wakeups;
 pub use catalog::SessionCatalog;
 pub(crate) use catalog::is_archived;
@@ -25,6 +26,7 @@ pub(crate) use images::is_retained_image;
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use permissions::{Approvals, PendingApproval};
 pub use questions::{PendingQuestion, Questions};
+pub use subagents::{SubagentAssignment, SubagentInspection, SubagentWork};
 pub use wakeups::{ScheduledWakeup, WakeupStatus, Wakeups};
 
 use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
@@ -102,6 +104,7 @@ pub struct Host {
     configuration: Option<Arc<Configuration>>,
     permissions: Option<Arc<crate::permissions::PermissionProfile>>,
     mcp_tools: Option<Arc<mcp_tools::McpTools>>,
+    subagents_enabled: bool,
     operating_regime: OperatingRegime,
     require_completion_text: bool,
     side_context: Option<Arc<grida_agent_master::side_context::SideContext>>,
@@ -267,6 +270,8 @@ struct StoredPrompt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     goal: Option<goals::GoalInput>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    subagent: Option<grida_agent_master::subagents::Assignment>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     completion_checks: Option<CompletionChecks>,
 }
 
@@ -282,6 +287,7 @@ struct SubmissionPolicy {
     allow_wakeups: bool,
     allow_mcp: bool,
     operating_regime: OperatingRegime,
+    subagent: Option<grida_agent_master::subagents::Assignment>,
 }
 
 enum InputAuthority {
@@ -346,6 +352,7 @@ enum TurnWork {
 
 struct PreparedInput {
     config: MasterConfig,
+    subagent: bool,
     operating_regime: OperatingRegime,
     messages: Vec<Message>,
     limit: Option<NonZeroU64>,
@@ -385,6 +392,8 @@ pub struct SessionSnapshot {
 struct SessionConfiguration {
     cwd: PathBuf,
     execution: Fingerprint,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    subagent: Option<grida_agent_master::subagents::Profile>,
 }
 
 /// The selected model and explicit output allowance for the scoped GG host.
@@ -519,6 +528,7 @@ impl Host {
             configuration,
             permissions: None,
             mcp_tools: None,
+            subagents_enabled: false,
             operating_regime: OperatingRegime::default(),
             require_completion_text: false,
             side_context: None,
@@ -551,6 +561,7 @@ impl Host {
         let configuration = SessionConfiguration {
             cwd: canonical_workspace(&cwd)?,
             execution: execution.configuration,
+            subagent: None,
         };
         let session = SessionId::new(uuid())?;
         self.store
@@ -565,7 +576,11 @@ impl Host {
 
     pub async fn load_session(&self, id: SessionId, cwd: PathBuf) -> Result<SessionSnapshot> {
         let session = self.store.inspect(id.clone()).await?;
-        if session_configuration(&session)?.cwd != canonical_workspace(&cwd)? {
+        let configuration = session_configuration(&session)?;
+        if configuration.subagent.is_some() {
+            return Err(problem(ErrorKind::Unavailable, "session_missing"));
+        }
+        if configuration.cwd != canonical_workspace(&cwd)? {
             return Err(problem(ErrorKind::Conflict, "session_workspace_mismatch"));
         }
         Ok(SessionSnapshot {
@@ -918,6 +933,21 @@ impl Host {
             .as_ref()
             .map(|input| self.prepare_input(execution, input, InputAuthority::RequireCaptured))
             .transpose()?;
+        let subagent = session_configuration(&view)?.subagent;
+        if prepared
+            .as_ref()
+            .is_some_and(|input| input.subagent != subagent.is_some())
+        {
+            return Err(problem(
+                ErrorKind::InvalidState,
+                "subagent_assignment_mismatch",
+            ));
+        }
+        if prepared.is_some()
+            && let Some(profile) = &subagent
+        {
+            profile.require_authority(&execution.authority.inference.authority)?;
+        }
         let claimed = match claim_request {
             WorkerClaim::Select(request) => {
                 if !matches!(&request.selection, TurnSelection::New { .. })
@@ -941,7 +971,15 @@ impl Host {
                         .transpose()?,
                     _ => None,
                 };
-                match (change, input.as_ref(), prepared.as_ref()) {
+                let reservation = if matches!(&request.selection, TurnSelection::New { .. }) {
+                    subagent
+                        .as_ref()
+                        .map(|profile| profile.reserve(&view.driver_state))
+                        .transpose()?
+                } else {
+                    None
+                };
+                match (change.or(reservation), input.as_ref(), prepared.as_ref()) {
                     (Some(change), Some(input), Some(prepared))
                         if matches!(prepared.goal, Some(goals::GoalInput::Continue(_))) =>
                     {
@@ -986,7 +1024,7 @@ impl Host {
         let image = execution
             .images
             .as_ref()
-            .filter(|_| prepared.operating_regime.is_act())
+            .filter(|_| prepared.operating_regime.is_act() && !prepared.subagent)
             .map(|images| {
                 image_tools::TurnImage::bind(
                     images.clone(),
@@ -1242,6 +1280,7 @@ impl Host {
             allow_wakeups,
             allow_mcp: true,
             operating_regime,
+            subagent: None,
         })
     }
 
@@ -1258,6 +1297,7 @@ impl Host {
             allow_wakeups,
             allow_mcp,
             operating_regime,
+            subagent,
         } = policy;
         if !operating_regime.is_act() && allow_wakeups {
             return Err(problem(ErrorKind::Unsupported, "plan_wakeups_unavailable"));
@@ -1265,9 +1305,23 @@ impl Host {
         validate_prompt_parts(&parts)?;
         let execution = self.execution()?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
-        let permission_capture = self.capture_permissions(session, &id)?;
-        let mcp_capture = self.capture_mcp(allow_mcp && operating_regime.is_act())?;
-        let guidance = if self.side_context.is_some() {
+        let child_work = subagent.is_some();
+        if child_work != session_configuration(session)?.subagent.is_some() {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "subagent_assignment_required",
+            ));
+        }
+        let permission_capture = if child_work {
+            None
+        } else {
+            self.capture_permissions(session, &id)?
+        };
+        let mcp_capture =
+            self.capture_mcp(!child_work && allow_mcp && operating_regime.is_act())?;
+        let guidance = if child_work {
+            None
+        } else if self.side_context.is_some() {
             if questions
                 || allow_wakeups
                 || configuration_permission != crate::ConfigurationPermission::Disabled
@@ -1317,7 +1371,11 @@ impl Host {
                     parts,
                     configuration,
                     max_output_tokens: execution.config.max_output_tokens,
-                    max_steps: Some(execution.config.max_steps),
+                    max_steps: Some(if child_work {
+                        grida_agent_master::subagents::INFERENCE_STEPS_PER_ASSIGNMENT
+                    } else {
+                        execution.config.max_steps
+                    }),
                     model: Some(execution.config.model.clone()),
                     authority: Some(CapturedAuthority {
                         principal: execution.authority.inference.authority.principal.clone(),
@@ -1331,7 +1389,12 @@ impl Host {
                     mcp_capture,
                     guidance,
                     goal: None,
-                    completion_checks: self.capture_completion_checks()?,
+                    subagent,
+                    completion_checks: if child_work {
+                        None
+                    } else {
+                        self.capture_completion_checks()?
+                    },
                 },
             )?,
         })
@@ -1354,6 +1417,7 @@ impl Host {
         }
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
         let mut mcp_tools = None;
+        let mut subagent = false;
         let (
             messages,
             operating_regime,
@@ -1386,6 +1450,35 @@ impl Host {
             }
             2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
+                subagent = stored.subagent.is_some();
+                if subagent {
+                    if !cancellation_only && !self.subagents_available() {
+                        return Err(problem(ErrorKind::Unsupported, "subagents_unavailable"));
+                    }
+                    if stored.questions
+                        || stored.allow_wakeups
+                        || !stored.operating_regime.is_act()
+                        || stored.configuration_permission
+                            != crate::ConfigurationPermission::Disabled
+                        || stored.permission_capture.is_some()
+                        || stored.mcp_capture.is_some()
+                        || stored.guidance.is_some()
+                        || stored.goal.is_some()
+                        || stored.completion_checks.is_some()
+                        || stored.max_steps
+                            != Some(grida_agent_master::subagents::INFERENCE_STEPS_PER_ASSIGNMENT)
+                        || !matches!(stored.parts.as_slice(), [PromptPart::Text { .. }])
+                    {
+                        return Err(problem(
+                            ErrorKind::InvalidState,
+                            "invalid_subagent_authority",
+                        ));
+                    }
+                    config.instructions.push_str("\n\n");
+                    config
+                        .instructions
+                        .push_str(grida_agent_master::subagents::INSTRUCTIONS);
+                }
                 if !cancellation_only
                     && !self.operating_regime.is_act()
                     && stored.operating_regime.is_act()
@@ -1484,6 +1577,7 @@ impl Host {
         }
         Ok(PreparedInput {
             config,
+            subagent,
             operating_regime,
             messages,
             limit,
@@ -2410,8 +2504,12 @@ fn decode_session_configuration(config: &Envelope) -> Result<SessionConfiguratio
             "unsupported_session_configuration",
         ));
     }
-    serde_json::from_slice(config.bytes())
-        .map_err(|_| problem(ErrorKind::InvalidState, "invalid_session_configuration"))
+    let configuration: SessionConfiguration = serde_json::from_slice(config.bytes())
+        .map_err(|_| problem(ErrorKind::InvalidState, "invalid_session_configuration"))?;
+    if let Some(subagent) = &configuration.subagent {
+        subagent.validate()?;
+    }
+    Ok(configuration)
 }
 
 fn canonical_workspace(path: &Path) -> Result<PathBuf> {

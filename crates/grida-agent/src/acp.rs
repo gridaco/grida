@@ -161,7 +161,8 @@ async fn serve_connection(
         ))
         .on_receive_request(
             async move |request: InitializeRequest, responder, connection| {
-                let mut advertised = extensions::advertised(reviewer);
+                let subagents = initialized_host.subagents_available();
+                let mut advertised = extensions::advertised(reviewer, subagents);
                 if reviewer {
                     advertised.insert(live::CAPABILITY.into(), 1.into());
                 }
@@ -187,7 +188,7 @@ async fn serve_connection(
                     let mut sessions = initialized_sessions.lock().unwrap();
                     sessions.initialized = true;
                     let meta = request.client_capabilities.meta.as_ref();
-                    sessions.negotiated = extensions::negotiated(meta, reviewer);
+                    sessions.negotiated = extensions::negotiated(meta, reviewer, subagents);
                     if reviewer
                         && !sessions.live_started
                         && meta

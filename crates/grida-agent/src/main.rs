@@ -95,6 +95,14 @@ fn command() -> Command {
                 .about("Serve stable Agent Client Protocol")
                 .arg(Arg::new("stdio").long("stdio").action(ArgAction::SetTrue))
                 .arg(
+                    Arg::new("subagents")
+                        .long("subagents")
+                        .requires("stdio")
+                        .conflicts_with("supervised-provider")
+                        .action(ArgAction::SetTrue)
+                        .help("Allow the private launcher to own bounded text-only subagents"),
+                )
+                .arg(
                     Arg::new("supervised-provider")
                         .long("supervised-provider")
                         .requires("stdio")
@@ -426,6 +434,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         (None, _, _) => Host::open(state_dir, Some(provider))?,
     };
     let host = host.with_operating_regime(regime);
+    let host = if name == "serve" && args.get_flag("subagents") {
+        host.with_subagents()
+    } else {
+        host
+    };
     let host = match mcp_client {
         Some(client) => host.with_mcp_client(client)?,
         None => host,

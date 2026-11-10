@@ -10,6 +10,7 @@ mod questions;
 mod routes;
 mod side_chats;
 mod skills;
+mod subagents;
 mod summaries;
 mod wakeups;
 
@@ -50,8 +51,8 @@ const CAPABILITIES: [&str; 7] = [
     CONFIG_RELOAD,
 ];
 
-pub(super) fn advertised(reviewer: bool) -> Meta {
-    capability_keys(reviewer)
+pub(super) fn advertised(reviewer: bool, subagents: bool) -> Meta {
+    capability_keys(reviewer, subagents)
         .map(|key| (key.into(), 1.into()))
         .collect()
 }
@@ -66,13 +67,17 @@ fn operating_regime(
     Ok(selection)
 }
 
-pub(super) fn negotiated(meta: Option<&Meta>, reviewer: bool) -> BTreeSet<&'static str> {
-    capability_keys(reviewer)
+pub(super) fn negotiated(
+    meta: Option<&Meta>,
+    reviewer: bool,
+    subagents: bool,
+) -> BTreeSet<&'static str> {
+    capability_keys(reviewer, subagents)
         .filter(|key| meta.and_then(|meta| meta.get(*key)).and_then(Value::as_u64) == Some(1))
         .collect()
 }
 
-fn capability_keys(reviewer: bool) -> impl Iterator<Item = &'static str> {
+fn capability_keys(reviewer: bool, subagents: bool) -> impl Iterator<Item = &'static str> {
     CAPABILITIES
         .into_iter()
         .chain(lifecycle::CAPABILITIES)
@@ -86,6 +91,7 @@ fn capability_keys(reviewer: bool) -> impl Iterator<Item = &'static str> {
         .chain(goals::CAPABILITIES)
         .chain(side_chats::capabilities(reviewer))
         .chain(wakeups::capabilities(reviewer))
+        .chain(subagents::capabilities(reviewer && subagents))
 }
 
 pub(super) fn configuration_permission(
@@ -332,6 +338,7 @@ pub(super) fn handlers(
             sessions.clone(),
             image_intake,
         ))
+        .extend(subagents::handlers(host.clone(), sessions.clone()))
         .extend(wakeups::handlers(host.clone(), sessions.clone()))
         .extend(side_chats::handlers(
             host.clone(),

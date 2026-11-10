@@ -309,6 +309,7 @@ impl Host {
                             allow_wakeups: false,
                             allow_mcp: capture.is_some(),
                             operating_regime,
+                            subagent: None,
                         },
                     )
                     .await?

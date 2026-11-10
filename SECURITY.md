@@ -1022,6 +1022,15 @@ lazy reads, read-only mutation, and symlink escape refusal.
   [transport fixtures](crates/grida-agent/tests/mcp_client.rs) and
   [launch fixtures](crates/grida-agent/tests/process/outbound_mcp.rs)
   exercise the native server and an independent peer.
+- [Private subagent controls](crates/grida-agent/src/acp/extensions/subagents.rs)
+  require an attached parent and a trusted opt-in launch. The
+  [host](crates/grida-agent/src/host/subagents.rs) rechecks the child's
+  retained parent link, verified provider scope, and exact settled sponsoring
+  turn. The [allocation policy](crates/grida-agent-master/src/subagents.rs)
+  binds a work reservation to the ordinary durable claim. Child work receives no
+  workspace, tool, or delegation grants. The
+  [process fixtures](crates/grida-agent/tests/process/subagents.rs) check
+  attachment scope, restart, exact result attribution, and allowance reuse.
 
 - Portable Rust provider contracts: [crates/grida-ai/src/catalogue.rs](crates/grida-ai/src/catalogue.rs),
   [crates/grida-ai/src/discovery.rs](crates/grida-ai/src/discovery.rs),

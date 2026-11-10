@@ -1,0 +1,220 @@
+//! GRIDA-SEC-004 — delegated child operations require a private parent attachment.
+
+use super::*;
+use crate::host::{SubagentAssignment, SubagentInspection, SubagentWork, TurnControl};
+use grida_agent_master::subagents::Allocation;
+
+const CREATE: &str = "co.grida/subagent/create";
+const ASSIGN: &str = "co.grida/subagent/assign";
+const INSPECT: &str = "co.grida/subagent/inspect";
+const STOP: &str = "co.grida/subagent/stop";
+
+pub(super) fn capabilities(available: bool) -> impl Iterator<Item = &'static str> {
+    [CREATE, ASSIGN, INSPECT, STOP]
+        .into_iter()
+        .filter(move |_| available)
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/subagent/create", response = Created)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Create {
+    parent_session_id: SessionId,
+    request_id: ChangeId,
+    name: String,
+    work_turns: u8,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+struct Created {
+    child_id: SessionId,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/subagent/assign", response = Assignment)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Assign {
+    parent_session_id: SessionId,
+    child_id: SessionId,
+    parent_turn_id: TurnId,
+    input_id: ChangeId,
+    instructions: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/subagent/inspect", response = Inspection)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Inspect {
+    parent_session_id: SessionId,
+    child_id: SessionId,
+    input_id: Option<ChangeId>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/subagent/stop", response = TurnControlResponse)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StopChild {
+    parent_session_id: SessionId,
+    child_id: SessionId,
+    turn_id: TurnId,
+    request_id: ChangeId,
+    expected_session_revision: SessionRevision,
+    expected_control_revision: ControlRevision,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+struct Inspection {
+    parent_session_id: SessionId,
+    child_id: SessionId,
+    name: String,
+    allocation: Allocation,
+    session_revision: SessionRevision,
+    current: Option<TurnSummary>,
+    latest: Option<TurnSummary>,
+    assignment: Option<Assignment>,
+}
+
+impl From<SubagentInspection> for Inspection {
+    fn from(view: SubagentInspection) -> Self {
+        let child_id = view.child;
+        Self {
+            parent_session_id: view.parent,
+            child_id: child_id.clone(),
+            name: view.name,
+            allocation: view.allocation,
+            session_revision: view.revision,
+            current: view.current.map(TurnSummary::from),
+            latest: view.latest.map(TurnSummary::from),
+            assignment: view
+                .assignment
+                .map(|work| Assignment::from_work(child_id, work)),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+struct Assignment {
+    child_id: SessionId,
+    parent_turn_id: TurnId,
+    input_id: ChangeId,
+    disposition: InputDisposition,
+    turn: Option<TurnSummary>,
+    result: Option<summaries::SummaryResponse>,
+}
+
+impl Assignment {
+    fn from_work(child_id: SessionId, work: SubagentWork) -> Self {
+        let result = work.turn.as_ref().and_then(|turn| {
+            turn.outcome.as_ref().map(|outcome| {
+                summaries::SummaryResponse::from_outcome(turn.binding.turn.clone(), outcome)
+            })
+        });
+        Self {
+            child_id,
+            parent_turn_id: work.parent_turn,
+            input_id: work.input,
+            disposition: work.disposition,
+            turn: work.turn.map(TurnSummary::from),
+            result,
+        }
+    }
+}
+
+pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>) -> RequestRoutes {
+    let create = (host.clone(), sessions.clone());
+    let assign = (host.clone(), sessions.clone());
+    let inspect = (host.clone(), sessions.clone());
+    RequestRoutes::default()
+        .on_receive_request(
+            async move |request: Create, responder, _| {
+                let result = async {
+                    require(&create.1, CREATE, Some(&request.parent_session_id))?;
+                    let child_id = create
+                        .0
+                        .create_subagent(
+                            request.parent_session_id,
+                            request.request_id,
+                            request.name,
+                            request.work_turns,
+                        )
+                        .await
+                        .map_err(host_error)?;
+                    Ok(Created { child_id })
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: Assign, responder, _| {
+                let result = async {
+                    require(&assign.1, ASSIGN, Some(&request.parent_session_id))?;
+                    let child = request.child_id;
+                    let work = assign
+                        .0
+                        .assign_subagent(SubagentAssignment {
+                            parent: request.parent_session_id,
+                            child: child.clone(),
+                            parent_turn: request.parent_turn_id,
+                            input: request.input_id,
+                            instructions: request.instructions,
+                        })
+                        .await
+                        .map_err(host_error)?;
+                    Ok(Assignment::from_work(child, work))
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: Inspect, responder, _| {
+                let result = async {
+                    require(&inspect.1, INSPECT, Some(&request.parent_session_id))?;
+                    inspect
+                        .0
+                        .inspect_subagent(
+                            request.parent_session_id,
+                            request.child_id,
+                            request.input_id,
+                        )
+                        .await
+                        .map(Inspection::from)
+                        .map_err(host_error)
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: StopChild, responder, _| {
+                let result = async {
+                    require(&sessions, STOP, Some(&request.parent_session_id))?;
+                    let turn = request.turn_id;
+                    let receipt = host
+                        .stop_subagent(
+                            request.parent_session_id,
+                            TurnControl {
+                                session: request.child_id,
+                                turn: turn.clone(),
+                                request: request.request_id,
+                                expected_session: request.expected_session_revision,
+                                expected_control: request.expected_control_revision,
+                            },
+                        )
+                        .await
+                        .map_err(host_error)?;
+                    turn_receipt(receipt, turn)
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
+}

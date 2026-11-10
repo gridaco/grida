@@ -193,6 +193,9 @@ impl Host {
         let Some(value) = view.driver_state.value() else {
             return Ok(None);
         };
+        if session_configuration(view)?.subagent.is_some() {
+            return Ok(None);
+        }
         let goal = Goal::decode(value)?;
         let Some(continuation) = goal.continuation() else {
             return Ok(None);

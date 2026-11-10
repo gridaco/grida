@@ -228,6 +228,7 @@ impl Host {
                     let configuration = SessionConfiguration {
                         cwd: canonical_workspace(&session_configuration(&source_view)?.cwd)?,
                         execution: host.execution()?.configuration,
+                        subagent: None,
                     };
                     encode(SESSION_SCHEMA, 2, &configuration)?
                 }

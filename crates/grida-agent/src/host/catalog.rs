@@ -72,7 +72,7 @@ fn bucket(archived: bool) -> u8 {
 
 pub(super) fn configuration_scope(configuration: &Envelope) -> Option<Fingerprint> {
     let config = decode_session_configuration(configuration).ok()?;
-    if !config.cwd.is_absolute() {
+    if !config.cwd.is_absolute() || config.subagent.is_some() {
         return None;
     }
     workspace_scope(&config.cwd).ok()

@@ -61,6 +61,9 @@ mod side_chats;
 #[cfg(unix)]
 #[path = "process/skills.rs"]
 mod skills;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "process/subagents.rs"]
+mod subagents;
 #[cfg(unix)]
 #[path = "process/summaries.rs"]
 mod summaries;

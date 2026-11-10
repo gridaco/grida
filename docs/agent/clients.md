@@ -305,8 +305,9 @@ target/debug/grida-agent serve --stdio --subagents \
   --credential-env OPENAI_API_KEY
 ```
 
-Attach to the parent and finish an Act turn. Negotiate version 1 for
-`co.grida/subagent/create`, `assign`, `inspect`, and `stop` separately.
+During initialization, negotiate version 1 for `co.grida/subagent/create`,
+`assign`, `inspect`, and `stop` separately. Attach to the parent and finish
+an Act turn.
 
 1. Create the child with a display name, a creation request ID, and an
    allowance of one to eight work turns. Retain the returned child ID.
@@ -315,9 +316,9 @@ Attach to the parent and finish an Act turn. Negotiate version 1 for
    workspace tools. When it is idle, assign a follow-up using the same child
    ID and a new input ID.
 3. Inspect a particular input to read the result from its original child
-   turn. After restart, attach to the same parent to inspect its children.
-   If an assignment was interrupted, stop that child turn before giving it
-   new work. Its reserved work turn still counts against the allowance.
+   turn. After restart, attach to the same parent and use the retained
+   child and input IDs. If an assignment was interrupted, stop it before
+   giving the child new work. Its reserved work turn still counts against the allowance.
 
 Retry creation or assignment with the same ID and fields to recover its
 receipt. Follow-up work after restart requires the same verified provider
