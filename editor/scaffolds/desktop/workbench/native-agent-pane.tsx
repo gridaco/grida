@@ -21,6 +21,7 @@ import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentComposerInput } from "../shared/agent-composer-input";
 import { QueuedMessageRows } from "../shared/queued-messages";
 import { NativeGoalPanel } from "./native-goal-panel";
+import { NativeSideChatPanel } from "./native-side-chat-panel";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
 const APPROVAL_ACTION = {
@@ -132,6 +133,16 @@ export function NativeAgentPane({
             </option>
           ))}
         </select>
+        {controller.canOpenSideChat && (
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            onClick={() => controller.openSideChat()}
+          >
+            Side chat
+          </Button>
+        )}
         <Button
           type="button"
           variant="ghost"
@@ -195,6 +206,12 @@ export function NativeAgentPane({
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
+      {state.sideChat && (
+        <NativeSideChatPanel
+          controller={state.sideChat}
+          close={() => void controller.closeSideChat()}
+        />
+      )}
       {status && (
         <div role="status" className="px-3 pt-2 text-xs text-muted-foreground">
           {status}

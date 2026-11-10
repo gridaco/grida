@@ -16,6 +16,8 @@ import type {
   NativeChatQueuePage,
   NativeChatQueueReceipt,
   NativeChatReadiness,
+  NativeChatSideAnswer,
+  NativeChatSideContext,
   NativeChatSnapshot,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
@@ -28,6 +30,7 @@ import type {
 } from "./native-agent-chat";
 import type { NativeApprovalReview } from "./native-agent-permissions";
 import type { NativeGoalInspection } from "./native-agent-goals";
+import type { NativeSideChat } from "./native-agent-side-chats";
 
 const MAX_ATTACHMENTS = 16;
 const MAX_OBSERVATIONS = 16;
@@ -45,6 +48,9 @@ export type ActiveNativeChat = Readonly<{
     | "list"
     | "create"
     | "load"
+    | "openSideChat"
+    | "askSideChat"
+    | "closeSideChat"
     | "submit"
     | "enqueue"
     | "inputReceipt"
@@ -75,6 +81,16 @@ type Attachment = {
   approvals: Map<string, NativeApprovalReview>;
   questions: Map<string, NativeQuestionReview>;
   goals: Map<string, NativeGoalInspection>;
+  side?: SideAttachment;
+  closingSide?: Promise<void>;
+};
+
+type SideAttachment = {
+  openId: string;
+  nativeRequestId: string;
+  opening?: Promise<NativeSideChat>;
+  chat?: NativeSideChat;
+  unconfirmed: boolean;
 };
 
 type Subscription = { attachment: Attachment; stop(): void };
@@ -204,9 +220,87 @@ export class NativeChatIpc {
     return this.attach(event, (chat) => chat.load(sessionId));
   }
 
+  async openSideChat(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    openId: string
+  ): Promise<NativeChatSideContext> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    if (
+      !token(openId) ||
+      attachment.closingSide ||
+      (attachment.side && attachment.side.openId !== openId)
+    )
+      throw new Error("native_chat_side_open_unavailable");
+    const side = (attachment.side ??= {
+      openId,
+      nativeRequestId: `side/${attachment.id}/${openId}`,
+      unconfirmed: false,
+    });
+    const chat =
+      side.chat ??
+      (await (side.opening ??= owner.active.chat
+        .openSideChat(attachment.session, side.nativeRequestId)
+        .then((opened) => {
+          side.chat = opened;
+          side.unconfirmed = false;
+          return opened;
+        })
+        .catch((error: unknown) => {
+          side.opening = undefined;
+          side.unconfirmed ||=
+            error instanceof Error &&
+            error.message === "native_agent_request_timeout";
+          throw error;
+        })));
+    this.revalidate(owner, attachment);
+    if (attachment.side !== side)
+      throw new Error("native_chat_side_unavailable");
+    return chat.context;
+  }
+
+  async askSideChat(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    openId: string,
+    requestId: string,
+    text: string
+  ): Promise<NativeChatSideAnswer> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const side = attachment.side;
+    if (!side?.chat || side.openId !== openId || !token(requestId))
+      throw new Error("native_chat_side_unavailable");
+    const answer = await owner.active.chat.askSideChat(
+      attachment.session,
+      side.chat,
+      requestId,
+      text
+    );
+    this.revalidate(owner, attachment);
+    if (attachment.side !== side)
+      throw new Error("native_chat_side_unavailable");
+    return answer;
+  }
+
+  async closeSideChat(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    openId: string
+  ): Promise<void> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    if (
+      !token(openId) ||
+      (attachment.side && attachment.side.openId !== openId)
+    )
+      throw new Error("native_chat_side_unavailable");
+    await this.releaseSide(owner, attachment);
+    this.revalidate(owner, attachment);
+  }
+
   detach(event: IpcMainInvokeEvent, attachmentId: string): void {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     owner.attachments.delete(attachment.id);
+    void this.releaseSide(owner, attachment).catch(() => {});
     for (const [id, subscription] of owner.subscriptions) {
       if (subscription.attachment === attachment)
         this.unsubscribeOwned(owner, id);
@@ -686,6 +780,8 @@ export class NativeChatIpc {
         stopWatching();
         for (const id of owner.subscriptions.keys())
           this.unsubscribeOwned(owner, id);
+        for (const attachment of owner.attachments.values())
+          void this.releaseSide(owner, attachment).catch(() => {});
         owner.attachments.clear();
       },
     };
@@ -722,6 +818,28 @@ export class NativeChatIpc {
     const subscription = owner.subscriptions.get(id);
     owner.subscriptions.delete(id);
     subscription?.stop();
+  }
+
+  private releaseSide(owner: Owner, attachment: Attachment): Promise<void> {
+    if (attachment.closingSide) return attachment.closingSide;
+    const side = attachment.side;
+    if (!side) return Promise.resolve();
+    attachment.side = undefined;
+    const chat = owner.active.chat;
+    const closing = (async () => {
+      let opened = side.chat ?? (await side.opening?.catch(() => undefined));
+      if (!opened && side.unconfirmed)
+        opened = await chat.openSideChat(
+          attachment.session,
+          side.nativeRequestId
+        );
+      if (opened) await chat.closeSideChat(opened);
+    })().finally(() => {
+      if (attachment.closingSide === closing)
+        attachment.closingSide = undefined;
+    });
+    attachment.closingSide = closing;
+    return closing;
   }
 
   private scope(

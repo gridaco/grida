@@ -256,14 +256,18 @@ presentation was requested because no editor is attached.
 
 ## Ask in a temporary side chat
 
+Choose **Side chat** in an attached native Desktop chat. Ask in its separate
+text composer while the parent continues. Closing the pane or switching
+parent chats discards the side conversation.
+
 A private stdio client can open a read-only side chat from an attached parent.
 It captures committed background, including an installed summary when present.
 The parent can keep working. The selected model treats that snapshot as quoted
 reference and answers the side chat's new questions. The open response identifies
 the source context and reports omitted material.
 
-Side chats accept text and use the host's selected model. They have no workspace
-tools or scheduled work. Close ends that side chat and discards its conversation.
+Side chats accept up to six text questions and use the host's selected model.
+They have no workspace tools or scheduled work. Close ends that side chat and discards its conversation.
 A disconnect also discards it. The parent keeps its own history and controls.
 
 Negotiate version 1 for `co.grida/side-chat/open`, `ask`, and `close` separately.

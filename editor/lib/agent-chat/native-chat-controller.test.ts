@@ -498,6 +498,82 @@ it("reads the pending goal from a reopened chat and withholds text replacement",
   controller.disconnect();
 });
 
+it("keeps side retries exact, parent input independent, and late answers out of the next chat", async () => {
+  const { bridge, controller } = fixture();
+  const context = {
+    sourceRevision: 2,
+    compacted: true,
+    truncated: false,
+    omitted: true,
+  };
+  const open = vi.fn<NonNullable<DesktopNativeChat["openSideChat"]>>(
+    async () => context
+  );
+  open.mockRejectedValueOnce(new Error("fixture lost open reply"));
+  const response = {
+    turnId: "side-turn",
+    status: "succeeded",
+    text: "Side answer.",
+    textTruncated: false,
+  } as const;
+  const ask = vi.fn<NonNullable<DesktopNativeChat["askSideChat"]>>(
+    async () => response
+  );
+  ask.mockRejectedValueOnce(new Error("fixture lost answer"));
+  const close = vi.fn<NonNullable<DesktopNativeChat["closeSideChat"]>>(
+    async () => {}
+  );
+  const submit = vi.spyOn(bridge, "submit");
+  bridge.openSideChat = open;
+  bridge.askSideChat = ask;
+  bridge.closeSideChat = close;
+
+  await controller.select("chat-a");
+  controller.openSideChat();
+  const side = controller.read().sideChat!;
+  await side.open();
+  expect(side.read().phase).toBe("unavailable");
+  await side.open();
+  expect(side.read().context).toEqual(context);
+  expect(open.mock.calls[0]).toEqual(open.mock.calls[1]);
+  side.setDraft("Explain the decision.");
+  await side.ask();
+  expect(side.read().draft).toBe("Explain the decision.");
+  const answer = Promise.withResolvers<typeof response>();
+  ask.mockReturnValueOnce(answer.promise);
+  const pending = side.ask();
+  expect(side.read().asking).toBe(true);
+  expect(controller.canSubmit).toBe(true);
+  await controller.submit("Continue the parent.");
+  expect(submit).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    expect.any(String),
+    "Continue the parent."
+  );
+  expect(ask.mock.calls[0]).toEqual(ask.mock.calls[1]);
+  answer.resolve(response);
+  await pending;
+  expect(side.read().exchanges).toEqual([
+    { question: "Explain the decision.", answer: response },
+  ]);
+  expect(controller.read().messages).toEqual([]);
+
+  const late = Promise.withResolvers<typeof response>();
+  ask.mockReturnValueOnce(late.promise);
+  side.setDraft("Follow up.");
+  const unfinished = side.ask();
+  await controller.select("chat-b");
+  late.resolve(response);
+  await unfinished;
+  expect(controller.read().sideChat).toBeNull();
+  expect(side.read().exchanges).toEqual([]);
+  expect(close).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    open.mock.calls[0][1]
+  );
+  controller.disconnect();
+});
+
 it("uses the readiness probe and preserves native mode through startup failure", async () => {
   const { bridge } = fixture();
   const availability = vi.spyOn(bridge, "available");

@@ -16,6 +16,7 @@ import type {
   NativeChatQueueChange,
   NativeChatQueuePage,
   NativeChatQueueReceipt,
+  NativeChatSideAnswer,
   NativeChatSnapshot,
   NativeChatSteer,
   NativeChatStreamUpdate,
@@ -26,6 +27,10 @@ import {
   NativeAgentGoals,
   type NativeGoalInspection,
 } from "./native-agent-goals";
+import {
+  NativeAgentSideChats,
+  type NativeSideChat,
+} from "./native-agent-side-chats";
 import {
   NativeAgentProcess,
   type NativeAgentLaunch,
@@ -50,6 +55,9 @@ const CAPABILITIES = {
   "co.grida/goal/start": 1,
   "co.grida/goal/inspect": 1,
   "co.grida/goal/control": 1,
+  "co.grida/side-chat/open": 1,
+  "co.grida/side-chat/ask": 1,
+  "co.grida/side-chat/close": 1,
 } as const;
 const TURN_DISPOSITIONS = [
   "running",
@@ -126,6 +134,9 @@ type TranscriptCapture = {
 
 export class NativeAgentChat {
   private readonly goals = new NativeAgentGoals((method, params) =>
+    this.process.request(method, params)
+  );
+  private readonly sideChats = new NativeAgentSideChats((method, params) =>
     this.process.request(method, params)
   );
   private readonly attached = new Map<string, NativeChatSession>();
@@ -249,6 +260,41 @@ export class NativeAgentChat {
       .finally(() => this.loading.delete(id));
     this.loading.set(id, requested);
     return requested;
+  }
+
+  async openSideChat(
+    parent: NativeChatSession,
+    requestId: string
+  ): Promise<NativeSideChat> {
+    const side = await this.sideChats.open(
+      this.requireAttached(parent),
+      requestId
+    );
+    try {
+      this.requireAttached(parent);
+    } catch (error) {
+      await this.sideChats.close(side).catch(() => {});
+      throw error;
+    }
+    return side;
+  }
+
+  askSideChat(
+    parent: NativeChatSession,
+    side: NativeSideChat,
+    requestId: string,
+    text: string
+  ): Promise<NativeChatSideAnswer> {
+    return this.sideChats.ask(
+      this.requireAttached(parent),
+      side,
+      requestId,
+      text
+    );
+  }
+
+  closeSideChat(side: NativeSideChat): Promise<void> {
+    return this.sideChats.close(side);
   }
 
   submit(
@@ -732,6 +778,7 @@ export class NativeAgentChat {
 
   close(): Promise<void> {
     this.closed = true;
+    this.sideChats.clear();
     this.attached.clear();
     this.listeners.clear();
     return this.process.close();

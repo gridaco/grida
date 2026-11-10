@@ -91,6 +91,27 @@ function setup() {
     async load(id) {
       return load(id);
     },
+    async openSideChat(parent, requestId) {
+      return {
+        id: requestId,
+        parent: parent.id,
+        context: {
+          sourceRevision: 1,
+          compacted: false,
+          truncated: false,
+          omitted: false,
+        },
+      };
+    },
+    async askSideChat() {
+      return {
+        turnId: "side-turn",
+        status: "succeeded",
+        text: "Side reply",
+        textTruncated: false,
+      };
+    },
+    async closeSideChat() {},
     async submit(session, inputId) {
       return {
         sessionId: session.id,
@@ -223,6 +244,112 @@ function setup() {
 }
 
 describe("native chat IPC", () => {
+  it("scopes temporary side chats to each parent attachment and endpoint generation", async () => {
+    const { ipc, first, second, chat, scopes } = setup();
+    const one = await ipc.create(first.event);
+    const two = await ipc.load(second.event, one.sessionId);
+    const openId = randomUUID();
+    const requestId = randomUUID();
+    const open = vi.spyOn(chat, "openSideChat");
+    const ask = vi.spyOn(chat, "askSideChat");
+    const close = vi.spyOn(chat, "closeSideChat");
+    const context = await ipc.openSideChat(
+      first.event,
+      one.attachmentId,
+      openId
+    );
+    await expect(
+      ipc.openSideChat(first.event, one.attachmentId, openId)
+    ).resolves.toEqual(context);
+    expect(open).toHaveBeenCalledTimes(1);
+    await expect(
+      ipc.askSideChat(
+        second.event,
+        two.attachmentId,
+        openId,
+        requestId,
+        "Copied"
+      )
+    ).rejects.toThrow("native_chat_side_unavailable");
+    await ipc.openSideChat(second.event, two.attachmentId, openId);
+    expect(open.mock.calls[0][1]).not.toBe(open.mock.calls[1][1]);
+    await ipc.askSideChat(
+      first.event,
+      one.attachmentId,
+      openId,
+      requestId,
+      "Original"
+    );
+    expect(ask).toHaveBeenCalledExactlyOnceWith(
+      { id: one.sessionId },
+      expect.objectContaining({ parent: one.sessionId }),
+      requestId,
+      "Original"
+    );
+
+    scopes.set(first.sender, { workspaceId: WORKSPACE, chat: { ...chat } });
+    await expect(
+      ipc.askSideChat(
+        first.event,
+        one.attachmentId,
+        openId,
+        requestId,
+        "Original"
+      )
+    ).rejects.toThrow("native_chat_scope_changed");
+    expect(close).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: open.mock.calls[0][1] })
+    );
+    ipc.detach(second.event, two.attachmentId);
+    await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(2));
+  });
+
+  it("retires a side chat that opens after navigation", async () => {
+    const { ipc, first, chat } = setup();
+    const parent = await ipc.create(first.event);
+    const opened =
+      Promise.withResolvers<
+        Awaited<ReturnType<ActiveNativeChat["chat"]["openSideChat"]>>
+      >();
+    vi.spyOn(chat, "openSideChat").mockReturnValueOnce(opened.promise);
+    const close = vi.spyOn(chat, "closeSideChat");
+    const opening = ipc.openSideChat(
+      first.event,
+      parent.attachmentId,
+      randomUUID()
+    );
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    const side = {
+      id: "late-side",
+      parent: parent.sessionId,
+      context: {
+        sourceRevision: 1,
+        compacted: false,
+        truncated: false,
+        omitted: false,
+      },
+    };
+    opened.resolve(side);
+    await expect(opening).rejects.toThrow("native_chat_attachment_unavailable");
+    expect(close).toHaveBeenCalledExactlyOnceWith(side);
+  });
+
+  it("recovers an unconfirmed open only to close the exact temporary chat", async () => {
+    const { ipc, first, chat } = setup();
+    const parent = await ipc.create(first.event);
+    const openId = randomUUID();
+    const open = vi
+      .spyOn(chat, "openSideChat")
+      .mockRejectedValueOnce(new Error("native_agent_request_timeout"));
+    const close = vi.spyOn(chat, "closeSideChat");
+    await expect(
+      ipc.openSideChat(first.event, parent.attachmentId, openId)
+    ).rejects.toThrow("native_agent_request_timeout");
+    await ipc.closeSideChat(first.event, parent.attachmentId, openId);
+    expect(open.mock.calls[1]).toEqual(open.mock.calls[0]);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
   it("issues goal controls only for the attached frame's inspected basis", async () => {
     const { ipc, first, second, chat } = setup();
     const one = await ipc.create(first.event);

@@ -21,6 +21,7 @@ import type {
   NativeChatTextUpdate,
   NativeChatUpdate,
 } from "@grida/desktop-bridge";
+import { NativeSideChatController } from "./native-side-chat-controller";
 
 const POLL_MS = 500;
 const RECENTS_LIMIT = 12;
@@ -36,6 +37,7 @@ export type NativeChatView = Readonly<{
   catalogLoading: boolean;
   catalogError: string | null;
   messages: readonly NativeChatMessage[];
+  sideChat: NativeSideChatController | null;
   observation: NativeChatObservation | null;
   approvals: readonly NativeChatApproval[];
   approvalError: string | null;
@@ -58,6 +60,7 @@ type Scope = {
   id: number;
   requested: string | null;
   attachment?: NativeChatAttachment;
+  sideChat?: NativeSideChatController;
   opening?: Promise<void>;
   refreshing?: Promise<void>;
   timer?: ReturnType<typeof setTimeout>;
@@ -91,6 +94,7 @@ const EMPTY: NativeChatView = Object.freeze({
   catalogLoading: false,
   catalogError: null,
   messages: [],
+  sideChat: null,
   observation: null,
   approvals: [],
   approvalError: null,
@@ -244,6 +248,7 @@ export class NativeChatController {
       scope: scope.id,
       selected: sessionId,
       messages: [],
+      sideChat: null,
       observation: null,
       approvals: [],
       approvalError: null,
@@ -287,6 +292,48 @@ export class NativeChatController {
             this.view.observation?.snapshot.current?.turnId
         : !this.needsQueue || !!this.bridge.enqueue)
     );
+  }
+
+  get canOpenSideChat(): boolean {
+    return (
+      !!this.scope?.attachment &&
+      !this.scope.sideChat &&
+      NativeSideChatController.supported(this.bridge)
+    );
+  }
+
+  openSideChat(): void {
+    const scope = this.scope;
+    if (
+      !scope?.attachment ||
+      scope.sideChat ||
+      !NativeSideChatController.supported(this.bridge)
+    )
+      return;
+    const side = new NativeSideChatController(
+      this.bridge,
+      scope.attachment.attachmentId
+    );
+    scope.sideChat = side;
+    this.update({ sideChat: side });
+    void side.open();
+  }
+
+  async closeSideChat(): Promise<void> {
+    const scope = this.scope;
+    const side = scope?.sideChat;
+    if (!scope || !side) return;
+    try {
+      await side.close();
+    } catch {
+      if (this.owns(scope))
+        this.update({ error: "Couldn't confirm that the side chat closed." });
+    } finally {
+      if (this.owns(scope) && scope.sideChat === side) {
+        scope.sideChat = undefined;
+        this.update({ sideChat: null });
+      }
+    }
   }
 
   get canSteer(): boolean {
@@ -839,6 +886,7 @@ export class NativeChatController {
   private queueRelease(scope: Scope | undefined): void {
     if (!scope) return;
     clearTimeout(scope.timer);
+    void scope.sideChat?.close().catch(() => {});
     this.attachments = this.attachments.then(async () => {
       // Detach removes the subscription. It does not stop accepted work.
       if (scope.attachment)

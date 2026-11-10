@@ -9,6 +9,20 @@ export type NativeChatPage = Readonly<{
   nextCursor: string | null;
 }>;
 
+export type NativeChatSideContext = Readonly<{
+  sourceRevision: number;
+  compacted: boolean;
+  truncated: boolean;
+  omitted: boolean;
+}>;
+
+export type NativeChatSideAnswer = Readonly<{
+  turnId: string;
+  status: "succeeded" | "failed" | "cancelled" | "uncertain";
+  text: string;
+  textTruncated: boolean;
+}>;
+
 export type NativeChatReadiness =
   | "legacy"
   | "native-starting"
@@ -225,6 +239,17 @@ export type DesktopNativeChat = {
   list(cursor?: string | null): Promise<NativeChatPage>;
   create(): Promise<NativeChatAttachment>;
   load(sessionId: string): Promise<NativeChatAttachment>;
+  openSideChat?(
+    attachmentId: string,
+    openId: string
+  ): Promise<NativeChatSideContext>;
+  askSideChat?(
+    attachmentId: string,
+    openId: string,
+    requestId: string,
+    text: string
+  ): Promise<NativeChatSideAnswer>;
+  closeSideChat?(attachmentId: string, openId: string): Promise<void>;
   detach(attachmentId: string): Promise<void>;
   submit(
     attachmentId: string,

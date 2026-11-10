@@ -976,6 +976,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   uses a separate request with the observed turn, control, and history basis.
   The [queue process fixture](desktop/src/main/native-agent-queue.test.ts)
   verifies exact retries, stale revisions, and the queue held after Stop.
+- The [Desktop side-chat adapter](desktop/src/main/native-agent-side-chats.ts)
+  exposes bounded answer text and context metadata. Main binds each open
+  identity to one parent attachment and private child connection. Closing,
+  detaching, or navigating retires that side chat independently of parent work.
 - [Native capability host](crates/grida-agent/src/tool_host.rs) and
   [its fixtures](crates/grida-agent/tests/tool_host.rs) bind a tool lease to
   a single capability and endpoint lifetime. The dispatcher checks the

@@ -373,6 +373,26 @@ const bridge: DesktopBridge = {
     create: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
     load: (sessionId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),
+    openSideChat: (attachmentId, openId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_OPEN_SIDE,
+        attachmentId,
+        openId
+      ),
+    askSideChat: (attachmentId, openId, requestId, text) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ASK_SIDE,
+        attachmentId,
+        openId,
+        requestId,
+        text
+      ),
+    closeSideChat: (attachmentId, openId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CLOSE_SIDE,
+        attachmentId,
+        openId
+      ),
     detach: async (attachmentId) => {
       for (const [id, subscriber] of nativeChatHandlers) {
         if (subscriber.attachmentId === attachmentId)
