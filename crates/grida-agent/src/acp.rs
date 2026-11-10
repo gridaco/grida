@@ -185,7 +185,8 @@ async fn serve_connection(
             async move |request: InitializeRequest, responder, connection| {
                 let subagents = initialized_host.subagents_available();
                 let deletion = reviewer && initialized_host.deletion_available();
-                let mut advertised = extensions::advertised(reviewer, subagents, deletion);
+                let effort = initialized_host.sponsorship_available();
+                let mut advertised = extensions::advertised(reviewer, subagents, deletion, effort);
                 if reviewer {
                     advertised.insert(live::CAPABILITY.into(), 1.into());
                 }
@@ -238,7 +239,7 @@ async fn serve_connection(
                     sessions.initialized = true;
                     let meta = request.client_capabilities.meta.as_ref();
                     sessions.negotiated =
-                        extensions::negotiated(meta, reviewer, subagents, deletion);
+                        extensions::negotiated(meta, reviewer, subagents, deletion, effort);
                     sessions.negotiated.extend(
                         [
                             crate::editor_surfaces::CAPABILITY,
@@ -433,6 +434,7 @@ async fn serve_connection(
                             questions: false,
                             configuration_permission: crate::ConfigurationPermission::Disabled,
                             operating_regime: None,
+                            effort: None,
                         })
                         .await
                         .map_err(host_error)

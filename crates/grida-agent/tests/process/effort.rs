@@ -243,3 +243,264 @@ async fn stopping_suspended_ultra_does_not_require_live_review_tools() {
     terminate_shared_server(host).await;
     endpoint.done().await;
 }
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+mod negotiated {
+    use super::super::approvals::Stdio as PrivateStdio;
+    use super::*;
+
+    const EFFORT: &str = "co.grida/session/effort";
+
+    fn capabilities(select_effort: bool) -> Value {
+        let mut request = extension_initialize();
+        if select_effort {
+            request["clientCapabilities"]["_meta"][EFFORT] = 1.into();
+        }
+        request["clientCapabilities"]["_meta"]["co.grida/session/revision-target"] = 1.into();
+        request
+    }
+
+    async fn private(
+        state: &Path,
+        endpoint: &str,
+        opt_in: bool,
+        negotiate: bool,
+    ) -> (PrivateStdio, Value) {
+        let mut command = executable();
+        command.args(["serve", "--stdio"]);
+        if opt_in {
+            command.arg("--subagents");
+        }
+        configured(&mut command, state, endpoint);
+        let child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut client = PrivateStdio::from_child(child);
+        let initialized = client.request("initialize", capabilities(negotiate)).await;
+        (
+            client,
+            initialized["result"]["agentCapabilities"]["_meta"][EFFORT].clone(),
+        )
+    }
+
+    async fn snapshot(client: &mut PrivateStdio, session: &str) -> Value {
+        let reply = client
+            .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+            .await;
+        reply
+            .get("result")
+            .unwrap_or_else(|| panic!("{reply}"))
+            .clone()
+    }
+
+    async fn idle(client: &mut PrivateStdio, session: &str) -> Value {
+        timeout(WAIT, async {
+            loop {
+                let view = snapshot(client, session).await;
+                if view["current"].is_null() && !view["latest"].is_null() {
+                    break view;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap()
+    }
+
+    fn input(session: &str, id: &str, text: &str, mode: &str, effort: &str) -> Value {
+        json!({"sessionId":session,"inputId":id,"prompt":[{"type":"text","text":text}],"operatingRegime":mode,"effort":effort})
+    }
+
+    #[tokio::test]
+    async fn effort_requires_a_trusted_private_launch_and_client_negotiation() {
+        let root = TempDir::new().unwrap();
+        let workspace = TempDir::new().unwrap();
+        let endpoint = "http://127.0.0.1:1/v1";
+        for (name, opt_in, negotiate) in [("plain", false, true), ("unnegotiated", true, false)] {
+            let (mut client, advertised) =
+                private(&root.path().join(name), endpoint, opt_in, negotiate).await;
+            assert_eq!(advertised, if opt_in { json!(1) } else { Value::Null });
+            let created = client
+                .request(
+                    "session/new",
+                    json!({"cwd":workspace.path(),"mcpServers":[]}),
+                )
+                .await;
+            let session = created["result"]["sessionId"].as_str().unwrap();
+            let denied = client
+                .request(
+                    "_co.grida/session/submit",
+                    input(session, "denied", PARENT, "act", "ultra"),
+                )
+                .await;
+            assert!(denied.get("error").is_some(), "{denied}");
+            assert!(snapshot(&mut client, session).await["current"].is_null());
+            assert!(client.finish().await.status.success());
+        }
+
+        let (host, url) = shared_server(&root.path().join("shared"), endpoint).await;
+        let mut socket = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+            .await
+            .unwrap();
+        let initialized = ws_rpc(&mut socket, 1, "initialize", capabilities(true)).await;
+        assert!(initialized["result"]["agentCapabilities"]["_meta"][EFFORT].is_null());
+        let created = ws_rpc(
+            &mut socket,
+            2,
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        let denied = ws_rpc(
+            &mut socket,
+            3,
+            "_co.grida/session/enqueue",
+            input(session, "denied", PARENT, "act", "ultra"),
+        )
+        .await;
+        assert!(denied.get("error").is_some(), "{denied}");
+        assert_eq!(
+            session_snapshot(&mut socket, session).await["queuedInputs"],
+            0
+        );
+        drop(socket);
+        terminate_shared_server(host).await;
+    }
+
+    #[tokio::test]
+    async fn per_input_effort_survives_queue_edit_restart_and_revision() {
+        let root = TempDir::new().unwrap();
+        let state = root.path().join("state");
+        let workspace = TempDir::new().unwrap();
+        let mut endpoint = Endpoint::start(vec![
+            Reply::Hold("Current task."),
+            Reply::Finished("Queued Plan."),
+            Reply::Finished("Revised Plan."),
+        ])
+        .await;
+        let (mut first, advertised) = private(&state, &endpoint.url, true, true).await;
+        assert_eq!(advertised, 1);
+        let created = first
+            .request(
+                "session/new",
+                json!({"cwd":workspace.path(),"mcpServers":[]}),
+            )
+            .await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        let original = input(session, "active", "First task.", "act", "standard");
+        let started = first
+            .request("_co.grida/session/submit", original.clone())
+            .await;
+        assert!(started.get("result").is_some(), "{started}");
+        assert!(!offers(&endpoint.request().await, "delegate_review"));
+        let exact = first
+            .request("_co.grida/session/submit", original.clone())
+            .await;
+        assert_eq!(
+            exact["result"]["inputPosition"],
+            started["result"]["inputPosition"]
+        );
+        let mut changed = original;
+        changed["effort"] = "ultra".into();
+        let conflict = first.request("_co.grida/session/submit", changed).await;
+        assert_eq!(conflict["error"]["data"], "submission_effort_changed");
+
+        let queued = first
+            .request(
+                "_co.grida/session/enqueue",
+                input(session, "queue", "Queued original.", "plan", "ultra"),
+            )
+            .await;
+        assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+        let view = snapshot(&mut first, session).await;
+        assert_eq!(view["queue"][0]["settings"]["effort"], "ultra");
+        let edit = first.request("_co.grida/session/replace", json!({
+            "queue":{"sessionId":session,"requestId":"edit-queue","expectedSessionRevision":view["sessionRevision"]},
+            "inputId":"queue","replacementInputId":"edited","prompt":[{"type":"text","text":"Edited queued task."}],
+        })).await;
+        assert!(edit.get("result").is_some(), "{edit}");
+        let view = snapshot(&mut first, session).await;
+        let stopped = first
+            .request(
+                "_co.grida/session/stop",
+                task_basis(&view, session, "stop-first"),
+            )
+            .await;
+        assert!(stopped.get("result").is_some(), "{stopped}");
+        assert!(
+            idle(&mut first, session).await["admissionPaused"]
+                .as_bool()
+                .unwrap()
+        );
+        assert!(first.finish().await.status.success());
+
+        let (mut second, advertised) = private(&state, &endpoint.url, true, true).await;
+        assert_eq!(advertised, 1);
+        let loaded = second
+            .request(
+                "session/load",
+                json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+            )
+            .await;
+        assert!(loaded.get("result").is_some(), "{loaded}");
+        let retained = second
+            .request(
+                "_co.grida/session/input",
+                json!({"sessionId":session,"inputId":"edited"}),
+            )
+            .await;
+        assert_eq!(retained["result"]["settings"]["effort"], "ultra");
+        assert_eq!(retained["result"]["settings"]["operatingRegime"], "plan");
+        let view = snapshot(&mut second, session).await;
+        let resumed = second.request("_co.grida/session/resume-queue", json!({
+            "sessionId":session,"requestId":"resume-queue","expectedSessionRevision":view["sessionRevision"],
+        })).await;
+        assert!(resumed.get("result").is_some(), "{resumed}");
+        let next = endpoint.request().await;
+        assert!(offers(&next, "delegate_review"));
+        assert!(next["messages"].to_string().contains("Plan is active."));
+        assert!(next["messages"].to_string().contains("Edited queued task."));
+        let _ = idle(&mut second, session).await;
+
+        let page = second
+            .request("_co.grida/session/history", json!({"sessionId":session}))
+            .await;
+        let page = &page["result"];
+        let original = page["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|message| message["preview"] == "Edited queued task.")
+            .unwrap();
+        let target = second.request("_co.grida/session/revision-target", json!({
+            "sessionId":session,"expectedSessionRevision":page["sessionRevision"],"messageId":original["anchor"]["message"],
+        })).await;
+        let target = &target["result"];
+        assert_eq!(target["effort"], "ultra");
+        let revise = json!({"sessionId":session,"requestId":"revise","expectedSessionRevision":target["sessionRevision"],
+            "expectedHistory":target["basis"],"anchor":target["anchor"],"replacementInputId":"revised",
+            "prompt":[{"type":"text","text":"Revised task."}],"effort":"standard","operatingRegime":"plan"});
+        let revised = second
+            .request("_co.grida/session/revise", revise.clone())
+            .await;
+        assert!(revised.get("result").is_some(), "{revised}");
+        let request = endpoint.request().await;
+        assert!(!offers(&request, "delegate_review"));
+        assert!(request["messages"].to_string().contains("Plan is active."));
+        let exact = second
+            .request("_co.grida/session/revise", revise.clone())
+            .await;
+        assert_eq!(exact["result"], revised["result"]);
+        let mut changed = revise;
+        changed["effort"] = "ultra".into();
+        let conflict = second.request("_co.grida/session/revise", changed).await;
+        assert_eq!(conflict["error"]["data"], "submission_effort_changed");
+        let _ = idle(&mut second, session).await;
+        assert!(second.finish().await.status.success());
+        endpoint.done().await;
+    }
+}

@@ -99,6 +99,7 @@ pub(super) fn handlers(
                                     &start.1,
                                     request.operating_regime,
                                 )?,
+                                effort: None,
                             },
                             request.goal,
                         )

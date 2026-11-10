@@ -71,6 +71,7 @@ struct Revise {
     #[serde(default)]
     allow_configuration_changes: bool,
     operating_regime: Option<crate::OperatingRegime>,
+    effort: Option<crate::EffortPreset>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -180,6 +181,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                                     &sessions,
                                     request.operating_regime,
                                 )?,
+                                effort: effort(&sessions, request.effort)?,
                             },
                         )
                         .await

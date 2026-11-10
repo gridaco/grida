@@ -1116,7 +1116,7 @@ lazy reads, read-only mutation, and symlink escape refusal.
   Current launch and provider authority are checked before dispatch. A later
   paired Pause or Stop fences an earlier wake. Replaying a committed Resume
   can recover readiness after a lost response or process restart.
-- [Headless Ultra](crates/grida-agent/src/host/sponsorship.rs) captures the
+- [Ultra](crates/grida-agent/src/host/sponsorship.rs) captures the
   separate parent and child allowances with the accepted input. Only that
   turn receives the exact review start and collection grants. The start
   uses the active parent attempt and current controls. Recovery can observe
@@ -1125,6 +1125,11 @@ lazy reads, read-only mutation, and symlink escape refusal.
   verifies the parent operation, accepted child input and exact child turn.
   It returns a bounded excerpt of verified findings, or a disposition without
   findings, and leaves child execution unchanged.
+  [Private ACP](crates/grida-agent/src/acp/extensions.rs) accepts an explicit
+  effort only when the trusted launch supports sponsorship and the client
+  negotiated the capability. Changed effort cannot reuse an accepted input
+  or revision request. Queue edits retain accepted effort and steering keeps
+  the current turn's choice.
 - Native Desktop opts into named children through the trusted Gateway launch.
   Main derives the sponsor from the exact attached parent observation and
   retains that sponsor for an exact assignment retry. It checks child, input,

@@ -36,6 +36,7 @@ struct Enqueue {
     #[serde(default)]
     allow_configuration_changes: bool,
     operating_regime: Option<crate::OperatingRegime>,
+    effort: Option<crate::EffortPreset>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -199,6 +200,7 @@ pub(super) fn handlers(
                                 &enqueue.1,
                                 request.operating_regime,
                             )?,
+                            effort: effort(&enqueue.1, request.effort)?,
                         })
                         .await
                         .map_err(host_error)?;

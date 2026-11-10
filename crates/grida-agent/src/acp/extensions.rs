@@ -39,6 +39,7 @@ const SUBMIT: &str = "co.grida/session/submit";
 const SNAPSHOT: &str = "co.grida/session/snapshot";
 const STOP: &str = "co.grida/session/stop";
 const OPERATING_REGIME: &str = "co.grida/session/operating-regime";
+const EFFORT: &str = "co.grida/session/effort";
 const CONFIG_INSPECT: &str = "co.grida/config/inspect";
 const CONFIG_UPDATE: &str = "co.grida/config/update";
 const CONFIG_RELOAD: &str = "co.grida/config/reload";
@@ -52,10 +53,20 @@ const CAPABILITIES: [&str; 7] = [
     CONFIG_RELOAD,
 ];
 
-pub(super) fn advertised(reviewer: bool, subagents: bool, delete_chat: bool) -> Meta {
-    capability_keys(reviewer, subagents, delete_chat)
+pub(super) fn advertised(reviewer: bool, subagents: bool, delete_chat: bool, effort: bool) -> Meta {
+    capability_keys(reviewer, subagents, delete_chat, effort)
         .map(|key| (key.into(), 1.into()))
         .collect()
+}
+
+fn effort(
+    sessions: &Mutex<ConnectionSessions>,
+    selection: Option<crate::EffortPreset>,
+) -> Result<Option<crate::EffortPreset>> {
+    if selection.is_some() {
+        require(sessions, EFFORT, None)?;
+    }
+    Ok(selection)
 }
 
 fn operating_regime(
@@ -73,8 +84,9 @@ pub(super) fn negotiated(
     reviewer: bool,
     subagents: bool,
     delete_chat: bool,
+    effort: bool,
 ) -> BTreeSet<&'static str> {
-    capability_keys(reviewer, subagents, delete_chat)
+    capability_keys(reviewer, subagents, delete_chat, effort)
         .filter(|key| meta.and_then(|meta| meta.get(*key)).and_then(Value::as_u64) == Some(1))
         .collect()
 }
@@ -83,6 +95,7 @@ fn capability_keys(
     reviewer: bool,
     subagents: bool,
     delete_chat: bool,
+    effort: bool,
 ) -> impl Iterator<Item = &'static str> {
     CAPABILITIES
         .into_iter()
@@ -100,6 +113,7 @@ fn capability_keys(
         .chain(side_chats::capabilities(reviewer))
         .chain(wakeups::capabilities(reviewer))
         .chain(subagents::capabilities(reviewer && subagents))
+        .chain((reviewer && effort).then_some(EFFORT))
 }
 
 pub(super) fn configuration_permission(
@@ -137,6 +151,7 @@ struct Submit {
     #[serde(default)]
     allow_wakeups: bool,
     operating_regime: Option<crate::OperatingRegime>,
+    effort: Option<crate::EffortPreset>,
     editor_endpoint_id: Option<BindingId>,
     #[serde(default)]
     editor_presentation: bool,
@@ -402,6 +417,7 @@ pub(super) fn handlers(
                                     &submit_sessions,
                                     request.operating_regime,
                                 )?,
+                                effort: effort(&submit_sessions, request.effort)?,
                             },
                             request.allow_wakeups,
                             request.editor_endpoint_id,

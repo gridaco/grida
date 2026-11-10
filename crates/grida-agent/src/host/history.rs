@@ -58,6 +58,8 @@ pub(crate) struct RevisionTarget {
     basis: HistoryBasis,
     anchor: ConversationAnchor,
     text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    effort: Option<EffortPreset>,
     subsequent_messages: usize,
 }
 
@@ -271,25 +273,26 @@ impl Host {
                 &message.id,
             ),
         };
-        let text = self
-            .original_text(session, turn.clone(), original, message)
+        let (text, effort) = self
+            .original_input(session, turn.clone(), original, message)
             .await?;
         Ok(RevisionTarget {
             session_revision: retained.session_revision,
             basis: retained.basis,
             anchor,
             text,
+            effort,
             subsequent_messages,
         })
     }
 
-    async fn original_text(
+    async fn original_input(
         &self,
         session: SessionId,
         turn: TurnId,
         original: &MessageId,
         visible: &Message,
-    ) -> Result<String> {
+    ) -> Result<(String, Option<EffortPreset>)> {
         for input in self.store.turn_submissions(session, turn).await? {
             if input.payload.schema().as_str() != INPUT_SCHEMA || input.payload.version() != 2 {
                 continue;
@@ -318,7 +321,7 @@ impl Host {
                 })
                 .collect();
             if !text.trim().is_empty() {
-                return Ok(text);
+                return Ok((text, stored.effort.map(|policy| policy.preset())));
             }
         }
         Err(revision_target_unavailable())
@@ -397,9 +400,10 @@ impl Host {
                 &replacement.parts,
                 replacement.configuration_permission == crate::ConfigurationPermission::Change,
             );
-            let intent = match replacement.operating_regime {
-                Some(regime) => Fingerprint::of(&(base, regime))?,
-                None => Fingerprint::of(&base)?,
+            let intent = match (replacement.operating_regime, replacement.effort) {
+                (regime, Some(effort)) => Fingerprint::of(&(base, "effort", regime, effort))?,
+                (Some(regime), None) => Fingerprint::of(&(base, regime))?,
+                (None, None) => Fingerprint::of(&base)?,
             };
             let previous = host
                 .store
@@ -408,6 +412,7 @@ impl Host {
             let new_input = previous.is_none();
             let input = if let Some(previous) = previous {
                 lifecycle::check_input(&previous.input, &replacement.parts)?;
+                InputSettings::for_input(&previous.input)?.require_effort(replacement.effort)?;
                 previous.input
             } else {
                 {

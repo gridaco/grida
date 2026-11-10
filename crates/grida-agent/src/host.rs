@@ -35,6 +35,7 @@ pub use subagents::{
 };
 pub use wakeups::{ScheduledWakeup, WakeupStatus, Wakeups};
 
+use crate::EffortPreset;
 use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
 use crate::configuration_tools::ConfigurationAccess;
 use crate::gg::GgConnection;
@@ -70,7 +71,7 @@ use agent_kit_sessions::{
 };
 use agent_kit_store_sqlite::{OperationClaim, OperationPairReceipt, SqliteStore};
 use grida_agent_master::configuration::SettingChange;
-use grida_agent_master::effort::{Policy as EffortPolicy, Preset as EffortPreset};
+use grida_agent_master::effort::Policy as EffortPolicy;
 use grida_agent_master::hooks::CompletionChecks;
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome, OperatingRegime};
 use serde::{Deserialize, Serialize};
@@ -242,6 +243,7 @@ pub struct PromptRequest {
     pub questions: bool,
     pub configuration_permission: crate::ConfigurationPermission,
     pub operating_regime: Option<OperatingRegime>,
+    pub effort: Option<EffortPreset>,
 }
 
 pub struct AcceptedRun {
@@ -1441,7 +1443,7 @@ impl Host {
             editor_presentation: false,
             operating_regime,
             subagent: None,
-            effort: self.capture_effort()?,
+            effort: self.capture_effort(request.effort.unwrap_or(self.effort))?,
         })
     }
 
@@ -1997,6 +1999,7 @@ impl Host {
         };
         lifecycle::check_input(&view.input, &request.parts)?;
         let settings = InputSettings::for_input(&view.input)?;
+        settings.require_effort(request.effort)?;
         if request
             .operating_regime
             .is_some_and(|regime| regime != settings.operating_regime)

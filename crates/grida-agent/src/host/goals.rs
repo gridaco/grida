@@ -86,6 +86,9 @@ impl Host {
         request: PromptRequest,
         goal: GoalRequest,
     ) -> Result<DurableSubmission> {
+        if request.effort == Some(EffortPreset::Ultra) {
+            return Err(problem(ErrorKind::Unsupported, "goal_effort_unavailable"));
+        }
         validate_prompt_parts(&request.parts)?;
         Goal::start(request.id.clone(), goal.objective.clone(), goal.allowance)?;
         let _admission = self.configuration_admission.lock().await;

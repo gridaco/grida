@@ -32,6 +32,8 @@ pub struct InputSettings {
     pub model: Option<agent_kit_core::ModelId>,
     #[serde(default)]
     pub operating_regime: OperatingRegime,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<EffortPreset>,
     pub max_input_tokens: Option<u64>,
     pub max_output_tokens: Option<u64>,
     #[serde(default)]
@@ -55,6 +57,13 @@ pub struct InputInspection {
 }
 
 impl InputSettings {
+    pub(super) fn require_effort(&self, selection: Option<EffortPreset>) -> Result<()> {
+        if selection.is_some_and(|selected| selected != self.effort.unwrap_or_default()) {
+            return Err(problem(ErrorKind::Conflict, "submission_effort_changed"));
+        }
+        Ok(())
+    }
+
     pub fn for_input(input: &Submission) -> Result<Self> {
         if input.payload.schema().as_str() != INPUT_SCHEMA {
             return Err(problem(
@@ -69,6 +78,7 @@ impl InputSettings {
                 Ok(Self {
                     model: stored.model,
                     operating_regime: stored.operating_regime,
+                    effort: stored.effort.map(|policy| policy.preset()),
                     max_input_tokens: stored
                         .configuration
                         .defaults

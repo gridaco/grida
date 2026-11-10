@@ -323,12 +323,12 @@ fn delegation_unavailable() -> Error {
 impl Host {
     /// Select the default product effort for new inputs on this trusted host.
     pub fn with_effort(mut self, preset: EffortPreset) -> Result<Self> {
+        self.capture_effort(preset)?;
         self.effort = preset;
-        self.capture_effort()?;
         Ok(self)
     }
 
-    pub(super) fn sponsorship_available(&self) -> bool {
+    pub(crate) fn sponsorship_available(&self) -> bool {
         self.subagents_enabled
             && self.side_context.is_none()
             && self.execution.as_ref().is_some_and(|execution| {
@@ -340,8 +340,8 @@ impl Host {
             })
     }
 
-    pub(super) fn capture_effort(&self) -> Result<Option<EffortPolicy>> {
-        if self.effort == EffortPreset::Standard {
+    pub(super) fn capture_effort(&self, preset: EffortPreset) -> Result<Option<EffortPolicy>> {
+        if preset == EffortPreset::Standard {
             return Ok(None);
         }
         if !self.sponsorship_available() {
@@ -355,7 +355,7 @@ impl Host {
             .ok_or_else(limit)?;
         let grant = delegation_selection(BindingId::new("delegation/capture")?, DELEGATE)?;
         Ok(Some(EffortPolicy::capture(
-            self.effort,
+            preset,
             standard,
             total,
             Some((&delegation_definition()?.offer()?, &grant)),
@@ -1045,12 +1045,7 @@ mod tests {
                     editor_presentation: false,
                     operating_regime: regime,
                     subagent: None,
-                    effort: host
-                        .clone()
-                        .with_effort(EffortPreset::Ultra)
-                        .unwrap()
-                        .capture_effort()
-                        .unwrap(),
+                    effort: host.capture_effort(EffortPreset::Ultra).unwrap(),
                 },
             )
             .await

@@ -4,9 +4,9 @@ use grida_agent::host::{GgOptions, Host};
 use grida_agent::mcp_client::McpClient;
 use grida_agent::process::{self, RunOptions};
 use grida_agent::{
-    CompatibleOutputLimitField, OperatingRegime, ProviderOptions, ProviderProtocol, acp, mcp,
+    CompatibleOutputLimitField, EffortPreset, OperatingRegime, ProviderOptions, ProviderProtocol,
+    acp, mcp,
 };
-use grida_agent_master::effort::Preset as EffortPreset;
 use serde_json::json;
 use std::path::PathBuf;
 use std::process::ExitCode;

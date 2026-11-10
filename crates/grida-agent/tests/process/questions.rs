@@ -494,6 +494,7 @@ async fn answer_before_a_deferred_step_suspends_keeps_its_resume_wake() {
             questions: true,
             configuration_permission: grida_agent::ConfigurationPermission::Disabled,
             operating_regime: None,
+            effort: None,
         })
         .await
         .unwrap();
