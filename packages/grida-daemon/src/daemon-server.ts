@@ -61,6 +61,8 @@ export type DaemonServerOptions = {
    */
   projects_root?: string;
   workspace_catalog?: string;
+  /** Trusted native profile exclusions, forwarded to the file and workspace routes. */
+  protected_file_roots?: ServerOptions["protected_file_roots"];
   /**
    * Host-injected dedicated root for durable binary media. This is distinct
    * from the daemon's secret/session `user_data_path` and from workspaces.
