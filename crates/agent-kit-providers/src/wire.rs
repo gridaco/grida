@@ -104,10 +104,15 @@ impl WireStream {
                     .response
                     .take()
                     .expect("non-success response is present");
-                return Incoming::Failure(
-                    InferenceStatus::Failed,
-                    read_http_error(response, self.limits.max_event_bytes).await,
-                );
+                let status = response.status;
+                let error = read_http_error(response, self.limits.max_event_bytes).await;
+                let disposition = match status {
+                    // An upstream or intermediary failure can follow dispatch.
+                    408 | 500..=599 => InferenceStatus::Interrupted,
+                    _ if error.kind == FailureKind::ContextLimit => InferenceStatus::Limited,
+                    _ => InferenceStatus::Failed,
+                };
+                return Incoming::Failure(disposition, error);
             }
             match response.body.next().await {
                 Some(Ok(bytes)) if bytes.is_empty() => {
@@ -170,11 +175,21 @@ struct ErrorBody {
 }
 
 #[derive(Deserialize)]
-struct WireError {
+pub(crate) struct WireError {
     code: Option<serde_json::Value>,
     #[serde(rename = "type")]
-    kind: Option<String>,
-    status: Option<String>,
+    kind: Option<Value>,
+    status: Option<Value>,
+}
+
+impl WireError {
+    pub(crate) fn code(&self) -> Option<&str> {
+        self.code
+            .as_ref()
+            .and_then(Value::as_str)
+            .or_else(|| self.kind.as_ref().and_then(Value::as_str))
+            .or_else(|| self.status.as_ref().and_then(Value::as_str))
+    }
 }
 
 fn receipt(id: String) -> Option<Envelope> {
@@ -198,7 +213,7 @@ pub(crate) async fn read_http_error(
     mut response: TransportResponse,
     maximum: usize,
 ) -> InferenceFailure {
-    if matches!(response.status, 401..=403) {
+    if matches!(response.status, 401 | 402) {
         return classify_error(response.status, None, response.retry_after_ms);
     }
     let mut bytes = Vec::new();
@@ -212,15 +227,7 @@ pub(crate) async fn read_http_error(
         }
     }
     let parsed: Option<ErrorBody> = serde_json::from_slice(&bytes).ok();
-    let code = parsed.as_ref().and_then(|parsed| {
-        parsed
-            .error
-            .code
-            .as_ref()
-            .and_then(Value::as_str)
-            .or(parsed.error.kind.as_deref())
-            .or(parsed.error.status.as_deref())
-    });
+    let code = parsed.as_ref().and_then(|parsed| parsed.error.code());
     classify_error(response.status, code, response.retry_after_ms)
 }
 
@@ -231,27 +238,48 @@ pub(crate) fn classify_error(
 ) -> InferenceFailure {
     let (kind, code) = match (status, code) {
         (402, _) => (FailureKind::Quota, "payment_required"),
-        (401 | 403, _)
+        (401, _) => (FailureKind::Authentication, "authentication_required"),
+        (_, Some("model_not_found")) => (FailureKind::Configuration, "model_unavailable"),
+        (403, _)
         | (
             _,
             Some(
                 "authentication_error"
                 | "permission_error"
+                | "invalid_api_key"
                 | "UNAUTHENTICATED"
                 | "PERMISSION_DENIED",
             ),
         ) => (FailureKind::Authentication, "authentication_required"),
-        (_, Some("insufficient_quota" | "billing_hard_limit_reached")) => {
-            (FailureKind::Quota, "quota_exhausted")
-        }
+        (
+            _,
+            Some(
+                "insufficient_quota"
+                | "billing_hard_limit_reached"
+                | "credit_balance_exhausted"
+                | "organization_spend_limit_exceeded"
+                | "project_spend_limit_exceeded"
+                | "organization_usage_limit_exceeded"
+                | "usage_limit_reached"
+                | "workspace_member_usage_limit_reached",
+            ),
+        ) => (FailureKind::Quota, "quota_exhausted"),
         (_, Some("context_length_exceeded")) => (FailureKind::ContextLimit, "context_limit"),
-        (429, _) | (_, Some("rate_limit_error" | "RESOURCE_EXHAUSTED")) => {
-            (FailureKind::RateLimit, "rate_limit")
-        }
-        (408 | 500..=599, _) | (_, Some("overloaded_error" | "api_error" | "UNAVAILABLE")) => {
-            (FailureKind::Transient, "provider_unavailable")
-        }
-        (400 | 404 | 422, _) | (_, Some("invalid_request_error" | "INVALID_ARGUMENT")) => {
+        (429, _)
+        | (
+            _,
+            Some("rate_limit_error" | "rate_limit_exceeded" | "slow_down" | "RESOURCE_EXHAUSTED"),
+        ) => (FailureKind::RateLimit, "rate_limit"),
+        (408 | 500..=599, _)
+        | (
+            _,
+            Some(
+                "overloaded_error" | "api_error" | "server_error" | "server_overloaded"
+                | "UNAVAILABLE",
+            ),
+        ) => (FailureKind::Transient, "provider_unavailable"),
+        (400 | 404 | 422, _)
+        | (_, Some("invalid_request_error" | "invalid_prompt" | "INVALID_ARGUMENT")) => {
             (FailureKind::Configuration, "provider_request_rejected")
         }
         _ => (FailureKind::Protocol, "provider_response_error"),

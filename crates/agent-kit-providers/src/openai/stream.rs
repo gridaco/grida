@@ -1,6 +1,6 @@
 use crate::StreamLimits;
 use crate::wire::short_identity;
-use crate::wire::{Incoming, WireStream, classify_error};
+use crate::wire::{Incoming, WireError, WireStream, classify_error};
 use crate::{StreamingTransport, TransportRequest};
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
@@ -146,10 +146,6 @@ struct CompletionDetails {
     reasoning_tokens: Option<u64>,
 }
 
-#[derive(Deserialize)]
-struct WireError {
-    code: Option<serde_json::Value>,
-}
 impl ResponseStream {
     async fn next(&mut self) -> Option<ProviderEvent> {
         loop {
@@ -199,11 +195,7 @@ impl ResponseStream {
         }
         let chunk: Chunk = serde_json::from_str(event).map_err(|_| "invalid_completion_chunk")?;
         if let Some(error) = chunk.error {
-            let failure = classify_error(
-                200,
-                error.code.as_ref().and_then(serde_json::Value::as_str),
-                None,
-            );
+            let failure = classify_error(200, error.code(), None);
             self.finish(InferenceStatus::Interrupted, Some(failure));
             return Ok(());
         }

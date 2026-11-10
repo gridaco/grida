@@ -1,5 +1,5 @@
 use super::{ItemStatus, ReplayScope, Summary, WireContent, WireItem};
-use crate::wire::{Incoming, Usage, WireStream, classify_error, short_identity};
+use crate::wire::{Incoming, Usage, WireError, WireStream, classify_error, short_identity};
 use crate::{StreamLimits, StreamingTransport, TransportRequest};
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
@@ -156,22 +156,6 @@ struct Incomplete {
 }
 
 #[derive(Deserialize)]
-struct WireError {
-    code: Option<Value>,
-    #[serde(rename = "type")]
-    kind: Option<String>,
-}
-
-impl WireError {
-    fn code(&self) -> Option<&str> {
-        self.code
-            .as_ref()
-            .and_then(Value::as_str)
-            .or(self.kind.as_deref())
-    }
-}
-
-#[derive(Deserialize)]
 struct TokenUsage {
     input_tokens: Option<u64>,
     output_tokens: Option<u64>,
@@ -260,9 +244,22 @@ impl Response {
                 self.finish(status, failure, None);
             }
             Event::Failed { response } => {
-                let error = provider_error(response.error.as_ref().and_then(WireError::code));
+                if response
+                    .status
+                    .as_deref()
+                    .is_some_and(|status| status != "failed")
+                {
+                    return Err("inconsistent_terminal_status");
+                }
+                let (status, failure) =
+                    provider_error(response.error.as_ref().and_then(WireError::code));
                 self.terminal_metadata(response.id, response.usage)?;
-                self.finish(error.0, error.1, None);
+                let status = if self.response_id.is_some() {
+                    status
+                } else {
+                    InferenceStatus::Interrupted
+                };
+                self.finish(status, failure, None);
             }
             Event::Error { error, code } => {
                 let code = code
@@ -270,6 +267,13 @@ impl Response {
                     .and_then(Value::as_str)
                     .or_else(|| error.as_ref().and_then(WireError::code));
                 let (status, failure) = provider_error(code);
+                // A stream-level error does not establish a failed response's
+                // identity or final usage.
+                let status = if status == InferenceStatus::Refused {
+                    status
+                } else {
+                    InferenceStatus::Interrupted
+                };
                 self.finish(status, failure, None);
             }
             // Finalized items contain the full arguments and encrypted state.
@@ -614,16 +618,6 @@ fn provider_error(code: Option<&str>) -> (InferenceStatus, Option<InferenceFailu
     let failure = match code {
         Some("content_filter" | "cyber_policy" | "bio_policy") => {
             return (InferenceStatus::Refused, None);
-        }
-        Some("usage_limit_reached" | "workspace_member_usage_limit_reached") => {
-            failure(FailureKind::Quota, "quota_exhausted")
-        }
-        Some("rate_limit_exceeded" | "slow_down") => failure(FailureKind::RateLimit, "rate_limit"),
-        Some("server_error" | "server_overloaded") => {
-            failure(FailureKind::Transient, "provider_unavailable")
-        }
-        Some("model_not_found" | "invalid_prompt") => {
-            failure(FailureKind::Configuration, "provider_request_rejected")
         }
         _ => classify_error(200, code, None),
     };

@@ -405,6 +405,7 @@ async fn incomplete_and_failed_streams_preserve_prefix_usage_and_classify_safe_c
         ),
         (
             json!({"type": "response.failed", "response": {
+                "id": "response_failed", "status": "failed",
                 "error": {"code": "context_length_exceeded", "message": secret},
                 "usage": {"input_tokens": 7}
             }}),
@@ -413,6 +414,7 @@ async fn incomplete_and_failed_streams_preserve_prefix_usage_and_classify_safe_c
         ),
         (
             json!({"type": "response.failed", "response": {
+                "id": "response_failed", "status": "failed",
                 "error": {"type": "usage_limit_reached", "message": secret},
                 "usage": {"input_tokens": 7}
             }}),
@@ -421,6 +423,7 @@ async fn incomplete_and_failed_streams_preserve_prefix_usage_and_classify_safe_c
         ),
         (
             json!({"type": "response.failed", "response": {
+                "id": "response_failed", "status": "failed",
                 "error": {"code": "rate_limit_exceeded", "message": secret},
                 "usage": {"input_tokens": 7}
             }}),
@@ -451,6 +454,95 @@ async fn incomplete_and_failed_streams_preserve_prefix_usage_and_classify_safe_c
         assert_eq!(outcome.usage[0].quantity, 7);
         assert!(outcome.usage[0].final_value);
         assert!(!serde_json::to_string(&outcome).unwrap().contains(secret));
+    }
+}
+
+#[tokio::test]
+async fn responses_stream_errors_without_verified_terminal_keep_the_attempt_interrupted() {
+    let private = "private-provider-diagnostic";
+    let cases = [
+        (
+            json!({"type":"error","code":"rate_limit_exceeded","message":private}),
+            "rate_limit",
+        ),
+        (
+            json!({"type":"response.failed","response":{"error":{"code":"server_error","message":private}}}),
+            "provider_unavailable",
+        ),
+        (
+            json!({"type":"response.failed","response":{"id":"response_failed","status":"completed","error":{"code":"server_error","message":private}}}),
+            "inconsistent_terminal_status",
+        ),
+    ];
+    for (terminal, code) in cases {
+        let transport = FixtureTransport::new([Ok(response(
+            [
+                text_delta("Visible prefix"),
+                call(1, "fc_1", "{}"),
+                terminal,
+            ]
+            .into_iter()
+            .map(frame),
+            true,
+        ))]);
+        let provider = adapter(transport.clone(), ResponsesEndpoint::Api, "lineage", "live");
+        let outcome = run(&provider, tool_request(), "attempt").await;
+        assert_eq!(outcome.status, InferenceStatus::Interrupted);
+        assert_eq!(outcome.failure.as_ref().unwrap().code, code);
+        assert_eq!(outcome.messages.len(), 1);
+        assert_eq!(
+            outcome.messages[0].content,
+            [Content::Text("Visible prefix".into())]
+        );
+        assert!(!serde_json::to_string(&outcome).unwrap().contains(private));
+        assert_eq!(transport.requests.lock().unwrap().len(), 1);
+    }
+}
+
+#[tokio::test]
+async fn responses_generation_preserves_http_rejection_and_dispatch_uncertainty() {
+    for (status, code, disposition, failure) in [
+        (
+            400,
+            "context_length_exceeded",
+            InferenceStatus::Limited,
+            FailureKind::ContextLimit,
+        ),
+        (
+            404,
+            "model_not_found",
+            InferenceStatus::Failed,
+            FailureKind::Configuration,
+        ),
+        (
+            429,
+            "credit_balance_exhausted",
+            InferenceStatus::Failed,
+            FailureKind::Quota,
+        ),
+        (
+            503,
+            "server_overloaded",
+            InferenceStatus::Interrupted,
+            FailureKind::Transient,
+        ),
+    ] {
+        let mut reply = response(
+            [serde_json::to_vec(&json!({"error":{"code":code}})).unwrap()],
+            false,
+        );
+        reply.status = status;
+        reply.retry_after_ms = Some(500);
+        let transport = FixtureTransport::new([Ok(reply)]);
+        let provider = adapter(transport.clone(), ResponsesEndpoint::Api, "lineage", "live");
+        let outcome = run(&provider, request(), "attempt").await;
+        assert_eq!(outcome.status, disposition);
+        let error = outcome.failure.unwrap();
+        assert_eq!(error.kind, failure);
+        assert_eq!(error.retry_after_ms, Some(500));
+        let requests = transport.requests.lock().unwrap();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].0.operation, TransportOperation::OpenAiResponses);
     }
 }
 

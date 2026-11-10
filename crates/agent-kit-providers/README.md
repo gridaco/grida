@@ -32,6 +32,12 @@ settings change. The host owns endpoint discovery, credential custody, model
 selection, and funding. Request bodies have no debug projection. Failures
 expose a classification and a fixed code.
 
+Inference distinguishes a transport failure known to precede dispatch from an
+interrupted attempt. HTTP timeouts and server errors preserve dispatch
+uncertainty. Recognized provider codes distinguish unavailable models, quota,
+rate limits, and context limits. An HTTP retry delay is advisory. Each adapter
+issues a single transport request per inference attempt.
+
 ## Model requests and streams
 
 The shared SSE framer handles fragmented bytes and UTF-8. Each adapter bounds
@@ -83,7 +89,9 @@ completed encrypted reasoning in the provider-state envelope for replay. When a
 stream ends without verified completion, the visible prefix and available
 usage survive without publishing a tool call from that stream. Stopping the
 local reader closes its stream. Remote execution and charges follow the
-provider's contract.
+provider's contract. An identified `response.failed` can report a terminal
+failure. A general `error` event can classify the fault while leaving the
+attempt interrupted. [Responses streaming events](https://developers.openai.com/api/reference/resources/responses/streaming-events)
 
 The Responses API profile can measure the prepared input before generation.
 It sends the same model, input items, instructions, tool definitions, and

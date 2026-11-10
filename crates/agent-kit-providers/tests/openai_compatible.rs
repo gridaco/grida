@@ -597,6 +597,162 @@ async fn transport_failure_retains_dispatch_certainty() {
 }
 
 #[tokio::test]
+async fn http_failures_distinguish_quota_model_rejections_and_dispatch_uncertainty() {
+    use FailureKind::{Authentication, Configuration, ContextLimit, Quota, RateLimit, Transient};
+    use InferenceStatus::{Failed, Interrupted, Limited};
+    for (status, provider_code, disposition, kind, safe_code) in [
+        (
+            401,
+            "model_not_found",
+            Failed,
+            Authentication,
+            "authentication_required",
+        ),
+        (
+            403,
+            "model_not_found",
+            Failed,
+            Configuration,
+            "model_unavailable",
+        ),
+        (
+            404,
+            "unknown_route",
+            Failed,
+            Configuration,
+            "provider_request_rejected",
+        ),
+        (
+            400,
+            "context_length_exceeded",
+            Limited,
+            ContextLimit,
+            "context_limit",
+        ),
+        (
+            429,
+            "credit_balance_exhausted",
+            Failed,
+            Quota,
+            "quota_exhausted",
+        ),
+        (
+            429,
+            "organization_spend_limit_exceeded",
+            Failed,
+            Quota,
+            "quota_exhausted",
+        ),
+        (
+            429,
+            "project_spend_limit_exceeded",
+            Failed,
+            Quota,
+            "quota_exhausted",
+        ),
+        (
+            429,
+            "organization_usage_limit_exceeded",
+            Failed,
+            Quota,
+            "quota_exhausted",
+        ),
+        (429, "slow_down", Failed, RateLimit, "rate_limit"),
+        (
+            408,
+            "timeout",
+            Interrupted,
+            Transient,
+            "provider_unavailable",
+        ),
+        (
+            504,
+            "gateway_timeout",
+            Interrupted,
+            Transient,
+            "provider_unavailable",
+        ),
+    ] {
+        let mut reply = response(
+            [serde_json::to_vec(
+                &json!({"error":{"code":provider_code,"message":"private diagnostic"}}),
+            )
+            .unwrap()],
+            false,
+        );
+        reply.status = status;
+        reply.request_id = Some("fixture-request".into());
+        reply.retry_after_ms = Some(250);
+        let transport = FixtureTransport::new([Ok(reply)]);
+        let outcome = execute(&adapter(transport.clone()), request(), "http-failure").await;
+        assert_eq!(outcome.status, disposition, "{status} {provider_code}");
+        assert!(outcome.messages.is_empty());
+        assert_eq!(
+            outcome.receipt.as_ref().unwrap().bytes(),
+            b"fixture-request"
+        );
+        assert!(
+            !serde_json::to_string(&outcome)
+                .unwrap()
+                .contains("private diagnostic")
+        );
+        let error = outcome.failure.unwrap();
+        assert_eq!(
+            (error.kind, error.code.as_str(), error.retry_after_ms),
+            (kind, safe_code, Some(250))
+        );
+        assert_eq!(transport.requests.lock().unwrap().len(), 1);
+    }
+}
+
+#[tokio::test]
+async fn streamed_error_preserves_partial_text_and_only_previously_completed_calls() {
+    for (error, kind, code, completed) in [
+        (
+            json!({"type":"rate_limit_error"}),
+            FailureKind::RateLimit,
+            "rate_limit",
+            false,
+        ),
+        (
+            json!({"code":"invalid_api_key"}),
+            FailureKind::Authentication,
+            "authentication_required",
+            true,
+        ),
+    ] {
+        let mut frames = vec![
+            choice(json!({"content":"Visible prefix"}), None),
+            choice(
+                json!({"tool_calls":[{"index":0,"id":"call","type":"function","function":{"name":"echo","arguments":"{}"}}]}),
+                None,
+            ),
+        ];
+        if completed {
+            frames.push(choice(json!({}), Some("tool_calls")));
+        }
+        frames.push(frame(json!({"error":error})));
+        let transport = FixtureTransport::new([Ok(response(frames, false))]);
+        let outcome = execute(
+            &adapter(transport.clone()),
+            tool_request(),
+            "streamed-error",
+        )
+        .await;
+        assert_eq!(outcome.status, InferenceStatus::Interrupted);
+        let content = &outcome.messages[0].content;
+        assert_eq!(content[0], Content::Text("Visible prefix".into()));
+        assert_eq!(content.len(), 1 + usize::from(completed));
+        if completed {
+            assert!(matches!(&content[1], Content::ToolCall(call) if call.tool.as_str() == "echo"));
+        }
+        let error = outcome.failure.unwrap();
+        assert_eq!((error.kind, error.code.as_str()), (kind, code));
+        assert_eq!(transport.requests.lock().unwrap().len(), 1);
+    }
+}
+
+#[tokio::test]
 async fn event_limit_preserves_valid_prefix_even_within_one_chunk() {
     let mut body = choice(json!({ "content": "prefix" }), None);
     body.extend_from_slice(b"data: ");
