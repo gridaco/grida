@@ -8,6 +8,7 @@ import {
   buildNativeAgentArtifacts,
   stageNativeAgent,
   verifyNativeAgent,
+  verifyNativeAgentRuntime,
 } from "./scripts/native-agent-package.mjs";
 
 const { fixtureBinary } = (await import(
@@ -96,6 +97,28 @@ describe("Desktop native agent package", () => {
       close: () => fs.rmSync(root, { recursive: true, force: true }),
     };
   }
+
+  it("statically verifies foreign packages without executing their binary", async () => {
+    const platform = process.platform === "linux" ? "darwin" : "linux";
+    const arch = "x64";
+    const fixture = stage(platform, arch);
+    try {
+      stageNativeAgent(fixture.resources, fixture.artifacts, platform, arch);
+      await expect(
+        verifyNativeAgentRuntime(fixture.resources, platform, arch)
+      ).resolves.toBe(false);
+      fs.unlinkSync(
+        path.join(fixture.resources, "native-agent", "agent-kit-sandbox-helper")
+      );
+      await expect(
+        verifyNativeAgentRuntime(fixture.resources, platform, arch)
+      ).rejects.toThrow(
+        "Native agent resource contents do not match the target"
+      );
+    } finally {
+      fixture.close();
+    }
+  });
 
   it.each([
     ["darwin", "arm64"],

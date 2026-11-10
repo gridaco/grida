@@ -1,7 +1,8 @@
 // GRIDA-SEC-004 — package the fixed native executables outside app.asar.
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 // The shared binary-format check runs in Node's packaging program.
@@ -11,6 +12,8 @@ const { binaryHeader } = await import(
 
 const DIRECTORY = "native-agent";
 const MAX_BINARY_BYTES = 128 * 1024 * 1024;
+const MAX_SMOKE_OUTPUT_BYTES = 64 * 1024;
+const SMOKE_TIMEOUT_MS = 5000;
 const workspace = fileURLToPath(new URL("../../", import.meta.url));
 const rustTargets = {
   "darwin-arm64": "aarch64-apple-darwin",
@@ -183,6 +186,181 @@ export function verifyNativeAgent(resources, os, cpu) {
   for (const name of names) {
     readExecutable(path.join(directory, name), os, cpu, true);
   }
+  return path.resolve(directory, names[0]);
+}
+
+/** Verify the installed entrypoint and observational reopen on its native target. */
+export async function verifyNativeAgentRuntime(resources, platform, arch) {
+  const executable = verifyNativeAgent(resources, platform, arch);
+  if (platform !== process.platform || arch !== process.arch) return false;
+
+  const root = fs.mkdtempSync(
+    path.join(fs.realpathSync.native(os.tmpdir()), "grida-native-smoke-")
+  );
+  try {
+    if (process.platform !== "win32") {
+      const directory = fs.lstatSync(root);
+      assert(
+        directory.isDirectory() &&
+          directory.uid === process.getuid() &&
+          (directory.mode & 0o777) === 0o700,
+        "Native agent smoke directory must be private"
+      );
+    }
+    const cwd = path.join(root, "workspace");
+    fs.mkdirSync(cwd, { mode: 0o700 });
+    const state = path.join(root, "state");
+    const initialize = {
+      method: "initialize",
+      params: { protocolVersion: 1 },
+      check: (result) =>
+        result?.protocolVersion === 1 &&
+        result.agentCapabilities?.loadSession === true,
+    };
+    const [, session] = await smokeProcess(executable, root, cwd, state, [
+      initialize,
+      {
+        method: "session/new",
+        params: { cwd, mcpServers: [] },
+        check: (result) =>
+          typeof result?.sessionId === "string" &&
+          /^[a-zA-Z0-9_-]{1,128}$/.test(result.sessionId),
+      },
+    ]);
+    await smokeProcess(executable, root, cwd, state, [
+      initialize,
+      {
+        method: "session/list",
+        params: { cwd },
+        check: (result) =>
+          result?.sessions?.length === 1 &&
+          result.sessions[0]?.sessionId === session.sessionId,
+      },
+      {
+        method: "session/load",
+        params: { cwd, mcpServers: [], sessionId: session.sessionId },
+        check: (result) => result !== null && typeof result === "object",
+      },
+    ]);
+    return true;
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function smokeProcess(executable, root, cwd, state, requests) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      [
+        "serve",
+        "--stdio",
+        "--state-dir",
+        state,
+        "--endpoint",
+        "http://127.0.0.1:1/v1",
+        "--model",
+        "packaged-smoke",
+      ],
+      {
+        cwd,
+        env: {
+          HOME: root,
+          TMPDIR: root,
+          ...(process.platform === "win32" && {
+            SystemRoot: process.env.SystemRoot,
+            USERPROFILE: root,
+            APPDATA: root,
+            LOCALAPPDATA: root,
+            TEMP: root,
+            TMP: root,
+          }),
+        },
+        shell: false,
+        stdio: "pipe",
+        windowsHide: true,
+      }
+    );
+    const results = [];
+    let pending = Buffer.alloc(0);
+    let outputBytes = 0;
+    let failure;
+    const deadline = setTimeout(
+      () => stop("Packaged native agent did not finish before its deadline"),
+      SMOKE_TIMEOUT_MS
+    );
+    function stop(message) {
+      if (failure) return;
+      failure = new Error(message);
+      child.kill("SIGKILL");
+      child.stdin.destroy();
+      child.stdout.destroy();
+      child.stderr.destroy();
+    }
+    function withinOutputLimit(chunk) {
+      outputBytes += chunk.length;
+      if (outputBytes > MAX_SMOKE_OUTPUT_BYTES)
+        stop("Packaged native agent exceeded its output limit");
+      return !failure;
+    }
+    function send() {
+      const request = requests[results.length];
+      if (!request) return child.stdin.end();
+      const { method, params } = request;
+      const frame = { jsonrpc: "2.0", id: results.length + 1, method, params };
+      child.stdin.write(`${JSON.stringify(frame)}\n`);
+    }
+
+    child.once("spawn", send);
+    child.on("error", () => stop("Could not launch the packaged native agent"));
+    child.stdin.on("error", () =>
+      stop("Packaged native agent closed its input")
+    );
+    child.stdout.on("data", (chunk) => {
+      if (!withinOutputLimit(chunk)) return;
+      pending = Buffer.concat([pending, chunk]);
+      const newline = pending.indexOf(10);
+      if (newline === -1) return;
+      const request = requests[results.length];
+      try {
+        const frame = JSON.parse(
+          new TextDecoder("utf-8", { fatal: true }).decode(
+            pending.subarray(0, newline)
+          )
+        );
+        assert.equal(newline + 1, pending.length);
+        assert.equal(frame.jsonrpc, "2.0");
+        assert.equal(frame.id, results.length + 1);
+        assert.ok(
+          request &&
+            !Object.hasOwn(frame, "error") &&
+            request.check(frame.result)
+        );
+        pending = Buffer.alloc(0);
+        results.push(frame.result);
+        send();
+      } catch {
+        stop(
+          `Packaged native agent returned an invalid ${request?.method ?? "extra"} reply`
+        );
+      }
+    });
+    child.stderr.on("data", withinOutputLimit);
+    child.once("close", (code, signal) => {
+      clearTimeout(deadline);
+      if (failure) return reject(failure);
+      if (
+        code !== 0 ||
+        signal ||
+        results.length !== requests.length ||
+        pending.length
+      )
+        return reject(
+          new Error("Packaged native agent did not exit cleanly after ACP EOF")
+        );
+      resolve(results);
+    });
+  });
 }
 
 if (

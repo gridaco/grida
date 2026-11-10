@@ -22,7 +22,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { verifyNativeAgent } from "./native-agent-package.mjs";
+import { verifyNativeAgentRuntime } from "./native-agent-package.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -104,8 +104,16 @@ if (!asar || !fs.existsSync(asar)) {
 }
 
 if (process.argv[3] === "--native-agent") {
-  verifyNativeAgent(path.dirname(asar), process.argv[4], process.argv[5]);
+  const ran = await verifyNativeAgentRuntime(
+    path.dirname(asar),
+    process.argv[4],
+    process.argv[5]
+  );
   console.log("✔ packaged native agent executables verified.");
+  if (ran)
+    console.log(
+      "✔ packaged native agent ACP startup, reopen and EOF verified."
+    );
 }
 
 // Extract the asar so we can resolve modules against the packaged tree

@@ -8,7 +8,9 @@ name: Verify Desktop Package
 # `electron-forge package` step runs the GRIDA-DESKTOP-BUILD-GUARD oracle
 # (desktop/scripts/verify-packaged-bundle.mjs, a postPackage hook) which fails
 # the build if the packaged app would crash on launch with "Cannot find module"
-# or ship packages outside the runtime closure. No signing/secrets required.
+# or ship packages outside the runtime closure. The same-target native binary
+# must also start, reopen a disposable ACP session, and close cleanly on EOF.
+# No signing/secrets required.
 on:
   pull_request:
     paths:
