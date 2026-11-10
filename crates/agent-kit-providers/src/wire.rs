@@ -1,15 +1,17 @@
 use crate::sse::Decoder;
 use crate::{
-    StreamLimits, StreamingTransport, TransportFailure, TransportRequest, TransportResponse,
+    InputImageResolver, StreamLimits, StreamingTransport, TransportFailure, TransportRequest,
+    TransportResponse,
 };
 use agent_kit_core::inference::{
     DispatchEvidence, FailureKind, InferenceControl, InferenceFailure, InferenceStatus,
     InferenceUpdate, MeasurementKind, Modality, ModelCapabilities, ProviderEvent, UsageObservation,
 };
-use agent_kit_core::messages::{ResultContent, ToolResult};
+use agent_kit_core::messages::{MediaRef, ResultContent, ToolResult};
 use agent_kit_core::{
     AttemptId, Envelope, Error, ErrorKind, Fingerprint, Result, SchemaId, ToolId,
 };
+use base64::{Engine, engine::general_purpose::STANDARD};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -354,6 +356,30 @@ pub(crate) fn text_profile(profile: &ModelCapabilities) -> bool {
     profile.input_modalities.len() == 1
         && profile.input_modalities.contains(&Modality::Text)
         && !profile.text_tools
+}
+
+pub(crate) fn image_profile(profile: &ModelCapabilities) -> bool {
+    profile.input_modalities.len() == 2
+        && profile.input_modalities.contains(&Modality::Text)
+        && profile.input_modalities.contains(&Modality::Image)
+        && !profile.text_tools
+}
+
+pub(crate) fn image_data_url(
+    media: &MediaRef,
+    resolver: Option<&InputImageResolver>,
+    remaining: &mut usize,
+) -> Result<String> {
+    let mut url = format!("data:{};base64,", media.media_type);
+    if let Some(resolver) = resolver {
+        let bytes = resolver(media, *remaining)?;
+        if bytes.is_empty() || bytes.len() > *remaining {
+            return Err(Error::new(ErrorKind::LimitExceeded, "request_byte_limit"));
+        }
+        *remaining -= bytes.len();
+        STANDARD.encode_string(&bytes, &mut url);
+    }
+    Ok(url)
 }
 
 pub(crate) fn tool_result(result: &ToolResult) -> Result<Value> {

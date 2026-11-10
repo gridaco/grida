@@ -87,6 +87,10 @@ impl CapturedCredential {
         }
     }
 
+    pub(crate) fn is_stored_for(&self, provider: &str) -> bool {
+        matches!(self.source.as_ref(), Lookup::Stored { provider: id, .. } if id == provider)
+    }
+
     /// Call at startup with the owned private state directory and a lineage
     /// that identifies the approved endpoint, model and credential source.
     pub(crate) fn replay_binding(

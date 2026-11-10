@@ -1,7 +1,11 @@
 mod stream;
 
-use crate::wire::{function_name, short_identity, text_profile, tool_result};
-use crate::{StreamLimits, StreamingTransport, TransportOperation, TransportRequest};
+use crate::wire::{
+    function_name, image_data_url, image_profile, short_identity, text_profile, tool_result,
+};
+use crate::{
+    InputImageResolver, StreamLimits, StreamingTransport, TransportOperation, TransportRequest,
+};
 use agent_kit_core::inference::{
     InferenceControl, InferenceRequest, InferenceRun, InputFormat, ModelCapabilities,
     PreparedRequest, Provider, ProviderBinding,
@@ -31,6 +35,7 @@ pub struct OpenAiCompatible {
     models: BTreeMap<ModelId, ModelProfile>,
     transport: Arc<dyn StreamingTransport>,
     limits: StreamLimits,
+    images: Option<Arc<InputImageResolver>>,
 }
 
 impl OpenAiCompatible {
@@ -40,11 +45,23 @@ impl OpenAiCompatible {
         transport: Arc<dyn StreamingTransport>,
         limits: StreamLimits,
     ) -> Result<Self> {
+        Self::with_image_resolver(binding, models, transport, limits, None)
+    }
+
+    /// Enable inline PNG input only on model profiles that explicitly declare it.
+    pub fn with_image_resolver(
+        binding: ProviderBinding,
+        models: BTreeMap<ModelId, ModelProfile>,
+        transport: Arc<dyn StreamingTransport>,
+        limits: StreamLimits,
+        images: Option<Arc<InputImageResolver>>,
+    ) -> Result<Self> {
         limits.validate()?;
         if models.is_empty()
-            || !models
-                .values()
-                .all(|model| text_profile(&model.capabilities))
+            || models.values().any(|model| {
+                !(text_profile(&model.capabilities)
+                    || (images.is_some() && image_profile(&model.capabilities)))
+            })
         {
             return Err(Error::new(
                 ErrorKind::Unsupported,
@@ -56,6 +73,7 @@ impl OpenAiCompatible {
             models,
             transport,
             limits,
+            images,
         })
     }
 
@@ -65,7 +83,12 @@ impl OpenAiCompatible {
             .ok_or_else(|| Error::new(ErrorKind::Unsupported, "model_unavailable"))
     }
 
-    fn encode(&self, request: &InferenceRequest, model: &ModelProfile) -> Result<EncodedRequest> {
+    fn encode(
+        &self,
+        request: &InferenceRequest,
+        model: &ModelProfile,
+        resolve_images: bool,
+    ) -> Result<EncodedRequest> {
         if request.extension.is_some() {
             return Err(Error::new(
                 ErrorKind::Unsupported,
@@ -73,8 +96,23 @@ impl OpenAiCompatible {
             ));
         }
         let mut messages = Vec::new();
+        let mut remaining_images = self.limits.max_request_bytes / 4 * 3;
         for message in &request.messages {
-            lower_message(message, model.capabilities.json_tools, &mut messages)?;
+            if message.role == Role::User
+                && message
+                    .content
+                    .iter()
+                    .any(|part| matches!(part, Content::Media(_)))
+            {
+                let resolver = self.images.as_deref().ok_or_else(unsupported_image)?;
+                messages.push(lower_image_message(
+                    message,
+                    resolve_images.then_some(resolver),
+                    &mut remaining_images,
+                )?);
+            } else {
+                lower_message(message, model.capabilities.json_tools, &mut messages)?;
+            }
         }
         let mut names = BTreeMap::new();
         let mut tools = Vec::new();
@@ -127,7 +165,7 @@ impl Provider for OpenAiCompatible {
     fn prepare(&self, request: InferenceRequest) -> Result<PreparedRequest> {
         let profile = self.model(&request.model)?;
         request.validate(&profile.capabilities)?;
-        self.encode(&request, profile)?;
+        self.encode(&request, profile, false)?;
         PreparedRequest::from_validated(request, self.binding.clone(), profile.capabilities.clone())
     }
 
@@ -139,7 +177,7 @@ impl Provider for OpenAiCompatible {
                 "prepared_provider_binding_changed",
             ));
         }
-        let encoded = self.encode(request.request(), profile)?;
+        let encoded = self.encode(request.request(), profile, true)?;
         let transport = Arc::clone(&self.transport);
         let limits = self.limits;
         let request = TransportRequest {
@@ -166,6 +204,30 @@ impl Provider for OpenAiCompatible {
 struct EncodedRequest {
     body: Vec<u8>,
     names: BTreeMap<String, ToolId>,
+}
+
+fn lower_image_message(
+    message: &Message,
+    resolver: Option<&InputImageResolver>,
+    remaining: &mut usize,
+) -> Result<Value> {
+    let content = message
+        .content
+        .iter()
+        .map(|part| match part {
+            Content::Text(text) => Ok(json!({ "type": "text", "text": text })),
+            Content::Media(media) if media.media_type == "image/png" => {
+                let url = image_data_url(media, resolver, remaining)?;
+                Ok(json!({ "type": "image_url", "image_url": { "url": url } }))
+            }
+            _ => Err(unsupported_image()),
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(json!({ "role": "user", "content": content }))
+}
+
+fn unsupported_image() -> Error {
+    Error::new(ErrorKind::Unsupported, "unsupported_compatible_input_image")
 }
 
 fn lower_message(message: &Message, tools_supported: bool, output: &mut Vec<Value>) -> Result<()> {

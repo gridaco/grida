@@ -2380,18 +2380,32 @@ impl Execution {
         let configuration = transport.selection();
         let binding = transport.binding().clone();
         let mut capabilities = text_capabilities(options.protocol.as_str())?;
-        let images = if cfg!(any(target_os = "macos", target_os = "linux"))
-            && options.protocol == ProviderProtocol::Responses
+        let image_profile = if options.protocol == ProviderProtocol::Responses
             && options.model.as_str() == "gpt-5.4"
         {
-            capabilities.revision = BindingId::new("responses-image-tools-v1")?;
+            Some("responses-image-tools-v1")
+        } else if transport.accepts_compatible_png(&options.model) {
+            Some("openrouter-png-tools-v1")
+        } else {
+            None
+        };
+        let images = if let Some(profile) =
+            image_profile.filter(|_| cfg!(any(target_os = "macos", target_os = "linux")))
+        {
+            capabilities.revision = BindingId::new(profile)?;
             capabilities.input_modalities.insert(Modality::Image);
             Some(Arc::new(images::Images::open(state_dir)?))
         } else {
             None
         };
+        let image_resolver = images.as_ref().map(|images| {
+            let images = images.clone();
+            Arc::new(move |media: &agent_kit_core::messages::MediaRef, maximum| {
+                images.resolve(media, maximum)
+            }) as Arc<agent_kit_providers::InputImageResolver>
+        });
         let provider: Arc<dyn Provider> = match options.protocol {
-            ProviderProtocol::OpenAiCompatible => Arc::new(OpenAiCompatible::new(
+            ProviderProtocol::OpenAiCompatible => Arc::new(OpenAiCompatible::with_image_resolver(
                 binding.clone(),
                 BTreeMap::from([(
                     options.model.clone(),
@@ -2408,6 +2422,7 @@ impl Execution {
                 )]),
                 transport.clone(),
                 PROVIDER_LIMITS,
+                image_resolver,
             )?),
             ProviderProtocol::Anthropic => Arc::new(Anthropic::new(
                 binding.clone(),
@@ -2431,12 +2446,7 @@ impl Execution {
                 )]),
                 transport.clone(),
                 PROVIDER_LIMITS,
-                images.as_ref().map(|images| {
-                    let images = images.clone();
-                    Arc::new(move |media: &agent_kit_core::messages::MediaRef, maximum| {
-                        images.resolve(media, maximum)
-                    }) as Arc<agent_kit_providers::InputImageResolver>
-                }),
+                image_resolver,
             )?),
             ProviderProtocol::Gemini => Arc::new(Gemini::new(
                 binding.clone(),

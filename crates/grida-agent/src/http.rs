@@ -219,6 +219,16 @@ impl HttpTransport {
         responses_context_window(&self.target, model)
     }
 
+    pub(crate) fn accepts_compatible_png(&self, model: &ModelId) -> bool {
+        self.protocol == ProviderProtocol::OpenAiCompatible
+            && self.target.as_str() == "https://openrouter.ai/api/v1/chat/completions"
+            && self
+                .credential
+                .as_ref()
+                .is_some_and(|credential| credential.is_stored_for("openrouter"))
+            && openrouter_png_model(model)
+    }
+
     pub async fn validate_credential(&self) -> Result<()> {
         if let Some(credential) = &self.credential {
             credential.validate().await?;
@@ -261,6 +271,21 @@ fn responses_context_window(target: &Url, model: &ModelId) -> Option<NonZeroU64>
             .expect("generated model context facts")
     });
     facts.windows.get(model.as_str()).copied()
+}
+
+fn openrouter_png_model(model: &ModelId) -> bool {
+    #[derive(serde::Deserialize)]
+    struct Facts {
+        models: Vec<ModelId>,
+    }
+    static FACTS: OnceLock<Facts> = OnceLock::new();
+    FACTS
+        .get_or_init(|| {
+            serde_json::from_str(include_str!("../data/openrouter-png-models.json"))
+                .expect("generated OpenRouter PNG binding facts")
+        })
+        .models
+        .contains(model)
 }
 
 impl StreamingTransport for HttpTransport {

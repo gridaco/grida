@@ -16,6 +16,7 @@ use agent_kit_providers::{
 };
 use serde_json::{Value, json};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use support::{
     FixtureTransport, control, frame, limits, message, offer, request, response, tool_request,
@@ -297,6 +298,90 @@ fn unsupported_inputs_and_request_bounds_fail_before_dispatch() {
         ErrorKind::Unsupported
     );
     assert!(transport.requests.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn compatible_png_resolves_only_on_dispatch_and_keeps_order_and_bounds() {
+    let transport = FixtureTransport::new([Ok(response(text_response("image"), false))]);
+    let mut profile = profile();
+    profile
+        .capabilities
+        .input_modalities
+        .insert(Modality::Image);
+    let png = MediaRef {
+        id: ArtifactId::new("image").unwrap(),
+        media_type: "image/png".into(),
+        locator: "private-locator".into(),
+        access_scope: BindingId::new("media").unwrap(),
+        retention: Retention::Retained,
+    };
+    let mut input = request();
+    input.messages[0].content = vec![
+        Content::Text("Before".into()),
+        Content::Media(png.clone()),
+        Content::Text("After".into()),
+    ];
+    let reads = Arc::new(AtomicUsize::new(0));
+    let count = reads.clone();
+    let provider = OpenAiCompatible::with_image_resolver(
+        binding(),
+        [(ModelId::new("model").unwrap(), profile)].into(),
+        transport.clone(),
+        StreamLimits {
+            max_request_bytes: 512,
+            ..limits()
+        },
+        Some(Arc::new(move |media, limit| {
+            assert_eq!(media, &png);
+            assert_eq!(limit, 384);
+            if count.fetch_add(1, Ordering::Relaxed) == 0 {
+                Ok(vec![0x89, b'P', b'N', b'G'])
+            } else {
+                Ok(vec![0; limit + 1])
+            }
+        })),
+    )
+    .unwrap();
+    let mut wrong_mime = input.clone();
+    let Content::Media(media) = &mut wrong_mime.messages[0].content[1] else {
+        panic!("fixture requires media");
+    };
+    media.media_type = "image/jpeg".into();
+    assert_eq!(
+        provider.prepare(wrong_mime).unwrap_err().code,
+        "unsupported_compatible_input_image"
+    );
+    let prepared = provider.prepare(input).unwrap();
+    assert_eq!(reads.load(Ordering::Relaxed), 0);
+    let outcome = provider
+        .start(prepared.clone(), control("image"))
+        .unwrap()
+        .finish()
+        .await;
+    assert_eq!(outcome.status, InferenceStatus::Completed);
+    let Err(error) = provider.start(prepared, control("oversized-image")) else {
+        panic!("oversized bytes must stop dispatch");
+    };
+    assert_eq!(error.kind, ErrorKind::LimitExceeded);
+    assert_eq!(reads.load(Ordering::Relaxed), 2);
+    let requests = transport.requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    let body: Value = serde_json::from_slice(&requests[0].0.body).unwrap();
+    assert_eq!(
+        body["messages"][0],
+        json!({"role":"user","content":[
+            {"type":"text","text":"Before"},
+            {"type":"image_url","image_url":{"url":"data:image/png;base64,iVBORw=="}},
+            {"type":"text","text":"After"}
+        ]})
+    );
+    assert!(
+        !requests[0]
+            .0
+            .body
+            .windows(15)
+            .any(|bytes| bytes == b"private-locator")
+    );
 }
 
 #[test]

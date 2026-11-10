@@ -41,6 +41,10 @@ vi.mock("./agent-sidecar-supervisor", () => sidecar);
 vi.mock("./agent-sidecar-client", () => ({ agentSidecarClient: sidecar }));
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
+const PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPg/88AAAIvAQ+3s0AMAAAAAElFTkSuQmCC";
+const OTHER_PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z88AAAMfAQ+5sXHtAAAAAElFTkSuQmCC";
 
 beforeEach(() => vi.resetModules());
 
@@ -56,27 +60,52 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
     selection: {
       kind: "byok",
       id: "openrouter",
+      model: "openai/gpt-5.6-terra",
+    } as const,
+    endpoint: "https://openrouter.ai/api/v1",
+    model: "openai/gpt-5.6-terra",
+    unavailable: "native_provider_byok_key_missing",
+    png: true,
+  },
+  {
+    selection: {
+      kind: "byok",
+      id: "openrouter",
       model: "openai/gpt-5.5",
     } as const,
     endpoint: "https://openrouter.ai/api/v1",
     model: "openai/gpt-5.5",
     unavailable: "native_provider_byok_key_missing",
+    png: false,
   },
   {
-    selection: { kind: "byok", id: "vercel", model: "openai/gpt-5.5" } as const,
+    selection: {
+      kind: "byok",
+      id: "vercel",
+      model: "openai/gpt-5.6-terra",
+    } as const,
     endpoint: "https://ai-gateway.vercel.sh/v1",
-    model: "openai/gpt-5.5",
+    model: "openai/gpt-5.6-terra",
     unavailable: "native_provider_byok_key_missing",
+    png: false,
   },
   {
     selection: { kind: "endpoint", id: "local" } as const,
     endpoint: "http://127.0.0.1:11434/v1",
-    model: "fixture-model",
+    model: "openai/gpt-5.6-terra",
     unavailable: "native_provider_endpoint_not_approved",
+    png: false,
+  },
+  {
+    selection: { kind: "endpoint", id: "local" } as const,
+    endpoint: "https://openrouter.ai/api/v1",
+    model: "openai/gpt-5.6-terra",
+    unavailable: "native_provider_endpoint_not_approved",
+    png: false,
   },
 ])(
-  "starts the exact $selection.id profile through Desktop and refuses an unavailable selection",
-  async ({ selection, endpoint, model, unavailable }) => {
+  "starts $selection.kind/$model at $endpoint with exact credential and PNG capability $png",
+  async ({ selection, endpoint, model, unavailable, png }) => {
     const base = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-native-provider-launch-")
     );
@@ -159,12 +188,28 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
 
       await agent.ensure(workspace.id);
       const chat = agent.current(workspace.id)!.chat;
+      expect(chat.acceptsPng).toBe(png);
       const session = await chat.create();
-      const submitted = await chat.submit(
-        session,
-        "selected-provider",
-        "Hello."
-      );
+      const input = {
+        action: "submit",
+        inputId: "selected-provider",
+        text: "Hello.",
+        png: Uint8Array.from(Buffer.from(PNG, "base64")).buffer,
+        operatingRegime: "act",
+      };
+      const submitText = async () => {
+        await expect(chat.submitImage(session, input)).rejects.toThrow(
+          "image_input_unavailable"
+        );
+        await expect(chat.inputReceipt(session, input.inputId)).rejects.toThrow(
+          "input_unavailable"
+        );
+        expect(dispatch).not.toHaveBeenCalled();
+        return chat.submit(session, input.inputId, input.text);
+      };
+      const submitted = await (png
+        ? chat.submitImage(session, input)
+        : submitText());
       await vi.waitFor(
         async () => {
           expect((await chat.observe(session)).latest).toMatchObject({
@@ -174,7 +219,38 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
         },
         { timeout: 5000 }
       );
+      const verifyImageReceipt = async () => {
+        const retained = await chat.inputReceipt(session, input.inputId);
+        expect(retained.turnId).toBe(submitted.turnId);
+        expect(await chat.submitImage(session, input)).toEqual(retained);
+        await expect(
+          chat.submitImage(session, {
+            ...input,
+            png: Uint8Array.from(Buffer.from(OTHER_PNG, "base64")).buffer,
+          })
+        ).rejects.toThrow("submission_input_changed");
+      };
+      if (png) await verifyImageReceipt();
       expect(dispatch).toHaveBeenCalledTimes(1);
+      const body = JSON.parse(dispatch.mock.calls[0][0].toString());
+      expect(
+        body.messages.filter(
+          (message: { role: string }) => message.role === "user"
+        )
+      ).toEqual([
+        {
+          role: "user",
+          content: png
+            ? [
+                { type: "text", text: input.text },
+                {
+                  type: "image_url",
+                  image_url: { url: `data:image/png;base64,${PNG}` },
+                },
+              ]
+            : input.text,
+        },
+      ]);
       expect(prepare.mock.calls[0][0]).toBe(`${endpoint}/chat/completions`);
       expect(prepare.mock.calls[0][1].get("authorization")).toBe(
         selection.kind === "byok" ? `Bearer ${key}` : null

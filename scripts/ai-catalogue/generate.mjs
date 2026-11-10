@@ -194,6 +194,23 @@ if (bundle) {
       windows: Object.fromEntries([...responseWindows].sort()),
     })
   );
+  // Pin the exact compatible model reviewed for PNG transport.
+  const openRouterPng = "openai/gpt-5.6-terra";
+  const model = publicModels["text.catalog"][openRouterPng];
+  const binding = model?.providers?.openrouter;
+  if (
+    service.definitions.text.members[openRouterPng]?.status !== "listed" ||
+    model?.tool_call !== true ||
+    !model?.image_input_mimes?.includes("image/png") ||
+    binding?.provider !== "openrouter" ||
+    binding.id !== openRouterPng ||
+    binding.url !== `https://openrouter.ai/${openRouterPng}`
+  )
+    throw Error(`Reviewed OpenRouter PNG binding changed: ${openRouterPng}`);
+  write(
+    path.join(root, "crates/grida-agent/data/openrouter-png-models.json"),
+    json({ models_release: release, models: [openRouterPng] })
+  );
   write(
     path.join(root, "packages/grida-ai/schemas/operations.generated.json"),
     json(values.operations)

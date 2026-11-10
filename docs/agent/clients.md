@@ -514,9 +514,11 @@ connection. Retrying an unconfirmed send with the same draft keeps the original
 input identity. To change a queued image, remove the queued message and submit
 a new one.
 
-This picker was verified with a disposable Responses API GPT-5.4 profile.
-The current native Desktop Gateway and ChatGPT subscription profiles
-offer text input.
+On macOS and Linux, the isolated native Desktop preview supports PNG input
+with **GPT-5.6 Terra** and a saved OpenRouter key. Select it at launch with
+`--native-chat-provider=openrouter --native-chat-model=openai/gpt-5.6-terra`.
+The Gateway, ChatGPT subscription, Vercel, and custom endpoint profiles offer
+text input. The provider receives the retained PNG when the conversation uses it.
 
 ## Edit selected SVG text
 

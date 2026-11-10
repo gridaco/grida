@@ -1,22 +1,25 @@
 mod stream;
 
-use crate::wire::{function_name, read_http_error, short_identity, text_profile, tool_result};
+use crate::wire::{
+    function_name, image_data_url, image_profile, read_http_error, short_identity, text_profile,
+    tool_result,
+};
 use crate::{
-    StreamLimits, StreamingTransport, TransportFailure, TransportOperation, TransportRequest,
+    InputImageResolver, StreamLimits, StreamingTransport, TransportFailure, TransportOperation,
+    TransportRequest,
 };
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceRequest, InferenceRun, InputFormat,
-    InputMeasurement, MeasurementKind, Modality, ModelCapabilities, PreparedRequest, Provider,
+    InputMeasurement, MeasurementKind, ModelCapabilities, PreparedRequest, Provider,
     ProviderBinding, RequestControl,
 };
 use agent_kit_core::messages::{
-    Content, MediaRef, Message, MessagePhase, ProvenanceKind, ProviderState, Role,
+    Content, Message, MessagePhase, ProvenanceKind, ProviderState, Role,
 };
 use agent_kit_core::{
     BindingId, BoxFuture, Envelope, Error, ErrorKind, Fingerprint, ModelId, ProviderId, Result,
     SchemaId, ToolCallId, ToolId,
 };
-use base64::{Engine, engine::general_purpose::STANDARD};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -52,10 +55,6 @@ pub struct ResponsesProfile {
     pub wire_model: ModelId,
     pub reasoning_effort: Option<ReasoningEffort>,
 }
-
-/// Resolve a host-authorized, immutable image reference to its exact bytes.
-/// This bounded local read runs only when counting or starting a request.
-pub type InputImageResolver = dyn Fn(&MediaRef, usize) -> Result<Vec<u8>> + Send + Sync;
 
 /// Stateless Responses SSE with text, optional images, and client-executed JSON functions.
 pub struct Responses {
@@ -106,9 +105,7 @@ impl Responses {
                 !(text_profile(capabilities)
                     || (images.is_some()
                         && endpoint == ResponsesEndpoint::Api
-                        && !capabilities.text_tools
-                        && capabilities.input_modalities
-                            == [Modality::Text, Modality::Image].into_iter().collect()))
+                        && image_profile(capabilities)))
             })
         {
             return Err(Error::new(
@@ -319,15 +316,11 @@ impl Responses {
                     ) {
                         return Err(unsupported_image());
                     }
-                    let mut url = format!("data:{};base64,", media.media_type);
-                    if resolve_images {
-                        let bytes = resolver(media, *remaining)?;
-                        if bytes.is_empty() || bytes.len() > *remaining {
-                            return Err(Error::new(ErrorKind::LimitExceeded, "request_byte_limit"));
-                        }
-                        *remaining -= bytes.len();
-                        STANDARD.encode_string(&bytes, &mut url);
-                    }
+                    let url = image_data_url(
+                        media,
+                        resolve_images.then_some(resolver.as_ref()),
+                        remaining,
+                    )?;
                     Ok(json!({"type": "input_image", "image_url": url, "detail": "auto"}))
                 }
                 _ => Err(Error::new(

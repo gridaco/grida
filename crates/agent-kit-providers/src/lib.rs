@@ -8,15 +8,18 @@ mod sse;
 mod wire;
 
 use agent_kit_core::inference::{ProviderBinding, RequestControl};
+use agent_kit_core::messages::MediaRef;
 use agent_kit_core::{BoxFuture, Error, ErrorKind, ModelId, Result};
 use futures_core::stream::BoxStream;
 
 pub use anthropic::Anthropic;
 pub use gemini::{Gemini, GeminiProfile};
 pub use openai::{ModelProfile, OpenAiCompatible, OutputLimitField};
-pub use responses::{
-    InputImageResolver, ReasoningEffort, Responses, ResponsesEndpoint, ResponsesProfile,
-};
+pub use responses::{ReasoningEffort, Responses, ResponsesEndpoint, ResponsesProfile};
+
+/// Resolve a host-authorized, immutable image reference to its exact bytes.
+/// This bounded local read runs only when counting or starting a request.
+pub type InputImageResolver = dyn Fn(&MediaRef, usize) -> Result<Vec<u8>> + Send + Sync;
 
 /// The bound host selects the destination and injects credentials. The body
 /// contains conversation data and deliberately has no Debug implementation.
