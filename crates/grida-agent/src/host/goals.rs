@@ -166,6 +166,7 @@ impl Host {
         request.effort = Some(effort);
         let mut policy = self.submission_policy(&request, allow_wakeups)?;
         policy.allow_host_tools = false;
+        policy.desktop_image_generation = None;
         if policy.effort.as_ref().is_some_and(|effort| {
             goal.allowance.inference_steps.get() <= effort.reserved_child_generation_steps()
         }) {
@@ -375,6 +376,7 @@ impl Host {
         captured.parts.clear();
         captured.allow_wakeups = false;
         captured.allow_library_selection = false;
+        captured.desktop_image_generation = None;
         captured.configuration_permission = crate::ConfigurationPermission::Disabled;
         if let Some(permission) = &captured.permission_capture {
             let profile = self

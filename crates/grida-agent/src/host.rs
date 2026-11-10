@@ -8,6 +8,7 @@ pub(crate) mod deletion;
 mod goals;
 mod history;
 mod host_tools;
+pub(crate) mod image_generation;
 mod image_tools;
 mod images;
 pub(crate) mod library;
@@ -124,6 +125,7 @@ pub struct Host {
     permissions: Option<Arc<crate::permissions::PermissionProfile>>,
     host_tools: Option<Arc<host_tools::HostTools>>,
     pub(crate) editor_surfaces: crate::editor_surfaces::EditorSurfaces,
+    pub(crate) desktop_image_generation: Option<image_generation::DesktopImageGeneration>,
     subagents_enabled: bool,
     effort: EffortPreset,
     operating_regime: OperatingRegime,
@@ -323,6 +325,8 @@ struct StoredPrompt {
     )]
     host_tools_capture: Option<host_tools::Capture>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    desktop_image_generation: Option<BindingId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     editor_endpoint: Option<BindingId>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     editor_presentation: bool,
@@ -350,6 +354,7 @@ struct SubmissionPolicy {
     allow_wakeups: bool,
     allow_library_selection: bool,
     allow_host_tools: bool,
+    desktop_image_generation: Option<BindingId>,
     editor_endpoint: Option<BindingId>,
     editor_presentation: bool,
     editor_svg_target: Option<BindingId>,
@@ -654,6 +659,7 @@ impl Host {
             permissions: None,
             host_tools: None,
             editor_surfaces: Default::default(),
+            desktop_image_generation: None,
             subagents_enabled: false,
             effort: EffortPreset::Standard,
             operating_regime: OperatingRegime::default(),
@@ -746,7 +752,7 @@ impl Host {
         session: SessionId,
         turn: TurnId,
         include_artifacts: bool,
-    ) -> Result<(TurnOutcome, Option<CropArtifacts>)> {
+    ) -> Result<(TurnOutcome, Option<CropArtifacts>, Option<&'static str>)> {
         self.store
             .inspect_turn_with(session, turn, move |state| {
                 let outcome = state
@@ -756,6 +762,7 @@ impl Host {
                 Ok((
                     outcome,
                     include_artifacts.then(|| image_tools::artifacts(state)),
+                    image_generation::summary_note(state),
                 ))
             })
             .await
@@ -1662,6 +1669,13 @@ impl Host {
             allow_wakeups,
             allow_library_selection: false,
             allow_host_tools: true,
+            desktop_image_generation: self
+                .desktop_image_generation
+                .as_ref()
+                .filter(|_| {
+                    operating_regime.is_act() && !allow_wakeups && self.side_context.is_none()
+                })
+                .and_then(image_generation::DesktopImageGeneration::capture),
             editor_endpoint: None,
             editor_presentation: false,
             editor_svg_target: None,
@@ -1684,6 +1698,7 @@ impl Host {
             allow_wakeups,
             allow_library_selection,
             allow_host_tools,
+            desktop_image_generation,
             editor_endpoint,
             editor_presentation,
             editor_svg_target,
@@ -1799,6 +1814,7 @@ impl Host {
                     configuration_permission,
                     permission_capture,
                     host_tools_capture,
+                    desktop_image_generation,
                     editor_endpoint,
                     editor_presentation,
                     editor_svg_target,
@@ -1911,6 +1927,7 @@ impl Host {
                             != crate::ConfigurationPermission::Disabled
                         || stored.permission_capture.is_some()
                         || stored.host_tools_capture.is_some()
+                        || stored.desktop_image_generation.is_some()
                         || stored.editor_endpoint.is_some()
                         || stored.editor_presentation
                         || stored.editor_svg_target.is_some()
@@ -1990,6 +2007,33 @@ impl Host {
                         endpoint.clone(),
                         stored.editor_presentation,
                         stored.editor_svg_target.is_some(),
+                    )?));
+                }
+                if !cancellation_only && let Some(binding) = &stored.desktop_image_generation {
+                    if !stored.operating_regime.is_act()
+                        || stored.allow_wakeups
+                        || stored.goal.is_some()
+                        || subagent
+                        || self.side_context.is_some()
+                    {
+                        return Err(problem(
+                            ErrorKind::InvalidState,
+                            "invalid_image_generation_scope",
+                        ));
+                    }
+                    let owner = self
+                        .desktop_image_generation
+                        .as_ref()
+                        .filter(|owner| owner.capture().as_ref() == Some(binding))
+                        .ok_or_else(|| {
+                            problem(
+                                ErrorKind::Unavailable,
+                                "retained_image_generation_binding_unavailable",
+                            )
+                        })?;
+                    host_tools.push(Arc::new(host_tools::HostTools::image_generation(
+                        owner.tool_host(session.clone())?,
+                        binding.clone(),
                     )?));
                 }
                 authority.validate(

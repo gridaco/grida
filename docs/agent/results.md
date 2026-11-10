@@ -18,6 +18,19 @@ If the summary details are unavailable, the chat keeps the recorded turn
 status and transcript. Choose **Retry summary** to read the details for
 that turn again.
 
+## Generate an image from native chat
+
+In a native workbench with a supported saved OpenRouter or Vercel AI Gateway
+connection, use **Act** and describe the image you want. The tool generates
+one image from text and can honor an explicit background where the connection
+supports it. The selected connection uses your saved provider key for the
+request.
+
+Check **Turn summary** for the result. Desktop keeps a retained image in
+**Tools → Recents**. If the provider generated the image and Desktop could
+not retain it, the summary explains what happened and the turn ends without
+another generation.
+
 ## See an artifact while work continues
 
 In a native workspace chat with live presentation, ask the agent to open

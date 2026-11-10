@@ -586,6 +586,7 @@ impl Host {
         captured.configuration_permission = crate::ConfigurationPermission::Disabled;
         captured.permission_capture = None;
         captured.host_tools_capture = None;
+        captured.desktop_image_generation = None;
         captured.editor_endpoint = None;
         captured.editor_presentation = false;
         captured.editor_svg_target = None;
@@ -1066,6 +1067,7 @@ mod tests {
                     allow_wakeups: false,
                     allow_library_selection: false,
                     allow_host_tools: false,
+                    desktop_image_generation: None,
                     editor_endpoint: None,
                     editor_presentation: false,
                     editor_svg_target: None,

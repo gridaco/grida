@@ -8,6 +8,7 @@ import fs from "node:fs/promises";
 import { isIPv4 } from "node:net";
 import path from "node:path";
 import type { NativeAgentLaunch } from "./native-agent-process";
+import { NativeImageGeneration } from "./native-image-generation";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 
 export namespace NativeProviderSelection {
@@ -26,6 +27,7 @@ export namespace NativeProviderSelection {
       | "model"
       | "credentialHome"
       | "configuredEndpointKey"
+      | "imageGeneration"
     > & {
       providerNetwork: NativeProviderNetwork;
     }
@@ -35,6 +37,7 @@ export namespace NativeProviderSelection {
     credentialHome: string;
     hasKey: (id: string) => Promise<boolean>;
     network: () => Promise<NativeProviderNetwork>;
+    imageRequest?: (init: RequestInit) => Promise<Response>;
   }>;
 
   const builtInEndpoints = {
@@ -65,11 +68,19 @@ export namespace NativeProviderSelection {
     const endpoint = builtInEndpoints[providerId];
     const target = `${endpoint}/chat/completions`;
     const network = await settings.network();
+    const imageGeneration = settings.imageRequest
+      ? NativeImageGeneration.forByok(
+          providerId,
+          endpoint,
+          settings.imageRequest
+        )
+      : undefined;
     return {
       provider: "openai-compatible",
       endpoint,
       model,
       credentialHome: home,
+      ...(imageGeneration && { imageGeneration }),
       providerNetwork: {
         prepare: (url, headers) =>
           url === target &&

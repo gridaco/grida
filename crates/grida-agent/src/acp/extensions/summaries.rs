@@ -93,6 +93,14 @@ impl SummaryResponse {
             artifacts_omitted: None,
         }
     }
+
+    fn prepend_factual_note(&mut self, note: &str) {
+        self.text.insert_str(0, "\n\n");
+        self.text.insert_str(0, note);
+        let end = self.text.floor_char_boundary(MAX_TEXT_BYTES);
+        self.text_truncated |= end < self.text.len();
+        self.text.truncate(end);
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -234,7 +242,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         .unwrap()
                         .negotiated
                         .contains(ARTIFACTS);
-                    let (outcome, artifacts) = summary_host
+                    let (outcome, artifacts, image_generation) = summary_host
                         .settled_summary(
                             request.session_id.clone(),
                             request.turn_id.clone(),
@@ -247,6 +255,9 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         require(&summary_sessions, ARTIFACTS, Some(&request.session_id))?;
                     }
                     let mut summary = SummaryResponse::from_outcome(request.turn_id, &outcome);
+                    if let Some(note) = image_generation {
+                        summary.prepend_factual_note(note);
+                    }
                     if let Some(artifacts) = artifacts {
                         summary.artifacts = Some(artifacts.items);
                         summary.artifacts_omitted =

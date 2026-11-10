@@ -344,6 +344,9 @@ impl Host {
                         self.retained_host_tools(capture)?;
                     }
                     let allow_host_tools = capture.is_some();
+                    let desktop_image_generation = stored
+                        .as_ref()
+                        .and_then(|input| input.desktop_image_generation.clone());
                     let effort = stored.and_then(|input| input.effort);
                     self.capture_input(
                         &view,
@@ -355,6 +358,7 @@ impl Host {
                             allow_wakeups: false,
                             allow_library_selection: false,
                             allow_host_tools,
+                            desktop_image_generation,
                             editor_endpoint: None,
                             editor_presentation: false,
                             editor_svg_target: None,

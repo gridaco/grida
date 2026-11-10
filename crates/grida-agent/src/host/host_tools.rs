@@ -29,7 +29,7 @@ pub(super) struct Capture {
 
 pub(super) struct HostTools {
     mcp: Option<McpClient>,
-    surface: Option<ToolHost>,
+    local: Option<ToolHost>,
     capture: Capture,
     grants: BTreeMap<ToolId, CapabilityGrant>,
     principal: &'static str,
@@ -52,7 +52,7 @@ impl Host {
         let (previous_mcp, previous_surface) = if let Some(owner) = self.host_tools.take() {
             let owner = Arc::try_unwrap(owner)
                 .map_err(|_| problem(ErrorKind::Conflict, "host_tool_owner_already_shared"))?;
-            (owner.mcp, owner.surface)
+            (owner.mcp, owner.local)
         } else {
             (None, None)
         };
@@ -105,7 +105,9 @@ impl Host {
 
 impl HostTools {
     pub(super) fn has_local_surface(&self) -> bool {
-        self.surface.is_some()
+        self.grants
+            .keys()
+            .any(|id| matches!(id.as_str(), OPEN_SURFACE | LIST_OPEN))
     }
 
     fn new(mcp: Option<McpClient>, surface: Option<ToolHost>) -> Result<Self> {
@@ -143,9 +145,19 @@ impl HostTools {
         )
     }
 
+    pub(super) fn image_generation(host: ToolHost, lease: BindingId) -> Result<Self> {
+        Self::with_local(
+            None,
+            Some(host),
+            &[super::image_generation::TOOL],
+            lease,
+            super::image_generation::PRINCIPAL,
+        )
+    }
+
     fn with_local(
         mcp: Option<McpClient>,
-        surface: Option<ToolHost>,
+        local: Option<ToolHost>,
         local_ids: &[&str],
         lease: BindingId,
         principal: &'static str,
@@ -157,12 +169,12 @@ impl HostTools {
             .map(McpClient::selected_grants)
             .transpose()?
             .unwrap_or_default();
-        let local = surface.iter().flat_map(|host| {
+        let local_grants = local.iter().flat_map(|host| {
             local_ids
                 .iter()
                 .map(move |id| host.grant(&ToolId::new(*id)?))
         });
-        for grant in selected.into_iter().map(Ok).chain(local) {
+        for grant in selected.into_iter().map(Ok).chain(local_grants) {
             let grant = grant?;
             let definition = grant.describe()?;
             let id = definition.tool.id.clone();
@@ -180,7 +192,7 @@ impl HostTools {
         };
         Ok(Self {
             mcp,
-            surface,
+            local,
             capture,
             grants,
             principal,
@@ -191,8 +203,8 @@ impl HostTools {
         if let Some(mcp) = &self.mcp {
             mcp.close();
         }
-        if let Some(surface) = &self.surface {
-            surface.close();
+        if let Some(local) = &self.local {
+            local.close();
         }
     }
 

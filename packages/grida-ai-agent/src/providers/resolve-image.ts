@@ -10,7 +10,7 @@ import type { ModelCatalogStore } from "./model-catalog";
 
 export type ResolvedImageModel = ImageClient.Resolved;
 export type ResolveImageDeps = {
-  secrets: SecretsStore;
+  secrets: Pick<SecretsStore, "_getKey">;
   catalog?: ModelCatalogStore;
   gg_catalog?: GGDiscoveryStore;
   provider_http?: ProviderHttp;

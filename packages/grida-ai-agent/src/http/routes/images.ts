@@ -24,6 +24,7 @@ import type { GGDiscoveryStore } from "@grida/ai";
  * gates + meters there), never in this process.
  */
 
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { Hono } from "hono";
 import { ImageClient } from "@grida/ai";
 import type { MediaPersistence, SecretsStore } from "@grida/daemon/server";
@@ -39,6 +40,22 @@ import type { ImageGeneratedImage } from "../../protocol/images";
 import { GeneratedMediaPersistence } from "./generated-media-persistence";
 
 const IMAGE_PROVIDERS = ["vercel", "fal", "openrouter", "gg"] as const;
+const RETAINED_IMAGE_TYPE = "application/vnd.grida.retained-image+json";
+const RETAINED_IMAGE_FIELDS = new Set([
+  "model_id",
+  "binding_id",
+  "prompt",
+  "provider",
+  "background",
+  "credential",
+  "n",
+]);
+const RETAINED_IMAGE_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
 
 export type ImagesRoutesDeps = {
   secrets: SecretsStore;
@@ -84,11 +101,52 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
       quality,
       background,
     } = r.data;
+    const retainedOnly = c.req.header("accept") === RETAINED_IMAGE_TYPE;
+    let imageKeys: Pick<SecretsStore, "_getKey"> = secrets;
+    let requiredBinding: string | undefined;
+    if (retainedOnly) {
+      const request = await c.req.json<Record<string, unknown>>();
+      const credential = retainedCredential(request.credential);
+      if (
+        (provider !== "openrouter" && provider !== "vercel") ||
+        !credential ||
+        typeof request.binding_id !== "string" ||
+        !request.binding_id ||
+        request.binding_id.length > 256 ||
+        (n ?? 1) !== 1 ||
+        !prompt.trim() ||
+        Buffer.byteLength(prompt) > 8 * 1024 ||
+        Object.keys(request).some((field) => !RETAINED_IMAGE_FIELDS.has(field))
+      )
+        return c.json({ error: "invalid retained image request" }, 400);
+      requiredBinding = request.binding_id;
+      imageKeys = {
+        async _getKey(id) {
+          if (id !== provider) return null;
+          const key = (await secrets._getKey(id))?.trim();
+          if (!key) return null;
+          const proof = createHash("sha256")
+            .update("grida-desktop-image-key-v1\0")
+            .update(credential.nonce)
+            .update("\0")
+            .update(key)
+            .digest();
+          return timingSafeEqual(proof, credential.proof) ? key : null;
+        },
+      };
+    }
 
     let resolved;
     try {
       resolved = await resolveImageModel(
-        { secrets, gg, gg_base_url, provider_http, catalog, gg_catalog },
+        {
+          secrets: imageKeys,
+          gg,
+          gg_base_url,
+          provider_http,
+          catalog,
+          gg_catalog,
+        },
         model_id,
         { ...(provider ? { explicit: provider } : {}), background }
       );
@@ -101,6 +159,8 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
       }
       return c.json({ error: "image generation failed", model_id }, 502);
     }
+    if (requiredBinding && resolved.binding_id !== requiredBinding)
+      return c.json({ error: "image model unavailable" }, 400);
 
     const size =
       width && height
@@ -121,6 +181,12 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
         signal: c.req.raw.signal,
       });
     } catch (e) {
+      if (
+        retainedOnly &&
+        e instanceof ImageClient.Failure &&
+        e.code === "provider_unavailable"
+      )
+        return c.json({ error: "image model unavailable" }, 400);
       if (e instanceof ImageClient.Failure && e.code === "invalid_input") {
         return c.json({ error: "invalid image input", code: e.code }, 400);
       }
@@ -133,6 +199,38 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
         label: "image generation failed",
         model_id,
         provider_id: resolved.provider_id,
+      });
+    }
+
+    if (retainedOnly) {
+      const [image] = generation.images;
+      if (!image || generation.images.length !== 1)
+        return c.json({ error: "image generation result unverified" }, 502);
+      const fileName = GeneratedMediaPersistence.fileName(
+        "image",
+        0,
+        image.media_type
+      );
+      let stored;
+      if (
+        fileName &&
+        deps.media &&
+        RETAINED_IMAGE_MIME_TYPES.has(image.media_type)
+      ) {
+        try {
+          stored = await deps.media.save({
+            file_name: fileName,
+            media_type: image.media_type,
+            bytes: image.data,
+          });
+        } catch {
+          console.warn("[grida-agent] generated media could not be saved");
+        }
+      }
+      return c.json({
+        model_id: resolved.model_id,
+        provider_id: resolved.provider_id,
+        stored_media: stored ?? null,
       });
     }
 
@@ -165,4 +263,19 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
       images,
     });
   });
+}
+
+function retainedCredential(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return undefined;
+  const { nonce, proof } = value as Record<string, unknown>;
+  if (
+    Object.keys(value).length !== 2 ||
+    typeof nonce !== "string" ||
+    !/^[a-f0-9]{32}$/.test(nonce) ||
+    typeof proof !== "string" ||
+    !/^[a-f0-9]{64}$/.test(proof)
+  )
+    return undefined;
+  return { nonce, proof: Buffer.from(proof, "hex") };
 }

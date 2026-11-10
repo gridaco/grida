@@ -129,6 +129,20 @@ fn command() -> Command {
                         .action(ArgAction::SetTrue),
                 )
                 .arg(
+                    Arg::new("desktop-image-generation")
+                        .long("desktop-image-generation")
+                        .value_name("BINDING")
+                        .requires_all(["supervised-provider", "credential-home"])
+                        .conflicts_with_all([
+                            "credential-env",
+                            "supervised-configured-endpoint-key",
+                            "supervised-gateway-scope",
+                            "supervised-chatgpt-scope",
+                            "listen",
+                        ])
+                        .hide(true),
+                )
+                .arg(
                     Arg::new("workspace-configuration")
                         .long("workspace-configuration")
                         .value_name("DIRECTORY")
@@ -574,6 +588,23 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         ));
     }
     let provider_env = provider.credential_env.clone();
+    let desktop_image_generation = if name == "serve" {
+        args.get_one::<String>("desktop-image-generation")
+    } else {
+        None
+    };
+    if desktop_image_generation.is_some()
+        && (provider.protocol != ProviderProtocol::OpenAiCompatible
+            || !matches!(
+                provider.endpoint.as_str(),
+                "https://openrouter.ai/api/v1" | "https://ai-gateway.vercel.sh/v1"
+            ))
+    {
+        return Err(problem(
+            ErrorKind::InvalidInput,
+            "desktop_image_generation_provider_invalid",
+        ));
+    }
     let workspace_configuration = if name == "serve" {
         args.get_one::<PathBuf>("workspace-configuration")
             .zip(args.get_one::<uuid::Uuid>("workspace-configuration-epoch"))
@@ -624,6 +655,10 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     };
     let mcp_client = outbound_mcp(args, regime, provider_env.as_deref()).await?;
     let host = host.with_operating_regime(regime);
+    let host = match desktop_image_generation {
+        Some(binding) => host.with_desktop_image_generation(binding)?,
+        None => host,
+    };
     let ultra = name == "run"
         && args
             .get_one::<String>("effort")

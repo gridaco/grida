@@ -68,6 +68,7 @@ impl Host {
             permissions: None,
             host_tools: None,
             editor_surfaces: Default::default(),
+            desktop_image_generation: None,
             subagents_enabled: false,
             effort: EffortPreset::Standard,
             operating_regime: OperatingRegime::Act,

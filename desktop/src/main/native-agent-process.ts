@@ -11,6 +11,7 @@ import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeAgentRevisions } from "./native-agent-revisions";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeAgentGoals } from "./native-agent-goals";
+import { NativeImageGeneration } from "./native-image-generation";
 import {
   NativeEditorSurfaceEndpoints,
   type NativeEditorSurfaceDelivery,
@@ -71,6 +72,7 @@ export type NativeAgentLaunch = {
   subagents?: true;
   mcp?: NativeMcpLaunch;
   workspace?: NativeWorkspaceSelection;
+  imageGeneration?: NativeImageGeneration;
   capabilities?: Readonly<Record<string, 1>>;
   onSessionUpdate?: (params: unknown) => void;
 };
@@ -140,7 +142,8 @@ export class NativeAgentProcess {
     private readonly child: ChildProcessWithoutNullStreams,
     private readonly onSessionUpdate?: (params: unknown) => void,
     askRoots?: ReadonlyMap<string, string>,
-    private readonly providerEgress?: NativeProviderEgress
+    private readonly providerEgress?: NativeProviderEgress,
+    private readonly imageGeneration?: NativeImageGeneration
   ) {
     if (askRoots) {
       this.permissions = new NativeAgentPermissions(
@@ -281,6 +284,20 @@ export class NativeAgentProcess {
   }
 
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
+    const imageGeneration = options.workspace
+      ? options.imageGeneration
+      : undefined;
+    if (
+      imageGeneration &&
+      (options.provider !== "openai-compatible" ||
+        options.endpoint !== imageGeneration.endpoint ||
+        !options.credentialHome ||
+        !options.providerNetwork ||
+        options.configuredEndpointKey !== undefined ||
+        options.gatewayScope !== undefined ||
+        options.subscriptionScope !== undefined)
+    )
+      throw new Error("native_agent_image_generation_profile_invalid");
     if (
       options.maxOutputTokens !== undefined &&
       (!Number.isSafeInteger(options.maxOutputTokens) ||
@@ -359,6 +376,7 @@ export class NativeAgentProcess {
       ...(permissionProfile ? NativeAgentPermissions.capabilities : {}),
     };
     if (providerEgress) capabilities[NativeProviderEgress.capability] = 1;
+    if (imageGeneration) capabilities[NativeImageGeneration.capability] = 1;
     const requestDeletion =
       process.platform === "darwin" || process.platform === "linux";
     const args = [
@@ -383,6 +401,8 @@ export class NativeAgentProcess {
     if (options.credentialHome)
       args.push("--credential-home", options.credentialHome);
     if (providerEgress) args.push("--supervised-provider");
+    if (imageGeneration)
+      args.push("--desktop-image-generation", imageGeneration.binding);
     if (options.workspaceConfiguration) {
       args.push(
         "--workspace-configuration",
@@ -424,7 +444,8 @@ export class NativeAgentProcess {
       }),
       options.onSessionUpdate,
       permissionProfile?.askRoots,
-      providerEgress
+      providerEgress,
+      imageGeneration
     );
     try {
       const response = object(
@@ -617,6 +638,7 @@ export class NativeAgentProcess {
 
   private async stop(): Promise<void> {
     this.providerEgress?.close();
+    this.imageGeneration?.close();
     this.editorEndpoints.close();
     this.child.stdin.end();
     const exit = await bounded(this.exited, SHUTDOWN_TIMEOUT_MS);
@@ -691,6 +713,22 @@ export class NativeAgentProcess {
         }
         if (
           this.connected &&
+          this.imageGeneration &&
+          message.method === NativeImageGeneration.method
+        ) {
+          const id = message.id;
+          void this.imageGeneration
+            .generate(id, message.params)
+            .then((result) => {
+              if (this.connected) this.write({ jsonrpc: "2.0", id, result });
+            })
+            .catch(() =>
+              this.disconnect("native_agent_image_generation_reply_failed")
+            );
+          return;
+        }
+        if (
+          this.connected &&
           this.editorSvgText &&
           message.method === NativeEditorSurfaceEndpoints.svgTextMethod
         ) {
@@ -745,6 +783,8 @@ export class NativeAgentProcess {
         });
       } else if (message.method === NativeProviderEgress.cancelMethod) {
         this.providerEgress?.cancel(message.params);
+      } else if (message.method === "$/cancel_request") {
+        this.imageGeneration?.cancel(object(message.params)?.requestId);
       } else if (message.method === "session/update") {
         try {
           this.onSessionUpdate?.(message.params);
@@ -784,6 +824,7 @@ export class NativeAgentProcess {
   private fail(error: Error): void {
     this.failure ??= error;
     this.providerEgress?.close();
+    this.imageGeneration?.close();
     this.editorEndpoints.close();
     this.providerRequests.clear();
     for (const pending of this.pending.values()) {

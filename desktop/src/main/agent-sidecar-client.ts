@@ -240,6 +240,7 @@ export namespace agentSidecarClient {
     return NativeProviderSelection.builtInByok(providerId, modelId, {
       ...nativeAgentByokSettings(),
       hasKey: transport.secrets.has,
+      imageRequest: (init) => transport.fetch("/images/generate", init),
     });
   }
 

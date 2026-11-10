@@ -18,6 +18,7 @@ use reqwest::header::{
 };
 use reqwest::{Client, Url};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::net::{IpAddr, SocketAddr};
 use std::num::NonZeroU64;
@@ -237,6 +238,40 @@ impl HttpTransport {
             credential.validate().await?;
         }
         Ok(())
+    }
+
+    pub(crate) async fn desktop_image_credential_proof(&self, nonce: &str) -> Result<String> {
+        let unavailable = || problem("desktop_image_generation_credential_unavailable");
+        if !matches!(self.dispatch, Dispatch::Supervised(_))
+            || self.protocol != ProviderProtocol::OpenAiCompatible
+        {
+            return Err(unavailable());
+        }
+        let provider = match self.target.as_str() {
+            "https://openrouter.ai/api/v1/chat/completions" => "openrouter",
+            "https://ai-gateway.vercel.sh/v1/chat/completions" => "vercel",
+            _ => return Err(unavailable()),
+        };
+        let credential = self
+            .credential
+            .as_ref()
+            .filter(|key| key.is_stored_for(provider))
+            .ok_or_else(unavailable)?;
+        let header = credential.header(CredentialFormat::Bearer).await?;
+        let key = header
+            .as_bytes()
+            .strip_prefix(b"Bearer ")
+            .ok_or_else(unavailable)?;
+        let mut digest = Sha256::new();
+        digest.update(b"grida-desktop-image-key-v1\0");
+        digest.update(nonce.as_bytes());
+        digest.update(b"\0");
+        digest.update(key);
+        Ok(digest
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect())
     }
 
     fn request_target(
@@ -625,6 +660,54 @@ mod tests {
             protocol,
             credential_home: None,
             compatible_output_limit_field: None,
+        }
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[tokio::test]
+    async fn image_credential_proof_uses_only_the_exact_supervised_saved_key() {
+        let fixture = tempfile::tempdir().unwrap();
+        let root = fixture.path().canonicalize().unwrap();
+        let home = root.join("custody");
+        let store = grida_auth::ProviderStore::new(home.clone()).unwrap();
+        let nonce = "0".repeat(32);
+        for (provider, endpoint) in [
+            ("openrouter", "https://openrouter.ai/api/v1"),
+            ("vercel", "https://ai-gateway.vercel.sh/v1"),
+        ] {
+            let state = root.join(provider);
+            std::fs::create_dir(&state).unwrap();
+            store.set(provider, "  fixture-key  ").unwrap();
+            let mut options = options(ProviderProtocol::OpenAiCompatible);
+            options.endpoint = endpoint.into();
+            options.credential_home = Some(home.clone());
+            let direct = HttpTransport::new(&state, &options, None).unwrap();
+            assert_eq!(
+                direct
+                    .desktop_image_credential_proof(&nonce)
+                    .await
+                    .unwrap_err()
+                    .code,
+                "desktop_image_generation_credential_unavailable"
+            );
+            let transport =
+                HttpTransport::new(&state, &options, Some(SupervisedProvider::default())).unwrap();
+            assert_eq!(
+                transport
+                    .desktop_image_credential_proof(&nonce)
+                    .await
+                    .unwrap(),
+                "d2e511331564e6cbfbd25b66f4a32946473a9edb988f14cf690ff14778652770"
+            );
+            store.set(provider, "fixture-rotated-key").unwrap();
+            assert_eq!(
+                transport
+                    .desktop_image_credential_proof(&nonce)
+                    .await
+                    .unwrap_err()
+                    .code,
+                "provider_credential_changed"
+            );
         }
     }
 

@@ -475,6 +475,17 @@ identities and carries `result`. Applied and unchanged replacement results
 report `saved: false`. Unavailable or stale targets supply a domain failure.
 Malformed, lost, or uncorrelated replies leave the tool outcome uncertain.
 
+The private Desktop supervisor can negotiate `co.grida/media/generate-image`
+version 1 for a captured saved BYOK image route. Ordinary Act work can offer
+`generate_image` with a bounded text prompt and optional background intent.
+The reverse request carries the session and call identities and an ephemeral
+credential proof. Main uses the captured provider, model, and catalog binding.
+The retained media service verifies the exact key it will use for the request.
+It returns a bounded Recents receipt without bytes or a workspace path.
+Cancellation aborts the matching request and preserves uncertainty about any
+completed provider work. Confirmed generation without retention ends the turn
+with a factual summary before another inference can repeat the request.
+
 ### Persistent goal operations
 
 Negotiate each `co.grida/goal/` capability at version `1`. The methods apply

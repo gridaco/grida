@@ -77,9 +77,13 @@ async fn serve(
     let (sdk, wire) = Channel::duplex();
     let (incoming, outgoing) = wire.into_parts();
     let editor_surfaces = host.editor_surfaces.clone();
+    let desktop_image_generation = host.desktop_image_generation.clone();
     let read = async {
         let result = transport::read(input, outgoing, delivery.clone()).await;
         editor_surfaces.detach();
+        if let Some(generation) = &desktop_image_generation {
+            generation.detach();
+        }
         if let Some(provider) = &provider {
             provider.detach();
         }
@@ -98,6 +102,9 @@ async fn serve(
         transport::write(output, incoming, delivery.clone()),
     );
     editor_surfaces.detach();
+    if let Some(generation) = &desktop_image_generation {
+        generation.detach();
+    }
     if let Some(provider) = &provider {
         provider.detach();
     }
@@ -219,6 +226,16 @@ async fn serve_connection(
                         return responder.respond_with_error(host_error(error));
                     }
                     advertised.insert(capability.into(), 1.into());
+                    let capability = crate::host::image_generation::CAPABILITY;
+                    if reviewer
+                        && let Some(generation) = &initialized_host.desktop_image_generation
+                        && request.client_capabilities.meta.as_ref()
+                            .and_then(|meta| meta.get(capability))
+                            .and_then(serde_json::Value::as_u64) == Some(1)
+                    {
+                        generation.attach(connection.clone());
+                        advertised.insert(capability.into(), 1.into());
+                    }
                     let capability = crate::editor_surfaces::CAPABILITY;
                     if reviewer
                         && initialized_host.supports_editor_tools()
