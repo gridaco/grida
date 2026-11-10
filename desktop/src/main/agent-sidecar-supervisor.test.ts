@@ -248,7 +248,7 @@ describe("AgentSidecarSupervisor recovery", () => {
     }
   });
 
-  it("checks completed cutover before every media-only launch attempt", async () => {
+  it("checks the exact completed cutover before media-only launch and archive recovery", async () => {
     const root = await fs.mkdtemp(
       path.join(os.tmpdir(), "grida-promoted-media-")
     );
@@ -264,9 +264,18 @@ describe("AgentSidecarSupervisor recovery", () => {
       vi.spyOn(NativeDesktopProfile, "managedCutover").mockReturnValue(true);
       vi.spyOn(NativeDesktopProfile, "agentData").mockReturnValue(agent);
       const { NativeAgentCutover } = await import("./native-agent-cutover");
+      const receipt = {
+        id: "a".repeat(64),
+        directory: path.join(agent, "chat-archive", "a".repeat(64)),
+        sqliteVersion: 3,
+        sessionCount: 1,
+        inputCaveats: [],
+      };
       const verify = vi
         .spyOn(NativeAgentCutover, "verifyCompletedMediaOnly")
-        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(receipt)
+        .mockResolvedValueOnce(receipt)
+        .mockResolvedValueOnce({ ...receipt, id: "b".repeat(64) })
         .mockRejectedValueOnce(new Error("archive changed"));
       const prepare = vi
         .spyOn(RetainedMediaLaunch, "prepareSettings")
@@ -288,11 +297,19 @@ describe("AgentSidecarSupervisor recovery", () => {
             : path.join(root, name)
       );
       const supervisor = new AgentSidecarSupervisor({ agent: false });
+      const reveal = vi.fn<(directory: string) => void>();
+      expect(supervisor.hasCompletedMediaArchive).toBe(false);
       await expect(supervisor.startRetainedMedia()).rejects.toBe(observed);
+      expect(supervisor.hasCompletedMediaArchive).toBe(true);
+      await supervisor.revealCompletedMediaArchive(reveal);
+      await expect(
+        supervisor.revealCompletedMediaArchive(reveal)
+      ).rejects.toThrow("legacy_chat_archive_unavailable");
+      expect(reveal).toHaveBeenCalledExactlyOnceWith(receipt.directory);
       await expect(supervisor.startRetainedMedia()).rejects.toThrow(
         "legacy_chat_handoff_required"
       );
-      expect(verify).toHaveBeenCalledTimes(2);
+      expect(verify).toHaveBeenCalledTimes(4);
       expect(verify).toHaveBeenLastCalledWith(
         expect.objectContaining({
           userDataPath: agent,
@@ -305,7 +322,7 @@ describe("AgentSidecarSupervisor recovery", () => {
       expect(Reflect.get(supervisor, "coldStartSource")).toBeUndefined();
 
       const checking = Promise.withResolvers<void>();
-      const finish = Promise.withResolvers<void>();
+      const finish = Promise.withResolvers<typeof receipt>();
       verify.mockImplementationOnce(() => {
         checking.resolve();
         return finish.promise;
@@ -313,8 +330,9 @@ describe("AgentSidecarSupervisor recovery", () => {
       const restarting = supervisor.startRetainedMedia();
       await checking.promise;
       await supervisor.closeRetainedMedia();
-      finish.resolve();
+      finish.resolve(receipt);
       await expect(restarting).rejects.toThrow("agent_sidecar_shutting_down");
+      expect(supervisor.hasCompletedMediaArchive).toBe(false);
       expect(prepare).toHaveBeenCalledOnce();
       expect(launch).toHaveBeenCalledOnce();
     } finally {

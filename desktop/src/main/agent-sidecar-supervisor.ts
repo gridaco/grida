@@ -114,6 +114,7 @@ export class AgentSidecarSupervisor {
   private ownedLegacy?: OwnedLegacyGeneration;
   private coldStartSource?: Promise<LegacyChatSource>;
   private retainedMedia?: RetainedMediaScope;
+  private completedMediaArchive?: Readonly<{ id: string; directory: string }>;
   private retiringMedia?: Promise<void>;
   private child: ChildProcess | null = null;
   private activeGeneration = 0;
@@ -264,15 +265,8 @@ export class AgentSidecarSupervisor {
     await source;
     if (mediaOnly && NativeDesktopProfile.managedCutover()) {
       try {
-        const { NativeAgentCutover } = await import("./native-agent-cutover");
-        await NativeAgentCutover.verifyCompletedMediaOnly(
-          await this.captureCutoverSource(),
-          async (identity, claimId) => {
-            if (!claimId) return false;
-            NativeDesktopProfile.verifyPromotion({ ...identity, claimId });
-            return true;
-          }
-        );
+        const archive = await this.verifyCompletedMediaArchive();
+        this.completedMediaArchive ??= archive;
       } catch (error) {
         throw new LegacyChatHandoffRequired(error);
       }
@@ -295,6 +289,35 @@ export class AgentSidecarSupervisor {
       editorBaseUrl: EDITOR_BASE_URL,
       mediaOnly,
     });
+  }
+
+  get hasCompletedMediaArchive(): boolean {
+    return !this.isShuttingDown && this.completedMediaArchive !== undefined;
+  }
+
+  async revealCompletedMediaArchive(
+    reveal: (directory: string) => void
+  ): Promise<void> {
+    if (!this.hasCompletedMediaArchive)
+      throw new Error("legacy_chat_archive_unavailable");
+    const archive = await this.verifyCompletedMediaArchive();
+    if (this.hasCompletedMediaArchive) reveal(archive.directory);
+  }
+
+  private async verifyCompletedMediaArchive() {
+    const { NativeAgentCutover } = await import("./native-agent-cutover");
+    const { id, directory } = await NativeAgentCutover.verifyCompletedMediaOnly(
+      await this.captureCutoverSource(),
+      async (identity, claimId) => {
+        if (!claimId) return false;
+        NativeDesktopProfile.verifyPromotion({ ...identity, claimId });
+        return true;
+      }
+    );
+    const accepted = this.completedMediaArchive;
+    if (accepted && (accepted.id !== id || accepted.directory !== directory))
+      throw new Error("legacy_chat_archive_unavailable");
+    return Object.freeze({ id, directory });
   }
 
   closeRetainedMedia(): Promise<void> {
@@ -1234,6 +1257,17 @@ export function startRetainedMediaSidecar(): Promise<AgentSidecarInfo> {
 
 export function closeRetainedMediaSidecar(): Promise<void> {
   return supervisor?.closeRetainedMedia() ?? Promise.resolve();
+}
+
+export function hasCompletedMediaArchive(): boolean {
+  return supervisor?.hasCompletedMediaArchive ?? false;
+}
+
+export async function revealCompletedMediaArchive(
+  reveal: (directory: string) => void
+): Promise<void> {
+  if (!supervisor) throw new Error("legacy_chat_archive_unavailable");
+  await supervisor.revealCompletedMediaArchive(reveal);
 }
 
 export function startOwnedLegacyWriter(): Promise<OwnedLegacyWriter> {

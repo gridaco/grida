@@ -237,7 +237,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
         "control.sqlite"
       );
       const controlBytes = fs.readFileSync(control);
-      await expect(verify()).resolves.toBeUndefined();
+      await expect(verify()).resolves.toEqual(cutover.archive);
       await expect(
         test.NativeAgentCutover.verifyCompletedMediaOnly(
           source,

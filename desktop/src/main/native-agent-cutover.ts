@@ -87,7 +87,7 @@ export class NativeAgentCutover {
   static async verifyCompletedMediaOnly(
     source: Awaited<ReturnType<typeof sealLegacyChatForColdStart>>,
     verifyWriterAdmission: LegacyChatWriterAdmission
-  ): Promise<void> {
+  ): Promise<NonNullable<Ready["archive"]>> {
     if (process.platform !== "darwin")
       throw new Error("native_chat_cutover_platform_unsupported");
     const stateDirectory = path.join(
@@ -105,7 +105,7 @@ export class NativeAgentCutover {
       checkpoint.source !== sourceKey
     )
       throw new Error("native_chat_cutover_not_completed");
-    await retireLegacy(
+    const archive = await retireLegacy(
       source,
       sourceKey,
       checkpoint,
@@ -113,6 +113,8 @@ export class NativeAgentCutover {
       new LegacyChatArchive(source),
       true
     );
+    if (!archive) throw new Error("native_chat_cutover_archive_changed");
+    return archive;
   }
 
   private static async claim(

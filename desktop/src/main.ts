@@ -21,6 +21,8 @@ import {
   startAgentSidecar,
   startRetainedMediaSidecar,
   closeRetainedMediaSidecar,
+  hasCompletedMediaArchive,
+  revealCompletedMediaArchive,
   startOwnedLegacyWriter,
   getAgentSidecarInfo,
   getAgentSidecarMode,
@@ -164,6 +166,7 @@ let nativeQuitDrain: Promise<void> | undefined;
 let nativeEditorMcp: NativeEditorMcpExport | undefined;
 let nativeExternalRuns: NativeExternalRuns | undefined;
 let nativeQuitReady = false;
+let archiveRevealGeneration = 0;
 const windowAdmission = {
   can_open: () => entryWindow?.isMain ?? false,
   admits: (window: BrowserWindow) => entryWindow?.ipcRoleFor(window) === "main",
@@ -174,14 +177,22 @@ const windowAdmission = {
         nativeDocumentOwner(filePath) !== undefined,
   native_workspaces: () => nativeFileWorkspaces,
   legacy_chat_archive: {
-    available: () => nativeDesktopAgent?.hasLegacyChatArchive ?? false,
+    available: () =>
+      nativeDesktopAgent?.hasLegacyChatArchive ?? hasCompletedMediaArchive(),
     reveal: async () => {
       const owner = nativeDesktopAgent;
-      if (!owner || !entryWindow?.isMain) return;
-      await owner.revealLegacyChatArchive((directory) => {
-        if (owner === nativeDesktopAgent && entryWindow?.isMain)
+      const generation = archiveRevealGeneration;
+      if (!entryWindow?.isMain) return;
+      const reveal = (directory: string) => {
+        if (
+          owner === nativeDesktopAgent &&
+          generation === archiveRevealGeneration &&
+          entryWindow?.isMain
+        )
           shell.showItemInFolder(directory);
-      });
+      };
+      if (owner) await owner.revealLegacyChatArchive(reveal);
+      else await revealCompletedMediaArchive(reveal);
     },
   },
   register: (window: BrowserWindow) => {
@@ -887,6 +898,7 @@ app.on("ready", async () => {
       await authenticatedEntryReady;
     },
     clear_hosted_session: async () => {
+      archiveRevealGeneration += 1;
       nativeEditorMcp?.revoke();
       await Promise.all([
         agentSidecarClient.clearGridaGatewaySession(),
