@@ -1,6 +1,7 @@
 //! GRIDA-SEC-004 — the built private host retains child scope and assignment evidence.
 
 use super::approvals::Stdio as PrivateStdio;
+use super::summaries::reported_usage_answer;
 use super::*;
 
 const CREATE: &str = "_co.grida/subagent/create";
@@ -14,6 +15,7 @@ const RESUME: &str = "_co.grida/subagent/resume";
 const STEER: &str = "_co.grida/subagent/steer";
 const RESUME_QUEUE: &str = "_co.grida/subagent/resume-queue";
 const WITHDRAW: &str = "_co.grida/subagent/withdraw";
+const SUMMARY: &str = "_co.grida/session/turn-summary";
 const CAPABILITIES: [&str; 11] = [
     CREATE,
     ASSIGN,
@@ -51,11 +53,11 @@ async fn serve_with_key(state: &Path, endpoint: &str, key: &str) -> PrivateStdio
         .unwrap();
     let mut client = PrivateStdio::from_child(child);
     let mut request = extension_initialize();
-    for key in CAPABILITIES {
+    for key in CAPABILITIES.into_iter().chain([SUMMARY]) {
         request["clientCapabilities"]["_meta"][&key[1..]] = 1.into();
     }
     let response = client.request("initialize", request).await;
-    for key in CAPABILITIES {
+    for key in CAPABILITIES.into_iter().chain([SUMMARY]) {
         assert_eq!(
             response["result"]["agentCapabilities"]["_meta"][&key[1..]],
             1
@@ -260,15 +262,28 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
     let workspace = TempDir::new().unwrap();
     let state = temporary.path().join("state");
     let mut provider = Endpoint::start(vec![
-        Reply::Finished("Parent completed."),
-        Reply::Finished("First child finding."),
-        Reply::Finished("Second child finding."),
+        reported_usage_answer("Parent completed.", 13, 5),
+        reported_usage_answer("First child finding.", 3, 1),
+        reported_usage_answer("Second child finding.", 7, 2),
     ])
     .await;
     let mut first = serve(&state, &provider.url).await;
     let parent = new_session(&mut first, workspace.path()).await;
     let parent_turn = settle_parent(&mut first, &parent).await;
     provider.request().await;
+    let parent_basis = json!({"sessionId":parent,"turnId":parent_turn});
+    let parent_result = first.request(SUMMARY, parent_basis.clone()).await;
+    let usage = |input, output| {
+        json!({
+            "reported": [
+                {"category":"input","tokens":input,"partial":false},
+                {"category":"output","tokens":output,"partial":false},
+                {"category":"cached_input","tokens":"0","partial":false},
+            ],
+            "attemptsWithoutCounts": 0,
+        })
+    };
+    assert_eq!(parent_result["result"]["tokenUsage"], usage("13", "5"));
 
     let created = first.request(CREATE, create(&parent)).await;
     let child = created["result"]["childId"].as_str().unwrap().to_owned();
@@ -332,6 +347,7 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
     assert_eq!(before["allocation"], json!({"workTurns":2,"reserved":1}));
     assert_eq!(first_result["parentTurnId"], parent_turn);
     assert_eq!(first_result["result"]["text"], "First child finding.");
+    assert_eq!(first_result["result"]["tokenUsage"], usage("3", "1"));
     assert_eq!(first_result["instructionPreview"], "Check the first point.");
     assert_eq!(first_result["instructionTruncated"], false);
     first.close().await;
@@ -344,6 +360,14 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
         observed_assignment(&mut second, &parent, &child).await,
         *first_result
     );
+    assert_eq!(
+        second.request(SUMMARY, parent_basis).await["result"],
+        parent_result["result"]
+    );
+    assert!(matches!(
+        provider.requests.try_recv(),
+        Err(mpsc::error::TryRecvError::Empty)
+    ));
     assert_eq!(
         second.request(ASSIGN, first_input.clone()).await["result"],
         *first_result
@@ -381,6 +405,7 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
         after["assignment"]["result"]["text"],
         "Second child finding."
     );
+    assert_eq!(after["assignment"]["result"]["tokenUsage"], usage("7", "2"));
     assert_eq!(
         after["assignment"]["instructionPreview"],
         &instructions[..instructions.floor_char_boundary(1024)]

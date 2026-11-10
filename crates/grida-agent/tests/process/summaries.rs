@@ -15,19 +15,20 @@ fn rejected(status: &str, code: &str) -> Reply {
     ))
 }
 
-fn reported_usage_answer() -> Reply {
-    let mut body = fixture_body(
-        Reply::Finished("Finished and ready to review."),
-        ProviderProtocol::OpenAiCompatible,
-    );
+pub(super) fn reported_usage_answer(
+    text: &'static str,
+    input_tokens: u64,
+    output_tokens: u64,
+) -> Reply {
+    let mut body = fixture_body(Reply::Finished(text), ProviderProtocol::OpenAiCompatible);
     body.truncate(body.len() - "data: [DONE]\n\n".len());
-    for prompt_tokens in [5, 11, 11] {
+    for prompt_tokens in [input_tokens / 2, input_tokens, input_tokens] {
         let usage = json!({
             "id": "fixture-response",
             "choices": [],
             "usage": {
                 "prompt_tokens": prompt_tokens,
-                "completion_tokens": 3,
+                "completion_tokens": output_tokens,
                 "prompt_tokens_details": { "cached_tokens": 0 }
             }
         });
@@ -74,7 +75,7 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
     );
     let (mut replies, expected): (Vec<_>, Vec<_>) = [
         (
-            reported_usage_answer(),
+            reported_usage_answer("Finished and ready to review.", 11, 3),
             "succeeded",
             "Finished and ready to review.",
         ),
