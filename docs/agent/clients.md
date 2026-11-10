@@ -141,6 +141,12 @@ requires an Act launch.
 
 ### Choose how much effort a task gets
 
+In a supported Desktop chat, choose **Standard** or **Ultra** beside **Plan**
+and **Act**. The Effort choice applies to the next message you send or queue.
+Steering keeps the current turn's effort. Editing a queued or earlier
+message keeps the original choice. Revising an earlier Ultra message
+requires a connection that supports Ultra.
+
 `run --effort standard` uses the ordinary task allowance and is the default.
 Use `run --effort ultra` when an independent review could help. Ultra gives
 the main agent more room to work and can start one separate reviewer while it
@@ -148,7 +154,8 @@ continues. The reviewer receives a text assignment without access to the
 parent's tools or chat history. The agent can collect a verified finding or
 see that the review is still pending or uncertain.
 The finished record identifies the reviewer and records whether its verified
-findings were collected.
+findings were collected. Desktop shows whether findings were collected in
+**Turn summary**.
 
 Ultra is available in Plan and Act on the source-built host. It requires a
 model with JSON tool calls and a provider that supports a bounded output.

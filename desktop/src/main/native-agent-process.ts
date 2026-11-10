@@ -27,6 +27,7 @@ const REQUEST_LIMIT = 16;
 const START_TIMEOUT_MS = 10_000;
 const SHUTDOWN_TIMEOUT_MS = 12_000;
 const KILL_TIMEOUT_MS = 2_000;
+const SESSION_EFFORT = "co.grida/session/effort";
 const SUBAGENT_CAPABILITIES = {
   "co.grida/subagent/list": 1,
   "co.grida/subagent/create": 1,
@@ -98,6 +99,7 @@ export class NativeAgentProcess {
   private nextId = 1;
   private ready = false;
   private imageInput = false;
+  private agentEffort = false;
   private scheduledWakeups = false;
   private historyRevision = false;
   private namedChildren = false;
@@ -164,6 +166,10 @@ export class NativeAgentProcess {
 
   get acceptsPng(): boolean {
     return this.connected && this.imageInput;
+  }
+
+  get acceptsEffort(): boolean {
+    return this.connected && this.agentEffort;
   }
 
   get acceptsWakeups(): boolean {
@@ -319,6 +325,7 @@ export class NativeAgentProcess {
                 ...NativeAgentRevisions.capabilities,
                 ...(options.subagents && {
                   ...SUBAGENT_CAPABILITIES,
+                  [SESSION_EFFORT]: 1,
                   [CHILD_STEERING]: 1,
                   [CHILD_MESSAGING]: 1,
                   [CHILD_QUEUE[0]]: 1,
@@ -351,6 +358,8 @@ export class NativeAgentProcess {
       }
       processOwner.imageInput =
         object(agentCapabilities?.promptCapabilities)?.image === true;
+      processOwner.agentEffort =
+        options.subagents === true && advertised?.[SESSION_EFFORT] === 1;
       processOwner.scheduledWakeups = Object.keys(
         NativeAgentWakeups.capabilities
       ).every((key) => advertised?.[key] === 1);

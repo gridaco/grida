@@ -351,13 +351,28 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
-    (event, id: string, input: string, text: string, regime?: unknown) =>
-      nativeChat.submit(event, id, input, text, regime)
+    (
+      event,
+      id: string,
+      input: string,
+      text: string,
+      regime?: unknown,
+      effort?: unknown
+    ) => nativeChat.submit(event, id, input, text, regime, effort)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_ENQUEUE,
-    (event, id: string, input: string, text: string, regime?: unknown) =>
-      nativeChat.enqueue(event, id, input, text, regime)
+    (
+      event,
+      id: string,
+      input: string,
+      text: string,
+      regime?: unknown,
+      effort?: unknown
+    ) => nativeChat.enqueue(event, id, input, text, regime, effort)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT, (event) =>
+    nativeChat.acceptsEffort(event)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG, (event) =>
     nativeChat.acceptsPng(event)

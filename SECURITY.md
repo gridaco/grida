@@ -896,6 +896,11 @@ lazy reads, read-only mutation, and symlink escape refusal.
   session, turn, and revisions. A reconnect requires a new attachment before
   the same scoped control can be retried. [Process tests](desktop/src/main/native-agent-chat.test.ts)
   cover cross-session rejection, stale controls, and continuation after restart.
+  The workspace Effort choice is forwarded only when the trusted native
+  child negotiates it. Main preserves the exact choice for reviewed requests
+  and refuses to resubmit a retained Ultra message on an incompatible
+  connection. The renderer sees only whether review findings were collected
+  in a summary for its exact observed turn.
 - [Desktop workspace ownership](desktop/src/main/native-workspace-agents.ts)
   shares one startup across requests for the same registered workspace and
   canonical root. It bounds concurrent engine ownership and withdraws lookup

@@ -14,6 +14,7 @@ import type {
   NativeChatRevisionTarget,
   NativeChatConfigurationInput,
   NativeChatControlReceipt,
+  NativeChatEffort,
   NativeChatGoalControl,
   NativeChatGoalReceipt,
   NativeChatGoalRequest,
@@ -181,6 +182,7 @@ type QueuePosition = Readonly<{
   inputPosition: number;
   goalStart?: NativeChatGoalRequest;
   operatingRegime?: NativeChatOperatingRegime;
+  effort?: "ultra";
   allowsConfigurationChange?: true;
 }>;
 const observed = new WeakMap<
@@ -234,6 +236,10 @@ export class NativeAgentChat {
 
   get acceptsPng(): boolean {
     return this.connected && this.process.acceptsPng;
+  }
+
+  get acceptsEffort(): boolean {
+    return this.connected && this.process.acceptsEffort;
   }
 
   get acceptsWakeups(): boolean {
@@ -389,7 +395,8 @@ export class NativeAgentChat {
       (revision) => {
         this.requireAttached(session);
         check(revision);
-      }
+      },
+      { selection: input.effort, available: this.acceptsEffort }
     );
   }
 
@@ -678,10 +685,12 @@ export class NativeAgentChat {
     inputId: string,
     text: string,
     operatingRegime?: NativeChatOperatingRegime,
-    editorSurfaces?: NativeEditorSurfaceSelection
+    editorSurfaces?: NativeEditorSurfaceSelection,
+    effort?: NativeChatEffort
   ): Promise<NativeChatAcceptance> {
     return this.send("submit", session, inputId, text, operatingRegime, {
       editorSurfaces,
+      effort,
     });
   }
 
@@ -689,22 +698,27 @@ export class NativeAgentChat {
     session: NativeChatSession,
     inputId: string,
     text: string,
-    operatingRegime?: NativeChatOperatingRegime
+    operatingRegime?: NativeChatOperatingRegime,
+    effort?: NativeChatEffort
   ): Promise<NativeChatAcceptance> {
-    return this.send("enqueue", session, inputId, text, operatingRegime);
+    return this.send("enqueue", session, inputId, text, operatingRegime, {
+      effort,
+    });
   }
 
   submitWithWakeup(
     session: NativeChatSession,
     inputId: string,
     text: string,
-    editorSurfaces?: NativeEditorSurfaceSelection
+    editorSurfaces?: NativeEditorSurfaceSelection,
+    effort?: NativeChatEffort
   ): Promise<NativeChatAcceptance> {
     if (!this.acceptsWakeups)
       return Promise.reject(new Error("native_chat_wakeup_unavailable"));
     return this.send("submit", session, inputId, text, "act", {
       allowWakeups: true,
       editorSurfaces,
+      effort,
     });
   }
 
@@ -753,7 +767,14 @@ export class NativeAgentChat {
     this.requireAttached(session);
     if (!this.acceptsPng) throw new Error("image_input_unavailable");
     const input = object(value);
-    if (Object.keys(input).length !== 5 || typeof input.text !== "string")
+    const effort =
+      input.effort === undefined
+        ? undefined
+        : choice(input.effort, ["standard", "ultra"] as const);
+    if (
+      Object.keys(input).length !== (effort ? 6 : 5) ||
+      typeof input.text !== "string"
+    )
       throw invalidResponse();
     return this.send(
       choice(input.action, ["submit", "enqueue"] as const),
@@ -761,7 +782,7 @@ export class NativeAgentChat {
       identity(input.inputId),
       input.text,
       choice(input.operatingRegime, ["act", "plan"] as const),
-      { image: pngPrompt(input.png) }
+      { image: pngPrompt(input.png), effort }
     );
   }
 
@@ -776,18 +797,27 @@ export class NativeAgentChat {
       allowConfigurationChanges?: true;
       allowWakeups?: true;
       editorSurfaces?: NativeEditorSurfaceSelection;
+      effort?: NativeChatEffort;
     } = {}
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     identity(inputId);
-    const { image, allowConfigurationChanges, allowWakeups, editorSurfaces } =
-      options;
+    const {
+      image,
+      allowConfigurationChanges,
+      allowWakeups,
+      editorSurfaces,
+      effort,
+    } = options;
+    if (effort !== undefined && !this.acceptsEffort)
+      throw new Error("native_chat_effort_unavailable");
     return acceptance(
       await this.process.request(`_co.grida/session/${mode}`, {
         sessionId,
         inputId,
         prompt: [...textPrompt(text), ...(image ? [image] : [])],
         ...(operatingRegime && { operatingRegime }),
+        ...(effort && { effort }),
         ...(allowConfigurationChanges && { allowConfigurationChanges }),
         ...(allowWakeups && { allowWakeups }),
         ...(mode === "submit" &&
@@ -825,7 +855,7 @@ export class NativeAgentChat {
         input.inputId,
         input.text,
         "act",
-        { allowConfigurationChanges: true }
+        { allowConfigurationChanges: true, effort: input.effort }
       );
     } catch (error) {
       if (
@@ -852,6 +882,7 @@ export class NativeAgentChat {
       if (
         settings.configurationPermission !== "change" ||
         settings.operatingRegime !== "act" ||
+        (settings.effort ?? "standard") !== (input.effort ?? "standard") ||
         part?.type !== "text" ||
         part.text !== input.text
       )
@@ -965,6 +996,9 @@ export class NativeAgentChat {
         result.checks.map((check: unknown) => choice(check, CHECK_STATUSES))
       ),
       ...(usage && { tokenUsage: usage }),
+      ...(typeof result.reviewFindingsCollected === "boolean" && {
+        reviewFindingsCollected: result.reviewFindingsCollected,
+      }),
       ...(this.process.acceptsArtifacts &&
         result.artifacts !== undefined && {
           artifacts: NativeAgentArtifacts.describe(result.artifacts),
@@ -1029,6 +1063,7 @@ export class NativeAgentChat {
         preview,
         ...(row.goalStart && { goalStart: row.goalStart }),
         ...(row.operatingRegime && { operatingRegime: row.operatingRegime }),
+        ...(row.effort && { effort: row.effort }),
         ...(row.allowsConfigurationChange && {
           allowsConfigurationChange: true as const,
         }),
@@ -1727,6 +1762,7 @@ function queuePositions(
       ...(settings.operatingRegime === "plan" && {
         operatingRegime: "plan" as const,
       }),
+      ...(settings.effort === "ultra" && { effort: "ultra" as const }),
       ...(settings.configurationPermission === "change" && {
         allowsConfigurationChange: true as const,
       }),

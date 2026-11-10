@@ -62,6 +62,10 @@ export function NativeTurnSummary({
       `Tools unresolved: ${summary.toolActivity.unresolved}`,
     summary.unresolvedOperations &&
       `Unresolved operations: ${summary.unresolvedOperations}`,
+    summary.reviewFindingsCollected !== undefined &&
+      (summary.reviewFindingsCollected
+        ? "Independent review findings collected"
+        : "Independent review findings were not collected"),
   ].filter(Boolean);
   const showText =
     !!text &&

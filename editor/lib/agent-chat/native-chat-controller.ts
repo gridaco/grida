@@ -18,6 +18,7 @@ import type {
   NativeChatRevisionInput,
   NativeChatRevisionTarget,
   NativeChatOperatingRegime,
+  NativeChatEffort,
   NativeChatPage,
   NativeChatQuestion,
   NativeChatQuestionAnswer,
@@ -95,6 +96,8 @@ export type NativeChatView = Readonly<{
   queueDraft: Readonly<{ inputId: string; text: string }> | null;
   steering: boolean;
   operatingRegime: NativeChatOperatingRegime;
+  effort: NativeChatEffort;
+  effortAvailable: boolean;
   goal: NativeChatGoalObservation | null;
   goalReady: boolean;
   loading: boolean;
@@ -145,6 +148,7 @@ type Scope = {
     inputId: string;
     mode: "submit" | "enqueue";
     operatingRegime?: NativeChatOperatingRegime;
+    effort?: NativeChatEffort;
     image?: ArrayBuffer;
     reviewConfiguration: boolean;
     allowWakeup: boolean;
@@ -199,6 +203,8 @@ const EMPTY: NativeChatView = Object.freeze({
   queueDraft: null,
   steering: false,
   operatingRegime: "act",
+  effort: "standard",
+  effortAvailable: false,
   goal: null,
   goalReady: false,
   loading: false,
@@ -401,6 +407,8 @@ export class NativeChatController {
       queueDraft: null,
       steering: false,
       operatingRegime: "act",
+      effort: "standard",
+      effortAvailable: false,
       goal: null,
       goalReady: false,
       loading: sessionId !== null,
@@ -409,6 +417,7 @@ export class NativeChatController {
       error: null,
     });
     void this.readImageCapability(scope);
+    void this.readEffortCapability(scope);
     void this.readWakeupCapability(scope);
     if (sessionId === null) {
       this.save();
@@ -513,6 +522,20 @@ export class NativeChatController {
     if (!this.bridge.acceptsPng || !this.bridge.submitImage) return;
     const supported = await this.bridge.acceptsPng().catch(() => false);
     if (this.owns(scope)) this.update({ imageInput: supported === true });
+  }
+
+  private async readEffortCapability(scope: Scope): Promise<void> {
+    if (!this.bridge.acceptsEffort || !this.bridge.submitInRegime) return;
+    const supported = await this.bridge.acceptsEffort().catch(() => false);
+    if (!this.owns(scope)) return;
+    this.update({
+      effortAvailable: supported === true,
+      ...(supported !== true &&
+        this.view.effort === "ultra" && {
+          effort: "standard",
+          error: "Ultra effort is unavailable on this connection.",
+        }),
+    });
   }
 
   private async readWakeupCapability(scope: Scope): Promise<void> {
@@ -1121,6 +1144,11 @@ export class NativeChatController {
       });
   }
 
+  selectEffort(effort: NativeChatEffort): void {
+    if (this.view.effortAvailable && !this.view.acting && !this.view.steering)
+      this.update({ effort });
+  }
+
   async submit(text: string): Promise<void> {
     const literal = text.trim();
     if (literal === "/compact" || literal === "/fork")
@@ -1162,12 +1190,15 @@ export class NativeChatController {
       image || reviewConfiguration || allowWakeup || this.bridge.submitInRegime
         ? this.view.operatingRegime
         : undefined;
+    const effort = this.view.effortAvailable ? this.view.effort : undefined;
     this.update({ acting: true, error: null });
     try {
       await this.open(scope);
       const attachment = this.attachment(scope);
       if (retained && retained.operatingRegime !== operatingRegime)
         throw new Error("native_chat_pending_regime_changed");
+      if (retained && retained.effort !== effort)
+        throw new Error("native_chat_pending_effort_changed");
       if (retained && retained.reviewConfiguration !== reviewConfiguration)
         throw new Error("native_context_limit_pending_review_changed");
       const pending: NonNullable<Scope["pending"]> = retained ?? {
@@ -1175,6 +1206,7 @@ export class NativeChatController {
         inputId: crypto.randomUUID(),
         mode,
         operatingRegime,
+        effort,
         image,
         reviewConfiguration,
         allowWakeup,
@@ -1188,7 +1220,8 @@ export class NativeChatController {
           accepted = await this.bridge.submitWithWakeup(
             attachment.attachmentId,
             pending.inputId,
-            pending.text
+            pending.text,
+            ...(pending.effort ? [pending.effort] : [])
           );
         } else if (pending.reviewConfiguration) {
           if (!this.bridge.submitWithConfigurationReview)
@@ -1199,6 +1232,7 @@ export class NativeChatController {
               action: pending.mode,
               inputId: pending.inputId,
               text: pending.text,
+              ...(pending.effort && { effort: pending.effort }),
             }
           );
         } else if (pending.image) {
@@ -1210,6 +1244,7 @@ export class NativeChatController {
             text: pending.text,
             png: pending.image,
             operatingRegime: pending.operatingRegime,
+            ...(pending.effort && { effort: pending.effort }),
           });
         } else if (pending.operatingRegime) {
           if (!this.bridge.submitInRegime)
@@ -1219,7 +1254,8 @@ export class NativeChatController {
             attachment.attachmentId,
             pending.inputId,
             pending.text,
-            pending.operatingRegime
+            pending.operatingRegime,
+            ...(pending.effort ? [pending.effort] : [])
           );
         } else {
           const send = this.bridge[pending.mode];
@@ -1460,10 +1496,18 @@ export class NativeChatController {
       this.update({ error: "Resolve the current work before resubmitting." });
       return;
     }
+    if (draft.effort === "ultra" && !this.view.effortAvailable) {
+      this.update({ error: "Ultra effort is unavailable on this connection." });
+      return;
+    }
+    const effort = this.view.effortAvailable
+      ? (draft.effort ?? "standard")
+      : undefined;
     const input = (scope.pendingRevision ??= {
       reviewId: draft.reviewId,
       text: draft.text,
       operatingRegime: this.view.operatingRegime,
+      ...(effort && { effort }),
     });
     this.update({ revisionSubmitting: true, error: null });
     try {
@@ -1484,7 +1528,8 @@ export class NativeChatController {
       const reason = error instanceof Error ? error.message : "";
       const unverified =
         reason.includes("native_chat_revision_unverified") ||
-        reason.includes("native_chat_revision_in_progress");
+        reason.includes("native_chat_revision_in_progress") ||
+        (draft.unverified && reason.includes("native_chat_effort_unavailable"));
       if (!unverified) scope.pendingRevision = undefined;
       this.update({
         revisionDraft: { ...draft, unverified },
@@ -1777,6 +1822,7 @@ export class NativeChatController {
     if (!scope || (!scope.attachment && !scope.requested)) return;
     scope.replay = true;
     void this.readImageCapability(scope);
+    void this.readEffortCapability(scope);
     scope.wakeupSettled = undefined;
     void this.readWakeupCapability(scope);
     if (scope.summaryRequest?.failed) scope.summaryRequest = undefined;
@@ -2657,6 +2703,10 @@ function revisionError(error: unknown): string {
     return "The chat changed. Reopen the message before resubmitting.";
   if (reason.includes("native_chat_revision_text_invalid"))
     return "Enter a replacement message within the text limit.";
+  if (reason.includes("native_chat_effort_unavailable"))
+    return "Ultra effort is unavailable on this connection.";
+  if (reason.includes("native_chat_revision_effort_changed"))
+    return "Resubmit this message with its original effort.";
   return "Couldn't revise this message.";
 }
 
@@ -2755,6 +2805,10 @@ function describe(error: unknown, fallback: string): string {
     return "This chat is too large to restore in the workspace pane.";
   if (error.message.includes("native_chat_pending_regime_changed"))
     return "Retry this draft in its original mode, or edit it to send a new message.";
+  if (error.message.includes("native_chat_pending_effort_changed"))
+    return "Retry with the original effort, or edit the draft to send a new message.";
+  if (error.message.includes("native_chat_effort_unavailable"))
+    return "Ultra effort is unavailable on this connection.";
   if (error.message.includes("image_size_limit"))
     return "Choose a PNG of at most 256 KiB within the supported image dimensions.";
   if (error.message.includes("invalid_png_image"))

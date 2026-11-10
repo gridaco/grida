@@ -6,6 +6,7 @@ import { Textarea } from "@app/ui/components/textarea";
 export function NativeMessageRevisionPanel({
   draft,
   submitting,
+  effortAvailable,
   onChange,
   onCancel,
   onSubmit,
@@ -14,13 +15,16 @@ export function NativeMessageRevisionPanel({
     text: string;
     subsequentMessages: number;
     unverified: boolean;
+    effort?: "ultra";
   };
   submitting: boolean;
+  effortAvailable: boolean;
   onChange: (text: string) => void;
   onCancel: () => void;
   onSubmit: () => void;
 }) {
   const later = draft.subsequentMessages;
+  const effortUnavailable = draft.effort === "ultra" && !effortAvailable;
   return (
     <form
       aria-label="Edit a previous message"
@@ -39,6 +43,13 @@ export function NativeMessageRevisionPanel({
           " in the active chat. The previous view and the effects of completed work are retained."
         }
       </p>
+      {draft.effort === "ultra" && (
+        <p className="text-xs text-muted-foreground">
+          {effortUnavailable
+            ? "This message used Ultra effort, which is unavailable on the current connection."
+            : "This message keeps its original Ultra effort."}
+        </p>
+      )}
       <Textarea
         aria-label="Replacement message"
         className="max-h-36 min-h-20 resize-y text-sm"
@@ -59,7 +70,7 @@ export function NativeMessageRevisionPanel({
         <Button
           type="submit"
           size="xs"
-          disabled={submitting || !draft.text.trim()}
+          disabled={submitting || effortUnavailable || !draft.text.trim()}
         >
           {submitting
             ? "Submitting…"

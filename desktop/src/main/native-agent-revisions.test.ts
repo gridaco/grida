@@ -130,3 +130,50 @@ it("rejects stale frames, wrong returned anchors and other attachment tokens", a
     request.mock.calls.every(([method]) => method.endsWith("/revision-target"))
   ).toBe(true);
 });
+
+it("preserves the captured Ultra effort and refuses an incompatible retry", async () => {
+  const attachment = {};
+  const check = () => {};
+  const requests: unknown[] = [];
+  const adapter = new NativeAgentRevisions(async (method, params) => {
+    if (method.endsWith("/revision-target"))
+      return { ...target, effort: "ultra" };
+    requests.push(params);
+    if (requests.length === 1) throw new Error("native_agent_request_timeout");
+    return {
+      sessionId: session.id,
+      view: 9,
+      inputId: (params as { replacementInputId: string }).replacementInputId,
+      inputPosition: 5,
+    };
+  });
+  const edit = await adapter.prepare(
+    attachment,
+    session,
+    observation,
+    messageId,
+    check
+  );
+  expect(edit.effort).toBe("ultra");
+  const apply = (available: boolean, selection?: "standard" | "ultra") =>
+    adapter.apply(attachment, session, edit.reviewId, "Edited", "plan", check, {
+      available,
+      selection,
+    });
+  await expect(apply(false)).rejects.toThrow("native_chat_effort_unavailable");
+  await expect(apply(true, "standard")).rejects.toThrow(
+    "native_chat_revision_effort_changed"
+  );
+  expect(requests).toHaveLength(0);
+  await expect(apply(true)).rejects.toThrow("native_chat_revision_unverified");
+  await expect(apply(true, "standard")).rejects.toThrow(
+    "native_chat_revision_identity_reused"
+  );
+  await expect(apply(false)).rejects.toThrow("native_chat_effort_unavailable");
+  await apply(true);
+  expect(requests[0]).toMatchObject({
+    effort: "ultra",
+    operatingRegime: "plan",
+  });
+  expect(requests[1]).toBe(requests[0]);
+});

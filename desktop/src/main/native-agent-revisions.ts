@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 — Main captures and owns each exact attached history revision.
 import { randomUUID } from "node:crypto";
 import type {
+  NativeChatEffort,
   NativeChatOperatingRegime,
   NativeChatRevisionReceipt,
   NativeChatRevisionTarget,
@@ -37,6 +38,7 @@ type RevisionRequest = Readonly<{
   anchor: NativeAgentHistory.Anchor;
   prompt: readonly [{ type: "text"; text: string }];
   operatingRegime: NativeChatOperatingRegime;
+  effort?: NativeChatEffort;
 }>;
 
 type Attempt = {
@@ -102,6 +104,7 @@ export class NativeAgentRevisions {
       !expectedHistory ||
       expectedHistory.view > expectedSessionRevision ||
       !revision(reply.subsequentMessages) ||
+      (reply.effort !== undefined && reply.effort !== "ultra") ||
       !validText(reply.text)
     )
       throw new Error("native_chat_revision_target_invalid");
@@ -110,6 +113,7 @@ export class NativeAgentRevisions {
       messageId,
       text: reply.text,
       subsequentMessages: reply.subsequentMessages,
+      ...(reply.effort === "ultra" && { effort: "ultra" as const }),
     });
     this.captures.set(attachment, {
       session,
@@ -127,23 +131,34 @@ export class NativeAgentRevisions {
     reviewId: string,
     text: string,
     operatingRegime: NativeChatOperatingRegime,
-    check: Check
+    check: Check,
+    effort?: { selection?: NativeChatEffort; available: boolean }
   ): Promise<NativeChatRevisionReceipt> {
     const capture = this.captures.get(attachment);
     if (capture?.target.reviewId !== reviewId || capture.session !== session)
       throw new Error("native_chat_revision_target_changed");
     if (!validText(text)) throw new Error("native_chat_revision_text_invalid");
+    const selectedEffort = effort?.selection ?? capture.target.effort;
     let attempt = capture.attempt;
     if (attempt) {
       if (
         attempt.request.prompt[0].text !== text ||
-        attempt.request.operatingRegime !== operatingRegime
+        attempt.request.operatingRegime !== operatingRegime ||
+        attempt.request.effort !== selectedEffort
       )
         throw new Error("native_chat_revision_identity_reused");
       check();
       if (attempt.receipt) return attempt.receipt;
       if (attempt.active) throw new Error("native_chat_revision_in_progress");
-    } else {
+    }
+    if (
+      effort?.selection !== undefined &&
+      effort.selection !== (capture.target.effort ?? "standard")
+    )
+      throw new Error("native_chat_revision_effort_changed");
+    if (selectedEffort !== undefined && !effort?.available)
+      throw new Error("native_chat_effort_unavailable");
+    if (!attempt) {
       check(capture.expectedSessionRevision);
       attempt = {
         request: {
@@ -155,6 +170,7 @@ export class NativeAgentRevisions {
           anchor: capture.anchor,
           prompt: [{ type: "text", text }],
           operatingRegime,
+          ...(selectedEffort && { effort: selectedEffort }),
         },
         active: false,
       };

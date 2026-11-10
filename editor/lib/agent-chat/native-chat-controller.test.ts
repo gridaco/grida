@@ -368,6 +368,10 @@ it("revises the exact earlier message and keeps the same receipt request after a
   transcripts.set(source, [first, later]);
   const observe = bridge.observe.bind(bridge);
   let supported = false;
+  let effortAvailable = false;
+  bridge.acceptsEffort = async () => effortAvailable;
+  bridge.submitInRegime = (_action, attachment, id, text) =>
+    bridge.submit(attachment, id, text);
   bridge.observe = async (id) => {
     const observation = await observe(id);
     return supported
@@ -383,6 +387,7 @@ it("revises the exact earlier message and keeps the same receipt request after a
     messageId: first.messageId,
     text: first.text,
     subsequentMessages: 1,
+    effort: "ultra",
   });
   bridge.prepareRevision = prepare;
   const revise =
@@ -422,6 +427,12 @@ it("revises the exact earlier message and keeps the same receipt request after a
   expect(controller.read().revisionDraft?.text).toBe(first.text);
   controller.changeRevisionText("Revised first");
   await controller.submitRevision();
+  expect(revise).not.toHaveBeenCalled();
+  expect(controller.read().error).toContain("Ultra effort is unavailable");
+  effortAvailable = true;
+  await controller.repair();
+  await controller.submitRevision();
+  expect(revise.mock.calls[0]?.[1].effort).toBe("ultra");
   expect(controller.read().revisionDraft?.unverified).toBe(true);
   controller.changeRevisionText("Do not change the request");
   controller.cancelRevision();
@@ -1430,6 +1441,58 @@ it("keeps reviewed configuration separate from normal and Plan sends", async () 
   expect(reviewed.mock.calls[0]).toEqual(reviewed.mock.calls[1]);
   expect(controller.read().reviewConfiguration).toBe(false);
   expect(normal).toHaveBeenCalledTimes(1);
+  controller.disconnect();
+});
+
+it("captures effort separately from Plan or Act and preserves it across a lost send", async () => {
+  const { bridge, controller, running } = fixture();
+  let effortAvailable = true;
+  bridge.acceptsEffort = async () => effortAvailable;
+  bridge.enqueue = (attachment, id, text) =>
+    bridge.submit(attachment, id, text);
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+    async (_action, attachment, id, text) => bridge.submit(attachment, id, text)
+  );
+  send.mockRejectedValueOnce(new Error("fixture lost send"));
+  bridge.submitInRegime = send;
+  running.add("chat-a");
+  await controller.select("chat-a");
+  expect(controller.read().effortAvailable).toBe(true);
+  controller.selectEffort("ultra");
+  controller.selectOperatingRegime("plan");
+  await expect(controller.submit("Review this plan.")).rejects.toThrow(
+    "fixture lost send"
+  );
+  controller.selectEffort("standard");
+  await expect(controller.submit("Review this plan.")).rejects.toThrow(
+    "native_chat_pending_effort_changed"
+  );
+  controller.selectEffort("ultra");
+  await controller.submit("Review this plan.");
+  expect(send.mock.calls[0]).toEqual(send.mock.calls[1]);
+  expect(send.mock.calls[1]).toEqual([
+    "enqueue",
+    "chat-a",
+    expect.any(String),
+    "Review this plan.",
+    "plan",
+    "ultra",
+  ]);
+  effortAvailable = false;
+  await controller.select("chat-b");
+  controller.selectEffort("ultra");
+  expect(controller.read()).toMatchObject({
+    effortAvailable: false,
+    effort: "standard",
+  });
+  await controller.submit("Send on the earlier connection.");
+  expect(send.mock.calls[2]).toEqual([
+    "submit",
+    "chat-b",
+    expect.any(String),
+    "Send on the earlier connection.",
+    "act",
+  ]);
   controller.disconnect();
 });
 

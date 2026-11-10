@@ -209,7 +209,11 @@ it("keeps older settled summaries and projects only bounded reported token count
     toolActivity: null,
     checks: [],
   };
-  let wire: typeof summary & { tokenUsage?: unknown } = summary;
+  let wire: typeof summary & {
+    tokenUsage?: unknown;
+    reviewFindingsCollected?: unknown;
+    childId?: unknown;
+  } = summary;
   const start = vi.spyOn(NativeAgentProcess, "start");
   start.mockResolvedValueOnce({
     request: async (method: string) => {
@@ -240,6 +244,15 @@ it("keeps older settled summaries and projects only bounded reported token count
     const session = await client.create();
     const snapshot = await client.observe(session);
     const read = () => client!.turnSummary(session, snapshot);
+    await expect(read()).resolves.toEqual(summary);
+    for (const reviewFindingsCollected of [true, false]) {
+      wire = { ...summary, reviewFindingsCollected, childId: "private-child" };
+      await expect(read()).resolves.toEqual({
+        ...summary,
+        reviewFindingsCollected,
+      });
+    }
+    wire = { ...summary, reviewFindingsCollected: "true" };
     await expect(read()).resolves.toEqual(summary);
     const output = { category: "output", tokens: "0", partial: true };
     const usage = { reported: [output], attemptsWithoutCounts: 1 };

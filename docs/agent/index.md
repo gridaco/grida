@@ -42,12 +42,15 @@ can still work with the same project files. [Ask in a side chat](./clients.md#as
 ## Give independent work a place
 
 On a supported Gateway connection, use **Subagents** to give a named
-reviewer an independent text assignment and inspect its findings. To let
+reviewer an independent text assignment and inspect its findings. Choose
+**Ultra** from **Effort** when the agent should decide whether to start an
+independent review. To let
 the same task check back once later, enable a scheduled check-in on an
 eligible Act message. A persistent goal can keep a larger task's objective,
 success criteria, and work allowance visible across turns.
 
 - [Work with subagents](./subagents.md)
+- [Choose how much effort a task gets](./clients.md#choose-how-much-effort-a-task-gets)
 - [Schedule a follow-up](./scheduled-work.md)
 - [Work toward a persistent goal](./clients.md#work-toward-a-persistent-goal)
 

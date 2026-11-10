@@ -11,6 +11,7 @@ import type {
   NativeChatCommandResult,
   NativeChatConfigurationInput,
   NativeChatControlReceipt,
+  NativeChatEffort,
   NativeChatGoalObservation,
   NativeChatGoalReceipt,
   NativeChatImageArtifact,
@@ -46,7 +47,10 @@ import type {
 import type { NativeApprovalReview } from "./native-agent-permissions";
 import type { NativeGoalInspection } from "./native-agent-goals";
 import type { NativeSideChat } from "./native-agent-side-chats";
-import type { NativeEditorSurfaceLease } from "./native-editor-surfaces";
+import type {
+  NativeEditorSurfaceLease,
+  NativeEditorSurfaceSelection,
+} from "./native-editor-surfaces";
 import {
   contextLimitValue,
   type ContextLimitBasis,
@@ -123,6 +127,7 @@ export type ActiveNativeChat = Readonly<{
         | "controlSubagentChild"
         | "readArtifact"
         | "acceptsWakeups"
+        | "acceptsEffort"
         | "submitWithWakeup"
         | "scheduledWakeup"
         | "controlWakeup"
@@ -381,12 +386,13 @@ export class NativeChatIpc {
     if (
       !chat.revise ||
       !input ||
-      Object.keys(input).length !== 3 ||
+      Object.keys(input).length !== (input.effort === undefined ? 3 : 4) ||
       !token(input.reviewId) ||
       typeof input.text !== "string" ||
       (input.operatingRegime !== "act" && input.operatingRegime !== "plan")
     )
       throw new Error("native_chat_revision_unavailable");
+    const effort = agentEffort(input.effort);
     return chat.revise(
       attachment,
       attachment.session,
@@ -394,6 +400,7 @@ export class NativeChatIpc {
         reviewId: input.reviewId,
         text: input.text,
         operatingRegime: input.operatingRegime,
+        ...(effort && { effort }),
       },
       (expected) => this.revalidateRevision(owner, attachment, expected)
     );
@@ -779,18 +786,20 @@ export class NativeChatIpc {
     attachmentId: string,
     inputId: string,
     text: string,
-    regime?: unknown
+    regime?: unknown,
+    effort?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const mode = operatingRegime(regime);
+    const selected = agentEffort(effort);
+    const surfaces =
+      mode === "act" ? attachment.editorSurfaces?.selection() : undefined;
     const result = await owner.active.chat.submit(
       attachment.session,
       inputId,
       text,
       mode,
-      ...(mode === "act" && attachment.editorSurfaces
-        ? ([attachment.editorSurfaces.selection()] as const)
-        : [])
+      ...submitSelections(surfaces, selected)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -801,14 +810,17 @@ export class NativeChatIpc {
     attachmentId: string,
     inputId: string,
     text: string,
-    regime?: unknown
+    regime?: unknown,
+    effort?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const selected = agentEffort(effort);
     const result = await owner.active.chat.enqueue(
       attachment.session,
       inputId,
       text,
-      operatingRegime(regime)
+      operatingRegime(regime),
+      ...(selected ? [selected] : [])
     );
     this.revalidate(owner, attachment);
     return result;
@@ -818,23 +830,28 @@ export class NativeChatIpc {
     return this.owner(event).active.chat.acceptsWakeups === true;
   }
 
+  acceptsEffort(event: IpcMainInvokeEvent): boolean {
+    return this.owner(event).active.chat.acceptsEffort === true;
+  }
+
   async submitWithWakeup(
     event: IpcMainInvokeEvent,
     attachmentId: string,
     inputId: string,
-    text: string
+    text: string,
+    effort?: unknown
   ): Promise<NativeChatAcceptance> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const chat = owner.active.chat;
     if (!chat.acceptsWakeups || !chat.submitWithWakeup)
       throw new Error("native_chat_wakeup_unavailable");
+    const selected = agentEffort(effort);
+    const surfaces = attachment.editorSurfaces?.selection();
     const result = await chat.submitWithWakeup(
       attachment.session,
       inputId,
       text,
-      ...(attachment.editorSurfaces
-        ? ([attachment.editorSurfaces.selection()] as const)
-        : [])
+      ...submitSelections(surfaces, selected)
     );
     this.revalidate(owner, attachment);
     return result;
@@ -995,11 +1012,14 @@ export class NativeChatIpc {
   ): Promise<NativeChatAcceptance> {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const input = configurationInput(value);
+    if (input.effort !== undefined && !owner.active.chat.acceptsEffort)
+      throw new Error("native_chat_effort_unavailable");
     let review = attachment.reviewedConfiguration;
     if (review?.input.inputId === input.inputId) {
       if (
         review.input.text !== input.text ||
-        review.input.action !== input.action
+        review.input.action !== input.action ||
+        review.input.effort !== input.effort
       )
         throw new Error("native_context_limit_review_reused");
       if (review.accepted) return review.accepted;
@@ -1930,11 +1950,25 @@ function operatingRegime(
   throw new Error("native_chat_operating_regime_invalid");
 }
 
+function agentEffort(value: unknown): NativeChatEffort | undefined {
+  if (value === undefined || value === "standard" || value === "ultra")
+    return value;
+  throw new Error("native_chat_effort_invalid");
+}
+
+function submitSelections(
+  surfaces: NativeEditorSurfaceSelection | undefined,
+  effort: NativeChatEffort | undefined
+): [surfaces?: NativeEditorSurfaceSelection, effort?: NativeChatEffort] {
+  if (effort) return [surfaces, effort];
+  return surfaces ? [surfaces] : [];
+}
+
 function configurationInput(value: unknown): NativeChatConfigurationInput {
   const input = record(value);
   if (
     !input ||
-    Object.keys(input).length !== 3 ||
+    Object.keys(input).length !== (input.effort === undefined ? 3 : 4) ||
     (input.action !== "submit" && input.action !== "enqueue") ||
     !token(input.inputId) ||
     typeof input.text !== "string" ||
@@ -1942,7 +1976,13 @@ function configurationInput(value: unknown): NativeChatConfigurationInput {
     Buffer.byteLength(input.text) > MAX_CONFIGURATION_MESSAGE_BYTES
   )
     throw new Error("native_context_limit_review_invalid");
-  return { action: input.action, inputId: input.inputId, text: input.text };
+  const effort = agentEffort(input.effort);
+  return {
+    action: input.action,
+    inputId: input.inputId,
+    text: input.text,
+    ...(effort && { effort }),
+  };
 }
 
 function requireObservation(

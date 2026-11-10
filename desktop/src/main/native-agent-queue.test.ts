@@ -7,6 +7,7 @@ import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
 import { NativeChatIpc } from "./native-chat-ipc";
+import { NativeGatewayConnection } from "./native-gateway-connection";
 
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 
@@ -29,7 +30,11 @@ async function provider() {
     request.on("end", () => {
       requests.push(body);
       const index = requests.length;
-      if (request.url !== "/v1/chat/completions" || index > 4) {
+      if (
+        (request.url !== "/v1/chat/completions" &&
+          request.url !== "/api/v1/ai/chat/completions") ||
+        index > 4
+      ) {
         response.writeHead(400).end();
         return;
       }
@@ -47,6 +52,7 @@ async function provider() {
   if (!address || typeof address === "string")
     throw new Error("fixture_listener_unavailable");
   return {
+    origin: `http://127.0.0.1:${address.port}`,
     endpoint: `http://127.0.0.1:${address.port}/v1`,
     requests,
     release: (index: number) =>
@@ -60,9 +66,9 @@ async function provider() {
   };
 }
 
-it.runIf(Boolean(packaged))(
-  "edits the retained queue and steers the active turn using separate exact bases",
-  async () => {
+it.runIf(Boolean(packaged)).each([false, true])(
+  "edits the retained queue and steers the active turn with effort opt-in %s",
+  async (effortEnabled) => {
     const root = fs.mkdtempSync(
       path.join(fs.realpathSync(os.tmpdir()), "grida-queue-")
     );
@@ -81,20 +87,49 @@ it.runIf(Boolean(packaged))(
       senderFrame: frame,
     } as unknown as IpcMainInvokeEvent;
     let chat: NativeAgentChat | undefined;
+    let gateway: NativeGatewayConnection | undefined;
     try {
+      if (effortEnabled)
+        gateway = await NativeGatewayConnection.open({
+          origin: endpoint.origin,
+          account: {
+            withGatewayGrant: async (_, accept) =>
+              accept({
+                token: "synthetic.queue.fixture",
+                expiresAt: Date.now() + 120_000,
+                subject: "queue-fixture",
+                organizationId: 1,
+                isCurrent: () => true,
+              }),
+          },
+          network: {
+            prepare: (target, headers) => (body, signal) =>
+              fetch(target, {
+                method: "POST",
+                body: new Uint8Array(body),
+                headers,
+                signal,
+              }),
+          },
+        });
       chat = await NativeAgentChat.start({
         resourcesPath: packaged!,
         stateDirectory: path.join(root, "state"),
         cwd,
-        provider: "openai-compatible",
-        endpoint: endpoint.endpoint,
-        model: "fixture",
+        ...(gateway
+          ? { ...gateway.launch("fixture"), subagents: true }
+          : {
+              provider: "openai-compatible",
+              endpoint: endpoint.endpoint,
+              model: "fixture",
+            }),
       });
       const active = { workspaceId: "workspace", chat };
       const ipc = new NativeChatIpc(origin, (candidate) =>
         candidate === sender ? active : null
       );
       const { attachmentId } = await ipc.create(event);
+      expect(ipc.acceptsEffort(event)).toBe(effortEnabled);
       const snapshot = () => ipc.observe(event, attachmentId);
       const page = async () => {
         const basis = await snapshot();
@@ -111,11 +146,47 @@ it.runIf(Boolean(packaged))(
       await expect(
         ipc.enqueue(event, attachmentId, "b", "Beta next.", "invalid-mode")
       ).rejects.toThrow("native_chat_operating_regime_invalid");
-      await ipc.enqueue(event, attachmentId, "b", "Beta next.", "plan");
+      await expect(
+        ipc.enqueue(
+          event,
+          attachmentId,
+          "b",
+          "Beta next.",
+          "plan",
+          "invalid-effort"
+        )
+      ).rejects.toThrow("native_chat_effort_invalid");
+      await ipc.enqueue(
+        event,
+        attachmentId,
+        "b",
+        "Beta next.",
+        "plan",
+        effortEnabled ? "ultra" : undefined
+      );
+      await expect(
+        ipc.enqueue(
+          event,
+          attachmentId,
+          "b",
+          "Beta next.",
+          "plan",
+          effortEnabled ? "standard" : "ultra"
+        )
+      ).rejects.toThrow(
+        effortEnabled
+          ? "submission_effort_changed"
+          : "native_chat_effort_unavailable"
+      );
       await ipc.enqueue(event, attachmentId, "c", "Gamma next.");
       expect((await page()).items).toEqual([
         { inputId: "a", preview: "Alpha next." },
-        { inputId: "b", preview: "Beta next.", operatingRegime: "plan" },
+        {
+          inputId: "b",
+          preview: "Beta next.",
+          operatingRegime: "plan",
+          ...(effortEnabled && { effort: "ultra" }),
+        },
         { inputId: "c", preview: "Gamma next." },
       ]);
       const captured = await snapshot();
@@ -156,6 +227,9 @@ it.runIf(Boolean(packaged))(
         "Gamma next.",
       ]);
       expect((await page()).items[1].operatingRegime).toBe("plan");
+      expect((await page()).items[1].effort).toBe(
+        effortEnabled ? "ultra" : undefined
+      );
 
       await ipc.editQueue(event, attachmentId, {
         action: "move",
@@ -216,6 +290,9 @@ it.runIf(Boolean(packaged))(
       await vi.waitFor(() => expect(endpoint.requests).toHaveLength(4));
       expect(endpoint.requests[2]).not.toContain("Plan is active");
       expect(endpoint.requests[3]).toContain("Plan is active");
+      expect(endpoint.requests[3].includes("collect_review")).toBe(
+        effortEnabled
+      );
       await vi.waitFor(async () => {
         expect((await snapshot()).snapshot.current).toBeNull();
         expect(
@@ -239,6 +316,7 @@ it.runIf(Boolean(packaged))(
       try {
         await chat?.close();
       } finally {
+        gateway?.close();
         await endpoint.close();
         fs.rmSync(root, { recursive: true, force: true });
       }

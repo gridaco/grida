@@ -400,6 +400,7 @@ export function NativeAgentPane({
         <NativeMessageRevisionPanel
           draft={state.revisionDraft}
           submitting={state.revisionSubmitting}
+          effortAvailable={state.effortAvailable}
           onChange={(text) => controller.changeRevisionText(text)}
           onCancel={() => controller.cancelRevision()}
           onSubmit={() => void controller.submitRevision()}
@@ -460,7 +461,7 @@ export function NativeAgentPane({
               id: item.inputId,
               text: item.goalStart
                 ? `Goal: ${item.preview ?? item.goalStart.objective}`
-                : `${item.operatingRegime === "plan" ? "Plan: " : item.allowsConfigurationChange ? "Settings permitted: " : ""}${item.preview ?? "Queued input with other content"}`,
+                : `${item.operatingRegime === "plan" ? "Plan · " : item.allowsConfigurationChange ? "Settings permitted · " : ""}${item.effort === "ultra" ? "Ultra · " : ""}${item.preview ?? "Queued input with other content"}`,
             }))}
             actions={(inputId, index) => {
               const position = queue.offset + index;
@@ -854,6 +855,27 @@ export function NativeAgentPane({
                   <option value="plan">Plan</option>
                 </select>
               )}
+              {state.effortAvailable &&
+                !state.steering &&
+                !state.revisionDraft && (
+                  <select
+                    aria-label="Effort for next message"
+                    title="Effort for next message"
+                    className="rounded-md bg-transparent px-1.5 text-xs"
+                    value={state.effort}
+                    disabled={state.acting}
+                    onChange={(event) =>
+                      controller.selectEffort(
+                        event.currentTarget.value === "ultra"
+                          ? "ultra"
+                          : "standard"
+                      )
+                    }
+                  >
+                    <option value="standard">Standard</option>
+                    <option value="ultra">Ultra</option>
+                  </select>
+                )}
               {(running || waitingForCheckIn) && !goalTurn ? (
                 <Button
                   type="button"

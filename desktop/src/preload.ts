@@ -583,7 +583,8 @@ const bridge: DesktopBridge = {
         attachmentId,
         inputId,
         text,
-        operatingRegime
+        operatingRegime,
+        ...(effort === undefined ? [] : [effort])
       ),
     enqueue: (attachmentId, inputId, text) =>
       ipcRenderer.invoke(
@@ -600,15 +601,18 @@ const bridge: DesktopBridge = {
       ),
     observe: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
+    acceptsEffort: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_EFFORT),
     acceptsPng: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
     acceptsWakeups: () =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_WAKEUPS),
-    submitWithWakeup: (attachmentId, inputId, text) =>
+    submitWithWakeup: (attachmentId, inputId, text, effort) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_WAKEUP,
         attachmentId,
         inputId,
-        text
+        text,
+        ...(effort === undefined ? [] : [effort])
       ),
     scheduledWakeup: (attachmentId, observationId) =>
       ipcRenderer.invoke(

@@ -11,6 +11,7 @@ export type NativeChatAttachment = Readonly<{
 }>;
 
 export type NativeChatOperatingRegime = "act" | "plan";
+export type NativeChatEffort = "standard" | "ultra";
 
 export type NativeChatCommand = "compact" | "fork";
 export type NativeChatCommandResult =
@@ -36,6 +37,7 @@ export type NativeChatImageInput = Readonly<{
   text: string;
   png: ArrayBuffer;
   operatingRegime: NativeChatOperatingRegime;
+  effort?: NativeChatEffort;
 }>;
 
 export type NativeContextLimit = Readonly<{
@@ -54,6 +56,7 @@ export type NativeChatConfigurationInput = Readonly<{
   action: "submit" | "enqueue";
   inputId: string;
   text: string;
+  effort?: NativeChatEffort;
 }>;
 
 export type NativeChatPage = Readonly<{
@@ -131,12 +134,14 @@ export type NativeChatRevisionTarget = Readonly<{
   messageId: string;
   text: string;
   subsequentMessages: number;
+  effort?: "ultra";
 }>;
 
 export type NativeChatRevisionInput = Readonly<{
   reviewId: string;
   text: string;
   operatingRegime: NativeChatOperatingRegime;
+  effort?: NativeChatEffort;
 }>;
 
 export type NativeChatRevisionReceipt = Readonly<{
@@ -213,6 +218,7 @@ export type NativeChatTurnSummary = Readonly<{
     | "skipped"
   )[];
   tokenUsage?: NativeChatTokenUsage;
+  reviewFindingsCollected?: boolean;
   artifacts?: readonly NativeChatImageArtifact[];
 }>;
 
@@ -243,6 +249,7 @@ export type NativeChatQueueItem = Readonly<{
   preview: string | null;
   goalStart?: NativeChatGoalRequest;
   operatingRegime?: NativeChatOperatingRegime;
+  effort?: "ultra";
   allowsConfigurationChange?: true;
 }>;
 
@@ -464,14 +471,17 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     inputId: string,
     text: string,
-    operatingRegime: NativeChatOperatingRegime
+    operatingRegime: NativeChatOperatingRegime,
+    effort?: NativeChatEffort
   ): Promise<NativeChatAcceptance>;
+  acceptsEffort?(): Promise<boolean>;
   acceptsPng?(): Promise<boolean>;
   acceptsWakeups?(): Promise<boolean>;
   submitWithWakeup?(
     attachmentId: string,
     inputId: string,
-    text: string
+    text: string,
+    effort?: NativeChatEffort
   ): Promise<NativeChatAcceptance>;
   scheduledWakeup?(
     attachmentId: string,
