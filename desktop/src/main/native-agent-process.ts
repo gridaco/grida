@@ -22,6 +22,15 @@ const REQUEST_LIMIT = 16;
 const START_TIMEOUT_MS = 10_000;
 const SHUTDOWN_TIMEOUT_MS = 12_000;
 const KILL_TIMEOUT_MS = 2_000;
+const SUBAGENT_CAPABILITIES = {
+  "co.grida/subagent/list": 1,
+  "co.grida/subagent/create": 1,
+  "co.grida/subagent/assign": 1,
+  "co.grida/subagent/inspect": 1,
+  "co.grida/subagent/pause": 1,
+  "co.grida/subagent/resume": 1,
+  "co.grida/subagent/stop": 1,
+} as const;
 
 export type NativeAgentLaunch = {
   resourcesPath: string;
@@ -33,6 +42,8 @@ export type NativeAgentLaunch = {
   providerNetwork?: NativeProviderNetwork;
   gatewayScope?: string;
   subscriptionScope?: string;
+  /** Trusted Main opt-in for the captured Gateway connection. */
+  subagents?: true;
   workspace?: NativeWorkspaceSelection;
   capabilities?: Readonly<Record<string, 1>>;
   onSessionUpdate?: (params: unknown) => void;
@@ -77,6 +88,7 @@ export class NativeAgentProcess {
   private imageInput = false;
   private scheduledWakeups = false;
   private historyRevision = false;
+  private namedChildren = false;
   private artifacts = false;
   private savedChatDeletion = false;
   private readonly commandCapabilities = new Set<string>();
@@ -145,6 +157,10 @@ export class NativeAgentProcess {
     return this.connected && this.historyRevision;
   }
 
+  get acceptsSubagents(): boolean {
+    return this.connected && this.namedChildren;
+  }
+
   get acceptsArtifacts(): boolean {
     return this.connected && this.artifacts;
   }
@@ -162,6 +178,8 @@ export class NativeAgentProcess {
   }
 
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
+    if (options.subagents && !options.gatewayScope)
+      throw new Error("native_agent_subagents_gateway_required");
     if (
       options.subscriptionScope !== undefined &&
       (!/^[a-f0-9]{64}$/.test(options.subscriptionScope) ||
@@ -243,6 +261,7 @@ export class NativeAgentProcess {
     if (providerEgress) args.push("--supervised-provider");
     if (options.gatewayScope)
       args.push("--supervised-gateway-scope", options.gatewayScope);
+    if (options.subagents) args.push("--subagents");
     if (options.subscriptionScope)
       args.push("--supervised-chatgpt-scope", options.subscriptionScope);
     if (permissionProfile)
@@ -269,6 +288,7 @@ export class NativeAgentProcess {
                 ...capabilities,
                 ...NativeAgentCommands.capabilities,
                 ...NativeAgentRevisions.capabilities,
+                ...(options.subagents && SUBAGENT_CAPABILITIES),
                 ...NativeAgentWakeups.capabilities,
                 [NativeAgentArtifacts.capability]: 1,
                 ...(requestDeletion && { [NativeAgentDeletion.capability]: 1 }),
@@ -298,6 +318,11 @@ export class NativeAgentProcess {
       processOwner.historyRevision = Object.keys(
         NativeAgentRevisions.capabilities
       ).every((key) => advertised?.[key] === 1);
+      processOwner.namedChildren =
+        options.subagents === true &&
+        Object.keys(SUBAGENT_CAPABILITIES).every(
+          (key) => advertised?.[key] === 1
+        );
       for (const key of Object.keys(NativeAgentCommands.capabilities)) {
         if (advertised?.[key] === 1) processOwner.commandCapabilities.add(key);
       }

@@ -208,3 +208,225 @@ it.skipIf(!resourcesPath)(
   },
   20_000
 );
+
+it.skipIf(!resourcesPath)(
+  "keeps a named child's exact assignment under the captured supervised Gateway scope",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-gateway-child-")
+    );
+    const cwd = path.join(root, "workspace");
+    await fs.mkdir(cwd, { mode: 0o700 });
+    const initial = fixture();
+    const rotated = fixture({ token: "synthetic.fixture.rotated" });
+    const changed = fixture({ organizationId: 19 });
+    const connections = await Promise.all(
+      [initial, rotated, changed].map((owner) =>
+        NativeGatewayConnection.open(owner.options)
+      )
+    );
+    const [first, renewed, other] = connections;
+    let cancelledStream = false;
+    function reply(text: string, hold = false): Response {
+      const event = (delta: unknown, reason: string | null) =>
+        `data: ${JSON.stringify({ id: "fixture", choices: [{ index: 0, delta, finish_reason: reason }] })}\n\n`;
+      const content = event({ role: "assistant", content: text }, null);
+      const stream = hold
+        ? new ReadableStream<Uint8Array>({
+            start: (controller) =>
+              controller.enqueue(new TextEncoder().encode(content)),
+            cancel: () => {
+              cancelledStream = true;
+            },
+          })
+        : content + event({}, "stop") + "data: [DONE]\n\n";
+      return new Response(stream, {
+        headers: { "content-type": "text/event-stream" },
+      });
+    }
+    initial.dispatch.mockImplementation(async (body) => {
+      const prompt = JSON.parse(body.toString());
+      expect(prompt.model).toBe("fixture");
+      const input = prompt.messages.at(-1)?.content;
+      if (input === "First child assignment")
+        return reply("First child result.");
+      if (input === "Held child assignment")
+        return reply("Partial child answer.", true);
+      return reply("Parent result.");
+    });
+    rotated.dispatch.mockImplementation(async (body) => {
+      expect(body.includes("Held child assignment")).toBe(true);
+      return reply("Continued child result.");
+    });
+    const stateDirectory = path.join(root, "state");
+    const open = (connection: NativeGatewayConnection) =>
+      NativeAgentProcess.start({
+        ...connection.launch("fixture"),
+        resourcesPath: resourcesPath!,
+        stateDirectory,
+        subagents: true,
+        capabilities: { "co.grida/session/snapshot": 1 },
+      });
+    type ChildTurn = {
+      turnId: string;
+      epoch: number;
+      journalPosition: number;
+      controlRevision: number;
+      paused: boolean;
+      disposition: string;
+    };
+    type ChildView = {
+      sessionRevision: number;
+      current: ChildTurn | null;
+      assignment: {
+        inputId: string;
+        parentTurnId: string;
+        turn: ChildTurn | null;
+        result: { turnId: string; status: string; text: string } | null;
+      } | null;
+    };
+    let agent: NativeAgentProcess | undefined;
+    try {
+      agent = await open(first);
+      expect(agent.acceptsSubagents).toBe(true);
+      const { sessionId: parentSessionId } = (await agent.request(
+        "session/new",
+        {
+          cwd,
+          mcpServers: [],
+        }
+      )) as { sessionId: string };
+      await expect(
+        agent.request("session/prompt", {
+          sessionId: parentSessionId,
+          prompt: [{ type: "text", text: "Private parent context" }],
+        })
+      ).resolves.toMatchObject({ stopReason: "end_turn" });
+      const { latest } = (await agent.request("_co.grida/session/snapshot", {
+        sessionId: parentSessionId,
+      })) as { latest: { turnId: string } };
+      const { childId } = (await agent.request("_co.grida/subagent/create", {
+        parentSessionId,
+        requestId: "create-reviewer",
+        name: "Reviewer",
+        workTurns: 3,
+      })) as { childId: string };
+      const assign = (inputId: string, instructions: string) =>
+        agent!.request("_co.grida/subagent/assign", {
+          parentSessionId,
+          childId,
+          parentTurnId: latest.turnId,
+          inputId,
+          instructions,
+        });
+      const inspect = (inputId: string) =>
+        agent!.request("_co.grida/subagent/inspect", {
+          parentSessionId,
+          childId,
+          inputId,
+        }) as Promise<ChildView>;
+      const load = () =>
+        agent!.request("session/load", {
+          sessionId: parentSessionId,
+          cwd,
+          mcpServers: [],
+        });
+      const control = (view: ChildView, requestId: string) => ({
+        parentSessionId,
+        childId,
+        requestId,
+        turnId: view.current!.turnId,
+        expectedSessionRevision: view.sessionRevision,
+        expectedControlRevision: view.current!.controlRevision,
+      });
+      const resume = (view: ChildView, requestId: string) =>
+        agent!.request("_co.grida/subagent/resume", {
+          task: control(view, requestId),
+          expectedEpoch: view.current!.epoch,
+          expectedJournalPosition: view.current!.journalPosition,
+        });
+      await assign("first-assignment", "First child assignment");
+      const completed = await vi.waitFor(async () => {
+        const view = await inspect("first-assignment");
+        expect(view.assignment?.result?.text).toBe("First child result.");
+        expect(view.assignment?.result?.turnId).toBe(
+          view.assignment?.turn?.turnId
+        );
+        return view.assignment;
+      });
+      expect(initial.dispatch).toHaveBeenCalledTimes(2);
+      const childRequest = initial.dispatch.mock.calls[1][0].toString();
+      expect(JSON.parse(childRequest).tools).toBeUndefined();
+      expect(childRequest).not.toContain("Private parent context");
+      await assign("held-assignment", "Held child assignment");
+      const active = await vi.waitFor(async () => {
+        expect(initial.dispatch).toHaveBeenCalledTimes(3);
+        const view = await inspect("held-assignment");
+        expect(view.current?.disposition).toBe("running");
+        return view;
+      });
+      await agent.request(
+        "_co.grida/subagent/pause",
+        control(active, "pause-child")
+      );
+      await vi.waitFor(async () => {
+        const view = await inspect("held-assignment");
+        expect(view.current).toMatchObject({
+          paused: true,
+          disposition: "suspended",
+        });
+      });
+      await agent.close();
+      expect(cancelledStream).toBe(true);
+
+      agent = await open(other);
+      await load();
+      const held = await inspect("held-assignment");
+      expect(held.current?.turnId).toBe(active.current?.turnId);
+      await expect(resume(held, "other-resume")).rejects.toThrow(
+        "subagent_authority_changed"
+      );
+      await expect(assign("other-input", "New work")).rejects.toThrow(
+        "session_execution_configuration_changed"
+      );
+      expect(changed.dispatch).not.toHaveBeenCalled();
+      await agent.close();
+
+      agent = await open(renewed);
+      await load();
+      expect((await inspect("first-assignment")).assignment).toEqual(completed);
+      await expect(
+        resume(await inspect("held-assignment"), "same-resume")
+      ).resolves.toMatchObject({
+        turn: { turnId: active.current?.turnId },
+      });
+      await vi.waitFor(async () => {
+        const view = await inspect("held-assignment");
+        expect(view.assignment).toMatchObject({
+          inputId: "held-assignment",
+          parentTurnId: latest.turnId,
+          result: {
+            text: "Continued child result.",
+            turnId: active.current?.turnId,
+          },
+        });
+      });
+      expect(rotated.dispatch).toHaveBeenCalledTimes(1);
+      expect(rotated.prepare.mock.calls[0][0]).toBe(target);
+      expect(rotated.prepare.mock.calls[0][1].get("authorization")).toBe(
+        "Bearer synthetic.fixture.rotated"
+      );
+      expect(initial.prepare.mock.calls.every(([url]) => url === target)).toBe(
+        true
+      );
+    } finally {
+      try {
+        await agent?.close();
+      } finally {
+        connections.forEach((connection) => connection.close());
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  },
+  30_000
+);

@@ -99,7 +99,6 @@ fn command() -> Command {
                     Arg::new("subagents")
                         .long("subagents")
                         .requires("stdio")
-                        .conflicts_with("supervised-provider")
                         .action(ArgAction::SetTrue)
                         .help("Allow the private launcher to own bounded text-only subagents"),
                 )
@@ -407,6 +406,13 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     } else {
         None
     };
+    let subagents = name == "serve" && args.get_flag("subagents");
+    if subagents && supervisor.is_some() && (gateway_scope.is_none() || chatgpt_scope.is_some()) {
+        return Err(problem(
+            ErrorKind::Unsupported,
+            "subagent_supervised_gateway_required",
+        ));
+    }
     let regime = if args
         .get_one::<String>("mode")
         .is_some_and(|mode| mode == "plan")
@@ -453,7 +459,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         (None, _, _) => Host::open(state_dir, Some(provider))?,
     };
     let host = host.with_operating_regime(regime);
-    let host = if name == "serve" && args.get_flag("subagents") {
+    let host = if subagents {
         host.with_subagents()
     } else {
         host
