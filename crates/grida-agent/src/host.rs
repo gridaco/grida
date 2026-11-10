@@ -264,6 +264,17 @@ pub struct DurableSubmission {
     pub disposition: InputDisposition,
 }
 
+impl DurableSubmission {
+    fn accepted(acceptance: Acceptance, disposition: InputDisposition) -> Self {
+        Self {
+            session: acceptance.session,
+            input: acceptance.input,
+            position: acceptance.position,
+            disposition,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct StoredPrompt {
     parts: Vec<PromptPart>,
@@ -351,10 +362,14 @@ enum Launch {
         policy: SubmissionPolicy,
         publish_text: bool,
     },
-    Queued,
+    Identified {
+        id: ChangeId,
+        parts: Vec<PromptPart>,
+        policy: SubmissionPolicy,
+    },
+    Queued(Option<Acceptance>),
     Sponsored(Box<OperationClaim>),
     Compact(ChangeId),
-    AutomaticCompact(Box<compaction::AutomaticCompaction>),
     RecoverCompaction(RecoveryRequest),
     Resume(ClaimRequest),
     ResumeSponsored(sponsorship::SponsoredWake),
@@ -368,15 +383,24 @@ enum WorkerClaim {
 }
 
 struct LaunchTicket {
-    admission: oneshot::Receiver<Result<Option<Acceptance>>>,
+    admission: oneshot::Receiver<Result<Option<DurableSubmission>>>,
     updates: broadcast::Receiver<TurnUpdate>,
     completion: oneshot::Receiver<Result<RunResult>>,
+}
+
+async fn prompt_acceptance(
+    admission: oneshot::Receiver<Result<Option<DurableSubmission>>>,
+) -> Result<DurableSubmission> {
+    admission
+        .await
+        .map_err(|_| problem(ErrorKind::Uncertain, "admission_worker_interrupted"))??
+        .ok_or_else(|| problem(ErrorKind::Uncertain, "prompt_acceptance_missing"))
 }
 
 struct Admitted {
     opened: agent_kit_runtime::OpenedTurn,
     work: TurnWork,
-    acceptance: Option<Acceptance>,
+    acceptance: Option<DurableSubmission>,
 }
 
 enum TurnWork {
@@ -705,48 +729,50 @@ impl Host {
 
     pub async fn start_prompt(&self, request: PromptRequest) -> Result<AcceptedRun> {
         let policy = self.submission_policy(&request, false)?;
-        self.launch_prompt(request, false, policy).await
+        let ticket = self.register_prompt(request, false, policy).await?;
+        let acceptance = prompt_acceptance(ticket.admission).await?;
+        let InputDisposition::Claimed { turn } = acceptance.disposition else {
+            return Err(problem(ErrorKind::Uncertain, "prompt_claim_missing"));
+        };
+        Ok(AcceptedRun {
+            session: acceptance.session,
+            turn,
+            input: acceptance.input,
+            position: acceptance.position,
+            updates: ticket.updates,
+            completion: ticket.completion,
+        })
     }
 
-    async fn launch_prompt(
+    async fn register_prompt(
         &self,
         request: PromptRequest,
-        publish_text: bool,
+        identified: bool,
         policy: SubmissionPolicy,
-    ) -> Result<AcceptedRun> {
+    ) -> Result<LaunchTicket> {
         self.execution()?;
         let PromptRequest {
             id, session, parts, ..
         } = request;
         validate_prompt_parts(&parts)?;
-        let turn = TurnId::new(uuid())?;
-        let ticket = {
-            let mut work = self.work.lock().await;
-            self.register(
-                &mut work,
-                session.clone(),
-                turn.clone(),
-                Launch::Prompt {
-                    id: id.clone(),
-                    parts,
-                    policy,
-                    publish_text,
-                },
-            )?
+        let launch = if identified
+            && compaction::ordinary_text(
+                policy.operating_regime,
+                policy.configuration_permission,
+                policy.effort.is_some(),
+                &parts,
+            ) {
+            Launch::Identified { id, parts, policy }
+        } else {
+            Launch::Prompt {
+                id,
+                parts,
+                policy,
+                publish_text: identified,
+            }
         };
-        let acceptance = ticket
-            .admission
-            .await
-            .map_err(|_| problem(ErrorKind::Uncertain, "admission_worker_interrupted"))??
-            .ok_or_else(|| problem(ErrorKind::Uncertain, "prompt_acceptance_missing"))?;
-        Ok(AcceptedRun {
-            session,
-            turn,
-            input: id,
-            position: acceptance.position,
-            updates: ticket.updates,
-            completion: ticket.completion,
-        })
+        let mut work = self.work.lock().await;
+        self.register(&mut work, session, TurnId::new(uuid())?, launch)
     }
 
     fn register(
@@ -777,17 +803,6 @@ impl Host {
         let task = async move {
             // The worker checks the same lock used for registration before
             // any durable claim, even when its requesting client disappears.
-            let (worker_turn, launch) = if matches!(&launch, Launch::Queued) {
-                match host
-                    .select_queued_compaction(&worker_session, &worker_turn)
-                    .await
-                {
-                    Some((turn, plan)) => (turn, Launch::AutomaticCompact(Box::new(plan))),
-                    None => (worker_turn, launch),
-                }
-            } else {
-                (worker_turn, launch)
-            };
             let answered = match &launch {
                 Launch::ResumeAnswered(position) => Some((&worker_turn, *position)),
                 _ => None,
@@ -808,7 +823,8 @@ impl Host {
                 _ => true,
             }
             .then(|| host.live_text.clone());
-            let automatic_compaction = matches!(&launch, Launch::AutomaticCompact(_));
+            let identified = matches!(&launch, Launch::Identified { .. });
+            let queue_admission = identified || matches!(&launch, Launch::Queued(_));
             let result = host.admit(&worker_session, &worker_turn, launch).await;
             let admitted = match result {
                 Ok(Some(run)) => run,
@@ -817,7 +833,7 @@ impl Host {
                         .await;
                     let _ = admission_tx.send(Ok(None));
                     host.wake_ready().await;
-                    if automatic_compaction {
+                    if identified {
                         host.kick_queue(worker_session).await;
                     }
                     return;
@@ -829,7 +845,7 @@ impl Host {
                         "stale_session_revision" | "suspension_mismatch"
                     );
                     let retry_queue = queue_waiting
-                        || (automatic_compaction
+                        || (queue_admission
                             && (basis_changed || error.code == "history_basis_changed"));
                     host.finish_work(
                         &worker_session,
@@ -846,6 +862,7 @@ impl Host {
                     return;
                 }
             };
+            let worker_turn = admitted.opened.turn.view().state.binding().turn.clone();
             let _ = admission_tx.send(Ok(admitted.acceptance));
             if explicit_resume {
                 host.wake_ready().await;
@@ -952,13 +969,42 @@ impl Host {
         }
         let launch = match launch {
             Launch::Sponsored(request) => return self.admit_sponsored(*request).await,
-            Launch::AutomaticCompact(candidate) => {
-                return self
-                    .admit_automatic_compaction(session, turn, *candidate)
-                    .await;
+            Launch::Identified { id, parts, policy } => {
+                let _admission = self.configuration_admission.lock().await;
+                let view = self.store.inspect(session.clone()).await?;
+                self.check_execution(&view)?;
+                require_idle(&view)?;
+                if !view.queued.is_empty() {
+                    return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
+                }
+                let input = self.capture_input(&view, id, parts, policy).await?;
+                let accepted = self
+                    .store
+                    .submit_at_revision(session.clone(), input, view.revision)
+                    .await?;
+                Launch::Queued(Some(accepted))
             }
             other => other,
         };
+        if let Launch::Queued(direct) = &launch
+            && let Some((maintenance, candidate)) = self
+                .select_queued_compaction(
+                    session,
+                    turn,
+                    direct.as_ref().map(|acceptance| &acceptance.input),
+                )
+                .await
+        {
+            let mut admitted = self
+                .admit_automatic_compaction(session, &maintenance, candidate)
+                .await?;
+            if let Some(admitted) = &mut admitted {
+                admitted.acceptance = direct.clone().map(|accepted| {
+                    DurableSubmission::accepted(accepted, InputDisposition::Queued)
+                });
+            }
+            return Ok(admitted);
+        }
         let maintenance_claim = match &launch {
             Launch::Compact(request) => {
                 return self.admit_compaction(session, turn, request.clone()).await;
@@ -977,11 +1023,12 @@ impl Host {
                 .await;
         }
         let execution = self.execution()?;
-        let configuration_admission = if matches!(&launch, Launch::Prompt { .. } | Launch::Queued) {
-            Some(self.configuration_admission.lock().await)
-        } else {
-            None
-        };
+        let configuration_admission =
+            if matches!(&launch, Launch::Prompt { .. } | Launch::Queued(_)) {
+                Some(self.configuration_admission.lock().await)
+            } else {
+                None
+            };
         let view = self.store.inspect(session.clone()).await?;
         self.check_execution(&view)?;
         let subagent = session_configuration(&view)?.subagent;
@@ -1013,9 +1060,14 @@ impl Host {
                     history,
                 )
             }
-            Launch::Queued => {
+            Launch::Queued(direct) => {
                 require_idle(&view)?;
                 self.install_pending_automatic_compaction(&view).await?;
+                if let Some(accepted) = &direct
+                    && view.queued.first().map(|head| &head.input.id) != Some(&accepted.input)
+                {
+                    return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
+                }
                 let next = match subagents::queued_work(&view) {
                     Some(next) => next.clone(),
                     None => {
@@ -1037,7 +1089,7 @@ impl Host {
                 }
                 selected.push(next.id.clone());
                 let claim = new_claim(session.clone(), turn.clone(), view.revision, selected)?;
-                (WorkerClaim::Select(claim), Some(next), None, history)
+                (WorkerClaim::Select(claim), Some(next), direct, history)
             }
             resume @ (Launch::Resume(_)
             | Launch::ResumeAnswered(_)
@@ -1079,10 +1131,12 @@ impl Host {
                     .await?;
                 (WorkerClaim::Recover(request), None, None, history)
             }
-            Launch::Compact(_) | Launch::RecoverCompaction(_) | Launch::AutomaticCompact(_) => {
+            Launch::Compact(_) | Launch::RecoverCompaction(_) => {
                 return Err(problem(ErrorKind::InvalidState, "compaction_plan_missing"));
             }
-            Launch::Sponsored(_) => unreachable!("sponsored launch handled before session lookup"),
+            Launch::Sponsored(_) | Launch::Identified { .. } => {
+                unreachable!("launch handled before session lookup")
+            }
         };
         let prepared = input
             .as_ref()
@@ -1414,7 +1468,12 @@ impl Host {
                 input: prepared.messages,
                 command,
             },
-            acceptance,
+            acceptance: acceptance.map(|accepted| {
+                DurableSubmission::accepted(
+                    accepted,
+                    InputDisposition::Claimed { turn: turn.clone() },
+                )
+            }),
         }))
     }
 
@@ -1909,7 +1968,7 @@ impl Host {
         }
         // Dropping the automatic continuation ticket detaches its result
         // channels. The registered worker still owns the selected turn.
-        let _ = self.register(&mut work, session, turn, Launch::Queued);
+        let _ = self.register(&mut work, session, turn, Launch::Queued(None));
     }
 
     async fn wake_ready(&self) {
@@ -2038,13 +2097,13 @@ impl Host {
         policy.editor_endpoint = editor_endpoint;
         policy.editor_presentation = editor_presentation;
         policy.editor_svg_target = editor_svg_target;
-        match self.launch_prompt(request.clone(), true, policy).await {
-            Ok(run) => Ok(DurableSubmission {
-                session: run.session,
-                input: run.input,
-                position: run.position,
-                disposition: InputDisposition::Claimed { turn: run.turn },
-            }),
+        let result = async {
+            let ticket = self.register_prompt(request.clone(), true, policy).await?;
+            prompt_acceptance(ticket.admission).await
+        }
+        .await;
+        match result {
+            Ok(accepted) => Ok(accepted),
             // An acceptance may have committed before the claim or response
             // failed. Re-read its identity and leave unclaimed input queued.
             Err(error) => self

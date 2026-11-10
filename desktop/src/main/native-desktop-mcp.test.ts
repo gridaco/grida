@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
 import type { IpcMainInvokeEvent } from "electron";
+import type { NativeChatAcceptance } from "@grida/desktop-bridge";
 import { DesktopAccountSession } from "./account-session";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import { NativeMcpLaunch } from "./native-mcp-launch";
@@ -35,8 +36,12 @@ const toolName = "mcp_local_lookup";
 const editorTool = "surface_list_open";
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
-  "uses separate editor and allowlisted MCP tools in the same selected Act turn",
+  "retains separate editor and allowlisted MCP authority through selected Act compaction",
   async () => {
+    const earlier = `Earlier workspace context ${"a".repeat(105_000)}`;
+    const recent = "Keep this recent workspace message verbatim.";
+    const summary = "Compacted workspace setup.";
+    const releaseSummary = Promise.withResolvers<void>();
     const base = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-native-desktop-mcp-")
     );
@@ -144,6 +149,16 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       let organizationId = 12;
       const offers: string[][] = [];
       const bodies: string[] = [];
+      const warmupOffers: string[][] = [];
+      const warmupReceipts: NativeChatAcceptance[] = [];
+      const summaryRequests: { names: string[]; body: string }[] = [];
+      let held:
+        | {
+            accepted: NativeChatAcceptance;
+            retry: NativeChatAcceptance;
+            receipt: NativeChatAcceptance;
+          }
+        | undefined;
       const origin = "https://gateway.example.test";
       sidecar.nativeAgentGatewayConnection.mockImplementation(async () =>
         NativeGatewayConnection.open({
@@ -166,18 +181,34 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
               );
               return async (body) => {
                 const text = body.toString();
-                bodies.push(text);
                 const request = JSON.parse(text);
                 const names = (request.tools ?? []).map(
                   (item: { function: { name: string } }) => item.function.name
                 );
+                const last = request.messages.at(-1)?.content;
+                if (last === earlier || last === recent) {
+                  warmupOffers.push(names);
+                  return stream(
+                    { content: "Retained workspace answer." },
+                    "stop"
+                  );
+                }
+                if (
+                  text.includes(
+                    "Summarize the supplied conversation for future continuation."
+                  )
+                ) {
+                  summaryRequests.push({ names, body: text });
+                  await releaseSummary.promise;
+                  return stream({ content: summary }, "stop");
+                }
+                bodies.push(text);
                 offers.push(names);
                 const results = request.messages.filter(
                   (item: { role: string }) => item.role === "tool"
                 );
                 if (names.includes(toolName) && results.length < 2) {
                   const readingEditor = results.length === 0;
-                  expect(names).toContain(editorTool);
                   return stream(
                     {
                       tool_calls: [
@@ -234,32 +265,104 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         } as unknown as IpcMainInvokeEvent;
         const ipc = new NativeChatIpc(origin, () => active);
         const session = await ipc.create(event);
+        const waitForCompletion = (accepted: NativeChatAcceptance) =>
+          vi.waitFor(
+            async () => {
+              const { snapshot } = await ipc.observe(
+                event,
+                session.attachmentId
+              );
+              expect(snapshot.latest?.status).toBe("succeeded");
+              const receipt = await ipc.inputReceipt(
+                event,
+                session.attachmentId,
+                accepted.inputId
+              );
+              expect(receipt).toMatchObject({
+                disposition: "completed",
+                turnId: snapshot.latest?.turnId,
+                inputPosition: accepted.inputPosition,
+              });
+            },
+            { timeout: 5000 }
+          );
+        const compact = workspaceId === selected.id && mode === "act";
+        if (compact) {
+          for (const [id, text] of [
+            ["earlier", earlier],
+            ["recent", recent],
+          ]) {
+            const started = await ipc.submit(
+              event,
+              session.attachmentId,
+              id,
+              text,
+              "plan"
+            );
+            warmupReceipts.push(started);
+            await waitForCompletion(started);
+          }
+        }
         ipc.publishEditorSurfaces(
           event,
           session.attachmentId,
           { active: "/poster.svg", open: ["/poster.svg"], truncated: false },
           1
         );
-        await ipc.submit(
+        const accepted = await ipc.submit(
           event,
           session.attachmentId,
           `test-${mode}`,
           "A harmless local lookup",
           mode
         );
-        await vi.waitFor(
-          async () => {
-            const { snapshot } = await ipc.observe(event, session.attachmentId);
-            expect(snapshot.latest?.status).toBe("succeeded");
-          },
-          { timeout: 5000 }
-        );
+        if (compact) {
+          await vi.waitFor(() => {
+            if (summaryRequests.length !== 1)
+              throw new Error("expected one held summary");
+          });
+          held = {
+            accepted,
+            retry: await ipc.submit(
+              event,
+              session.attachmentId,
+              "test-act",
+              "A harmless local lookup",
+              mode
+            ),
+            receipt: await ipc.inputReceipt(
+              event,
+              session.attachmentId,
+              "test-act"
+            ),
+          };
+          releaseSummary.resolve();
+        }
+        await waitForCompletion(accepted);
       }
       await send(unselected.id, "act");
       expect(methods).toEqual([]);
       await send(selected.id, "plan");
       expect(methods).toEqual(["server/discover", "tools/list"]);
       await send(selected.id, "act");
+      expect(warmupReceipts.map((receipt) => receipt.disposition)).toEqual([
+        "claimed",
+        "claimed",
+      ]);
+      expect(warmupOffers.flat()).not.toContain(toolName);
+      expect(warmupOffers.flat()).not.toContain(editorTool);
+      expect(summaryRequests).toHaveLength(1);
+      expect(summaryRequests[0].names).toEqual([]);
+      expect(summaryRequests[0].body).toContain(earlier);
+      expect(summaryRequests[0].body).not.toContain(recent);
+      expect(summaryRequests[0].body).not.toContain("A harmless local lookup");
+      expect(held?.accepted).toMatchObject({
+        inputId: "test-act",
+        disposition: "queued",
+        turnId: null,
+      });
+      expect(held?.retry).toEqual(held?.accepted);
+      expect(held?.receipt).toEqual(held?.accepted);
       expect(methods).toEqual(["server/discover", "tools/list", "tools/call"]);
       expect(toolCalls).toMatchObject([
         {
@@ -292,6 +395,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         structured: { active: "/poster.svg", open: ["/poster.svg"] },
       });
       expect(bodies.at(-1)).toContain("Exact local result");
+      expect(bodies.at(-1)).toContain(summary);
+      expect(bodies.at(-1)).toContain(recent);
+      expect(bodies.at(-1)).not.toContain(earlier);
       expect(bodies.join("")).not.toContain(token);
       await desktop.clearAccount();
       organizationId = 13;
@@ -300,6 +406,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       );
       expect(methods).toHaveLength(3);
     } finally {
+      releaseSummary.resolve();
       try {
         await agent?.close();
       } finally {

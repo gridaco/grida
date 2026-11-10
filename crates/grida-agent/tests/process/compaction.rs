@@ -107,6 +107,129 @@ async fn prime_automatic_history(
 }
 
 #[tokio::test]
+async fn identified_submit_keeps_one_queued_receipt_during_automatic_compaction() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let (release, held) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("Initial direct answer."),
+        Reply::Finished("First original answer."),
+        Reply::Finished("Recent original answer."),
+        Reply::Finished("Synchronous prompt answer."),
+        Reply::Release("Earlier work and unresolved decisions.", held),
+        Reply::Finished("Direct input answer."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+    let ordinary = ws_rpc(
+        &mut socket,
+        9,
+        "_co.grida/session/submit",
+        prompt_request(&session, "initial-direct", "Small identified submission."),
+    )
+    .await;
+    assert_eq!(ordinary["result"]["disposition"], "claimed", "{ordinary}");
+    assert!(ordinary["result"]["turnId"].is_string());
+    endpoint.request().await;
+    wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+
+    let older = prime_automatic_history(&mut endpoint, &mut socket, &session).await;
+    let synchronous = prompt(
+        &mut socket,
+        10,
+        &session,
+        "Keep this standard prompt verbatim.",
+    )
+    .await;
+    assert_eq!(
+        synchronous["result"]["stopReason"], "end_turn",
+        "{synchronous}"
+    );
+    let synchronous_request = endpoint.request().await;
+    assert_eq!(
+        synchronous_request["messages"]
+            .as_array()
+            .unwrap()
+            .last()
+            .unwrap()["content"],
+        "Keep this standard prompt verbatim."
+    );
+    assert!(synchronous_request["messages"].to_string().contains(&older));
+
+    let mut direct = prompt_request(
+        &session,
+        "direct-after-history",
+        "Exactly one direct input.",
+    );
+    direct["operatingRegime"] = "act".into();
+    let pending = ws_rpc(&mut socket, 11, "_co.grida/session/submit", direct.clone()).await;
+    assert_eq!(pending["result"]["disposition"], "queued", "{pending}");
+    assert!(pending["result"]["turnId"].is_null());
+    let summary = endpoint.request().await;
+    assert!(summary.get("tools").is_none());
+    let messages = summary["messages"].to_string();
+    assert!(messages.contains(&older));
+    assert!(!messages.contains("Keep this standard prompt verbatim."));
+    assert!(!messages.contains("Exactly one direct input."));
+    let current = session_snapshot(&mut socket, &session).await;
+    let helper_turn = current["current"]["turnId"].as_str().unwrap().to_owned();
+    let receipt_request = json!({"sessionId":session,"inputId":"direct-after-history"});
+    let captured = ws_rpc(
+        &mut socket,
+        12,
+        "_co.grida/session/input",
+        receipt_request.clone(),
+    )
+    .await;
+    assert_eq!(captured["result"]["receipt"], pending["result"]);
+    assert_eq!(captured["result"]["settings"]["operatingRegime"], "act");
+    let retried = ws_rpc(&mut socket, 13, "_co.grida/session/submit", direct.clone()).await;
+    assert_eq!(retried["result"], pending["result"]);
+    direct["operatingRegime"] = "plan".into();
+    let changed = ws_rpc(&mut socket, 14, "_co.grida/session/submit", direct).await;
+    assert!(
+        changed["error"]
+            .to_string()
+            .contains("submission_operating_regime_changed"),
+        "{changed}"
+    );
+    release.send(()).unwrap();
+    let user = endpoint.request().await;
+    let messages = user["messages"].to_string();
+    assert!(messages.contains("Earlier work and unresolved decisions."));
+    assert!(messages.contains("Keep this standard prompt verbatim."));
+    assert_eq!(messages.matches("Exactly one direct input.").count(), 1);
+    wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    let settled = ws_rpc(&mut socket, 15, "_co.grida/session/input", receipt_request).await;
+    assert_eq!(
+        settled["result"]["settings"],
+        captured["result"]["settings"]
+    );
+    assert_eq!(settled["result"]["prompt"], captured["result"]["prompt"]);
+    assert_eq!(settled["result"]["receipt"]["disposition"], "completed");
+    assert_eq!(
+        settled["result"]["receipt"]["inputPosition"],
+        pending["result"]["inputPosition"]
+    );
+    assert_ne!(settled["result"]["receipt"]["turnId"], helper_turn);
+    let transcript = load(&mut socket, &session, workspace.path()).await.join("");
+    assert_eq!(transcript.matches("Exactly one direct input.").count(), 1);
+    assert!(!transcript.contains("Earlier work and unresolved decisions."));
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
 async fn automatic_compaction_keeps_queue_inputs_and_the_recent_context_exact() {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("state");

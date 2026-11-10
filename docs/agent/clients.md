@@ -688,11 +688,14 @@ prompt or call the identified compaction operation. Start from an idle chat
 with an open, empty queue. The summary uses the selected model. New prompts
 can enter the queue while it runs.
 
-For ordinary queued text messages in **Act**, the native host can also
-summarize a large earlier part of the conversation before starting the next
-message. It keeps the most recent turn verbatim and preserves the accepted
-messages and their queue order. If the summary attempt fails, queued work
-can continue with the previous context and the same input settings.
+For ordinary **Act** text, the native host can summarize a large earlier part
+of the conversation before starting an accepted queued message or an
+identified submit. An identified submit reports the same accepted input as
+queued while the summary runs. The host keeps the most recent turn verbatim
+and preserves queue order and input settings. If the summary attempt fails,
+work can continue with the previous context. Standard ACP `session/prompt`
+still waits for its user turn to finish. The automatic trigger uses the size
+of earlier text. The provider can still report a context limit.
 
 After a successful compaction, future model requests use the summary and any
 turns it did not cover. If the history is too large for one summary request,

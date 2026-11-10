@@ -279,9 +279,14 @@ impl Host {
         &self,
         session: &SessionId,
         reserved: &TurnId,
+        direct: Option<&ChangeId>,
     ) -> Option<(TurnId, AutomaticCompaction)> {
         let view = self.store.inspect(session.clone()).await.ok()?;
-        if view.current.is_some() || view.admission_paused {
+        if view.current.is_some()
+            || view.admission_paused
+            || direct
+                .is_some_and(|input| view.queued.first().map(|head| &head.input.id) != Some(input))
+        {
             return None;
         }
         let (turn, plan) = self.prepare_automatic_compaction(&view).await.ok()??;
@@ -320,14 +325,13 @@ impl Host {
             return Ok(None);
         }
         let stored: StoredPrompt = decode_input(head)?;
-        if !stored.operating_regime.is_act()
-            || stored.goal.is_some()
-            || stored.effort.is_some()
-            || stored.configuration_permission == crate::ConfigurationPermission::Change
-            || !stored
-                .parts
-                .iter()
-                .all(|part| matches!(part, PromptPart::Text { .. }))
+        if stored.goal.is_some()
+            || !ordinary_text(
+                stored.operating_regime,
+                stored.configuration_permission,
+                stored.effort.is_some(),
+                &stored.parts,
+            )
         {
             return Ok(None);
         }
@@ -702,6 +706,20 @@ impl Host {
             inference_usage: Some(account.inference_usage),
         })
     }
+}
+
+pub(super) fn ordinary_text(
+    regime: OperatingRegime,
+    configuration: crate::ConfigurationPermission,
+    ultra: bool,
+    parts: &[PromptPart],
+) -> bool {
+    regime.is_act()
+        && configuration != crate::ConfigurationPermission::Change
+        && !ultra
+        && parts
+            .iter()
+            .all(|part| matches!(part, PromptPart::Text { .. }))
 }
 
 fn compaction_plan_for(
