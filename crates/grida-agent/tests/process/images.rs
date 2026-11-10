@@ -9,6 +9,190 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 const IMAGE_MODEL: &str = "gpt-5.4";
 const ARTIFACTS: &str = "co.grida/session/artifacts";
 
+#[tokio::test]
+async fn deleting_a_crop_chat_reclaims_its_private_files_and_recovers_after_interruption() {
+    use agent_kit_core::Fingerprint;
+    use agent_kit_sessions::SessionRevision;
+    use agent_kit_store_sqlite::{SqliteStore, deletion::DeleteSession};
+    use std::fs;
+    use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+
+    const DELETE: &str = "_co.grida/session/delete";
+    for interrupted in [false, true] {
+        let root = TempDir::new().unwrap();
+        let state = root.path().join("state");
+        let workspace = TempDir::new().unwrap();
+        let cwd = workspace.path().canonicalize().unwrap();
+        let original = encode_png(2, 1, &[255, 0, 0, 0, 255, 0]);
+        let data = STANDARD.encode(&original);
+        let mut endpoint = Endpoint::start_protocol(
+            ProviderProtocol::Responses,
+            vec![
+                Reply::Tool(
+                    "crop_retained_image",
+                    r#"{"x":1,"y":0,"width":1,"height":1}"#,
+                ),
+                Reply::Finished("The cropped copy is ready."),
+            ],
+            Some(TEST_CREDENTIAL),
+        )
+        .await;
+        let mut client = stdio(&state, &endpoint.url, IMAGE_MODEL);
+        client
+            .request("initialize", super::deletion::capabilities())
+            .await;
+        let created = client
+            .request("session/new", json!({"cwd":cwd,"mcpServers":[]}))
+            .await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        let owner = SessionId::new(session).unwrap();
+        let crop = client
+            .request(
+                "session/prompt",
+                json!({
+                    "sessionId":session,"prompt":upload(session,"crop",&data)["prompt"],
+                }),
+            )
+            .await;
+        assert_eq!(crop["result"]["stopReason"], "end_turn", "{crop}");
+        endpoint.request().await;
+        assert_eq!(
+            last_tool_result(endpoint.request().await)["status"],
+            "succeeded"
+        );
+        settled(&mut client, session).await;
+        let history = client
+            .request("_co.grida/session/history", json!({"sessionId":session}))
+            .await;
+        let forked = client.request("_co.grida/session/fork", json!({
+            "sessionId":session,"requestId":"fork-portable","expectedHistory":history["result"]["basis"],
+            "anchor":history["result"]["messages"].as_array().unwrap().last().unwrap()["anchor"],
+        })).await;
+        let fork = forked["result"]["sessionId"].as_str().unwrap();
+        let scope = fs::read_dir(state.join("retained-inputs"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let source = scope
+            .join("sources")
+            .read_dir()
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "asset")
+            })
+            .unwrap();
+        let staging = source.with_file_name(".stage-f9e1302d-f4d7-4980-bf19-c43b07c9dce2");
+        fs::hard_link(&source, &staging).unwrap();
+        assert_eq!(source.metadata().unwrap().nlink(), 2);
+        let work = scope
+            .join("work")
+            .read_dir()
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let published = cwd.join("independent.png");
+        let output = fs::read(work).unwrap();
+        fs::write(&published, &output).unwrap();
+        let request = super::deletion::deletion(&mut client, session, &cwd).await;
+
+        if interrupted {
+            client.close().await;
+            // Leave the exact committed state a process exit would leave
+            // between retirement in SQLite and removal by the file owner.
+            let metadata = scope.metadata().unwrap();
+            let identity = *Fingerprint::of(&(
+                &owner,
+                metadata.dev(),
+                metadata.ino(),
+                metadata.created().unwrap(),
+            ))
+            .unwrap()
+            .bytes();
+            let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+            store
+                .delete_idle_with_cleanup(
+                    DeleteSession {
+                        session: owner.clone(),
+                        scope: Fingerprint::of(&("grida-session-workspace-v1", &cwd)).unwrap(),
+                        request: ChangeId::new(request["requestId"].as_str().unwrap()).unwrap(),
+                        expected_revision: SessionRevision(
+                            request["expectedSessionRevision"].as_u64().unwrap(),
+                        ),
+                        expected_catalog_revision: request["expectedCatalogRevision"]
+                            .as_u64()
+                            .unwrap(),
+                    },
+                    Some(identity),
+                    |_, _| Ok(()),
+                    |_| Ok(()),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                store.pending_retirement_cleanup(None).await.unwrap(),
+                vec![(owner, identity)]
+            );
+            drop(store);
+
+            let original_scope = scope.with_extension("original-fixture");
+            fs::rename(&scope, &original_scope).unwrap();
+            fs::DirBuilder::new().mode(0o700).create(&scope).unwrap();
+            client = stdio(&state, &endpoint.url, IMAGE_MODEL);
+            client
+                .request("initialize", super::deletion::capabilities())
+                .await;
+            let unverified = client.request(DELETE, request.clone()).await;
+            assert_eq!(
+                unverified["error"]["data"], "session_deletion_unverified",
+                "{unverified}"
+            );
+            assert!(scope.is_dir());
+            client.close().await;
+            fs::remove_dir(&scope).unwrap();
+            fs::rename(&original_scope, &scope).unwrap();
+            client = stdio(&state, &endpoint.url, IMAGE_MODEL);
+            client
+                .request("initialize", super::deletion::capabilities())
+                .await;
+            timeout(WAIT, async {
+                while scope.exists() {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .unwrap();
+        }
+
+        let deleted = client.request(DELETE, request.clone()).await;
+        assert_eq!(
+            deleted["result"],
+            json!({"sessionId":session,"requestId":request["requestId"]})
+        );
+        assert!(!scope.exists());
+        assert_eq!(fs::read(published).unwrap(), output);
+        let loaded = client
+            .request(
+                "session/load",
+                json!({"sessionId":fork,"cwd":cwd,"mcpServers":[]}),
+            )
+            .await;
+        assert!(loaded["result"].is_object(), "{loaded}");
+        assert_eq!(
+            client.request(DELETE, request).await["result"],
+            deleted["result"]
+        );
+        client.close().await;
+        assert!(endpoint.requests.try_recv().is_err());
+        endpoint.done().await;
+    }
+}
+
 fn artifact_initialize() -> Value {
     let mut request = extension_initialize();
     request["clientCapabilities"]["_meta"][ARTIFACTS] = 1.into();

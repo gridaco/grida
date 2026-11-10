@@ -163,8 +163,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         type: "warning",
         message: "Delete this saved chat?",
         detail: title
-          ? `“${title}” and its messages will be permanently removed. Project files and independent forks stay available.`
-          : "This chat and its messages will be permanently removed. Project files and independent forks stay available.",
+          ? `“${title}” and its private attachments and working copies will be permanently removed. Project files and independent forks stay available.`
+          : "This chat and its private attachments and working copies will be permanently removed. Project files and independent forks stay available.",
         buttons: ["Cancel", "Delete chat"],
         defaultId: 0,
         cancelId: 0,

@@ -11,6 +11,11 @@ CREATE TABLE session_retirements (
 ) WITHOUT ROWID;
 ";
 
+pub(super) const CLEANUP_SCHEMA: &str = "
+ALTER TABLE session_retirements ADD COLUMN cleanup BLOB CHECK(length(cleanup) = 32);
+CREATE INDEX session_retirements_pending ON session_retirements(session) WHERE cleanup IS NOT NULL;
+";
+
 #[derive(Clone, Debug, Serialize)]
 pub struct DeleteSession {
     pub session: SessionId,
@@ -25,6 +30,7 @@ pub struct DeleteSession {
 pub struct SessionDeleted {
     pub session: SessionId,
     pub request: ChangeId,
+    pub cleanup: Option<[u8; 32]>,
 }
 
 impl SqliteStore {
@@ -46,6 +52,18 @@ impl SqliteStore {
     pub async fn delete_idle(
         &self,
         request: DeleteSession,
+        check_session: impl FnOnce(&Envelope, &DriverStateSnapshot) -> Result<()> + Send + 'static,
+        check_turn: impl FnMut(&TurnState) -> Result<()> + Send + 'static,
+    ) -> Result<SessionDeleted> {
+        self.delete_idle_with_cleanup(request, None, check_session, check_turn)
+            .await
+    }
+
+    /// Atomically retain the owner's cleanup identity with the retirement.
+    pub async fn delete_idle_with_cleanup(
+        &self,
+        request: DeleteSession,
+        cleanup: Option<[u8; 32]>,
         check_session: impl FnOnce(&Envelope, &DriverStateSnapshot) -> Result<()> + Send + 'static,
         check_turn: impl FnMut(&TurnState) -> Result<()> + Send + 'static,
     ) -> Result<SessionDeleted> {
@@ -91,8 +109,8 @@ impl SqliteStore {
 
             transaction
                 .execute(
-                    "INSERT INTO session_retirements(session,scope,fingerprint) VALUES(?1,?2,?3)",
-                    params![id.as_str(), request.scope.bytes().as_slice(), fingerprint.bytes().as_slice()],
+                    "INSERT INTO session_retirements(session,scope,fingerprint,cleanup) VALUES(?1,?2,?3,?4)",
+                    params![id.as_str(), request.scope.bytes().as_slice(), fingerprint.bytes().as_slice(), cleanup.as_ref().map(|value| value.as_slice())],
                 )
                 .map_err(database_error)?;
             for sql in [
@@ -107,7 +125,48 @@ impl SqliteStore {
             }
             transaction.commit().map_err(commit_error)?;
             inner.changed.notify_waiters();
-            Ok(receipt(&request))
+            Ok(receipt(&request, cleanup))
+        })
+        .await
+    }
+
+    /// Enumerate a bounded page of retired identities awaiting their owner's cleanup.
+    pub async fn pending_retirement_cleanup(
+        &self,
+        after: Option<SessionId>,
+    ) -> Result<Vec<(SessionId, [u8; 32])>> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let mut statement = connection
+                .prepare("SELECT session,cleanup FROM session_retirements WHERE cleanup IS NOT NULL AND session > ?1 ORDER BY session LIMIT 16")
+                .map_err(database_error)?;
+            let mut rows = statement
+                .query([after.as_ref().map(SessionId::as_str).unwrap_or("")])
+                .map_err(database_error)?;
+            let mut pending = Vec::new();
+            while let Some(row) = rows.next().map_err(database_error)? {
+                let session: String = row.get(0).map_err(database_error)?;
+                let bytes: Vec<u8> = row.get(1).map_err(database_error)?;
+                pending.push((SessionId::new(session)?, cleanup_identity(bytes)?));
+            }
+            Ok(pending)
+        })
+        .await
+    }
+
+    /// Clear only the exact cleanup identity after the owner verifies removal.
+    pub async fn finish_retirement_cleanup(
+        &self,
+        session: SessionId,
+        cleanup: [u8; 32],
+    ) -> Result<()> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            connection
+                .execute(
+                    "UPDATE session_retirements SET cleanup=NULL WHERE session=?1 AND cleanup=?2",
+                    params![session.as_str(), cleanup.as_slice()],
+                )
+                .map_err(commit_error)?;
+            Ok(())
         })
         .await
     }
@@ -171,24 +230,34 @@ fn lookup_receipt(
     request: &DeleteSession,
     fingerprint: Fingerprint,
 ) -> Result<Option<SessionDeleted>> {
-    let stored: Option<Vec<u8>> = connection
+    let stored: Option<(Vec<u8>, Option<Vec<u8>>)> = connection
         .query_row(
-            "SELECT fingerprint FROM session_retirements WHERE session=?1 AND scope=?2",
+            "SELECT fingerprint,cleanup FROM session_retirements WHERE session=?1 AND scope=?2",
             params![request.session.as_str(), request.scope.bytes().as_slice()],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()
         .map_err(database_error)?;
     match stored {
-        Some(stored) if stored.as_slice() == fingerprint.bytes() => Ok(Some(receipt(request))),
+        Some((stored, cleanup)) if stored.as_slice() == fingerprint.bytes() => Ok(Some(receipt(
+            request,
+            cleanup.map(cleanup_identity).transpose()?,
+        ))),
         Some(_) => Err(error(ErrorKind::Conflict, "request_identity_reused")),
         None => Ok(None),
     }
 }
 
-fn receipt(request: &DeleteSession) -> SessionDeleted {
+fn cleanup_identity(bytes: Vec<u8>) -> Result<[u8; 32]> {
+    bytes
+        .try_into()
+        .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))
+}
+
+fn receipt(request: &DeleteSession, cleanup: Option<[u8; 32]>) -> SessionDeleted {
     SessionDeleted {
         session: request.session.clone(),
         request: request.request.clone(),
+        cleanup,
     }
 }

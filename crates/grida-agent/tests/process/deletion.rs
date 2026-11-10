@@ -10,7 +10,7 @@ const DELETE: &str = "_co.grida/session/delete";
 const CATALOG: &str = "_co.grida/session/catalog-entry";
 const SNAPSHOT: &str = "_co.grida/session/snapshot";
 
-fn capabilities() -> Value {
+pub(super) fn capabilities() -> Value {
     let mut request = extension_initialize();
     for key in [
         "co.grida/session/delete",
@@ -59,7 +59,7 @@ fn setup(session: &str, cwd: &Path) -> Value {
     json!({"sessionId":session,"cwd":cwd,"mcpServers":[]})
 }
 
-async fn deletion(client: &mut Client, session: &str, cwd: &Path) -> Value {
+pub(super) async fn deletion(client: &mut Client, session: &str, cwd: &Path) -> Value {
     let target = json!({"sessionId":session});
     let snapshot = client.request(SNAPSHOT, target.clone()).await;
     let catalog = client.request(CATALOG, target).await;

@@ -107,13 +107,33 @@ pub struct ScratchScope {
     inner: native::Scope,
 }
 
-/// Check for an exact owner entry without creating a scope or following it.
-pub(crate) fn owner_scope_exists(parent: &Path, base: &str, owner: &SessionId) -> Result<bool> {
+/// Inspect an owned scope without creating it, and return its cleanup identity.
+pub(crate) fn retirement_identity(
+    parent: &Path,
+    base: &str,
+    owner: &SessionId,
+) -> Result<Option<[u8; 32]>> {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
-    return native::owner_scope_exists(parent, base, owner);
+    return native::retirement(parent, base, owner, None);
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {
         let _ = (parent, base, owner);
+        Err(unsupported())
+    }
+}
+
+/// Remove only the previously inspected scope of a durably retired owner.
+pub(crate) fn retire(
+    parent: &Path,
+    base: &str,
+    owner: &SessionId,
+    identity: [u8; 32],
+) -> Result<()> {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    return native::retirement(parent, base, owner, Some(identity)).map(|_| ());
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = (parent, base, owner, identity);
         Err(unsupported())
     }
 }
@@ -276,23 +296,108 @@ mod native {
         file: File,
     }
 
-    pub(super) fn owner_scope_exists(parent: &Path, base: &str, owner: &SessionId) -> Result<bool> {
+    pub(super) fn retirement(
+        parent: &Path,
+        base: &str,
+        owner: &SessionId,
+        expected: Option<[u8; 32]>,
+    ) -> Result<Option<[u8; 32]>> {
         validate_absolute(parent)?;
         let parent = Directory::open(parent)?;
-        let base = match unix::openat(&parent.file, base, directory_flags(), Mode::empty()) {
-            Ok(file) => Directory {
-                path: parent.path.join(base),
-                file: file.into(),
-            },
-            Err(Errno::NOENT) => return Ok(false),
-            Err(error) => return Err(io_failure(error)),
+        let Some(base) = parent.existing_child(base)? else {
+            if expected.is_some() {
+                parent.sync()?;
+            }
+            return Ok(None);
         };
-        base.validate()?;
-        match unix::statat(&base.file, key(owner)?, AtFlags::SYMLINK_NOFOLLOW) {
-            Ok(_) => Ok(true),
-            Err(Errno::NOENT) => Ok(false),
-            Err(error) => Err(io_failure(error)),
+        check_base(&base.path)?;
+        let name = key(owner)?;
+        let Some(scope) = base.existing_child(&name)? else {
+            if expected.is_some() {
+                base.sync()?;
+            }
+            return Ok(None);
+        };
+        let metadata = scope.file.metadata().map_err(io_failure)?;
+        let created = metadata.created().map_err(io_failure)?;
+        let identity = *Fingerprint::of(&(owner, metadata.dev(), metadata.ino(), created))?.bytes();
+        if expected.is_some_and(|expected| expected != identity) {
+            return Err(invalid_storage());
         }
+
+        // The lock is removed after all children. An empty scope without it
+        // can be left by interrupted creation or retirement.
+        let lock = scope
+            .read("owner.lock")?
+            .map(|_| scope.lock(true))
+            .transpose()?;
+        let mut parts = Vec::new();
+        scope.entries(|part| {
+            if part == "owner.lock" && lock.is_some() {
+                return Ok(());
+            }
+            if !matches!(part, "sources" | "work") || lock.is_none() {
+                return Err(invalid_storage());
+            }
+            let directory = scope.existing_child(part)?.ok_or_else(invalid_storage)?;
+            // A crash after linkat can leave the published name and its
+            // temporary link. Use the same staging recovery as normal open.
+            directory.remove_staging()?;
+            let mut files = Vec::new();
+            directory.entries(|entry| {
+                let (key, suffix) = entry.split_once('.').unwrap_or((entry, ""));
+                let valid = if part == "sources" {
+                    matches!(suffix, "asset" | "working")
+                } else {
+                    suffix.is_empty() || safe_extension(suffix)
+                };
+                if !is_key(key) || !valid {
+                    return Err(invalid_storage());
+                }
+                let file = directory.read(entry)?.ok_or_else(invalid_storage)?;
+                let item = file.metadata().map_err(io_failure)?;
+                if item.dev() != metadata.dev() {
+                    return Err(invalid_storage());
+                }
+                files.push((entry.to_owned(), item));
+                Ok(())
+            })?;
+            parts.push((part.to_owned(), directory, files));
+            Ok(())
+        })?;
+
+        if expected.is_some() {
+            for (part, directory, files) in parts {
+                scope.validate()?;
+                directory.validate()?;
+                for (name, captured) in files {
+                    let current =
+                        fs::symlink_metadata(directory.path.join(&name)).map_err(io_failure)?;
+                    private_metadata(&current, false)?;
+                    if !same(&captured, &current) {
+                        return Err(invalid_storage());
+                    }
+                    unix::unlinkat(&directory.file, name.as_str(), AtFlags::empty())
+                        .map_err(io_failure)?;
+                }
+                directory.sync()?;
+                directory.validate()?;
+                unix::unlinkat(&scope.file, part.as_str(), AtFlags::REMOVEDIR)
+                    .map_err(io_failure)?;
+            }
+            scope.validate()?;
+            if lock.is_some() {
+                // Commit the child removals before dropping the owner lock.
+                scope.sync()?;
+                unix::unlinkat(&scope.file, "owner.lock", AtFlags::empty()).map_err(io_failure)?;
+            }
+            scope.sync()?;
+            scope.validate()?;
+            base.validate()?;
+            unix::unlinkat(&base.file, name.as_str(), AtFlags::REMOVEDIR).map_err(io_failure)?;
+            base.sync()?;
+        }
+        Ok(Some(identity))
     }
 
     #[derive(Default)]
@@ -681,6 +786,25 @@ mod native {
             };
             directory.validate()?;
             Ok(directory)
+        }
+
+        fn existing_child(&self, name: &str) -> Result<Option<Self>> {
+            let file = match unix::openat(&self.file, name, directory_flags(), Mode::empty()) {
+                Ok(file) => File::from(file),
+                Err(Errno::NOENT) => return Ok(None),
+                Err(error) => return Err(io_failure(error)),
+            };
+            if file.metadata().map_err(io_failure)?.dev()
+                != self.file.metadata().map_err(io_failure)?.dev()
+            {
+                return Err(invalid_storage());
+            }
+            let child = Self {
+                path: self.path.join(name),
+                file,
+            };
+            child.validate()?;
+            Ok(Some(child))
         }
 
         fn validate(&self) -> Result<()> {

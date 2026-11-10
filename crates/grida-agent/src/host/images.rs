@@ -15,6 +15,7 @@ use std::sync::Mutex;
 const MIME: &str = "image/png";
 const NAME: &str = "image.png";
 const LOCATOR: &str = "retained-input:";
+const STORAGE: &str = "retained-inputs";
 pub(super) const MAX_IMAGE_BYTES: usize = 256 * 1024;
 pub(super) const MAX_PIXELS: u64 = 4 * 1024 * 1024;
 pub(super) const MAX_DECODED_BYTES: usize = 8 * 1024 * 1024;
@@ -73,8 +74,15 @@ pub(super) struct Images {
 }
 
 impl Images {
-    pub(super) fn retained_scope_exists(state_dir: &Path, session: &SessionId) -> Result<bool> {
-        crate::scratch::owner_scope_exists(state_dir, "retained-inputs", session)
+    pub(super) fn retirement_identity(
+        state_dir: &Path,
+        session: &SessionId,
+    ) -> Result<Option<[u8; 32]>> {
+        crate::scratch::retirement_identity(state_dir, STORAGE, session)
+    }
+
+    pub(super) fn retire(state_dir: &Path, session: &SessionId, identity: [u8; 32]) -> Result<()> {
+        crate::scratch::retire(state_dir, STORAGE, session, identity)
     }
 
     pub(super) fn open(state_dir: &Path) -> Result<Self> {
@@ -85,7 +93,7 @@ impl Images {
                 .map_err(|_| storage_unavailable())?;
             crate::scratch::check_private_directory(&state_dir)?;
             Ok(Self {
-                base: state_dir.join("retained-inputs"),
+                base: state_dir.join(STORAGE),
                 access: Mutex::new(()),
             })
         }

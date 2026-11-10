@@ -40,8 +40,15 @@ impl Host {
         &self,
         request: SavedChatDeletion,
     ) -> Result<Option<SessionDeleted>> {
-        let (request, _) = request.scoped().await?;
-        self.store.deletion_receipt(request).await
+        self.owned_control(move |host| async move {
+            let (request, _) = request.scoped().await?;
+            let _admission = host.configuration_admission.lock().await;
+            match host.store.deletion_receipt(request).await? {
+                Some(receipt) => Ok(Some(host.finish_deletion(receipt).await?)),
+                None => Ok(None),
+            }
+        })
+        .await
     }
 
     pub(crate) async fn delete_saved_chat(
@@ -57,7 +64,7 @@ impl Host {
             let (request, cwd) = request.scoped().await?;
             let _admission = host.configuration_admission.lock().await;
             if let Some(receipt) = host.store.deletion_receipt(request.clone()).await? {
-                return Ok(receipt);
+                return host.finish_deletion(receipt).await;
             }
             let session = request.session.clone();
             let view = host.store.inspect(session.clone()).await?;
@@ -102,27 +109,77 @@ impl Host {
             ));
         }
         let owner = request.session.clone();
-        if tokio::task::spawn_blocking(move || {
-            images::Images::retained_scope_exists(&state_dir, &owner)
+        let cleanup = tokio::task::spawn_blocking(move || {
+            images::Images::retirement_identity(&state_dir, &owner)
         })
         .await
-        .map_err(|_| problem(ErrorKind::Unavailable, "attachment_storage_unavailable"))??
-        {
-            return Err(problem(
-                ErrorKind::Conflict,
-                "session_deletion_has_retained_inputs",
-            ));
-        }
-        self.store
-            .delete_idle(
+        .map_err(|_| problem(ErrorKind::Unavailable, "attachment_storage_unavailable"))?
+        .map_err(|_| problem(ErrorKind::Conflict, "session_deletion_has_retained_inputs"))?;
+        let receipt = self
+            .store
+            .delete_idle_with_cleanup(
                 request,
+                cleanup,
                 move |configuration, driver| {
                     require_saved_workspace(configuration, &cwd)?;
                     goals::require_resolved_goal(driver)
                 },
                 require_resolved_work,
             )
+            .await?;
+        self.finish_deletion(receipt).await
+    }
+
+    async fn finish_deletion(&self, mut receipt: SessionDeleted) -> Result<SessionDeleted> {
+        if let Some(identity) = receipt.cleanup {
+            self.cleanup_retired(receipt.session.clone(), identity)
+                .await
+                .map_err(|_| problem(ErrorKind::Uncertain, "session_deletion_unverified"))?;
+            receipt.cleanup = None;
+        }
+        Ok(receipt)
+    }
+
+    async fn cleanup_retired(&self, session: SessionId, identity: [u8; 32]) -> Result<()> {
+        let state_dir = self
+            .state_dir
+            .clone()
+            .ok_or_else(|| problem(ErrorKind::Unavailable, "attachment_storage_unavailable"))?;
+        let owner = session.clone();
+        tokio::task::spawn_blocking(move || images::Images::retire(&state_dir, &owner, identity))
             .await
+            .map_err(|_| problem(ErrorKind::Uncertain, "session_deletion_unverified"))??;
+        self.store
+            .finish_retirement_cleanup(session, identity)
+            .await
+    }
+
+    pub(crate) async fn recover_retired_chat_data(&self) {
+        if !self.deletion_available() {
+            return;
+        }
+        let _ = self
+            .owned_control(|host| async move {
+                let mut after = None;
+                while !host.controls.is_closed() {
+                    let pending = host.store.pending_retirement_cleanup(after).await?;
+                    let Some((last, _)) = pending.last() else {
+                        break;
+                    };
+                    after = Some(last.clone());
+                    for (session, identity) in pending {
+                        let _admission = host.configuration_admission.lock().await;
+                        if host.controls.is_closed() {
+                            return Ok(());
+                        }
+                        if host.cleanup_retired(session, identity).await.is_err() {
+                            eprintln!("grida-agent: retired chat data cleanup is pending");
+                        }
+                    }
+                }
+                Ok(())
+            })
+            .await;
     }
 }
 

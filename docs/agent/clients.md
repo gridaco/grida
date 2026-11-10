@@ -245,9 +245,10 @@ On macOS and Linux, private stdio clients can negotiate
 chat. Attach the chat and read both its execution and catalog revisions before
 asking for confirmation. The host requires idle work and refuses chats with
 pending inputs, unresolved execution, an open side chat, an unfinished Goal,
-named subagents, or retained input storage. Authored files and independent
+or named subagents. Deletion also removes the chat's private attachments
+and unpublished working copies. Authored files, saved exports, and independent
 forks stay available. Retry a lost deletion reply with the original request
-ID, workspace, and revisions.
+ID, workspace, and revisions, even if the chat has disappeared from the list.
 
 When a native chat owner is active in Desktop, the workspace **Chat** selector
 shows saved chats in that workspace. Use **Older chats** to browse further or
@@ -258,10 +259,11 @@ while keeping its draft and any running work. Open it from **Archived chats**
 and choose **Restore chat** to return it to the active list.
 
 On macOS and Linux, select an eligible idle chat and choose **Delete chat**.
-Confirm in the Desktop dialog to remove the saved conversation. Desktop
-closes the deleted chat in any open workspace window. Project files and
-independent forks stay available. Chats with outstanding work or retained
-dependencies remain available to archive.
+Confirm in the Desktop dialog to remove the conversation and its private
+attachments and working copies. Desktop closes the deleted chat in any open
+workspace window. Project files, saved exports, and independent forks stay
+available. You can archive chats that still have outstanding work or named
+subagents.
 
 With the native **Ask me** profile, a read outside the current grants pauses
 for review when its folder is eligible for additional access. The pane shows

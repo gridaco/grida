@@ -64,10 +64,12 @@ for future attachment or execution.
 
 Deletion requires idle, resolved work and an empty queue. A concurrent
 transcript replay or catalog read can require a retry. An open side chat, a
-pending wake-up, an unfinished Goal, named children, retained input storage,
-or unresolved execution evidence blocks deletion. Independent forks retain
-their own copied prefix. Workspace files and the legacy chat archive have
-separate owners.
+pending wake-up, an unfinished Goal, named children, or unresolved execution
+evidence blocks deletion. The host removes verified chat-owned attachment and
+working data before returning success. If the database commit outlives removal,
+restarting the private host or retrying the exact request can complete removal.
+Independent forks retain their own copied prefix. Workspace files, exported
+copies, and the legacy chat archive have separate owners.
 
 ## Standard messages and custom UX
 

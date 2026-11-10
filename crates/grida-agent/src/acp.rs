@@ -70,6 +70,8 @@ async fn serve(
     provider: Option<crate::SupervisedProvider>,
     side_chats: Arc<crate::host::side_chats::SideChats>,
 ) -> std::result::Result<(), ServeError> {
+    let recovering = host.clone();
+    let cleanup = tokio::spawn(async move { recovering.recover_retired_chat_data().await });
     let delivery = Arc::new(Delivery::new());
     let (sdk, wire) = Channel::duplex();
     let (incoming, outgoing) = wire.into_parts();
@@ -103,6 +105,7 @@ async fn serve(
         .await
         .and(sides)
         .map_err(ServeError::Shutdown)?;
+    let _ = cleanup.await;
     result.map(|_| ()).map_err(ServeError::Protocol)
 }
 

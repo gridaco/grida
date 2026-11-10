@@ -368,3 +368,42 @@ async fn migrates_existing_catalog_without_changing_its_entries() {
     assert_eq!(store.catalog_entry(session()).await.unwrap(), entry);
     remove(&store, deletion(&store).await).await.unwrap();
 }
+
+#[tokio::test]
+async fn upgrades_a_retired_chat_without_reopening_its_identity() {
+    let directory = private_directory();
+    let path = directory.path().join("sessions.sqlite");
+    let store = SqliteStore::open_cataloged(&path, project).unwrap();
+    let original = create(session(), "workspace");
+    store.create(original.clone()).await.unwrap();
+    let request = deletion(&store).await;
+    let receipt = remove(&store, request.clone()).await.unwrap();
+    drop(store);
+
+    let previous = rusqlite::Connection::open(&path).unwrap();
+    previous
+        .execute_batch(
+            "DROP INDEX session_retirements_pending;
+         ALTER TABLE session_retirements DROP COLUMN cleanup;
+         PRAGMA user_version=9;",
+        )
+        .unwrap();
+    drop(previous);
+
+    let store = SqliteStore::open_cataloged(&path, project).unwrap();
+    assert_eq!(
+        store.deletion_receipt(request).await.unwrap(),
+        Some(receipt)
+    );
+    assert!(
+        store
+            .pending_retirement_cleanup(None)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        store.create(original).await.unwrap_err().code,
+        "session_identity_retired"
+    );
+}
