@@ -403,15 +403,24 @@ impl Host {
                 control_revision: control.expected_control,
             },
         };
+        self.resume_claim(request, control.turn).await
+    }
+
+    pub(super) async fn resume_claim(
+        &self,
+        request: ClaimRequest,
+        turn: TurnId,
+    ) -> Result<TurnView> {
         if let Some(view) = self.store.claim_receipt(request.clone()).await? {
             return Ok(view);
         }
+        let session = request.session.clone();
         let ticket = {
             let mut work = self.work.lock().await;
             self.register(
                 &mut work,
-                control.session.clone(),
-                control.turn.clone(),
+                session.clone(),
+                turn.clone(),
                 Launch::Resume(request.clone()),
             )
         };
@@ -423,7 +432,7 @@ impl Host {
             .admission
             .await
             .map_err(|_| problem(ErrorKind::Uncertain, "admission_worker_interrupted"))??;
-        self.store.inspect_turn(control.session, control.turn).await
+        self.store.inspect_turn(session, turn).await
     }
 
     pub(super) async fn kick_stopped(&self, session: SessionId, turn: TurnId) {

@@ -320,6 +320,74 @@ impl Host {
         .await
     }
 
+    /// Continue an unpaused suspension after explicit cancellation of its
+    /// exact timer. Cancelling the timer itself never admits continuation.
+    pub(crate) async fn resume_cancelled_wakeup(
+        &self,
+        control: TurnControl,
+        epoch: u64,
+        position: JournalPosition,
+        wait: WaitId,
+    ) -> Result<TurnView> {
+        let revision = control.expected_control;
+        // Ordinary resume already binds epoch, journal position and session
+        // revision. Include the wake-up and control basis in its receipt key.
+        let identity = Fingerprint::of(&(
+            "continue-cancelled-wakeup",
+            &control.request,
+            &wait,
+            revision,
+        ))?;
+        let key: String = identity
+            .bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        let request = ClaimRequest {
+            id: ChangeId::new(format!("cancelled-wakeup/{key}"))?,
+            session: control.session.clone(),
+            expected_revision: control.expected_session,
+            selection: TurnSelection::Resume {
+                turn: control.turn.clone(),
+                epoch,
+                position,
+            },
+        };
+        let ready = self
+            .store
+            .inspect_turn_with(control.session, control.turn.clone(), move |state| {
+                let record = state
+                    .waits()
+                    .get(&wait)
+                    .filter(|record| is_wakeup(record))
+                    .ok_or_else(unavailable)?;
+                let scheduled = read_wakeup(record)?;
+                if scheduled.session != state.binding().session
+                    || scheduled.turn != state.binding().turn
+                    || read_disposition(record)? != Some(WakeupDisposition::Cancelled)
+                {
+                    return Err(unavailable());
+                }
+                Ok(state.is_suspended()
+                    && state.controls().admits_work()
+                    && state.controls().revision == revision
+                    && state.position() == position
+                    && state.binding().epoch == epoch
+                    && state.waits().values().all(|wait| !wait.is_pending())
+                    && state
+                        .operations()
+                        .get(&scheduled.operation)
+                        .is_some_and(|operation| operation.outcome().is_none()))
+            })
+            .await?;
+        if !ready {
+            return self.store.claim_receipt(request).await?.ok_or_else(|| {
+                problem(ErrorKind::Conflict, "cancelled_wakeup_resume_unavailable")
+            });
+        }
+        self.resume_claim(request, control.turn).await
+    }
+
     pub(super) async fn release_timer(&self, session: &SessionId, turn: &TurnId) {
         self.work.lock().await.release_timer(session, turn);
     }

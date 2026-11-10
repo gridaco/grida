@@ -343,6 +343,15 @@ closes it. Cancelling the wake-up makes no automatic continuation. Load,
 inspection, and connection setup make no recovery request. Closing the host
 releases the live timer, and a new host reports `armed: false` until recovery.
 
+An attached private client can negotiate
+`co.grida/session/continue-cancelled-wakeup` version 1 and explicitly continue
+the same unpaused, suspended turn through `_co.grida/session/resume`. Add the
+exact `cancelledWakeupId` to the normal task, epoch, and journal basis. The
+host verifies the cancelled wait and that no interaction still blocks the
+turn, then resumes it without delivering the scheduled prompt. Repeat the
+same request and basis to observe the claim receipt. A paused turn uses the
+ordinary Resume request without this field.
+
 With a trusted native permission profile, an access that requires approval
 records its directory, action and scope identities, and a bounded description
 of the file operation or command. The reply uses `decision: "approve_once"`

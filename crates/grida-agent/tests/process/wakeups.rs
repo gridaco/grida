@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const LIST: &str = "co.grida/session/wakeups";
 const CANCEL: &str = "co.grida/session/cancel-wakeup";
 const RECOVER: &str = "co.grida/session/recover-wakeup";
+const CONTINUE_CANCELLED: &str = "co.grida/session/continue-cancelled-wakeup";
 const PURPOSE: &str = "Check the render again.";
 const WAKE: Reply = Reply::Tool(
     "request_wakeup",
@@ -25,11 +26,25 @@ fn initialize() -> Value {
 }
 
 async fn client(state: &Path, endpoint: &str) -> StdioClient {
+    client_with_continuation(state, endpoint, false).await
+}
+
+async fn client_with_continuation(state: &Path, endpoint: &str, continuing: bool) -> StdioClient {
     let mut client = StdioClient::from_child(spawn_serve(state, endpoint));
-    let ready = client.request("initialize", initialize()).await;
+    let mut params = initialize();
+    if continuing {
+        params["clientCapabilities"]["_meta"][CONTINUE_CANCELLED] = 1.into();
+    }
+    let ready = client.request("initialize", params).await;
     for key in [LIST, CANCEL, RECOVER] {
         assert_eq!(
             ready["result"]["agentCapabilities"]["_meta"][key], 1,
+            "{ready}"
+        );
+    }
+    if continuing {
+        assert_eq!(
+            ready["result"]["agentCapabilities"]["_meta"][CONTINUE_CANCELLED], 1,
             "{ready}"
         );
     }
@@ -431,6 +446,121 @@ async fn pause_cancel_and_stop_do_not_trigger_due_model_work() {
     assert_eq!(refused["error"]["data"], "wakeup_unavailable", "{refused}");
     client.close().await;
     endpoint.done().await;
+}
+
+#[tokio::test]
+async fn a_cancelled_unpaused_checkin_continues_the_same_turn_only_on_explicit_resume() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut provider = Endpoint::start(vec![
+        RESTART_WAKE,
+        Reply::Finished("Continued without the cancelled check-in."),
+    ])
+    .await;
+    let mut original = client(&state, &provider.url).await;
+    let session = new_chat(&mut original, workspace.path()).await;
+    let (turn, wakeup) = start(&mut original, &session, &mut provider).await;
+    let cancelled = original
+        .request(
+            "_co.grida/session/cancel-wakeup",
+            target(&session, &turn, &wakeup),
+        )
+        .await;
+    assert_eq!(
+        cancelled["result"]["wakeup"]["status"], "cancelled",
+        "{cancelled}"
+    );
+    let view = status(&mut original, &session).await;
+    assert_eq!(view["current"]["disposition"], "suspended");
+    assert_eq!(view["current"]["paused"], false);
+    let request = json!({
+        "task":task_basis(&view,&session,"continue-cancelled"),
+        "expectedEpoch":view["current"]["epoch"],
+        "expectedJournalPosition":view["current"]["journalPosition"],
+        "cancelledWakeupId":wakeup["waitId"],
+    });
+    let unnegotiated = original
+        .request("_co.grida/session/resume", request.clone())
+        .await;
+    assert_eq!(unnegotiated["error"]["code"], -32601, "{unnegotiated}");
+    let ordinary = resume(&mut original, &session, &view, "paused-only").await;
+    assert_eq!(
+        ordinary["error"]["data"], "pause_state_changed",
+        "{ordinary}"
+    );
+    assert!(provider.requests.try_recv().is_err());
+    original.close().await;
+
+    let mut reopened = client_with_continuation(&state, &provider.url, true).await;
+    let loaded = reopened
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    assert!(loaded["result"].is_object(), "{loaded}");
+    after_due(&wakeup).await;
+    assert!(provider.requests.try_recv().is_err());
+    let mut wrong = request.clone();
+    wrong["cancelledWakeupId"] = "other-wakeup".into();
+    let refused = reopened.request("_co.grida/session/resume", wrong).await;
+    assert_eq!(refused["error"]["data"], "wakeup_unavailable", "{refused}");
+    let mut wrong_basis = request.clone();
+    wrong_basis["task"]["expectedControlRevision"] =
+        (view["current"]["controlRevision"].as_u64().unwrap() + 1).into();
+    let refused = reopened
+        .request("_co.grida/session/resume", wrong_basis.clone())
+        .await;
+    assert_eq!(
+        refused["error"]["data"], "cancelled_wakeup_resume_unavailable",
+        "{refused}"
+    );
+    assert!(provider.requests.try_recv().is_err());
+    let resumed = reopened
+        .request("_co.grida/session/resume", request.clone())
+        .await;
+    assert_eq!(
+        resumed["result"]["requestId"], "continue-cancelled",
+        "{resumed}"
+    );
+    assert_eq!(resumed["result"]["turn"]["turnId"], turn);
+    assert_eq!(resumed["result"]["turn"]["epoch"], 2);
+    let continued = provider.request().await;
+    assert!(
+        continued["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|message| {
+                message["role"] == "tool"
+                    && message["content"]
+                        .as_str()
+                        .is_some_and(|text| text.contains("cancelled") && !text.contains(PURPOSE))
+            })
+    );
+    let settled = wait_for(&mut reopened, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    assert_eq!(settled["latest"]["turnId"], turn);
+    assert_eq!(settled["latest"]["status"], "succeeded");
+    let retried = reopened.request("_co.grida/session/resume", request).await;
+    assert_eq!(
+        retried["result"]["requestId"], "continue-cancelled",
+        "{retried}"
+    );
+    assert_eq!(retried["result"]["turn"]["epoch"], 2);
+    let refused = reopened
+        .request("_co.grida/session/resume", wrong_basis)
+        .await;
+    assert_eq!(
+        refused["error"]["data"], "cancelled_wakeup_resume_unavailable",
+        "{refused}"
+    );
+    assert!(provider.requests.try_recv().is_err());
+    reopened.close().await;
+    provider.done().await;
 }
 
 #[tokio::test]

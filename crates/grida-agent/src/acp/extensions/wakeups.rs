@@ -7,10 +7,14 @@ use agent_kit_core::WaitId;
 const LIST: &str = "co.grida/session/wakeups";
 const CANCEL: &str = "co.grida/session/cancel-wakeup";
 const RECOVER: &str = "co.grida/session/recover-wakeup";
+pub(super) const CONTINUE_CANCELLED: &str = "co.grida/session/continue-cancelled-wakeup";
 const CAPABILITIES: [&str; 3] = [LIST, CANCEL, RECOVER];
 
 pub(super) fn capabilities(private: bool) -> impl Iterator<Item = &'static str> {
-    CAPABILITIES.into_iter().filter(move |_| private)
+    CAPABILITIES
+        .into_iter()
+        .filter(move |_| private)
+        .chain(private.then_some(CONTINUE_CANCELLED))
 }
 
 pub(super) fn available(sessions: &Mutex<ConnectionSessions>) -> bool {

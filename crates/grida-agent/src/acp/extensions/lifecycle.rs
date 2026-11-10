@@ -3,6 +3,7 @@
 use super::*;
 use crate::host::{PromptPart, QueueEdit, TurnControl};
 use agent_client_protocol::v1::schema::ResourceLink;
+use agent_kit_core::WaitId;
 
 const ENQUEUE: &str = "co.grida/session/enqueue";
 const INPUT: &str = "co.grida/session/input";
@@ -155,6 +156,7 @@ struct Resume {
     task: TaskBasis,
     expected_epoch: u64,
     expected_journal_position: JournalPosition,
+    cancelled_wakeup_id: Option<WaitId>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -346,16 +348,31 @@ pub(super) fn handlers(
         .on_receive_request(
             async move |request: Resume, responder, _| {
                 let result = async {
-                    require(&sessions, RESUME, Some(&request.task.session_id))?;
+                    let session = request.task.session_id.clone();
+                    require(&sessions, RESUME, Some(&session))?;
                     let request_id = request.task.request_id.clone();
-                    let turn = host
-                        .resume(
-                            request.task.into(),
-                            request.expected_epoch,
-                            request.expected_journal_position,
-                        )
-                        .await
-                        .map_err(host_error)?;
+                    let turn = match request.cancelled_wakeup_id {
+                        Some(wait) => {
+                            require(&sessions, wakeups::CONTINUE_CANCELLED, Some(&session))?;
+                            host.resume_cancelled_wakeup(
+                                request.task.into(),
+                                request.expected_epoch,
+                                request.expected_journal_position,
+                                wait,
+                            )
+                            .await
+                        }
+                        None => {
+                            host.resume(
+                                request.task.into(),
+                                request.expected_epoch,
+                                request.expected_journal_position,
+                            )
+                            .await
+                        }
+                    }
+                    .map_err(host_error)?;
+                    require(&sessions, RESUME, Some(&session))?;
                     Ok(ResumeResponse {
                         request_id,
                         turn: TurnSummary::from(turn),
