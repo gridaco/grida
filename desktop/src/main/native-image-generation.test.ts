@@ -107,7 +107,11 @@ it("passes one canonical reference only on a captured reference-capable route", 
     kind: "unavailable",
   });
   expect(
-    await vercel.generate(1, { ...call, referencePng: png }, true)
+    await vercel.generate(
+      1,
+      { ...call, referencePng: png },
+      { libraryReference: true }
+    )
   ).toEqual({
     kind: "unavailable",
   });
@@ -117,14 +121,22 @@ it("passes one canonical reference only on a captured reference-capable route", 
     Buffer.alloc(256 * 1024 + 1).toString("base64"),
   ]) {
     expect(
-      await openrouter.generate(1, { ...call, referencePng }, true)
+      await openrouter.generate(
+        1,
+        { ...call, referencePng },
+        { libraryReference: true }
+      )
     ).toEqual({
       kind: "unavailable",
     });
   }
   expect(request).not.toHaveBeenCalled();
   expect(
-    await openrouter.generate(1, { ...call, referencePng: png }, true)
+    await openrouter.generate(
+      1,
+      { ...call, referencePng: png },
+      { libraryReference: true }
+    )
   ).toMatchObject({ kind: "retained", id });
   expect(request).toHaveBeenCalledOnce();
   expect(JSON.parse(String(request.mock.calls[0][0].body))).toEqual({
@@ -138,72 +150,90 @@ it("passes one canonical reference only on a captured reference-capable route", 
   });
 });
 
-it("sends the attached PNG only after an approved transfer review", async () => {
-  const request = vi.fn<(init: RequestInit) => Promise<Response>>(async () =>
-    Response.json({
-      model_id: model,
-      provider_id: "openrouter",
-      stored_media: item,
-    })
-  );
-  const owner = NativeImageGeneration.forByok(
-    "openrouter",
-    "https://openrouter.ai/api/v1",
-    request
-  )!;
-  const gate = new AbortController();
-  const close = vi.fn<() => void>();
-  const review = vi.fn<ImageReferenceReview>();
-  review.mockResolvedValueOnce({ kind: "declined" }).mockResolvedValue({
-    kind: "approved",
-    signal: gate.signal,
-    check: () => gate.signal.throwIfAborted(),
-    close,
-  });
-  const attached = {
-    ...call,
-    referencePng: png,
-    referenceOrigin: "attachment",
-  };
-  expect(await owner.generate(1, attached, true)).toEqual({
-    kind: "unavailable",
-  });
-  expect(await owner.generate(1, attached, false, false, review)).toEqual({
-    kind: "reference_declined",
-  });
-  expect(request).not.toHaveBeenCalled();
-  expect(
-    await owner.generate(
-      2,
-      { ...attached, callId: "approved" },
-      false,
-      false,
-      review
-    )
-  ).toMatchObject({ kind: "retained", id });
-  expect(review).toHaveBeenCalledWith({
-    model,
-    signal: expect.any(AbortSignal),
-  });
-  expect(request).toHaveBeenCalledOnce();
-  const body = JSON.parse(String(request.mock.calls[0][0].body));
-  expect(body.reference_png).toBe(png);
-  expect(body).not.toHaveProperty("referenceOrigin");
-  expect(close).toHaveBeenCalledOnce();
+it.each(["attachment", "workspace"] as const)(
+  "sends the %s PNG only after an approved transfer review",
+  async (kind) => {
+    const request = vi.fn<(init: RequestInit) => Promise<Response>>(async () =>
+      Response.json({
+        model_id: model,
+        provider_id: "openrouter",
+        stored_media: item,
+      })
+    );
+    const owner = NativeImageGeneration.forByok(
+      "openrouter",
+      "https://openrouter.ai/api/v1",
+      request
+    )!;
+    const gate = new AbortController();
+    const close = vi.fn<() => void>();
+    const review = vi.fn<ImageReferenceReview>();
+    review.mockResolvedValueOnce({ kind: "declined" }).mockResolvedValue({
+      kind: "approved",
+      signal: gate.signal,
+      check: () => gate.signal.throwIfAborted(),
+      close,
+    });
+    const referencePath = "assets/source.png";
+    const reference = {
+      ...call,
+      referencePng: png,
+      referenceOrigin: kind,
+      ...(kind === "workspace" && { referencePath }),
+    };
+    const authority =
+      kind === "workspace"
+        ? { reviewWorkspace: review }
+        : { reviewAttachment: review };
+    expect(
+      await owner.generate(1, reference, { libraryReference: true })
+    ).toEqual({
+      kind: "unavailable",
+    });
+    for (const unsafePath of [
+      "../source.png",
+      "/source.png",
+      "a\\source.png",
+      "a/\u202E.png",
+    ]) {
+      expect(
+        await owner.generate(
+          1,
+          { ...reference, referencePath: unsafePath },
+          authority
+        )
+      ).toEqual({
+        kind: "unavailable",
+      });
+    }
+    expect(review).not.toHaveBeenCalled();
+    expect(await owner.generate(1, reference, authority)).toEqual({
+      kind: "reference_declined",
+    });
+    expect(request).not.toHaveBeenCalled();
+    expect(
+      await owner.generate(2, { ...reference, callId: "approved" }, authority)
+    ).toMatchObject({ kind: "retained", id });
+    expect(review).toHaveBeenCalledWith({
+      model,
+      signal: expect.any(AbortSignal),
+      source: kind === "workspace" ? { kind, path: referencePath } : { kind },
+    });
+    expect(request).toHaveBeenCalledOnce();
+    const body = JSON.parse(String(request.mock.calls[0][0].body));
+    expect(body.reference_png).toBe(png);
+    expect(body).not.toHaveProperty("referenceOrigin");
+    expect(body).not.toHaveProperty("referencePath");
+    expect(close).toHaveBeenCalledOnce();
 
-  gate.abort();
-  expect(
-    await owner.generate(
-      3,
-      { ...attached, callId: "revoked" },
-      false,
-      false,
-      review
-    )
-  ).toEqual({ kind: "unavailable" });
-  expect(request).toHaveBeenCalledOnce();
-  expect(close).toHaveBeenCalledTimes(2);
-});
+    gate.abort();
+    expect(
+      await owner.generate(3, { ...reference, callId: "revoked" }, authority)
+    ).toEqual({ kind: "unavailable" });
+    expect(request).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledTimes(2);
+  }
+);
 
 it("only cancels the current exact request and aborts it on owner close", async () => {
   const request = vi.fn<(init: RequestInit) => Promise<Response>>(

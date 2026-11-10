@@ -253,7 +253,12 @@ async fn serve_connection(
                             && request.client_capabilities.meta.as_ref()
                                 .and_then(|meta| meta.get(attachment))
                                 .and_then(serde_json::Value::as_u64) == Some(1);
-                        generation.attach(connection.clone(), references, place, attachments);
+                        let workspace_reference = crate::host::image_generation::WORKSPACE_CAPABILITY;
+                        let workspace_references = initialized_host.supports_workspace_image_reference()
+                            && request.client_capabilities.meta.as_ref()
+                                .and_then(|meta| meta.get(workspace_reference))
+                                .and_then(serde_json::Value::as_u64) == Some(1);
+                        generation.attach(connection.clone(), references, place, attachments, workspace_references);
                         advertised.insert(capability.into(), 1.into());
                         if references {
                             advertised.insert(reference.into(), 1.into());
@@ -263,6 +268,9 @@ async fn serve_connection(
                         }
                         if attachments {
                             advertised.insert(attachment.into(), 1.into());
+                        }
+                        if workspace_references {
+                            advertised.insert(workspace_reference.into(), 1.into());
                         }
                     }
                     let capability = crate::editor_surfaces::CAPABILITY;

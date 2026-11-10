@@ -7,10 +7,20 @@ import type { WorkspaceReviewReceipt } from "./native-workspace-review";
 type Provider = "openrouter" | "vercel";
 type Request = (init: RequestInit) => Promise<Response>;
 type CredentialProof = { nonce: string; proof: string };
+type LocalReference =
+  | { kind: "attachment" }
+  | { kind: "workspace"; path: string };
 export type ImageReferenceReview = (input: {
   model: string;
   signal: AbortSignal;
+  source: LocalReference;
 }) => Promise<WorkspaceReviewReceipt>;
+type GenerationAuthority = {
+  libraryReference?: boolean;
+  placement?: boolean;
+  reviewAttachment?: ImageReferenceReview;
+  reviewWorkspace?: ImageReferenceReview;
+};
 type Reply =
   | {
       kind: "retained";
@@ -52,6 +62,8 @@ export class NativeImageGeneration {
   static readonly method = `_${this.capability}`;
   static readonly referenceCapability = "co.grida/media/image-reference";
   static readonly attachmentCapability = "co.grida/media/attachment-reference";
+  static readonly workspaceReferenceCapability =
+    "co.grida/media/workspace-reference";
   readonly binding: string;
   private readonly calls = new Set<string>();
   private readonly lifetime = new AbortController();
@@ -110,9 +122,7 @@ export class NativeImageGeneration {
   async generate(
     id: number | string,
     value: unknown,
-    referenceNegotiated = false,
-    placementNegotiated = false,
-    reviewReference?: ImageReferenceReview
+    authority: GenerationAuthority = {}
   ): Promise<Reply> {
     const params = record(value);
     if (!params) return { kind: "unavailable" };
@@ -123,8 +133,21 @@ export class NativeImageGeneration {
       background,
       referencePng,
       referenceOrigin,
+      referencePath,
     } = params;
-    const attachment = referenceOrigin === "attachment";
+    let source: LocalReference | undefined;
+    if (referenceOrigin === "attachment" && referencePath === undefined)
+      source = { kind: "attachment" };
+    else if (
+      referenceOrigin === "workspace" &&
+      isWorkspaceReferencePath(referencePath)
+    )
+      source = { kind: "workspace", path: referencePath };
+    const review =
+      source?.kind === "attachment"
+        ? authority.reviewAttachment
+        : authority.reviewWorkspace;
+    const placement = authority.placement === true;
     const credential = credentialProof(params.credential);
     if (
       this.lifetime.signal.aborted ||
@@ -135,7 +158,8 @@ export class NativeImageGeneration {
         4 +
           Number(background !== undefined) +
           Number(referencePng !== undefined) +
-          Number(referenceOrigin !== undefined) ||
+          Number(referenceOrigin !== undefined) +
+          Number(referencePath !== undefined) ||
       typeof sessionId !== "string" ||
       !ID.test(sessionId) ||
       typeof callId !== "string" ||
@@ -143,10 +167,10 @@ export class NativeImageGeneration {
       typeof prompt !== "string" ||
       !prompt.trim() ||
       Buffer.byteLength(prompt) > MAX_PROMPT_BYTES ||
-      (referenceOrigin !== undefined &&
-        (!attachment || !reviewReference || referencePng === undefined)) ||
+      ((referenceOrigin !== undefined || referencePath !== undefined) &&
+        (!source || !review || referencePng === undefined)) ||
       (referencePng !== undefined &&
-        ((!attachment && !referenceNegotiated) ||
+        ((!source && !authority.libraryReference) ||
           !this.supportsReference ||
           !isBoundedPng(referencePng))) ||
       (background !== undefined &&
@@ -182,7 +206,7 @@ export class NativeImageGeneration {
       credential,
       ...(background && { background }),
       ...(typeof referencePng === "string" && { reference_png: referencePng }),
-      ...(placementNegotiated && { receipt_sha256: true }),
+      ...(placement && { receipt_sha256: true }),
     };
     let approval:
       | Extract<WorkspaceReviewReceipt, { kind: "approved" }>
@@ -190,10 +214,11 @@ export class NativeImageGeneration {
     let dispatched = false;
     try {
       requestSignal.throwIfAborted();
-      if (attachment && reviewReference) {
-        const reviewed = await reviewReference({
+      if (source && review) {
+        const reviewed = await review({
           model: this.model,
           signal: requestSignal,
+          source,
         });
         if (reviewed.kind === "approved") approval = reviewed;
         requestSignal.throwIfAborted();
@@ -230,19 +255,19 @@ export class NativeImageGeneration {
         return { kind: "uncertain" };
       if (result.stored_media === null && Object.keys(result).length === 3)
         return { kind: "generated_unretained" };
-      if (Object.keys(result).length !== (placementNegotiated ? 4 : 3))
+      if (Object.keys(result).length !== (placement ? 4 : 3))
         return { kind: "uncertain" };
       const item = retained(result.stored_media);
       if (
         !item ||
-        (placementNegotiated &&
+        (placement &&
           (typeof result.sha256 !== "string" ||
             !/^[a-f0-9]{64}$/.test(result.sha256)))
       )
         return { kind: "uncertain" };
       return {
         ...item,
-        ...(placementNegotiated &&
+        ...(placement &&
           typeof result.sha256 === "string" && { sha256: result.sha256 }),
       };
     } catch {
@@ -252,6 +277,15 @@ export class NativeImageGeneration {
       this.active = undefined;
     }
   }
+}
+
+function isWorkspaceReferencePath(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    Buffer.byteLength(value) <= 1024 &&
+    !/[\\\p{Cc}\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/u.test(value) &&
+    value.split("/").every((part) => part && part !== "." && part !== "..")
+  );
 }
 
 function isBoundedPng(value: unknown): value is string {

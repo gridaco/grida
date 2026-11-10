@@ -723,13 +723,18 @@ app.on("ready", async () => {
                   })
               : undefined,
           reviewImageReference:
-            (workspaceId: string): ImageReferenceReview =>
-            ({ signal, model }) =>
-              workspaceReview.confirm(workspaceId, signal, {
-                message: "Send the attached PNG to OpenRouter?",
-                detail: `OpenRouter will receive the PNG attached to this turn to generate an image with ${model}.`,
+            (workspace: { id: string; root: string }): ImageReferenceReview =>
+            ({ signal, model, source }) => {
+              const input =
+                source.kind === "workspace"
+                  ? `the captured PNG from ${path.join(workspace.root, source.path)}`
+                  : "the PNG attached to this turn";
+              return workspaceReview.confirm(workspace.id, signal, {
+                message: "Send the reference PNG to OpenRouter?",
+                detail: `OpenRouter will receive ${input} to generate an image with ${model}.`,
                 accept: "Send PNG",
-              }),
+              });
+            },
           selectableProfiles: strictRetainedMedia,
         };
         nativeDesktopAgent = NativeDesktopProfile.managedCutover()

@@ -3,7 +3,9 @@
 use crate::command::{
     AuthorizedCommand, CommandAccess, CommandArguments, CommandLimits, CommandTool, ReviewedCommand,
 };
-use crate::file_tools::{FileAuthority, FileTools, ImageCapture, VIEW_IMAGE, read_request};
+use crate::file_tools::{
+    CAPTURE_IMAGE_REFERENCE, FileAuthority, FileTools, ImageCapture, VIEW_IMAGE, read_request,
+};
 use crate::goal_verification::ReadVerification;
 use crate::workspace::{DirectoryBinding, DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
 use agent_kit_core::authority::{
@@ -241,6 +243,13 @@ impl PermissionProfile {
 
     pub(crate) fn completion_hook(&self) -> Option<&CompletionHook> {
         self.completion_hook.as_ref()
+    }
+
+    pub(crate) fn supports_workspace_image_reference(&self) -> bool {
+        self.workspace
+            .primary()
+            .and_then(|primary| self.directories.get(primary))
+            .is_some_and(|rules| rules.read != AccessRule::Deny)
     }
 
     pub(crate) fn with_automatic_read_review(mut self, review: ReadProfile) -> Result<Self> {
@@ -614,6 +623,16 @@ impl TurnPermissions {
         grants: &mut BTreeMap<ToolId, GrantSelection>,
         capture_image: Option<Arc<ImageCapture>>,
     ) -> Result<()> {
+        self.insert_file_tools_with_images(inventory, grants, capture_image, None)
+    }
+
+    fn insert_file_tools_with_images(
+        self: &Arc<Self>,
+        inventory: &mut Inventory,
+        grants: &mut BTreeMap<ToolId, GrantSelection>,
+        capture_image: Option<Arc<ImageCapture>>,
+        capture_reference: Option<Arc<ImageCapture>>,
+    ) -> Result<()> {
         if self
             .profile
             .directories
@@ -625,8 +644,14 @@ impl TurnPermissions {
                 self.profile.workspace.clone(),
                 Arc::new(move |invocation| owner.file_authority(invocation)),
                 capture_image,
+                capture_reference.filter(|_| self.profile.supports_workspace_image_reference()),
             )?);
-            for tool in files.adapters()?.into_iter().chain(files.view_adapter()?) {
+            for tool in files
+                .adapters()?
+                .into_iter()
+                .chain(files.view_adapter()?)
+                .chain(files.reference_adapter()?)
+            {
                 inventory.insert(tool.clone())?;
                 grants.insert(tool.definition().id.clone(), self.files.clone());
             }
@@ -639,7 +664,7 @@ impl TurnPermissions {
         inventory: &mut Inventory,
         grants: &mut BTreeMap<ToolId, GrantSelection>,
     ) -> Result<Option<Arc<CommandTool>>> {
-        self.insert_with_images(inventory, grants, None)
+        self.insert_with_images(inventory, grants, None, None)
     }
 
     pub(crate) fn insert_with_images(
@@ -647,8 +672,9 @@ impl TurnPermissions {
         inventory: &mut Inventory,
         grants: &mut BTreeMap<ToolId, GrantSelection>,
         capture_image: Option<Arc<ImageCapture>>,
+        capture_reference: Option<Arc<ImageCapture>>,
     ) -> Result<Option<Arc<CommandTool>>> {
-        self.insert_file_tools(inventory, grants, capture_image)?;
+        self.insert_file_tools_with_images(inventory, grants, capture_image, capture_reference)?;
         let model_commands = !self.profile.hooks_only
             && self.profile.directories.values().any(|rule| {
                 rule.command_read != AccessRule::Deny || rule.command_read_write != AccessRule::Deny
@@ -768,7 +794,7 @@ impl TurnPermissions {
                 let capture = process.capture_fingerprint()?;
                 (directory, effect, Some(capture), rule)
             }
-            "read_file" | "list_files" | "search_text" | VIEW_IMAGE
+            "read_file" | "list_files" | "search_text" | VIEW_IMAGE | CAPTURE_IMAGE_REFERENCE
                 if admission.grants == self.files =>
             {
                 let request = read_request(invocation)?;

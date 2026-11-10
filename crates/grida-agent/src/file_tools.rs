@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::Semaphore;
 
 const MAX_PATH_BYTES: usize = 4096;
+const MAX_REFERENCE_PATH_BYTES: usize = 1024;
 const MAX_QUERY_BYTES: usize = 128;
 const MAX_INPUT_BYTES: usize = 8192;
 const MAX_OUTPUT_BYTES: usize = 64 * 1024;
@@ -33,12 +34,15 @@ pub type CurrentFileAuthority = dyn Fn() -> Result<FileAuthority> + Send + Sync;
 type InvocationAuthority = dyn Fn(&Invocation) -> Result<FileAuthority> + Send + Sync;
 pub(crate) type ImageCapture = dyn Fn(Vec<u8>) -> Result<MediaRef> + Send + Sync;
 pub(crate) const VIEW_IMAGE: &str = "view_image";
+pub(crate) const CAPTURE_IMAGE_REFERENCE: &str = "capture_image_reference";
+pub(crate) const WORKSPACE_IMAGE_REFERENCE_SCHEMA: &str = "grida.agent.workspace-image-reference";
 
 /// Captures directory selection for one turn and checks live grants at use.
 pub struct FileTools {
     captured: Arc<WorkspaceSnapshot>,
     current: Arc<InvocationAuthority>,
     capture_image: Option<Arc<ImageCapture>>,
+    capture_reference: Option<Arc<ImageCapture>>,
     workers: Arc<Semaphore>,
 }
 
@@ -49,13 +53,14 @@ impl FileTools {
         captured: Arc<WorkspaceSnapshot>,
         current: Arc<CurrentFileAuthority>,
     ) -> Result<Self> {
-        Self::with_authority(captured, Arc::new(move |_| current()), None)
+        Self::with_authority(captured, Arc::new(move |_| current()), None, None)
     }
 
     pub(crate) fn with_authority(
         captured: Arc<WorkspaceSnapshot>,
         current: Arc<InvocationAuthority>,
         capture_image: Option<Arc<ImageCapture>>,
+        capture_reference: Option<Arc<ImageCapture>>,
     ) -> Result<Self> {
         if !cfg!(any(target_os = "macos", target_os = "linux")) {
             return Err(problem(
@@ -67,6 +72,7 @@ impl FileTools {
             captured,
             current,
             capture_image,
+            capture_reference,
             workers: Arc::new(Semaphore::new(WORKERS)),
         })
     }
@@ -90,12 +96,23 @@ impl FileTools {
             })
             .transpose()
     }
+
+    pub(crate) fn reference_adapter(self: &Arc<Self>) -> Result<Option<Arc<dyn Tool>>> {
+        self.capture_reference
+            .as_ref()
+            .map(|_| {
+                FileTool::new(self.clone(), Operation::CaptureReference)
+                    .map(|tool| Arc::new(tool) as Arc<dyn Tool>)
+            })
+            .transpose()
+    }
 }
 
 #[derive(Clone, Copy)]
 enum Operation {
     Read,
     View,
+    CaptureReference,
     List,
     Search,
 }
@@ -126,6 +143,18 @@ impl FileTool {
                 "See the pixels of one PNG in a readable workspace directory. Use a relative path and an optional directory ID. The primary directory is the default. The PNG must be at most 256 KiB. This tool leaves the source untouched.",
                 vec!["path"],
             ),
+            Operation::CaptureReference => {
+                properties.remove("directory");
+                properties.insert(
+                    "path".into(),
+                    json!({"type":"string","minLength":1,"maxLength":MAX_REFERENCE_PATH_BYTES}),
+                );
+                (
+                    CAPTURE_IMAGE_REFERENCE,
+                    "Capture one explicitly requested PNG in the primary workspace for image generation. Use its relative path. Pass the returned reference_id as workspace_reference_id to generate_image_from_workspace_reference in this turn. The PNG must be at most 256 KiB.",
+                    vec!["path"],
+                )
+            }
             Operation::List => (
                 "list_files",
                 "List bounded direct child files and folders. Use an optional relative folder path and directory ID. Omitting the path lists the selected directory. Symlinks are omitted.",
@@ -244,6 +273,7 @@ pub(crate) fn read_request(invocation: &Invocation) -> Result<Request> {
     let operation = match invocation.definition().id.as_str() {
         "read_file" => Operation::Read,
         VIEW_IMAGE => Operation::View,
+        CAPTURE_IMAGE_REFERENCE => Operation::CaptureReference,
         "list_files" => Operation::List,
         "search_text" => Operation::Search,
         _ => return Err(problem(ErrorKind::Unsupported, "file_tool_unavailable")),
@@ -269,6 +299,9 @@ impl Operation {
         }
         match (self, request.path.as_deref(), request.query.as_deref()) {
             (Self::Read | Self::View, Some(path), None) if !path.as_os_str().is_empty() => {}
+            (Self::CaptureReference, Some(path), None)
+                if request.directory.is_none()
+                    && path.to_str().is_some_and(workspace_reference_path) => {}
             (Self::List, _, None) => {}
             (Self::Search, _, Some(query))
                 if !query.is_empty()
@@ -278,6 +311,18 @@ impl Operation {
         }
         Ok(request)
     }
+}
+
+pub(crate) fn workspace_reference_path(path: &str) -> bool {
+    path.len() <= MAX_REFERENCE_PATH_BYTES
+        && path
+            .split('/')
+            .all(|part| !matches!(part, "" | "." | ".."))
+        && !path.chars().any(|ch| {
+            // Keep the relative name legible as a single line in the transfer review.
+            ch.is_control()
+                || matches!(ch, '\\' | '\u{061c}' | '\u{200e}' | '\u{200f}' | '\u{2028}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+        })
 }
 
 pub(crate) fn validate_path(path: &Path) -> Result<()> {
@@ -341,6 +386,7 @@ impl FileTools {
             &self.captured,
             &self.current,
             &self.capture_image,
+            &self.capture_reference,
             request.directory,
             &budget.invocation,
         );
@@ -355,3 +401,31 @@ impl FileTools {
 mod native;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(crate) use native::{open_root_directory, open_root_file, verify_open_path};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generation_reference_requires_one_unambiguous_primary_path() {
+        let parse = |value| Operation::CaptureReference.parse(&ToolArguments::Json(value));
+        let request = parse(json!({"path":"images/Résumé.png"})).unwrap();
+        assert_eq!(request.path.unwrap(), Path::new("images/Résumé.png"));
+        assert!(request.directory.is_none());
+        for path in [
+            "",
+            "/images/cover.png",
+            "images//cover.png",
+            "images/cover.png/",
+            "images/./cover.png",
+            "images/../cover.png",
+            "images\\cover.png",
+            "images/cover\n.png",
+            "images/cover\u{202e}.png",
+        ] {
+            assert!(parse(json!({"path":path})).is_err(), "{path:?}");
+        }
+        assert!(parse(json!({"path":"é".repeat(513)})).is_err());
+        assert!(parse(json!({"path":"cover.png", "directory":"primary"})).is_err());
+    }
+}

@@ -124,6 +124,7 @@ export class NativeAgentProcess {
   private imageReference = false;
   private imagePlacementEnabled = false;
   private imageAttachmentEnabled = false;
+  private imageWorkspaceReferenceEnabled = false;
   private librarySelection = false;
   private fileInput = false;
   private agentEffort = false;
@@ -479,6 +480,7 @@ export class NativeAgentProcess {
                 ...(imagePlacement && { [NativeImagePlacement.capability]: 1 }),
                 ...(reviewImageReference && {
                   [NativeImageGeneration.attachmentCapability]: 1,
+                  [NativeImageGeneration.workspaceReferenceCapability]: 1,
                 }),
                 ...NativeAgentCommands.capabilities,
                 ...NativeAgentRevisions.capabilities,
@@ -538,6 +540,9 @@ export class NativeAgentProcess {
         reviewImageReference !== undefined &&
         processOwner.imageInput &&
         advertised?.[NativeImageGeneration.attachmentCapability] === 1;
+      processOwner.imageWorkspaceReferenceEnabled =
+        reviewImageReference !== undefined &&
+        advertised?.[NativeImageGeneration.workspaceReferenceCapability] === 1;
       processOwner.librarySelection =
         options.workspace !== undefined &&
         processOwner.imageInput &&
@@ -754,15 +759,16 @@ export class NativeAgentProcess {
         ) {
           const id = message.id;
           void this.imageGeneration
-            .generate(
-              id,
-              message.params,
-              this.imageReference,
-              this.imagePlacementEnabled,
-              this.imageAttachmentEnabled
+            .generate(id, message.params, {
+              libraryReference: this.imageReference,
+              placement: this.imagePlacementEnabled,
+              reviewAttachment: this.imageAttachmentEnabled
                 ? this.reviewImageReference
-                : undefined
-            )
+                : undefined,
+              reviewWorkspace: this.imageWorkspaceReferenceEnabled
+                ? this.reviewImageReference
+                : undefined,
+            })
             .then((result) => {
               if (this.connected) this.write({ jsonrpc: "2.0", id, result });
             })

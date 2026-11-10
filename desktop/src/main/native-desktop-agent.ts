@@ -57,7 +57,9 @@ type LaunchOptions = Readonly<{
   imagePlacement?: (
     workspace: Pick<WorkspaceMediaGrant, "workspaceId" | "root" | "identity">
   ) => NativeImagePlacement;
-  reviewImageReference?: (workspaceId: string) => ImageReferenceReview;
+  reviewImageReference?: (
+    workspace: Pick<Workspace, "id" | "root">
+  ) => ImageReferenceReview;
   mcp?: NativeMcpLaunch;
   selectableProfiles?: boolean;
   onLifecycle?: (
@@ -717,7 +719,7 @@ export class NativeDesktopAgent {
         ? this.imagePlacement?.({ workspaceId: id, root, identity })
         : undefined,
       reviewImageReference: imageTools
-        ? this.reviewImageReference?.(id)
+        ? this.reviewImageReference?.({ id, root })
         : undefined,
       workspaceConfiguration,
       resourcesPath: this.resourcesPath,

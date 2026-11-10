@@ -506,6 +506,21 @@ known failure and keeps the attachment in its original chat. Prior turns,
 generic file attachments and other sessions supply no authority to use a
 PNG for generation.
 
+The reviewed workbench can also negotiate `co.grida/media/workspace-reference`
+version 1. `capture_image_reference` reads one relative PNG path in the
+primary workspace through the native file grant. It retains the exact PNG
+and returns an operation identity and relative path. The private receipt
+holds the retained media identity. The chat model receives no image bytes
+from capture.
+
+`generate_image_from_workspace_reference` requires the exact capture
+operation from the current active turn. The host checks its grant and
+receipt and verifies the retained bytes. The reverse request supplies
+`referenceOrigin: "workspace"`, the captured source's `referencePath`, and
+the retained `referencePng`. Main uses the path in its transfer review and
+omits it from the image service request. The captured version remains
+available after a source edit. A previous turn's capture is refused.
+
 The private Desktop supervisor can negotiate `co.grida/media/place-image`
 version 1 alongside generation for an admitted workbench. The host captures
 the binding for ordinary Act work. A retained generation on that binding

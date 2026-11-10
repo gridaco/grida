@@ -36,6 +36,12 @@ attachment to OpenRouter for generation. If you cancel, that generation
 request sends nothing to the image provider. Attach the PNG again to use
 it in a later turn.
 
+You can also ask **Act** to use a PNG in the workspace, for example
+“Generate an image using `assets/reference.png`.” Use a regular PNG of
+at most 256 KiB. Desktop shows the source path before sending the
+captured PNG. If the file changes while the task is paused, continuing
+uses the captured version. Ask for a new capture to use the updated file.
+
 Check **Turn summary** for the result. Desktop keeps a retained image in
 **Tools → Recents**. If the provider generated the image and Desktop could
 not retain it, the summary explains what happened and the turn ends without

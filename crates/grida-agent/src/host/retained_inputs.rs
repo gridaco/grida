@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex};
 
 const STORAGE: &str = "retained-inputs";
 pub(super) const WORKSPACE_VIEW: &str = "workspace-view/";
+pub(super) const WORKSPACE_REFERENCE: &str = "workspace-reference/";
 pub(super) const LIBRARY_SELECTION: &str = "library-selection/";
 const LIMITS: ScratchLimits = ScratchLimits {
     max_assets: 16,
@@ -91,12 +92,28 @@ impl RetainedInputs {
         session: SessionId,
         cwd: PathBuf,
     ) -> Arc<ImageCapture> {
+        self.workspace_png_capture(session, cwd, WORKSPACE_VIEW)
+    }
+
+    pub(super) fn workspace_reference_capture(
+        self: &Arc<Self>,
+        session: SessionId,
+        cwd: PathBuf,
+    ) -> Arc<ImageCapture> {
+        self.workspace_png_capture(session, cwd, WORKSPACE_REFERENCE)
+    }
+
+    fn workspace_png_capture(
+        self: &Arc<Self>,
+        session: SessionId,
+        cwd: PathBuf,
+        namespace: &'static str,
+    ) -> Arc<ImageCapture> {
         let storage = self.clone();
         Arc::new(move |bytes| {
             let image = ImageUpload::from_png(bytes)?;
             let identity = Fingerprint::of(&image.digest)?;
-            let asset =
-                storage.retain_png(&session, &cwd, WORKSPACE_VIEW, identity, &image.bytes)?;
+            let asset = storage.retain_png(&session, &cwd, namespace, identity, &image.bytes)?;
             media(&asset)
         })
     }

@@ -12,6 +12,7 @@ use crate::tool_host::{
 };
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::{Client, JsonRpcRequest, JsonRpcResponse};
+use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ResultContent};
 use agent_kit_core::tools::{RecoveryKind, ToolDefinition, ToolOutcome};
@@ -28,8 +29,13 @@ use std::time::Instant;
 use uuid::Uuid;
 
 mod placement;
+mod workspace_reference;
 pub(crate) use placement::CAPABILITY as PLACE_CAPABILITY;
 pub(super) use placement::TOOL as PLACE_TOOL;
+pub(crate) use workspace_reference::CAPABILITY as WORKSPACE_CAPABILITY;
+pub(super) use workspace_reference::{
+    TOOL as WORKSPACE_TOOL, unavailable as workspace_reference_unavailable,
+};
 
 pub(crate) const CAPABILITY: &str = "co.grida/media/generate-image";
 pub(crate) const REFERENCE_CAPABILITY: &str = "co.grida/media/image-reference";
@@ -65,19 +71,43 @@ pub(super) fn attached_image<'a>(
     .then_some(asset)
 }
 
-fn generation_operation(state: &TurnState, operation: &OperationState) -> Option<u32> {
+#[derive(PartialEq, Eq)]
+enum GenerationReceipt {
+    Retained,
+    Placeable,
+}
+
+fn generation_operation(
+    state: &TurnState,
+    operation: &OperationState,
+) -> Option<GenerationReceipt> {
     let OperationInput::Tool(invocation) = &operation.record.input else {
         return None;
     };
     let grants = &operation.record.grants;
-    let version = invocation.definition().version;
-    (invocation.definition().id.as_str() == TOOL
-        && (TEXT_VERSION..=PLACEABLE_BOTH_REFERENCES_VERSION).contains(&version)
-        && grants.authority.principal.as_str() == PRINCIPAL
-        && grants.authority.scope.as_str() == state.binding().turn.as_str()
-        && matches!(grants.grants.as_slice(), [grant] if grant.as_str() == TOOL)
-        && !operation.attempts.is_empty())
-    .then_some(version)
+    let tool = invocation.definition().id.as_str();
+    if grants.authority.principal.as_str() != PRINCIPAL
+        || grants.authority.scope.as_str() != state.binding().turn.as_str()
+        || !matches!(grants.grants.as_slice(), [grant] if grant.as_str() == tool)
+        || operation.attempts.is_empty()
+    {
+        return None;
+    }
+    match (tool, invocation.definition().version) {
+        (TOOL, TEXT_VERSION | REFERENCE_VERSION | ATTACHMENT_VERSION | BOTH_REFERENCES_VERSION)
+        | (WORKSPACE_TOOL, workspace_reference::VERSION) => Some(GenerationReceipt::Retained),
+        (
+            TOOL,
+            PLACEABLE_TEXT_VERSION
+            | PLACEABLE_REFERENCE_VERSION
+            | PLACEABLE_ATTACHMENT_VERSION
+            | PLACEABLE_BOTH_REFERENCES_VERSION,
+        )
+        | (WORKSPACE_TOOL, workspace_reference::PLACEABLE_VERSION) => {
+            Some(GenerationReceipt::Placeable)
+        }
+        _ => None,
+    }
 }
 
 pub(super) fn summary_note(state: &TurnState) -> Option<&'static str> {
@@ -133,6 +163,7 @@ struct DesktopConnection {
     references: bool,
     placement: bool,
     attachment_references: bool,
+    workspace_references: bool,
 }
 
 pub(super) struct Prepared {
@@ -140,14 +171,20 @@ pub(super) struct Prepared {
     references: bool,
     placement: bool,
     attachment: Option<AssetRef>,
+    workspace_reference: bool,
 }
 
 impl Prepared {
+    pub(super) fn workspace_reference(&self) -> bool {
+        self.workspace_reference
+    }
+
     pub(super) fn bind(
         self,
         store: Arc<SqliteStore>,
         execution: &Execution,
         turn: &TurnBinding,
+        workspace_capture: Option<&GrantSelection>,
     ) -> Result<Arc<HostTools>> {
         let reference = if self.references {
             Some(ReferenceScope {
@@ -177,13 +214,33 @@ impl Prepared {
                 })
             })
             .transpose()?;
-        let tool =
-            self.owner
-                .tool_host(turn, reference, attachment, self.placement.then_some(store))?;
+        let workspace = if self.workspace_reference {
+            Some(workspace_reference::Scope::new(
+                store.clone(),
+                turn.clone(),
+                execution
+                    .retained_inputs
+                    .clone()
+                    .ok_or_else(workspace_reference_unavailable)?,
+                workspace_capture
+                    .cloned()
+                    .ok_or_else(workspace_reference_unavailable)?,
+            ))
+        } else {
+            None
+        };
+        let tool = self.owner.tool_host(
+            turn,
+            reference,
+            attachment,
+            workspace,
+            self.placement.then_some(store),
+        )?;
         Ok(Arc::new(HostTools::image_generation(
             tool,
             self.owner.binding,
             self.placement,
+            self.workspace_reference,
         )?))
     }
 }
@@ -198,6 +255,15 @@ impl Host {
                     .transport
                     .accepts_compatible_png(&execution.config.model)
             })
+    }
+
+    pub(crate) fn supports_workspace_image_reference(&self) -> bool {
+        self.supports_attachment_reference()
+            && self.accepts_files()
+            && self
+                .permissions
+                .as_ref()
+                .is_some_and(|profile| profile.supports_workspace_image_reference())
     }
 
     /// Bind image generation to the trusted supervisor's exact media profile.
@@ -235,12 +301,14 @@ impl DesktopImageGeneration {
         references: bool,
         placement: bool,
         attachment_references: bool,
+        workspace_references: bool,
     ) {
         *self.connection.lock().unwrap() = Some(DesktopConnection {
             client,
             references,
             placement,
             attachment_references,
+            workspace_references,
         });
     }
 
@@ -277,11 +345,20 @@ impl DesktopImageGeneration {
             .is_some_and(|connection| connection.attachment_references)
     }
 
+    pub(super) fn workspace_references(&self) -> bool {
+        self.connection
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|connection| connection.workspace_references)
+    }
+
     pub(super) fn prepare(
         &self,
         references: bool,
         placement: bool,
         attachment: Option<AssetRef>,
+        workspace_reference: bool,
     ) -> Result<Prepared> {
         if references && !self.references() {
             return Err(reference_unavailable());
@@ -295,11 +372,15 @@ impl DesktopImageGeneration {
         if attachment.is_some() && !self.attachment_references() {
             return Err(attachment_unavailable());
         }
+        if workspace_reference && !self.workspace_references() {
+            return Err(workspace_reference_unavailable());
+        }
         Ok(Prepared {
             owner: self.clone(),
             references,
             placement,
             attachment,
+            workspace_reference,
         })
     }
 
@@ -308,6 +389,7 @@ impl DesktopImageGeneration {
         turn: &TurnBinding,
         reference: Option<ReferenceScope>,
         attachment: Option<AttachmentScope>,
+        workspace: Option<workspace_reference::Scope>,
         placement_store: Option<Arc<SqliteStore>>,
     ) -> Result<ToolHost> {
         let mut properties = json!({
@@ -341,10 +423,6 @@ impl DesktopImageGeneration {
         if reference.is_some() && attachment.is_some() {
             input_schema["not"] = json!({"required":["attached_image", "library_reference_id"]});
         }
-        let mut statuses = vec!["retained", "generated_unretained"];
-        if attachment.is_some() {
-            statuses.push("reference_declined");
-        }
         let definition = CapabilityDefinition {
             tool: ToolDefinition {
                 id: ToolId::new(TOOL)?,
@@ -365,32 +443,50 @@ impl DesktopImageGeneration {
                 max_output_bytes: if placement { 4096 } else { 1024 },
                 recovery: RecoveryKind::Unavailable,
             },
-            output_schema: json!({
-                "type": "object",
-                "properties": {
-                    "status": {"enum": statuses},
-                    "id": {"type": "string"},
-                    "media_type": {"type": "string"},
-                    "bytes": {"type": "integer"}
-                },
-                "required": ["status"],
-                "additionalProperties": false
-            }),
+            output_schema: generation_output_schema(attachment.is_some()),
             effect: CapabilityEffect::Mutation,
         };
-        let executor = Arc::new(GenerateImage {
+        let dispatch = DispatchImage {
             session: turn.session.clone(),
             owner: self.clone(),
+            placement_turn: placement.then(|| turn.turn.clone()),
+        };
+        let executor = Arc::new(GenerateImage {
+            dispatch: dispatch.clone(),
             reference,
             attachment,
-            placement_turn: placement.then(|| turn.turn.clone()),
         }) as Arc<dyn CapabilityExecutor>;
         let mut tools = vec![(definition, executor)];
+        if let Some(workspace) = workspace {
+            tools.push(workspace_reference::tool(workspace, dispatch)?);
+        }
         if let Some(store) = placement_store {
             tools.push(placement::tool(self.clone(), store, turn.clone())?);
         }
         ToolHost::new(tools)
     }
+}
+
+fn generation_output_schema(can_decline: bool) -> Value {
+    let mut statuses = vec!["retained", "generated_unretained"];
+    if can_decline {
+        statuses.push("reference_declined");
+    }
+    json!({
+        "type": "object",
+        "properties": {
+            "status": {"enum": statuses},
+            "id": {"type": "string"},
+            "media_type": {"type": "string"},
+            "bytes": {"type": "integer"}
+        },
+        "required": ["status"],
+        "additionalProperties": false
+    })
+}
+
+fn valid_prompt(prompt: &str) -> bool {
+    !prompt.trim().is_empty() && prompt.len() <= MAX_PROMPT_BYTES
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -419,8 +515,7 @@ impl Arguments {
             )
         };
         let args: Self = serde_json::from_value(value.clone()).map_err(|_| invalid())?;
-        if args.prompt.trim().is_empty()
-            || args.prompt.len() > MAX_PROMPT_BYTES
+        if !valid_prompt(&args.prompt)
             || (value.get("library_reference_id").is_some()
                 && (!references
                     || !args.library_reference_id.as_ref().is_some_and(|id| {
@@ -451,12 +546,21 @@ struct Request {
     reference_png: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reference_origin: Option<ReferenceOrigin>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reference_path: Option<String>,
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum ReferenceOrigin {
     Attachment,
+    Workspace,
+}
+
+enum ImageReference {
+    Library(String),
+    Attachment(String),
+    Workspace { png: String, path: String },
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -494,7 +598,11 @@ enum Reply {
 }
 
 impl Reply {
-    fn outcome(self, placement_turn: Option<&TurnId>, attachment: bool) -> ToolOutcome {
+    fn outcome(
+        self,
+        placement_turn: Option<&TurnId>,
+        reference: Option<ReferenceOrigin>,
+    ) -> ToolOutcome {
         match self {
             Self::Retained {
                 id,
@@ -535,8 +643,12 @@ impl Reply {
                 receipt: None,
                 truncated: false,
             },
-            Self::ReferenceDeclined if attachment => {
-                let mut outcome = ToolOutcome::failed("The user declined sending the attached image to the image provider. Ask before attempting generation again or generating without it.");
+            Self::ReferenceDeclined if let Some(reference) = reference => {
+                let source = match reference {
+                    ReferenceOrigin::Attachment => "attached image",
+                    ReferenceOrigin::Workspace => "captured workspace image",
+                };
+                let mut outcome = ToolOutcome::failed(&format!("The user declined sending the {source} to the image provider. Ask before attempting generation again or generating without it."));
                 outcome.structured = Some(json!({"status":"reference_declined"}));
                 outcome
             }
@@ -547,10 +659,15 @@ impl Reply {
 }
 
 struct GenerateImage {
-    session: SessionId,
-    owner: DesktopImageGeneration,
+    dispatch: DispatchImage,
     reference: Option<ReferenceScope>,
     attachment: Option<AttachmentScope>,
+}
+
+#[derive(Clone)]
+struct DispatchImage {
+    session: SessionId,
+    owner: DesktopImageGeneration,
     placement_turn: Option<TurnId>,
 }
 
@@ -652,8 +769,7 @@ impl CapabilityExecutor for GenerateImage {
 
 impl GenerateImage {
     async fn generate(&self, call: &CapabilityCall, arguments: Arguments) -> ToolOutcome {
-        let attachment = arguments.attached_image == Some(true);
-        let reference_png = if attachment {
+        let reference = if arguments.attached_image == Some(true) {
             let Some(scope) = &self.attachment else {
                 return ToolOutcome::failed("image_generation_attachment_unavailable");
             };
@@ -663,7 +779,7 @@ impl GenerateImage {
                 result = scope.read() => result,
             };
             match resolved {
-                Ok(png) => Some(png),
+                Ok(png) => Some(ImageReference::Attachment(png)),
                 Err(_) => return ToolOutcome::failed("image_generation_attachment_unavailable"),
             }
         } else if let Some(id) = arguments.library_reference_id {
@@ -676,12 +792,26 @@ impl GenerateImage {
                 result = scope.read(id) => result,
             };
             match resolved {
-                Ok(png) => Some(png),
+                Ok(png) => Some(ImageReference::Library(png)),
                 Err(_) => return ToolOutcome::failed("image_generation_reference_unavailable"),
             }
         } else {
             None
         };
+        self.dispatch
+            .generate(call, arguments.prompt, arguments.background, reference)
+            .await
+    }
+}
+
+impl DispatchImage {
+    async fn generate(
+        &self,
+        call: &CapabilityCall,
+        prompt: String,
+        background: Option<Background>,
+        reference: Option<ImageReference>,
+    ) -> ToolOutcome {
         let nonce = Uuid::new_v4().simple().to_string();
         let proof = tokio::select! {
             biased;
@@ -700,29 +830,43 @@ impl GenerateImage {
             .unwrap()
             .as_ref()
             .filter(|connection| {
-                (reference_png.is_none()
-                    || (attachment && connection.attachment_references)
-                    || (!attachment && connection.references))
-                    && (self.placement_turn.is_none() || connection.placement)
+                let allowed = match &reference {
+                    Some(ImageReference::Library(_)) => connection.references,
+                    Some(ImageReference::Attachment(_)) => connection.attachment_references,
+                    Some(ImageReference::Workspace { .. }) => connection.workspace_references,
+                    None => true,
+                };
+                allowed && (self.placement_turn.is_none() || connection.placement)
             })
             .map(|connection| connection.client.clone());
         let Some(connection) = client else {
             return ToolOutcome::failed("desktop_image_generation_unavailable");
         };
+        let (reference_png, reference_origin, reference_path) = match reference {
+            Some(ImageReference::Library(png)) => (Some(png), None, None),
+            Some(ImageReference::Attachment(png)) => {
+                (Some(png), Some(ReferenceOrigin::Attachment), None)
+            }
+            Some(ImageReference::Workspace { png, path }) => {
+                (Some(png), Some(ReferenceOrigin::Workspace), Some(path))
+            }
+            None => (None, None, None),
+        };
         let request = Request {
             session_id: self.session.clone(),
             call_id: call.binding.id.clone(),
-            prompt: arguments.prompt,
-            background: arguments.background,
+            prompt,
+            background,
             credential: CredentialWitness { nonce, proof },
             reference_png,
-            reference_origin: attachment.then_some(ReferenceOrigin::Attachment),
+            reference_origin,
+            reference_path,
         };
         tokio::select! {
             biased;
             () = call.cancellation.cancelled() => ToolOutcome::uncertain(),
             reply = connection.send_request(request).block_task() => {
-                reply.map_or_else(|_| ToolOutcome::uncertain(), |reply| reply.outcome(self.placement_turn.as_ref(), attachment))
+                reply.map_or_else(|_| ToolOutcome::uncertain(), |reply| reply.outcome(self.placement_turn.as_ref(), reference_origin))
             }
         }
     }
@@ -751,6 +895,7 @@ mod tests {
             },
             reference_png: None,
             reference_origin: None,
+            reference_path: None,
         };
         assert_eq!(
             serde_json::to_value(request).unwrap(),
@@ -818,14 +963,14 @@ mod tests {
                 .extend(extra.as_object().unwrap().clone());
             assert!(Arguments::parse(&args, true, true).is_err());
         }
-        let denial = Reply::ReferenceDeclined.outcome(None, true);
+        let denial = Reply::ReferenceDeclined.outcome(None, Some(ReferenceOrigin::Attachment));
         assert_eq!(denial.status, OutcomeStatus::Failed);
         assert_eq!(
             denial.structured,
             Some(json!({"status":"reference_declined"}))
         );
         assert_eq!(
-            Reply::ReferenceDeclined.outcome(None, false).status,
+            Reply::ReferenceDeclined.outcome(None, None).status,
             OutcomeStatus::Uncertain
         );
     }
@@ -837,7 +982,7 @@ mod tests {
             json!({"kind":"retained", "id":id, "mediaType":"image/png", "bytes":128}),
         )
         .unwrap()
-        .outcome(None, false);
+        .outcome(None, None);
         assert_eq!(accepted.status, OutcomeStatus::Succeeded);
         assert_eq!(
             accepted.structured,
@@ -845,7 +990,7 @@ mod tests {
         );
         let unretained = serde_json::from_value::<Reply>(json!({"kind":"generated_unretained"}))
             .unwrap()
-            .outcome(None, false);
+            .outcome(None, None);
         assert_eq!(unretained.status, OutcomeStatus::Uncertain);
         assert_eq!(
             unretained.structured,
@@ -860,7 +1005,7 @@ mod tests {
             assert_eq!(
                 serde_json::from_value::<Reply>(reply)
                     .unwrap()
-                    .outcome(None, false)
+                    .outcome(None, None)
                     .status,
                 OutcomeStatus::Uncertain
             );

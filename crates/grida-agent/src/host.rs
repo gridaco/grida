@@ -331,6 +331,8 @@ struct StoredPrompt {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_attachment_reference: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    allow_workspace_reference: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_image_placement: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     editor_endpoint: Option<BindingId>,
@@ -1376,11 +1378,24 @@ impl Host {
             .as_ref()
             .filter(|_| execution.workspace_vision && !prepared.subagent)
             .map(|images| {
-                images.workspace_image_capture(claim.lease.binding().session.clone(), cwd)
+                images.workspace_image_capture(claim.lease.binding().session.clone(), cwd.clone())
+            });
+        let capture_reference = prepared
+            .image_generation
+            .as_ref()
+            .filter(|image| image.workspace_reference())
+            .and(execution.retained_inputs.as_ref())
+            .map(|images| {
+                images.workspace_reference_capture(claim.lease.binding().session.clone(), cwd)
             });
         let command = match &permission_scope {
             Some(permissions) if prepared.operating_regime.is_act() => permissions
-                .insert_with_images(&mut inventory, &mut authority.tools, capture_image)?,
+                .insert_with_images(
+                    &mut inventory,
+                    &mut authority.tools,
+                    capture_image,
+                    capture_reference,
+                )?,
             Some(permissions) => {
                 permissions.insert_file_tools(
                     &mut inventory,
@@ -1404,10 +1419,14 @@ impl Host {
             })
             .transpose()?;
         if let Some(image_generation) = prepared.image_generation.take() {
+            let workspace_capture = authority.tools.get(&agent_kit_core::ToolId::new(
+                crate::file_tools::CAPTURE_IMAGE_REFERENCE,
+            )?);
             prepared.host_tools.push(image_generation.bind(
                 self.store.clone(),
                 execution,
                 claim.lease.binding(),
+                workspace_capture,
             )?);
         }
         let host_tools = prepared
@@ -1817,6 +1836,13 @@ impl Host {
                 .as_ref()
                 .is_some_and(image_generation::DesktopImageGeneration::attachment_references)
             && image_generation::attached_image(&parts, &session.session).is_some();
+        let allow_workspace_reference = desktop_image_generation.is_some()
+            && permission_capture.is_some()
+            && self.supports_workspace_image_reference()
+            && self
+                .desktop_image_generation
+                .as_ref()
+                .is_some_and(image_generation::DesktopImageGeneration::workspace_references);
         Ok(Submission {
             id,
             payload: encode(
@@ -1847,6 +1873,7 @@ impl Host {
                     desktop_image_generation,
                     allow_image_reference,
                     allow_attachment_reference,
+                    allow_workspace_reference,
                     allow_image_placement,
                     editor_endpoint,
                     editor_presentation,
@@ -1964,6 +1991,7 @@ impl Host {
                         || stored.desktop_image_generation.is_some()
                         || stored.allow_image_reference
                         || stored.allow_attachment_reference
+                        || stored.allow_workspace_reference
                         || stored.allow_image_placement
                         || stored.editor_endpoint.is_some()
                         || stored.editor_presentation
@@ -2086,11 +2114,19 @@ impl Host {
                         stored.allow_image_reference,
                         stored.allow_image_placement,
                         attachment,
+                        stored.allow_workspace_reference,
                     )?);
+                    if stored.allow_workspace_reference
+                        && (stored.permission_capture.is_none()
+                            || !self.supports_workspace_image_reference())
+                    {
+                        return Err(image_generation::workspace_reference_unavailable());
+                    }
                 } else if !cancellation_only
                     && (stored.allow_image_reference
                         || stored.allow_image_placement
-                        || stored.allow_attachment_reference)
+                        || stored.allow_attachment_reference
+                        || stored.allow_workspace_reference)
                 {
                     return Err(problem(
                         ErrorKind::InvalidState,

@@ -81,15 +81,7 @@ fn canonical_id(id: &str) -> bool {
 
 fn source_artifact(state: &TurnState, id: &str) -> Result<Artifact> {
     let mut candidates = state.operations().values().filter_map(|operation| {
-        if !matches!(
-            generation_operation(state, operation),
-            Some(
-                PLACEABLE_TEXT_VERSION
-                    | PLACEABLE_REFERENCE_VERSION
-                    | PLACEABLE_ATTACHMENT_VERSION
-                    | PLACEABLE_BOTH_REFERENCES_VERSION
-            )
-        ) {
+        if generation_operation(state, operation) != Some(GenerationReceipt::Placeable) {
             return None;
         }
         let OperationOutcome::Tool(outcome) = operation.outcome()? else {
@@ -373,7 +365,7 @@ mod tests {
             bytes: 128,
             sha256: Some(digest.clone()),
         };
-        let mut result = reply.clone().outcome(Some(&turn), false);
+        let mut result = reply.clone().outcome(Some(&turn), None);
         assert_eq!(result.status, OutcomeStatus::Succeeded);
         assert_eq!(
             result.structured.as_ref().unwrap()["source_turn_id"],
@@ -401,6 +393,6 @@ mod tests {
             digest
         );
         assert!(Artifact::from_outcome(&result, &TurnId::new("wrong-turn").unwrap()).is_none());
-        assert_eq!(reply.outcome(None, false).receipt, None);
+        assert_eq!(reply.outcome(None, None).receipt, None);
     }
 }

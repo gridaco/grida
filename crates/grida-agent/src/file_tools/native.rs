@@ -3,6 +3,7 @@
 use super::*;
 use crate::host::MAX_IMAGE_BYTES;
 use crate::workspace::FileAccess;
+use agent_kit_core::{Envelope, SchemaId};
 use rustix::fs::{self as unix, AtFlags, Dir, FileType, Mode, OFlags, Stat};
 use rustix::io::Errno;
 use serde::Serialize;
@@ -62,6 +63,7 @@ impl FileTools {
                 text_outcome(decode(bytes)?, false, budget.output)
             }
             Operation::View => self.view_image(directory, path, budget),
+            Operation::CaptureReference => self.capture_reference(path, budget),
             Operation::List => self.list(directory, path, budget),
             Operation::Search => self.search(
                 directory,
@@ -88,6 +90,59 @@ impl FileTools {
             .capture_image
             .as_ref()
             .ok_or_else(|| problem(ErrorKind::Unavailable, "image_view_unavailable"))?;
+        let bytes = self.read_png(directory, path, budget)?;
+        let label = format!("Viewed PNG {} ({} bytes).", path.display(), bytes.len());
+        let image = capture(bytes)?;
+        bounded_outcome(
+            ToolOutcome {
+                status: OutcomeStatus::Succeeded,
+                content: vec![ResultContent::Text(label), ResultContent::Media(image)],
+                structured: None,
+                receipt: None,
+                truncated: false,
+            },
+            budget.output,
+        )
+    }
+
+    fn capture_reference(&self, path: &Path, budget: &Budget) -> Result<ToolOutcome> {
+        let capture = self.capture_reference.as_ref().ok_or_else(|| {
+            problem(
+                ErrorKind::Unavailable,
+                "workspace_image_reference_unavailable",
+            )
+        })?;
+        let image = capture(self.read_png(None, path, budget)?)?;
+        let receipt = Envelope::new(
+            SchemaId::new(WORKSPACE_IMAGE_REFERENCE_SCHEMA)?,
+            1,
+            serde_json::to_vec(&image).map_err(|_| {
+                problem(
+                    ErrorKind::InvalidState,
+                    "workspace_image_reference_encoding",
+                )
+            })?,
+        )?;
+        bounded_outcome(
+            ToolOutcome {
+                status: OutcomeStatus::Succeeded,
+                content: vec![ResultContent::Text(
+                    "Captured the workspace PNG as an image generation reference.".into(),
+                )],
+                structured: Some(json!({"reference_id": budget.invocation.id(), "path": path})),
+                receipt: Some(receipt),
+                truncated: false,
+            },
+            budget.output,
+        )
+    }
+
+    fn read_png(
+        &self,
+        directory: Option<&BindingId>,
+        path: &Path,
+        budget: &Budget,
+    ) -> Result<Vec<u8>> {
         let mut file = self.open(directory, path, Kind::File, budget)?;
         let before = unix::fstat(&file).map_err(open_error)?;
         let (bytes, limited) = read(&mut file, MAX_IMAGE_BYTES, budget)?;
@@ -108,18 +163,7 @@ impl FileTools {
             return Err(problem(ErrorKind::Conflict, "image_source_changed"));
         }
         budget.check()?;
-        let label = format!("Viewed PNG {} ({} bytes).", path.display(), bytes.len());
-        let image = capture(bytes)?;
-        bounded_outcome(
-            ToolOutcome {
-                status: OutcomeStatus::Succeeded,
-                content: vec![ResultContent::Text(label), ResultContent::Media(image)],
-                structured: None,
-                receipt: None,
-                truncated: false,
-            },
-            budget.output,
-        )
+        Ok(bytes)
     }
 
     fn root(&self, directory: Option<&BindingId>, budget: &Budget) -> Result<Root> {

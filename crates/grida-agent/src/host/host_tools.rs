@@ -149,14 +149,17 @@ impl HostTools {
         host: ToolHost,
         lease: BindingId,
         placement: bool,
+        workspace: bool,
     ) -> Result<Self> {
-        use super::image_generation::{PLACE_TOOL, PRINCIPAL, TOOL};
-        let capabilities: &[&str] = if placement {
-            &[TOOL, PLACE_TOOL]
-        } else {
-            &[TOOL]
-        };
-        Self::with_local(None, Some(host), capabilities, lease, PRINCIPAL)
+        use super::image_generation::{PLACE_TOOL, PRINCIPAL, TOOL, WORKSPACE_TOOL};
+        let mut capabilities = vec![TOOL];
+        if placement {
+            capabilities.push(PLACE_TOOL);
+        }
+        if workspace {
+            capabilities.push(WORKSPACE_TOOL);
+        }
+        Self::with_local(None, Some(host), &capabilities, lease, PRINCIPAL)
     }
 
     fn with_local(
