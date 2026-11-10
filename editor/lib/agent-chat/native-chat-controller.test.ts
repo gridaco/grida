@@ -163,6 +163,47 @@ it("reads bounded earlier messages and ignores a page from a previous chat", asy
   controller.disconnect();
 });
 
+it("refreshes latest messages when settlement arrives during an earlier read", async () => {
+  vi.useFakeTimers();
+  const { bridge, controller, running } = fixture();
+  running.add("chat-a");
+  const earlier = Promise.withResolvers<NativeChatTranscriptPage>();
+  const prior = message("prior", "Before settlement");
+  const settled = message("settled", "Settled result");
+  const older = message("older", "Earlier transcript");
+  const read = vi.fn<NonNullable<DesktopNativeChat["transcriptPage"]>>();
+  read.mockResolvedValueOnce({ view: 1, messages: [prior], older: "older-a" });
+  read.mockReturnValueOnce(earlier.promise);
+  read.mockResolvedValueOnce({
+    view: 1,
+    messages: [settled],
+    older: "older-a",
+  });
+  bridge.transcriptPage = read;
+  try {
+    await controller.select("chat-a");
+    const loading = controller.showEarlierMessages();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(read).toHaveBeenNthCalledWith(2, "chat-a", "older-a");
+
+    running.delete("chat-a");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(controller.read().observation?.snapshot.current).toBeNull();
+    expect(read).toHaveBeenCalledTimes(2);
+
+    earlier.resolve({ view: 1, messages: [older], older: null });
+    await loading;
+    expect(controller.read().messages).toEqual([older]);
+    await vi.advanceTimersByTimeAsync(0);
+    controller.showLatestMessages();
+    expect(controller.read().messages).toEqual([settled]);
+    expect(read).toHaveBeenNthCalledWith(3, "chat-a");
+  } finally {
+    controller.disconnect();
+    vi.useRealTimers();
+  }
+});
+
 it("publishes editor updates only while the selected chat attachment is owned", async () => {
   const { bridge } = fixture();
   const publish = vi.fn<

@@ -2510,7 +2510,13 @@ export class NativeChatController {
           this.refreshGoal(scope, attachment, next),
         ]);
         if (!this.owns(scope)) return;
-        if (!replay || scope.earlierRead) return;
+        if (!replay) return;
+        if (scope.earlierRead) {
+          // The observation already advanced. Keep its replay pending until
+          // the earlier page releases the shared transcript reader.
+          scope.replay = true;
+          return;
+        }
         scope.replay = false;
         const page = this.bridge.transcriptPage
           ? await this.bridge.transcriptPage(attachment.attachmentId)
