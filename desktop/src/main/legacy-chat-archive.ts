@@ -890,7 +890,8 @@ async function copyScratch(
 
 async function inspectArchive(
   directory: string,
-  retainedId?: string
+  retainedId?: string,
+  snapshots?: Map<string, Stats>
 ): Promise<Manifest> {
   checkPrivateDirectory(await fs.lstat(directory));
   const entries = await fs.opendir(directory);
@@ -901,23 +902,31 @@ async function inspectArchive(
   }
   const database = path.join(directory, DB_NAME);
   const files: FileEvidence[] = [
-    { path: DB_NAME, ...(await digestFile(database, undefined, true)) },
+    {
+      path: DB_NAME,
+      ...(await digestFile(database, undefined, true, snapshots)),
+    },
   ];
   const { sqliteVersion, sessions } = readDatabase(database);
   const budget = { entries: 0, pathBytes: 0 };
   for (const section of SCRATCH_ARCHIVES) {
     const scratch = path.join(directory, section);
-    if (!(await statIfPresent(scratch))) continue;
+    const before = await statIfPresent(scratch);
+    if (!before) continue;
+    snapshots?.set(scratch, before);
     await walk(scratch, budget, 0, async (file, relative, isDirectory) => {
       const [session, ...segments] = relative.split(path.sep);
       if (!sessions.has(session) || (!isDirectory && segments.length === 0)) {
         throw new ArchiveFailure("invalid_receipt");
       }
-      if (isDirectory) checkPrivateDirectory(await fs.lstat(file));
-      else
+      if (isDirectory) {
+        const before = await fs.lstat(file);
+        checkPrivateDirectory(before);
+        snapshots?.set(file, before);
+      } else
         files.push({
           path: [section, session, ...segments].join("/"),
-          ...(await digestFile(file, undefined, true)),
+          ...(await digestFile(file, undefined, true, snapshots)),
         });
     });
   }
@@ -1075,17 +1084,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 async function verifyArchive(parent: string, id: string): Promise<Receipt> {
   const directory = path.join(parent, id);
-  checkPrivateDirectory(await fs.lstat(directory));
+  const before = await fs.lstat(directory);
+  checkPrivateDirectory(before);
+  const snapshots = new Map([[directory, before]]);
   const existing = await digestFile(
     path.join(directory, MANIFEST_NAME),
     undefined,
-    true
+    true,
+    snapshots
   );
   if (existing.sha256 !== id) throw new ArchiveFailure("invalid_receipt");
-  const manifest = await inspectArchive(directory, id);
+  const manifest = await inspectArchive(directory, id, snapshots);
   const encoded = encodeManifest(manifest);
   if (sha256(encoded) !== id || existing.size !== encoded.byteLength) {
     throw new ArchiveFailure("invalid_receipt");
+  }
+  // A file can change after its hash while the rest of the archive is read.
+  for (const [filename, snapshot] of snapshots) {
+    const current = await statIfPresent(filename);
+    if (!current || !sameSnapshot(snapshot, current))
+      throw new ArchiveFailure("source_changed");
   }
   return archiveReceipt(directory, id, manifest);
 }
@@ -1164,7 +1182,8 @@ function safeSegment(value: string) {
 async function digestFile(
   filename: string,
   output?: string,
-  privateFile = false
+  privateFile = false,
+  snapshots?: Map<string, Stats>
 ) {
   const before = await fs.lstat(filename);
   checkSourceFile(before, privateFile);
@@ -1190,6 +1209,7 @@ async function digestFile(
       )
         throw new ArchiveFailure("source_changed");
       await destination?.sync();
+      snapshots?.set(filename, opened);
       return { size, sha256: hash.digest("hex") };
     } finally {
       await destination?.close();

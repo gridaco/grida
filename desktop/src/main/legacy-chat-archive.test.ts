@@ -1022,6 +1022,43 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
     );
   });
 
+  it("rejects an archived input changed in place after hashing while verification continues", async () => {
+    const { archive, db, scratch } = await fixture();
+    createDatabase(db);
+    await fs.mkdir(scratch, { recursive: true, mode: 0o700 });
+    const names = ["upload.png", "second.txt"];
+    for (const name of names)
+      await fs.writeFile(path.join(scratch, name), "four");
+    const receipt = (await archive.snapshotQuiesced())!;
+    const inputs = names.map((name) =>
+      path.join(receipt.directory, "scratch", "ses_fixture", name)
+    );
+    const open = fs.open.bind(fs);
+    let first: string | undefined;
+    let changed: string | undefined;
+    const change = vi.spyOn(fs, "open").mockImplementation(async (...args) => {
+      const filename = args[0];
+      if (typeof filename === "string" && inputs.includes(filename)) {
+        if (!first) first = filename;
+        else if (filename !== first && !changed) {
+          changed = first;
+          await fs.writeFile(changed, "five");
+          await fs.utimes(changed, 0, 0);
+        }
+      }
+      return open(...args);
+    });
+    try {
+      await expect(archive.verify(receipt.id)).rejects.toMatchObject({
+        code: "source_changed",
+      });
+      expect(changed).toBeDefined();
+      expect(await fs.readFile(changed!, "utf8")).toBe("five");
+    } finally {
+      change.mockRestore();
+    }
+  });
+
   it("does not treat a stranded WAL as an empty legacy store", async () => {
     const { archive, db } = await fixture();
     await fs.writeFile(`${db}-wal`, "stranded");
