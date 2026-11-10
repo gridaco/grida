@@ -7,6 +7,7 @@ pub mod goals;
 pub mod history;
 pub mod hooks;
 pub mod questions;
+mod retry;
 pub mod side_context;
 pub mod subagents;
 pub mod usage;
@@ -21,7 +22,7 @@ use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, Prov
 use agent_kit_core::tools::InventorySnapshot;
 use agent_kit_core::turn::{
     OperationInput, OperationOutcome, OperationState, SettlementReceipt, SuspensionReceipt,
-    TurnOutcome,
+    TurnOutcome, TurnState,
 };
 use agent_kit_core::{
     Envelope, Error, ErrorKind, Fingerprint, MessageId, OperationId, Result, SchemaId,
@@ -167,9 +168,15 @@ struct Continuation {
     request_history: Option<HistoryPosition>,
     #[serde(default)]
     request_generation: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    retry: Option<retry::AdmissionRetry>,
 }
 
 impl Continuation {
+    fn pending_retry(&self) -> Option<&retry::AdmissionRetry> {
+        self.retry.as_ref().filter(|retry| retry.step == self.step)
+    }
+
     fn step_key(&self) -> String {
         if self.request_generation == 0 {
             format!("conversation/{}", self.step)
@@ -180,6 +187,28 @@ impl Continuation {
             )
         }
     }
+}
+
+/// The retained deadline for the current retry step, if it has been reserved.
+pub fn pending_retry_not_before(state: &TurnState) -> Result<Option<u64>> {
+    let has_rejection = state.operations().values().any(|operation| {
+        matches!(
+            operation.outcome(),
+            Some(OperationOutcome::Inference(outcome)) if retry::admission_rejection(outcome).is_some()
+        )
+    });
+    let Some(checkpoint) = state.checkpoint().filter(|checkpoint| {
+        has_rejection
+            && !state.controls().cancelled
+            && checkpoint.schema().as_str() == CONTINUATION_SCHEMA
+    }) else {
+        return Ok(None);
+    };
+    let continuation: Continuation = decode(CONTINUATION_SCHEMA, checkpoint)?;
+    Ok(continuation
+        .pending_retry()
+        .filter(|_| continuation.outcome.is_none())
+        .map(|retry| retry.not_before_ms))
 }
 
 impl Master {
@@ -325,44 +354,71 @@ impl Master {
                 continue;
             }
             let step_key = continuation.step_key();
-            let request = match &continuation.request {
-                Some(request) => request.clone(),
-                None => {
-                    let input_view = turn.view();
-                    continuation.request_history = Some(input_view.state.history().position());
-                    let request = match self.prepare(&input_view) {
-                        Ok(request) => request,
-                        Err(error) => {
-                            let mut outcome = self.account(
-                                &turn,
-                                OutcomeStatus::Failed,
-                                continuation.step,
-                                "The model input could not be prepared with the selected configuration.",
-                                None,
-                                None,
-                            )?;
-                            let mut account =
-                                read_account(outcome.account.as_ref().expect("master account"))?;
-                            account.failure = Some(error);
-                            outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
-                            continuation.outcome = Some(outcome);
-                            turn.checkpoint(
-                                OperationKey::new(format!("{step_key}/input-rejected"))?,
-                                encode(CONTINUATION_SCHEMA, &continuation)?,
-                            )
-                            .await?;
-                            continue;
-                        }
+            let retry = continuation.pending_retry();
+            let delay = retry
+                .map(|retry| retry.delay(&self.authority.inference))
+                .transpose();
+            if let Ok(Some(delay)) = &delay
+                && !delay.is_zero()
+                && !turn
+                    .wait_while_admitted(view.state.controls().revision, *delay)
+                    .await?
+            {
+                continue;
+            }
+            let input_view = turn.view();
+            let prepared = delay.and_then(|_| {
+                let request = match &continuation.request {
+                    Some(request) => request.clone(),
+                    None => self.prepare(&input_view)?,
+                };
+                if let Some(retry) = retry {
+                    retry.verify_request(&request)?;
+                }
+                Ok(request)
+            });
+            let request = match prepared {
+                Ok(request) => request,
+                Err(error) => {
+                    let text = if retry.is_some() {
+                        "The rate-limited request could not retry with its captured configuration."
+                    } else {
+                        "The model input could not be prepared with the selected configuration."
                     };
-                    continuation.request = Some(request.clone());
+                    let mut outcome = self.account(
+                        &turn,
+                        OutcomeStatus::Failed,
+                        continuation.step,
+                        text,
+                        None,
+                        None,
+                    )?;
+                    let mut account =
+                        read_account(outcome.account.as_ref().expect("master account"))?;
+                    account.failure = Some(error);
+                    outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+                    continuation.request = None;
+                    continuation.outcome = Some(outcome);
                     turn.checkpoint(
-                        OperationKey::new(format!("{step_key}/request"))?,
+                        OperationKey::new(format!("{step_key}/input-rejected"))?,
                         encode(CONTINUATION_SCHEMA, &continuation)?,
                     )
                     .await?;
-                    request
+                    continue;
                 }
             };
+            if continuation.request.is_none() {
+                continuation.request_history = Some(input_view.state.history().position());
+                if continuation.pending_retry().is_some() {
+                    continuation.interrupted = false;
+                }
+                continuation.request = Some(request.clone());
+                turn.checkpoint(
+                    OperationKey::new(format!("{step_key}/request"))?,
+                    encode(CONTINUATION_SCHEMA, &continuation)?,
+                )
+                .await?;
+            }
             let step = turn
                 .step(StepPlan {
                     key: OperationKey::new(step_key.clone())?,
@@ -478,6 +534,21 @@ impl Master {
                 continue;
             }
             continuation.step += 1;
+            let mut retrying = false;
+            if continuation.retry.is_none()
+                && continuation.step < max_steps
+                && !current.state.controls().cancelled
+                && step.tools.is_empty()
+                && let Some(request) = &continuation.request
+            {
+                continuation.retry = retry::AdmissionRetry::schedule(
+                    continuation.step,
+                    request,
+                    &self.authority.inference,
+                    &step.inference,
+                );
+                retrying = continuation.retry.is_some();
+            }
             let outcome =
                 if current.state.controls().cancelled {
                     Some(self.cancelled_outcome(&turn, continuation.step).await?)
@@ -490,7 +561,7 @@ impl Master {
                         None,
                         step.inference.failure.as_ref(),
                     )?)
-                } else if interrupted_by_pause {
+                } else if interrupted_by_pause || retrying {
                     None
                 } else {
                     match step.inference.status {
@@ -554,6 +625,9 @@ impl Master {
                                 Some(
                                     "input_measurement_unavailable" | "input_bound_unavailable",
                                 ) => "The selected model cannot verify the configured input limit.",
+                                Some("rate_limit") => {
+                                    "The provider rate limit prevented this turn from finishing."
+                                }
                                 _ => "The model request failed.",
                             };
                             Some(self.account(
@@ -626,6 +700,7 @@ impl Master {
                 outcome: None,
                 request_history: None,
                 request_generation: 0,
+                retry: None,
             }),
             Some(envelope) => {
                 let value: Continuation = decode(CONTINUATION_SCHEMA, envelope)?;

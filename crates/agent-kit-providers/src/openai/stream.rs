@@ -399,6 +399,7 @@ impl ResponseStream {
                 kind,
                 code: code.into(),
                 retry_after_ms: None,
+                dispatch: None,
             }),
         );
     }

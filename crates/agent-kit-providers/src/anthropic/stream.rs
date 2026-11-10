@@ -350,6 +350,7 @@ impl Response {
                         kind: FailureKind::ContextLimit,
                         code: "context_limit".into(),
                         retry_after_ms: None,
+                        dispatch: None,
                     });
                 self.finish(status, failure, true);
             }
@@ -402,6 +403,7 @@ impl Response {
                 kind: FailureKind::Protocol,
                 code: code.into(),
                 retry_after_ms: None,
+                dispatch: None,
             }),
             false,
         );

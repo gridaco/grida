@@ -23,9 +23,11 @@ pub(super) fn events(
     limits: StreamLimits,
     scope: ReplayScope,
     names: BTreeMap<String, ToolId>,
+    rate_rejection_evidence: bool,
 ) -> BoxStream<'static, ProviderEvent> {
     let state = Response {
-        wire: WireStream::new(transport, request, control.clone(), limits),
+        wire: WireStream::new(transport, request, control.clone(), limits)
+            .with_rate_rejection_evidence(rate_rejection_evidence),
         attempt: control.attempt,
         limits,
         scope,
@@ -611,6 +613,7 @@ fn failure(kind: FailureKind, code: &str) -> InferenceFailure {
         kind,
         code: code.into(),
         retry_after_ms: None,
+        dispatch: None,
     }
 }
 

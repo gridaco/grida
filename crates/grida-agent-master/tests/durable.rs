@@ -4,10 +4,10 @@ use agent_kit_core::authority::{
 use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
-    FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceRequest,
-    InferenceRun, InferenceStatus, InferenceUpdate, InputFormat, InputMeasurement, MeasurementKind,
-    Modality, ModelCapabilities, PreparedRequest, Provider, ProviderBinding, ProviderEvent,
-    RequestControl, UsageObservation,
+    DispatchEvidence, FailureKind, InferenceControl, InferenceFailure, InferenceOutcome,
+    InferenceRequest, InferenceRun, InferenceStatus, InferenceUpdate, InputFormat,
+    InputMeasurement, MeasurementKind, Modality, ModelCapabilities, PreparedRequest, Provider,
+    ProviderBinding, ProviderEvent, RequestControl, UsageObservation,
 };
 use agent_kit_core::messages::{
     Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
@@ -29,7 +29,7 @@ use agent_kit_core::{
 };
 use agent_kit_runtime::{
     AdmissionContext, CompletionDraft, ExecutionLimits, ExecutionServices, FinishOutcome, Runtime,
-    ToolAdmission, ToolDecision, ToolGate,
+    ToolAdmission, ToolDecision, ToolGate, TurnObserver,
 };
 use agent_kit_sessions::{
     ClaimOutcome, ClaimRequest, ClaimedTurn, ControlRequest, CreateSession, RecoveryRequest,
@@ -111,6 +111,7 @@ fn input() -> Vec<Message> {
 #[derive(Clone, Copy)]
 enum Script {
     Answer,
+    AdmissionLimit(u64),
     UsageAnswer,
     Failure(FailureKind),
     ToolThenAnswer,
@@ -153,6 +154,7 @@ impl Provider for ScriptProvider {
                     kind: FailureKind::Configuration,
                     code: error.code,
                     retry_after_ms: None,
+                    dispatch: None,
                 });
             let held = self.hold_next_count.lock().unwrap().take();
             if let Some(entered) = held {
@@ -189,6 +191,25 @@ impl Provider for ScriptProvider {
             .lock()
             .unwrap()
             .push(request.request().clone());
+        if let Script::AdmissionLimit(delay) = self.script
+            && index == 0
+        {
+            let outcome = InferenceOutcome {
+                status: InferenceStatus::Failed,
+                messages: Vec::new(),
+                usage: Vec::new(),
+                failure: Some(InferenceFailure {
+                    kind: FailureKind::RateLimit,
+                    code: "rate_limit".into(),
+                    retry_after_ms: Some(delay),
+                    dispatch: Some(DispatchEvidence::RejectedBeforeExecution),
+                }),
+                receipt: None,
+            };
+            return Ok(InferenceRun::from_stream(control, move |_| {
+                Box::pin(stream::iter([ProviderEvent::Finished(outcome)]))
+            }));
+        }
         let tools = matches!(self.script, Script::Tools | Script::ToolAndDeferred)
             || matches!(self.script, Script::ToolThenAnswer) && index == 0;
         let mut content = if tools {
@@ -271,6 +292,7 @@ impl Provider for ScriptProvider {
                     kind,
                     code: "fixture_failure".into(),
                     retry_after_ms: None,
+                    dispatch: None,
                 }),
             )
         } else {
@@ -1163,6 +1185,178 @@ async fn cancellation_after_answer_publication_precedes_successful_settlement() 
         .unwrap()
     else {
         panic!("expected cancelled settlement")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+async fn wait_for_retry(observer: &mut TurnObserver) -> u64 {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Some(due) = observer
+                .snapshot()
+                .state
+                .checkpoint()
+                .and_then(|checkpoint| {
+                    let value: serde_json::Value =
+                        serde_json::from_slice(checkpoint.bytes()).unwrap();
+                    value["retry"]["not_before_ms"].as_u64()
+                })
+            {
+                return due;
+            }
+            observer.next().await.expect("the run retains its retry");
+        }
+    })
+    .await
+    .expect("the first definitive rejection schedules a retry")
+}
+
+#[tokio::test]
+async fn a_paused_retry_reopens_with_the_same_due_time_and_authority() {
+    for change_authority in [false, true] {
+        let fixture = Fixture::new(Script::AdmissionLimit(1_500));
+        let store = fixture.store();
+        let claim = fixture.claim(&store).await;
+        let mut opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let master = fixture.master(4, "Be concise");
+        let task = tokio::spawn(async move { master.run(opened.turn, input()).await });
+        let due = wait_for_retry(&mut opened.observer).await;
+        let view = store.inspect(session_id()).await.unwrap();
+        let current = view.current.unwrap();
+        store
+            .control(ControlRequest {
+                id: change_id("pause-backoff"),
+                session: session_id(),
+                expected_revision: view.revision,
+                action: SessionControl::Turn {
+                    turn: turn_id(),
+                    expected: current.controls.revision,
+                    directive: ControlDirective::Pause,
+                },
+            })
+            .await
+            .unwrap();
+        let MasterOutcome::Suspended(receipt) = tokio::time::timeout(Duration::from_secs(1), task)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("Pause must interrupt the backoff");
+        };
+        store
+            .verify(CommitReceipt::Suspended(receipt))
+            .await
+            .unwrap();
+        assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+        drop(opened.observer);
+        drop(store);
+
+        if change_authority {
+            fixture.provider.authority.lock().unwrap().binding = BindingId::new("renewed").unwrap();
+        }
+        let store = fixture.reopen().await;
+        assert_eq!(
+            store
+                .inspect_turn_with(session_id(), turn_id(), |state| {
+                    let checkpoint = state.checkpoint().expect("retained retry");
+                    let value: serde_json::Value =
+                        serde_json::from_slice(checkpoint.bytes()).unwrap();
+                    Ok(value["retry"]["not_before_ms"].as_u64())
+                })
+                .await
+                .unwrap(),
+            Some(due)
+        );
+        let view = store.inspect(session_id()).await.unwrap();
+        let current = view.current.unwrap();
+        store
+            .control(ControlRequest {
+                id: change_id("resume-backoff"),
+                session: session_id(),
+                expected_revision: view.revision,
+                action: SessionControl::Turn {
+                    turn: turn_id(),
+                    expected: current.controls.revision,
+                    directive: ControlDirective::Resume,
+                },
+            })
+            .await
+            .unwrap();
+        let view = store.inspect(session_id()).await.unwrap();
+        let current = view.current.unwrap();
+        let ClaimOutcome::Acquired(claim) = store
+            .claim(ClaimRequest {
+                id: change_id("claim-backoff"),
+                session: session_id(),
+                expected_revision: view.revision,
+                selection: TurnSelection::Resume {
+                    turn: turn_id(),
+                    epoch: current.binding.epoch,
+                    position: current.position,
+                },
+            })
+            .await
+            .unwrap()
+        else {
+            panic!("expected resumed retry");
+        };
+        let opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let MasterOutcome::Settled(receipt) = fixture
+            .master(4, "Be concise")
+            .run(opened.turn, input())
+            .await
+            .unwrap()
+        else {
+            panic!("the resumed retry must settle");
+        };
+        let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+        if change_authority {
+            assert_eq!(receipt.outcome.status, OutcomeStatus::Failed);
+            assert_eq!(account.failure.unwrap().code, "retry_authority_changed");
+            assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+        } else {
+            assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+            assert_eq!(account.steps, 2);
+            assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
+        }
+        store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn stopping_during_backoff_dispatches_no_retry() {
+    let fixture = Fixture::new(Script::AdmissionLimit(3_000));
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let mut opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let master = fixture.master(4, "Be concise");
+    let task = tokio::spawn(async move { master.run(opened.turn, input()).await });
+    wait_for_retry(&mut opened.observer).await;
+    let view = store.inspect(session_id()).await.unwrap();
+    let current = view.current.unwrap();
+    store
+        .control(ControlRequest {
+            id: change_id("stop-backoff"),
+            session: session_id(),
+            expected_revision: view.revision,
+            action: SessionControl::Turn {
+                turn: turn_id(),
+                expected: current.controls.revision,
+                directive: ControlDirective::Cancel,
+            },
+        })
+        .await
+        .unwrap();
+    let MasterOutcome::Settled(receipt) = tokio::time::timeout(Duration::from_secs(1), task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap()
+    else {
+        panic!("Stop must interrupt the backoff");
     };
     assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);

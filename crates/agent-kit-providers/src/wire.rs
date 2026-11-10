@@ -3,8 +3,8 @@ use crate::{
     StreamLimits, StreamingTransport, TransportFailure, TransportRequest, TransportResponse,
 };
 use agent_kit_core::inference::{
-    FailureKind, InferenceControl, InferenceFailure, InferenceStatus, InferenceUpdate,
-    MeasurementKind, Modality, ModelCapabilities, ProviderEvent, UsageObservation,
+    DispatchEvidence, FailureKind, InferenceControl, InferenceFailure, InferenceStatus,
+    InferenceUpdate, MeasurementKind, Modality, ModelCapabilities, ProviderEvent, UsageObservation,
 };
 use agent_kit_core::messages::{ResultContent, ToolResult};
 use agent_kit_core::{
@@ -33,6 +33,7 @@ pub(crate) struct WireStream {
     decoder: Decoder,
     bytes_received: usize,
     pending_limit: Option<&'static str>,
+    rate_rejection_evidence: bool,
 }
 
 impl WireStream {
@@ -44,6 +45,7 @@ impl WireStream {
     ) -> Self {
         Self {
             transport,
+            rate_rejection_evidence: false,
             request: Some(request),
             response: None,
             control,
@@ -52,6 +54,11 @@ impl WireStream {
             bytes_received: 0,
             pending_limit: None,
         }
+    }
+
+    pub(crate) fn with_rate_rejection_evidence(mut self, supported: bool) -> Self {
+        self.rate_rejection_evidence = supported;
+        self
     }
 
     pub(crate) fn close(&mut self) {
@@ -105,7 +112,11 @@ impl WireStream {
                     .take()
                     .expect("non-success response is present");
                 let status = response.status;
-                let error = read_http_error(response, self.limits.max_event_bytes).await;
+                let (mut error, complete_rate_rejection) =
+                    read_http_failure(response, self.limits.max_event_bytes).await;
+                if self.rate_rejection_evidence && complete_rate_rejection {
+                    error.dispatch = Some(DispatchEvidence::RejectedBeforeExecution);
+                }
                 let disposition = match status {
                     // An upstream or intermediary failure can follow dispatch.
                     408 | 500..=599 => InferenceStatus::Interrupted,
@@ -165,6 +176,7 @@ fn failure(status: InferenceStatus, kind: FailureKind, code: &str) -> Incoming {
             kind,
             code: code.into(),
             retry_after_ms: None,
+            dispatch: None,
         },
     )
 }
@@ -210,25 +222,50 @@ fn receipt(id: String) -> Option<Envelope> {
 }
 
 pub(crate) async fn read_http_error(
-    mut response: TransportResponse,
+    response: TransportResponse,
     maximum: usize,
 ) -> InferenceFailure {
+    read_http_failure(response, maximum).await.0
+}
+
+async fn read_http_failure(
+    mut response: TransportResponse,
+    maximum: usize,
+) -> (InferenceFailure, bool) {
     if matches!(response.status, 401 | 402) {
-        return classify_error(response.status, None, response.retry_after_ms);
+        return (
+            classify_error(response.status, None, response.retry_after_ms),
+            false,
+        );
     }
     let mut bytes = Vec::new();
-    while let Some(Ok(chunk)) = response.body.next().await {
-        if chunk.is_empty() || chunk.len() > maximum.saturating_sub(bytes.len()) {
-            break;
+    let complete = loop {
+        match response.body.next().await {
+            None => break true,
+            Some(Ok(chunk))
+                if !chunk.is_empty() && chunk.len() <= maximum.saturating_sub(bytes.len()) =>
+            {
+                bytes.extend_from_slice(&chunk);
+                if bytes.len() == maximum {
+                    break false;
+                }
+            }
+            _ => break false,
         }
-        bytes.extend_from_slice(&chunk);
-        if bytes.len() == maximum {
-            break;
-        }
-    }
+    };
     let parsed: Option<ErrorBody> = serde_json::from_slice(&bytes).ok();
     let code = parsed.as_ref().and_then(|parsed| parsed.error.code());
-    classify_error(response.status, code, response.retry_after_ms)
+    let complete_rate_rejection = complete
+        && response.status == 429
+        && parsed
+            .as_ref()
+            .and_then(|parsed| parsed.error.code.as_ref())
+            .and_then(Value::as_str)
+            == Some("rate_limit_exceeded");
+    (
+        classify_error(response.status, code, response.retry_after_ms),
+        complete_rate_rejection,
+    )
 }
 
 pub(crate) fn classify_error(
@@ -288,6 +325,7 @@ pub(crate) fn classify_error(
         kind,
         code: code.into(),
         retry_after_ms,
+        dispatch: None,
     }
 }
 

@@ -90,6 +90,10 @@ struct Endpoint {
 enum Reply {
     Finished(&'static str),
     InputCount(u64),
+    RateLimited {
+        code: &'static str,
+        retry_after: u64,
+    },
     Hold(&'static str),
     Stop(&'static str),
     #[cfg(unix)]
@@ -236,6 +240,19 @@ async fn fixture_request(
             .unwrap();
         return;
     }
+    if let Reply::RateLimited { code, retry_after } = reply {
+        let body = json!({"error":{"code":code,"message":"fixture rejection"}}).to_string();
+        let response = format!(
+            "HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nContent-Length: {}\r\nRetry-After: {retry_after}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        stream
+            .get_mut()
+            .write_all(response.as_bytes())
+            .await
+            .unwrap();
+        return;
+    }
     #[cfg(unix)]
     let (reply, delayed_done) = match reply {
         Reply::Release(text, ready) => {
@@ -283,6 +300,7 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         Reply::Hold(text) => (text, None),
         Reply::Stop(reason) => ("", Some(reason)),
         Reply::InputCount(_) => unreachable!("count responses use the JSON endpoint"),
+        Reply::RateLimited { .. } => unreachable!("rate limits use an HTTP error response"),
         #[cfg(unix)]
         Reply::Tool(name, arguments) => {
             if protocol == ProviderProtocol::Responses {

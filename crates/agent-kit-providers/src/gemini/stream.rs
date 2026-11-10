@@ -375,6 +375,7 @@ impl Response {
                 kind: FailureKind::Protocol,
                 code: code.into(),
                 retry_after_ms: None,
+                dispatch: None,
             }),
             false,
         );

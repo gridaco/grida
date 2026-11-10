@@ -38,6 +38,12 @@ uncertainty. Recognized provider codes distinguish unavailable models, quota,
 rate limits, and context limits. An HTTP retry delay is advisory. Each adapter
 issues a single transport request per inference attempt.
 
+The Responses API profile records an admission rejection when generation
+returns a complete HTTP 429 body with the explicit `rate_limit_exceeded`
+error code. An incomplete error body, an error inside a stream, or a response
+from the subscription profile provides no such evidence. The master decides
+whether to make another attempt.
+
 ## Model requests and streams
 
 The shared SSE framer handles fragmented bytes and UTF-8. Each adapter bounds

@@ -28,6 +28,232 @@ fn input_limit(state: &Path, tokens: u64) {
 }
 
 #[tokio::test]
+async fn verified_responses_admission_rejection_retries_once_after_the_advised_delay() {
+    let directory = TempDir::new().unwrap();
+    let state = directory.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Responses,
+        vec![
+            Reply::RateLimited {
+                code: "rate_limit_exceeded",
+                retry_after: 1,
+            },
+            Reply::Finished("Recovered reply."),
+        ],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let child = tokio::spawn({
+        let mut command = run(
+            &state,
+            workspace.path(),
+            &endpoint.url,
+            "Retry only on rejection.",
+        );
+        async move { timeout(WAIT, command.output()).await.unwrap().unwrap() }
+    });
+    let first = endpoint.request().await;
+    let first_seen = tokio::time::Instant::now();
+    assert_eq!(endpoint.request().await, first);
+    assert!(first_seen.elapsed() >= Duration::from_millis(950));
+    let output = child.await.unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result = records(&output.stdout);
+    assert_eq!(result[1]["account"]["text"], "Recovered reply.");
+    assert_eq!(result[1]["account"]["steps"], 2);
+    assert_eq!(
+        result[1]["account"]["inference_usage"]["unreported_attempts"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn responses_rate_limit_budget_stops_after_the_second_rejection() {
+    let directory = TempDir::new().unwrap();
+    let state = directory.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Responses,
+        vec![
+            Reply::RateLimited {
+                code: "rate_limit_exceeded",
+                retry_after: 0,
+            },
+            Reply::RateLimited {
+                code: "rate_limit_exceeded",
+                retry_after: 0,
+            },
+        ],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let output = timeout(
+        WAIT,
+        run(
+            &state,
+            workspace.path(),
+            &endpoint.url,
+            "Repeated rate limit.",
+        )
+        .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let result = records(&output.stdout);
+    let account = &result[1]["account"];
+    assert_eq!(account["steps"], 2);
+    assert_eq!(account["inference_failure"]["kind"], "rate_limit");
+    assert_eq!(
+        account["inference_failure"]["dispatch"],
+        "rejected_before_execution"
+    );
+    assert_eq!(endpoint.request().await, endpoint.request().await);
+    assert!(endpoint.requests.try_recv().is_err());
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn responses_leaves_quota_and_long_advice_for_the_client() {
+    for (code, advice, kind) in [
+        ("insufficient_quota", 0, "quota"),
+        ("rate_limit_exceeded", 6, "rate_limit"),
+    ] {
+        let directory = TempDir::new().unwrap();
+        let state = directory.path().join("state");
+        let workspace = TempDir::new().unwrap();
+        let mut endpoint = Endpoint::start_protocol(
+            ProviderProtocol::Responses,
+            vec![Reply::RateLimited {
+                code,
+                retry_after: advice,
+            }],
+            Some(TEST_CREDENTIAL),
+        )
+        .await;
+        let output = timeout(
+            WAIT,
+            run(
+                &state,
+                workspace.path(),
+                &endpoint.url,
+                "Respect the provider's decision.",
+            )
+            .output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(output.status.code(), Some(1));
+        let result = records(&output.stdout);
+        assert_eq!(result[1]["account"]["steps"], 1);
+        assert_eq!(result[1]["account"]["inference_failure"]["kind"], kind);
+        endpoint.request().await;
+        assert!(endpoint.requests.try_recv().is_err());
+        endpoint.done().await;
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn private_client_sees_the_retry_deadline_and_can_stop_before_dispatch() {
+    use super::approvals::Stdio as StdioClient;
+    use super::lifecycle::{prompt_request, task_basis};
+
+    let directory = TempDir::new().unwrap();
+    let state = directory.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start_protocol(
+        ProviderProtocol::Responses,
+        vec![Reply::RateLimited {
+            code: "rate_limit_exceeded",
+            retry_after: 5,
+        }],
+        Some(TEST_CREDENTIAL),
+    )
+    .await;
+    let mut command = executable();
+    command.args(["serve", "--stdio", "--provider", "responses"]);
+    configured(&mut command, &state, &endpoint.url);
+    let mut client = StdioClient::from_child(
+        command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap(),
+    );
+    let ready = client.request("initialize", extension_initialize()).await;
+    assert_eq!(ready["result"]["protocolVersion"], 1);
+    let created = client
+        .request(
+            "session/new",
+            json!({"cwd":workspace.path(),"mcpServers":[]}),
+        )
+        .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    let accepted = client
+        .request(
+            "_co.grida/session/submit",
+            prompt_request(session, "wait", "Wait for the limit."),
+        )
+        .await;
+    let turn = accepted["result"]["turnId"].as_str().unwrap();
+    endpoint.request().await;
+    let waiting = timeout(Duration::from_secs(3), async {
+        loop {
+            let response = client
+                .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+                .await;
+            assert!(response["result"].is_object(), "{response}");
+            if response["result"]["retryNotBeforeMs"].is_u64() {
+                break response["result"].clone();
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("a waiting retry is observable");
+    assert_eq!(waiting["current"]["turnId"], turn);
+    let stopped = client
+        .request(
+            "_co.grida/session/stop",
+            task_basis(&waiting, session, "stop-backoff"),
+        )
+        .await;
+    assert!(stopped["result"].is_object(), "{stopped}");
+    timeout(Duration::from_secs(3), async {
+        loop {
+            let response = client
+                .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+                .await;
+            assert!(response["result"].is_object(), "{response}");
+            if response["result"]["current"].is_null() {
+                assert_eq!(response["result"]["latest"]["status"], "cancelled");
+                assert!(response["result"].get("retryNotBeforeMs").is_none());
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("Stop settles without waiting for the retry time");
+    assert!(endpoint.requests.try_recv().is_err());
+    client.close().await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
 async fn complete_input_is_counted_before_native_responses_generation() {
     let directory = TempDir::new().unwrap();
     let state = directory.path().join("state");

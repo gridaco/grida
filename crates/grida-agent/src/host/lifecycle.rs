@@ -106,6 +106,17 @@ impl InputSettings {
 }
 
 impl Host {
+    pub(crate) async fn inspect_with_retry(
+        &self,
+        session: SessionId,
+    ) -> Result<(SessionView, Option<u64>)> {
+        self.store
+            .inspect_with_current(session, |current| {
+                current.map_or(Ok(None), grida_agent_master::pending_retry_not_before)
+            })
+            .await
+    }
+
     pub(super) async fn owned_control<T, F>(
         &self,
         operation: impl FnOnce(Host) -> F + Send + 'static,

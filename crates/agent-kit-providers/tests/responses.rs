@@ -2,8 +2,9 @@ mod support;
 
 use agent_kit_core::authority::AuthorityBinding;
 use agent_kit_core::inference::{
-    FailureKind, InferenceOutcome, InferenceRequest, InferenceStatus, InferenceUpdate,
-    InputMeasurement, MeasurementKind, Modality, ModelCapabilities, Provider, ProviderBinding,
+    DispatchEvidence, FailureKind, InferenceOutcome, InferenceRequest, InferenceStatus,
+    InferenceUpdate, InputMeasurement, MeasurementKind, Modality, ModelCapabilities, Provider,
+    ProviderBinding,
 };
 use agent_kit_core::messages::{
     Content, MediaRef, Message, MessagePhase, OutcomeStatus, ResultContent, Retention, Role,
@@ -12,7 +13,7 @@ use agent_kit_core::messages::{
 use agent_kit_core::{ArtifactId, BindingId, ModelId, PrincipalId, ProviderId, ScopeId};
 use agent_kit_providers::{
     ReasoningEffort, Responses, ResponsesEndpoint, ResponsesProfile, StreamLimits,
-    TransportOperation,
+    TransportFailure, TransportOperation,
 };
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -543,6 +544,45 @@ async fn responses_generation_preserves_http_rejection_and_dispatch_uncertainty(
         let requests = transport.requests.lock().unwrap();
         assert_eq!(requests.len(), 1);
         assert_eq!(requests[0].0.operation, TransportOperation::OpenAiResponses);
+    }
+}
+
+#[tokio::test]
+async fn only_a_complete_typed_api_rate_rejection_proves_no_generation() {
+    for (endpoint, body_failed, code_key, expected) in [
+        (
+            ResponsesEndpoint::Api,
+            false,
+            "code",
+            Some(DispatchEvidence::RejectedBeforeExecution),
+        ),
+        (ResponsesEndpoint::Api, true, "code", None),
+        (ResponsesEndpoint::Api, false, "type", None),
+        (ResponsesEndpoint::Subscription, false, "code", None),
+    ] {
+        let body =
+            serde_json::to_vec(&json!({"error":{(code_key):"rate_limit_exceeded"}})).unwrap();
+        let mut reply = response([body.clone()], false);
+        reply.status = 429;
+        reply.retry_after_ms = Some(500);
+        if body_failed {
+            reply.body = Box::pin(futures_util::stream::iter([
+                Ok(body),
+                Err(TransportFailure::Interrupted),
+            ]));
+        }
+        let transport = FixtureTransport::new([Ok(reply)]);
+        let provider = adapter(transport.clone(), endpoint, "lineage", "live");
+        let mut input = request();
+        if endpoint == ResponsesEndpoint::Subscription {
+            input.max_output_tokens = None;
+        }
+        let outcome = run(&provider, input, "attempt").await;
+        assert_eq!(outcome.status, InferenceStatus::Failed);
+        let failure = outcome.failure.unwrap();
+        assert_eq!(failure.kind, FailureKind::RateLimit);
+        assert_eq!(failure.dispatch, expected);
+        assert_eq!(transport.requests.lock().unwrap().len(), 1);
     }
 }
 

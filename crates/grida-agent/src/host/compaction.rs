@@ -420,6 +420,7 @@ impl Host {
                             kind: FailureKind::Configuration,
                             code: error.code,
                             retry_after_ms: None,
+                            dispatch: None,
                         });
                         account
                     }

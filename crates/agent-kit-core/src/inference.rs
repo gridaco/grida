@@ -227,6 +227,7 @@ pub trait Provider: Send + Sync {
                     kind: FailureKind::Configuration,
                     code: error.code,
                     retry_after_ms: None,
+                    dispatch: None,
                 })
         })
     }
@@ -302,6 +303,15 @@ pub struct InferenceFailure {
     pub kind: FailureKind,
     pub code: String,
     pub retry_after_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dispatch: Option<DispatchEvidence>,
+}
+
+/// Positive evidence from the adapter about the disposition of the request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DispatchEvidence {
+    RejectedBeforeExecution,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -459,6 +469,7 @@ impl InferenceRun {
                             kind: FailureKind::OutputLimit,
                             code: "output_limit".into(),
                             retry_after_ms: None,
+                            dispatch: None,
                         });
                     }
                     if outcome.usage.is_empty() {
@@ -504,6 +515,7 @@ impl InferenceRun {
                 kind,
                 code: code.into(),
                 retry_after_ms: None,
+                dispatch: None,
             }),
             receipt: self.receipt.take(),
         });

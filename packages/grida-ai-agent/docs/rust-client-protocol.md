@@ -278,6 +278,12 @@ Queue can wake retained waiting work, and Resume Task checks captured settings
 and current authority before reacquiring a suspended turn. A credential change
 blocks dispatch under an earlier captured authority.
 
+An attached snapshot can include `retryNotBeforeMs`, a Unix time in
+milliseconds for the current turn's retained provider retry. It is the earliest
+dispatch time, subject to the same authority and task controls as the original
+request. Pause holds the retry and Stop closes it. The value is absent when
+there is no current retry.
+
 Clients negotiate both question operations to enable the corresponding tools
 for newly accepted input. Answers use `{ "kind": "text", "text": "..." }`,
 `{ "kind": "choice", "index": 0 }`, or `{ "kind": "skipped" }`.

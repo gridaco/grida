@@ -16,7 +16,7 @@ use agent_kit_core::{AttemptId, CancellationToken, ChangeId, Fingerprint, Messag
 use std::num::NonZeroU64;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::{Mutex as AsyncMutex, Semaphore, broadcast, mpsc, watch};
 
 pub struct Runtime {
@@ -120,6 +120,30 @@ impl Turn {
         TurnOperations {
             inner: Arc::clone(&self.inner),
         }
+    }
+
+    /// Wait without claiming an executor. A changed control revision releases
+    /// the caller early so it can act on the new durable state.
+    pub async fn wait_while_admitted(
+        &self,
+        expected: ControlRevision,
+        delay: Duration,
+    ) -> Result<bool> {
+        self.inner.ensure_open()?;
+        let lease = self.inner.lease()?;
+        let current = self.inner.refresh().await?;
+        if current.controls().revision != expected || !current.controls().admits_work() {
+            return Ok(false);
+        }
+        let elapsed = tokio::select! {
+            biased;
+            _ = self.inner.cancellation.cancelled() => return Err(Error::new(ErrorKind::InvalidState, "admission_closed")),
+            changed = lease.controls().changed(expected) => { changed?; false }
+            _ = tokio::time::sleep(delay) => true,
+        };
+        let current = self.inner.refresh().await?;
+        self.inner.ensure_open()?;
+        Ok(elapsed && current.controls().revision == expected && current.controls().admits_work())
     }
 
     pub async fn append_history(
@@ -1086,6 +1110,7 @@ fn admission_failure(code: &str, kind: FailureKind) -> InferenceFailure {
         kind,
         code: code.into(),
         retry_after_ms: None,
+        dispatch: None,
     }
 }
 

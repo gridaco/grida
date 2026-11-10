@@ -204,6 +204,8 @@ struct SnapshotResponse {
     admission_paused: bool,
     current: Option<TurnSummary>,
     latest: Option<TurnSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    retry_not_before_ms: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -397,8 +399,8 @@ pub(super) fn handlers(
             async move |request: Snapshot, responder, _| {
                 let result = async {
                     require(&snapshot_sessions, SNAPSHOT, Some(&request.session_id))?;
-                    let snapshot = snapshot_host
-                        .inspect(request.session_id)
+                    let (snapshot, retry_not_before_ms) = snapshot_host
+                        .inspect_with_retry(request.session_id)
                         .await
                         .map_err(host_error)?;
                     Ok(SnapshotResponse {
@@ -413,6 +415,7 @@ pub(super) fn handlers(
                         admission_paused: snapshot.admission_paused,
                         current: snapshot.current.map(TurnSummary::from),
                         latest: snapshot.latest.map(TurnSummary::from),
+                        retry_not_before_ms,
                     })
                 }
                 .await;

@@ -359,6 +359,19 @@ impl SqliteStore {
         .await
     }
 
+    /// Project the current turn from the same state used for the session view.
+    /// The projection runs under the store lock and must be a pure in-memory transform.
+    pub async fn inspect_with_current<T: Send + 'static>(
+        &self,
+        session: SessionId,
+        project: impl FnOnce(Option<&TurnState>) -> Result<T> + Send + 'static,
+    ) -> Result<(SessionView, T)> {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            session_view_with(inner, connection, session, project)
+        })
+        .await
+    }
+
     /// Observe the current turn view associated with an exactly repeated claim.
     /// This issues no lease and never starts or resumes execution.
     pub async fn claim_receipt(&self, request: ClaimRequest) -> Result<Option<TurnView>> {
@@ -1362,6 +1375,15 @@ fn session_view(
     connection: &Connection,
     session_id: SessionId,
 ) -> Result<SessionView> {
+    session_view_with(inner, connection, session_id, |_| Ok(())).map(|(view, ())| view)
+}
+
+fn session_view_with<T>(
+    inner: &Inner,
+    connection: &Connection,
+    session_id: SessionId,
+    project: impl FnOnce(Option<&TurnState>) -> Result<T>,
+) -> Result<(SessionView, T)> {
     let session = load_session(connection, &session_id)?;
     let mut statement = connection.prepare(
         "SELECT id FROM submissions WHERE session=?1 AND queue_order IS NOT NULL ORDER BY queue_order",
@@ -1375,11 +1397,19 @@ fn session_view(
         .into_iter()
         .map(|id| load_input(connection, &session_id, &ChangeId::new(id)?))
         .collect::<Result<Vec<_>>>()?;
-    let current = session
-        .active_turn
-        .as_ref()
-        .map(|id| load_turn(connection, &session_id, id).and_then(|state| turn_view(inner, &state)))
-        .transpose()?;
+    let (current, projection) = {
+        let state = session
+            .active_turn
+            .as_ref()
+            .map(|id| load_turn(connection, &session_id, id))
+            .transpose()?;
+        let projection = project(state.as_ref())?;
+        let current = state
+            .as_ref()
+            .map(|state| turn_view(inner, state))
+            .transpose()?;
+        (current, projection)
+    };
     let latest_id: Option<String> = connection
         .query_row(
             "SELECT id FROM turns WHERE session=?1 ORDER BY ordinal DESC LIMIT 1",
@@ -1394,7 +1424,7 @@ fn session_view(
                 .and_then(|state| turn_view(inner, &state))
         })
         .transpose()?;
-    Ok(SessionView {
+    let view = SessionView {
         session: session_id,
         revision: session.revision,
         configuration: session.configuration,
@@ -1403,7 +1433,8 @@ fn session_view(
         queued,
         current,
         latest,
-    })
+    };
+    Ok((view, projection))
 }
 
 fn load_input(connection: &Connection, session: &SessionId, id: &ChangeId) -> Result<InputView> {

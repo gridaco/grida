@@ -2394,6 +2394,7 @@ async fn pause_and_cancel_interrupt_counting_with_no_generation_attempt() {
                 kind: FailureKind::Cancelled,
                 code: code.into(),
                 retry_after_ms: None,
+                dispatch: None,
             }
         );
         let record = turn.operation(&key).unwrap().unwrap();
@@ -2415,6 +2416,7 @@ async fn a_typed_count_failure_has_no_generation_usage_or_attempt() {
         kind: FailureKind::RateLimit,
         code: "rate_limit".into(),
         retry_after_ms: Some(750),
+        dispatch: None,
     };
     let provider = CountedProvider::new(false, Err(failure.clone()));
     let tool = CounterTool::new(None);

@@ -454,6 +454,7 @@ impl Provider for Responses {
         let encoded = self.encode(request.request(), profile, &scope, true)?;
         let transport = Arc::clone(&self.transport);
         let limits = self.limits;
+        let rate_rejection_evidence = self.endpoint == ResponsesEndpoint::Api;
         let request = TransportRequest {
             binding: self.binding.clone(),
             operation: TransportOperation::OpenAiResponses,
@@ -461,7 +462,15 @@ impl Provider for Responses {
             max_response_bytes: limits.max_response_bytes,
         };
         Ok(InferenceRun::from_stream(control, move |control| {
-            stream::events(transport, request, control, limits, scope, encoded.names)
+            stream::events(
+                transport,
+                request,
+                control,
+                limits,
+                scope,
+                encoded.names,
+                rate_rejection_evidence,
+            )
         }))
     }
 }
@@ -477,6 +486,7 @@ fn count_failure(code: &str, kind: FailureKind) -> InferenceFailure {
         kind,
         code: code.into(),
         retry_after_ms: None,
+        dispatch: None,
     }
 }
 
