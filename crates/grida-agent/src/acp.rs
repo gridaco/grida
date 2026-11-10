@@ -14,11 +14,11 @@ pub use websocket::{ListenOptions, serve_websocket};
 use crate::host::{AcceptedRun, Host, PromptPart, PromptRequest, RunResult, SessionCatalog};
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::v1::schema::{
-    AgentCapabilities, CancelNotification, ContentBlock, Implementation, InitializeRequest,
-    InitializeResponse, ListSessionsRequest, ListSessionsResponse, LoadSessionRequest,
-    LoadSessionResponse, NewSessionRequest, NewSessionResponse, PromptCapabilities,
-    PromptRequest as AcpPrompt, PromptResponse, SessionCapabilities, SessionInfo,
-    SessionListCapabilities, StopReason,
+    AgentCapabilities, CancelNotification, ContentBlock, EmbeddedResourceResource, Implementation,
+    InitializeRequest, InitializeResponse, ListSessionsRequest, ListSessionsResponse,
+    LoadSessionRequest, LoadSessionResponse, NewSessionRequest, NewSessionResponse,
+    PromptCapabilities, PromptRequest as AcpPrompt, PromptResponse, SessionCapabilities,
+    SessionInfo, SessionListCapabilities, StopReason,
 };
 use agent_client_protocol::{
     Agent, Channel, Error, Result, on_receive_notification, on_receive_request,
@@ -175,6 +175,8 @@ async fn serve_connection(
     let prompt_host = host.clone();
     let prompt_sessions = sessions.clone();
     let image_intake = reviewer && host.accepts_images();
+    let files = host.accepts_files();
+    let embedded_context = reviewer && files;
 
     Agent
         .v1()
@@ -190,7 +192,6 @@ async fn serve_connection(
                 let subagents = initialized_host.subagents_available();
                 let deletion = reviewer && initialized_host.deletion_available();
                 let effort = initialized_host.sponsorship_available();
-                let files = initialized_host.accepts_files();
                 let mut advertised =
                     extensions::advertised(reviewer, subagents, deletion, effort, files);
                 if reviewer {
@@ -290,7 +291,11 @@ async fn serve_connection(
                                 .session_capabilities(
                                     SessionCapabilities::new().list(SessionListCapabilities::new()),
                                 )
-                                .prompt_capabilities(PromptCapabilities::new().image(image_intake))
+                                .prompt_capabilities(
+                                    PromptCapabilities::new()
+                                        .image(image_intake)
+                                        .embedded_context(embedded_context),
+                                )
                                 .meta(advertised),
                         )
                         .agent_info(Implementation::new(
@@ -466,7 +471,7 @@ async fn serve_connection(
                     });
                 }
                 let start = async {
-                    let parts = prompt_parts(request.prompt, image_intake)?;
+                    let parts = prompt_parts(request.prompt, image_intake, embedded_context)?;
                     // ACP JSON-RPC IDs correlate requests on one connection. A
                     // distinct host-generated ID identifies each durable input.
                     let id = ChangeId::new(uuid::Uuid::new_v4().to_string()).map_err(host_error)?;
@@ -648,17 +653,38 @@ fn prompt_part(block: ContentBlock) -> Result<PromptPart> {
     }
 }
 
-fn prompt_parts(blocks: Vec<ContentBlock>, image_intake: bool) -> Result<Vec<PromptPart>> {
+fn prompt_parts(
+    blocks: Vec<ContentBlock>,
+    image_intake: bool,
+    embedded_context: bool,
+) -> Result<Vec<PromptPart>> {
     if blocks.len() > crate::host::MAX_PROMPT_PARTS {
         return Err(Error::invalid_params().data("invalid_prompt_parts"));
     }
-    if blocks
+    let images = blocks
         .iter()
         .filter(|block| matches!(block, ContentBlock::Image(_)))
-        .count()
-        > 1
-    {
+        .count();
+    if images > 1 {
         return Err(Error::invalid_params().data("image_count_limit"));
+    }
+    let resources = blocks
+        .iter()
+        .filter(|block| matches!(block, ContentBlock::Resource(_)))
+        .count();
+    if resources != 0 {
+        if !embedded_context {
+            return Err(Error::invalid_params().data("embedded_context_unavailable"));
+        }
+        if resources + images > 1 {
+            return Err(Error::invalid_params().data("file_attachment_count_limit"));
+        }
+        if !blocks
+            .iter()
+            .any(|block| matches!(block, ContentBlock::Text(text) if !text.text.trim().is_empty()))
+        {
+            return Err(Error::invalid_params().data("selected_file_requires_text"));
+        }
     }
     blocks
         .into_iter()
@@ -675,9 +701,41 @@ fn prompt_parts(blocks: Vec<ContentBlock>, image_intake: bool) -> Result<Vec<Pro
                         .map_err(|error| Error::invalid_params().data(error.code))?,
                 })
             }
+            ContentBlock::Resource(embedded) => {
+                let file = match embedded.resource {
+                    EmbeddedResourceResource::TextResourceContents(text) => {
+                        let name = embedded_resource_name(&text.uri)?;
+                        crate::host::FileUpload::from_text(&name, text.text)
+                    }
+                    EmbeddedResourceResource::BlobResourceContents(blob) => {
+                        let name = embedded_resource_name(&blob.uri)?;
+                        crate::host::FileUpload::decode(&name, &blob.blob)
+                    }
+                    _ => return Err(Error::invalid_params().data("embedded_resource_unsupported")),
+                };
+                Ok(PromptPart::File {
+                    file: file.map_err(host_error)?,
+                })
+            }
             other => prompt_part(other),
         })
         .collect()
+}
+
+fn embedded_resource_name(uri: &str) -> Result<String> {
+    let invalid = || Error::invalid_params().data("embedded_resource_uri_invalid");
+    if uri.len() > 4096 || uri.chars().any(char::is_control) {
+        return Err(invalid());
+    }
+    // The URI only supplies a display name. The admitted bytes come from the
+    // payload, even if a local file exists at the same URI.
+    let uri = reqwest::Url::parse(uri).map_err(|_| invalid())?;
+    Ok(uri
+        .path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .filter(|segment| !segment.is_empty())
+        .unwrap_or("attachment")
+        .to_owned())
 }
 
 fn validate_session_setup(

@@ -44,16 +44,7 @@ impl std::fmt::Debug for FileUpload {
 
 impl FileUpload {
     pub(crate) fn decode(name: &str, data: &str) -> Result<Self> {
-        if name.is_empty()
-            || name.len() > 256
-            || name.contains(['/', '\\'])
-            || name.chars().any(char::is_control)
-        {
-            return Err(problem(
-                ErrorKind::InvalidInput,
-                "retained_file_name_invalid",
-            ));
-        }
+        Self::validate_name(name)?;
         if data.len() > MAX_FILE_BYTES.div_ceil(3) * 4 {
             return Err(problem(ErrorKind::LimitExceeded, "file_size_limit"));
         }
@@ -64,6 +55,28 @@ impl FileUpload {
             return Err(problem(ErrorKind::LimitExceeded, "file_size_limit"));
         }
         Ok(Self::with_bytes(name, bytes))
+    }
+
+    pub(crate) fn from_text(name: &str, text: String) -> Result<Self> {
+        Self::validate_name(name)?;
+        if text.len() > MAX_FILE_BYTES {
+            return Err(problem(ErrorKind::LimitExceeded, "file_size_limit"));
+        }
+        Ok(Self::with_bytes(name, text.into_bytes()))
+    }
+
+    fn validate_name(name: &str) -> Result<()> {
+        if name.is_empty()
+            || name.len() > 256
+            || name.contains(['/', '\\'])
+            || name.chars().any(char::is_control)
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "retained_file_name_invalid",
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn read_selected_file(path: &Path) -> Result<Self> {

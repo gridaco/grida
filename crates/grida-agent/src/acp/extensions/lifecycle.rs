@@ -172,6 +172,7 @@ pub(super) fn handlers(
     host: Arc<Host>,
     sessions: Arc<Mutex<ConnectionSessions>>,
     image_intake: bool,
+    embedded_context: bool,
 ) -> RequestRoutes {
     let enqueue = (host.clone(), sessions.clone());
     let input = (host.clone(), sessions.clone());
@@ -194,6 +195,7 @@ pub(super) fn handlers(
                             parts: identified_prompt(
                                 request.prompt,
                                 image_intake,
+                                embedded_context,
                                 request.selected_file,
                                 &enqueue.1,
                                 request.allow_configuration_changes,
@@ -245,7 +247,7 @@ pub(super) fn handlers(
                     let edit = QueueEdit::Replace {
                         input: request.input_id,
                         replacement: request.replacement_input_id,
-                        parts: prompt_parts(request.prompt, image_intake)?,
+                        parts: prompt_parts(request.prompt, image_intake, false)?,
                         questions: questions::available(&replace.1),
                         configuration_permission: configuration_permission(
                             &replace.1,

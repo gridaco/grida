@@ -292,6 +292,13 @@ Text and resource-link descriptors are accepted as prompt content. A resource
 link supplies context about a resource. File access follows a separately granted
 capability.
 
+When a private stdio host advertises `embeddedContext`, send a text request
+with one `resource` block containing UTF-8 `text` or standard base64 `blob`.
+The host retains up to 256 KiB of supplied bytes for inspection. The URI
+provides a display name. The model can request the retained file’s size,
+SHA-256, or a UTF-8 excerpt of up to 2 KiB. Send an image or another file in a
+separate request. Shared WebSocket clients can send resource links.
+
 Stdio carries newline-delimited protocol frames with a 1 MiB frame limit and at
 most 16 unanswered requests per connection. Closing the supervising pipe starts
 bounded shutdown and requests suspension of owned work. A later host process can

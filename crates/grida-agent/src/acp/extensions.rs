@@ -190,15 +190,25 @@ impl std::fmt::Debug for SelectedFile {
 fn identified_prompt(
     prompt: Vec<ContentBlock>,
     image_intake: bool,
+    embedded_context: bool,
     file: Option<SelectedFile>,
     sessions: &Mutex<ConnectionSessions>,
     incompatible: bool,
 ) -> Result<Vec<crate::host::PromptPart>> {
-    let mut parts = prompt_parts(prompt, image_intake)?;
+    let has_embedded = prompt
+        .iter()
+        .any(|block| matches!(block, ContentBlock::Resource(_)));
+    if has_embedded && incompatible {
+        return Err(Error::invalid_params().data("selected_file_options_unsupported"));
+    }
+    let mut parts = prompt_parts(prompt, image_intake, embedded_context)?;
     if let Some(file) = file {
         require(sessions, FILE_INTAKE, None)?;
         if incompatible {
             return Err(Error::invalid_params().data("selected_file_options_unsupported"));
+        }
+        if has_embedded {
+            return Err(Error::invalid_params().data("file_attachment_count_limit"));
         }
         if !parts.iter().any(|part| matches!(part, crate::host::PromptPart::Text { text } if !text.trim().is_empty())) {
             return Err(Error::invalid_params().data("selected_file_requires_text"));
@@ -396,12 +406,14 @@ pub(super) fn handlers(
     let update_host = host.clone();
     let update_sessions = sessions.clone();
     let image_intake = reviewer && host.accepts_images();
+    let embedded_context = reviewer && host.accepts_files();
 
     RequestRoutes::default()
         .extend(lifecycle::handlers(
             host.clone(),
             sessions.clone(),
             image_intake,
+            embedded_context,
         ))
         .extend(questions::handlers(host.clone(), sessions.clone()))
         .extend(approvals::handlers(
@@ -470,6 +482,7 @@ pub(super) fn handlers(
                     let parts = identified_prompt(
                         request.prompt,
                         image_intake,
+                        embedded_context,
                         request.selected_file,
                         &submit_sessions,
                         request.allow_wakeups

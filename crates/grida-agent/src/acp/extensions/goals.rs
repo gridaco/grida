@@ -91,7 +91,7 @@ pub(super) fn handlers(
                     if request.allow_wakeups && !wakeups::available(&start.1) {
                         return Err(unavailable("wakeup_capability_required"));
                     }
-                    let parts = prompt_parts(request.prompt, image_intake)?;
+                    let parts = prompt_parts(request.prompt, image_intake, false)?;
                     let mut goal = request.goal;
                     let review = require(&start.1, CONFIRM_COMPLETION, None).is_ok();
                     if goal.user_review && !review {
