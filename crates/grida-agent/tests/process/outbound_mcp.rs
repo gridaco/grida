@@ -55,6 +55,49 @@ fn with_mcp(command: &mut Command, address: &str) {
         .env(TOKEN_ENV, MCP_TOKEN);
 }
 
+#[tokio::test]
+async fn supervised_launch_requires_a_valid_gateway_scope_before_mcp_discovery() {
+    let state = TempDir::new().unwrap();
+    let peer = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = format!("http://{}/mcp", peer.local_addr().unwrap());
+    let valid_scope = "a".repeat(64);
+    for (options, code) in [
+        (&[][..], "mcp_supervised_gateway_required"),
+        (
+            &["--supervised-chatgpt-scope", valid_scope.as_str()][..],
+            "mcp_supervised_gateway_required",
+        ),
+        (
+            &["--supervised-gateway-scope", "invalid"][..],
+            "gg_scope_invalid",
+        ),
+    ] {
+        let mut command = executable();
+        command
+            .args(["serve", "--stdio", "--supervised-provider", "--state-dir"])
+            .arg(state.path())
+            .args([
+                "--endpoint",
+                "https://gateway.example.test/api/v1/ai",
+                "--model",
+                "fixture-model",
+            ])
+            .args(options);
+        with_mcp(&mut command, &address);
+        let result = timeout(WAIT, command.output()).await.unwrap().unwrap();
+        assert!(!result.status.success());
+        assert_eq!(
+            String::from_utf8_lossy(&result.stderr).trim(),
+            format!("grida-agent: {code}")
+        );
+    }
+    assert!(
+        timeout(Duration::from_millis(100), peer.accept())
+            .await
+            .is_err()
+    );
+}
+
 fn run(state: &Path, workspace: &Path, provider: &str, peer: &str, mode: &str) -> Command {
     let mut command = executable();
     command

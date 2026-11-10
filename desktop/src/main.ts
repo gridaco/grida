@@ -42,6 +42,7 @@ import { DesktopEntryWindow } from "./main/desktop-entry-window";
 import { DesktopPreferences } from "./main/desktop-preferences";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
+import { NativeMcpLaunch } from "./main/native-mcp-launch";
 import { nativeWorkspaceCatalog } from "./main/workspace-media-access";
 import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 
@@ -583,6 +584,11 @@ app.on("ready", async () => {
   if (nativeProfile) {
     try {
       const provider = await NativeDesktopProfile.configure(app);
+      const mcp = await NativeMcpLaunch.configure(
+        process.argv,
+        app.getPath("userData"),
+        provider
+      );
       workspaceCatalog = nativeWorkspaceCatalog();
       await workspaceCatalog.initialize();
       nativeDesktopAgent = await NativeDesktopAgent.prepareFresh(
@@ -590,6 +596,7 @@ app.on("ready", async () => {
         process.resourcesPath,
         {
           provider,
+          mcp,
           openExternal: (url) => shell.openExternal(url),
           workspaceCatalogRoot: path.dirname(workspaceCatalog.directory),
         }

@@ -370,6 +370,11 @@ variable from any model credential. Repeat `--mcp-tool` for each tool you trust
 the agent to invoke in Act. A Plan-only launch skips discovery. A Plan message
 submitted to an Act host has no MCP tools.
 
+The disposable Desktop Gateway profile can also enable one local peer for a
+selected workspace through [trusted launch options](https://github.com/gridaco/grida/blob/main/desktop/README.md).
+Workspace startup can discover the peer before you select Plan. Only Act can
+invoke the allowlisted tools.
+
 Retained work keeps its original tool connection. If that connection closes,
 Stop is still available for a suspended turn. A lost reply after a tool call
 leaves an uncertain result. Reconcile it before sending new work that would

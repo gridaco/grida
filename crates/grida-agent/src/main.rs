@@ -109,7 +109,7 @@ fn command() -> Command {
                     Arg::new("supervised-provider")
                         .long("supervised-provider")
                         .requires("stdio")
-                        .conflicts_with_all(["mcp-endpoint", "headless-surface"])
+                        .conflicts_with("headless-surface")
                         .action(ArgAction::SetTrue),
                 )
                 .arg(
@@ -469,7 +469,16 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     } else {
         OperatingRegime::Act
     };
-    let mcp_client = outbound_mcp(args, regime, provider.credential_env.as_deref()).await?;
+    if supervisor.is_some()
+        && args.get_one::<String>("mcp-endpoint").is_some()
+        && (gateway_scope.is_none() || chatgpt_scope.is_some())
+    {
+        return Err(problem(
+            ErrorKind::Unsupported,
+            "mcp_supervised_gateway_required",
+        ));
+    }
+    let provider_env = provider.credential_env.clone();
     let host = match (&supervisor, gateway_scope, chatgpt_scope) {
         (Some(supervisor), _, Some(scope)) => {
             if provider.protocol != ProviderProtocol::Responses {
@@ -506,6 +515,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         }
         (None, _, _) => Host::open(state_dir, Some(provider))?,
     };
+    let mcp_client = outbound_mcp(args, regime, provider_env.as_deref()).await?;
     let host = host.with_operating_regime(regime);
     let ultra = name == "run"
         && args

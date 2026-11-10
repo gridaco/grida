@@ -1076,6 +1076,13 @@ lazy reads, read-only mutation, and symlink escape refusal.
   or authorize replay. Loss of a correlated result leaves the call
   uncertain. The [native launch](crates/grida-agent/src/main.rs) selects the
   peer and a separate environment credential before admitting work.
+  [Desktop Main](desktop/src/main/native-mcp-launch.ts) enables this path only
+  in an explicit disposable Gateway launch. It pins the selected canonical
+  workspace identity and the first exact account, organization and origin
+  scope. Main reads a bounded owner-only bearer from the protected browser
+  profile by descriptor, refuses replacement, and passes it only in the
+  selected native child's environment. Renderer, sidecar and command custody
+  remain separate. Other supervised profiles fail before discovery.
   [Turn authority](crates/grida-agent/src/host/host_tools.rs) binds the
   selected definitions to the accepted lease and excludes Plan. The opt-in
   native headless operation uses the same definition and execution as the

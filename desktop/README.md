@@ -170,6 +170,24 @@ and media still use the retained sidecar.
 This profile requires an empty legacy chat source and defaults to the Grida
 account's Gateway connection.
 
+To give one workspace access to a trusted local MCP server in this disposable
+Gateway profile, put its bearer in `native-mcp.bearer` under `--user-data-dir`.
+Use mode `0600` or `0400` and store the exact token bytes without a newline.
+Add these options to the Desktop launch:
+
+```sh
+--native-chat-mcp-root=/absolute/canonical/workspace \
+--native-chat-mcp-endpoint=http://127.0.0.1:8766/mcp \
+--native-chat-mcp-source=local --native-chat-mcp-tool=lookup
+```
+
+Open the selected folder through Desktop. Repeat `--native-chat-mcp-tool` for
+each tool the agent may invoke. The launch accepts `127.0.0.1` or `[::1]` with
+an explicit port and the stateless MCP 2026-07-28 profile. Main binds the
+selection to that folder identity and its first authenticated Gateway account,
+organization and origin for this launch. Discovery runs when that workspace's
+native process starts. Plan prompts cannot use the discovered tools.
+
 Add `--native-chat-provider=chatgpt` to explicitly select the experimental
 ChatGPT subscription profile for that disposable run. Use the existing Desktop
 ChatGPT sign-in with an eligible account. The launch uses its reviewed default

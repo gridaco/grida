@@ -15,6 +15,7 @@ import {
 import { NativeAgentCutover } from "./native-agent-cutover";
 import type { NativeChatGptHost } from "./native-chatgpt-host";
 import type { NativeDesktopProfile } from "./native-desktop-profile";
+import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
 
 const DRAIN_TIMEOUT_MS = 35_000;
@@ -44,7 +45,8 @@ export class NativeDesktopAgent {
     private readonly account: DesktopAccountSession,
     private readonly resourcesPath: string,
     private readonly subscription?: Subscription,
-    private readonly workspaceCatalogRoot?: string
+    private readonly workspaceCatalogRoot?: string,
+    private readonly mcp?: NativeMcpLaunch
   ) {
     if (subscription) {
       const { oauth } = subscription;
@@ -96,6 +98,7 @@ export class NativeDesktopAgent {
       provider: NativeDesktopProfile.Provider;
       openExternal: (url: string) => Promise<void>;
       workspaceCatalogRoot?: string;
+      mcp?: NativeMcpLaunch;
     }>
   ) {
     const cutover = await NativeAgentCutover.prepareFresh();
@@ -115,7 +118,8 @@ export class NativeDesktopAgent {
       account,
       resourcesPath,
       subscription,
-      options?.workspaceCatalogRoot
+      options?.workspaceCatalogRoot,
+      options?.mcp
     );
   }
 
@@ -190,6 +194,7 @@ export class NativeDesktopAgent {
         return {
           launch: {
             ...provider,
+            mcp: this.mcp?.forWorkspace(root),
             resourcesPath: this.resourcesPath,
             workspace: {
               id,

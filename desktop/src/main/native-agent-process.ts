@@ -9,6 +9,7 @@ import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
 import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeAgentRevisions } from "./native-agent-revisions";
+import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeAgentGoals } from "./native-agent-goals";
 import {
   NativeEditorSurfaceEndpoints,
@@ -57,6 +58,7 @@ export type NativeAgentLaunch = {
   subscriptionScope?: string;
   /** Trusted Main opt-in for the captured Gateway connection. */
   subagents?: true;
+  mcp?: NativeMcpLaunch;
   workspace?: NativeWorkspaceSelection;
   capabilities?: Readonly<Record<string, 1>>;
   onSessionUpdate?: (params: unknown) => void;
@@ -307,9 +309,20 @@ export class NativeAgentProcess {
       args.push("--supervised-chatgpt-scope", options.subscriptionScope);
     if (permissionProfile)
       args.push("--permission-profile", permissionProfile.profile);
+    const environment = nativeEnvironment();
+    if (options.mcp) {
+      if (!options.workspace || !options.gatewayScope)
+        throw new Error("native_desktop_mcp_gateway_workspace_required");
+      await options.mcp.extendChild(
+        options.workspace.primary.path,
+        options.gatewayScope,
+        args,
+        environment
+      );
+    }
     const processOwner = new NativeAgentProcess(
       spawn(executable, args, {
-        env: nativeEnvironment(),
+        env: environment,
         shell: false,
         windowsHide: true,
         stdio: "pipe",
