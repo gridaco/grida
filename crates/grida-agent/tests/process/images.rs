@@ -247,7 +247,7 @@ async fn requested_library_selection_survives_restart_and_replays_the_exact_answ
 
     let mut next = super::lifecycle::prompt_request(session, "skip", "Find another reference.");
     next["allowLibrarySelection"] = true.into();
-    let started = recovered.request("_co.grida/session/submit", next).await;
+    let started = submit_after_library_turn(&mut recovered, next).await;
     let turn = started["result"]["turnId"].as_str().unwrap();
     assert!(!endpoint.request().await.to_string().contains(&image_url));
     let waiting = wait_for_library_selection(&mut recovered, session).await;
@@ -269,7 +269,7 @@ async fn requested_library_selection_survives_restart_and_replays_the_exact_answ
     );
 
     let plain = super::lifecycle::prompt_request(session, "plain", "Continue in text.");
-    recovered.request("_co.grida/session/submit", plain).await;
+    submit_after_library_turn(&mut recovered, plain).await;
     let request = endpoint.request().await;
     assert!(
         !request["tools"]
@@ -282,6 +282,26 @@ async fn requested_library_selection_survives_restart_and_replays_the_exact_answ
     );
     recovered.close().await;
     endpoint.done().await;
+}
+
+async fn submit_after_library_turn(client: &mut StdioClient, prompt: Value) -> Value {
+    // A terminal snapshot can precede release of its in-memory worker. Retry
+    // only that admission conflict, keeping the identified input unchanged.
+    let response = timeout(WAIT, async {
+        loop {
+            let response = client
+                .request("_co.grida/session/submit", prompt.clone())
+                .await;
+            if response["error"]["data"] != "session_prompt_in_progress" {
+                return response;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("previous Library turn did not release its worker");
+    assert!(response["result"]["turnId"].is_string(), "{response}");
+    response
 }
 
 async fn wait_for_library_selection(client: &mut StdioClient, session: &str) -> Value {
