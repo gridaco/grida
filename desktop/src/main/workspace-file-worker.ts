@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — one exact workspace file operation under Seatbelt.
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
@@ -26,6 +27,16 @@ type FileRequest = {
   write?: { length: number; expectedMtime?: string };
 };
 type DirectoryEntry = Pick<WorkspaceFsEntry, "name" | "kind">;
+type NativeIdentity = WorkspaceMediaGrant["identity"];
+export type DocumentFileGrant = Readonly<{
+  path: string;
+  identity: NativeIdentity;
+  parentIdentity: NativeIdentity;
+  protected: readonly string[];
+}>;
+type WorkerScope =
+  | { workspace: WorkspaceMediaGrant }
+  | { document: DocumentFileGrant; temporary?: string };
 type Worker = {
   child: ChildProcessWithoutNullStreams;
   abort: () => void;
@@ -56,8 +67,40 @@ export class WorkspaceFileWorkers {
       path: relPath,
       ...(includeModified && { includeModified: true }),
     });
+    return await this.openBody(
+      { workspace: grant },
+      request,
+      signal,
+      includeModified
+    );
+  }
+
+  async openDocument(
+    grant: DocumentFileGrant,
+    signal: AbortSignal
+  ): Promise<WorkspaceFileBody & { mtime: number }> {
+    const request = JSON.stringify({ document: grant }) + "\n";
+    const body = await this.openBody(
+      { document: grant },
+      request,
+      signal,
+      true
+    );
+    if (body.mtime === undefined) {
+      await body.close();
+      throw unavailable();
+    }
+    return { ...body, mtime: body.mtime };
+  }
+
+  private async openBody(
+    scope: WorkerScope,
+    request: string,
+    signal: AbortSignal,
+    includeModified: boolean
+  ): Promise<WorkspaceFileBody & { mtime?: number }> {
     const { child, abort, exited, output, diagnostic } = await this.launch(
-      grant,
+      scope,
       request,
       signal
     );
@@ -106,7 +149,7 @@ export class WorkspaceFileWorkers {
   ): Promise<DirectoryEntry[]> {
     const request = frame(grant, { path: relative, listDirectory: true });
     const { child, abort, exited, output, diagnostic } = await this.launch(
-      grant,
+      { workspace: grant },
       request,
       signal
     );
@@ -156,8 +199,56 @@ export class WorkspaceFileWorkers {
         expectedMtime: expectedMtime?.toString(),
       },
     });
+    return await this.save(
+      { workspace: grant },
+      request,
+      content,
+      signal,
+      check,
+      savedWorkspace
+    );
+  }
+
+  async saveDocument(
+    grant: DocumentFileGrant,
+    content: Buffer,
+    expectedMtime: number,
+    signal: AbortSignal,
+    check: () => void
+  ): Promise<{ mtime: number; identity: NativeIdentity }> {
+    if (!Number.isFinite(expectedMtime)) throw unavailable();
+    const temporary = `.grida-save-${randomUUID()}.tmp`;
+    const request =
+      JSON.stringify({
+        document: {
+          ...grant,
+          write: {
+            length: content.length,
+            expectedMtime: expectedMtime.toString(),
+            temporary,
+          },
+        },
+      }) + "\n";
+    return await this.save(
+      { document: grant, temporary },
+      request,
+      content,
+      signal,
+      check,
+      savedDocument
+    );
+  }
+
+  private async save<T>(
+    scope: WorkerScope,
+    request: string,
+    content: Buffer,
+    signal: AbortSignal,
+    check: () => void,
+    receipt: (response: unknown) => T
+  ): Promise<T> {
     const { child, abort, exited, output, diagnostic } = await this.launch(
-      grant,
+      scope,
       request,
       signal,
       check
@@ -166,19 +257,13 @@ export class WorkspaceFileWorkers {
     try {
       child.stdin.write(request);
       child.stdin.end(content);
-      const response = await readJsonFrame(output, MAX_HEADER_BYTES);
+      const response = await readJsonFrame(
+        output,
+        "document" in scope ? 256 : MAX_HEADER_BYTES
+      );
       if (!(await output.next()).done) throw unavailable();
       await verifyExit(exited, abort);
-      if (
-        !response ||
-        typeof response !== "object" ||
-        Object.keys(response).length !== 1 ||
-        !("mtime" in response) ||
-        typeof response.mtime !== "number" ||
-        !Number.isFinite(response.mtime)
-      )
-        throw unavailable();
-      return { mtime: response.mtime };
+      return receipt(response);
     } catch {
       abort();
       const closed = await exitWithin(exited);
@@ -201,7 +286,7 @@ export class WorkspaceFileWorkers {
   }
 
   private async launch(
-    grant: WorkspaceMediaGrant,
+    scope: WorkerScope,
     request: string,
     signal: AbortSignal,
     admitWrite?: () => void
@@ -218,12 +303,15 @@ export class WorkspaceFileWorkers {
     const child = spawn(
       "/usr/bin/sandbox-exec",
       [
-        ...sandboxArguments(executable, grant, admitWrite !== undefined),
+        ...sandboxArguments(executable, scope, admitWrite !== undefined),
         executable,
         "workspace-file",
       ],
       {
-        cwd: grant.root,
+        cwd:
+          "workspace" in scope
+            ? scope.workspace.root
+            : path.dirname(scope.document.path),
         env: {},
         stdio: ["pipe", "pipe", "pipe"],
       }
@@ -338,6 +426,39 @@ async function readMetadata(
   return { size, mtime: parsed.mtime };
 }
 
+function savedMtime(response: unknown, length: number): number {
+  if (
+    !response ||
+    typeof response !== "object" ||
+    Object.keys(response).length !== length ||
+    !("mtime" in response) ||
+    typeof response.mtime !== "number" ||
+    !Number.isFinite(response.mtime)
+  )
+    throw unavailable();
+  return response.mtime;
+}
+
+function savedWorkspace(response: unknown) {
+  return { mtime: savedMtime(response, 1) };
+}
+
+function savedDocument(response: unknown) {
+  const mtime = savedMtime(response, 2);
+  const { identity } = response as { identity?: unknown };
+  if (
+    !identity ||
+    typeof identity !== "object" ||
+    Object.keys(identity).length !== 3 ||
+    !["device", "inode", "birthTimeNs"].every((key) => {
+      const value = (identity as Record<string, unknown>)[key];
+      return typeof value === "string" && /^\d{1,39}$/.test(value);
+    })
+  )
+    throw unavailable();
+  return { mtime, identity: identity as NativeIdentity };
+}
+
 async function readJsonFrame(
   output: AsyncIterator<Buffer>,
   limit: number
@@ -427,25 +548,51 @@ async function installedAgent(resourcesPath: string) {
 
 function sandboxArguments(
   executable: string,
-  grant: WorkspaceMediaGrant,
+  scope: WorkerScope,
   write: boolean
 ) {
   const rules = [
     "(version 1)",
     "(deny default)",
     '(allow process-exec file-read* file-map-executable (literal (param "EXE")))',
-    '(allow file-read* (subpath (param "ROOT")))',
-    '(allow file-read-metadata file-test-existence (path-ancestors (param "EXE")) (path-ancestors (param "ROOT")))',
+    '(allow file-read-metadata file-test-existence (path-ancestors (param "EXE")))',
     '(allow file-read* file-map-executable (subpath "/System/Library") (subpath "/usr/lib"))',
     '(allow file-read* file-test-existence (literal "/"))',
     '(allow file-read* file-write-data (literal "/dev/null"))',
     '(allow sysctl-read (sysctl-name "hw.logicalcpu") (sysctl-name "hw.activecpu") (sysctl-name "hw.pagesize") (sysctl-name "hw.pagesize_compat"))',
   ];
-  if (write)
+  const args = ["-D", `EXE=${executable}`];
+  if ("workspace" in scope) {
+    args.push("-D", `ROOT=${scope.workspace.root}`);
     rules.push(
-      '(allow file-write* (require-all (subpath (param "ROOT")) (require-not (literal (param "ROOT")))))'
+      '(allow file-read* (subpath (param "ROOT")))',
+      '(allow file-read-metadata file-test-existence (path-ancestors (param "ROOT")))'
     );
-  const args = ["-D", `EXE=${executable}`, "-D", `ROOT=${grant.root}`];
+    if (write)
+      rules.push(
+        '(allow file-write* (require-all (subpath (param "ROOT")) (require-not (literal (param "ROOT")))))'
+      );
+  } else {
+    const parent = path.dirname(scope.document.path);
+    args.push(
+      "-D",
+      `PARENT=${parent}`,
+      "-D",
+      `DOCUMENT=${scope.document.path}`
+    );
+    rules.push(
+      '(allow file-read-metadata file-test-existence (path-ancestors (param "PARENT")) (literal (param "PARENT")))',
+      '(allow file-read* (literal (param "DOCUMENT")))'
+    );
+    if (scope.temporary) {
+      args.push("-D", `STAGED=${path.join(parent, scope.temporary)}`);
+      rules.push(
+        '(allow file-read-metadata file-test-existence (literal (param "STAGED")))',
+        '(allow file-write* (literal (param "DOCUMENT")) (literal (param "STAGED")))'
+      );
+    }
+  }
+  const grant = "workspace" in scope ? scope.workspace : scope.document;
   grant.protected.forEach((target, index) => {
     const key = `P${index}`;
     args.push("-D", `${key}=${target}`);
@@ -457,6 +604,7 @@ function sandboxArguments(
 }
 
 const definitiveWriteErrors = new Set([
+  "document_file_changed",
   "workspace_write_modified_since",
   "workspace_write_type_unsupported",
   "workspace_write_failed",
@@ -480,6 +628,8 @@ const definitiveWriteErrors = new Set([
 function workerError(diagnostic: string, error: unknown) {
   const code = workerCode(diagnostic);
   switch (code) {
+    case "document_file_changed":
+      return new WorkspaceMediaError(409, code);
     case "workspace_directory_limit":
       return new WorkspaceMediaError(413, code);
     case "file_unavailable":

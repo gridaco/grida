@@ -139,21 +139,25 @@ fn same_file(first: &File, second: &File) -> Result<bool> {
     Ok(a.dev() == b.dev() && a.ino() == b.ino())
 }
 
-struct Staged<'a> {
+pub(super) struct Staged<'a> {
     parent: &'a File,
-    file: File,
-    name: String,
+    pub(super) file: File,
+    pub(super) name: String,
     identity: Stat,
 }
 
 impl<'a> Staged<'a> {
     fn create(parent: &'a File) -> Result<Self> {
         let name = format!(".grida-save-{}.tmp", Uuid::new_v4());
+        Self::create_named(parent, name, Mode::from_bits_truncate(0o644))
+    }
+
+    pub(super) fn create_named(parent: &'a File, name: String, mode: Mode) -> Result<Self> {
         let file: File = openat(
             parent,
             name.as_str(),
             OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-            Mode::from_bits_truncate(0o644),
+            mode,
         )
         .map_err(|_| failed())?
         .into();
@@ -172,7 +176,7 @@ impl<'a> Staged<'a> {
             && stat.st_nlink == 1
     }
 
-    fn owns_name(&self) -> bool {
+    pub(super) fn owns_name(&self) -> bool {
         statat(self.parent, self.name.as_str(), AtFlags::SYMLINK_NOFOLLOW)
             .is_ok_and(|stat| self.matches(&stat))
     }

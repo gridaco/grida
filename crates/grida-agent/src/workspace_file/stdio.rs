@@ -11,11 +11,19 @@ use std::time::UNIX_EPOCH;
 const MAX_FRAME: usize = 32 * 1024;
 
 #[derive(Deserialize)]
+#[serde(untagged)]
+enum Request {
+    #[cfg(target_os = "macos")]
+    Document(super::document::Request),
+    Workspace(OpenRequest),
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct OpenRequest {
     workspace_id: BindingId,
     root: PathBuf,
-    identity: RootIdentity,
+    identity: NativeIdentity,
     protected: Vec<PathBuf>,
     path: PathBuf,
     #[serde(default)]
@@ -37,24 +45,38 @@ struct Saved {
     mtime: f64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct RootIdentity {
+pub(super) struct NativeIdentity {
     device: String,
     inode: String,
     birth_time_ns: String,
 }
 
-impl RootIdentity {
-    fn matches(&self, metadata: &std::fs::Metadata) -> bool {
+impl NativeIdentity {
+    #[cfg(target_os = "macos")]
+    pub(super) fn capture(metadata: &std::fs::Metadata) -> Result<Self> {
+        Ok(Self {
+            device: metadata.dev().to_string(),
+            inode: metadata.ino().to_string(),
+            birth_time_ns: birth_time_ns(metadata).ok_or_else(unavailable)?,
+        })
+    }
+
+    pub(super) fn matches(&self, metadata: &std::fs::Metadata) -> bool {
         self.device == metadata.dev().to_string()
             && self.inode == metadata.ino().to_string()
-            && metadata
-                .created()
-                .ok()
-                .and_then(|created| created.duration_since(UNIX_EPOCH).ok())
-                .is_some_and(|created| self.birth_time_ns == created.as_nanos().to_string())
+            && birth_time_ns(metadata).is_some_and(|birth| self.birth_time_ns == birth)
     }
+}
+
+fn birth_time_ns(metadata: &std::fs::Metadata) -> Option<String> {
+    metadata.created().ok().and_then(|created| {
+        created
+            .duration_since(UNIX_EPOCH)
+            .ok()
+            .map(|elapsed| elapsed.as_nanos().to_string())
+    })
 }
 
 #[derive(Serialize)]
@@ -66,9 +88,9 @@ struct Opened {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Span {
-    offset: String,
-    length: String,
+pub(super) struct Span {
+    pub(super) offset: String,
+    pub(super) length: String,
 }
 
 /// Serve one file operation on the trusted owner's inherited pipes. The caller owns
@@ -78,7 +100,13 @@ pub fn serve_stdio() -> Result<()> {
     let mut input = stdin.lock();
     let stdout = io::stdout();
     let mut output = stdout.lock();
-    let request = frame::<OpenRequest>(&mut input)?.ok_or_else(invalid_frame)?;
+    let request = match frame::<Request>(&mut input)?.ok_or_else(invalid_frame)? {
+        #[cfg(target_os = "macos")]
+        Request::Document(request) => {
+            return super::document::serve(&mut input, &mut output, request);
+        }
+        Request::Workspace(request) => request,
+    };
     if (request.list_directory && request.include_modified)
         || (request.write.is_some() && (request.list_directory || request.include_modified))
     {
@@ -212,7 +240,7 @@ pub fn serve_stdio() -> Result<()> {
     Ok(())
 }
 
-fn milliseconds(time: SystemTime) -> f64 {
+pub(super) fn milliseconds(time: SystemTime) -> f64 {
     let nanoseconds = match time.duration_since(UNIX_EPOCH) {
         Ok(duration) => duration.as_nanos() as i128,
         Err(before_epoch) => -(before_epoch.duration().as_nanos() as i128),
@@ -222,7 +250,7 @@ fn milliseconds(time: SystemTime) -> f64 {
     node_mtime_ms(seconds, nanos)
 }
 
-fn frame<T: for<'de> Deserialize<'de>>(input: &mut impl BufRead) -> Result<Option<T>> {
+pub(super) fn frame<T: for<'de> Deserialize<'de>>(input: &mut impl BufRead) -> Result<Option<T>> {
     let mut line = Vec::new();
     let length = input
         .take((MAX_FRAME + 1) as u64)
@@ -239,10 +267,10 @@ fn frame<T: for<'de> Deserialize<'de>>(input: &mut impl BufRead) -> Result<Optio
         .map_err(|_| invalid_frame())
 }
 
-fn invalid_frame() -> Error {
+pub(super) fn invalid_frame() -> Error {
     Error::new(ErrorKind::InvalidInput, "workspace_file_frame_invalid")
 }
 
-fn output_failed() -> Error {
+pub(super) fn output_failed() -> Error {
     Error::new(ErrorKind::Unavailable, "workspace_file_output_unavailable")
 }

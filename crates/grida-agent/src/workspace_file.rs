@@ -1,6 +1,8 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — ranged reads from one authorized native directory.
 
 mod directory;
+#[cfg(target_os = "macos")]
+mod document;
 mod stdio;
 mod write;
 pub use stdio::serve_stdio;

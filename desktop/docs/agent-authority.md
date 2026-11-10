@@ -416,6 +416,16 @@ Main's workspace Trash helper covers one path-checked native operation.
 Moving file I/O out of the compatibility process requires equivalent
 per-workspace containment and the existing exact registered-handle checks.
 
+The private selected-document worker on macOS uses a separate Seatbelt
+scope. The caller supplies a canonical file and the captured native
+identities of the file and parent. The worker can traverse the parent
+without listing it. A read exposes only the selected regular file. A save
+can replace that file through one private sibling created for the request.
+It checks the captured identity and modification time before replacement
+and returns the new identity after verifying the write. Document bytes
+stream in bounded chunks without the workspace text writer's size limit.
+Desktop's standalone window still uses its compatibility route.
+
 The native workspace reader can open one registered directory's file and
 stream an exact byte span from the descriptor used for metadata. It checks
 the registered directory's native identity and protected roots, then
