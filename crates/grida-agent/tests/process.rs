@@ -45,6 +45,9 @@ mod lifecycle;
 #[path = "process/live.rs"]
 mod live;
 #[cfg(unix)]
+#[path = "process/operating_regime.rs"]
+mod operating_regime;
+#[cfg(unix)]
 #[path = "process/questions.rs"]
 mod questions;
 #[path = "process/responses.rs"]

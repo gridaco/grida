@@ -31,6 +31,16 @@ pub enum ConfigurationPermission {
     Change,
 }
 
+impl ConfigurationPermission {
+    pub(crate) fn for_regime(self, regime: crate::OperatingRegime) -> Self {
+        if regime == crate::OperatingRegime::Plan && self == Self::Change {
+            Self::Inspect
+        } else {
+            self
+        }
+    }
+}
+
 pub(crate) struct ConfigurationAccess {
     read: GrantSelection,
     change: GrantSelection,

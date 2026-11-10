@@ -366,6 +366,53 @@ async fn unrelated_cwd_does_not_inherit_launch_permissions() {
 
 #[tokio::test]
 #[ignore = "requires a reviewed native helper and OS confinement"]
+async fn plan_can_read_but_does_not_offer_the_provisioned_command_tool() {
+    let fixture = Fixture::new(true);
+    fs::write(fixture.primary.join("note"), "permitted plan input").unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("read_file", r#"{"path":"note"}"#),
+        Reply::Finished("Proposed result and verification."),
+    ])
+    .await;
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .args(["--mode", "plan", "--prompt", "Plan using the note"])
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let first = endpoint.request().await;
+    let tools = first["tools"].as_array().unwrap();
+    assert!(
+        tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == "read_file")
+    );
+    assert!(
+        !tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == "run_command")
+    );
+    assert!(
+        endpoint.request().await["messages"]
+            .to_string()
+            .contains("permitted plan input")
+    );
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
 async fn approved_native_command_dispatches_the_exact_scope_once_after_restart() {
     let fixture = Fixture::new(true);
     let arguments = Box::leak(

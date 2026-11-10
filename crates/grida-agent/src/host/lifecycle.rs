@@ -30,6 +30,8 @@ pub struct TurnControl {
 #[serde(rename_all = "camelCase")]
 pub struct InputSettings {
     pub model: Option<agent_kit_core::ModelId>,
+    #[serde(default)]
+    pub operating_regime: OperatingRegime,
     pub max_input_tokens: Option<u64>,
     pub max_output_tokens: Option<u64>,
     #[serde(default)]
@@ -66,6 +68,7 @@ impl InputSettings {
                 let stored: StoredPrompt = decode_input(input)?;
                 Ok(Self {
                     model: stored.model,
+                    operating_regime: stored.operating_regime,
                     max_input_tokens: stored
                         .configuration
                         .defaults
@@ -79,7 +82,9 @@ impl InputSettings {
                         Some(goals::GoalInput::Start(goal)) => Some(goal),
                         _ => None,
                     },
-                    configuration_permission: stored.configuration_permission,
+                    configuration_permission: stored
+                        .configuration_permission
+                        .for_regime(stored.operating_regime),
                     skills: stored
                         .guidance
                         .as_ref()
@@ -262,11 +267,14 @@ impl Host {
             } => {
                 validate_prompt_parts(&parts)?;
                 let original = self.store.input(session.clone(), input.clone()).await?;
-                if let Some(original) = original.as_ref()
-                    && original.disposition == InputDisposition::Queued
-                    && InputSettings::for_input(&original.input)?
-                        .goal_start
-                        .is_some()
+                let original_settings = original
+                    .as_ref()
+                    .filter(|input| input.disposition == InputDisposition::Queued)
+                    .map(|input| InputSettings::for_input(&input.input))
+                    .transpose()?;
+                if original_settings
+                    .as_ref()
+                    .is_some_and(|settings| settings.goal_start.is_some())
                 {
                     return Err(problem(
                         ErrorKind::Conflict,
@@ -283,13 +291,22 @@ impl Host {
                 } else {
                     let view = self.store.inspect(session.clone()).await?;
                     self.check_execution(&view)?;
-                    self.capture_submission(
+                    let operating_regime = if !self.operating_regime.is_act() {
+                        self.operating_regime
+                    } else {
+                        original_settings
+                            .map_or(self.operating_regime, |settings| settings.operating_regime)
+                    };
+                    self.capture_input(
                         &view,
                         replacement,
                         parts,
-                        questions,
-                        configuration_permission,
-                        false,
+                        SubmissionPolicy {
+                            questions,
+                            configuration_permission,
+                            allow_wakeups: false,
+                            operating_regime,
+                        },
                     )
                     .await?
                 };

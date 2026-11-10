@@ -401,11 +401,11 @@ impl TurnPermissions {
         selection == &self.files || selection == &self.commands
     }
 
-    pub fn insert(
+    pub(crate) fn insert_file_tools(
         self: &Arc<Self>,
         inventory: &mut Inventory,
         grants: &mut BTreeMap<ToolId, GrantSelection>,
-    ) -> Result<Option<Arc<CommandTool>>> {
+    ) -> Result<()> {
         if self
             .profile
             .directories
@@ -422,6 +422,15 @@ impl TurnPermissions {
                 grants.insert(tool.definition().id.clone(), self.files.clone());
             }
         }
+        Ok(())
+    }
+
+    pub fn insert(
+        self: &Arc<Self>,
+        inventory: &mut Inventory,
+        grants: &mut BTreeMap<ToolId, GrantSelection>,
+    ) -> Result<Option<Arc<CommandTool>>> {
+        self.insert_file_tools(inventory, grants)?;
         let Some(command) = self.profile.command.as_ref().filter(|_| {
             self.profile.directories.values().any(|rule| {
                 rule.command_read != AccessRule::Deny || rule.command_read_write != AccessRule::Deny

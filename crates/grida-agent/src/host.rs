@@ -61,7 +61,7 @@ use agent_kit_sessions::{
 use agent_kit_store_sqlite::SqliteStore;
 use grida_agent_master::configuration::SettingChange;
 use grida_agent_master::hooks::CompletionChecks;
-use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome};
+use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome, OperatingRegime};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, VecDeque};
 use std::num::NonZeroU64;
@@ -99,6 +99,7 @@ pub struct Host {
     gg_connection: Option<Arc<GgConnection>>,
     configuration: Option<Arc<Configuration>>,
     permissions: Option<Arc<crate::permissions::PermissionProfile>>,
+    operating_regime: OperatingRegime,
     require_completion_text: bool,
     side_context: Option<Arc<grida_agent_master::side_context::SideContext>>,
     #[cfg(unix)]
@@ -245,6 +246,8 @@ struct StoredPrompt {
     max_steps: Option<u32>,
     model: Option<agent_kit_core::ModelId>,
     authority: Option<CapturedAuthority>,
+    #[serde(default, skip_serializing_if = "OperatingRegime::is_act")]
+    operating_regime: OperatingRegime,
     #[serde(default)]
     questions: bool,
     #[serde(default)]
@@ -265,6 +268,13 @@ struct StoredPrompt {
 struct CapturedAuthority {
     principal: PrincipalId,
     scope: ScopeId,
+}
+
+struct SubmissionPolicy {
+    questions: bool,
+    configuration_permission: crate::ConfigurationPermission,
+    allow_wakeups: bool,
+    operating_regime: OperatingRegime,
 }
 
 enum InputAuthority {
@@ -331,6 +341,7 @@ enum TurnWork {
 
 struct PreparedInput {
     config: MasterConfig,
+    operating_regime: OperatingRegime,
     messages: Vec<Message>,
     limit: Option<NonZeroU64>,
     questions: bool,
@@ -501,6 +512,7 @@ impl Host {
             gg_connection: None,
             configuration,
             permissions: None,
+            operating_regime: OperatingRegime::default(),
             require_completion_text: false,
             side_context: None,
             #[cfg(unix)]
@@ -516,6 +528,12 @@ impl Host {
 
     pub(crate) fn observe_text(&self) -> broadcast::Receiver<live::LiveText> {
         self.live_text.subscribe()
+    }
+
+    /// Select the allowed regime for new work without widening retained work.
+    pub fn with_operating_regime(mut self, regime: OperatingRegime) -> Self {
+        self.operating_regime = regime;
+        self
     }
 
     pub async fn new_session(&self, cwd: PathBuf) -> Result<SessionId> {
@@ -968,6 +986,7 @@ impl Host {
         let image = execution
             .images
             .as_ref()
+            .filter(|_| prepared.operating_regime.is_act())
             .map(|images| {
                 image_tools::TurnImage::bind(
                     images.clone(),
@@ -1046,10 +1065,15 @@ impl Host {
         let mut authority = execution.authority.clone();
         let operations = opened.turn.operations();
         let mut inventory = Inventory::new();
-        let command = if let Some(permissions) = permission_scope {
-            permissions.insert(&mut inventory, &mut authority.tools)?
-        } else {
-            None
+        let command = match permission_scope {
+            Some(permissions) if prepared.operating_regime.is_act() => {
+                permissions.insert(&mut inventory, &mut authority.tools)?
+            }
+            Some(permissions) => {
+                permissions.insert_file_tools(&mut inventory, &mut authority.tools)?;
+                None
+            }
+            None => None,
         };
         if let Some(image) = image {
             image.insert(&mut inventory, &mut authority.tools)?;
@@ -1200,6 +1224,36 @@ impl Host {
         configuration_permission: crate::ConfigurationPermission,
         allow_wakeups: bool,
     ) -> Result<Submission> {
+        self.capture_input(
+            session,
+            id,
+            parts,
+            SubmissionPolicy {
+                questions,
+                configuration_permission,
+                allow_wakeups,
+                operating_regime: self.operating_regime,
+            },
+        )
+        .await
+    }
+
+    async fn capture_input(
+        &self,
+        session: &SessionView,
+        id: ChangeId,
+        parts: Vec<PromptPart>,
+        policy: SubmissionPolicy,
+    ) -> Result<Submission> {
+        let SubmissionPolicy {
+            questions,
+            configuration_permission,
+            allow_wakeups,
+            operating_regime,
+        } = policy;
+        if !operating_regime.is_act() && allow_wakeups {
+            return Err(problem(ErrorKind::Unsupported, "plan_wakeups_unavailable"));
+        }
         validate_prompt_parts(&parts)?;
         let execution = self.execution()?;
         let configuration = self.with_configuration(Configuration::snapshot).await?;
@@ -1260,6 +1314,7 @@ impl Host {
                         principal: execution.authority.inference.authority.principal.clone(),
                         scope: execution.authority.inference.authority.scope.clone(),
                     }),
+                    operating_regime,
                     questions,
                     allow_wakeups,
                     configuration_permission,
@@ -1290,6 +1345,7 @@ impl Host {
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
         let (
             messages,
+            operating_regime,
             limit,
             questions,
             allow_wakeups,
@@ -1305,6 +1361,7 @@ impl Host {
                 config.max_steps = 1;
                 (
                     decode_input(input)?,
+                    OperatingRegime::Act,
                     None,
                     false,
                     false,
@@ -1318,6 +1375,13 @@ impl Host {
             }
             2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
+                if !cancellation_only
+                    && !self.operating_regime.is_act()
+                    && stored.operating_regime.is_act()
+                {
+                    return Err(problem(ErrorKind::Conflict, "retained_act_requires_act"));
+                }
+                stored.operating_regime.apply(&mut config);
                 authority.validate(
                     stored.authority.as_ref(),
                     &execution.authority.inference.authority,
@@ -1360,10 +1424,13 @@ impl Host {
                 };
                 (
                     messages,
+                    stored.operating_regime,
                     stored.configuration.defaults.context.max_input_tokens,
                     stored.questions,
-                    !cancellation_only && stored.allow_wakeups,
-                    stored.configuration_permission,
+                    !cancellation_only && stored.operating_regime.is_act() && stored.allow_wakeups,
+                    stored
+                        .configuration_permission
+                        .for_regime(stored.operating_regime),
                     Some(stored.configuration),
                     if cancellation_only {
                         None
@@ -1400,6 +1467,7 @@ impl Host {
         }
         Ok(PreparedInput {
             config,
+            operating_regime,
             messages,
             limit,
             questions,

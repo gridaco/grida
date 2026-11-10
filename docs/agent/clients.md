@@ -86,7 +86,7 @@ disposition when output remains available.
 | 1         | Failed request, execution, or output delivery          |
 | 4         | Verified suspension                                    |
 | 5         | Uncertain execution or unverified shutdown             |
-| 6         | Input required with a retained question                |
+| 6         | Input required with a retained question or approval    |
 | 130       | Stopped task or process signal                         |
 
 After an output failure, use the accepted identifiers to inspect retained state.
@@ -96,6 +96,23 @@ Use `run --questions` to enable structured questions in an embedded run. When
 an answer is needed, the process verifies suspension and returns `input_required`
 with the session, turn, and pending question identities. A capable service client
 can answer the retained question through the same state directory.
+
+If a granted launch profile requires human approval for a tool action, the
+same exit code identifies the retained approval. Only a host-authorized
+reviewer can answer that approval. A general ACP observer can inspect it.
+
+### Plan before carrying out a task
+
+Use `--mode plan` with `run` or `serve` to investigate and prepare a proposal.
+The agent can read permitted material and ask enabled questions. Commands,
+working-copy edits, settings changes through agent tools, and timed wake-ups
+are unavailable in Plan.
+
+To authorize execution, open the same chat with `--mode act` and submit a new
+prompt. Act is the default and still uses your selected permissions. Previously
+accepted Plan inputs keep their limits through queue edits and restart. A host
+launched in Plan can inspect or stop retained Act work. Continuing that work
+requires an Act launch.
 
 ### Require a completion check
 

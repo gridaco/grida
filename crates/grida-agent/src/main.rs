@@ -2,7 +2,9 @@ use agent_kit_core::{Error, ErrorKind, ModelId, Result, SessionId};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
 use grida_agent::host::{GgOptions, Host};
 use grida_agent::process::{self, RunOptions};
-use grida_agent::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol, acp, mcp};
+use grida_agent::{
+    CompatibleOutputLimitField, OperatingRegime, ProviderOptions, ProviderProtocol, acp, mcp,
+};
 use serde_json::json;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -175,6 +177,13 @@ fn state_dir() -> Arg {
 fn launch(command: Command) -> Command {
     command
         .arg(state_dir())
+        .arg(
+            Arg::new("mode")
+                .long("mode")
+                .value_parser(["act", "plan"])
+                .default_value("act")
+                .help("Choose authorized execution or investigation and proposal only"),
+        )
         .arg(
             Arg::new("require-completion-text")
                 .long("require-completion-text")
@@ -367,6 +376,15 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         }
         (None, _, _) => Host::open(state_dir, Some(provider))?,
     };
+    let regime = if args
+        .get_one::<String>("mode")
+        .is_some_and(|mode| mode == "plan")
+    {
+        OperatingRegime::Plan
+    } else {
+        OperatingRegime::Act
+    };
+    let host = host.with_operating_regime(regime);
     let host = match permissions {
         Some(profile) => host.with_permission_profile(profile),
         None => host,

@@ -25,3 +25,4 @@ pub use http::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol};
 pub use supervised_provider::SupervisedProvider;
 
 pub use configuration_tools::ConfigurationPermission;
+pub use grida_agent_master::OperatingRegime;

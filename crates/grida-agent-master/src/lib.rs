@@ -37,6 +37,26 @@ use std::sync::Arc;
 const CONTINUATION_SCHEMA: &str = "grida.agent.conversation";
 const ACCOUNT_SCHEMA: &str = "grida.agent.account";
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OperatingRegime {
+    #[default]
+    Act,
+    Plan,
+}
+
+impl OperatingRegime {
+    pub fn is_act(&self) -> bool {
+        *self == Self::Act
+    }
+
+    pub fn apply(self, config: &mut MasterConfig) {
+        if self == Self::Plan {
+            config.instructions.push_str("\n\nPlan is active. Investigate permitted material and ask useful questions. End with a reviewable proposal describing the intended outcome, important decisions, and how to verify the work. Leave execution for an explicitly authorized Act turn.");
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MasterConfig {
     pub model: agent_kit_core::ModelId,
