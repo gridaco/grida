@@ -151,6 +151,7 @@ struct Execution {
     configuration_tools: Arc<ConfigurationAccess>,
     images: Option<Arc<retained_inputs::RetainedInputs>>,
     workspace_vision: bool,
+    tool_result_images: bool,
     retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
 }
 
@@ -1698,7 +1699,7 @@ impl Host {
         let configuration = self.with_configuration(Configuration::snapshot).await?;
         let child_work = subagent.is_some();
         if allow_library_selection
-            && (!execution.workspace_vision || child_work || self.side_context.is_some())
+            && (!execution.tool_result_images || child_work || self.side_context.is_some())
         {
             return Err(problem(
                 ErrorKind::Unsupported,
@@ -1935,7 +1936,7 @@ impl Host {
                 }
                 if !cancellation_only
                     && stored.allow_library_selection
-                    && !execution.workspace_vision
+                    && !execution.tool_result_images
                 {
                     return Err(problem(
                         ErrorKind::Unsupported,
@@ -2556,11 +2557,12 @@ impl Execution {
         let configuration = transport.selection();
         let binding = transport.binding().clone();
         let mut capabilities = text_capabilities(options.protocol.as_str())?;
+        let compatible_png = transport.accepts_compatible_png(&options.model);
         let image_profile = if options.protocol == ProviderProtocol::Responses
             && options.model.as_str() == "gpt-5.4"
         {
             Some("responses-image-tools-v1")
-        } else if transport.accepts_compatible_png(&options.model) {
+        } else if compatible_png {
             Some("openrouter-png-tools-v1")
         } else {
             None
@@ -2573,6 +2575,7 @@ impl Execution {
             None
         };
         let workspace_vision = images.is_some() && options.protocol == ProviderProtocol::Responses;
+        let compatible_tool_images = compatible_png && images.is_some();
         let image_resolver = images.as_ref().map(|images| {
             let images = images.clone();
             Arc::new(move |media: &agent_kit_core::messages::MediaRef, maximum| {
@@ -2580,25 +2583,34 @@ impl Execution {
             }) as Arc<agent_kit_providers::InputImageResolver>
         });
         let provider: Arc<dyn Provider> = match options.protocol {
-            ProviderProtocol::OpenAiCompatible => Arc::new(OpenAiCompatible::with_image_resolver(
-                binding.clone(),
-                BTreeMap::from([(
-                    options.model.clone(),
-                    ModelProfile {
-                        capabilities,
-                        output_limit: match options.compatible_output_limit_field {
-                            Some(CompatibleOutputLimitField::MaxTokens) => OutputLimitField::Tokens,
-                            Some(CompatibleOutputLimitField::MaxCompletionTokens) | None => {
-                                OutputLimitField::CompletionTokens
-                            }
+            ProviderProtocol::OpenAiCompatible => {
+                let provider = OpenAiCompatible::with_image_resolver(
+                    binding.clone(),
+                    BTreeMap::from([(
+                        options.model.clone(),
+                        ModelProfile {
+                            capabilities,
+                            output_limit: match options.compatible_output_limit_field {
+                                Some(CompatibleOutputLimitField::MaxTokens) => {
+                                    OutputLimitField::Tokens
+                                }
+                                Some(CompatibleOutputLimitField::MaxCompletionTokens) | None => {
+                                    OutputLimitField::CompletionTokens
+                                }
+                            },
+                            include_usage: true,
                         },
-                        include_usage: true,
-                    },
-                )]),
-                transport.clone(),
-                PROVIDER_LIMITS,
-                image_resolver,
-            )?),
+                    )]),
+                    transport.clone(),
+                    PROVIDER_LIMITS,
+                    image_resolver,
+                )?;
+                Arc::new(if compatible_tool_images {
+                    provider.with_retained_png_tool_results()
+                } else {
+                    provider
+                })
+            }
             ProviderProtocol::Anthropic => Arc::new(Anthropic::new(
                 binding.clone(),
                 BTreeMap::from([(options.model.clone(), capabilities)]),
@@ -2650,6 +2662,7 @@ impl Execution {
         )?;
         execution.images = images;
         execution.workspace_vision = workspace_vision;
+        execution.tool_result_images = workspace_vision || compatible_tool_images;
         Ok(execution)
     }
 
@@ -2779,6 +2792,7 @@ impl Execution {
             configuration_tools,
             images: None,
             workspace_vision: false,
+            tool_result_images: false,
             retained_inputs: None,
         })
     }

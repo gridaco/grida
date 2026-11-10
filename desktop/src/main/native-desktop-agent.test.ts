@@ -9,6 +9,7 @@ import path from "node:path";
 import { beforeEach, expect, it, vi } from "vitest";
 import { CHATGPT_RESPONSES_URL } from "../chatgpt-configuration";
 import { DesktopAccountSession } from "./account-session";
+import { NativeAgentProcess } from "./native-agent-process";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import { NativeProviderSelection } from "./native-provider-selection";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
@@ -67,6 +68,200 @@ beforeEach(() => {
   sidecar.nativeAgentGatewayConnection.mockClear();
   sidecar.listGatewayModels.mockResolvedValue([]);
 });
+
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "delivers a selected Library PNG on the approved OpenRouter tool continuation",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(
+        await fs.realpath(os.tmpdir()),
+        "grida-native-library-provider-"
+      )
+    );
+    const credentialHome = path.join(root, "credentials");
+    const cwd = path.join(root, "workspace");
+    const model = "openai/gpt-5.6-terra";
+    const key = "library-provider-fixture-key";
+    const list = "co.grida/session/library-selections";
+    const answer = "co.grida/session/answer-library-selection";
+    const query = "Geometric prints";
+    const selectedId = "d365c5fb-5833-48e9-a081-ae6d52c9b49c";
+    let requestCount = 0;
+    const dispatch = vi.fn<(body: Buffer) => Promise<Response>>(async () => {
+      const first = requestCount++ === 0;
+      const chunk = {
+        id: "library-provider-fixture",
+        choices: [
+          {
+            index: 0,
+            delta: first
+              ? {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "library-fixture-call",
+                      type: "function",
+                      function: {
+                        name: "design_search",
+                        arguments: JSON.stringify({
+                          initial_search_query: query,
+                        }),
+                      },
+                    },
+                  ],
+                }
+              : { content: "Received the reference." },
+            finish_reason: first ? "tool_calls" : "stop",
+          },
+        ],
+      };
+      return new Response(
+        `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`,
+        {
+          headers: { "content-type": "text/event-stream" },
+        }
+      );
+    });
+    const prepare: NativeProviderNetwork["prepare"] = (target, headers) => {
+      expect(target).toBe("https://openrouter.ai/api/v1/chat/completions");
+      expect(headers.get("authorization")).toBe(`Bearer ${key}`);
+      return dispatch;
+    };
+    let child: NativeAgentProcess | undefined;
+    try {
+      await Promise.all(
+        [cwd, credentialHome].map((directory) =>
+          fs.mkdir(directory, { mode: 0o700 })
+        )
+      );
+      const secrets = new SecretsStore(new AuthStore(root), credentialHome);
+      await secrets.set("openrouter", key);
+      const launch = await NativeProviderSelection.builtInByok(
+        "openrouter",
+        model,
+        {
+          credentialHome,
+          hasKey: (id) => secrets.has(id),
+          network: async () => ({ prepare }),
+        }
+      );
+      const owner = await NativeAgentProcess.start({
+        ...launch,
+        resourcesPath: resources!,
+        stateDirectory: path.join(root, "state"),
+        capabilities: {
+          [list]: 1,
+          [answer]: 1,
+          "co.grida/session/submit": 1,
+          "co.grida/session/snapshot": 1,
+        },
+      });
+      child = owner;
+      const { sessionId } = (await owner.request("session/new", {
+        cwd,
+        mcpServers: [],
+      })) as { sessionId: string };
+      const { turnId } = (await owner.request("_co.grida/session/submit", {
+        sessionId,
+        inputId: "find-reference",
+        prompt: [{ type: "text", text: "Find a visual reference." }],
+        allowLibrarySelection: true,
+      })) as { turnId: string };
+      const snapshot = () =>
+        owner.request("_co.grida/session/snapshot", { sessionId });
+      const waiting = await vi.waitFor(
+        async () => {
+          const state = (await snapshot()) as { sessionRevision: number };
+          expect(state).toMatchObject({
+            current: { turnId, disposition: "suspended" },
+          });
+          return state;
+        },
+        { timeout: 5000 }
+      );
+      const pending = (await owner.request(`_${list}`, {
+        sessionId,
+        turnId,
+      })) as {
+        controlRevision: number;
+        selections: { waitId: string; initialSearchQuery: string }[];
+      };
+      expect(pending.selections).toEqual([
+        { waitId: expect.any(String), initialSearchQuery: query },
+      ]);
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(dispatch.mock.calls[0][0].toString())).toMatchObject({
+        model,
+        tools: expect.arrayContaining([
+          expect.objectContaining({
+            function: expect.objectContaining({ name: "design_search" }),
+          }),
+        ]),
+      });
+      await owner.request(`_${answer}`, {
+        sessionId,
+        turnId,
+        requestId: "select-reference",
+        expectedSessionRevision: waiting.sessionRevision,
+        expectedControlRevision: pending.controlRevision,
+        waitId: pending.selections[0].waitId,
+        answer: { kind: "selected", id: selectedId, data: PNG },
+      });
+      await vi.waitFor(
+        async () => {
+          expect(await snapshot()).toMatchObject({
+            latest: { turnId, status: "succeeded" },
+          });
+        },
+        { timeout: 5000 }
+      );
+
+      expect(dispatch).toHaveBeenCalledTimes(2);
+      const body = dispatch.mock.calls[1][0].toString();
+      const [call, reply, attachment] = JSON.parse(body).messages.slice(-3);
+      expect(call).toMatchObject({
+        role: "assistant",
+        tool_calls: [
+          expect.objectContaining({
+            function: {
+              name: "design_search",
+              arguments: JSON.stringify({ initial_search_query: query }),
+            },
+          }),
+        ],
+      });
+      const callId = call.tool_calls[0].id;
+      const marker = `Tool-provided image 1 for result ${callId}`;
+      expect(reply).toMatchObject({ role: "tool", tool_call_id: callId });
+      expect(JSON.parse(reply.content)).toMatchObject({
+        status: "succeeded",
+        content: expect.arrayContaining([
+          expect.stringContaining(selectedId),
+          expect.stringContaining(marker),
+        ]),
+      });
+      expect(attachment).toEqual({
+        role: "user",
+        content: [
+          { type: "text", text: marker },
+          {
+            type: "image_url",
+            image_url: { url: `data:image/png;base64,${PNG}` },
+          },
+        ],
+      });
+      expect(body.match(/data:image\/png;base64,/g)).toHaveLength(1);
+      expect(body).not.toContain("retained-input:");
+    } finally {
+      try {
+        await child?.close();
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  },
+  15_000
+);
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
   "uses the compatible output limit for new chats and reopens the previous owner",

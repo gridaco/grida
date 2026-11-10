@@ -308,7 +308,7 @@ impl Host {
     pub(crate) fn accepts_library_selection(&self) -> bool {
         self.execution
             .as_ref()
-            .is_some_and(|execution| execution.workspace_vision)
+            .is_some_and(|execution| execution.tool_result_images)
     }
 
     pub(crate) async fn library_selections(

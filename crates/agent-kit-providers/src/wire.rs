@@ -414,10 +414,14 @@ pub(crate) fn tool_result(result: &ToolResult) -> Result<Value> {
         };
         text.push(value);
     }
-    Ok(json!({
-        "status": result.status, "content": text, "structured": result.structured,
+    Ok(tool_result_payload(result, text))
+}
+
+pub(crate) fn tool_result_payload(result: &ToolResult, content: impl Serialize) -> Value {
+    json!({
+        "status": result.status, "content": content, "structured": result.structured,
         "truncated": result.truncated
-    }))
+    })
 }
 
 #[derive(Default)]

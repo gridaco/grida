@@ -309,7 +309,8 @@ verifies the exact retained bytes before dispatch. A fork or compaction can
 omit earlier image content and records that omission. Image steering, earlier
 message replacement, and shared WebSocket intake are unavailable.
 
-On the private stdio Responses PNG profile, negotiate both
+On the private stdio Responses PNG profile or reviewed saved OpenRouter PNG
+profile, negotiate both
 `co.grida/session/library-selections` and `co.grida/session/answer-library-selection`
 at version 1. An identified Submit with `allowLibrarySelection: true` can
 offer `design_search` for that input. The tool asks the attached client to
@@ -325,6 +326,8 @@ The same PNG bounds and retained quota apply. Send the identical request and
 revision basis to recover its receipt. An explicit Pause still requires Resume.
 The host retains a private image identity and passes the selected pixels to
 the captured provider within that turn. Later turns retain a text description.
+For the compatible connection, the provider adapter sends every tool reply
+before adding labeled PNG input correlated to the originating tool reply.
 If interruption occurs after the bytes are retained and before the choice is
 committed, the unused copy stays subject to the chat's storage and deletion policy.
 The host receives no Library URL or access grant. Desktop picker integration

@@ -2,7 +2,7 @@ mod stream;
 
 use crate::wire::{
     RateRejectionEvidence, function_name, image_data_url, image_profile, short_identity,
-    text_profile, tool_result,
+    text_profile, tool_result, tool_result_payload,
 };
 use crate::{
     InputImageResolver, StreamLimits, StreamingTransport, TransportOperation, TransportRequest,
@@ -11,10 +11,13 @@ use agent_kit_core::inference::{
     InferenceControl, InferenceRequest, InferenceRun, InputFormat, ModelCapabilities,
     PreparedRequest, Provider, ProviderBinding,
 };
-use agent_kit_core::messages::{Content, Message, Role, ToolArguments};
+use agent_kit_core::messages::{
+    Content, Message, ResultContent, Retention, Role, ToolArguments, ToolResult,
+};
 use agent_kit_core::{Error, ErrorKind, ModelId, Result, ToolId};
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,6 +40,7 @@ pub struct OpenAiCompatible {
     transport: Arc<dyn StreamingTransport>,
     limits: StreamLimits,
     images: Option<Arc<InputImageResolver>>,
+    retained_png_tool_results: bool,
     rate_rejection_evidence: RateRejectionEvidence,
 }
 
@@ -76,8 +80,17 @@ impl OpenAiCompatible {
             transport,
             limits,
             images,
+            retained_png_tool_results: false,
             rate_rejection_evidence: RateRejectionEvidence::None,
         })
+    }
+
+    /// Enable retained PNG tool-result projection on a reviewed endpoint.
+    /// The host must verify support for a user image following a tool exchange.
+    /// The model must also support JSON tools and have a bound image resolver.
+    pub fn with_retained_png_tool_results(mut self) -> Self {
+        self.retained_png_tool_results = true;
+        self
     }
 
     /// Enable admission evidence for a trusted endpoint that guarantees a
@@ -108,8 +121,45 @@ impl OpenAiCompatible {
         }
         let mut messages = Vec::new();
         let mut remaining_images = self.limits.max_request_bytes / 4 * 3;
-        for message in &request.messages {
-            if message.role == Role::User
+        let has_tool_media = request
+            .messages
+            .iter()
+            .flat_map(|message| &message.content)
+            .any(|part| matches!(part, Content::ToolResult(result) if has_result_media(result)));
+        let tool_image_resolver = if has_tool_media {
+            let resolver = self
+                .images
+                .as_deref()
+                .filter(|_| {
+                    self.retained_png_tool_results
+                        && model.capabilities.json_tools
+                        && image_profile(&model.capabilities)
+                })
+                .ok_or_else(unsupported_tool_media)?;
+            validate_tool_exchanges(&request.messages)?;
+            resolve_images.then_some(resolver)
+        } else {
+            None
+        };
+        for group in request
+            .messages
+            .chunk_by(|left, right| left.role == Role::Tool && right.role == Role::Tool)
+        {
+            let message = &group[0];
+            if message.role == Role::Tool {
+                if !model.capabilities.json_tools {
+                    return Err(Error::new(
+                        ErrorKind::Unsupported,
+                        "unsupported_tool_history",
+                    ));
+                }
+                lower_tool_group(
+                    group,
+                    tool_image_resolver,
+                    &mut remaining_images,
+                    &mut messages,
+                )?;
+            } else if message.role == Role::User
                 && message
                     .content
                     .iter()
@@ -243,25 +293,108 @@ fn unsupported_image() -> Error {
     Error::new(ErrorKind::Unsupported, "unsupported_compatible_input_image")
 }
 
-fn lower_message(message: &Message, tools_supported: bool, output: &mut Vec<Value>) -> Result<()> {
-    if message.role == Role::Tool {
-        if !tools_supported {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "unsupported_tool_history",
-            ));
+fn unsupported_tool_media() -> Error {
+    Error::new(ErrorKind::Unsupported, "unsupported_tool_media")
+}
+
+fn has_result_media(result: &ToolResult) -> bool {
+    result
+        .content
+        .iter()
+        .any(|part| matches!(part, ResultContent::Media(_)))
+}
+
+// Check the exchange boundaries before staging an image as a user message.
+// Sibling replies may be recorded in a different order than the calls.
+fn validate_tool_exchanges(messages: &[Message]) -> Result<()> {
+    let invalid = || Error::new(ErrorKind::InvalidInput, "invalid_compatible_tool_exchange");
+    let mut pending = BTreeSet::new();
+    for message in messages {
+        if message.role == Role::Tool {
+            if message.content.is_empty() {
+                return Err(invalid());
+            }
+            for part in &message.content {
+                if !matches!(part, Content::ToolResult(result) if pending.remove(&result.call)) {
+                    return Err(invalid());
+                }
+            }
+        } else {
+            if !pending.is_empty() {
+                return Err(invalid());
+            }
+            if message.role == Role::Assistant {
+                pending.extend(message.content.iter().filter_map(|part| match part {
+                    Content::ToolCall(call) => Some(&call.id),
+                    _ => None,
+                }));
+            }
         }
-        for part in &message.content {
-            let Content::ToolResult(result) = part else {
-                return Err(Error::new(ErrorKind::InvalidInput, "invalid_tool_message"));
-            };
-            let content = tool_result(result)?;
-            let content = serde_json::to_string(&content)
-                .map_err(|_| Error::new(ErrorKind::InvalidInput, "tool_result_encoding_failed"))?;
-            output.push(json!({ "role": "tool", "tool_call_id": short_identity("call", &result.call)?, "content": content }));
-        }
-        return Ok(());
     }
+    if !pending.is_empty() {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
+fn lower_tool_group(
+    group: &[Message],
+    resolver: Option<&InputImageResolver>,
+    remaining: &mut usize,
+    output: &mut Vec<Value>,
+) -> Result<()> {
+    let mut attachments = Vec::new();
+    for part in group.iter().flat_map(|message| &message.content) {
+        let Content::ToolResult(result) = part else {
+            return Err(Error::new(ErrorKind::InvalidInput, "invalid_tool_message"));
+        };
+        let call = short_identity("call", &result.call)?;
+        let content = if has_result_media(result) {
+            lower_tool_images(result, &call, resolver, remaining, &mut attachments)?
+        } else {
+            tool_result(result)?
+        };
+        let content = serde_json::to_string(&content)
+            .map_err(|_| Error::new(ErrorKind::InvalidInput, "tool_result_encoding_failed"))?;
+        output.push(json!({ "role": "tool", "tool_call_id": call, "content": content }));
+    }
+    // Chat Completions accepts images in user content. Keep the synthetic
+    // content outside the contiguous tool replies, even across message records.
+    if !attachments.is_empty() {
+        output.push(json!({ "role": "user", "content": attachments }));
+    }
+    Ok(())
+}
+
+fn lower_tool_images(
+    result: &ToolResult,
+    call: &str,
+    resolver: Option<&InputImageResolver>,
+    remaining: &mut usize,
+    attachments: &mut Vec<Value>,
+) -> Result<Value> {
+    let mut content = Vec::new();
+    let mut ordinal = 0;
+    for part in &result.content {
+        match part {
+            ResultContent::Text(text) => content.push(Cow::Borrowed(text.as_str())),
+            ResultContent::Media(media)
+                if media.media_type == "image/png" && media.retention == Retention::Retained =>
+            {
+                ordinal += 1;
+                let label = format!("Tool-provided image {ordinal} for result {call}");
+                let url = image_data_url(media, resolver, remaining)?;
+                content.push(Cow::Owned(format!("[{label} attached below]")));
+                attachments.push(json!({ "type": "text", "text": label }));
+                attachments.push(json!({ "type": "image_url", "image_url": { "url": url } }));
+            }
+            ResultContent::Media(_) => return Err(unsupported_tool_media()),
+        }
+    }
+    Ok(tool_result_payload(result, content))
+}
+
+fn lower_message(message: &Message, tools_supported: bool, output: &mut Vec<Value>) -> Result<()> {
     let mut text = String::new();
     let mut calls = Vec::new();
     for part in &message.content {

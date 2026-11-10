@@ -5,14 +5,16 @@ use agent_kit_core::inference::{
     Modality, ModelCapabilities, Provider, ProviderBinding,
 };
 use agent_kit_core::messages::{
-    Content, MediaRef, OutcomeStatus, ResultContent, Retention, Role, ToolArguments, ToolResult,
+    Content, MediaRef, OutcomeStatus, ResultContent, Retention, Role, ToolArguments, ToolCall,
+    ToolResult,
 };
 use agent_kit_core::{
-    ArtifactId, AttemptId, BindingId, ErrorKind, ModelId, PrincipalId, ProviderId, ScopeId, ToolId,
+    ArtifactId, AttemptId, BindingId, ErrorKind, ModelId, PrincipalId, ProviderId, ScopeId,
+    ToolCallId, ToolId,
 };
 use agent_kit_providers::{
-    ModelProfile, OpenAiCompatible, OutputLimitField, StreamLimits, TransportFailure,
-    TransportOperation,
+    InputImageResolver, ModelProfile, OpenAiCompatible, OutputLimitField, StreamLimits,
+    TransportFailure, TransportOperation,
 };
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -384,6 +386,254 @@ async fn compatible_png_resolves_only_on_dispatch_and_keeps_order_and_bounds() {
     );
 }
 
+fn png_tool_adapter(
+    transport: Arc<FixtureTransport>,
+    limits: StreamLimits,
+    resolver: Arc<InputImageResolver>,
+) -> OpenAiCompatible {
+    let mut profile = profile();
+    profile
+        .capabilities
+        .input_modalities
+        .insert(Modality::Image);
+    OpenAiCompatible::with_image_resolver(
+        binding(),
+        [(ModelId::new("model").unwrap(), profile)].into(),
+        transport,
+        limits,
+        Some(resolver),
+    )
+    .unwrap()
+}
+
+fn png_tool_request() -> InferenceRequest {
+    let mut request = request();
+    let call = |id: &str| ToolCall {
+        id: ToolCallId::new(id).unwrap(),
+        tool: ToolId::new("filesystem/view_image").unwrap(),
+        arguments: ToolArguments::Json(json!({ "file": id })),
+    };
+    let first = call("z-call");
+    let second = call("a-call");
+    request.messages.push(message(
+        "assistant",
+        Role::Assistant,
+        vec![
+            Content::ToolCall(first.clone()),
+            Content::ToolCall(second.clone()),
+        ],
+    ));
+    // Runtime records siblings in durable ID order, which can differ from
+    // the provider's call array order.
+    for call in [second, first] {
+        let id = call.id.as_str();
+        let image = MediaRef {
+            id: ArtifactId::new(id).unwrap(),
+            media_type: "image/png".into(),
+            locator: format!("private-locator/{id}"),
+            access_scope: BindingId::new("media").unwrap(),
+            retention: Retention::Retained,
+        };
+        request.messages.push(message(
+            &format!("result-{id}"),
+            Role::Tool,
+            vec![Content::ToolResult(ToolResult {
+                call: call.id.clone(),
+                status: OutcomeStatus::Succeeded,
+                content: vec![ResultContent::Text(id.into()), ResultContent::Media(image)],
+                structured: Some(json!({ "width": 2 })),
+                truncated: false,
+            })],
+        ));
+    }
+    request
+}
+
+#[tokio::test]
+async fn reviewed_png_tool_images_follow_all_correlated_sibling_replies() {
+    let transport = FixtureTransport::new([Ok(response(text_response("done"), false))]);
+    let reads = Arc::new(AtomicUsize::new(0));
+    let provider = png_tool_adapter(
+        transport.clone(),
+        limits(),
+        Arc::new({
+            let reads = reads.clone();
+            move |media, maximum| {
+                let index = reads.fetch_add(1, Ordering::Relaxed);
+                assert_eq!(maximum, limits().max_request_bytes / 4 * 3 - index * 4);
+                Ok(match media.id.as_str() {
+                    "a-call" => vec![0x89, b'P', b'N', b'A'],
+                    "z-call" => vec![0x89, b'P', b'N', b'Z'],
+                    _ => panic!("unexpected media identity"),
+                })
+            }
+        }),
+    )
+    .with_retained_png_tool_results();
+    let mut input = png_tool_request();
+    input.messages.push(message(
+        "follow-up",
+        Role::User,
+        vec![Content::Text("Compare those.".into())],
+    ));
+    let prepared = provider.prepare(input.clone()).unwrap();
+    assert_eq!(prepared.request(), &input);
+    assert_eq!(reads.load(Ordering::Relaxed), 0);
+    let outcome = provider
+        .start(prepared, control("tool-images"))
+        .unwrap()
+        .finish()
+        .await;
+    assert_eq!(outcome.status, InferenceStatus::Completed);
+    assert_eq!(reads.load(Ordering::Relaxed), 2);
+
+    let requests = transport.requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    let body: Value = serde_json::from_slice(&requests[0].0.body).unwrap();
+    let messages = body["messages"].as_array().unwrap();
+    assert_eq!(messages.len(), 6);
+    let first_call = messages[1]["tool_calls"][0]["id"].as_str().unwrap();
+    let second_call = messages[1]["tool_calls"][1]["id"].as_str().unwrap();
+    let first_label = format!("Tool-provided image 1 for result {first_call}");
+    let second_label = format!("Tool-provided image 1 for result {second_call}");
+    for (message, call, result, label) in [
+        (&messages[2], second_call, "a-call", &second_label),
+        (&messages[3], first_call, "z-call", &first_label),
+    ] {
+        assert_eq!(message["role"], "tool");
+        assert_eq!(message["tool_call_id"], call);
+        assert_eq!(
+            serde_json::from_str::<Value>(message["content"].as_str().unwrap()).unwrap(),
+            json!({"status":"succeeded","content":[result, format!("[{label} attached below]")],"structured":{"width":2},"truncated":false})
+        );
+    }
+    assert_eq!(
+        messages[4],
+        json!({"role":"user","content":[
+            {"type":"text","text":second_label},
+            {"type":"image_url","image_url":{"url":"data:image/png;base64,iVBOQQ=="}},
+            {"type":"text","text":first_label},
+            {"type":"image_url","image_url":{"url":"data:image/png;base64,iVBOWg=="}},
+        ]})
+    );
+    assert_eq!(
+        messages[5],
+        json!({"role":"user","content":"Compare those."})
+    );
+    assert!(!String::from_utf8_lossy(&requests[0].0.body).contains("private-locator"));
+}
+
+#[test]
+fn compatible_tool_images_refuse_invalid_exchanges_and_unreviewed_profiles() {
+    let transport = FixtureTransport::new([]);
+    let resolver: Arc<InputImageResolver> = Arc::new(|_, _| panic!("prepare must not read images"));
+    let generic = png_tool_adapter(transport.clone(), limits(), resolver.clone());
+    let reviewed = png_tool_adapter(transport.clone(), limits(), resolver.clone())
+        .with_retained_png_tool_results();
+    let input = png_tool_request();
+    assert_eq!(
+        generic.prepare(input.clone()).unwrap_err().code,
+        "unsupported_tool_media"
+    );
+    assert_eq!(
+        adapter(transport.clone())
+            .with_retained_png_tool_results()
+            .prepare(input.clone())
+            .unwrap_err()
+            .code,
+        "unsupported_tool_media"
+    );
+    let mut no_tools = profile();
+    no_tools.capabilities.json_tools = false;
+    no_tools
+        .capabilities
+        .input_modalities
+        .insert(Modality::Image);
+    let no_tools = OpenAiCompatible::with_image_resolver(
+        binding(),
+        [(input.model.clone(), no_tools)].into(),
+        transport.clone(),
+        limits(),
+        Some(resolver),
+    )
+    .unwrap()
+    .with_retained_png_tool_results();
+    assert_eq!(
+        no_tools.prepare(input.clone()).unwrap_err().code,
+        "unsupported_tool_media"
+    );
+
+    let mut missing = input.clone();
+    missing.messages.pop();
+    assert_eq!(
+        reviewed.prepare(missing).unwrap_err().code,
+        "incomplete_tool_exchange"
+    );
+
+    let mut interrupted = input.clone();
+    interrupted.messages.insert(
+        3,
+        message("early", Role::User, vec![Content::Text("too early".into())]),
+    );
+    assert_eq!(
+        reviewed.prepare(interrupted).unwrap_err().code,
+        "invalid_compatible_tool_exchange"
+    );
+
+    let mut orphan = input.clone();
+    orphan.messages.remove(1);
+    assert_eq!(
+        reviewed.prepare(orphan).unwrap_err().code,
+        "unmatched_tool_result"
+    );
+
+    let mut unsupported = input;
+    let Content::ToolResult(result) = &mut unsupported.messages[2].content[0] else {
+        panic!("fixture requires a tool result");
+    };
+    let ResultContent::Media(media) = &mut result.content[1] else {
+        panic!("fixture requires media");
+    };
+    media.media_type = "image/jpeg".into();
+    assert_eq!(
+        reviewed.prepare(unsupported).unwrap_err().code,
+        "unsupported_tool_media"
+    );
+    assert!(transport.requests.lock().unwrap().is_empty());
+}
+
+#[test]
+fn compatible_tool_images_enforce_resolver_and_encoded_request_bounds() {
+    let transport = FixtureTransport::new([]);
+    for overrun in [false, true] {
+        let provider = png_tool_adapter(
+            transport.clone(),
+            StreamLimits {
+                max_request_bytes: 4096,
+                ..limits()
+            },
+            Arc::new(move |media, maximum| {
+                assert_eq!(media.id.as_str(), "a-call");
+                assert_eq!(maximum, 3072);
+                Ok(vec![0; maximum + usize::from(overrun)])
+            }),
+        )
+        .with_retained_png_tool_results();
+        let mut input = png_tool_request();
+        let Content::ToolResult(result) = &mut input.messages[3].content[0] else {
+            panic!("fixture requires a tool result");
+        };
+        result.content.pop();
+        let prepared = provider.prepare(input).unwrap();
+        let Err(error) = provider.start(prepared, control("tool-image-too-large")) else {
+            panic!("oversized bytes must stop dispatch");
+        };
+        assert_eq!(error.kind, ErrorKind::LimitExceeded);
+        assert_eq!(error.code, "request_byte_limit");
+    }
+    assert!(transport.requests.lock().unwrap().is_empty());
+}
+
 #[test]
 fn prepared_request_cannot_switch_binding_before_dispatch() {
     let transport = FixtureTransport::new([]);
@@ -481,6 +731,10 @@ async fn request_lowering_preserves_tool_result_correlation_and_uses_wire_names(
     assert_eq!(
         body["messages"][1]["tool_calls"][0]["id"],
         body["messages"][2]["tool_call_id"]
+    );
+    assert_eq!(
+        body["messages"][2]["content"],
+        r#"{"status":"succeeded","content":["contents"],"structured":null,"truncated":false}"#
     );
     let name = body["tools"][0]["function"]["name"].as_str().unwrap();
     assert!(

@@ -20,7 +20,7 @@ async fn requested_library_selection_survives_restart_and_replays_the_exact_answ
     let directory = TempDir::new().unwrap();
     let state = directory.path().join("state");
     let workspace = TempDir::new().unwrap();
-    let mut endpoint = Endpoint::start_protocol(
+    let mut endpoint = Endpoint::start_protocol_with_wait(
         ProviderProtocol::Responses,
         vec![
             Reply::Tool("design_search", QUERY),
@@ -30,6 +30,9 @@ async fn requested_library_selection_survives_restart_and_replays_the_exact_answ
             Reply::Finished("Ordinary prompt."),
         ],
         Some(TEST_CREDENTIAL),
+        // The fixture leaves the provider idle across two process restarts
+        // and competing durable answers under concurrent suite I/O.
+        WAIT * 3,
     )
     .await;
     let mut initialize = extension_initialize();
