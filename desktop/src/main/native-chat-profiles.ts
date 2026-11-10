@@ -4,11 +4,13 @@ import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
+  byokProvidersFor,
   isValidEndpointProviderId,
   type EndpointProviderConfig,
 } from "@grida/agent";
+import { catalog } from "@grida/ai/catalogue";
 import type { NativeChatProfileChoice } from "@grida/desktop-bridge";
-import type { NativeProviderSelection } from "./native-provider-selection";
+import { NativeProviderSelection } from "./native-provider-selection";
 
 const FILENAME = "chat-profiles.json";
 const PROFILE_ID = /^[a-f0-9]{64}$/;
@@ -32,18 +34,46 @@ export namespace NativeChatProfiles {
   export function binding(providerId: string, launch: Launch): string {
     const base = new URL(launch.endpoint);
     base.pathname = base.pathname.replace(/\/$/, "");
+    const builtIn = NativeProviderSelection.isBuiltInByok(providerId);
     return createHash("sha256")
       .update(
         JSON.stringify([
-          "desktop-compatible-chat-v1",
+          builtIn
+            ? "desktop-builtin-byok-chat-v1"
+            : "desktop-compatible-chat-v1",
           providerId,
           launch.provider,
           base.href,
-          launch.configuredEndpointKey ? "stored" : "anonymous",
+          builtIn || launch.configuredEndpointKey ? "stored" : "anonymous",
           launch.model,
         ])
       )
       .digest("hex");
+  }
+
+  export async function builtInChoices(
+    resolve: (providerId: string, modelId: string) => Promise<Launch>
+  ): Promise<Saved[]> {
+    const models = catalog.text.listed_models();
+    const sample = models[0];
+    if (!sample) return [];
+    const choices: Saved[] = [];
+    for (const { id, label: connection } of byokProvidersFor("text")) {
+      if (!NativeProviderSelection.isBuiltInByok(id)) continue;
+      // All listed text choices use the same fixed route and credential owner.
+      const eligible = await resolve(id, sample.id).catch(() => null);
+      if (!eligible) continue;
+      for (const model of models) {
+        choices.push({
+          id: binding(id, { ...eligible, model: model.id }),
+          providerId: id,
+          modelId: model.id,
+          connection,
+          model: label(catalog.text.displayLabel(model), model.id),
+        });
+      }
+    }
+    return choices;
   }
 
   /** Model settings supply choices; the existing native resolver decides eligibility. */
@@ -198,7 +228,8 @@ function saved(value: unknown): value is NativeChatProfiles.Saved {
     Object.keys(entry).length === 5 &&
     NativeChatProfiles.validId(entry.id) &&
     typeof entry.providerId === "string" &&
-    isValidEndpointProviderId(entry.providerId) &&
+    (isValidEndpointProviderId(entry.providerId) ||
+      NativeProviderSelection.isBuiltInByok(entry.providerId)) &&
     modelId(entry.modelId) &&
     modelId(entry.connection) &&
     modelId(entry.model)

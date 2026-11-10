@@ -43,20 +43,25 @@ export namespace NativeProviderSelection {
   // The native CLI also owns these vendor keys in the shared store.
   const nativeVendorKeys = new Set(["openai", "anthropic", "google"]);
 
+  export function isBuiltInByok(
+    providerId: string
+  ): providerId is keyof typeof builtInEndpoints {
+    return Object.hasOwn(builtInEndpoints, providerId);
+  }
+
   export async function builtInByok(
     providerId: string,
     model: string,
     settings: ByokSettings
   ): Promise<Launch & Readonly<{ credentialHome: string }>> {
-    if (!Object.hasOwn(builtInEndpoints, providerId))
+    if (!isBuiltInByok(providerId))
       throw new Error("native_provider_byok_unavailable");
     if (!Object.hasOwn(catalog.text.catalog, model))
       throw new Error("native_provider_model_unavailable");
     const home = await checkedCredentialHome(settings.credentialHome);
     if (!(await settings.hasKey(providerId)))
       throw new Error("native_provider_byok_key_missing");
-    const endpoint =
-      builtInEndpoints[providerId as keyof typeof builtInEndpoints];
+    const endpoint = builtInEndpoints[providerId];
     const target = `${endpoint}/chat/completions`;
     const network = await settings.network();
     return {

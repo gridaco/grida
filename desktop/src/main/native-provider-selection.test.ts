@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
+import { NativeChatProfiles } from "./native-chat-profiles";
 import { NativeProviderSelection } from "./native-provider-selection";
 import {
   NativeProviderEgress,
@@ -56,6 +57,9 @@ it("uses a registered model and binds the anonymous launch to the approved route
     endpoint: base,
     model: "beta",
   });
+  expect(NativeChatProfiles.binding("local", launch)).toBe(
+    "f7f349efbe0f9d67c2a98163ebbd002349c92818a84b0b2a787142cc05cbf30b"
+  );
   expect(owner.network).toHaveBeenCalledExactlyOnceWith("local", base);
   expect(
     launch.providerNetwork.prepare(`${target}?other=1`, new Headers())

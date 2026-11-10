@@ -6,6 +6,7 @@ import path from "node:path";
 import { beforeEach, expect, it, vi } from "vitest";
 import { CHATGPT_RESPONSES_URL } from "../chatgpt-configuration";
 import { DesktopAccountSession } from "./account-session";
+import { NativeGatewayConnection } from "./native-gateway-connection";
 import { NativeProviderSelection } from "./native-provider-selection";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import type { NativeProviderNetwork } from "./native-provider-egress";
@@ -26,6 +27,10 @@ const sidecar = vi.hoisted(() => ({
   findWorkspace:
     vi.fn<
       typeof import("./agent-sidecar-client").agentSidecarClient.findWorkspace
+    >(),
+  listProviderEndpoints:
+    vi.fn<
+      typeof import("./agent-sidecar-client").agentSidecarClient.listProviderEndpoints
     >(),
   nativeBuiltInByok:
     vi.fn<
@@ -449,4 +454,235 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     }
   },
   25_000
+);
+
+it.runIf(Boolean(resources) && process.platform !== "win32")(
+  "keeps saved OpenRouter and Vercel model chats with their exact workers and custody",
+  async () => {
+    const base = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-native-provider-picker-")
+    );
+    const source = {
+      userDataPath: path.join(base, "agent"),
+      desktopUserDataPath: path.join(base, "browser"),
+      scratchBase: path.join(base, "scratch"),
+      providerHome: path.join(base, "providers"),
+      mediaRoot: path.join(base, "media"),
+    };
+    const root = path.join(base, "workspace");
+    const secrets = new SecretsStore(
+      new AuthStore(source.userDataPath),
+      source.providerHome
+    );
+    const model = "openai/gpt-5.6-terra";
+    const origin = "https://editor.example.test";
+    const gatewayTarget = origin + "/api/v1/ai/chat/completions";
+    const providers = [
+      ["openrouter", "OpenRouter", "https://openrouter.ai/api/v1"],
+      ["vercel", "Vercel AI Gateway", "https://ai-gateway.vercel.sh/v1"],
+    ] as const;
+    const requested: Array<{ target: string; model: string }> = [];
+    const prepare: NativeProviderNetwork["prepare"] = (target, headers) => {
+      const provider = providers.find(
+        ([, , endpoint]) => target === endpoint + "/chat/completions"
+      );
+      if (!provider && target !== gatewayTarget) return null;
+      expect(headers.get("authorization")).toBe(
+        provider ? `Bearer ${provider[0]}-fixture-key` : "Bearer fixture.gg.key"
+      );
+      return async (body) => {
+        const request = JSON.parse(body.toString());
+        requested.push({ target, model: request.model });
+        const chunk = {
+          id: "provider-picker-fixture",
+          choices: [
+            {
+              index: 0,
+              delta: provider
+                ? { content: provider[1] + " answered." }
+                : {
+                    tool_calls: [
+                      {
+                        index: 0,
+                        id: "fixture-question",
+                        type: "function",
+                        function: {
+                          name: "question",
+                          arguments: JSON.stringify({
+                            question: "Keep the original chat waiting?",
+                            options: ["Keep", "Continue"],
+                          }),
+                        },
+                      },
+                    ],
+                  },
+              finish_reason: provider ? "stop" : "tool_calls",
+            },
+          ],
+        };
+        return new Response(
+          `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`,
+          { headers: { "content-type": "text/event-stream" } }
+        );
+      };
+    };
+    let agent: import("./native-desktop-agent").NativeDesktopAgent | undefined;
+    try {
+      await Promise.all(
+        [
+          root,
+          source.userDataPath,
+          source.desktopUserDataPath,
+          source.providerHome,
+        ].map((directory) => fs.mkdir(directory, { mode: 0o700 }))
+      );
+      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.listProviderEndpoints.mockResolvedValue([]);
+      sidecar.nativeBuiltInByok.mockImplementation((id, selected) =>
+        NativeProviderSelection.builtInByok(id, selected, {
+          credentialHome: source.providerHome,
+          hasKey: (id) => secrets.has(id),
+          network: async () => ({ prepare }),
+        })
+      );
+      sidecar.nativeAgentGatewayConnection.mockImplementation(
+        (account, organizationId, signal) =>
+          NativeGatewayConnection.open({
+            origin,
+            account,
+            network: { prepare },
+            organizationId,
+            signal,
+          })
+      );
+      const workspaces = new NativeWorkspaceCatalog({
+        browserData: source.desktopUserDataPath,
+        projectsRoot: path.join(base, "projects"),
+        protectedPaths: [source.userDataPath, source.providerHome],
+      });
+      const workspace = await workspaces.openSelected(root);
+      sidecar.findWorkspace.mockImplementation((id) => workspaces.find(id));
+      const launch = async () => {
+        const { NativeDesktopAgent } = await import("./native-desktop-agent");
+        return NativeDesktopAgent.prepareFresh(
+          new DesktopAccountSession({
+            base_url: origin,
+            fetch: async () =>
+              Response.json({
+                token: "fixture.gg.key",
+                account_subject: "fixture-user",
+                expires_at: new Date(Date.now() + 120_000).toISOString(),
+                organization: { id: 1 },
+              }),
+          }),
+          resources!,
+          {
+            provider: "gateway",
+            openExternal: async () => {},
+            selectableProfiles: true,
+          }
+        );
+      };
+      agent = await launch();
+      const desktop = agent;
+      expect(await desktop.profiles(workspace.id)).toEqual({
+        choices: [],
+        saved: [],
+      });
+      for (const [id] of providers) await secrets.set(id, `${id}-fixture-key`);
+      await desktop.ensure(workspace.id);
+      const original = desktop.current(workspace.id)!.chat;
+      const pending = await original.create();
+      await original.submit(pending, "gateway-input", "Keep waiting.");
+      await vi.waitFor(async () =>
+        expect((await original.observe(pending)).current?.disposition).toBe(
+          "suspended"
+        )
+      );
+
+      const choices = (await desktop.profiles(workspace.id)).choices;
+      const sessions = new Map<
+        string,
+        { profileId: string; sessionId: string }
+      >();
+      for (const [, connection] of providers) {
+        const { id } = choices.find(
+          (choice) =>
+            choice.connection === connection && choice.model === "GPT-5.6 Terra"
+        )!;
+        await desktop.selectProfile(
+          workspace.id,
+          { kind: "new", id },
+          () => {}
+        );
+        const chat = desktop.current(workspace.id, id)!.chat;
+        expect((await chat.list()).sessionIds).toEqual([]);
+        await expect(chat.load(pending.id)).rejects.toThrow("session_missing");
+        const session = await chat.create();
+        await chat.submit(session, "byok-input", "Use the selected model.");
+        await vi.waitFor(
+          async () =>
+            expect(await chat.observe(session)).toMatchObject({
+              latest: { status: "succeeded" },
+            }),
+          { timeout: 5000 }
+        );
+        sessions.set(connection, { profileId: id, sessionId: session.id });
+      }
+      expect(
+        new Set([...sessions.values()].map(({ profileId }) => profileId)).size
+      ).toBe(2);
+      expect(desktop.current(workspace.id)?.chat).toBe(original);
+      expect((await original.observe(pending)).current?.disposition).toBe(
+        "suspended"
+      );
+      expect(requested.slice(1)).toEqual(
+        providers.map(([, , endpoint]) => ({
+          target: endpoint + "/chat/completions",
+          model,
+        }))
+      );
+
+      await desktop.close();
+      vi.resetModules();
+      agent = await launch();
+      const reopened = agent;
+      const openrouter = sessions.get("OpenRouter")!;
+      const vercel = sessions.get("Vercel AI Gateway")!;
+      await reopened.selectProfile(
+        workspace.id,
+        { kind: "saved", id: openrouter.profileId },
+        () => {}
+      );
+      const restored = reopened.current(
+        workspace.id,
+        openrouter.profileId
+      )!.chat;
+      expect((await restored.list()).sessionIds).toEqual([
+        openrouter.sessionId,
+      ]);
+      const saved = await restored.load(openrouter.sessionId);
+      expect(
+        (await restored.transcript(saved)).map(({ text }) => text)
+      ).toContain("OpenRouter answered.");
+      await secrets.delete("vercel");
+      expect((await reopened.profiles(workspace.id)).saved).toContainEqual(
+        expect.objectContaining({ id: vercel.profileId, available: false })
+      );
+      await expect(
+        reopened.selectProfile(
+          workspace.id,
+          { kind: "saved", id: vercel.profileId },
+          () => {}
+        )
+      ).rejects.toThrow("native_provider_byok_key_missing");
+      expect(reopened.current(workspace.id)).toBeNull();
+      expect(reopened.current(workspace.id, vercel.profileId)).toBeNull();
+      expect(requested).toHaveLength(3);
+    } finally {
+      await agent?.close();
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  },
+  30_000
 );

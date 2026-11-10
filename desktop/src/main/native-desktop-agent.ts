@@ -23,6 +23,7 @@ import type { NativeChatGptHost } from "./native-chatgpt-host";
 import { NativeChatProfiles } from "./native-chat-profiles";
 import type { NativeDesktopProfile } from "./native-desktop-profile";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
+import { NativeProviderSelection } from "./native-provider-selection";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
 
 const DRAIN_TIMEOUT_MS = 35_000;
@@ -224,11 +225,13 @@ export class NativeDesktopAgent {
         : await NativeChatProfiles.read(directory);
     const profile = profiles.find(({ id }) => id === selection.id);
     if (!profile) throw new Error("native_chat_profile_unavailable");
+    const launchProfile = NativeProviderSelection.isBuiltInByok(
+      profile.providerId
+    )
+      ? agentSidecarClient.nativeBuiltInByok
+      : agentSidecarClient.nativeConfiguredEndpoint;
     const resolve = async () => {
-      const launch = await agentSidecarClient.nativeConfiguredEndpoint(
-        profile.providerId,
-        profile.modelId
-      );
+      const launch = await launchProfile(profile.providerId, profile.modelId);
       check();
       if (NativeChatProfiles.binding(profile.providerId, launch) !== profile.id)
         throw new Error("native_chat_profile_changed");
@@ -270,10 +273,18 @@ export class NativeDesktopAgent {
   }
 
   private async availableProfiles() {
-    return await NativeChatProfiles.choices(
-      await agentSidecarClient.listProviderEndpoints(),
-      agentSidecarClient.nativeConfiguredEndpoint
-    );
+    const [builtIn, configured] = await Promise.all([
+      NativeChatProfiles.builtInChoices(agentSidecarClient.nativeBuiltInByok),
+      agentSidecarClient
+        .listProviderEndpoints()
+        .then((endpoints) =>
+          NativeChatProfiles.choices(
+            endpoints,
+            agentSidecarClient.nativeConfiguredEndpoint
+          )
+        ),
+    ]);
+    return [...builtIn, ...configured];
   }
 
   private async workspace(workspaceId: string) {

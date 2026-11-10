@@ -16,17 +16,18 @@ the endpoint can use a key saved under its own ID.
 
 ## Start a chat with a saved model
 
-In a managed native workspace on macOS with Apple silicon, save and approve a
-compatible endpoint in Desktop settings. Once the workspace chat is ready,
-open **Model connection** and choose a registered model under **New chat
-with…**. Use **Refresh models** after changing the saved connection.
+In a managed native workspace on macOS with Apple silicon, add an OpenRouter or
+Vercel AI Gateway key in Desktop settings, or save and approve a compatible
+endpoint. Once the workspace chat is ready, open **Model connection** and choose
+a model under **New chat with…**. Each choice shows the connection and model.
+Use **Refresh models** after changing the saved connection.
 
 Each chat keeps its original model connection. **Saved chats by model** reopens
 the chat list for that connection, and **Default connection** returns to the default
 list. Switching lists leaves existing work and pending questions in their
 original chats. All connections in the workspace share its context-limit setting.
-Removing a connection or changing its endpoint can make its saved chats
-unavailable. Restore the original approved connection to reopen them.
+Removing a key or changing a compatible endpoint can make its saved chats
+unavailable. Restore access to the original connection to reopen them.
 
 ## Recover a connection
 
