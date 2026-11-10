@@ -537,6 +537,21 @@ publication. It distinguishes a new file, an exact file already at the
 destination, a declined review, a conflicting file, and unavailable or
 unverified work. Reconnect does not repeat a dispatched placement.
 
+### Gateway settlement lookup
+
+On a supervised Gateway connection, negotiate
+`co.grida/gateway/billing-status` version 1. The private
+`_co.grida/gateway/billing-status` request takes an attached `sessionId`
+and the exact retained `turnId`, `operationId`, and `attemptId`.
+The worker resolves the dispatch receipt under the captured Gateway scope.
+Main reads the current status through its fixed authenticated jobs route.
+
+A response reports `kind` as `pending`, `unavailable`, or `settled`.
+The settled response includes the exact decimal `chargedMills`. An
+unavailable receipt can result from a missing dispatch identity, changed
+scope, or a jobs response above 2 MiB. Lookup is observational and can be
+repeated after reopening. The retained inference evidence stays intact.
+
 ### Persistent goal operations
 
 Negotiate each `co.grida/goal/` capability at version `1`. The methods apply

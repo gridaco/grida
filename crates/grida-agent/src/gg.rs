@@ -1,10 +1,12 @@
 //! GRIDA-SEC-006 / GRIDA-GG: token — invocation-scoped native GG chat authority.
 
+use agent_client_protocol::JsonRpcResponse;
 use agent_kit_core::authority::AuthorityBinding;
-use agent_kit_core::inference::{ProviderBinding, RequestControl};
+use agent_kit_core::inference::{DispatchEvidence, ProviderBinding, RequestControl};
+use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnState};
 use agent_kit_core::{
-    BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint, PrincipalId,
-    ProviderId, Result, SchemaId, ScopeId,
+    AttemptId, BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Fingerprint,
+    OperationId, PrincipalId, ProviderId, Result, SchemaId, ScopeId,
 };
 use agent_kit_providers::{
     StreamingTransport, TerminalReceiptDecoder, TransportFailure, TransportOperation,
@@ -94,6 +96,39 @@ impl SupervisedGg {
     pub(crate) fn validate(&self) -> Result<()> {
         self.supervisor.validate()
     }
+
+    pub(crate) fn retained_request_id(
+        &self,
+        state: &TurnState,
+        operation: &OperationId,
+        attempt: &AttemptId,
+    ) -> Option<String> {
+        let operation = state.operations().get(operation)?;
+        let OperationInput::Inference(request) = &operation.record.input else {
+            return None;
+        };
+        let binding = request.binding();
+        if binding.provider != self.binding.provider
+            || binding.authority != operation.record.grants.authority
+            || binding.authority.principal != self.binding.authority.principal
+            || binding.authority.scope != self.binding.authority.scope
+        {
+            return None;
+        }
+        let attempt = operation.attempts.iter().find(|item| &item.id == attempt)?;
+        let OperationOutcome::Inference(outcome) = attempt.outcome.as_ref()? else {
+            return None;
+        };
+        if outcome
+            .failure
+            .as_ref()
+            .and_then(|failure| failure.dispatch)
+            == Some(DispatchEvidence::RejectedBeforeExecution)
+        {
+            return None;
+        }
+        gateway_request_id(outcome.receipt.as_ref()?).map(str::to_owned)
+    }
 }
 
 impl StreamingTransport for SupervisedGg {
@@ -153,24 +188,34 @@ enum GatewayBillingStatus {
     Settled,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, JsonRpcResponse)]
+#[serde(
+    tag = "kind",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum GatewayBillingRead {
+    Pending,
+    Settled { charged_mills: String },
+    Unavailable,
+}
+
+impl GatewayBillingRead {
+    pub(crate) fn checked(self) -> Self {
+        match &self {
+            Self::Settled { charged_mills } if !valid_decimal(charged_mills) => Self::Unavailable,
+            _ => self,
+        }
+    }
+}
+
 fn gateway_billing_receipt(
     scope: Fingerprint,
     request: &Envelope,
     frame: &[u8],
 ) -> Option<Envelope> {
-    if request.schema().as_str() != "http.request-id" || request.version() != 1 {
-        return None;
-    }
-    let request_id = std::str::from_utf8(request.bytes()).ok()?;
-    let suffix = request_id.strip_prefix("req_")?;
-    if suffix.is_empty()
-        || suffix.len() > 124
-        || !suffix
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
-    {
-        return None;
-    }
+    let request_id = gateway_request_id(request)?;
     let observation = serde_json::from_slice::<GatewayBillingFrame>(frame)
         .ok()?
         .grida_billing;
@@ -198,6 +243,23 @@ fn gateway_billing_receipt(
         .ok()?,
     )
     .ok()
+}
+
+fn gateway_request_id(request: &Envelope) -> Option<&str> {
+    if request.schema().as_str() != "http.request-id" || request.version() != 1 {
+        return None;
+    }
+    let request_id = std::str::from_utf8(request.bytes()).ok()?;
+    let suffix = request_id.strip_prefix("req_")?;
+    if suffix.is_empty()
+        || suffix.len() > 124
+        || !suffix
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
+        return None;
+    }
+    Some(request_id)
 }
 
 fn valid_decimal(value: &str) -> bool {

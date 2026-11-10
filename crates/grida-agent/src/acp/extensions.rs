@@ -4,6 +4,7 @@ pub(super) mod approvals;
 mod catalog;
 pub(super) mod compaction;
 mod deletion;
+pub(super) mod gateway_billing;
 mod goals;
 mod history;
 pub(super) mod library;
@@ -435,6 +436,7 @@ pub(super) fn handlers(
         ))
         .extend(skills::handlers(host.clone(), sessions.clone()))
         .extend(summaries::handlers(host.clone(), sessions.clone()))
+        .extend(gateway_billing::handlers(host.clone(), sessions.clone()))
         .extend(goals::handlers(
             host.clone(),
             sessions.clone(),

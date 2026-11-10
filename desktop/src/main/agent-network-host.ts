@@ -14,6 +14,7 @@ import { AgentNetworkPolicy } from "../agent-network-policy";
 import { AgentSidecarChannel } from "../agent-sidecar-channel";
 import { AgentNetworkAuthority } from "./agent-network-authority";
 import type { NativeProviderNetwork } from "./native-provider-egress";
+import type { NativeGatewayJobNetwork } from "./native-gateway-connection";
 
 const READY_TIMEOUT_MS = 15_000;
 const GRANT_ACK_TIMEOUT_MS = 5_000;
@@ -178,6 +179,33 @@ export class AgentNetworkHost {
             signal,
           });
       },
+    };
+  }
+
+  static async nativeGatewayJobNetwork(
+    authority: AgentNetworkAuthority,
+    origin: string
+  ): Promise<NativeGatewayJobNetwork> {
+    const networkSession = await AgentNetworkHost.networkSession();
+    return async (requestId, bearer, signal) => {
+      if (!/^req_[A-Za-z0-9_-]{1,124}$/.test(requestId))
+        throw new Error("native_gateway_job_invalid");
+      const target = new URL("/api/v1/ai/jobs", origin);
+      target.searchParams.set("request_id", requestId);
+      const approved = AgentNetworkPolicy.authorize(authority.grants(), {
+        grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+        method: "GET",
+        url: target.href,
+        headers: [
+          ["authorization", `Bearer ${bearer}`],
+          ["accept", "application/json"],
+        ],
+      });
+      return await requestThroughSession(networkSession, approved.url.href, {
+        method: approved.method,
+        headers: approved.headers,
+        signal,
+      });
     };
   }
 

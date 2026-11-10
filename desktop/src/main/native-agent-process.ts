@@ -29,6 +29,10 @@ import {
   NativeProviderEgress,
   type NativeProviderNetwork,
 } from "./native-provider-egress";
+import {
+  NativeGatewayConnection,
+  type NativeGatewayBilling,
+} from "./native-gateway-connection";
 
 const FRAME_LIMIT = 1024 * 1024;
 const REQUEST_LIMIT = 16;
@@ -71,6 +75,7 @@ export type NativeAgentLaunch = {
   workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
   providerNetwork?: NativeProviderNetwork;
   gatewayScope?: string;
+  gatewayJobBilling?: NativeGatewayConnection["readJobBilling"];
   subscriptionScope?: string;
   /** Trusted Main opt-in for the captured Gateway connection. */
   subagents?: true;
@@ -88,6 +93,13 @@ type Pending = {
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 };
+
+type GatewayAttempt = Readonly<{
+  sessionId: string;
+  turnId: string;
+  operationId: string;
+  attemptId: string;
+}>;
 
 /** Exact child custody after the bounded stop attempt has run out of time. */
 export class NativeAgentTerminationPending extends Error {
@@ -110,6 +122,10 @@ export class NativeAgentProcess {
   readonly permissions?: NativeAgentPermissions;
   private readonly pending = new Map<number, Pending>();
   private readonly providerRequests = new Set<number | string>();
+  private readonly gatewayBillingRequests = new Map<
+    number | string,
+    AbortController
+  >();
   private readonly editorEndpoints = new NativeEditorSurfaceEndpoints();
   private readonly buffer = Buffer.allocUnsafe(FRAME_LIMIT);
   private readonly decoder = new TextDecoder("utf-8", { fatal: true });
@@ -131,6 +147,7 @@ export class NativeAgentProcess {
   private scheduledWakeups = false;
   private historyRevision = false;
   private transcriptWindow = false;
+  private gatewayBillingEnabled = false;
   private namedChildren = false;
   private childTurnControls = false;
   private childMessaging = false;
@@ -155,7 +172,8 @@ export class NativeAgentProcess {
     private readonly providerEgress?: NativeProviderEgress,
     private readonly imageGeneration?: NativeImageGeneration,
     private readonly imagePlacement?: NativeImagePlacement,
-    private readonly reviewImageReference?: ImageReferenceReview
+    private readonly reviewImageReference?: ImageReferenceReview,
+    private readonly gatewayJobBilling?: NativeAgentLaunch["gatewayJobBilling"]
   ) {
     if (askRoots) {
       this.permissions = new NativeAgentPermissions(
@@ -391,6 +409,8 @@ export class NativeAgentProcess {
       ...options.capabilities,
       ...(permissionProfile ? NativeAgentPermissions.capabilities : {}),
     };
+    if (options.gatewayJobBilling && !options.gatewayScope)
+      throw new Error("native_agent_gateway_profile_invalid");
     if (providerEgress) capabilities[NativeProviderEgress.capability] = 1;
     if (imageGeneration) capabilities[NativeImageGeneration.capability] = 1;
     const requestDeletion =
@@ -463,7 +483,8 @@ export class NativeAgentProcess {
       providerEgress,
       imageGeneration,
       imagePlacement,
-      reviewImageReference
+      reviewImageReference,
+      options.gatewayJobBilling
     );
     try {
       const response = object(
@@ -501,6 +522,9 @@ export class NativeAgentProcess {
                   [NativeEditorSurfaceEndpoints.svgTextCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
+                ...(options.gatewayJobBilling && {
+                  [NativeGatewayConnection.billingCapability]: 1,
+                }),
                 ...(options.workspace && LIBRARY_SELECTION_CAPABILITIES),
                 "co.grida/session/selected-file": 1,
                 [TRANSCRIPT_WINDOW]: 1,
@@ -523,6 +547,9 @@ export class NativeAgentProcess {
       const agentCapabilities = object(response.agentCapabilities);
       const advertised = object(agentCapabilities?._meta);
       processOwner.transcriptWindow = advertised?.[TRANSCRIPT_WINDOW] === 1;
+      processOwner.gatewayBillingEnabled =
+        options.gatewayJobBilling !== undefined &&
+        advertised?.[NativeGatewayConnection.billingCapability] === 1;
       for (const [capability, version] of Object.entries(capabilities)) {
         if (advertised?.[capability] !== version)
           throw new Error("native_agent_capabilities_unavailable");
@@ -611,6 +638,24 @@ export class NativeAgentProcess {
     return this.call(method, params, timeoutMs);
   }
 
+  async gatewayBillingStatus(
+    attempt: GatewayAttempt
+  ): Promise<NativeGatewayBilling> {
+    if (!this.connected || !this.gatewayBillingEnabled)
+      return { kind: "unavailable" };
+    try {
+      return NativeGatewayConnection.billingResult(
+        await this.call(
+          NativeGatewayConnection.billingStatusMethod,
+          attempt,
+          20_000
+        )
+      );
+    } catch {
+      return { kind: "unavailable" };
+    }
+  }
+
   registerEditorSurfaces(
     sessionId: string,
     snapshot: NativeEditorSurfaceSnapshot,
@@ -678,6 +723,7 @@ export class NativeAgentProcess {
 
   private async stop(): Promise<void> {
     this.providerEgress?.close();
+    this.cancelGatewayBillingRequests();
     this.imageGeneration?.close();
     this.imagePlacement?.close();
     this.editorEndpoints.close();
@@ -750,6 +796,15 @@ export class NativeAgentProcess {
           !this.shutdown
         ) {
           this.providerRequest(message.id, message.params);
+          return;
+        }
+        if (
+          this.connected &&
+          this.gatewayBillingEnabled &&
+          this.gatewayJobBilling &&
+          message.method === NativeGatewayConnection.readJobBillingMethod
+        ) {
+          this.gatewayBillingRequest(message.id, message.params);
           return;
         }
         if (
@@ -852,6 +907,8 @@ export class NativeAgentProcess {
         this.providerEgress?.cancel(message.params);
       } else if (message.method === "$/cancel_request") {
         const id = object(message.params)?.requestId;
+        if (typeof id === "number" || typeof id === "string")
+          this.gatewayBillingRequests.get(id)?.abort();
         this.imageGeneration?.cancel(id);
         this.imagePlacement?.cancel(id);
       } else if (message.method === "session/update") {
@@ -893,6 +950,7 @@ export class NativeAgentProcess {
   private fail(error: Error): void {
     this.failure ??= error;
     this.providerEgress?.close();
+    this.cancelGatewayBillingRequests();
     this.imageGeneration?.close();
     this.imagePlacement?.close();
     this.editorEndpoints.close();
@@ -907,6 +965,35 @@ export class NativeAgentProcess {
   private disconnect(code: string): void {
     this.fail(new Error(code));
     void this.close().catch(() => {});
+  }
+
+  private cancelGatewayBillingRequests(): void {
+    for (const controller of this.gatewayBillingRequests.values())
+      controller.abort();
+    this.gatewayBillingRequests.clear();
+  }
+
+  private gatewayBillingRequest(id: number | string, params: unknown): void {
+    if (this.gatewayBillingRequests.has(id))
+      throw new Error("native_agent_gateway_request_id_reused");
+    const value = object(params);
+    if (
+      this.gatewayBillingRequests.size >= REQUEST_LIMIT ||
+      Object.keys(value ?? {}).length !== 1 ||
+      typeof value?.requestId !== "string"
+    ) {
+      this.write({ jsonrpc: "2.0", id, result: { kind: "unavailable" } });
+      return;
+    }
+    const controller = new AbortController();
+    this.gatewayBillingRequests.set(id, controller);
+    void this.gatewayJobBilling!(value.requestId, controller.signal)
+      .then((result) => {
+        if (this.connected && !controller.signal.aborted)
+          this.write({ jsonrpc: "2.0", id, result });
+      })
+      .catch(() => this.disconnect("native_agent_gateway_billing_reply_failed"))
+      .finally(() => this.gatewayBillingRequests.delete(id));
   }
 
   private providerRequest(id: number | string, params: unknown): void {

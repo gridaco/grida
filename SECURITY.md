@@ -2078,6 +2078,12 @@ levels into one.
    evidence to the captured scope. Pending observations carry no amount.
    The early request ID remains available on cancellation, and generic
    compatible endpoints have no Gateway receipt decoder.
+   The private [billing lookup](crates/grida-agent/src/acp/extensions/gateway_billing.rs)
+   resolves the retained request ID from one attached session's exact
+   inference attempt and compares its original authority with the current
+   Gateway scope. Main uses the current scoped grant for a bounded fixed
+   jobs GET. The response exposes settlement status and a verified amount,
+   and leaves the original inference receipt intact.
    Independent native hosts keep their own account custody under GRIDA-SEC-010.
    The fixed exchange delivers a frozen GG grant only to a construction-time
    trusted synchronous memory sink; its public result contains only org/expiry

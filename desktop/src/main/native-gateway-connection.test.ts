@@ -12,6 +12,7 @@ import type {
   DesktopGatewayGrant,
 } from "./account-session";
 import { NativeGatewayConnection } from "./native-gateway-connection";
+import type { NativeGatewayJobNetwork } from "./native-gateway-connection";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 import { NativeAgentProcess } from "./native-agent-process";
 import { NativeAgentChat } from "./native-agent-chat";
@@ -140,6 +141,55 @@ it("does not dispatch after a scope change, a cancelled request, or close during
   expect(owner.dispatch).not.toHaveBeenCalled();
 });
 
+it("reads only exact job billing and discards a response after account withdrawal", async () => {
+  let live = true;
+  const owner = fixture({ isCurrent: () => live });
+  const jobNetwork = vi.fn<NativeGatewayJobNetwork>(async () =>
+    Response.json({
+      id: "req_accepted",
+      request_id: "req_accepted",
+      billing: { status: "settled", charged_mills: "0" },
+      result: { private: "ignored" },
+    })
+  );
+  const connection = await NativeGatewayConnection.open({
+    ...owner.options,
+    jobNetwork,
+  });
+  const signal = new AbortController().signal;
+  try {
+    await expect(
+      connection.readJobBilling("../arbitrary", signal)
+    ).resolves.toEqual({ kind: "unavailable" });
+    expect(jobNetwork).not.toHaveBeenCalled();
+    await expect(
+      connection.readJobBilling("req_accepted", signal)
+    ).resolves.toEqual({ kind: "settled", chargedMills: "0" });
+    expect(jobNetwork).toHaveBeenLastCalledWith(
+      "req_accepted",
+      owner.grant.token,
+      expect.any(AbortSignal)
+    );
+    await expect(
+      connection.readJobBilling("req_other", signal)
+    ).resolves.toEqual({ kind: "unavailable" });
+    jobNetwork.mockImplementationOnce(async () => {
+      live = false;
+      return Response.json({
+        id: "req_accepted",
+        request_id: "req_accepted",
+        billing: { status: "settled", charged_mills: "3" },
+      });
+    });
+    await expect(
+      connection.readJobBilling("req_accepted", signal)
+    ).resolves.toEqual({ kind: "unavailable" });
+    expect(owner.dispatch).not.toHaveBeenCalled();
+  } finally {
+    connection.close();
+  }
+});
+
 const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 it.skipIf(!resourcesPath)(
   "retains only the exact Gateway billing receipt across native restart",
@@ -152,8 +202,19 @@ it.skipIf(!resourcesPath)(
     const genericDirectory = path.join(root, "generic");
     await fs.mkdir(cwd, { mode: 0o700 });
     const owner = fixture();
-    const connection = await NativeGatewayConnection.open(owner.options);
-    const { gatewayScope, ...generic } = connection.launch("fixture");
+    let billing: {
+      status: "pending" | "settled";
+      charged_mills: string | null;
+    } = { status: "pending", charged_mills: null };
+    const jobNetwork = vi.fn<NativeGatewayJobNetwork>(async (requestId) =>
+      Response.json({ id: requestId, request_id: requestId, billing })
+    );
+    const connection = await NativeGatewayConnection.open({
+      ...owner.options,
+      jobNetwork,
+    });
+    const { gatewayScope, gatewayJobBilling, ...generic } =
+      connection.launch("fixture");
     const scope = [
       ...createHash("sha256")
         .update(
@@ -166,6 +227,7 @@ it.skipIf(!resourcesPath)(
       { request_id: "req_pending", status: "pending", charged_mills: null },
       { request_id: "req_other", status: "settled", charged_mills: "7" },
       { request_id: "req_zero", status: "settled", charged_mills: "0" },
+      { request_id: "req_interrupted", status: "pending", charged_mills: null },
       { request_id: "req_generic", status: "settled", charged_mills: "9" },
     ];
     const requestIds = [
@@ -173,6 +235,7 @@ it.skipIf(!resourcesPath)(
       "req_pending",
       "req_mismatch",
       "req_zero",
+      "req_interrupted",
       "req_generic",
     ];
     let calls = 0;
@@ -189,23 +252,24 @@ it.skipIf(!resourcesPath)(
         ],
         grida_billing: { version: 1, ...observations[index] },
       };
-      return new Response(
-        `data: ${JSON.stringify(frame)}\n\ndata: [DONE]\n\n`,
-        {
-          headers: {
-            "content-type": "text/event-stream",
-            "x-request-id": requestIds[index],
-          },
-        }
-      );
+      const done =
+        requestIds[index] === "req_interrupted" ? "" : "data: [DONE]\n\n";
+      return new Response(`data: ${JSON.stringify(frame)}\n\n${done}`, {
+        headers: {
+          "content-type": "text/event-stream",
+          "x-request-id": requestIds[index],
+        },
+      });
     });
     const open = (directory: string, trusted: boolean) =>
       NativeAgentProcess.start({
-        ...(trusted ? { ...generic, gatewayScope } : generic),
+        ...(trusted
+          ? { ...generic, gatewayScope, gatewayJobBilling }
+          : generic),
         resourcesPath: resourcesPath!,
         stateDirectory: directory,
       });
-    const receipts = (directory: string, session: string) => {
+    const retainedTurns = (directory: string, session: string) => {
       const db = new DatabaseSync(path.join(directory, "runtime.sqlite"), {
         readOnly: true,
       });
@@ -219,7 +283,9 @@ it.skipIf(!resourcesPath)(
           const turn = JSON.parse(String(snapshot));
           type Receipt = { schema: string; bytes: number[] };
           const operations = Object.values(turn.operations) as Array<{
+            record: { id: string };
             attempts: Array<{
+              id: string;
               outcome: {
                 value: { receipt: Receipt; terminal_receipt?: Receipt };
               };
@@ -233,17 +299,29 @@ it.skipIf(!resourcesPath)(
             terminal_receipt.schema !== "grida.gateway.billing-receipt"
           )
             throw new Error("unexpected terminal receipt schema");
-          return [
-            Buffer.from(receipt.bytes).toString("utf8"),
-            terminal_receipt
-              ? JSON.parse(Buffer.from(terminal_receipt.bytes).toString("utf8"))
-              : null,
-          ];
+          return {
+            attempt: {
+              sessionId: session,
+              turnId: String(turn.binding.turn),
+              operationId: operations[0].record.id,
+              attemptId: operations[0].attempts[0].id,
+            },
+            receipt: [
+              Buffer.from(receipt.bytes).toString("utf8"),
+              terminal_receipt
+                ? JSON.parse(
+                    Buffer.from(terminal_receipt.bytes).toString("utf8")
+                  )
+                : null,
+            ],
+          };
         });
       } finally {
         db.close();
       }
     };
+    const receipts = (directory: string, session: string) =>
+      retainedTurns(directory, session).map(({ receipt }) => receipt);
     const start = async (agent: NativeAgentProcess) =>
       (await agent.request("session/new", {
         cwd,
@@ -255,6 +333,7 @@ it.skipIf(!resourcesPath)(
         prompt: [{ type: "text", text: "Fixture prompt" }],
       });
     let agent: NativeAgentProcess | undefined;
+    let foreign: NativeGatewayConnection | undefined;
     try {
       agent = await open(stateDirectory, true);
       const { sessionId } = await start(agent);
@@ -263,19 +342,68 @@ it.skipIf(!resourcesPath)(
           stopReason: "end_turn",
         });
       }
+      await expect(prompt(agent, sessionId)).rejects.toThrow(
+        "agent_turn_uncertain"
+      );
+      const [first, pending, , , interrupted] = retainedTurns(
+        stateDirectory,
+        sessionId
+      );
+      await expect(
+        agent.gatewayBillingStatus(pending.attempt)
+      ).resolves.toEqual({ kind: "pending" });
+      await expect(
+        agent.gatewayBillingStatus({ ...pending.attempt, attemptId: "stale" })
+      ).resolves.toEqual({ kind: "unavailable" });
+      await expect(
+        agent.gatewayBillingStatus({
+          ...pending.attempt,
+          turnId: first.attempt.turnId,
+        })
+      ).resolves.toEqual({ kind: "unavailable" });
+      expect(jobNetwork).toHaveBeenCalledTimes(1);
       await agent.close();
       const expected = [
         ["req_settled", { ...observations[0], scope }],
         ["req_pending", { ...observations[1], scope }],
         ["req_mismatch", null],
         ["req_zero", { ...observations[3], scope }],
+        ["req_interrupted", null],
       ];
       expect(receipts(stateDirectory, sessionId)).toEqual(expected);
+      billing = { status: "settled", charged_mills: "0.125" };
       agent = await open(stateDirectory, true);
       await agent.request("session/load", { sessionId, cwd, mcpServers: [] });
+      await expect(
+        agent.gatewayBillingStatus(pending.attempt)
+      ).resolves.toEqual({ kind: "settled", chargedMills: "0.125" });
+      await expect(
+        agent.gatewayBillingStatus(interrupted.attempt)
+      ).resolves.toEqual({ kind: "settled", chargedMills: "0.125" });
+      expect(jobNetwork.mock.calls.map(([id]) => id)).toEqual([
+        "req_pending",
+        "req_pending",
+        "req_interrupted",
+      ]);
       await agent.close();
       expect(receipts(stateDirectory, sessionId)).toEqual(expected);
-      expect(calls).toBe(4);
+      expect(calls).toBe(5);
+
+      foreign = await NativeGatewayConnection.open({
+        ...fixture({ organizationId: 13 }).options,
+        jobNetwork,
+      });
+      agent = await NativeAgentProcess.start({
+        ...foreign.launch("fixture"),
+        resourcesPath: resourcesPath!,
+        stateDirectory,
+      });
+      await agent.request("session/load", { sessionId, cwd, mcpServers: [] });
+      await expect(
+        agent.gatewayBillingStatus(pending.attempt)
+      ).resolves.toEqual({ kind: "unavailable" });
+      expect(jobNetwork).toHaveBeenCalledTimes(3);
+      await agent.close();
 
       agent = await open(genericDirectory, false);
       const genericSession = await start(agent);
@@ -286,12 +414,13 @@ it.skipIf(!resourcesPath)(
       expect(receipts(genericDirectory, genericSession.sessionId)).toEqual([
         ["req_generic", null],
       ]);
-      expect(calls).toBe(5);
+      expect(calls).toBe(6);
     } finally {
       try {
         await agent?.close();
       } finally {
         connection.close();
+        foreign?.close();
         await fs.rm(root, { recursive: true, force: true });
       }
     }

@@ -757,6 +757,35 @@ impl Host {
         self.store.inspect(id).await
     }
 
+    fn supervised_gateway(&self) -> Option<&Arc<crate::gg::SupervisedGg>> {
+        let Credential::SupervisedGg(gateway) = &self.execution.as_ref()?.authorization.credential
+        else {
+            return None;
+        };
+        Some(gateway)
+    }
+
+    pub(crate) fn supports_gateway_billing_status(&self) -> bool {
+        self.supervised_gateway().is_some()
+    }
+
+    pub(crate) async fn gateway_billing_request_id(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+        operation: OperationId,
+        attempt: agent_kit_core::AttemptId,
+    ) -> Option<String> {
+        let gateway = self.supervised_gateway()?.clone();
+        gateway.validate().ok()?;
+        self.store
+            .inspect_turn_with(session, turn, move |state| {
+                Ok(gateway.retained_request_id(state, &operation, &attempt))
+            })
+            .await
+            .ok()?
+    }
+
     pub(crate) async fn settled_summary(
         &self,
         session: SessionId,

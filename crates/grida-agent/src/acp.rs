@@ -232,6 +232,15 @@ async fn serve_connection(
                         return responder.respond_with_error(host_error(error));
                     }
                     advertised.insert(capability.into(), 1.into());
+                    let billing = extensions::gateway_billing::CAPABILITY;
+                    if reviewer
+                        && initialized_host.supports_gateway_billing_status()
+                        && request.client_capabilities.meta.as_ref()
+                            .and_then(|meta| meta.get(billing))
+                            .and_then(serde_json::Value::as_u64) == Some(1)
+                    {
+                        advertised.insert(billing.into(), 1.into());
+                    }
                     let capability = crate::host::image_generation::CAPABILITY;
                     if reviewer
                         && let Some(generation) = &initialized_host.desktop_image_generation
@@ -328,6 +337,7 @@ async fn serve_connection(
                             crate::editor_surfaces::CAPABILITY,
                             crate::editor_surfaces::OPEN_CAPABILITY,
                             crate::editor_surfaces::SVG_TEXT_CAPABILITY,
+                            extensions::gateway_billing::CAPABILITY,
                         ]
                         .into_iter()
                         .filter(|key| advertised.contains_key(*key)),

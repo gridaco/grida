@@ -499,14 +499,19 @@ export class AgentSidecarSupervisor {
     organizationId?: number,
     signal?: AbortSignal
   ): Promise<NativeGatewayConnection> {
-    const network = await AgentNetworkHost.nativeProviderNetwork(
-      this.networkAuthority,
-      AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
-    );
+    const origin = new URL(EDITOR_BASE_URL).origin;
+    const [network, jobNetwork] = await Promise.all([
+      AgentNetworkHost.nativeProviderNetwork(
+        this.networkAuthority,
+        AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+      ),
+      AgentNetworkHost.nativeGatewayJobNetwork(this.networkAuthority, origin),
+    ]);
     return await NativeGatewayConnection.open({
-      origin: new URL(EDITOR_BASE_URL).origin,
+      origin,
       account,
       network,
+      jobNetwork,
       organizationId,
       signal,
     });
