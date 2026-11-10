@@ -595,21 +595,10 @@ lists their parameters.
 
 ### Ask the agent to check later
 
-In native Desktop chat, select **Allow one scheduled check-in** before
-sending a text message from an idle chat in Act. Tell the agent what to check
-and when. If the agent schedules a check-in, the chat shows its purpose and
-time. The task waits without an open model request. When the check-in comes
-due, the running host continues the same task if it can run.
-
-**Pause** holds delivery until you choose **Resume**. **Stop** ends the task.
-**Cancel check-in** removes the scheduled follow-up. Choose **Continue** if
-you want the waiting task to proceed after cancellation, or **Resume** if
-you paused it. After restarting Desktop, open the same chat and choose
-**Restore schedule**. A restored check-in in a paused task still needs
-**Resume**.
-
 Private ACP clients can opt in on a single Act submission and inspect the
-retained time, reason, status, and whether the host has armed the timer.
+retained time, reason, status, and whether the host has armed the timer. They
+can cancel the wait, explicitly continue the task, or restore its schedule
+after restart. For the Desktop workflow, see [Schedule a follow-up](./scheduled-work.md).
 
 The [feature catalog](./features.md) describes the wider agent experience and
 the availability of its product features.
