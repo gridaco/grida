@@ -9,7 +9,7 @@ use crate::{
 use futures_core::stream::BoxStream;
 use futures_util::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU64;
 use std::time::Instant;
 
@@ -358,13 +358,85 @@ pub struct InputMeasurement {
 pub struct InferenceRun {
     stream: BoxStream<'static, ProviderEvent>,
     cancellation: CancellationToken,
+    attempt: AttemptId,
     maximum: usize,
     received: usize,
     terminal: Option<InferenceOutcome>,
     partial: Vec<Message>,
-    usage: Vec<UsageObservation>,
+    usage: UsageEvidence,
     receipt: Option<Envelope>,
     receipt_bytes: usize,
+}
+
+#[derive(Default)]
+struct UsageEvidence {
+    latest: BTreeMap<(String, String, String), (UsageObservation, usize)>,
+    bytes: usize,
+}
+
+impl UsageEvidence {
+    fn retain(
+        &mut self,
+        attempt: &AttemptId,
+        observation: UsageObservation,
+        limit: usize,
+    ) -> std::result::Result<(), (FailureKind, &'static str)> {
+        if &observation.attempt != attempt {
+            return Err((FailureKind::Protocol, "usage_attempt_mismatch"));
+        }
+        let oversized = (FailureKind::OutputLimit, "response_byte_limit");
+        if observation
+            .source
+            .len()
+            .saturating_add(observation.category.len())
+            .saturating_add(observation.unit.len())
+            > limit
+        {
+            return Err(oversized);
+        }
+        let key = (
+            observation.source.clone(),
+            observation.category.clone(),
+            observation.unit.clone(),
+        );
+        let previous_bytes = match self.latest.get(&key) {
+            Some((previous, _)) if previous.revision > observation.revision => return Ok(()),
+            Some((previous, _)) if previous.revision == observation.revision => {
+                return if previous == &observation {
+                    Ok(())
+                } else {
+                    Err((FailureKind::Protocol, "usage_revision_conflict"))
+                };
+            }
+            Some((_, size)) => *size,
+            None => 0,
+        };
+        // Charge one separator byte per observation and one opening bracket.
+        let bytes = encoded_size(&observation).saturating_add(1);
+        let total = (self.bytes - previous_bytes).saturating_add(bytes);
+        if total.saturating_add(1) > limit {
+            return Err(oversized);
+        }
+        self.bytes = total;
+        self.latest.insert(key, (observation, bytes));
+        Ok(())
+    }
+
+    fn encoded_size(&self) -> usize {
+        self.bytes.saturating_add(usize::from(self.bytes > 0))
+    }
+
+    fn take(&mut self) -> Vec<UsageObservation> {
+        self.bytes = 0;
+        std::mem::take(&mut self.latest)
+            .into_values()
+            .map(|(value, _)| value)
+            .collect()
+    }
+}
+
+fn encoded_size(value: &impl Serialize) -> usize {
+    serde_json::to_vec(value).map_or(usize::MAX, |bytes| bytes.len())
 }
 
 impl InferenceRun {
@@ -383,11 +455,12 @@ impl InferenceRun {
         Self {
             stream: create(child),
             cancellation,
+            attempt: control.attempt,
             maximum: control.max_output_bytes,
             received: 0,
             terminal: None,
             partial: vec![],
-            usage: vec![],
+            usage: UsageEvidence::default(),
             receipt: None,
             receipt_bytes: 0,
         }
@@ -415,7 +488,7 @@ impl InferenceRun {
                     let size = if receipt.bytes().len() > remaining {
                         usize::MAX
                     } else {
-                        serde_json::to_vec(&receipt).map_or(usize::MAX, |bytes| bytes.len())
+                        encoded_size(&receipt)
                     };
                     if size > remaining {
                         self.interrupt(
@@ -430,7 +503,7 @@ impl InferenceRun {
                     self.receipt = Some(receipt);
                 }
                 Some(ProviderEvent::Update(update)) => {
-                    let size = serde_json::to_vec(&update).map_or(usize::MAX, |bytes| bytes.len());
+                    let size = encoded_size(&update);
                     if size > self.maximum.saturating_sub(self.received) {
                         self.interrupt(
                             FailureKind::OutputLimit,
@@ -440,6 +513,14 @@ impl InferenceRun {
                         continue;
                     }
                     self.received += size;
+                    if let InferenceUpdate::Usage(observation) = &update
+                        && let Err((kind, code)) =
+                            self.usage
+                                .retain(&self.attempt, observation.clone(), self.maximum)
+                    {
+                        self.interrupt(kind, InferenceStatus::Interrupted, code);
+                        continue;
+                    }
                     self.capture(&update);
                     return Some(update);
                 }
@@ -460,9 +541,9 @@ impl InferenceRun {
                         }
                         outcome.receipt = Some(receipt);
                     }
-                    let size = serde_json::to_vec(&outcome.messages)
-                        .map_or(usize::MAX, |bytes| bytes.len());
-                    if size > self.maximum.saturating_sub(self.receipt_bytes) {
+                    let remaining = self.maximum.saturating_sub(self.receipt_bytes);
+                    let mut size = encoded_size(&outcome.messages);
+                    if size.saturating_add(self.usage.encoded_size()) > remaining {
                         outcome.messages = std::mem::take(&mut self.partial);
                         outcome.status = InferenceStatus::Limited;
                         outcome.failure.get_or_insert(InferenceFailure {
@@ -471,10 +552,29 @@ impl InferenceRun {
                             retry_after_ms: None,
                             dispatch: None,
                         });
+                        size = encoded_size(&outcome.messages);
                     }
-                    if outcome.usage.is_empty() {
-                        outcome.usage = std::mem::take(&mut self.usage);
+                    for observation in std::mem::take(&mut outcome.usage) {
+                        if let Err((kind, code)) = self.usage.retain(
+                            &self.attempt,
+                            observation,
+                            remaining.saturating_sub(size),
+                        ) {
+                            outcome.status = if kind == FailureKind::OutputLimit {
+                                InferenceStatus::Limited
+                            } else {
+                                InferenceStatus::Interrupted
+                            };
+                            outcome.failure = Some(InferenceFailure {
+                                kind,
+                                code: code.into(),
+                                retry_after_ms: None,
+                                dispatch: None,
+                            });
+                            break;
+                        }
                     }
+                    outcome.usage = self.usage.take();
                     self.terminal = Some(outcome);
                 }
                 None => {
@@ -510,7 +610,7 @@ impl InferenceRun {
         self.terminal = Some(InferenceOutcome {
             status,
             messages: std::mem::take(&mut self.partial),
-            usage: std::mem::take(&mut self.usage),
+            usage: self.usage.take(),
             failure: Some(InferenceFailure {
                 kind,
                 code: code.into(),
@@ -538,7 +638,7 @@ impl InferenceRun {
                 let id = MessageId::new("provider-state").expect("constant identity");
                 self.capture_content(id, Content::ProviderState(state.clone()));
             }
-            InferenceUpdate::Usage(usage) => self.usage.push(usage.clone()),
+            InferenceUpdate::Usage(_) => {}
         }
     }
 

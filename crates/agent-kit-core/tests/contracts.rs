@@ -6,7 +6,7 @@ use agent_kit_core::history::{History, HistoryPosition, HistoryProjection, Histo
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceOutcome, InferenceRequest, InferenceRun,
     InferenceStatus, InferenceUpdate, InputFormat, MeasurementKind, Modality, ModelCapabilities,
-    ProviderBinding, ProviderEvent,
+    ProviderBinding, ProviderEvent, UsageObservation,
 };
 use agent_kit_core::messages::{
     Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
@@ -561,6 +561,118 @@ async fn inference_eof_retains_partial_content_and_is_interrupted() {
         result.messages[0].content[0],
         Content::Text("partial".into())
     );
+}
+
+fn usage(category: &str, revision: u64, quantity: u64) -> UsageObservation {
+    UsageObservation {
+        attempt: AttemptId::new("attempt").unwrap(),
+        source: "fixture".into(),
+        category: category.into(),
+        unit: "tokens".into(),
+        revision,
+        quantity,
+        certainty: MeasurementKind::Exact,
+        final_value: revision > 1,
+    }
+}
+
+fn finished_with_usage(usage: Vec<UsageObservation>) -> ProviderEvent {
+    ProviderEvent::Finished(InferenceOutcome {
+        status: InferenceStatus::Completed,
+        messages: Vec::new(),
+        usage,
+        failure: None,
+        receipt: None,
+    })
+}
+
+#[tokio::test]
+async fn inference_retains_stream_only_usage_and_normalizes_terminal_revisions() {
+    let input = usage("input_tokens", 1, 11);
+    let provisional_output = usage("output_tokens", 1, 3);
+    let final_output = usage("output_tokens", 2, 7);
+    let mut run = InferenceRun::from_stream(inference_control(CancellationToken::new()), |_| {
+        Box::pin(stream::iter([
+            ProviderEvent::Update(InferenceUpdate::Usage(input.clone())),
+            ProviderEvent::Update(InferenceUpdate::Usage(provisional_output.clone())),
+            finished_with_usage(vec![
+                final_output.clone(),
+                final_output.clone(),
+                provisional_output.clone(),
+            ]),
+        ]))
+    });
+    assert_eq!(
+        run.next().await,
+        Some(InferenceUpdate::Usage(input.clone()))
+    );
+    assert_eq!(
+        run.next().await,
+        Some(InferenceUpdate::Usage(provisional_output))
+    );
+    let result = run.finish().await;
+    assert_eq!(result.status, InferenceStatus::Completed);
+    assert_eq!(result.usage, vec![input, final_output]);
+}
+
+#[tokio::test]
+async fn inference_bounds_terminal_usage_and_retains_the_accepted_prefix() {
+    let input = usage("input_tokens", 1, 11);
+    let output = usage("output_tokens", 2, 7);
+    let extra = usage("reasoning_output_tokens", 2, 5);
+    let receipt = envelope("request-id");
+    let limit = serde_json::to_vec(&[input.clone(), output.clone()])
+        .unwrap()
+        .len()
+        + serde_json::to_vec(&receipt).unwrap().len()
+        + serde_json::to_vec(&Vec::<Message>::new()).unwrap().len();
+    let run = InferenceRun::from_stream(
+        InferenceControl {
+            max_output_bytes: limit,
+            ..inference_control(CancellationToken::new())
+        },
+        |_| {
+            Box::pin(stream::iter([
+                ProviderEvent::Receipt(receipt.clone()),
+                ProviderEvent::Update(InferenceUpdate::Usage(input.clone())),
+                finished_with_usage(vec![output.clone(), output.clone(), extra]),
+            ]))
+        },
+    );
+    let result = run.finish().await;
+    assert_eq!(result.status, InferenceStatus::Limited);
+    assert_eq!(result.failure.unwrap().code, "response_byte_limit");
+    assert_eq!(result.usage, vec![input, output]);
+    assert_eq!(result.receipt, Some(receipt));
+}
+
+#[tokio::test]
+async fn invalid_usage_does_not_poison_the_attempts_accepted_evidence() {
+    let input = usage("input_tokens", 1, 11);
+    let mut wrong_attempt = input.clone();
+    wrong_attempt.attempt = AttemptId::new("unrelated").unwrap();
+    let outcomes = [
+        (
+            ProviderEvent::Update(InferenceUpdate::Usage(wrong_attempt)),
+            "usage_attempt_mismatch",
+        ),
+        (
+            finished_with_usage(vec![usage("input_tokens", 1, 99)]),
+            "usage_revision_conflict",
+        ),
+    ];
+    for (invalid, expected) in outcomes {
+        let run = InferenceRun::from_stream(inference_control(CancellationToken::new()), |_| {
+            Box::pin(stream::iter([
+                ProviderEvent::Update(InferenceUpdate::Usage(input.clone())),
+                invalid,
+            ]))
+        });
+        let result = run.finish().await;
+        assert_eq!(result.status, InferenceStatus::Interrupted);
+        assert_eq!(result.failure.unwrap().code, expected);
+        assert_eq!(result.usage, vec![input.clone()]);
+    }
 }
 
 #[tokio::test]
