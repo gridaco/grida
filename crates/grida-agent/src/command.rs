@@ -665,6 +665,7 @@ pub(crate) fn project_process(
     let stop_reason = evidence.stopped.map(|reason| match reason {
         StopReason::Requested => "requested",
         StopReason::Deadline => "deadline",
+        StopReason::InputLimit => "input_limit",
         StopReason::OutputLimit => "output_limit",
     });
     let status = match (verified, evidence.completion, evidence.stopped) {

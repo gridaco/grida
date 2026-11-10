@@ -11,6 +11,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 fn trusted(path: impl AsRef<Path>) -> TrustedExecutable {
     let path = fs::canonicalize(path).unwrap();
@@ -116,6 +117,18 @@ impl Fixture {
             arguments: vec!["-c".into(), script.into(), "sh".into()],
             cwd: self.workspace.clone(),
             environment: BTreeMap::from([("VISIBLE".into(), "approved".into())]),
+            stdin: vec![],
+            timeout: Duration::from_secs(5),
+            max_output_bytes: 4096,
+        }
+    }
+
+    fn stream_command(&self, executable: &TrustedExecutable) -> ProcessSpec {
+        ProcessSpec {
+            executable: executable.path.clone(),
+            arguments: vec![],
+            cwd: self.workspace.clone(),
+            environment: BTreeMap::new(),
             stdin: vec![],
             timeout: Duration::from_secs(5),
             max_output_bytes: 4096,
@@ -327,6 +340,111 @@ async fn native_output_and_cancellation_are_bounded() {
     let result = run.finish().await.unwrap();
     assert_eq!(result.stopped, Some(StopReason::Requested));
     assert!(result.temporary_removed);
+    #[cfg(target_os = "macos")]
+    assert_eq!(result.descendants, Descendants::ProcessGroupSignalled);
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn reviewed_streaming_stdio_exchanges_binary_data_and_closes() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let cat = trusted("/bin/cat");
+    let scope = fixture.scope();
+    let mut wrong = cat.clone();
+    wrong.sha256[0] ^= 1;
+    let error = sandbox
+        .prepare(fixture.stream_command(&cat), scope.clone())
+        .unwrap()
+        .spawn_streaming(&wrong, CancellationToken::new())
+        .err()
+        .unwrap();
+    assert_eq!(error.code, "reviewed_executable_changed");
+
+    let mut fixed = fixture.stream_command(&cat);
+    fixed.stdin = b"fixed".to_vec();
+    let error = sandbox
+        .prepare(fixed, scope.clone())
+        .unwrap()
+        .spawn_streaming(&cat, CancellationToken::new())
+        .err()
+        .unwrap();
+    assert_eq!(error.code, "sandbox_fixed_stdin_present");
+
+    let (running, mut stream) = sandbox
+        .prepare(fixture.stream_command(&cat), scope)
+        .unwrap()
+        .spawn_streaming(&cat, CancellationToken::new())
+        .unwrap();
+    // Each response must arrive before the writer reaches EOF.
+    for message in [[0xff, 0, 0x0a], [0, 0x0d, 0x80]] {
+        stream.write_all(&message).await.unwrap();
+        let mut response = [0; 3];
+        stream.read_exact(&mut response).await.unwrap();
+        assert_eq!(response, message);
+    }
+    stream.shutdown().await.unwrap();
+    assert_eq!(stream.read(&mut [0; 1]).await.unwrap(), 0);
+    let result = running.finish().await.unwrap();
+    assert_eq!(result.completion, Completion::Exited(0), "{result:?}");
+    assert_eq!(result.stopped, None, "{result:?}");
+    assert!(result.stdout.is_empty() && result.stderr.is_empty());
+    assert!(!result.output_truncated);
+    assert!(result.temporary_removed);
+    #[cfg(target_os = "macos")]
+    assert_eq!(result.descendants, Descendants::ProcessGroupSignalled);
+    #[cfg(target_os = "linux")]
+    assert_eq!(result.descendants, Descendants::NamespaceEnded);
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn reviewed_streaming_stdio_retains_bounds_and_stop_ownership() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let cat = trusted("/bin/cat");
+    let mut output = fixture.stream_command(&cat);
+    output.max_output_bytes = 8;
+    let (running, mut stream) = sandbox
+        .prepare(output, fixture.scope())
+        .unwrap()
+        .spawn_streaming(&cat, CancellationToken::new())
+        .unwrap();
+    stream.write_all(b"123456789").await.unwrap();
+    let mut received = Vec::new();
+    stream.read_to_end(&mut received).await.unwrap();
+    let result = running.finish().await.unwrap();
+    assert_eq!(received, b"12345678");
+    assert_eq!(result.stopped, Some(StopReason::OutputLimit), "{result:?}");
+    assert!(result.output_truncated && result.temporary_removed);
+
+    let wc = trusted("/usr/bin/wc");
+    let mut input = fixture.stream_command(&wc);
+    input.arguments.push("-c".into());
+    let (running, mut stream) = sandbox
+        .prepare(input, fixture.scope())
+        .unwrap()
+        .spawn_streaming(&wc, CancellationToken::new())
+        .unwrap();
+    let _ = stream.write_all(&vec![0; 1024 * 1024 + 1]).await;
+    let result = running.finish().await.unwrap();
+    assert_eq!(result.stopped, Some(StopReason::InputLimit), "{result:?}");
+    assert!(result.temporary_removed);
+
+    let (running, mut stream) = sandbox
+        .prepare(fixture.stream_command(&cat), fixture.scope())
+        .unwrap()
+        .spawn_streaming(&cat, CancellationToken::new())
+        .unwrap();
+    stream.write_all(b"ready").await.unwrap();
+    let mut ready = [0; 5];
+    stream.read_exact(&mut ready).await.unwrap();
+    assert_eq!(&ready, b"ready");
+    running.request_stop();
+    let result = running.finish().await.unwrap();
+    assert_eq!(result.stopped, Some(StopReason::Requested), "{result:?}");
+    assert!(result.temporary_removed);
+    assert_eq!(stream.read(&mut [0; 1]).await.unwrap(), 0);
     #[cfg(target_os = "macos")]
     assert_eq!(result.descendants, Descendants::ProcessGroupSignalled);
 }

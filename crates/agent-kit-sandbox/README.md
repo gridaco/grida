@@ -1,6 +1,6 @@
 # agent-kit-sandbox
 
-Run a finite command under a host-issued native filesystem scope with raw
+Run a bounded process under a host-issued native filesystem scope with raw
 networking denied. The caller validates current authority and chooses the
 approved executable, working directory, runtime files, environment, and limits.
 The crate owns preparation, launch, cancellation, and native evidence.
@@ -27,6 +27,16 @@ Ordinary payloads inherit only stdin, stdout, and stderr. The helper reports
 whether a command started and how it exited on a separate close-on-exec
 descriptor. Launcher exit alone cannot establish payload completion. Stopping
 an operation bounds cleanup attempts and preserves uncertain effects.
+
+Trusted embedders on macOS and Linux can open bidirectional stdio with
+`PreparedProcess::spawn_streaming`. This requires a reviewed system executable
+and its pinned digest, and the process specification must have empty fixed
+stdin. The host supplies the exact arguments and scope during preparation.
+The stream carries opaque bytes through bounded buffers. Closing its writer
+sends EOF. Read stdout concurrently with request writes and continue draining
+it through shutdown. The existing output budget covers streamed stdout and
+captured stderr together, and the separate stdin budget stops excess input.
+The running handle still owns cancellation, cleanup, and native evidence.
 
 ## Profiles
 

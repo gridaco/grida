@@ -93,6 +93,7 @@ pub struct Support {
 pub enum StopReason {
     Requested,
     Deadline,
+    InputLimit,
     OutputLimit,
 }
 
@@ -248,6 +249,22 @@ impl PreparedProcess {
             let _ = cancellation;
             Err(unavailable())
         }
+    }
+
+    /// Open bounded, bidirectional stdio to a reviewed system executable.
+    ///
+    /// The stream carries only payload stdin and stdout. Closing its writer
+    /// sends EOF. The running handle owns termination and evidence, including
+    /// captured stderr. Read stdout while the process runs to allow progress.
+    /// The process specification must have empty fixed stdin.
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub fn spawn_streaming(
+        self,
+        executable: &TrustedExecutable,
+        cancellation: CancellationToken,
+    ) -> Result<(RunningProcess, tokio::io::DuplexStream)> {
+        let (native, stream) = self.native.spawn_streaming(executable, cancellation)?;
+        Ok((RunningProcess { native }, stream))
     }
 }
 

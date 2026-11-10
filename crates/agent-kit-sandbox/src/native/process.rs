@@ -4,7 +4,7 @@ use std::os::fd::AsRawFd;
 use std::os::unix::net::UnixStream;
 use std::process::Stdio;
 use std::sync::Mutex;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt, DuplexStream, WriteHalf};
 use tokio::process::{Child, Command};
 use tokio::task::JoinHandle;
 
@@ -34,7 +34,11 @@ impl Drop for Running {
     }
 }
 
-pub(super) fn spawn(prepared: Prepared, cancellation: CancellationToken) -> Result<Running> {
+pub(super) fn spawn(
+    prepared: Prepared,
+    cancellation: CancellationToken,
+    stream: Option<DuplexStream>,
+) -> Result<Running> {
     tokio::runtime::Handle::try_current()
         .map_err(|_| refused(ErrorKind::InvalidState, "sandbox_async_runtime_required"))?;
     let payload = serde_json::to_vec(&prepared.launch)
@@ -76,6 +80,7 @@ pub(super) fn spawn(prepared: Prepared, cancellation: CancellationToken) -> Resu
         payload,
         cancellation,
         stop.clone(),
+        stream,
     ));
     Ok(Running { stop, task })
 }
@@ -242,6 +247,7 @@ fn configure_spawn(command: &mut Command, preserve: i32) -> Result<()> {
 struct Output {
     stdout: Vec<u8>,
     stderr: Vec<u8>,
+    received: usize,
     truncated: bool,
 }
 
@@ -251,24 +257,38 @@ async fn capture_output(
     stderr: bool,
     max: usize,
     overflow: CancellationToken,
+    mut forward: Option<WriteHalf<DuplexStream>>,
 ) {
     let mut bytes = [0; 8192];
     loop {
         match input.read(&mut bytes).await {
             Ok(0) => return,
             Ok(count) => {
-                let mut output = capture.lock().expect("output lock");
-                let remaining = max - output.stdout.len() - output.stderr.len();
-                let take = count.min(remaining);
-                let target = if stderr {
-                    &mut output.stderr
-                } else {
-                    &mut output.stdout
+                let take = {
+                    let mut output = capture.lock().expect("output lock");
+                    let take = count.min(max - output.received);
+                    output.received += take;
+                    if forward.is_none() {
+                        let target = if stderr {
+                            &mut output.stderr
+                        } else {
+                            &mut output.stdout
+                        };
+                        target.extend_from_slice(&bytes[..take]);
+                    }
+                    if take < count {
+                        output.truncated = true;
+                        overflow.cancel();
+                    }
+                    take
                 };
-                target.extend_from_slice(&bytes[..take]);
+                if let Some(writer) = &mut forward
+                    && writer.write_all(&bytes[..take]).await.is_err()
+                {
+                    capture.lock().expect("output lock").truncated = true;
+                    return;
+                }
                 if take < count {
-                    output.truncated = true;
-                    overflow.cancel();
                     return;
                 }
             }
@@ -287,9 +307,14 @@ async fn supervise(
     payload: Vec<u8>,
     cancellation: CancellationToken,
     stop: CancellationToken,
+    stream: Option<DuplexStream>,
 ) -> ProcessEvidence {
     let capture = Arc::new(Mutex::new(Output::default()));
     let overflow = CancellationToken::new();
+    let input_overflow = CancellationToken::new();
+    let (stream_input, stream_output) = stream
+        .map(tokio::io::split)
+        .map_or((None, None), |(input, output)| (Some(input), Some(output)));
     let stdout = child.stdout.take().expect("stdout piped");
     let stderr = child.stderr.take().expect("stderr piped");
     let mut output_tasks = [
@@ -299,6 +324,7 @@ async fn supervise(
             false,
             prepared.max_output_bytes,
             overflow.clone(),
+            stream_output,
         )),
         tokio::spawn(capture_output(
             stderr,
@@ -306,16 +332,28 @@ async fn supervise(
             true,
             prepared.max_output_bytes,
             overflow.clone(),
+            None,
         )),
     ];
     let mut input = child.stdin.take().expect("stdin piped");
-    let input_task = tokio::spawn(async move {
-        input
-            .write_all(&(payload.len() as u32).to_be_bytes())
-            .await?;
-        input.write_all(&payload).await?;
-        input.write_all(&prepared.stdin).await?;
-        input.shutdown().await
+    let input_task = tokio::spawn({
+        let input_overflow = input_overflow.clone();
+        async move {
+            input
+                .write_all(&(payload.len() as u32).to_be_bytes())
+                .await?;
+            input.write_all(&payload).await?;
+            if let Some(mut stream) = stream_input {
+                let copied =
+                    tokio::io::copy(&mut (&mut stream).take(MAX_INPUT as u64), &mut input).await?;
+                if copied == MAX_INPUT as u64 && stream.read_u8().await.is_ok() {
+                    input_overflow.cancel();
+                }
+            } else {
+                input.write_all(&prepared.stdin).await?;
+            }
+            input.shutdown().await
+        }
     });
     let pid = child.id().expect("spawned process has id") as i32;
     let deadline = (Instant::now() + prepared.timeout).min(prepared.valid_until);
@@ -326,6 +364,7 @@ async fn supervise(
         biased;
         _ = cancellation.cancelled() => Some(StopReason::Requested),
         _ = stop.cancelled() => Some(StopReason::Requested),
+        _ = input_overflow.cancelled() => Some(StopReason::InputLimit),
         _ = overflow.cancelled() => Some(StopReason::OutputLimit),
         _ = tokio::time::sleep_until(deadline.into()) => Some(StopReason::Deadline),
         // Seatbelt's helper holds the group open after the payload exits.
@@ -393,7 +432,13 @@ async fn supervise(
     ProcessEvidence {
         support: prepared.support,
         completion,
-        stopped: stopped.or_else(|| overflow.is_cancelled().then_some(StopReason::OutputLimit)),
+        stopped: stopped
+            .or_else(|| {
+                input_overflow
+                    .is_cancelled()
+                    .then_some(StopReason::InputLimit)
+            })
+            .or_else(|| overflow.is_cancelled().then_some(StopReason::OutputLimit)),
         stdout: std::mem::take(&mut output.stdout),
         stderr: std::mem::take(&mut output.stderr),
         output_truncated: output.truncated || !outputs_complete,

@@ -629,6 +629,29 @@ impl Prepared {
     }
 
     pub(super) fn spawn(self, cancellation: CancellationToken) -> Result<Running> {
+        self.validate_spawn(&cancellation)?;
+        process::spawn(self, cancellation, None)
+    }
+
+    pub(super) fn spawn_streaming(
+        self,
+        executable: &TrustedExecutable,
+        cancellation: CancellationToken,
+    ) -> Result<(Running, tokio::io::DuplexStream)> {
+        if !self.stdin.is_empty() {
+            return Err(refused(
+                ErrorKind::InvalidInput,
+                "sandbox_fixed_stdin_present",
+            ));
+        }
+        self.validate_spawn(&cancellation)?;
+        self.verify_executable(executable)?;
+        let (client, supervisor) = tokio::io::duplex(16 * 1024);
+        let running = process::spawn(self, cancellation, Some(supervisor))?;
+        Ok((running, client))
+    }
+
+    fn validate_spawn(&self, cancellation: &CancellationToken) -> Result<()> {
         if self.valid_until <= Instant::now() || cancellation.is_cancelled() {
             return Err(refused(ErrorKind::InvalidState, "sandbox_admission_closed"));
         }
@@ -644,6 +667,6 @@ impl Prepared {
         {
             return Err(refused(ErrorKind::Conflict, "sandbox_location_changed"));
         }
-        process::spawn(self, cancellation)
+        Ok(())
     }
 }
