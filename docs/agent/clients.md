@@ -343,6 +343,16 @@ process. [Native launch profile](https://github.com/gridaco/grida/blob/main/crat
 The `grida agent run-external` command uses the same reviewed profile and
 local receipt. [Run a local ACP peer from the CLI](../cli/agent.md#run-a-local-acp-peer)
 
+### Use the Local agent preview in Desktop
+
+An explicitly provisioned Linux native preview shows **Local agent** in the
+selected workspace. Open it, enter one text request, and select **Run**. The
+dialog names the reviewed peer and shows its offline, read-only workspace
+access. Closing the dialog leaves the run active. Reopen it to check the
+retained result or select **Stop** for the current run. If a send reply is
+missing, **Retry exact request** keeps the original request identity.
+Unverified cleanup blocks a replacement run.
+
 ## Run a confined command
 
 Source-built native hosts can run finite commands on macOS and Linux when

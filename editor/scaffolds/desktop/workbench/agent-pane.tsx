@@ -128,6 +128,7 @@ import type {
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
 import { NativeAgentPane } from "./native-agent-pane";
+import { NativeExternalAgentPanel } from "./native-external-agent-panel";
 import styles from "./agent-pane.module.css";
 
 export type AgentPaneProps = {
@@ -179,14 +180,24 @@ type AgentPaneContentProps = Omit<AgentPaneProps, "className">;
 function AgentPaneRoute(props: AgentPaneContentProps) {
   const bridge = useDesktopBridge();
   if (!bridge) return null;
-  return bridge.nativeChat ? (
-    <NativeAgentPaneGate
-      key={props.workspace.id}
-      bridge={bridge.nativeChat}
-      legacy={props}
-    />
-  ) : (
-    <AgentPaneContent {...props} />
+  return (
+    <>
+      {bridge.nativeExternalAgent && (
+        <NativeExternalAgentPanel
+          key={`local/${props.workspace.id}`}
+          bridge={bridge.nativeExternalAgent}
+        />
+      )}
+      {bridge.nativeChat ? (
+        <NativeAgentPaneGate
+          key={props.workspace.id}
+          bridge={bridge.nativeChat}
+          legacy={props}
+        />
+      ) : (
+        <AgentPaneContent {...props} />
+      )}
+    </>
   );
 }
 
