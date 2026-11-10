@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 — legacy archive fixtures use disposable private roots only.
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -70,6 +71,117 @@ it("finds no chat store on a fresh launch and creates no archive", async () => {
 });
 
 describe.skipIf(!unix)("legacy chat preservation", () => {
+  it("requires the idle legacy WAL owner to close before sealing", async () => {
+    const { archive, db, archiveRoot } = await fixture();
+    createDatabase(db);
+    const writer = spawn(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `
+        import { DatabaseSync } from "node:sqlite";
+        const db = new DatabaseSync(process.argv[1]);
+        db.exec("PRAGMA journal_mode = WAL");
+        db.prepare("SELECT id FROM chat_sessions LIMIT 1").get();
+        process.stdout.write("ready\\n");
+        process.stdin.resume();
+        process.stdin.once("end", () => db.close());
+      `,
+        db,
+      ],
+      { stdio: ["pipe", "pipe", "inherit"] }
+    );
+    const closed = once(writer, "close");
+    try {
+      const [ready] = await once(writer.stdout, "data");
+      expect(ready.toString()).toBe("ready\n");
+      await expect(
+        archive.sealQuiesced({ requestId: "retire" })
+      ).rejects.toThrow("Legacy chat archive: source_busy");
+      await expect(fs.lstat(archiveRoot)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+    } finally {
+      writer.stdin.end();
+      await expect(closed).resolves.toEqual([0, null]);
+    }
+    const result = await archive.sealQuiesced({ requestId: "retire" });
+    expect(result.sessionCount).toBe(2);
+    expect(result.inputCaveats).not.toHaveLength(0);
+    const source = new DatabaseSync(db, { readOnly: true });
+    const preserved = new DatabaseSync(
+      path.join(result.directory, "sessions.db"),
+      { readOnly: true }
+    );
+    try {
+      expect(source.prepare("PRAGMA user_version").get()?.user_version).toBe(
+        2_147_483_647
+      );
+      expect(preserved.prepare("PRAGMA user_version").get()?.user_version).toBe(
+        3
+      );
+      expect(
+        source.prepare("SELECT id FROM chat_sessions ORDER BY id").all()
+      ).toEqual(
+        preserved.prepare("SELECT id FROM chat_sessions ORDER BY id").all()
+      );
+    } finally {
+      source.close();
+      preserved.close();
+    }
+  });
+
+  it("recaptures an unsealed source and only reuses the archive named by its seal", async () => {
+    const { archive, db } = await fixture();
+    createDatabase(db);
+    const orphan = await archive.snapshotQuiesced();
+    const writer = new DatabaseSync(db);
+    try {
+      writer.exec("INSERT INTO chat_sessions VALUES ('ses_after_archive')");
+    } finally {
+      writer.close();
+    }
+    const receipt = await archive.sealQuiesced({ requestId: "retire" });
+    expect(receipt.id).not.toBe(orphan?.id);
+    expect(receipt.sessionCount).toBe(3);
+    expect(
+      await archive.sealQuiesced({
+        requestId: "retire",
+        expectedArchiveId: receipt.id,
+      })
+    ).toEqual(receipt);
+    await expect(
+      archive.sealQuiesced({
+        requestId: "retire",
+        expectedArchiveId: orphan!.id,
+      })
+    ).rejects.toThrow("Legacy chat archive: invalid_source_seal");
+    await expect(
+      archive.sealQuiesced({ requestId: "another-cutoff" })
+    ).rejects.toThrow("Legacy chat archive: invalid_source_seal");
+  });
+
+  it("refuses to seal an absent or unknown legacy source", async () => {
+    const { archive, db, archiveRoot } = await fixture();
+    await expect(archive.sealQuiesced({ requestId: "retire" })).rejects.toThrow(
+      "Legacy chat archive: source_missing"
+    );
+    await expect(fs.lstat(db)).rejects.toMatchObject({ code: "ENOENT" });
+    createDatabase(db, 4);
+    await expect(archive.sealQuiesced({ requestId: "retire" })).rejects.toThrow(
+      "Legacy chat archive: unsupported_schema"
+    );
+    await expect(fs.lstat(archiveRoot)).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    const source = new DatabaseSync(db, { readOnly: true });
+    try {
+      expect(source.prepare("PRAGMA user_version").get()?.user_version).toBe(4);
+    } finally {
+      source.close();
+    }
+  });
   it("preserves committed WAL rows, selected scratch and inline bytes in a verified receipt", async () => {
     const { archive, db, root, scratch, scratchBase, userDataPath } =
       await fixture();

@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 — disposable legacy and native stores exercise cold startup.
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -7,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultScratchBase } from "@grida/agent/sandbox";
 import type { NativeAgentChatLaunch } from "./native-agent-chat";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
+import { LegacyChatArchive } from "./legacy-chat-archive";
 import { LegacyChatSourceLease } from "./legacy-chat-source-lease";
 
 const electron = vi.hoisted(() => ({ temp: "", userData: "", media: "" }));
@@ -107,6 +109,16 @@ function writeLegacy(database: string, scratchBase: string): void {
 }
 
 describe.skipIf(!supported)("Native Desktop cold start", () => {
+  it("refuses an absent source on the existing-data path", async () => {
+    const test = await fixture();
+    await expect(test.prepare()).rejects.toThrow(
+      "Legacy chat archive: source_missing"
+    );
+    expect(fs.existsSync(test.database)).toBe(false);
+    expect(fs.existsSync(test.archiveRoot)).toBe(false);
+    expect(fs.existsSync(test.nativeState)).toBe(false);
+  });
+
   it("refuses existing legacy history when native chat is selected for a fresh profile", async () => {
     const test = await fixture();
     writeLegacy(test.database, test.scratchBase);
@@ -251,6 +263,71 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     expect(fs.readdirSync(test.archiveRoot)).toEqual([first.archive?.id]);
   });
 
+  it("recovers a committed source seal before shared retirement is published", async () => {
+    const test = await fixture();
+    writeLegacy(test.database, test.scratchBase);
+    const source = { userDataPath: test.legacy, scratchBase: test.scratchBase };
+    const key = createHash("sha256")
+      .update(JSON.stringify([source.userDataPath, source.scratchBase]))
+      .digest("hex");
+    const requestId = `desktop-native-chat-${key}`;
+    const lease = new LegacyChatSourceLease(source);
+    const archive = new LegacyChatArchive(source);
+    await expect(
+      lease.retire({
+        ...fixtureAdmission,
+        requestId,
+        verifyArchive: async () => {
+          await archive.sealQuiesced({ requestId });
+          throw new Error("interrupted before lease commit");
+        },
+      })
+    ).rejects.toThrow("interrupted before lease commit");
+    expect(fs.existsSync(test.nativeState)).toBe(false);
+    const [archiveId] = fs.readdirSync(test.archiveRoot);
+    const recovered = await test.prepare();
+    expect(recovered.archive?.id).toBe(archiveId);
+    expect(fs.readdirSync(test.archiveRoot)).toEqual([archiveId]);
+    expect(JSON.parse(fs.readFileSync(test.checkpoint, "utf8"))).toMatchObject({
+      archiveId,
+      nativeReady: false,
+    });
+    await expect(lease.claimWriter()).rejects.toThrow("retired");
+  });
+
+  it.runIf(Boolean(nativeResources))(
+    "rechecks the exact source seal and archive before publishing native readiness",
+    async () => {
+      const test = await fixture();
+      writeLegacy(test.database, test.scratchBase);
+      const prepared = await test.prepare();
+      const launch = { ...test.launch, resourcesPath: nativeResources! };
+      const file = path.join(
+        prepared.archive!.directory,
+        "scratch/ses_fixture/note.txt"
+      );
+      const original = fs.readFileSync(file);
+      fs.writeFileSync(file, "changed");
+      await expect(prepared.startWorkspace("work", launch)).rejects.toThrow(
+        "Legacy chat archive: invalid_receipt"
+      );
+      fs.writeFileSync(file, original);
+      const source = new DatabaseSync(test.database);
+      try {
+        source.exec("PRAGMA user_version=3");
+      } finally {
+        source.close();
+      }
+      await expect(prepared.startWorkspace("work", launch)).rejects.toThrow(
+        "Legacy chat archive: invalid_source_seal"
+      );
+      expect(
+        JSON.parse(fs.readFileSync(test.checkpoint, "utf8")).nativeReady
+      ).toBe(false);
+    },
+    10_000
+  );
+
   it.runIf(Boolean(nativeResources))(
     "starts the actual native process from its separate store after verifying the legacy cutoff",
     async () => {
@@ -344,7 +421,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     "shares workspace startup across windows and drains all retained ownership",
     async () => {
       const test = await fixture();
-      const prepared = await test.NativeAgentCutover.prepare(fixtureAdmission);
+      const prepared = await test.NativeAgentCutover.prepareFresh();
       const workspace = { id: "work", root: test.launch.cwd };
       const release = vi.fn<() => void>();
       const launch = { ...test.launch, resourcesPath: nativeResources! };
@@ -404,7 +481,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     "reopens a disconnected workspace without redispatching interrupted work",
     async () => {
       const test = await fixture();
-      const prepared = await test.NativeAgentCutover.prepare(fixtureAdmission);
+      const prepared = await test.NativeAgentCutover.prepareFresh();
       const workspace = { id: "work", root: test.launch.cwd };
       const resourcesPath = test.child("crash-resources");
       const executableDir = path.join(resourcesPath, "native-agent");

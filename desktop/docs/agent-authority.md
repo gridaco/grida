@@ -373,6 +373,24 @@ that satisfies the credential-service boundary because they do not expose
 local file or process authority to the model. Missing local-agent containment
 does not authorize those local capabilities.
 
+## Legacy chat cutoff
+
+Existing-data preparation requires trusted evidence that legacy writers and
+their managed commands are quiescent. A retained exclusive SQLite connection
+backs up the historical database and holds its lock through archive
+verification. It then commits the verified archive ID together with a source
+schema version that the reviewed legacy openers refuse. The archive preserves
+the original schema and records any inputs already missing or unverifiable.
+
+If startup is interrupted after the source commit, preparation verifies the
+archive named by the source seal before publishing its local receipt.
+Desktop publishes native readiness after the workspace process completes its
+ACP handshake and Main rechecks the seal and archive. Existing-data
+preparation refuses an absent source. Normal Desktop starts the compatibility
+chat path, while isolated disposable profiles can start fresh native chat.
+The seal relies on the historical forward-version check and requires a
+separate deployment boundary for unreviewed legacy writers.
+
 ## Retained media process
 
 The packaged retained-media launcher on macOS arm64 uses a deny-by-default

@@ -49,7 +49,8 @@ export class NativeAgentCutover {
     private readonly stateDirectory: string,
     private readonly checkpoint: Checkpoint,
     readonly archive: Ready["archive"],
-    readonly protectedPaths: readonly string[]
+    readonly protectedPaths: readonly string[],
+    private readonly verifyCutoff?: () => Promise<void>
   ) {}
 
   /** Verify the shared legacy cutoff before starting any workspace engine. */
@@ -130,7 +131,12 @@ export class NativeAgentCutover {
       stateDirectory,
       checkpoint,
       cutoff,
-      Object.freeze([desktop, ...separate])
+      Object.freeze([desktop, ...separate]),
+      existing
+        ? async () => {
+            await retireLegacy(source, sourceKey, checkpoint, existing);
+          }
+        : undefined
     );
   }
 
@@ -171,14 +177,19 @@ export class NativeAgentCutover {
 
   private async markReady(): Promise<void> {
     if (this.checkpoint.nativeReady) return;
-    this.publication ??= writeCheckpoint(this.stateDirectory, {
-      ...this.checkpoint,
-      nativeReady: true,
-    }).catch((error: unknown) => {
+    this.publication ??= this.publishReady().catch((error: unknown) => {
       this.publication = undefined;
       throw error;
     });
     await this.publication;
+  }
+
+  private async publishReady(): Promise<void> {
+    await this.verifyCutoff?.();
+    await writeCheckpoint(this.stateDirectory, {
+      ...this.checkpoint,
+      nativeReady: true,
+    });
   }
 }
 
@@ -189,23 +200,22 @@ async function retireLegacy(
   existing: ExistingCutoff
 ): Promise<Ready["archive"]> {
   const archive = new LegacyChatArchive(source);
+  const requestId = `desktop-native-chat-${sourceKey}`;
   let cutoff: Ready["archive"] = null;
   await new LegacyChatSourceLease(source).retire({
-    requestId: `desktop-native-chat-${sourceKey}`,
+    requestId,
     verifyWriterAdmission: existing.verifyWriterAdmission,
     verifyArchive: async (retained) => {
       if (previous && (!retained || retained.archiveId !== previous.archiveId))
         throw new Error("native_chat_cutover_archive_changed");
-      if (retained) {
-        cutoff = retained.archiveId
-          ? await archive.verify(retained.archiveId)
-          : null;
-      } else {
-        await requireDrainedCommands(source.scratchBase);
-        const captured = await archive.snapshotQuiesced();
-        cutoff = captured ? await archive.verify(captured.id) : null;
-      }
-      return cutoff?.id ?? null;
+      if (retained && !retained.archiveId)
+        throw new Error("native_chat_cutover_archive_changed");
+      await requireDrainedCommands(source.scratchBase);
+      cutoff = await archive.sealQuiesced({
+        requestId,
+        expectedArchiveId: retained?.archiveId ?? undefined,
+      });
+      return cutoff.id;
     },
   });
   return cutoff;
