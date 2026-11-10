@@ -201,6 +201,19 @@ const docs = [
   },
   {
     type: "category",
+    label: "Agent",
+    collapsed: true,
+    link: { type: "doc", id: "agent/index" },
+    items: [
+      "agent/subagents",
+      "agent/scheduled-work",
+      "agent/results",
+      "agent/clients",
+      "agent/features",
+    ],
+  },
+  {
+    type: "category",
     label: "Forms",
     collapsed: true,
     items: [

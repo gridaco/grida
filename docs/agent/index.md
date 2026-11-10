@@ -1,0 +1,62 @@
+---
+title: Grida Agent
+description: Start a workspace chat, guide its work, and return to saved results in Grida Desktop or from a native client.
+keywords: [agent, Desktop, workspace, chat, ACP]
+format: md
+---
+
+# Grida Agent
+
+Use a workspace chat in Grida Desktop to ask about a project, plan a change,
+or carry out a task with the access you grant. The workflows below apply
+to native workspace chat where your Desktop build and connection support
+it. Available controls and inputs vary with the connection.
+
+## Start a workspace chat
+
+1. Open a workspace and its chat pane. Select a model connection that is
+   available in your build.
+2. Give the agent an objective and name the files or tabs that matter.
+   Choose **Plan** to investigate and propose a change, or **Act** to do
+   the work under the chat's permissions.
+3. Review requests for additional access as they appear. To change the
+   direction of work, send a correction to the current turn. Queue a
+   message when it belongs in the next turn.
+
+For example, ask in **Plan**, “Compare the two drafts and propose the
+smaller change.” Review the proposal, then choose **Act** and send a new
+message specifying the change you want. [Plan before acting](./clients.md#plan-before-carrying-out-a-task)
+
+## Return to the work
+
+Reopen the chat from the workspace to see its messages and any retained
+work. Choose **Resume** once a paused turn is ready to continue. **Stop**
+ends the current turn and holds the queue. Open **Turn summary** on the
+latest finished turn for available tool results, checks, unresolved work,
+and reported usage. [Inspect and save results](./results.md)
+
+Use a temporary side chat for a separate question about the current
+context, or branch a saved chat to explore another approach. A branch
+can still work with the same project files. [Ask in a side chat](./clients.md#ask-in-a-temporary-side-chat) · [Branch or revise a chat](./clients.md#branch-or-revise-a-chat)
+
+## Give independent work a place
+
+On a supported Gateway connection, use **Subagents** to give a named
+reviewer an independent text assignment and inspect its findings. To let
+the same task check back once later, enable a scheduled check-in on an
+eligible Act message. A persistent goal can keep a larger task's objective,
+success criteria, and work allowance visible across turns.
+
+- [Work with subagents](./subagents.md)
+- [Schedule a follow-up](./scheduled-work.md)
+- [Work toward a persistent goal](./clients.md#work-toward-a-persistent-goal)
+
+## Use a native client
+
+Build the native host from source to run a task from a script or connect a
+local ACP client. Select a state directory to keep chats across restarts.
+The client guide covers provider setup, permissions, supported commands,
+and how to inspect a task after it stops. [Connect an agent client](./clients.md)
+
+For specific availability or configuration details, see the
+[feature catalog](./features.md) and [agent configuration reference](../reference/agent-configuration.md).
