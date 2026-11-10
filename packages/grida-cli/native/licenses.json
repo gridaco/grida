@@ -1,7 +1,7 @@
 {
   "format": 1,
   "generator": "cargo-about 0.8.2",
-  "cargo_lock_sha256": "278559a1f3e9bbd17ea983d6c93e033cf0530d8941f0fbf3d50052fd2c8c870e",
+  "cargo_lock_sha256": "60459820f9c242afe49e4e224da8d8cfdf2d7208b6e8a676be17ca8fb7746d52",
   "targets": [
     "x86_64-apple-darwin",
     "aarch64-apple-darwin",
