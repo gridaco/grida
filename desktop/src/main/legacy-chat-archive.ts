@@ -88,9 +88,16 @@ type Seal = Readonly<{
 export class LegacyChatArchive {
   private pending: Promise<Receipt | null> | undefined;
   private readonly source: Source;
+  readonly historicalScratchBase: string | undefined;
 
   constructor(source: Source) {
     this.source = { ...source };
+    if (source.historicalSrtTempRoot !== undefined) {
+      this.historicalScratchBase = historicalScratchBase(
+        source.userDataPath,
+        source.historicalSrtTempRoot
+      );
+    }
   }
 
   snapshotQuiesced(): Promise<Receipt | null> {
@@ -267,7 +274,7 @@ export class LegacyChatArchive {
         throw new ArchiveFailure("unsafe_source");
       }
       const historicalScratch = await captureHistoricalScratch(
-        this.source,
+        this.historicalScratchBase,
         userData,
         scratch
       );
@@ -671,13 +678,7 @@ function readDatabase(filename: string) {
   }
 }
 
-async function captureHistoricalScratch(
-  source: Source,
-  userData: string,
-  scratch: string | undefined
-) {
-  const temp = source.historicalSrtTempRoot;
-  if (temp === undefined) return;
+function historicalScratchBase(userDataPath: string, temp: string): string {
   if (
     !path.isAbsolute(temp) ||
     path.resolve(temp) !== temp ||
@@ -685,18 +686,23 @@ async function captureHistoricalScratch(
   ) {
     throw new ArchiveFailure("unsafe_source");
   }
+  // Before Desktop injected a scratch base, the sidecar derived this name
+  // from its exact configured data path and the SRT child's os.tmpdir().
+  const tag = sha256(Buffer.from(path.resolve(userDataPath))).slice(0, 16);
+  return path.join(temp, `grida-agent-${tag}`);
+}
+
+async function captureHistoricalScratch(
+  candidate: string | undefined,
+  userData: string,
+  scratch: string | undefined
+) {
+  if (candidate === undefined) return;
+  const temp = path.dirname(candidate);
   const tempStat = await statIfPresent(temp);
   if (!tempStat) return;
   if (!tempStat.isDirectory() || (await fs.realpath(temp)) !== temp)
     throw new ArchiveFailure("unsafe_source");
-
-  // Before Desktop injected a scratch base, the sidecar derived this name
-  // from its exact configured data path and the SRT child's os.tmpdir().
-  const tag = sha256(Buffer.from(path.resolve(source.userDataPath))).slice(
-    0,
-    16
-  );
-  const candidate = path.join(temp, `grida-agent-${tag}`);
   const otherRoots = [userData, scratch].filter((root) => root !== undefined);
   if (
     otherRoots.some(

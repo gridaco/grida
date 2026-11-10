@@ -9,7 +9,10 @@ import { defaultScratchBase } from "@grida/agent/sandbox";
 import type { NativeAgentChatLaunch } from "./native-agent-chat";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
 import { LegacyChatArchive } from "./legacy-chat-archive";
-import { LegacyChatSourceLease } from "./legacy-chat-source-lease";
+import {
+  LegacyChatSourceLease,
+  type LegacyChatWriterAdmission,
+} from "./legacy-chat-source-lease";
 
 const electron = vi.hoisted(() => ({ temp: "", userData: "", media: "" }));
 vi.mock("electron", () => ({
@@ -68,10 +71,15 @@ async function fixture() {
     model: "fixture",
   };
   const { NativeAgentCutover } = await import("./native-agent-cutover");
-  const prepare = async (credentialHome?: string) => {
+  const prepare = async (
+    credentialHome?: string,
+    admission: Parameters<
+      typeof NativeAgentCutover.prepare
+    >[0] = fixtureAdmission
+  ) => {
     vi.resetModules();
     const { NativeAgentCutover } = await import("./native-agent-cutover");
-    return NativeAgentCutover.prepare({ ...fixtureAdmission, credentialHome });
+    return NativeAgentCutover.prepare({ ...admission, credentialHome });
   };
   return {
     NativeAgentCutover,
@@ -247,6 +255,77 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     const prepared = await test.prepare();
     expect(prepared.archive?.sessionCount).toBe(1);
     await expect(lease.claimWriter()).rejects.toThrow("retired");
+  });
+
+  it("binds the attested historical scratch to the retired source and retry", async () => {
+    const test = await fixture();
+    const tempRoot = test.child("historical-srt");
+    const historicalBase = defaultScratchBase(test.legacy, tempRoot);
+    writeLegacy(test.database, historicalBase);
+    const source = fs.statSync(test.legacy, { bigint: true });
+    const digest = (values: readonly string[]) =>
+      createHash("sha256").update(JSON.stringify(values)).digest("hex");
+    const historicalScratch = {
+      sourceId: digest([
+        "legacy-chat-source-v1",
+        test.legacy,
+        source.dev.toString(),
+        source.ino.toString(),
+      ]),
+      scratchId: digest(["legacy-chat-scratch-v1", test.scratchBase]),
+      tempRoot,
+    };
+    const verifyWriterAdmission = vi.fn<LegacyChatWriterAdmission>(
+      async () => true
+    );
+    await expect(
+      test.prepare(undefined, {
+        verifyWriterAdmission,
+        historicalScratch: { ...historicalScratch, scratchId: "0".repeat(64) },
+      })
+    ).rejects.toThrow("native_chat_cutover_historical_scratch_mismatch");
+    expect(verifyWriterAdmission).not.toHaveBeenCalled();
+    expect(fs.existsSync(test.archiveRoot)).toBe(false);
+
+    const admission = { verifyWriterAdmission, historicalScratch };
+    const unfinished = path.join(historicalBase, "commands", "cmd-unverified");
+    fs.mkdirSync(unfinished, { mode: 0o700, recursive: true });
+    await expect(test.prepare(undefined, admission)).rejects.toThrow(
+      "legacy_chat_command_drain_unverified"
+    );
+    expect(fs.existsSync(test.archiveRoot)).toBe(false);
+    fs.rmdirSync(unfinished);
+
+    const first = await test.prepare(undefined, admission);
+    expect(first.protectedPaths).toContain(historicalBase);
+    expect(first.archive?.inputCaveats).toEqual([
+      {
+        partId: "file_fixture",
+        path: "note.txt",
+        reason: "historical_scratch_candidate",
+      },
+    ]);
+    expect(
+      fs.readFileSync(
+        path.join(first.archive!.directory, "scratch-srt/ses_fixture/note.txt"),
+        "utf8"
+      )
+    ).toBe("four");
+    const reopened = await test.prepare(undefined, admission);
+    expect(reopened.archive).toEqual(first.archive);
+    await expect(test.prepare()).rejects.toThrow(
+      "native_chat_cutover_source_changed"
+    );
+    await expect(
+      test.prepare(undefined, {
+        ...admission,
+        historicalScratch: {
+          ...historicalScratch,
+          tempRoot: test.child("different-srt"),
+        },
+      })
+    ).rejects.toThrow("native_chat_cutover_source_changed");
+    expect(fs.readdirSync(test.archiveRoot)).toEqual([first.archive?.id]);
   });
 
   it("reuses the retired archive when startup stopped before publishing its Desktop receipt", async () => {

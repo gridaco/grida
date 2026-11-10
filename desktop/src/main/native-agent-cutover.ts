@@ -35,8 +35,13 @@ type Ready = Readonly<{
 }>;
 
 type Launch = Omit<NativeAgentChatLaunch, "stateDirectory">;
+type HistoricalScratchEvidence = Readonly<
+  Parameters<LegacyChatWriterAdmission>[0] & { tempRoot: string }
+>;
 type ExistingCutoff = Readonly<{
   verifyWriterAdmission: LegacyChatWriterAdmission;
+  /** Captured by the trusted owner of the exact historical launch and drain. */
+  historicalScratch?: HistoricalScratchEvidence;
   credentialHome?: string;
 }>;
 
@@ -55,7 +60,12 @@ export class NativeAgentCutover {
 
   /** Verify the shared legacy cutoff before starting any workspace engine. */
   static prepare(existing: ExistingCutoff): Promise<NativeAgentCutover> {
-    return this.claim(existing);
+    return this.claim({
+      ...existing,
+      historicalScratch: existing.historicalScratch && {
+        ...existing.historicalScratch,
+      },
+    });
   }
 
   /** Admit an isolated native profile without claiming an existing-data cutoff. */
@@ -101,19 +111,37 @@ export class NativeAgentCutover {
     if (separate.some((root) => overlaps(root, stateDirectory)))
       throw new Error("native_chat_cutover_state_overlap");
 
+    const historical = existing?.historicalScratch;
+    const archive = existing
+      ? new LegacyChatArchive({
+          ...source,
+          historicalSrtTempRoot: historical?.tempRoot,
+        })
+      : undefined;
+    const historicalBase = archive?.historicalScratchBase;
+    const basis = [source.userDataPath, source.scratchBase];
+    if (historical && historicalBase) {
+      if ([desktop, ...separate].some((root) => overlaps(root, historicalBase)))
+        throw new Error("native_chat_cutover_historical_scratch_overlap");
+      basis.push(historical.sourceId, historical.scratchId, historicalBase);
+      separate.push(historicalBase);
+    }
     if (!existing)
       await requireFreshSource(source.userDataPath, source.scratchBase);
     const sourceKey = createHash("sha256")
-      .update(JSON.stringify([source.userDataPath, source.scratchBase]))
+      .update(JSON.stringify(basis))
       .digest("hex");
     const previous = await readCheckpoint(stateDirectory);
     if (previous && previous.source !== sourceKey)
       throw new Error("native_chat_cutover_source_changed");
     if (!existing && previous?.archiveId)
       throw new Error("native_chat_requires_fresh_profile");
-    const cutoff = existing
-      ? await retireLegacy(source, sourceKey, previous, existing)
-      : null;
+    const verifyCutoff =
+      existing && archive
+        ? (previous: Checkpoint | null) =>
+            retireLegacy(source, sourceKey, previous, existing, archive)
+        : undefined;
+    const cutoff = verifyCutoff ? await verifyCutoff(previous) : null;
     let checkpoint = previous;
     if (!checkpoint) {
       await ensureState(stateDirectory);
@@ -132,9 +160,9 @@ export class NativeAgentCutover {
       checkpoint,
       cutoff,
       Object.freeze([desktop, ...separate]),
-      existing
+      verifyCutoff
         ? async () => {
-            await retireLegacy(source, sourceKey, checkpoint, existing);
+            await verifyCutoff(checkpoint);
           }
         : undefined
     );
@@ -197,20 +225,32 @@ async function retireLegacy(
   source: Awaited<ReturnType<typeof sealLegacyChatForColdStart>>,
   sourceKey: string,
   previous: Checkpoint | null,
-  existing: ExistingCutoff
+  existing: ExistingCutoff,
+  archive: LegacyChatArchive
 ): Promise<Ready["archive"]> {
-  const archive = new LegacyChatArchive(source);
+  const historical = existing.historicalScratch;
   const requestId = `desktop-native-chat-${sourceKey}`;
   let cutoff: Ready["archive"] = null;
   await new LegacyChatSourceLease(source).retire({
     requestId,
-    verifyWriterAdmission: existing.verifyWriterAdmission,
+    verifyWriterAdmission: async (identity) => {
+      if (
+        historical &&
+        (historical.sourceId !== identity.sourceId ||
+          historical.scratchId !== identity.scratchId)
+      ) {
+        throw new Error("native_chat_cutover_historical_scratch_mismatch");
+      }
+      return await existing.verifyWriterAdmission(identity);
+    },
     verifyArchive: async (retained) => {
       if (previous && (!retained || retained.archiveId !== previous.archiveId))
         throw new Error("native_chat_cutover_archive_changed");
       if (retained && !retained.archiveId)
         throw new Error("native_chat_cutover_archive_changed");
       await requireDrainedCommands(source.scratchBase);
+      if (archive.historicalScratchBase)
+        await requireDrainedCommands(archive.historicalScratchBase, true);
       cutoff = await archive.sealQuiesced({
         requestId,
         expectedArchiveId: retained?.archiveId ?? undefined,
@@ -242,11 +282,24 @@ async function requireFreshSource(userDataPath: string, scratchBase: string) {
     throw new Error("native_chat_requires_fresh_profile");
 }
 
-async function requireDrainedCommands(scratchBase: string): Promise<void> {
+async function requireDrainedCommands(
+  scratchBase: string,
+  historical = false
+): Promise<void> {
+  if (historical) {
+    const temp = path.dirname(scratchBase);
+    const stat = await statIfPresent(temp);
+    if (!stat) return;
+    if (!stat.isDirectory() || (await fs.realpath(temp)) !== temp)
+      throw new Error("native_chat_cutover_historical_scratch_unsafe");
+  }
   const scratch = await statIfPresent(scratchBase);
   if (!scratch) return;
   checkDirectory(scratch, true);
-  const commands = path.join(await fs.realpath(scratchBase), "commands");
+  const resolved = await fs.realpath(scratchBase);
+  if (historical && resolved !== scratchBase)
+    throw new Error("native_chat_cutover_historical_scratch_unsafe");
+  const commands = path.join(resolved, "commands");
   const metadata = await statIfPresent(commands);
   if (!metadata) return;
   checkDirectory(metadata, true);
