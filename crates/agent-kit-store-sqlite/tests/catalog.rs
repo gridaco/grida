@@ -3,7 +3,7 @@ mod support;
 
 use agent_kit_core::{Envelope, ErrorKind, Fingerprint, SessionId};
 use agent_kit_sessions::{CreateSession, SessionStore};
-use agent_kit_store_sqlite::SqliteStore;
+use agent_kit_store_sqlite::{SqliteStore, catalog::CatalogPage};
 use support::{change, payload, private_directory};
 
 fn project(config: &Envelope) -> Option<Fingerprint> {
@@ -19,6 +19,13 @@ fn create(id: &str, scope: &str) -> CreateSession {
         request: change("create"),
         configuration: payload(scope),
     }
+}
+
+fn ids(page: &CatalogPage) -> Vec<SessionId> {
+    page.entries
+        .iter()
+        .map(|entry| entry.session.clone())
+        .collect()
 }
 
 #[tokio::test]
@@ -50,14 +57,17 @@ async fn catalog_migration_and_paging_keep_scope_and_creation_order() {
     let store = SqliteStore::open_cataloged(&filename, project).unwrap();
     let scope_a = project(&payload("a")).unwrap();
     let scope_b = project(&payload("b")).unwrap();
-    let page = store.list_catalog(scope_a, None).await.unwrap();
+    let page = store.list_catalog(scope_a, 0, None).await.unwrap();
     let expected: Vec<_> = (2..34)
         .rev()
         .map(|n| SessionId::new(format!("a-{n:02}")).unwrap())
         .collect();
-    assert_eq!(page.sessions, expected);
+    assert_eq!(ids(&page), expected);
     assert_eq!(page.next_after, expected.last().cloned());
-    let error = match store.list_catalog(scope_b, page.next_after.clone()).await {
+    let error = match store
+        .list_catalog(scope_b, 0, page.next_after.clone())
+        .await
+    {
         Err(error) => error,
         Ok(_) => panic!("foreign cursor must be rejected"),
     };
@@ -68,17 +78,17 @@ async fn catalog_migration_and_paging_keep_scope_and_creation_order() {
     let accepted = store.create(newest.clone()).await.unwrap();
     assert_eq!(store.create(newest).await.unwrap(), accepted);
     assert_eq!(
-        store.list_catalog(scope_a, None).await.unwrap().sessions[0],
+        store.list_catalog(scope_a, 0, None).await.unwrap().entries[0].session,
         new_id
     );
     drop(store);
     let reopened = SqliteStore::open_cataloged(&filename, project).unwrap();
     let tail = reopened
-        .list_catalog(scope_a, page.next_after)
+        .list_catalog(scope_a, 0, page.next_after)
         .await
         .unwrap();
     assert_eq!(
-        tail.sessions,
+        ids(&tail),
         [
             SessionId::new("a-01").unwrap(),
             SessionId::new("a-00").unwrap()
@@ -87,12 +97,74 @@ async fn catalog_migration_and_paging_keep_scope_and_creation_order() {
     assert!(tail.next_after.is_none());
     assert!(
         reopened
-            .list_catalog(Fingerprint::of(&"empty-scope").unwrap(), None)
+            .list_catalog(Fingerprint::of(&"empty-scope").unwrap(), 0, None)
             .await
             .unwrap()
-            .sessions
+            .entries
             .is_empty()
     );
     let view = reopened.inspect(new_id).await.unwrap();
     assert!(view.current.is_none() && view.latest.is_none());
+}
+
+#[tokio::test]
+async fn catalog_organization_upgrades_an_existing_index_and_fences_edits() {
+    let directory = private_directory();
+    let filename = directory.path().join("sessions.sqlite");
+    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
+    let scope = project(&payload("a")).unwrap();
+    let chat = create("chat", "a");
+    let id = chat.id.clone();
+    store.create(chat).await.unwrap();
+    let before = store.inspect(id.clone()).await.unwrap();
+    drop(store);
+
+    let legacy = rusqlite::Connection::open(&filename).unwrap();
+    legacy
+        .execute_batch(
+            "DROP INDEX session_catalog_bucket;
+             ALTER TABLE session_catalog DROP COLUMN revision;
+             ALTER TABLE session_catalog DROP COLUMN label;
+             ALTER TABLE session_catalog DROP COLUMN bucket;
+             CREATE INDEX session_catalog_scope ON session_catalog(scope,ordinal);
+             PRAGMA user_version=6;",
+        )
+        .unwrap();
+    drop(legacy);
+
+    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
+    let mut draft = store.catalog_entry(id.clone()).await.unwrap();
+    assert_eq!(draft.revision, 0);
+    assert_eq!(draft.label, None);
+    assert_eq!(draft.bucket, 0);
+    draft.label = Some("Draft".to_owned());
+    draft.bucket = 1;
+    let archived = store.replace_catalog_entry(draft.clone()).await.unwrap();
+    assert_eq!(archived.revision, 1);
+    assert_eq!(
+        store.replace_catalog_entry(draft.clone()).await.unwrap(),
+        archived
+    );
+    draft.label = Some("A stale rename".to_owned());
+    assert_eq!(
+        store.replace_catalog_entry(draft).await.unwrap_err().code,
+        "session_catalog_revision_changed"
+    );
+    assert!(
+        store
+            .list_catalog(scope, 0, None)
+            .await
+            .unwrap()
+            .entries
+            .is_empty()
+    );
+    assert_eq!(
+        store.list_catalog(scope, 1, None).await.unwrap().entries,
+        [archived.clone()]
+    );
+    assert_eq!(store.inspect(id.clone()).await.unwrap(), before);
+    drop(store);
+
+    let reopened = SqliteStore::open_cataloged(&filename, project).unwrap();
+    assert_eq!(reopened.catalog_entry(id).await.unwrap(), archived);
 }

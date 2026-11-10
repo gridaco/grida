@@ -33,8 +33,10 @@ state. An exact retry returns the original receipt even after later changes.
 
 The optional owner-defined catalog projects immutable session configuration
 into a scope fingerprint. It indexes the scope at creation and upgrades earlier
-records without reading their turns. A scoped page returns at most 32 session
-IDs in reverse creation order. Its anchor must already belong to that scope.
+records without reading their turns. A scoped page returns at most 32 entries
+from an owner-selected bucket in reverse creation order. Its anchor must
+already belong to that scope. An entry has an optional bounded display label
+and its own revision. Updating it leaves execution and history unchanged.
 
 A live lease blocks recovery of its turn. Dropping it makes interrupted execution
 eligible for an explicit recovery request. Reopening the database preserves the
