@@ -64,6 +64,8 @@ and how to inspect a task after it stops. [Connect an agent client](./clients.md
 
 - [Change agent settings](./settings.md)
 - [Automate lifecycle checks](./hooks.md)
+- [Use chat commands, skills, and tools](./skills-and-tools.md)
+- [Connect another agent to Grida with MCP](./grida-mcp.md)
 
 For specific availability or configuration details, see the
 [feature catalog](./features.md) and [agent configuration reference](../reference/agent-configuration.md).
