@@ -146,6 +146,10 @@ function setup() {
         disposition: "queued",
       };
     },
+    acceptsPng: false,
+    async submitImage(session) {
+      return this.submit(session, "image-input", "Describe image.");
+    },
     async inputReceipt(session, inputId) {
       return this.submit(session, inputId, "Fixture");
     },
@@ -272,6 +276,46 @@ function setup() {
 }
 
 describe("native chat IPC", () => {
+  it("reports PNG capability only in the current workspace and rejects late delivery", async () => {
+    const { ipc, first, second, chat, scopes } = setup();
+    expect(ipc.acceptsPng(first.event)).toBe(false);
+    const capable = { ...chat, acceptsPng: true };
+    scopes.set(first.sender, { workspaceId: WORKSPACE, chat: capable });
+    expect(ipc.acceptsPng(first.event)).toBe(true);
+    expect(ipc.acceptsPng(second.event)).toBe(false);
+    const opened = await ipc.create(first.event);
+    const payload = {
+      action: "submit",
+      inputId: "image-input",
+      text: "Describe image.",
+      png: new ArrayBuffer(16),
+      operatingRegime: "act",
+    } as const;
+    const reply =
+      Promise.withResolvers<Awaited<ReturnType<typeof capable.submitImage>>>();
+    const submit = vi
+      .spyOn(capable, "submitImage")
+      .mockReturnValueOnce(reply.promise);
+    await expect(
+      ipc.submitImage(second.event, opened.attachmentId, payload)
+    ).rejects.toThrow("native_chat_attachment_unavailable");
+    expect(submit).not.toHaveBeenCalled();
+    const pending = ipc.submitImage(first.event, opened.attachmentId, payload);
+    expect(submit).toHaveBeenCalledExactlyOnceWith(
+      { id: opened.sessionId },
+      payload
+    );
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    reply.resolve({
+      sessionId: opened.sessionId,
+      inputId: "image-input",
+      inputPosition: 1,
+      turnId: "turn",
+      disposition: "claimed",
+    });
+    await expect(pending).rejects.toThrow("native_chat_attachment_unavailable");
+  });
+
   it("keeps archive browsing detached and binds organization to the admitted attachment", async () => {
     const { ipc, first, second, chat } = setup();
     const list = vi.spyOn(chat, "list");

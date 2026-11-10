@@ -442,6 +442,13 @@ const bridge: DesktopBridge = {
       ),
     observe: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
+    acceptsPng: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
+    submitImage: (attachmentId, input) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_IMAGE,
+        attachmentId,
+        input
+      ),
     turnSummary: (attachmentId, observationId) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_TURN_SUMMARY,

@@ -63,6 +63,7 @@ export function NativeAgentPane({
     controller.read
   );
   const draft = useRef<Pick<ComposerController, "appendText">>(null);
+  const pngPicker = useRef<HTMLInputElement>(null);
   const side = state.sideChat;
   useEffect(() => {
     controller.connect(initialSession);
@@ -562,6 +563,38 @@ export function NativeAgentPane({
         />
       )}
       <div className="shrink-0 p-3">
+        {state.imageInput && (
+          <input
+            key={`png-${state.scope}`}
+            ref={pngPicker}
+            type="file"
+            accept="image/png,.png"
+            aria-label="Select PNG"
+            className="hidden"
+            onChange={(event) => {
+              const input = event.currentTarget;
+              const file = input.files?.[0];
+              input.value = "";
+              if (file) void controller.pickPng(state.scope, file);
+            }}
+          />
+        )}
+        {(state.imageDraft || state.imageReading) && (
+          <div className="flex items-center gap-2 px-1 pb-1 text-xs">
+            <span className="min-w-0 flex-1 truncate">
+              {state.imageReading ? "Reading PNG…" : state.imageDraft?.name}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={state.acting}
+              onClick={() => controller.removePng(state.scope)}
+            >
+              Remove PNG
+            </Button>
+          </div>
+        )}
         <AgentComposerInput
           key={state.scope}
           catalog={TEXT_CATALOG}
@@ -572,11 +605,13 @@ export function NativeAgentPane({
           busy={!!turn}
           isStreaming={streamingControlsOnly}
           placeholder={
-            state.steering
-              ? "Add guidance to this turn…"
-              : turn || snapshot?.admissionPaused || queued
-                ? "Queue a follow-up…"
-                : undefined
+            state.imageDraft
+              ? "Add a message to send this PNG…"
+              : state.steering
+                ? "Add guidance to this turn…"
+                : turn || snapshot?.admissionPaused || queued
+                  ? "Queue a follow-up…"
+                  : undefined
           }
           submissionScope={state.scope}
           draftRef={draft}
@@ -584,6 +619,17 @@ export function NativeAgentPane({
           onStop={() => void controller.control("stop")}
           toolbarStart={
             <>
+              {state.imageInput && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={!controller.canAttachPng}
+                  onClick={() => pngPicker.current?.click()}
+                >
+                  {state.imageDraft ? "Replace PNG" : "Add PNG"}
+                </Button>
+              )}
               {bridge.submitInRegime && !state.steering && (
                 <select
                   aria-label="Mode for next message"

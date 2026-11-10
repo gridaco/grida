@@ -235,6 +235,10 @@ it.runIf(Boolean(packaged))(
     try {
       client = await NativeAgentChat.start(launch);
       const session = await client.create();
+      expect(client.acceptsPng).toBe(false);
+      await expect(client.submitImage(session, {})).rejects.toThrow(
+        "image_input_unavailable"
+      );
       const other = await client.create();
       const updates: NativeChatStreamUpdate[] = [];
       const otherUpdates: NativeChatStreamUpdate[] = [];

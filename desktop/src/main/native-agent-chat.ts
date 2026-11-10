@@ -97,6 +97,8 @@ const INPUT_DISPOSITIONS = [
   "withdrawn",
 ] as const;
 const MAX_TEXT_BYTES = 512 * 1024;
+const MAX_PNG_BYTES = 256 * 1024;
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const MAX_UPDATE_BYTES = 8 * 1024;
 const MAX_SUMMARY_BYTES = 8 * 1024;
 const MAX_SUMMARY_CHECKS = 8;
@@ -174,6 +176,10 @@ export class NativeAgentChat {
 
   get connected(): boolean {
     return !this.closed && this.process.connected;
+  }
+
+  get acceptsPng(): boolean {
+    return this.connected && this.process.acceptsPng;
   }
 
   get hasExited(): boolean {
@@ -380,12 +386,32 @@ export class NativeAgentChat {
     return this.send("enqueue", session, inputId, text, operatingRegime);
   }
 
+  async submitImage(
+    session: NativeChatSession,
+    value: unknown
+  ): Promise<NativeChatAcceptance> {
+    this.requireAttached(session);
+    if (!this.acceptsPng) throw new Error("image_input_unavailable");
+    const input = object(value);
+    if (Object.keys(input).length !== 5 || typeof input.text !== "string")
+      throw invalidResponse();
+    return this.send(
+      choice(input.action, ["submit", "enqueue"] as const),
+      session,
+      identity(input.inputId),
+      input.text,
+      choice(input.operatingRegime, ["act", "plan"] as const),
+      pngPrompt(input.png)
+    );
+  }
+
   private async send(
     mode: "submit" | "enqueue",
     session: NativeChatSession,
     inputId: string,
     text: string,
-    operatingRegime?: NativeChatOperatingRegime
+    operatingRegime?: NativeChatOperatingRegime,
+    image?: ReturnType<typeof pngPrompt>
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     identity(inputId);
@@ -393,7 +419,7 @@ export class NativeAgentChat {
       await this.process.request(`_co.grida/session/${mode}`, {
         sessionId,
         inputId,
-        prompt: textPrompt(text),
+        prompt: [...textPrompt(text), ...(image ? [image] : [])],
         ...(operatingRegime && { operatingRegime }),
       }),
       sessionId,
@@ -1168,6 +1194,19 @@ function textPrompt(text: string) {
   )
     throw new Error("native_chat_text_invalid");
   return [{ type: "text", text }];
+}
+
+function pngPrompt(value: unknown) {
+  if (!(value instanceof ArrayBuffer) || value.byteLength > MAX_PNG_BYTES)
+    throw new Error("image_size_limit");
+  const bytes = Buffer.from(value);
+  if (!bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE))
+    throw new Error("invalid_png_image");
+  return {
+    type: "image",
+    mimeType: "image/png",
+    data: bytes.toString("base64"),
+  };
 }
 
 function queuePositions(

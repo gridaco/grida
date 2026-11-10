@@ -30,6 +30,7 @@ import { NativeSideChatController } from "./native-side-chat-controller";
 const POLL_MS = 500;
 const RECENTS_LIMIT = 12;
 const MAX_LIVE_BYTES = 1024 * 1024;
+const MAX_PNG_BYTES = 256 * 1024;
 const utf8 = new TextEncoder();
 
 export type NativeChatView = Readonly<{
@@ -50,6 +51,9 @@ export type NativeChatView = Readonly<{
   }> | null;
   messages: readonly NativeChatMessage[];
   sideChat: NativeSideChatController | null;
+  imageInput: boolean;
+  imageReading: boolean;
+  imageDraft: Readonly<{ name: string; size: number }> | null;
   observation: NativeChatObservation | null;
   turnSummary: NativeChatTurnSummary | null;
   approvals: readonly NativeChatApproval[];
@@ -75,6 +79,8 @@ type Scope = {
   requested: string | null;
   attachment?: NativeChatAttachment;
   sideChat?: NativeSideChatController;
+  image?: ArrayBuffer;
+  imageRead?: object;
   opening?: Promise<void>;
   refreshing?: Promise<void>;
   timer?: ReturnType<typeof setTimeout>;
@@ -101,6 +107,7 @@ type Scope = {
     inputId: string;
     mode: "submit" | "enqueue";
     operatingRegime?: NativeChatOperatingRegime;
+    image?: ArrayBuffer;
   };
   awaitingTurn?: string;
 };
@@ -120,6 +127,9 @@ const EMPTY: NativeChatView = Object.freeze({
   catalogDraft: null,
   messages: [],
   sideChat: null,
+  imageInput: false,
+  imageReading: false,
+  imageDraft: null,
   observation: null,
   turnSummary: null,
   approvals: [],
@@ -297,6 +307,9 @@ export class NativeChatController {
       catalogDraft: null,
       messages: [],
       sideChat: null,
+      imageInput: false,
+      imageReading: false,
+      imageDraft: null,
       observation: null,
       turnSummary: null,
       approvals: [],
@@ -316,6 +329,7 @@ export class NativeChatController {
       repairing: false,
       error: null,
     });
+    void this.readImageCapability(scope);
     if (sessionId === null) {
       this.save();
       return;
@@ -336,12 +350,79 @@ export class NativeChatController {
       !!this.scope &&
       !this.view.loading &&
       !this.view.acting &&
+      !this.view.imageReading &&
+      (!this.scope.image || this.view.imageInput) &&
       (this.view.steering
         ? this.canSteer &&
           this.scope.steeringTarget ===
             this.view.observation?.snapshot.current?.turnId
         : !this.needsQueue || !!this.bridge.enqueue)
     );
+  }
+
+  get canAttachPng(): boolean {
+    return (
+      !!this.scope &&
+      this.view.imageInput &&
+      !this.view.loading &&
+      !this.view.acting &&
+      !this.view.steering
+    );
+  }
+
+  async pickPng(
+    scopeId: number,
+    file: Pick<File, "name" | "size" | "arrayBuffer">
+  ): Promise<void> {
+    const scope = this.scope;
+    if (!scope || scope.id !== scopeId || !this.canAttachPng) return;
+    const read = {};
+    scope.imageRead = read;
+    this.update({ imageReading: true, error: null });
+    const ownsRead = () => this.owns(scope) && scope.imageRead === read;
+    try {
+      if (file.size <= 0 || file.size > MAX_PNG_BYTES)
+        throw new Error("image_size_limit");
+      const bytes = await file.arrayBuffer();
+      if (!ownsRead()) return;
+      if (bytes.byteLength !== file.size) throw new Error("invalid_png_image");
+      const previous = scope.image && new Uint8Array(scope.image);
+      if (
+        previous?.byteLength !== bytes.byteLength ||
+        !new Uint8Array(bytes).every((byte, index) => byte === previous[index])
+      ) {
+        scope.image = bytes;
+        if (scope.pending?.image) scope.pending = undefined;
+      }
+      this.update({
+        imageDraft: { name: file.name.slice(0, 256), size: bytes.byteLength },
+      });
+    } catch (error) {
+      if (ownsRead())
+        this.update({
+          error: describe(error, "Couldn't read the selected PNG."),
+        });
+    } finally {
+      if (ownsRead()) {
+        scope.imageRead = undefined;
+        this.update({ imageReading: false });
+      }
+    }
+  }
+
+  removePng(scopeId: number): void {
+    const scope = this.scope;
+    if (!scope || scope.id !== scopeId || this.view.acting) return;
+    scope.imageRead = undefined;
+    scope.image = undefined;
+    if (scope.pending?.image) scope.pending = undefined;
+    this.update({ imageDraft: null, imageReading: false, error: null });
+  }
+
+  private async readImageCapability(scope: Scope): Promise<void> {
+    if (!this.bridge.acceptsPng || !this.bridge.submitImage) return;
+    const supported = await this.bridge.acceptsPng().catch(() => false);
+    if (this.owns(scope)) this.update({ imageInput: supported === true });
   }
 
   get canOrganizeChats(): boolean {
@@ -478,6 +559,8 @@ export class NativeChatController {
     const turn = this.view.observation?.snapshot.current;
     return (
       !!this.bridge.steer &&
+      !this.scope?.image &&
+      !this.scope?.imageRead &&
       !!turn &&
       !turn.cancelled &&
       (turn.disposition === "running" || turn.disposition === "suspended")
@@ -662,14 +745,19 @@ export class NativeChatController {
       throw new Error("native_chat_not_ready");
     if (this.view.steering) return this.submitSteering(scope, text);
     const mode = this.needsQueue ? "enqueue" : "submit";
-    const operatingRegime = this.bridge.submitInRegime
-      ? this.view.operatingRegime
-      : undefined;
+    const image = scope.image;
+    const operatingRegime =
+      image || this.bridge.submitInRegime
+        ? this.view.operatingRegime
+        : undefined;
     this.update({ acting: true, error: null });
     try {
       await this.open(scope);
       const attachment = this.attachment(scope);
-      const retained = scope.pending?.text === text ? scope.pending : undefined;
+      const retained =
+        scope.pending?.text === text && scope.pending.image === image
+          ? scope.pending
+          : undefined;
       if (retained && retained.operatingRegime !== operatingRegime)
         throw new Error("native_chat_pending_regime_changed");
       const pending: NonNullable<Scope["pending"]> = retained ?? {
@@ -677,11 +765,22 @@ export class NativeChatController {
         inputId: crypto.randomUUID(),
         mode,
         operatingRegime,
+        image,
       };
       scope.pending = pending;
       let accepted;
       try {
-        if (pending.operatingRegime) {
+        if (pending.image) {
+          if (!this.bridge.submitImage || !pending.operatingRegime)
+            throw new Error("image_input_unavailable");
+          accepted = await this.bridge.submitImage(attachment.attachmentId, {
+            action: pending.mode,
+            inputId: pending.inputId,
+            text: pending.text,
+            png: pending.image,
+            operatingRegime: pending.operatingRegime,
+          });
+        } else if (pending.operatingRegime) {
           if (!this.bridge.submitInRegime)
             throw new Error("native_chat_operating_regime_unavailable");
           accepted = await this.bridge.submitInRegime(
@@ -712,6 +811,10 @@ export class NativeChatController {
       }
       scope.pending = undefined;
       if (this.owns(scope)) {
+        if (pending.image && scope.image === pending.image) {
+          scope.image = undefined;
+          this.update({ imageDraft: null });
+        }
         scope.awaitingTurn = accepted.turnId ?? undefined;
         scope.replay = true;
         await this.refresh(scope);
@@ -920,6 +1023,7 @@ export class NativeChatController {
     const scope = this.scope;
     if (!scope || (!scope.attachment && !scope.requested)) return;
     scope.replay = true;
+    void this.readImageCapability(scope);
     if (scope.summaryRequest?.failed) scope.summaryRequest = undefined;
     this.update({ error: null });
     try {
@@ -1633,7 +1737,15 @@ function describe(error: unknown, fallback: string): string {
   if (error.message.includes("native_chat_transcript_too_large"))
     return "This chat is too large to restore in the workspace pane.";
   if (error.message.includes("native_chat_pending_regime_changed"))
-    return "Retry this draft in its original mode, or change the text to send a new message.";
+    return "Retry this draft in its original mode, or edit it to send a new message.";
+  if (error.message.includes("image_size_limit"))
+    return "Choose a PNG of at most 256 KiB within the supported image dimensions.";
+  if (error.message.includes("invalid_png_image"))
+    return "Choose a valid PNG image.";
+  if (error.message.includes("image_input_unavailable"))
+    return "This chat's current provider does not accept PNG inputs.";
+  if (error.message.includes("native_agent_frame_limit"))
+    return "This message exceeds the connection limit. Shorten it and try again.";
   return fallback;
 }
 

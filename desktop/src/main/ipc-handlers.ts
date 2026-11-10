@@ -220,6 +220,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, id: string, input: string, text: string, regime?: unknown) =>
       nativeChat.enqueue(event, id, input, text, regime)
   );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG, (event) =>
+    nativeChat.acceptsPng(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_IMAGE,
+    (event, id: string, input: unknown) =>
+      nativeChat.submitImage(event, id, input)
+  );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_INPUT_RECEIPT,
     (event, id: string, input: string) =>

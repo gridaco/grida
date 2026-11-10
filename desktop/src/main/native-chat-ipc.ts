@@ -58,6 +58,8 @@ export type ActiveNativeChat = Readonly<{
     | "closeSideChat"
     | "submit"
     | "enqueue"
+    | "acceptsPng"
+    | "submitImage"
     | "inputReceipt"
     | "observe"
     | "turnSummary"
@@ -383,6 +385,24 @@ export class NativeChatIpc {
     const result = await owner.active.chat.inputReceipt(
       attachment.session,
       inputId
+    );
+    this.revalidate(owner, attachment);
+    return result;
+  }
+
+  acceptsPng(event: IpcMainInvokeEvent): boolean {
+    return this.owner(event).active.chat.acceptsPng;
+  }
+
+  async submitImage(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    input: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const result = await owner.active.chat.submitImage(
+      attachment.session,
+      input
     );
     this.revalidate(owner, attachment);
     return result;

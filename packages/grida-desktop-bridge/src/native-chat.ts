@@ -6,6 +6,14 @@ export type NativeChatAttachment = Readonly<{
 
 export type NativeChatOperatingRegime = "act" | "plan";
 
+export type NativeChatImageInput = Readonly<{
+  action: "submit" | "enqueue";
+  inputId: string;
+  text: string;
+  png: ArrayBuffer;
+  operatingRegime: NativeChatOperatingRegime;
+}>;
+
 export type NativeChatPage = Readonly<{
   sessionIds: readonly string[];
   titles?: readonly Readonly<{ sessionId: string; title: string }>[];
@@ -312,6 +320,11 @@ export type DesktopNativeChat = {
     inputId: string,
     text: string,
     operatingRegime: NativeChatOperatingRegime
+  ): Promise<NativeChatAcceptance>;
+  acceptsPng?(): Promise<boolean>;
+  submitImage?(
+    attachmentId: string,
+    input: NativeChatImageInput
   ): Promise<NativeChatAcceptance>;
   inputReceipt(
     attachmentId: string,

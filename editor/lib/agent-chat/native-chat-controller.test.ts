@@ -744,6 +744,96 @@ it("reads one summary per observed terminal turn and drops replies after switchi
   controller.disconnect();
 });
 
+it("keeps PNG retries exact and drops replaced or navigated file reads", async () => {
+  const { bridge, controller, running } = fixture();
+  const textSend = vi.spyOn(bridge, "submit");
+  const send = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>(
+    async (sessionId, input) => ({
+      sessionId,
+      inputId: input.inputId,
+      inputPosition: 2,
+      turnId: null,
+      disposition: "queued",
+    })
+  );
+  send.mockRejectedValueOnce(new Error("fixture lost image acknowledgement"));
+  bridge.acceptsPng = async () => true;
+  bridge.submitImage = send;
+  bridge.submitInRegime =
+    vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
+  bridge.enqueue = async (id, inputId, text) =>
+    bridge.submit(id, inputId, text);
+  running.add("chat-a");
+  await controller.select("chat-a");
+  expect(controller.canAttachPng).toBe(true);
+  const scope = controller.read().scope;
+  const previous = Promise.withResolvers<ArrayBuffer>();
+  const first = controller.pickPng(scope, {
+    name: "retired.png",
+    size: 8,
+    arrayBuffer: () => previous.promise,
+  });
+  expect(controller.canSubmit).toBe(false);
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]).buffer;
+  await controller.pickPng(scope, {
+    name: "chosen.png",
+    size: png.byteLength,
+    arrayBuffer: async () => png,
+  });
+  previous.resolve(new ArrayBuffer(8));
+  await first;
+  expect(controller.read().imageDraft?.name).toBe("chosen.png");
+  await expect(controller.submit(" ")).rejects.toThrow("native_chat_not_ready");
+  expect(send).not.toHaveBeenCalled();
+  await expect(controller.submit("Describe it.")).rejects.toThrow(
+    "fixture lost image acknowledgement"
+  );
+  expect(controller.read().imageDraft?.name).toBe("chosen.png");
+  controller.selectOperatingRegime("plan");
+  await expect(controller.submit("Describe it.")).rejects.toThrow(
+    "native_chat_pending_regime_changed"
+  );
+  expect(send).toHaveBeenCalledTimes(1);
+  controller.selectOperatingRegime("act");
+  await controller.pickPng(scope, {
+    name: "same-bytes.png",
+    size: png.byteLength,
+    arrayBuffer: async () => png.slice(0),
+  });
+  await controller.submit("Describe it.");
+  expect(send.mock.calls[0]).toEqual(send.mock.calls[1]);
+  expect(send.mock.calls[1]).toEqual([
+    "chat-a",
+    {
+      action: "enqueue",
+      inputId: expect.any(String),
+      text: "Describe it.",
+      png,
+      operatingRegime: "act",
+    },
+  ]);
+  expect(controller.read().imageDraft).toBeNull();
+  expect(textSend).not.toHaveBeenCalled();
+
+  const late = Promise.withResolvers<ArrayBuffer>();
+  const reading = controller.pickPng(scope, {
+    name: "stale.png",
+    size: png.byteLength,
+    arrayBuffer: () => late.promise,
+  });
+  await controller.select("chat-b");
+  late.resolve(png);
+  await reading;
+  await controller.pickPng(scope, {
+    name: "old-chooser.png",
+    size: png.byteLength,
+    arrayBuffer: async () => png,
+  });
+  expect(controller.read().imageDraft).toBeNull();
+  expect(controller.read().imageReading).toBe(false);
+  controller.disconnect();
+});
+
 it("uses the readiness probe and preserves native mode through startup failure", async () => {
   const { bridge } = fixture();
   const availability = vi.spyOn(bridge, "available");

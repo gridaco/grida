@@ -82,6 +82,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         capabilities: { "co.grida/session/history": 1 },
         onSessionUpdate: (params) => observed.push(params),
       });
+      expect(agent.acceptsPng).toBe(false);
       const [prompt, failure] = await Promise.allSettled([
         agent.request("session/prompt", {}),
         agent.request("unavailable", {}),

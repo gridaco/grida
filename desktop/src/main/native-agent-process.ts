@@ -69,6 +69,7 @@ export class NativeAgentProcess {
   private buffered = 0;
   private nextId = 1;
   private ready = false;
+  private imageInput = false;
   private observedExit = false;
   private shutdown: Promise<void> | undefined;
   private failure: Error | undefined;
@@ -120,6 +121,10 @@ export class NativeAgentProcess {
 
   get hasExited(): boolean {
     return this.observedExit;
+  }
+
+  get acceptsPng(): boolean {
+    return this.connected && this.imageInput;
   }
 
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
@@ -234,11 +239,14 @@ export class NativeAgentProcess {
       ) {
         throw new Error("native_agent_protocol_incompatible");
       }
-      const advertised = object(object(response.agentCapabilities)?._meta);
+      const agentCapabilities = object(response.agentCapabilities);
+      const advertised = object(agentCapabilities?._meta);
       for (const [capability, version] of Object.entries(capabilities)) {
         if (advertised?.[capability] !== version)
           throw new Error("native_agent_capabilities_unavailable");
       }
+      processOwner.imageInput =
+        object(agentCapabilities?.promptCapabilities)?.image === true;
       processOwner.ready = true;
       return processOwner;
     } catch (error) {

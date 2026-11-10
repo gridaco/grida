@@ -353,6 +353,18 @@ Open supplies the parent session and a request ID. Ask supplies the returned sid
 chat ID, a request ID, and text, and returns a completion account. Close supplies
 the side chat ID. These IDs work only on the connection that opened the chat.
 
+## Attach a PNG to a message
+
+When the native Desktop chat advertises image input, choose **Add PNG**,
+select one PNG up to 256 KiB, and write a message before sending. The text
+and image enter the chat together, including when the message joins the
+queue. A failed send preserves the draft for retry. To change a queued
+image, remove the queued message and submit a new one.
+
+This picker was verified with a disposable Responses API GPT-5.4 profile.
+The current native Desktop Gateway and ChatGPT subscription profiles
+offer text input.
+
 ## Read a turn summary
 
 In the native Desktop workspace pane, open **Turn summary** below the latest
