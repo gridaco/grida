@@ -33,7 +33,10 @@ import {
   PendingTurnIndicator,
   QuestionPrompt,
 } from "@/kits/agent-chat";
-import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
+import {
+  NativeChatController,
+  type NativeChatEditorSurfaces,
+} from "@/lib/agent-chat/native-chat-controller";
 import type { ComposerController } from "@/kits/composer";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
 import {
@@ -47,7 +50,6 @@ import { NativeTurnSummary } from "./native-turn-summary";
 import { NativeContextLimitPanel } from "./native-context-limit-panel";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
 import { NativeSubagentsPanel } from "./native-subagents-panel";
-import type { WorkspaceSurfaceHost } from "./workspace-surface-host";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
 const COMMAND_DESCRIPTIONS = {
@@ -68,15 +70,15 @@ const selectionMemory = {
 
 export function NativeAgentPaneGate({
   bridge,
-  workspaceId,
+  selectionKey,
   initialSession,
   editorSurfaces,
   legacy,
 }: {
   bridge: DesktopNativeChat;
-  workspaceId: string;
+  selectionKey?: string;
   initialSession: string | null;
-  editorSurfaces?: WorkspaceSurfaceHost;
+  editorSurfaces?: NativeChatEditorSurfaces;
   legacy: ReactNode;
 }) {
   const [attempt, setAttempt] = useState(0);
@@ -127,7 +129,7 @@ export function NativeAgentPaneGate({
     <NativeAgentPane
       key={initialSession}
       bridge={bridge}
-      workspaceId={workspaceId}
+      selectionKey={selectionKey}
       initialSession={initialSession}
       editorSurfaces={editorSurfaces}
     />
@@ -146,24 +148,24 @@ const nativeChatUnavailableMessage = {
 
 export function NativeAgentPane({
   bridge,
-  workspaceId,
+  selectionKey,
   initialSession,
   editorSurfaces,
 }: {
   bridge: DesktopNativeChat;
-  workspaceId: string;
+  selectionKey?: string;
   initialSession: string | null;
-  editorSurfaces?: WorkspaceSurfaceHost;
+  editorSurfaces?: NativeChatEditorSurfaces;
 }) {
   const controller = useMemo(
     () =>
       new NativeChatController(
         bridge,
         selectionMemory,
-        `grida.nativeChat.${workspaceId}`,
+        selectionKey && `grida.nativeChat.${selectionKey}`,
         editorSurfaces
       ),
-    [bridge, workspaceId, editorSurfaces]
+    [bridge, selectionKey, editorSurfaces]
   );
   const state = useSyncExternalStore(
     controller.subscribe,

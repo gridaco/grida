@@ -37,6 +37,11 @@ name the file in your request. Access follows the chat’s workspace grants.
 
 ## Work without a project
 
+On a Desktop build with native document chat, open an SVG directly to start a
+chat for that file. Reopen the SVG and choose its saved chat from the sidebar.
+Select plain text in the SVG to [ask the agent to edit it](./clients.md#edit-selected-svg-text).
+The chat has no access to the surrounding folder.
+
 On macOS and Linux, a source-built native run can take one explicitly
 selected PNG with `--input-png` and keep its work in private scratch.
 Omit the workspace and permission profile to work without a project grant.

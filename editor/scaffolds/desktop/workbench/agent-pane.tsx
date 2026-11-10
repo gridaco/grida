@@ -188,7 +188,7 @@ function AgentPaneRoute(props: AgentPaneContentProps) {
         <NativeAgentPaneGate
           key={props.workspace.id}
           bridge={bridge.nativeChat}
-          workspaceId={props.workspace.id}
+          selectionKey={props.workspace.id}
           initialSession={initialSession}
           editorSurfaces={props.surfaceHost}
           legacy={<AgentPaneContent {...props} />}

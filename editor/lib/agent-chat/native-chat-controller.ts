@@ -43,6 +43,16 @@ import type {
 import { NativeSideChatController } from "./native-side-chat-controller";
 import { NativeSubagentController } from "./native-subagent-controller";
 
+export type NativeChatEditorSurfaces = {
+  readEditorSurfaces(): NativeEditorSurfaceSnapshot;
+  subscribeToEditorSurfaces(listener: () => void): () => void;
+  open?(path: string, requireCurrent: () => boolean): Promise<void>;
+  svgText?: {
+    capture(): string | undefined;
+    invoke(request: NativeEditorSvgText.Request): NativeEditorSvgText.Result;
+  };
+};
+
 const POLL_MS = 500;
 const RECENTS_LIMIT = 12;
 const MAX_LIVE_BYTES = 1024 * 1024;
@@ -279,17 +289,7 @@ export class NativeChatController {
     private readonly bridge: DesktopNativeChat,
     private readonly memory?: Pick<Storage, "getItem" | "setItem">,
     private readonly memoryKey?: string,
-    private readonly editorSurfaces?: {
-      readEditorSurfaces(): NativeEditorSurfaceSnapshot;
-      subscribeToEditorSurfaces(listener: () => void): () => void;
-      open?(path: string, requireCurrent: () => boolean): Promise<void>;
-      svgText?: {
-        capture(): string | undefined;
-        invoke(
-          request: NativeEditorSvgText.Request
-        ): NativeEditorSvgText.Result;
-      };
-    }
+    private readonly editorSurfaces?: NativeChatEditorSurfaces
   ) {}
 
   static watchReadiness(

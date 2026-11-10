@@ -574,17 +574,17 @@ Reopening preserves the same file or identifies which copy is unavailable.
 
 ## Edit selected SVG text
 
-Open an SVG in the native Desktop workspace and select one plain text element.
-Send an immediate text message in **Act** asking the agent to read or replace
-that selection. The agent works against the editor and selection captured for
-the message. A tab, selection, or editor revision change makes that target
-unavailable. Select the text and send a new message to work on a new target.
+Open an SVG in a native Desktop workspace or in a standalone file window that
+offers native chat. Select one plain text element and send an immediate text
+message in **Act** asking the agent to read or replace it. A tab, selection, or
+editor revision change makes the captured target unavailable. Select the text
+and send a new message to work on a new target.
 
 The change appears in the SVG editor and can be undone there. Use the editor's
-normal **Save** command to write it to disk. If another process changed the
-file, the existing save dialog lets you keep editing or resolve the conflict.
-The selected-text tools are available only for immediate Act messages in an
-attached workspace. Plan and queued messages omit them.
+normal **Save** command to write it to disk. The workspace save dialog handles
+conflicts when another process has changed a workspace file. In a standalone
+window, the chat can use only the captured plain text selection from the
+editor. Plan and queued messages omit the selected-text tools.
 
 ## Read a turn summary
 

@@ -11,13 +11,14 @@
  *   - **the editor** — the SVG canvas vs the slides deck.
  * The chrome (title bar + chat-left AI sidebar) is shared.
  *
- * A root deck can use its registered workspace's native chat. The standalone
- * document sidebar binds the current editor through a stable `AgentFs`.
+ * A root deck can use its registered workspace's native chat. A standalone
+ * SVG can use its own saved chats and share the selected text with the agent.
  */
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import type { SvgEditor } from "@grida/svg-editor";
 import { cn } from "@app/ui/lib/utils";
 import {
   ResizableHandle,
@@ -34,6 +35,7 @@ import { WorkspaceChangesProvider } from "../workbench/workspace-changes";
 import { NativeAgentPaneGate } from "../workbench/native-agent-pane";
 import { CANVAS_PATH } from "../ai-sidebar/agent-fs-binding";
 import { useActiveEditorAgentFs } from "./active-editor-agent-fs";
+import { DocumentSurfaceHost } from "./document-surface-host";
 import { SingleFileSvgSurface, type FileMeta } from "./single-file-svg-surface";
 
 /**
@@ -52,7 +54,7 @@ export function DesktopFileShell({
   workspaceId,
   basePath = "",
 }: {
-  /** Single-file mode: the agent sidecar's opaque doc id. */
+  /** Single-file mode: the selected document's opaque id. */
   docId?: string;
   /** Bundle (deck) mode: the workspace the `.canvas` is registered as. */
   workspaceId?: string;
@@ -66,7 +68,18 @@ export function DesktopFileShell({
       : "empty";
   const bridge = useDesktopBridge();
 
-  const { fs, setActiveEditor } = useActiveEditorAgentFs();
+  const { fs, setActiveEditor: bindLegacyEditor } = useActiveEditorAgentFs();
+  const documentSurface = useMemo(
+    () => (docId ? new DocumentSurfaceHost() : undefined),
+    [docId]
+  );
+  const setActiveEditor = useCallback(
+    (editor: SvgEditor | null) => {
+      documentSurface?.setEditor(editor);
+      bindLegacyEditor(editor);
+    },
+    [documentSurface, bindLegacyEditor]
+  );
   const currentSurfacePath =
     mode === "doc"
       ? CANVAS_PATH
@@ -116,6 +129,9 @@ export function DesktopFileShell({
       <AISidebarChat fs={fs} surfaceHost={surfaceHost} />
     );
   const nativeChat = bridge?.nativeChat;
+  // See test/desktop-agent-chat-standalone-svg.md.
+  const fileChatAvailable =
+    mode === "doc" ? nativeChat?.document : !basePath && nativeChat?.deck;
   return (
     <div className="flex h-svh w-full flex-col bg-background">
       <TitleBar>
@@ -130,11 +146,12 @@ export function DesktopFileShell({
           maxSize={SIDEBAR_MAX_SIZE}
         >
           <aside className="flex h-full w-full flex-col">
-            {mode === "deck" && workspaceId && !basePath && nativeChat?.deck ? (
+            {nativeChat && fileChatAvailable ? (
               <NativeAgentPaneGate
                 bridge={nativeChat}
-                workspaceId={workspaceId}
+                selectionKey={mode === "deck" ? workspaceId : undefined}
                 initialSession={null}
+                editorSurfaces={documentSurface}
                 legacy={legacyChat}
               />
             ) : (
