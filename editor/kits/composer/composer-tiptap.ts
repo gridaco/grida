@@ -268,6 +268,26 @@ export namespace ComposerTiptap {
       .run();
   }
 
+  export function appendText(
+    editor: Editor,
+    text: string,
+    maxBytes: number
+  ): boolean {
+    if (editor.isDestroyed || !text) return false;
+    const draft = editor.getText({ blockSeparator: "\n" });
+    if (new TextEncoder().encode(`${draft}\n${text}`).length > maxBytes)
+      return false;
+    const paragraphs = text.split("\n").map((line) => ({
+      type: "paragraph",
+      content: line ? [{ type: "text", text: line }] : [],
+    }));
+    return editor
+      .chain()
+      .insertContentAt(editor.state.doc.content.size, paragraphs)
+      .focus("end")
+      .run();
+  }
+
   export function toDocument(json: JSONContent): ComposerDocument.Root {
     return {
       type: "doc",

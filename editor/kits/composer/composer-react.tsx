@@ -46,6 +46,7 @@ export type ComposerController = {
   removeAttachment: ComposerCore["removeAttachment"];
   setContexts: ComposerCore["setContexts"];
   clear: () => void;
+  appendText: (text: string, maxBytes: number) => boolean;
   insertFileReference: (reference: ComposerFileReference) => boolean;
   setTriggerIndex: (index: number) => void;
   moveTriggerIndex: (delta: number) => void;
@@ -122,6 +123,9 @@ export function useComposer() {
       clear() {
         editor?.commands.clearContent(true);
         core.clear();
+      },
+      appendText(text, maxBytes) {
+        return !!editor && ComposerTiptap.appendText(editor, text, maxBytes);
       },
       insertFileReference(reference) {
         if (!editor) return false;

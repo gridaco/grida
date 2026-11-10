@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import type { DesktopNativeChat } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
 import { Textarea } from "@app/ui/components/textarea";
@@ -17,6 +17,7 @@ import {
   QuestionPrompt,
 } from "@/kits/agent-chat";
 import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
+import type { ComposerController } from "@/kits/composer";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentComposerInput } from "../shared/agent-composer-input";
 import { QueuedMessageRows } from "../shared/queued-messages";
@@ -24,6 +25,7 @@ import { NativeGoalPanel } from "./native-goal-panel";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
+const MAX_DRAFT_BYTES = 512 * 1024;
 const APPROVAL_ACTION = {
   read_file: "Read file",
   list_files: "List folder",
@@ -58,6 +60,8 @@ export function NativeAgentPane({
     controller.read,
     controller.read
   );
+  const draft = useRef<Pick<ComposerController, "appendText">>(null);
+  const side = state.sideChat;
   useEffect(() => {
     controller.connect(initialSession);
     return () => controller.disconnect();
@@ -206,10 +210,19 @@ export function NativeAgentPane({
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
-      {state.sideChat && (
+      {side && (
         <NativeSideChatPanel
-          controller={state.sideChat}
+          controller={side}
           close={() => void controller.closeSideChat()}
+          draftUnavailable={state.steering || state.acting}
+          addToDraft={(turnId) =>
+            controller.stageSideAnswer(
+              side,
+              turnId,
+              (text) =>
+                draft.current?.appendText(text, MAX_DRAFT_BYTES) ?? false
+            )
+          }
         />
       )}
       {status && (
@@ -460,6 +473,7 @@ export function NativeAgentPane({
                 : undefined
           }
           submissionScope={state.scope}
+          draftRef={draft}
           onSubmit={(text) => controller.submit(text)}
           onStop={() => void controller.control("stop")}
           toolbarStart={

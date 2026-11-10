@@ -19,11 +19,13 @@
 import {
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
   type ChangeEvent,
   type ReactNode,
+  type Ref,
 } from "react";
 import {
   ArrowUpIcon,
@@ -49,6 +51,7 @@ import {
   ComposerTriggerMenu,
   useComposer,
   type ComposerCatalog,
+  type ComposerController,
   type ComposerMessage,
 } from "@/kits/composer";
 import {
@@ -117,6 +120,7 @@ export type AgentComposerInputProps = {
    * in the newly selected session.
    */
   submissionScope?: string | number;
+  draftRef?: Ref<Pick<ComposerController, "appendText">>;
   onStop: () => void;
   placeholder?: string;
   autofocus?: boolean;
@@ -204,6 +208,7 @@ function AgentComposerInner({
   awaitSubmission = false,
   canSubmit = true,
   submissionScope,
+  draftRef,
   onStop,
   placeholder = "Ask anything…",
   autofocus,
@@ -225,6 +230,9 @@ function AgentComposerInner({
   const isBusy = busy ?? isStreaming;
   const composer = useComposer();
   const { addAttachment } = composer;
+  useImperativeHandle(draftRef, () => ({ appendText: composer.appendText }), [
+    composer.appendText,
+  ]);
   const desktopBridge = useDesktopBridge();
 
   const actionById = useMemo(() => {

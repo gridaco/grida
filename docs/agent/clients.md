@@ -266,6 +266,11 @@ Choose **Side chat** in an attached native Desktop chat. Ask in its separate
 text composer while the parent continues. Closing the pane or switching
 parent chats discards the side conversation.
 
+Choose **Add to parent draft** under a completed answer to append a labeled
+quote to your unsent message. Long answers contribute a marked excerpt.
+The draft stays editable and remains in the parent composer after closing
+the side chat. Send the draft when ready.
+
 A private stdio client can open a read-only side chat from an attached parent.
 It captures committed background, including an installed summary when present.
 The parent can keep working. The selected model treats that snapshot as quoted
