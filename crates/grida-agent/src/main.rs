@@ -113,6 +113,18 @@ fn command() -> Command {
                         .action(ArgAction::SetTrue),
                 )
                 .arg(
+                    Arg::new("supervised-configured-endpoint-key")
+                        .long("supervised-configured-endpoint-key")
+                        .value_name("ENDPOINT_ID")
+                        .requires_all(["supervised-provider", "credential-home"])
+                        .conflicts_with_all([
+                            "supervised-gateway-scope",
+                            "supervised-chatgpt-scope",
+                            "listen",
+                        ])
+                        .hide(true),
+                )
+                .arg(
                     Arg::new("supervised-gateway-scope")
                         .long("supervised-gateway-scope")
                         .value_name("SCOPE")
@@ -460,8 +472,16 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     } else {
         None
     };
-    let supervisor = (name == "serve" && args.get_flag("supervised-provider"))
-        .then(grida_agent::SupervisedProvider::default);
+    let supervisor = if name == "serve" && args.get_flag("supervised-provider") {
+        Some(
+            match args.get_one::<String>("supervised-configured-endpoint-key") {
+                Some(key) => grida_agent::SupervisedProvider::for_configured_endpoint(key)?,
+                None => grida_agent::SupervisedProvider::default(),
+            },
+        )
+    } else {
+        None
+    };
     let gateway_scope = if name == "serve" {
         args.get_one::<String>("supervised-gateway-scope")
     } else {

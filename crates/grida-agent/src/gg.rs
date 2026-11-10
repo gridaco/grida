@@ -116,6 +116,7 @@ impl StreamingTransport for SupervisedGg {
                     request.body,
                     request.max_response_bytes,
                     control,
+                    None,
                 )
                 .await
         })

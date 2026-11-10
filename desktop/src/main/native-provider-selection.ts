@@ -1,5 +1,8 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — resolve a native launch from Desktop settings.
-import type { EndpointProviderConfig } from "@grida/agent";
+import {
+  isValidEndpointProviderId,
+  type EndpointProviderConfig,
+} from "@grida/agent";
 import { catalog } from "@grida/ai/catalogue";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -11,10 +14,18 @@ export namespace NativeProviderSelection {
     list: () => Promise<readonly EndpointProviderConfig[]>;
     hasKey: (id: string) => Promise<boolean>;
     network: (id: string, baseUrl: string) => Promise<NativeProviderNetwork>;
+    credentialHome?: string;
   }>;
 
   type Launch = Readonly<
-    Pick<NativeAgentLaunch, "provider" | "endpoint" | "model"> & {
+    Pick<
+      NativeAgentLaunch,
+      | "provider"
+      | "endpoint"
+      | "model"
+      | "credentialHome"
+      | "configuredEndpointKey"
+    > & {
       providerNetwork: NativeProviderNetwork;
     }
   >;
@@ -29,6 +40,8 @@ export namespace NativeProviderSelection {
     openrouter: "https://openrouter.ai/api/v1",
     vercel: "https://ai-gateway.vercel.sh/v1",
   } as const;
+  // The native CLI also owns these vendor keys in the shared store.
+  const nativeVendorKeys = new Set(["openai", "anthropic", "google"]);
 
   export async function builtInByok(
     providerId: string,
@@ -39,15 +52,7 @@ export namespace NativeProviderSelection {
       throw new Error("native_provider_byok_unavailable");
     if (!Object.hasOwn(catalog.text.catalog, model))
       throw new Error("native_provider_model_unavailable");
-    // Windows Desktop's keys belong to its own auth.json custody owner.
-    if (process.platform !== "darwin" && process.platform !== "linux")
-      throw new Error("native_provider_byok_platform_unsupported");
-    const home = settings.credentialHome;
-    if (
-      !path.isAbsolute(home) ||
-      (await fs.realpath(home).catch(() => null)) !== home
-    )
-      throw new Error("native_provider_byok_home_invalid");
+    const home = await checkedCredentialHome(settings.credentialHome);
     if (!(await settings.hasKey(providerId)))
       throw new Error("native_provider_byok_key_missing");
     const endpoint =
@@ -77,15 +82,20 @@ export namespace NativeProviderSelection {
     const config = (await settings.list()).find(
       (entry) => entry.id === providerId
     );
-    if (!config) throw new Error("native_provider_endpoint_unavailable");
+    if (!config || !isValidEndpointProviderId(config.id))
+      throw new Error("native_provider_endpoint_unavailable");
     const model = modelId ?? config.default_model_id ?? config.models[0]?.id;
     if (
       model === undefined ||
       !config.models.some((entry) => entry.id === model)
     )
       throw new Error("native_provider_model_unavailable");
-    if (await settings.hasKey(config.id))
-      throw new Error("native_provider_endpoint_credential_unavailable");
+    const hasKey = await settings.hasKey(config.id);
+    if (hasKey && nativeVendorKeys.has(config.id))
+      throw new Error("native_provider_endpoint_credential_id_reserved");
+    const credentialHome = hasKey
+      ? await checkedCredentialHome(settings.credentialHome)
+      : undefined;
     const endpoint = config.base_url;
     const network = await settings.network(config.id, endpoint);
     const target = new URL(endpoint);
@@ -94,12 +104,32 @@ export namespace NativeProviderSelection {
       provider: "openai-compatible",
       endpoint,
       model,
+      ...(credentialHome && {
+        credentialHome,
+        configuredEndpointKey: config.id,
+      }),
       providerNetwork: {
         prepare: (url, headers) =>
-          url === target.href && !headers.has("authorization")
+          url === target.href &&
+          (hasKey
+            ? /^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
+            : !headers.has("authorization"))
             ? network.prepare(url, headers)
             : null,
       },
     };
+  }
+
+  async function checkedCredentialHome(home?: string): Promise<string> {
+    // Windows Desktop's keys belong to its own auth.json custody owner.
+    if (process.platform !== "darwin" && process.platform !== "linux")
+      throw new Error("native_provider_byok_platform_unsupported");
+    if (
+      !home ||
+      !path.isAbsolute(home) ||
+      (await fs.realpath(home).catch(() => null)) !== home
+    )
+      throw new Error("native_provider_byok_home_invalid");
+    return home;
   }
 }

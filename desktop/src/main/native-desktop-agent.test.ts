@@ -65,6 +65,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
     endpoint: "https://openrouter.ai/api/v1",
     model: "openai/gpt-5.6-terra",
     unavailable: "native_provider_byok_key_missing",
+    keyed: true,
     png: true,
   },
   {
@@ -76,6 +77,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
     endpoint: "https://openrouter.ai/api/v1",
     model: "openai/gpt-5.5",
     unavailable: "native_provider_byok_key_missing",
+    keyed: true,
     png: false,
   },
   {
@@ -87,6 +89,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
     endpoint: "https://ai-gateway.vercel.sh/v1",
     model: "openai/gpt-5.6-terra",
     unavailable: "native_provider_byok_key_missing",
+    keyed: true,
     png: false,
   },
   {
@@ -94,6 +97,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
     endpoint: "http://127.0.0.1:11434/v1",
     model: "openai/gpt-5.6-terra",
     unavailable: "native_provider_endpoint_not_approved",
+    keyed: false,
     png: false,
   },
   {
@@ -101,11 +105,20 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
     endpoint: "https://openrouter.ai/api/v1",
     model: "openai/gpt-5.6-terra",
     unavailable: "native_provider_endpoint_not_approved",
+    keyed: false,
+    png: false,
+  },
+  {
+    selection: { kind: "endpoint", id: "local" } as const,
+    endpoint: "https://openrouter.ai/api/v1",
+    model: "openai/gpt-5.6-terra",
+    unavailable: "native_provider_endpoint_not_approved",
+    keyed: true,
     png: false,
   },
 ])(
-  "starts $selection.kind/$model at $endpoint with exact credential and PNG capability $png",
-  async ({ selection, endpoint, model, unavailable, png }) => {
+  "starts $selection.kind/$model at $endpoint with keyed=$keyed and PNG=$png",
+  async ({ selection, endpoint, model, unavailable, keyed, png }) => {
     const base = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-native-provider-launch-")
     );
@@ -156,7 +169,8 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
           list: async () => [
             { id: "local", base_url: endpoint, models: [{ id: model }] },
           ],
-          hasKey: async () => false,
+          hasKey: (id) => secrets.has(id),
+          credentialHome: source.providerHome,
           network: async () => {
             if (!approved)
               throw new Error("native_provider_endpoint_not_approved");
@@ -180,6 +194,10 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
         resources!,
         { provider: selection, openExternal: vi.fn<() => Promise<void>>() }
       );
+      if (selection.kind === "endpoint" && keyed) {
+        await secrets.set(selection.id, key);
+        await secrets.set("openrouter", "unrelated-fixture-key");
+      }
       await expect(agent.ensure(workspace.id)).rejects.toThrow(unavailable);
       expect(agent.current(workspace.id)).toBeNull();
       expect(prepare).not.toHaveBeenCalled();
@@ -253,7 +271,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
       ]);
       expect(prepare.mock.calls[0][0]).toBe(`${endpoint}/chat/completions`);
       expect(prepare.mock.calls[0][1].get("authorization")).toBe(
-        selection.kind === "byok" ? `Bearer ${key}` : null
+        keyed ? `Bearer ${key}` : null
       );
       expect(sidecar.nativeAgentGatewayConnection).not.toHaveBeenCalled();
     } finally {

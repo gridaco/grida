@@ -6,7 +6,10 @@ import path from "node:path";
 import { expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
 import { NativeProviderSelection } from "./native-provider-selection";
-import type { NativeProviderNetwork } from "./native-provider-egress";
+import {
+  NativeProviderEgress,
+  type NativeProviderNetwork,
+} from "./native-provider-egress";
 
 const base = "http://127.0.0.1:11434/v1";
 const target = `${base}/chat/completions`;
@@ -77,7 +80,7 @@ it("uses a registered model and binds the anonymous launch to the approved route
   expect(explicit.model).toBe("alpha");
 });
 
-it("refuses missing selections, key-backed configurations and missing approval", async () => {
+it("refuses missing selections, models and approval", async () => {
   const owner = settings();
   const select = (provider: string, model?: string) =>
     NativeProviderSelection.configuredEndpoint(provider, model, owner);
@@ -87,10 +90,6 @@ it("refuses missing selections, key-backed configurations and missing approval",
   await expect(select("local", "unknown")).rejects.toThrow(
     "native_provider_model_unavailable"
   );
-  owner.hasKey.mockResolvedValueOnce(true);
-  await expect(select("local")).rejects.toThrow(
-    "native_provider_endpoint_credential_unavailable"
-  );
   expect(owner.network).not.toHaveBeenCalled();
   owner.network.mockRejectedValueOnce(
     new Error("native_provider_endpoint_not_approved")
@@ -99,6 +98,47 @@ it("refuses missing selections, key-backed configurations and missing approval",
     "native_provider_endpoint_not_approved"
   );
 });
+
+it.runIf(sharedCustody)(
+  "binds a custom key to its exact route and never selects a reserved vendor key",
+  async () => {
+    const home = await privateHome();
+    const owner = settings();
+    try {
+      owner.hasKey.mockResolvedValue(true);
+      const selected = await NativeProviderSelection.configuredEndpoint(
+        "local",
+        undefined,
+        { ...owner, credentialHome: home }
+      );
+      expect(selected).toMatchObject({
+        credentialHome: home,
+        configuredEndpointKey: "local",
+      });
+      const headers = new Headers({ authorization: "Bearer fixture" });
+      expect(
+        selected.providerNetwork.prepare(target, new Headers())
+      ).toBeNull();
+      expect(
+        selected.providerNetwork.prepare(target + "?other=1", headers)
+      ).toBeNull();
+      expect(owner.prepare).not.toHaveBeenCalled();
+      expect(selected.providerNetwork.prepare(target, headers)).toBe(
+        owner.dispatch
+      );
+      owner.list.mockResolvedValue([{ ...config, id: "openai" }]);
+      await expect(
+        NativeProviderSelection.configuredEndpoint("openai", undefined, {
+          ...owner,
+          credentialHome: home,
+        })
+      ).rejects.toThrow("native_provider_endpoint_credential_id_reserved");
+      expect(owner.network).toHaveBeenCalledExactlyOnceWith("local", base);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  }
+);
 
 const byokProviders = [
   ["openrouter", "https://openrouter.ai/api/v1"],
@@ -194,7 +234,9 @@ it.runIf(sharedCustody)(
   }
 );
 
-it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
+it
+  .runIf(sharedCustody && Boolean(packaged))
+  .each([...byokProviders, ["local", base]] as const)(
   "runs a native %s turn and refuses replacement credentials through the old launch",
   async (provider, endpoint) => {
     const home = await privateHome();
@@ -206,6 +248,8 @@ it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
       credentialHome
     );
     const key = `${provider}-fixture-key`;
+    const custom = provider === "local";
+    const model = custom ? config.default_model_id : byokModel;
     const dispatch = vi.fn<
       (body: Buffer, signal: AbortSignal) => Promise<Response>
     >(
@@ -217,18 +261,21 @@ it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
     );
     const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
     let chat: NativeAgentChat | undefined;
+    let restoreExchange: (() => void) | undefined;
     try {
       await fs.mkdir(cwd, { mode: 0o700 });
-      await store.set(provider, ` ${key} `);
-      const profile = await NativeProviderSelection.builtInByok(
-        provider,
-        byokModel,
-        {
-          credentialHome,
-          hasKey: (id) => store.has(id),
-          network: async () => ({ prepare }),
-        }
-      );
+      await store.set(provider, custom ? key : ` ${key} `);
+      const settings = {
+        credentialHome,
+        hasKey: (id: string) => store.has(id),
+        network: async () => ({ prepare }),
+      };
+      const profile = custom
+        ? await NativeProviderSelection.configuredEndpoint(provider, model, {
+            ...settings,
+            list: async () => [config],
+          })
+        : await NativeProviderSelection.builtInByok(provider, model, settings);
       chat = await NativeAgentChat.start({
         ...profile,
         cwd,
@@ -257,17 +304,38 @@ it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
       );
       expect(dispatch).toHaveBeenCalledTimes(1);
       expect(JSON.parse(dispatch.mock.calls[0][0].toString())).toMatchObject({
-        model: byokModel,
+        model,
         stream: true,
       });
       const transcript = JSON.stringify(await chat.transcript(session));
       expect(transcript).toContain("BYOK fixture answer");
       expect(transcript).not.toContain(key);
-      await store.set(provider, key);
+      let rotatedDuringUpload = false;
+      if (custom) {
+        const exchange = NativeProviderEgress.prototype.exchange;
+        const spy = vi
+          .spyOn(NativeProviderEgress.prototype, "exchange")
+          .mockImplementation(
+            async function (this: NativeProviderEgress, request) {
+              const reply = await exchange.call(this, request);
+              if (
+                (request as { action?: string })?.action === "append" &&
+                !rotatedDuringUpload
+              ) {
+                await store.set(provider, `rotated-${key}`);
+                rotatedDuringUpload = true;
+              }
+              return reply;
+            }
+          );
+        restoreExchange = () => spy.mockRestore();
+      } else {
+        await store.set(provider, key);
+      }
       const second = await chat.submit(
         session,
         "byok-fixture-second",
-        "Another fixture request"
+        custom ? "\\".repeat(36_000) : "Another fixture request"
       );
       await vi.waitFor(
         async () => {
@@ -278,6 +346,7 @@ it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
         },
         { timeout: 4000 }
       );
+      expect(rotatedDuringUpload).toBe(custom);
       expect(dispatch).toHaveBeenCalledTimes(1);
       await chat.close();
       expect(
@@ -286,6 +355,7 @@ it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
         ).includes(key)
       ).toBe(false);
     } finally {
+      restoreExchange?.();
       await chat?.close();
       await fs.rm(home, { recursive: true, force: true });
     }

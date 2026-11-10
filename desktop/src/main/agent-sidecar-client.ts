@@ -227,6 +227,7 @@ export namespace agentSidecarClient {
       list: transport.providers.list_endpoints,
       hasKey: transport.secrets.has,
       network: nativeAgentEndpointNetwork,
+      credentialHome: nativeAgentByokSettings().credentialHome,
     });
   }
 

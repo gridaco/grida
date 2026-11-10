@@ -228,10 +228,12 @@ The isolated native preview can also launch a saved provider selection. Set
 `--native-chat-model=<catalogue model ID>`. Add the provider key in Desktop
 settings first. These profiles use shared key custody on macOS and Linux.
 
-For an approved anonymous compatible endpoint, pass
+For an approved compatible endpoint, pass
 `--native-chat-provider=endpoint:<saved ID>`. Add `--native-chat-model=<saved model ID>`
 to choose a registered model. Omit it to use the saved default or the first
-registered model. An unavailable selection leaves the workspace chat unopened.
+registered model. On macOS and Linux, a saved key for that endpoint ID is used
+on its approved route. Built-in provider key IDs are reserved. An unavailable
+selection leaves the workspace chat unopened.
 
 To export a live workspace view to another local agent, place a separate
 64-character hexadecimal bearer in `native-mcp-export.bearer` under

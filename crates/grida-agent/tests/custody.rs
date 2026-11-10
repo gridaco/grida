@@ -27,6 +27,7 @@ fn environment_lookup_is_explicit_and_redacts_header() {
         }
         let credential = CapturedCredential::capture(source).unwrap();
         assert_eq!(credential.source_kind(), "environment");
+        assert!(!credential.is_stored_for("openrouter"));
         let runtime = tokio::runtime::Builder::new_current_thread()
             .build()
             .unwrap();
@@ -89,6 +90,56 @@ fn rejects_invalid_source_name_before_lookup() {
     assert!(!format!("{error:?}").contains("INVALID=KEY"));
 }
 
+#[test]
+fn configured_endpoint_keys_refuse_vendor_slots_and_direct_launch() {
+    use grida_agent::SupervisedProvider;
+
+    for reserved in [
+        "openai",
+        "openrouter",
+        "vercel",
+        "anthropic",
+        "google",
+        "fal",
+        "elevenlabs",
+        "tripo",
+        "gg",
+        "chatgpt",
+        "not/valid",
+    ] {
+        assert_eq!(
+            SupervisedProvider::for_configured_endpoint(reserved)
+                .err()
+                .unwrap()
+                .code,
+            "configured_endpoint_credential_id_invalid"
+        );
+    }
+    assert!(SupervisedProvider::for_configured_endpoint("local_gateway").is_ok());
+
+    let directory = tempfile::tempdir().unwrap();
+    let response = std::process::Command::new(env!("CARGO_BIN_EXE_grida-agent"))
+        .args([
+            "serve",
+            "--stdio",
+            "--endpoint",
+            "http://127.0.0.1:1/v1",
+            "--model",
+            "fixture",
+            "--supervised-configured-endpoint-key",
+            "local_gateway",
+            "--credential-home",
+        ])
+        .arg(directory.path())
+        .arg("--state-dir")
+        .arg(directory.path())
+        .output()
+        .unwrap();
+    assert!(!response.status.success());
+    assert!(String::from_utf8_lossy(&response.stderr).contains("--supervised-provider"));
+    assert!(!directory.path().join("providers").exists());
+}
+
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod stored {
     use super::*;
@@ -120,6 +171,8 @@ mod stored {
             };
             store.set(provider, " \u{a0}fixture-key  ").unwrap();
             let credential = CapturedCredential::capture(source()).unwrap();
+            assert!(credential.is_stored_for(provider));
+            assert!(!credential.is_stored_for("local_gateway"));
             let header = credential.header(CredentialFormat::Bearer).await.unwrap();
             assert!(header.is_sensitive());
             assert_eq!(header, "Bearer fixture-key");

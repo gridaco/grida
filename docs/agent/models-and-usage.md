@@ -10,7 +10,8 @@ format: md
 The model connection determines which inputs and tools are available in a
 native workspace chat. A managed Desktop profile uses the Grida Gateway.
 The isolated native preview can use a saved OpenRouter or Vercel key on
-macOS and Linux, or an approved compatible endpoint that needs no key.
+macOS and Linux, or an approved compatible endpoint. On macOS and Linux,
+the endpoint can use a key saved under its own ID.
 [Configure a native Desktop profile](https://github.com/gridaco/grida/blob/main/desktop/README.md#distributions)
 
 ## Recover a connection

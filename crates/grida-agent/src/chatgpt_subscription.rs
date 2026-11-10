@@ -102,6 +102,7 @@ impl StreamingTransport for SupervisedChatGpt {
                     request.body,
                     request.max_response_bytes,
                     control,
+                    None,
                 )
                 .await
         })

@@ -1,5 +1,6 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — provider HTTP on the private supervising pipe.
 
+use crate::custody::CapturedCredential;
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::{Client, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse};
 use agent_kit_core::inference::RequestControl;
@@ -23,6 +24,7 @@ const TIMEOUT: Duration = Duration::from_secs(120);
 #[derive(Clone, Default)]
 pub struct SupervisedProvider {
     connection: Arc<Mutex<Connection>>,
+    configured_endpoint_key: Option<String>,
 }
 
 #[derive(Default)]
@@ -34,6 +36,41 @@ enum Connection {
 }
 
 impl SupervisedProvider {
+    pub fn for_configured_endpoint(key: &str) -> Result<Self> {
+        if !key.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
+            || key.len() > 32
+            || !key.bytes().all(|byte| {
+                byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'-')
+            })
+            || matches!(
+                key,
+                "openai"
+                    | "openrouter"
+                    | "vercel"
+                    | "anthropic"
+                    | "google"
+                    | "fal"
+                    | "elevenlabs"
+                    | "tripo"
+                    | "gg"
+                    | "chatgpt"
+            )
+        {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "configured_endpoint_credential_id_invalid",
+            ));
+        }
+        Ok(Self {
+            configured_endpoint_key: Some(key.to_owned()),
+            ..Self::default()
+        })
+    }
+
+    pub(crate) fn configured_endpoint_key(&self) -> Option<&str> {
+        self.configured_endpoint_key.as_deref()
+    }
+
     pub(crate) fn validate(&self) -> Result<()> {
         if matches!(*self.connection.lock().unwrap(), Connection::Attached(_)) {
             Ok(())
@@ -68,6 +105,7 @@ impl SupervisedProvider {
         body: Vec<u8>,
         max_response_bytes: usize,
         control: RequestControl,
+        credential: Option<&CapturedCredential>,
     ) -> std::result::Result<TransportResponse, TransportFailure> {
         use TransportFailure::{Interrupted, Unavailable};
         if body.is_empty()
@@ -126,6 +164,16 @@ impl SupervisedProvider {
                 .await;
             if !matches!(reply, Some(Reply::Accepted)) {
                 return Err(Unavailable);
+            }
+        }
+        if let Some(credential) = credential {
+            // Upload only buffers bytes in Main. Recheck stored authority
+            // after that wait and before authorizing a provider request.
+            tokio::select! {
+                biased;
+                _ = stream.control.cancellation.cancelled() => return Err(Unavailable),
+                _ = tokio::time::sleep_until(stream.deadline.into()) => return Err(Unavailable),
+                result = credential.validate() => result.map_err(|_| Unavailable)?,
             }
         }
         if stream.control.cancellation.is_cancelled() || stream.deadline <= Instant::now() {

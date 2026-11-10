@@ -881,15 +881,21 @@ lazy reads, read-only mutation, and symlink escape refusal.
   different Gateway account or organization scope from dispatching the chat.
 - [Configured native provider selection](desktop/src/main/native-provider-selection.ts)
   resolves a registered model through the authenticated settings owner and
-  binds its anonymous request to the approved chat endpoint. A configured key
-  requires a separate custody composition. [Main's grant owner](desktop/src/main/agent-network-authority.ts)
+  binds its requests to the approved chat endpoint. A saved endpoint key is
+  looked up by its own configured ID in shared native custody. The
+  [supervised provider](crates/grida-agent/src/supervised_provider.rs)
+  accepts this selection only on a private broker launch and refuses reserved
+  built-in key identities. The broker pipe carries key bytes only in the
+  provider request header. The child rechecks captured credential custody
+  after the broker buffers the request and before dispatch.
+  [Main's grant owner](desktop/src/main/agent-network-authority.ts)
   rotates the captured grant when the approved base changes, including a path
   change on the same origin. Retained launch profiles cannot use the new grant.
   Built-in OpenRouter and Vercel profiles require a selected catalogue model and
   a stored key from the supervisor's credential home. Their broker authorizes
   only that provider's exact Chat Completions route. This launch path is limited
   to shared custody on macOS and Linux. [Process fixtures](desktop/src/main/native-provider-selection.test.ts)
-  exercise both stored keys and refusal after credential replacement.
+  exercise built-in and configured keys and refusal after credential replacement.
   The isolated [Desktop profile](desktop/src/main/native-desktop-profile.ts)
   accepts only a saved provider identity and model choice. The
   [workspace launcher](desktop/src/main/native-desktop-agent.ts) resolves

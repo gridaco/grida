@@ -54,6 +54,7 @@ export type NativeAgentLaunch = {
   endpoint: string;
   model: string;
   credentialHome?: string;
+  configuredEndpointKey?: string;
   providerNetwork?: NativeProviderNetwork;
   gatewayScope?: string;
   subscriptionScope?: string;
@@ -254,6 +255,15 @@ export class NativeAgentProcess {
     if (options.subagents && !options.gatewayScope)
       throw new Error("native_agent_subagents_gateway_required");
     if (
+      options.configuredEndpointKey !== undefined &&
+      (!options.credentialHome ||
+        !options.providerNetwork ||
+        options.provider !== "openai-compatible" ||
+        options.gatewayScope !== undefined ||
+        options.subscriptionScope !== undefined)
+    )
+      throw new Error("native_agent_configured_endpoint_profile_invalid");
+    if (
       options.subscriptionScope !== undefined &&
       (!/^[a-f0-9]{64}$/.test(options.subscriptionScope) ||
         options.provider !== "responses" ||
@@ -316,6 +326,11 @@ export class NativeAgentProcess {
     if (options.credentialHome)
       args.push("--credential-home", options.credentialHome);
     if (providerEgress) args.push("--supervised-provider");
+    if (options.configuredEndpointKey !== undefined)
+      args.push(
+        "--supervised-configured-endpoint-key",
+        options.configuredEndpointKey
+      );
     if (options.gatewayScope)
       args.push("--supervised-gateway-scope", options.gatewayScope);
     if (options.subagents) args.push("--subagents");

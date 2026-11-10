@@ -118,7 +118,10 @@ impl HttpTransport {
         }
         let base = provider_base(&options.endpoint)?;
         let (target, operation) = provider_route(base.clone(), options.protocol, &options.model)?;
-        let source = credential_source(options, &base)?;
+        let configured_key = supervised
+            .as_ref()
+            .and_then(SupervisedProvider::configured_endpoint_key);
+        let source = credential_source(options, &base, configured_key)?;
         let source_identity = match &source {
             Some(CredentialSource::Environment { name }) => {
                 serde_json::json!(["environment", name])
@@ -355,6 +358,7 @@ impl StreamingTransport for HttpTransport {
                             request.body,
                             request.max_response_bytes,
                             control,
+                            self.credential.as_ref(),
                         )
                         .await;
                 }
@@ -472,12 +476,24 @@ fn direct_client(base: &Url) -> Result<Client> {
         .map_err(|_| problem("provider_http_client_unavailable"))
 }
 
-fn credential_source(options: &ProviderOptions, base: &Url) -> Result<Option<CredentialSource>> {
+fn credential_source(
+    options: &ProviderOptions,
+    base: &Url,
+    configured_key: Option<&str>,
+) -> Result<Option<CredentialSource>> {
+    if configured_key.is_some()
+        && (options.protocol != ProviderProtocol::OpenAiCompatible
+            || options.credential_home.is_none()
+            || options.credential_env.is_some())
+    {
+        return Err(invalid("configured_endpoint_credential_profile_invalid"));
+    }
     match (&options.credential_env, &options.credential_home) {
         (Some(_), Some(_)) => Err(invalid("provider_credential_source_conflict")),
         (Some(name), None) => Ok(Some(CredentialSource::Environment { name: name.clone() })),
         (None, Some(home)) => {
-            let provider = stored_provider(options.protocol, base)
+            let provider = configured_key
+                .or_else(|| stored_provider(options.protocol, base))
                 .ok_or_else(|| invalid("stored_credential_endpoint_mismatch"))?;
             if !home.is_absolute() {
                 return Err(invalid("credential_home_must_be_absolute"));
