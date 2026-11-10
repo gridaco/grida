@@ -97,6 +97,9 @@ impl Host {
             let stored = retained_goal_prompt(&accepted.input)?;
             if stored.goal.as_ref() != Some(&GoalInput::Start(goal))
                 || !images::same_prompt(&stored.parts, &request.parts)
+                || request
+                    .operating_regime
+                    .is_some_and(|regime| regime != stored.operating_regime)
                 || (stored.configuration_permission == crate::ConfigurationPermission::Change)
                     != (request.configuration_permission == crate::ConfigurationPermission::Change)
             {
@@ -119,15 +122,9 @@ impl Host {
         self.check_execution(&view)?;
         require_goal_start(&view)?;
         self.check_ready_capacity(&request.session).await?;
+        let policy = self.submission_policy(&request, false)?;
         let mut input = self
-            .capture_submission(
-                &view,
-                request.id,
-                request.parts,
-                request.questions,
-                request.configuration_permission,
-                false,
-            )
+            .capture_input(&view, request.id, request.parts, policy)
             .await?;
         let mut stored: StoredPrompt = decode_input(&input)?;
         stored.goal = Some(GoalInput::Start(goal));

@@ -34,13 +34,15 @@ use std::sync::{Arc, Mutex};
 const SUBMIT: &str = "co.grida/session/submit";
 const SNAPSHOT: &str = "co.grida/session/snapshot";
 const STOP: &str = "co.grida/session/stop";
+const OPERATING_REGIME: &str = "co.grida/session/operating-regime";
 const CONFIG_INSPECT: &str = "co.grida/config/inspect";
 const CONFIG_UPDATE: &str = "co.grida/config/update";
 const CONFIG_RELOAD: &str = "co.grida/config/reload";
-const CAPABILITIES: [&str; 6] = [
+const CAPABILITIES: [&str; 7] = [
     SUBMIT,
     SNAPSHOT,
     STOP,
+    OPERATING_REGIME,
     CONFIG_INSPECT,
     CONFIG_UPDATE,
     CONFIG_RELOAD,
@@ -50,6 +52,16 @@ pub(super) fn advertised(reviewer: bool) -> Meta {
     capability_keys(reviewer)
         .map(|key| (key.into(), 1.into()))
         .collect()
+}
+
+fn operating_regime(
+    sessions: &Mutex<ConnectionSessions>,
+    selection: Option<crate::OperatingRegime>,
+) -> Result<Option<crate::OperatingRegime>> {
+    if selection.is_some() {
+        require(sessions, OPERATING_REGIME, None)?;
+    }
+    Ok(selection)
 }
 
 pub(super) fn negotiated(meta: Option<&Meta>, reviewer: bool) -> BTreeSet<&'static str> {
@@ -106,6 +118,7 @@ struct Submit {
     allow_configuration_changes: bool,
     #[serde(default)]
     allow_wakeups: bool,
+    operating_regime: Option<crate::OperatingRegime>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -343,6 +356,10 @@ pub(super) fn handlers(
                                 configuration_permission: configuration_permission(
                                     &submit_sessions,
                                     request.allow_configuration_changes,
+                                )?,
+                                operating_regime: operating_regime(
+                                    &submit_sessions,
+                                    request.operating_regime,
                                 )?,
                             },
                             request.allow_wakeups,

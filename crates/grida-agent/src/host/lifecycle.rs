@@ -154,15 +154,9 @@ impl Host {
         if view.current.is_none() && !view.admission_paused {
             self.check_ready_capacity(&request.session).await?;
         }
+        let policy = self.submission_policy(&request, false)?;
         let input = self
-            .capture_submission(
-                &view,
-                request.id,
-                request.parts,
-                request.questions,
-                request.configuration_permission,
-                false,
-            )
+            .capture_input(&view, request.id, request.parts, policy)
             .await?;
         let acceptance = self.store.submit(request.session, input).await?;
         self.kick_queue(acceptance.session.clone()).await;

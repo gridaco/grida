@@ -34,6 +34,7 @@ struct Enqueue {
     prompt: Vec<ContentBlock>,
     #[serde(default)]
     allow_configuration_changes: bool,
+    operating_regime: Option<crate::OperatingRegime>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -192,6 +193,10 @@ pub(super) fn handlers(
                             configuration_permission: configuration_permission(
                                 &enqueue.1,
                                 request.allow_configuration_changes,
+                            )?,
+                            operating_regime: operating_regime(
+                                &enqueue.1,
+                                request.operating_regime,
                             )?,
                         })
                         .await

@@ -935,6 +935,7 @@ async fn dropping_admission_waiter_leaves_the_worker_under_host_ownership() {
             }],
             questions: false,
             configuration_permission: grida_agent::ConfigurationPermission::Disabled,
+            operating_regime: None,
         }));
         // The current-thread executor cannot run the registered worker during
         // this poll. Drop the request before its first durable admission step.
@@ -1449,6 +1450,7 @@ fn extension_initialize() -> Value {
         "protocolVersion":1,
         "clientCapabilities":{"_meta":{
             "co.grida/session/submit":1,
+            "co.grida/session/operating-regime":1,
             "co.grida/session/snapshot":1,
             "co.grida/session/stop":1,
             "co.grida/session/enqueue":1,
@@ -1534,6 +1536,7 @@ async fn retry_reports_a_previously_accepted_unclaimed_input_without_starting_it
             }],
             questions: false,
             configuration_permission: grida_agent::ConfigurationPermission::Disabled,
+            operating_regime: None,
         })
         .await
         .unwrap();
@@ -2004,6 +2007,7 @@ async fn compatible_paths_with_different_dispatch_targets_have_distinct_session_
             }],
             questions: false,
             configuration_permission: grida_agent::ConfigurationPermission::Disabled,
+            operating_regime: None,
         })
         .await;
     let Err(error) = result else {

@@ -265,15 +265,19 @@ impl Host {
         self.owned_control(move |host| async move {
             prompt_input(&replacement.id, &replacement.parts)?;
             let _admission = host.configuration_admission.lock().await;
-            let session = replacement.session;
+            let session = replacement.session.clone();
             let cut = ConversationCut::BeforeEditableUser(derivation.anchor);
             // The explicit write opt-in is caller intent. Read and question
             // capabilities are captured settings of the original acceptance.
-            let intent = Fingerprint::of(&(
+            let base = (
                 &cut,
                 &replacement.parts,
                 replacement.configuration_permission == crate::ConfigurationPermission::Change,
-            ))?;
+            );
+            let intent = match replacement.operating_regime {
+                Some(regime) => Fingerprint::of(&(base, regime))?,
+                None => Fingerprint::of(&base)?,
+            };
             let previous = host
                 .store
                 .input(session.clone(), replacement.id.clone())
@@ -301,15 +305,9 @@ impl Host {
                 if !view.admission_paused {
                     host.check_ready_capacity(&session).await?;
                 }
-                host.capture_submission(
-                    &view,
-                    replacement.id,
-                    replacement.parts,
-                    replacement.questions,
-                    replacement.configuration_permission,
-                    false,
-                )
-                .await?
+                let policy = host.submission_policy(&replacement, false)?;
+                host.capture_input(&view, replacement.id, replacement.parts, policy)
+                    .await?
             };
             let revised = host
                 .store

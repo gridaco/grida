@@ -50,7 +50,7 @@ async fn plan_withholds_settings_writes_and_preserves_its_scope_through_a_queue_
         Reply::Finished("The requested setting was applied."),
     ])
     .await;
-    let (first, mut socket) = start_mode(&state, &endpoint.url, "plan").await;
+    let (first, mut socket) = start_mode(&state, &endpoint.url, "act").await;
     let created = ws_rpc(
         &mut socket,
         2,
@@ -61,8 +61,9 @@ async fn plan_withholds_settings_writes_and_preserves_its_scope_through_a_queue_
     let session = created["result"]["sessionId"].as_str().unwrap();
     let mut draft = prompt_request(session, "first-plan", "Investigate the default.");
     draft["allowConfigurationChanges"] = true.into();
+    draft["operatingRegime"] = "plan".into();
     assert_eq!(
-        ws_rpc(&mut socket, 3, "_co.grida/session/submit", draft).await["result"]["disposition"],
+        ws_rpc(&mut socket, 3, "_co.grida/session/submit", draft.clone()).await["result"]["disposition"],
         "claimed"
     );
     let request = endpoint.request().await;
@@ -70,14 +71,19 @@ async fn plan_withholds_settings_writes_and_preserves_its_scope_through_a_queue_
     assert!(offered(&request, "config_inspect"));
     assert!(!offered(&request, "config_update"));
     assert!(!offered(&request, "config_reload"));
+    let replay = ws_rpc(&mut socket, 9, "_co.grida/session/submit", draft.clone()).await;
+    assert_eq!(replay["result"]["disposition"], "claimed");
+    draft["operatingRegime"] = "act".into();
+    let refused = ws_rpc(&mut socket, 10, "_co.grida/session/submit", draft).await;
+    assert!(
+        refused["error"]
+            .to_string()
+            .contains("submission_operating_regime_changed")
+    );
+    let mut queued = prompt_request(session, "queued-plan", "Propose the change.");
+    queued["operatingRegime"] = "plan".into();
     assert_eq!(
-        ws_rpc(
-            &mut socket,
-            4,
-            "_co.grida/session/enqueue",
-            prompt_request(session, "queued-plan", "Propose the change."),
-        )
-        .await["result"]["disposition"],
+        ws_rpc(&mut socket, 4, "_co.grida/session/enqueue", queued,).await["result"]["disposition"],
         "queued"
     );
     let snapshot = session_snapshot(&mut socket, session).await;
@@ -149,6 +155,7 @@ async fn plan_withholds_settings_writes_and_preserves_its_scope_through_a_queue_
 
     let mut act = prompt_request(session, "approved-act", "Apply the planned change.");
     act["allowConfigurationChanges"] = true.into();
+    act["operatingRegime"] = "act".into();
     let accepted = ws_rpc(&mut socket, 6, "_co.grida/session/submit", act).await;
     assert!(accepted.get("error").is_none(), "{accepted}");
     let request = endpoint.request().await;
@@ -226,6 +233,14 @@ async fn plan_launch_can_observe_and_stop_retained_act_but_refuses_to_resume_it(
     )
     .await;
     assert!(loaded.get("error").is_none(), "{loaded}");
+    let mut forbidden = prompt_request(session, "act-on-plan", "Start action.");
+    forbidden["operatingRegime"] = "act".into();
+    let denied = ws_rpc(&mut socket, 8, "_co.grida/session/enqueue", forbidden).await;
+    assert!(
+        denied["error"]
+            .to_string()
+            .contains("act_unavailable_on_plan_host")
+    );
     let before = session_snapshot(&mut socket, session).await;
     let refused = ws_rpc(
         &mut socket,

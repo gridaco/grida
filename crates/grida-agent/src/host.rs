@@ -219,6 +219,7 @@ pub struct PromptRequest {
     pub parts: Vec<PromptPart>,
     pub questions: bool,
     pub configuration_permission: crate::ConfigurationPermission,
+    pub operating_regime: Option<OperatingRegime>,
 }
 
 pub struct AcceptedRun {
@@ -300,9 +301,7 @@ enum Launch {
     Prompt {
         id: ChangeId,
         parts: Vec<PromptPart>,
-        questions: bool,
-        allow_wakeups: bool,
-        configuration_permission: crate::ConfigurationPermission,
+        policy: SubmissionPolicy,
         publish_text: bool,
     },
     Queued,
@@ -587,12 +586,9 @@ impl Host {
         allow_wakeups: bool,
     ) -> Result<AcceptedRun> {
         self.execution()?;
+        let policy = self.submission_policy(&request, allow_wakeups)?;
         let PromptRequest {
-            id,
-            session,
-            parts,
-            questions,
-            configuration_permission,
+            id, session, parts, ..
         } = request;
         validate_prompt_parts(&parts)?;
         let turn = TurnId::new(uuid())?;
@@ -605,9 +601,7 @@ impl Host {
                 Launch::Prompt {
                     id: id.clone(),
                     parts,
-                    questions,
-                    allow_wakeups,
-                    configuration_permission,
+                    policy,
                     publish_text,
                 },
             )?
@@ -813,28 +807,14 @@ impl Host {
         self.check_execution(&view)?;
         let (claim_request, input, acceptance, history) = match launch {
             Launch::Prompt {
-                id,
-                parts,
-                questions,
-                allow_wakeups,
-                configuration_permission,
-                ..
+                id, parts, policy, ..
             } => {
                 require_idle(&view)?;
                 if !view.queued.is_empty() {
                     return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
                 }
                 let history = self.provider_history(session.clone(), None).await?;
-                let input = self
-                    .capture_submission(
-                        &view,
-                        id,
-                        parts,
-                        questions,
-                        configuration_permission,
-                        allow_wakeups,
-                    )
-                    .await?;
+                let input = self.capture_input(&view, id, parts, policy).await?;
                 let acceptance = self.store.submit(session.clone(), input.clone()).await?;
                 let view = self.store.inspect(session.clone()).await?;
                 if view.queued.first().map(|head| &head.input.id) != Some(&input.id) {
@@ -1215,27 +1195,24 @@ impl Host {
         Ok(())
     }
 
-    async fn capture_submission(
+    fn submission_policy(
         &self,
-        session: &SessionView,
-        id: ChangeId,
-        parts: Vec<PromptPart>,
-        questions: bool,
-        configuration_permission: crate::ConfigurationPermission,
+        request: &PromptRequest,
         allow_wakeups: bool,
-    ) -> Result<Submission> {
-        self.capture_input(
-            session,
-            id,
-            parts,
-            SubmissionPolicy {
-                questions,
-                configuration_permission,
-                allow_wakeups,
-                operating_regime: self.operating_regime,
-            },
-        )
-        .await
+    ) -> Result<SubmissionPolicy> {
+        let operating_regime = request.operating_regime.unwrap_or(self.operating_regime);
+        if operating_regime.is_act() && !self.operating_regime.is_act() {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "act_unavailable_on_plan_host",
+            ));
+        }
+        Ok(SubmissionPolicy {
+            questions: request.questions,
+            configuration_permission: request.configuration_permission,
+            allow_wakeups,
+            operating_regime,
+        })
     }
 
     async fn capture_input(
@@ -1621,7 +1598,17 @@ impl Host {
             return Ok(None);
         };
         lifecycle::check_input(&view.input, &request.parts)?;
-        if InputSettings::for_input(&view.input)?.allow_wakeups != allow_wakeups {
+        let settings = InputSettings::for_input(&view.input)?;
+        if request
+            .operating_regime
+            .is_some_and(|regime| regime != settings.operating_regime)
+        {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "submission_operating_regime_changed",
+            ));
+        }
+        if settings.allow_wakeups != allow_wakeups {
             return Err(problem(
                 ErrorKind::Conflict,
                 "submission_wakeup_permission_changed",

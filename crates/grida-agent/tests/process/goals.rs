@@ -40,6 +40,7 @@ fn request(session: &SessionId, id: &str, text: &str) -> PromptRequest {
         parts: vec![PromptPart::Text { text: text.into() }],
         questions: false,
         configuration_permission: ConfigurationPermission::Disabled,
+        operating_regime: None,
     }
 }
 

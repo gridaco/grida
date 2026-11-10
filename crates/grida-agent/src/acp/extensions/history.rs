@@ -55,6 +55,7 @@ struct Revise {
     prompt: Vec<ContentBlock>,
     #[serde(default)]
     allow_configuration_changes: bool,
+    operating_regime: Option<crate::OperatingRegime>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -142,6 +143,10 @@ pub(super) fn handlers(
                                 configuration_permission: configuration_permission(
                                     &sessions,
                                     request.allow_configuration_changes,
+                                )?,
+                                operating_regime: operating_regime(
+                                    &sessions,
+                                    request.operating_regime,
                                 )?,
                             },
                         )

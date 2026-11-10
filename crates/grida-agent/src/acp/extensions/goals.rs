@@ -20,6 +20,7 @@ struct Start {
     input_id: ChangeId,
     prompt: Vec<ContentBlock>,
     goal: GoalRequest,
+    operating_regime: Option<crate::OperatingRegime>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -94,6 +95,10 @@ pub(super) fn handlers(
                                 questions: questions::available(&start.1),
                                 configuration_permission: configuration_permission(
                                     &start.1, false,
+                                )?,
+                                operating_regime: operating_regime(
+                                    &start.1,
+                                    request.operating_regime,
                                 )?,
                             },
                             request.goal,

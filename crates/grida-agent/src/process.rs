@@ -208,6 +208,7 @@ async fn admit_run(host: &Host, options: RunOptions) -> Result<AcceptedRun> {
         parts,
         questions: options.questions,
         configuration_permission: crate::ConfigurationPermission::Disabled,
+        operating_regime: None,
     })
     .await
 }

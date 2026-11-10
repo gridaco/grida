@@ -101,6 +101,12 @@ key with value `1` in `clientCapabilities._meta`. Calling an unnegotiated
 extension returns method not found. Attach the session through standard
 `session/new` or `session/load` before using its custom operations.
 
+Negotiate `co.grida/session/operating-regime` to send `operatingRegime` as
+`plan` or `act` when submitting, enqueueing, starting a goal, or revising
+history. The host captures the effective choice with the input. Omission uses
+the launch default. A Plan launch refuses Act, and an exact retry cannot change
+the accepted regime. Queue edits preserve Plan's narrower scope.
+
 A queue basis contains `sessionId`, `requestId`, and
 `expectedSessionRevision`. A task basis adds `turnId` and
 `expectedControlRevision`. Snapshot returns the ordered queue and turn
