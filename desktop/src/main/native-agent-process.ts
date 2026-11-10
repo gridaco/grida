@@ -51,6 +51,7 @@ const CHILD_QUEUE = [
 export type NativeAgentLaunch = {
   resourcesPath: string;
   stateDirectory: string;
+  processCwd?: string;
   provider: "openai-compatible" | "responses" | "anthropic" | "gemini";
   endpoint: string;
   model: string;
@@ -303,6 +304,7 @@ export class NativeAgentProcess {
       options.resourcesPath,
       options.stateDirectory,
       options.credentialHome,
+      options.processCwd,
     ]) {
       if (directory !== undefined && !path.isAbsolute(directory)) {
         throw new Error("native_agent_absolute_directory_required");
@@ -378,6 +380,7 @@ export class NativeAgentProcess {
     }
     const processOwner = new NativeAgentProcess(
       spawn(executable, args, {
+        ...(options.processCwd && { cwd: options.processCwd }),
         env: environment,
         shell: false,
         windowsHide: true,
@@ -508,7 +511,7 @@ export class NativeAgentProcess {
     sessionId: string,
     snapshot: NativeEditorSurfaceSnapshot,
     requireCurrent: () => void,
-    deliver: NativeEditorSurfaceDelivery,
+    deliver: NativeEditorSurfaceDelivery | undefined,
     revision?: number,
     svgText?: NativeEditorSvgTextDelivery
   ) {

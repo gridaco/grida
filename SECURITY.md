@@ -946,14 +946,20 @@ lazy reads, read-only mutation, and symlink escape refusal.
   separate canonical browser and agent directories under an owner-only
   temporary root. Existing legacy chat data or scratch refuses that launch.
 - [Native chat IPC](desktop/src/main/native-chat-ipc.ts) is available to
-  the current top-level workspace frame or a verified root deck frame under
+  the current top-level workspace, verified root deck, or selected SVG frame under
   the existing authenticated window guard. The [native workspace catalog](desktop/src/main/native-workspace-catalog.ts)
   verifies the registered directory and the root deck marker or an implicit
   `.canvas` root. Main rechecks the deck frame and directory generation before
   a request and before returning its result. A deck shares the worker for its
-  exact registered directory generation. The standalone document and nested
-  deck routes confer no native chat authority. Workbench editor endpoints
-  and external-agent commands remain scoped to the workbench route.
+  exact registered directory generation. A standalone SVG requires the
+  [exact native document owner](desktop/src/main/native-document-files.ts) and
+  rechecks its physical identity before requests and delivery. Its chat worker
+  uses private storage and a private working directory, without a project grant
+  or external tool host. The attached editor can publish only `/canvas.svg`
+  and provide a captured plain text selection. The editor still owns Save.
+  Document window retirement drains its worker. Nested decks confer no native
+  chat authority. Workbench presentation and external-agent commands remain
+  scoped to the workbench route.
   Attachments and observed control revisions are issued in Main. A copied
   handle or workspace URL alone confers no access. Navigation invalidates
   the frame's attachments and observation delivery. Forget withdraws matching

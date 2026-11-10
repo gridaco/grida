@@ -18,6 +18,7 @@ import {
 import type { NativeChatSession } from "./native-agent-chat";
 import type { NativeSavedChatDeletionPreview } from "./native-agent-deletion";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
+import { NativeDocumentIdentityBusy } from "./native-document-files";
 
 const ORIGIN = "https://fixture.invalid";
 const WORKSPACE = "workspace";
@@ -532,6 +533,112 @@ function setup(
 }
 
 describe("native chat IPC", () => {
+  it("withdraws selected-file chat delivery on physical replacement or navigation", async () => {
+    const { chat, emit, listeners } = setup();
+    const docId = randomUUID();
+    const key = randomUUID();
+    const url = `${ORIGIN}/desktop/file?docId=${docId}`;
+    const first = windowAt(url);
+    const copied = windowAt(url);
+    const malformed = windowAt(`${url}&path=nested.svg`);
+    let selected = first.sender;
+    let active = false;
+    let physical: string = key;
+    const identity = vi.fn<
+      (sender: WebContents, id: string) => Promise<string>
+    >(async (sender, id) => {
+      if (sender !== selected || id !== docId) throw new Error("unselected");
+      return physical;
+    });
+    const ensure = vi.fn<
+      (key: string, requireCurrent: () => void) => Promise<void>
+    >(async () => {
+      active = true;
+    });
+    const close = vi.fn<(key: string) => Promise<void>>(async () => {
+      active = false;
+    });
+    const workspace = vi.fn<(id: string) => Promise<void>>(async () => {});
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      () => null,
+      { admits: () => true, ensure: workspace },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      {
+        identity,
+        ensure,
+        close,
+        current: (id) => (active ? { workspaceId: id, chat } : null),
+      }
+    );
+    const request = <T>(invoke: () => T) =>
+      ipc.documentRequest(first.event, invoke);
+    await expect(
+      ipc.documentRequest(copied.event, () => ipc.status(copied.event, true))
+    ).rejects.toThrow("native_chat_scope_changed");
+    await expect(
+      ipc.documentRequest(malformed.event, () =>
+        ipc.status(malformed.event, true)
+      )
+    ).rejects.toThrow("native_chat_scope_changed");
+    expect(identity).toHaveBeenCalledTimes(1);
+    expect(ensure).not.toHaveBeenCalled();
+    await expect(request(() => ipc.status(first.event, true))).resolves.toBe(
+      "native-ready"
+    );
+    expect(ensure).toHaveBeenCalledExactlyOnceWith(key, expect.any(Function));
+    expect(workspace).not.toHaveBeenCalled();
+    const { attachmentId, sessionId } = await request(() =>
+      ipc.create(first.event)
+    );
+    const subscription = randomUUID();
+    await request(() => ipc.subscribe(first.event, attachmentId, subscription));
+
+    identity.mockRejectedValueOnce(new NativeDocumentIdentityBusy());
+    await expect(
+      request(() => ipc.transcript(first.event, attachmentId))
+    ).rejects.toThrow("still in progress");
+    expect(close).not.toHaveBeenCalled();
+    emit(sessionId, UPDATE);
+    await vi.waitFor(() => expect(first.frame.send).toHaveBeenCalledTimes(1));
+
+    const update = Promise.withResolvers<string>();
+    identity.mockReturnValueOnce(update.promise);
+    emit(sessionId, UPDATE);
+    physical = randomUUID();
+    update.resolve(physical);
+    await vi.waitFor(() => expect(close).toHaveBeenCalledExactlyOnceWith(key));
+    expect(first.frame.send).toHaveBeenCalledTimes(1);
+    expect(listeners.get(sessionId)?.size).toBe(0);
+    await expect(ipc.transcript(first.event, attachmentId)).rejects.toThrow(
+      "native_chat_attachment_unavailable"
+    );
+
+    selected = copied.sender;
+    const reopen = <T>(invoke: () => T) =>
+      ipc.documentRequest(copied.event, invoke);
+    await expect(reopen(() => ipc.status(copied.event, true))).resolves.toBe(
+      "native-ready"
+    );
+    const fresh = await reopen(() => ipc.create(copied.event));
+    await reopen(() =>
+      ipc.subscribe(copied.event, fresh.attachmentId, randomUUID())
+    );
+    const held = Promise.withResolvers<string>();
+    identity.mockReturnValueOnce(held.promise);
+    emit(fresh.sessionId, UPDATE);
+    copied.contents.emit("did-start-navigation", { isMainFrame: true });
+    held.resolve(physical);
+    expect(close).toHaveBeenLastCalledWith(physical);
+    expect(copied.frame.send).not.toHaveBeenCalled();
+    expect(listeners.get(fresh.sessionId)?.size).toBe(0);
+  });
+
   it("keeps root deck attachments on the same registered root and exact frame", async () => {
     const { chat, emit, listeners } = setup();
     const workspaceId = "eac20941e6a410aa";

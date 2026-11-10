@@ -19,8 +19,11 @@ import {
 
 const STATE_DIRECTORY = "native-chat";
 const WORKSPACES_DIRECTORY = "workspaces";
+const DOCUMENTS_DIRECTORY = "documents";
 const CHECKPOINT = "cutover.json";
 const PENDING = ".cutover.pending";
+const DOCUMENT_KEY =
+  /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const CHECKPOINT_BYTES = 4096;
 const DIGEST = /^[a-f0-9]{64}$/;
 
@@ -218,14 +221,7 @@ export class NativeAgentCutover {
       (profileId !== undefined && !DIGEST.test(profileId))
     )
       throw new Error("native_chat_workspace_invalid");
-    if (
-      launch.credentialHome &&
-      overlaps(
-        await intendedLocation(launch.credentialHome),
-        this.stateDirectory
-      )
-    )
-      throw new Error("native_chat_cutover_state_overlap");
+    await this.requireProviderIsolation(launch);
     const directory = await this.workspaceDirectory(
       workspaceId,
       launch.cwd,
@@ -237,6 +233,50 @@ export class NativeAgentCutover {
       await ensureState(profiles);
       stateDirectory = path.join(profiles, profileId);
     }
+    return await this.startAt(launch, stateDirectory);
+  }
+
+  async startDocument(
+    key: string,
+    launch: Omit<Launch, "cwd">
+  ): Promise<Ready> {
+    if (
+      !DOCUMENT_KEY.test(key) ||
+      !launch.providerNetwork ||
+      launch.workspace ||
+      launch.workspaceConfiguration ||
+      launch.mcp ||
+      launch.processCwd ||
+      launch.subagents
+    )
+      throw new Error("native_chat_document_invalid");
+    await this.requireProviderIsolation(launch);
+    const documents = path.join(this.stateDirectory, DOCUMENTS_DIRECTORY);
+    const directory = path.join(documents, key);
+    const cwd = path.join(directory, "context");
+    const state = path.join(directory, "runtime");
+    for (const location of [documents, directory, cwd, state])
+      await ensureState(location);
+    return await this.startAt({ ...launch, cwd, processCwd: cwd }, state);
+  }
+
+  private async requireProviderIsolation(
+    launch: Pick<Launch, "credentialHome">
+  ): Promise<void> {
+    if (
+      launch.credentialHome &&
+      overlaps(
+        await intendedLocation(launch.credentialHome),
+        this.stateDirectory
+      )
+    )
+      throw new Error("native_chat_cutover_state_overlap");
+  }
+
+  private async startAt(
+    launch: Launch,
+    stateDirectory: string
+  ): Promise<Ready> {
     const chat = await NativeAgentChat.start({ ...launch, stateDirectory });
     try {
       await this.markReady();

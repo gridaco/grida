@@ -77,6 +77,27 @@ describe("ipc_admission", () => {
     }
   });
 
+  it("admits exact selected-file SVG chat without project settings or presentation", () => {
+    const document = allowedFor("main", "/desktop/file", true);
+    expect(document).toEqual(
+      expect.arrayContaining([
+        IPC_CHANNELS.NATIVE_CHAT_STATUS,
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
+        IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
+        IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+      ])
+    );
+    for (const channel of [
+      IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
+      IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
+      IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT,
+      IPC_CHANNELS.NATIVE_CHAT_SAVE_CONTEXT_LIMIT,
+      IPC_CHANNELS.NATIVE_CHAT_SUBMIT_CONFIGURATION,
+      ...nativeExternal,
+    ])
+      expect(document).not.toContain(channel);
+  });
+
   it("admits native chat on the exact workspace or a producer-checked root deck", () => {
     expect(
       allowedFor("main", "/desktop/workspace").filter((channel) =>
@@ -193,9 +214,10 @@ describe("ipc_admission", () => {
 
 function allowedFor(
   role: Parameters<typeof ipc_admission.allows>[0]["role"],
-  pathname: string
+  pathname: string,
+  selectedDocument = false
 ): IpcChannel[] {
   return allChannels.filter((channel) =>
-    ipc_admission.allows({ role, channel, pathname })
+    ipc_admission.allows({ role, channel, pathname, selectedDocument })
   );
 }

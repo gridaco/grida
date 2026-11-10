@@ -193,6 +193,30 @@ export class NativeDesktopAgent {
     });
   }
 
+  async ensureDocument(key: string, requireCurrent: () => void): Promise<void> {
+    const generation = this.accountGeneration;
+    if (this.accountDrain) await this.accountDrain;
+    const check = () => {
+      requireCurrent();
+      if (this.closed || generation !== this.accountGeneration)
+        throw new Error("native_workspace_closing");
+    };
+    check();
+    await (this.owners ??= this.newOwners()).open({
+      id: key,
+      requireCurrent: check,
+    });
+    check();
+  }
+
+  currentDocument(key: string) {
+    return this.owners?.currentDocument(key) ?? null;
+  }
+
+  closeDocument(key: string): Promise<void> {
+    return this.owners?.closeDocument(key) ?? Promise.resolve();
+  }
+
   forgetWorkspace(workspaceId: string): Promise<void> {
     const activity: WorkspaceActivity = this.workspaceActivity.get(
       workspaceId
@@ -442,6 +466,15 @@ export class NativeDesktopAgent {
       async (workspace, signal) => {
         const { provider, release } = await this.prepareProvider(signal);
         try {
+          if (!("root" in workspace))
+            return {
+              launch: {
+                ...provider,
+                subagents: undefined,
+                resourcesPath: this.resourcesPath,
+              },
+              release,
+            };
           return {
             launch: {
               ...(await this.workspaceLaunch(workspace, provider)),

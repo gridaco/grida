@@ -700,7 +700,8 @@ app.on("ready", async () => {
         nativeDocuments = new NativeDocumentFiles(
           workspaceCatalog.fileProtectionPaths(),
           app.getPath("home"),
-          documentWorkers
+          documentWorkers,
+          path.join(app.getPath("userData"), "document-identities")
         );
       }
       recentFiles = new RecentStore(app.getPath("userData"), {
@@ -814,6 +815,12 @@ app.on("ready", async () => {
       forget_native_workspace: (workspaceId) =>
         native.forgetWorkspace(workspaceId),
       resolve_native_deck: workspaceCatalog?.rootDeck.bind(workspaceCatalog),
+      native_document_chat: {
+        current: (key) => native.currentDocument(key),
+        ensure: (key, requireCurrent) =>
+          native.ensureDocument(key, requireCurrent),
+        close: (key) => native.closeDocument(key),
+      },
       native_chat_profiles: native.selectableProfiles
         ? {
             list: (workspaceId) => native.profiles(workspaceId),

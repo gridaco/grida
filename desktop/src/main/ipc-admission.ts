@@ -40,6 +40,19 @@ const WORKBENCH_CHAT_CHANNELS = new Set<IpcChannel>([
   IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
 ]);
 
+const DOCUMENT_EDITOR_CHANNELS = new Set<IpcChannel>([
+  IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
+  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+]);
+
+const PROJECT_CONFIGURATION_CHANNELS = new Set<IpcChannel>([
+  IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
+  IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT,
+  IPC_CHANNELS.NATIVE_CHAT_SAVE_CONTEXT_LIMIT,
+  IPC_CHANNELS.NATIVE_CHAT_SUBMIT_CONFIGURATION,
+]);
+
 /**
  * Closed IPC allowlist for non-main entry roles.
  *
@@ -60,10 +73,12 @@ export namespace ipc_admission {
     role,
     channel,
     pathname,
+    selectedDocument = false,
   }: {
     role: DesktopIpcRole;
     channel: IpcChannel;
     pathname: string;
+    selectedDocument?: boolean;
   }): boolean {
     switch (role) {
       case "main":
@@ -89,7 +104,12 @@ export namespace ipc_admission {
         if (channel.startsWith("grida:native-chat:")) {
           return (
             pathname === "/desktop/workspace" ||
-            (pathname === "/desktop/file" && isDeckChat(channel))
+            (pathname === "/desktop/file" &&
+              (selectedDocument
+                ? DOCUMENT_EDITOR_CHANNELS.has(channel) ||
+                  (isDeckChat(channel) &&
+                    !PROJECT_CONFIGURATION_CHANNELS.has(channel))
+                : isDeckChat(channel)))
           );
         }
         if (

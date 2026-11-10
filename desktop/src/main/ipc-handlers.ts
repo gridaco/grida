@@ -101,6 +101,10 @@ type RegisterIpcHandlersOptions = {
   native_chat_disabled?: boolean;
   forget_native_workspace?: (workspaceId: string) => Promise<void>;
   resolve_native_deck?: (workspaceId: string) => Promise<WorkspaceMediaGrant>;
+  native_document_chat?: Pick<
+    import("./native-chat-ipc").NativeChatDocumentOwner,
+    "current" | "ensure" | "close"
+  >;
   native_external_agent?: NativeExternalRuns;
   native_chat_profiles?: import("./native-chat-ipc").NativeChatProfileOwner;
   publish_workspace_surfaces?: (
@@ -203,7 +207,22 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     },
     options.native_chat_profiles,
     options.resolve_native_deck,
-    options.native_chat_disabled
+    options.native_chat_disabled,
+    options.native_document_chat && {
+      ...options.native_document_chat,
+      identity: (sender, docId, owner) => {
+        const files = options.document_files;
+        const window = admittedWindow(sender);
+        const check = () => {
+          owner.check();
+          if (!window || options.resolve_document_window?.(docId) !== window)
+            throw new Error("native_chat_scope_changed");
+        };
+        check();
+        if (!files) throw new Error("native_chat_unavailable");
+        return files.chatIdentity(docId, { signal: owner.signal, check });
+      },
+    }
   );
   const externalAgent = new NativeExternalRunIpc(
     EDITOR_ORIGIN,
@@ -229,11 +248,13 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       const window = BrowserWindow.fromWebContents(event.sender);
       const role = window ? options.resolve_ipc_role(window) : null;
       const pathname = ipc_sender.pathname(senderUrl);
+      const docId = ipc_sender.documentId(senderUrl);
+      const selectedDocument = docId !== null;
       if (
         !ipc_sender.isAllowed(senderUrl, EDITOR_ORIGIN) ||
         !role ||
         !pathname ||
-        !ipc_admission.allows({ role, channel, pathname })
+        !ipc_admission.allows({ role, channel, pathname, selectedDocument })
       ) {
         console.warn(
           `[grida] IPC ${channel} denied: sender=${ipc_sender.diagnostic(senderUrl)}`
@@ -241,9 +262,18 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         throw new Error(`IPC ${channel} denied`);
       }
       const invoke = () => handler(event, ...(args as A));
-      return pathname === "/desktop/file" && ipc_admission.isDeckChat(channel)
-        ? nativeChat.deckRequest(event, invoke)
-        : invoke();
+      if (
+        pathname === "/desktop/file" &&
+        channel.startsWith("grida:native-chat:")
+      ) {
+        if (docId) {
+          if (!window || options.resolve_document_window?.(docId) !== window)
+            throw new Error("native_chat_scope_changed");
+          return nativeChat.documentRequest(event, invoke);
+        }
+        return nativeChat.deckRequest(event, invoke);
+      }
+      return invoke();
     });
   }
 

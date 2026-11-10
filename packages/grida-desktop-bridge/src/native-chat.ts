@@ -450,10 +450,12 @@ export type NativeChatUpdate =
       reason: "delivery_limit" | "session_deleted";
     }>;
 
-/** Available only for a main-selected native chat in the current workspace. */
+/** Available for a native chat in the exact scope selected by Main. */
 export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   /** This host also accepts native chat requests from an admitted root deck. */
   readonly deck?: true;
+  /** This native package offers chat for the exact selected standalone SVG. */
+  readonly document?: true;
   available(): Promise<boolean>;
   /**
    * Starts the admitted workspace when requested and native mode is selected.

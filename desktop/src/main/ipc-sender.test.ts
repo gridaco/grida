@@ -37,6 +37,22 @@ it("pins the standalone document route to one exact document query", () => {
     expect(ipc_sender.isDocument(origin + path, "a")).toBe(false);
 });
 
+it("accepts only the issued UUID shape for standalone document chat", () => {
+  const id = "c05543c0-40dd-4ca2-9a08-be6b86977e8e";
+  const route = `https://grida.co/desktop/file?docId=${id}`;
+  expect(ipc_sender.documentId(route)).toBe(id);
+  for (const href of [
+    `${route}&docId=${id}`,
+    `${route}&id=eac20941e6a410aa`,
+    `${route}&path=`,
+    `${route}#other`,
+    route.replace(id, "other"),
+    route.replace(id, id.toUpperCase()),
+    route.replace("/file", "/file/other"),
+  ])
+    expect(ipc_sender.documentId(href)).toBeNull();
+});
+
 describe("ipc_sender.isAllowed", () => {
   it.each([
     "https://grida.co/desktop",

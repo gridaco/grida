@@ -3,7 +3,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
-import { NativeDocumentFiles } from "./native-document-files";
+import {
+  NativeDocumentFiles,
+  NativeDocumentIdentityBusy,
+} from "./native-document-files";
 import {
   WorkspaceWriteUnverified,
   WorkspaceFileWorkers,
@@ -132,13 +135,26 @@ it.runIf(process.platform !== "win32")(
       );
 
       await files.read(id, owner);
-      workers.saveDocument.mockImplementationOnce(async (grant, content) => ({
-        mtime: 124,
-        identity: await replaceFile(grant.path, content),
-      }));
-      expect(await files.write(id, "<svg>updated</svg>", owner)).toEqual({
+      const saving = Promise.withResolvers<void>();
+      const proceed = Promise.withResolvers<void>();
+      workers.saveDocument.mockImplementationOnce(async (grant, content) => {
+        saving.resolve();
+        await proceed.promise;
+        return { mtime: 124, identity: await replaceFile(grant.path, content) };
+      });
+      const write = files.write(id, "<svg>updated</svg>", owner);
+      await saving.promise;
+      try {
+        await expect(files.chatIdentity(id, owner)).rejects.toBeInstanceOf(
+          NativeDocumentIdentityBusy
+        );
+      } finally {
+        proceed.resolve();
+      }
+      expect(await write).toEqual({
         mtime: 124,
       });
+      expect(await files.chatIdentity(id, owner)).toBe(key);
       const nextReceipt = await fs.readFile(receiptPath, "utf8");
       expect(nextReceipt).not.toBe(retained);
       files.release(id);

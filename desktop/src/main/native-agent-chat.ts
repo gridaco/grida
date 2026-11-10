@@ -693,7 +693,7 @@ export class NativeAgentChat {
     session: NativeChatSession,
     snapshot: NativeEditorSurfaceSnapshot,
     requireCurrent: () => void,
-    deliver: NativeEditorSurfaceDelivery,
+    deliver: NativeEditorSurfaceDelivery | undefined,
     revision?: number,
     svgText?: NativeEditorSvgTextDelivery
   ) {

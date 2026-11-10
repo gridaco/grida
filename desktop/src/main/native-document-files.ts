@@ -103,14 +103,16 @@ export class NativeDocumentFiles {
     if (!identities) throw unavailable();
     const entry = this.selected(id, owner);
     const { grant } = entry;
+    if (path.extname(grant.path).toLowerCase() !== ".svg") throw unavailable();
     const check = async () => {
       owner.signal.throwIfAborted();
       const current = await this.capture(grant.path);
       owner.signal.throwIfAborted();
       owner.check();
       if (entry.retired) throw unavailable();
-      if (entry.operation === "write") throw busy();
-      if (entry.grant !== grant || !sameGrant(grant, current)) throw changed();
+      if (entry.operation === "write" || entry.grant !== grant)
+        throw new NativeDocumentIdentityBusy();
+      if (!sameGrant(grant, current)) throw changed();
     };
     try {
       await check();
@@ -125,7 +127,9 @@ export class NativeDocumentFiles {
       await check();
       return key;
     } catch (error) {
-      throw publicError(error);
+      throw error instanceof NativeDocumentIdentityBusy
+        ? error
+        : publicError(error);
     }
   }
 
@@ -314,6 +318,12 @@ async function documentText(
   if (length + tail.length > MAX_STRING_LENGTH) throw tooLarge();
   chunks.push(tail);
   return chunks.join("");
+}
+
+export class NativeDocumentIdentityBusy extends Error {
+  constructor() {
+    super("A document operation is still in progress.");
+  }
 }
 
 function publicError(error: unknown): Error {

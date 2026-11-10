@@ -32,6 +32,18 @@ export namespace ipc_sender {
     );
   }
 
+  export function documentId(raw: string | undefined): string | null {
+    const id = parse(raw)?.searchParams.get("docId");
+    return raw &&
+      id &&
+      /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(
+        id
+      ) &&
+      isDocument(raw, id)
+      ? id
+      : null;
+  }
+
   export function rootDeckId(raw: string | undefined): string | null {
     const url = parse(raw);
     if (url?.pathname !== "/desktop/file" || url.hash) return null;

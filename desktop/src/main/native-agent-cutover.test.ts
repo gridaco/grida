@@ -1,12 +1,20 @@
 // GRIDA-SEC-004 — disposable legacy and native stores exercise cold startup.
 import fs from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultScratchBase } from "@grida/agent/sandbox";
 import type { NativeAgentChatLaunch } from "./native-agent-chat";
+import type { IpcMainInvokeEvent, WebContents } from "electron";
+import type { NativeEditorSvgText } from "@grida/desktop-bridge";
+import { IPC_CHANNELS } from "../bridge/contract";
+import { NativeChatIpc } from "./native-chat-ipc";
+import { NativeDocumentFiles } from "./native-document-files";
+import { NativeGatewayConnection } from "./native-gateway-connection";
+import { WorkspaceFileWorkers } from "./workspace-file-worker";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
 import { LegacyChatArchive } from "./legacy-chat-archive";
 import {
@@ -571,6 +579,262 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
       }
     },
     15000
+  );
+
+  it.runIf(Boolean(nativeResources))(
+    "persists selected SVG chat with a rootless native worker and live text reply",
+    async () => {
+      const test = await fixture();
+      writeLegacy(test.database, test.scratchBase);
+      const prepared = await test.prepare();
+      const selected = path.join(test.child("user-files"), "drawing.svg");
+      const original = "<svg>Original</svg>";
+      fs.writeFileSync(selected, original);
+      const origin = "https://editor.fixture.invalid";
+      const target = randomUUID();
+      const offers: string[][] = [];
+      const toolReplies: unknown[] = [];
+      const connection = await NativeGatewayConnection.open({
+        origin,
+        account: {
+          withGatewayGrant: async (_, accept) =>
+            accept({
+              token: "fixture.gateway.token",
+              subject: "synthetic-user",
+              organizationId: 12,
+              expiresAt: Date.now() + 120_000,
+              isCurrent: () => true,
+            }),
+        },
+        network: {
+          prepare: () => async (body) => {
+            const request = JSON.parse(body.toString());
+            offers.push(
+              (request.tools ?? []).map(
+                (tool: { function: { name: string } }) => tool.function.name
+              )
+            );
+            const event = (delta: object, finish_reason: string | null) =>
+              `data: ${JSON.stringify({ id: "fixture", choices: [{ index: 0, delta, finish_reason }] })}\n\n`;
+            const tool = offers.length === 1;
+            const delta = tool
+              ? {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "replace",
+                      type: "function",
+                      function: {
+                        name: "svg_replace_selected_text",
+                        arguments: JSON.stringify({
+                          revision: target,
+                          text: "Changed",
+                        }),
+                      },
+                    },
+                  ],
+                }
+              : { content: "The selected text changed." };
+            toolReplies.push(
+              ...request.messages.filter(
+                (message: { role: string }) => message.role === "tool"
+              )
+            );
+            return new Response(
+              event(delta, null) +
+                event({}, tool ? "tool_calls" : "stop") +
+                "data: [DONE]\n\n",
+              { headers: { "content-type": "text/event-stream" } }
+            );
+          },
+        },
+      });
+      const workers = new WorkspaceFileWorkers(nativeResources!);
+      const receipts = path.join(electron.userData, "document-identities");
+      const launch = {
+        ...connection.launch("fixture"),
+        resourcesPath: nativeResources!,
+      };
+      const owners = new NativeWorkspaceAgents(prepared, async () => ({
+        launch,
+      }));
+      const files = new NativeDocumentFiles(
+        [electron.userData],
+        path.dirname(selected),
+        workers,
+        receipts
+      );
+      const docId = await files.register(selected);
+      let current: WebContents | undefined;
+      const ipc = new NativeChatIpc(
+        origin,
+        () => null,
+        {
+          admits: () => true,
+          ensure: async () => {
+            throw new Error("unexpected workspace");
+          },
+        },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        {
+          identity: (sender, id, owner) => {
+            if (sender !== current || id !== docId)
+              throw new Error("unexpected document");
+            return files.chatIdentity(id, owner);
+          },
+          current: (key) => owners.currentDocument(key),
+          ensure: async (id, requireCurrent) => {
+            await owners.open({ id, requireCurrent });
+          },
+          close: (key) => owners.closeDocument(key),
+        }
+      );
+      const received = vi.fn<(request: NativeEditorSvgText.Request) => void>();
+      const frame = {
+        url: `${origin}/desktop/file?docId=${docId}`,
+        send(
+          channel: string,
+          request: NativeEditorSvgText.Request & {
+            attachmentId: string;
+            callId: string;
+          }
+        ) {
+          if (channel !== IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT) return;
+          received(request);
+          void ipc
+            .documentRequest(event, () =>
+              ipc.replyEditorSvgText(
+                event,
+                request.attachmentId,
+                request.callId,
+                { kind: "applied", path: "/canvas.svg", saved: false }
+              )
+            )
+            .catch(() => {});
+        },
+      };
+      const contents = Object.assign(new EventEmitter(), {
+        mainFrame: frame,
+        isDestroyed: () => false,
+        isLoadingMainFrame: () => false,
+      });
+      const event = {
+        sender: contents,
+        senderFrame: frame,
+      } as unknown as IpcMainInvokeEvent;
+      current = event.sender;
+      const invoke = <T>(run: () => T) => ipc.documentRequest(event, run);
+      try {
+        await expect(invoke(() => ipc.status(event, true))).resolves.toBe(
+          "native-ready"
+        );
+        const attachment = await invoke(() => ipc.create(event));
+        const scoped = {
+          active: "/canvas.svg",
+          open: ["/canvas.svg"],
+          truncated: false,
+        };
+        await expect(
+          invoke(() =>
+            ipc.publishEditorSurfaces(event, attachment.attachmentId, {
+              ...scoped,
+              open: ["/canvas.svg", "/sibling.svg"],
+            })
+          )
+        ).rejects.toThrow("native_chat_editor_surfaces_invalid");
+        await expect(
+          invoke(() =>
+            ipc.publishEditorSurfaces(event, attachment.attachmentId, scoped, 1)
+          )
+        ).rejects.toThrow("native_chat_editor_surfaces_invalid");
+        await invoke(() =>
+          ipc.publishEditorSurfaces(event, attachment.attachmentId, scoped)
+        );
+        await invoke(() =>
+          ipc.submit(
+            event,
+            attachment.attachmentId,
+            "fixture-selected-svg",
+            "Change the selected text.",
+            "act",
+            undefined,
+            target
+          )
+        );
+        await vi.waitFor(
+          async () => {
+            const { snapshot } = await invoke(() =>
+              ipc.observe(event, attachment.attachmentId)
+            );
+            expect(snapshot.latest?.status).toBe("succeeded");
+          },
+          { timeout: 6000 }
+        );
+        expect(received).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({
+            operation: { kind: "replace", revision: target, text: "Changed" },
+          })
+        );
+        expect(toolReplies).toEqual([
+          expect.objectContaining({
+            content: expect.stringContaining('"saved":false'),
+          }),
+        ]);
+        expect(offers[0]).toEqual(
+          expect.arrayContaining([
+            "svg_replace_selected_text",
+            "svg_read_selected_text",
+            "surface_list_open",
+          ])
+        );
+        for (const offer of offers)
+          for (const denied of [
+            "read_file",
+            "list_files",
+            "search_text",
+            "run_command",
+            "surface_open",
+            "spawn_agent",
+          ])
+            expect(offer).not.toContain(denied);
+        expect(fs.readFileSync(selected, "utf8")).toBe(original);
+        const key = await files.chatIdentity(docId, {
+          signal: new AbortController().signal,
+          check() {},
+        });
+        const context = path.join(
+          test.nativeState,
+          "documents",
+          key,
+          "context"
+        );
+        expect(fs.statSync(context).mode & 0o777).toBe(0o700);
+        expect(fs.readdirSync(context)).toEqual([]);
+        contents.emit("did-start-navigation", { isMainFrame: true });
+        await owners.closeDocument(key);
+        expect(owners.currentDocument(key)).toBeNull();
+        await expect(invoke(() => ipc.status(event, true))).resolves.toBe(
+          "native-ready"
+        );
+        const reopened = await invoke(() =>
+          ipc.load(event, attachment.sessionId)
+        );
+        expect(
+          await invoke(() => ipc.transcript(event, reopened.attachmentId))
+        ).not.toHaveLength(0);
+        expect(offers).toHaveLength(2);
+      } finally {
+        await owners.close();
+        connection.close();
+        workers.close();
+      }
+    },
+    15_000
   );
 
   it.runIf(Boolean(nativeResources))(
