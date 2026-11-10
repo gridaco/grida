@@ -79,6 +79,75 @@ async fn opened(
     (input, output, metadata)
 }
 
+async fn list(root: &Path, path: &str) -> std::process::Output {
+    let mut child = launch(worker());
+    let mut request = request(root, path);
+    request["listDirectory"] = json!(true);
+    let mut input = child.stdin.take().unwrap();
+    send(&mut input, request).await;
+    drop(input);
+    complete(child).await
+}
+
+#[tokio::test]
+async fn private_worker_lists_exact_directory_without_following_child_links() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap().join("workspace");
+    fs::create_dir(&root).unwrap();
+    fs::create_dir(root.join("subfolder")).unwrap();
+    fs::write(root.join("subfolder/draft.txt"), b"content").unwrap();
+    fs::write(root.join("root.txt"), b"root").unwrap();
+    let outside = root.parent().unwrap().join("outside");
+    fs::create_dir(&outside).unwrap();
+    fs::write(outside.join("secret.txt"), b"outside").unwrap();
+    std::os::unix::fs::symlink(&outside, root.join("escape")).unwrap();
+    std::os::unix::fs::symlink(root.join("subfolder"), root.join("alias")).unwrap();
+    let _socket = std::os::unix::net::UnixListener::bind(root.join("local.sock")).unwrap();
+
+    let listed = list(&root, "").await;
+    assert!(listed.status.success(), "{:?}", listed.stderr);
+    let value: Value = serde_json::from_slice(&listed.stdout).unwrap();
+    let mut entries = value["entries"].as_array().unwrap().clone();
+    entries.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+    assert_eq!(
+        entries,
+        [
+            json!({"name":"alias", "kind":"symlink"}),
+            json!({"name":"escape", "kind":"symlink"}),
+            json!({"name":"local.sock", "kind":"other"}),
+            json!({"name":"root.txt", "kind":"file"}),
+            json!({"name":"subfolder", "kind":"directory"}),
+        ]
+    );
+    let alias = list(&root, "alias").await;
+    assert!(alias.status.success(), "{:?}", alias.stderr);
+    assert_eq!(
+        serde_json::from_slice::<Value>(&alias.stdout).unwrap(),
+        json!({"entries":[{"name":"draft.txt", "kind":"file"}]})
+    );
+    let escaped = list(&root, "escape").await;
+    assert!(!escaped.status.success());
+    assert!(escaped.stdout.is_empty());
+}
+
+#[tokio::test]
+async fn private_worker_refuses_an_incomplete_directory_listing() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    for index in 0..8_192 {
+        fs::File::create(root.join(format!("entry-{index}"))).unwrap();
+    }
+    let full = list(&root, "").await;
+    assert!(full.status.success(), "{:?}", full.stderr);
+    let value: Value = serde_json::from_slice(&full.stdout).unwrap();
+    assert_eq!(value["entries"].as_array().unwrap().len(), 8_192);
+    fs::File::create(root.join("over-limit")).unwrap();
+    let refused = list(&root, "").await;
+    assert!(!refused.status.success());
+    assert!(refused.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&refused.stderr).contains("workspace_directory_limit"));
+}
+
 #[tokio::test]
 async fn private_worker_supplies_fractional_mtime_only_when_requested() {
     let temp = tempfile::tempdir().unwrap();

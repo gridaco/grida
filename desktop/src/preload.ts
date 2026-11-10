@@ -871,7 +871,12 @@ const bridge: DesktopBridge = {
       await ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_FORGET, id);
     },
     readdir: (workspaceId, relPath) =>
-      agentClient.workspaces.readdir(workspaceId, relPath ?? ""),
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_READ,
+        workspaceId,
+        relPath ?? "",
+        "directory"
+      ),
     read_file: (workspaceId, relPath) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.WORKSPACE_READ,

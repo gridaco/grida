@@ -160,10 +160,11 @@ with `--native-chat` and `--user-data-dir` set to a precreated owner-only
 browser directory. Set `GRIDA_AGENT_USER_DATA` to a separate sibling directory
 under the same owner-only root in the system temporary directory. Chat uses a
 separate native store for each registered workspace. Main owns the workspace
-catalog. On packaged macOS arm64 builds, buffered editor reads and media Range
-reads use the confined native file worker. The buffered reader preserves the
-modification time used by the editor's stale-write check. The retained sidecar
-continues to serve directory listings, writes, endpoint settings and media.
+catalog. On packaged macOS arm64 builds, directory listings, buffered editor
+reads and media Range reads use the confined native file worker. A directory
+listing either returns all entries within its bound or reports a limit error.
+The buffered reader preserves the modification time used by the editor's
+stale-write check. The retained sidecar serves writes, endpoint settings and media.
 This profile requires an empty legacy chat source and defaults to the Grida
 account's Gateway connection.
 

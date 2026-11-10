@@ -344,6 +344,23 @@ pub(crate) fn open_root_file(directory: &File, root: &Path, path: &Path) -> Resu
     open_beneath(root, path, Kind::File, || Ok(()))
 }
 
+pub(crate) fn open_root_directory(directory: &File, root: &Path, path: &Path) -> Result<File> {
+    validate_path(path)?;
+    let file = directory.try_clone().map_err(|_| unavailable())?;
+    if path.as_os_str().is_empty() {
+        return Ok(file);
+    }
+    open_beneath(
+        Root {
+            file,
+            path: root.to_path_buf(),
+        },
+        path,
+        Kind::Directory,
+        || Ok(()),
+    )
+}
+
 #[cfg(target_os = "linux")]
 fn open_beneath(
     root: Root,

@@ -1,4 +1,4 @@
-//! GRIDA-SEC-004 / GRIDA-SEC-014 — one registered-root file span on private pipes.
+//! GRIDA-SEC-004 / GRIDA-SEC-014 — one registered-root read on private pipes.
 
 use super::*;
 use crate::file_tools::FileAuthority;
@@ -20,6 +20,8 @@ struct OpenRequest {
     path: PathBuf,
     #[serde(default)]
     include_modified: bool,
+    #[serde(default)]
+    list_directory: bool,
 }
 
 #[derive(Deserialize)]
@@ -64,6 +66,9 @@ pub fn serve_stdio() -> Result<()> {
     let stdout = io::stdout();
     let mut output = stdout.lock();
     let request = frame::<OpenRequest>(&mut input)?.ok_or_else(invalid_frame)?;
+    if request.list_directory && request.include_modified {
+        return Err(invalid_frame());
+    }
     let directory = BindingId::new("registered-workspace")?;
     let protected = Arc::new(ProtectedRoots::new(request.protected)?);
     let snapshot = Arc::new(WorkspaceSnapshot::capture(
@@ -97,6 +102,14 @@ pub fn serve_stdio() -> Result<()> {
         workspace: snapshot.clone(),
         protected,
     };
+    if request.list_directory {
+        let listing = super::directory::list(&authority, &directory, &request.path)?;
+        return output
+            .write_all(&listing)
+            .and_then(|()| output.write_all(b"\n"))
+            .and_then(|()| output.flush())
+            .map_err(|_| output_failed());
+    }
     let opened = OpenedWorkspaceFile::open(
         &snapshot,
         &directory,

@@ -3,6 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
+import type { WorkspaceFsEntry } from "@grida/daemon";
 import type { WorkspaceFileBody } from "@grida/daemon/server";
 import {
   WorkspaceMediaError,
@@ -11,10 +12,20 @@ import {
 
 const MAX_WORKERS = 8;
 const MAX_HEADER_BYTES = 128;
+const MAX_DIRECTORY_BYTES = 2 * 1024 * 1024;
+const MAX_DIRECTORY_ENTRIES = 8192;
 const START_TIMEOUT_MS = 5_000;
 const CLOSE_TIMEOUT_MS = 2_000;
 
 type Exit = { code: number | null };
+type DirectoryEntry = Pick<WorkspaceFsEntry, "name" | "kind">;
+type Worker = {
+  child: ChildProcessWithoutNullStreams;
+  abort: () => void;
+  exited: Promise<Exit>;
+  output: AsyncIterator<Buffer>;
+  diagnostic: () => string;
+};
 
 export class WorkspaceFileWorkers {
   private readonly active = new Set<ChildProcessWithoutNullStreams>();
@@ -28,52 +39,18 @@ export class WorkspaceFileWorkers {
     signal: AbortSignal,
     includeModified = false
   ): Promise<WorkspaceFileBody & { mtime?: number }> {
-    if (signal.aborted) throw cancelled();
-    const executable = await installedAgent(this.resourcesPath);
-    if (this.closed || this.active.size >= MAX_WORKERS) {
-      throw new WorkspaceMediaError(503, "workspace_media_worker_capacity");
-    }
-    if (signal.aborted) throw cancelled();
-    const openFrame =
-      JSON.stringify({
-        ...grant,
-        path: relPath,
-        ...(includeModified && { includeModified: true }),
-      }) + "\n";
-    if (Buffer.byteLength(openFrame) > 32 * 1024) {
-      throw new WorkspaceMediaError(400, "workspace_media_open_limit");
-    }
-    const child = spawn(
-      "/usr/bin/sandbox-exec",
-      [...sandboxArguments(executable, grant), executable, "workspace-file"],
-      {
-        cwd: grant.root,
-        env: {},
-        stdio: ["pipe", "pipe", "pipe"],
-      }
-    );
-    this.active.add(child);
-    const abort = () => terminate(child);
-    signal.addEventListener("abort", abort, { once: true });
-    const exited = new Promise<Exit>((resolve) =>
-      child.once("close", (code) => {
-        signal.removeEventListener("abort", abort);
-        this.active.delete(child);
-        resolve({ code });
-      })
-    );
-    child.on("error", () => {});
-    child.stdin.on("error", abort);
-    let diagnostic = "";
-    child.stderr.on("data", (chunk: Buffer) => {
-      diagnostic += chunk
-        .subarray(0, Math.max(0, 1024 - diagnostic.length))
-        .toString("utf8");
+    const request = frame(grant, {
+      path: relPath,
+      ...(includeModified && { includeModified: true }),
     });
-    const output: AsyncIterator<Buffer> = child.stdout[Symbol.asyncIterator]();
+    const { child, abort, exited, output, diagnostic } = await this.launch(
+      grant,
+      request,
+      signal
+    );
     const deadline = setTimeout(abort, START_TIMEOUT_MS);
     try {
-      child.stdin.write(openFrame);
+      child.stdin.write(request);
       const metadata = await readMetadata(output, includeModified);
       if (signal.aborted) throw cancelled();
       let consumed = false;
@@ -103,16 +80,114 @@ export class WorkspaceFileWorkers {
       abort();
       await exitWithin(exited);
       if (signal.aborted) throw cancelled();
-      throw workerError(diagnostic, error);
+      throw workerError(diagnostic(), error);
     } finally {
       clearTimeout(deadline);
     }
+  }
+
+  async list(
+    grant: WorkspaceMediaGrant,
+    relative: string,
+    signal: AbortSignal
+  ): Promise<DirectoryEntry[]> {
+    const request = frame(grant, { path: relative, listDirectory: true });
+    const { child, abort, exited, output, diagnostic } = await this.launch(
+      grant,
+      request,
+      signal
+    );
+    const deadline = setTimeout(abort, START_TIMEOUT_MS);
+    try {
+      child.stdin.end(request);
+      const response = await readJsonFrame(output, MAX_DIRECTORY_BYTES);
+      if (!(await output.next()).done) throw unavailable();
+      await verifyExit(exited, abort);
+      if (signal.aborted) throw cancelled();
+      if (
+        !response ||
+        typeof response !== "object" ||
+        Object.keys(response).length !== 1 ||
+        !("entries" in response) ||
+        !Array.isArray(response.entries) ||
+        response.entries.length > MAX_DIRECTORY_ENTRIES ||
+        !response.entries.every(isDirectoryEntry)
+      )
+        throw unavailable();
+      return response.entries;
+    } catch (error) {
+      abort();
+      await exitWithin(exited);
+      if (signal.aborted) throw cancelled();
+      const stderr = diagnostic();
+      if (workerCode(stderr) === "file_type_unsupported")
+        throw new WorkspaceMediaError(400, "not-a-directory");
+      throw workerError(stderr, error);
+    } finally {
+      clearTimeout(deadline);
+    }
+  }
+
+  private async launch(
+    grant: WorkspaceMediaGrant,
+    request: string,
+    signal: AbortSignal
+  ): Promise<Worker> {
+    if (signal.aborted) throw cancelled();
+    if (Buffer.byteLength(request) > 32 * 1024)
+      throw new WorkspaceMediaError(400, "workspace_media_open_limit");
+    const executable = await installedAgent(this.resourcesPath);
+    if (this.closed || this.active.size >= MAX_WORKERS) {
+      throw new WorkspaceMediaError(503, "workspace_media_worker_capacity");
+    }
+    if (signal.aborted) throw cancelled();
+    const child = spawn(
+      "/usr/bin/sandbox-exec",
+      [...sandboxArguments(executable, grant), executable, "workspace-file"],
+      {
+        cwd: grant.root,
+        env: {},
+        stdio: ["pipe", "pipe", "pipe"],
+      }
+    );
+    this.active.add(child);
+    const abort = () => terminate(child);
+    signal.addEventListener("abort", abort, { once: true });
+    const exited = new Promise<Exit>((resolve) =>
+      child.once("close", (code) => {
+        signal.removeEventListener("abort", abort);
+        this.active.delete(child);
+        resolve({ code });
+      })
+    );
+    child.on("error", () => {});
+    child.stdin.on("error", abort);
+    let diagnostic = "";
+    child.stderr.on("data", (chunk: Buffer) => {
+      diagnostic += chunk
+        .subarray(0, Math.max(0, 1024 - diagnostic.length))
+        .toString("utf8");
+    });
+    return {
+      child,
+      abort,
+      exited,
+      output: child.stdout[Symbol.asyncIterator](),
+      diagnostic: () => diagnostic,
+    };
   }
 
   close() {
     this.closed = true;
     for (const child of this.active) terminate(child);
   }
+}
+
+function frame(
+  grant: WorkspaceMediaGrant,
+  request: { path: string; includeModified?: true; listDirectory?: true }
+): string {
+  return JSON.stringify({ ...grant, ...request }) + "\n";
 }
 
 function terminate(child: ChildProcessWithoutNullStreams) {
@@ -163,38 +238,65 @@ async function readMetadata(
   output: AsyncIterator<Buffer>,
   includeModified: boolean
 ): Promise<{ size: number; mtime?: number }> {
-  let header = Buffer.alloc(0);
+  const parsed = await readJsonFrame(output, MAX_HEADER_BYTES);
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    Object.keys(parsed).length !== (includeModified ? 2 : 1) ||
+    !("size" in parsed) ||
+    typeof parsed.size !== "string" ||
+    !/^\d+$/.test(parsed.size)
+  )
+    throw unavailable();
+  const size = Number(parsed.size);
+  if (!Number.isSafeInteger(size)) throw unavailable();
+  if (!includeModified) return { size };
+  if (
+    !("mtime" in parsed) ||
+    typeof parsed.mtime !== "number" ||
+    !Number.isFinite(parsed.mtime)
+  )
+    throw unavailable();
+  return { size, mtime: parsed.mtime };
+}
+
+async function readJsonFrame(
+  output: AsyncIterator<Buffer>,
+  limit: number
+): Promise<unknown> {
+  const chunks: Buffer[] = [];
+  let length = 0;
   for (;;) {
     const item = await output.next();
     if (item.done) throw unavailable();
-    if (header.length + item.value.length > MAX_HEADER_BYTES)
-      throw unavailable();
-    header = Buffer.concat([header, item.value]);
-    const end = header.indexOf(10);
+    length += item.value.length;
+    if (length > limit) throw unavailable();
+    chunks.push(item.value);
+    const end = item.value.indexOf(10);
     if (end < 0) continue;
-    if (end !== header.length - 1) throw unavailable();
-    const parsed: unknown = JSON.parse(header.toString("utf8"));
-    if (
-      !parsed ||
-      typeof parsed !== "object" ||
-      Object.keys(parsed).length !== (includeModified ? 2 : 1) ||
-      !("size" in parsed) ||
-      typeof parsed.size !== "string" ||
-      !/^\d+$/.test(parsed.size)
-    ) {
-      throw unavailable();
-    }
-    const size = Number(parsed.size);
-    if (!Number.isSafeInteger(size)) throw unavailable();
-    if (!includeModified) return { size };
-    if (
-      !("mtime" in parsed) ||
-      typeof parsed.mtime !== "number" ||
-      !Number.isFinite(parsed.mtime)
-    )
-      throw unavailable();
-    return { size, mtime: parsed.mtime };
+    if (end !== item.value.length - 1) throw unavailable();
+    return JSON.parse(Buffer.concat(chunks, length).toString("utf8"));
   }
+}
+
+function isDirectoryEntry(value: unknown): value is DirectoryEntry {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Object.keys(value).length !== 2 ||
+    !("name" in value) ||
+    typeof value.name !== "string" ||
+    !value.name ||
+    value.name === "." ||
+    value.name === ".." ||
+    value.name.includes("/") ||
+    value.name.includes("\0") ||
+    !("kind" in value)
+  )
+    return false;
+  return ["file", "directory", "symlink", "other"].some(
+    (kind) => value.kind === kind
+  );
 }
 
 async function verifyExit(exited: Promise<Exit>, abort: () => void) {
@@ -269,8 +371,10 @@ function sandboxArguments(executable: string, grant: WorkspaceMediaGrant) {
 }
 
 function workerError(diagnostic: string, error: unknown) {
-  const code = /^grida-agent: ([a-z0-9_]{1,96})$/m.exec(diagnostic)?.[1];
+  const code = workerCode(diagnostic);
   switch (code) {
+    case "workspace_directory_limit":
+      return new WorkspaceMediaError(413, code);
     case "file_unavailable":
       return new WorkspaceMediaError(404, "workspace_media_file_unavailable");
     case "workspace_directory_changed":
@@ -281,10 +385,16 @@ function workerError(diagnostic: string, error: unknown) {
     case "file_symlink_unsupported":
     case "file_relative_path_invalid":
     case "file_mount_unsupported":
+    case "file_path_changed":
+    case "workspace_path_changed":
       return new WorkspaceMediaError(403, code);
     default:
       return error instanceof WorkspaceMediaError ? error : unavailable();
   }
+}
+
+function workerCode(diagnostic: string): string | undefined {
+  return /^grida-agent: ([a-z0-9_]{1,96})$/m.exec(diagnostic)?.[1];
 }
 
 function unavailable() {

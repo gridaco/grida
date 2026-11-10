@@ -63,6 +63,8 @@ it.runIf(
       const signal = new AbortController().signal;
       const read = (file: string, kind: "text" | "bytes") =>
         agentSidecarClient.readWorkspaceFile(saved.id, file, kind, signal);
+      const list = (directory: string) =>
+        agentSidecarClient.readWorkspaceDirectory(saved.id, directory, signal);
 
       const authored = Buffer.from("\uFEFFdraft");
       await fs.writeFile(draft, authored);
@@ -120,6 +122,39 @@ it.runIf(
         "path-escapes-workspace"
       );
       await expect(read("escape.txt", "text")).rejects.toThrow(
+        /workspace_path_outside_root|path_authority_unavailable/
+      );
+      await fs.mkdir(path.join(project, ".git"));
+      await fs.mkdir(path.join(project, "decks"));
+      await fs.writeFile(
+        path.join(project, "decks", "draft.canvas"),
+        "fixture"
+      );
+      await fs.writeFile(path.join(project, ".DS_Store"), "not listed");
+      await fs.writeFile(path.join(project, ".gitignore"), "kept");
+      await fs.symlink(
+        path.join(project, "decks"),
+        path.join(project, "alias")
+      );
+      const outsideDirectory = path.join(root, "unregistered-directory");
+      await fs.mkdir(outsideDirectory);
+      await fs.symlink(outsideDirectory, path.join(project, "outside-dir"));
+      const expected = await workspaceFs.readDir(saved, "");
+      expect(expected[0]).toMatchObject({ name: "decks", kind: "directory" });
+      expect(expected).toContainEqual({
+        name: "outside-dir",
+        kind: "symlink",
+        rel_path: "outside-dir",
+      });
+      expect(expected.map((entry) => entry.name)).toContain(".gitignore");
+      expect(expected.map((entry) => entry.name)).not.toContain(".DS_Store");
+      await expect(list("")).resolves.toEqual(expected);
+      await expect(list(".")).resolves.toEqual(expected);
+      await expect(list("alias")).resolves.toEqual([
+        { name: "draft.canvas", kind: "file", rel_path: "alias/draft.canvas" },
+      ]);
+      await expect(list("draft.txt")).rejects.toThrow("not-a-directory");
+      await expect(list("outside-dir")).rejects.toThrow(
         /workspace_path_outside_root|path_authority_unavailable/
       );
 

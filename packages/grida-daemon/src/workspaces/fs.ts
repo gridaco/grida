@@ -150,9 +150,17 @@ export namespace workspaceFs {
       }
       throw err;
     }
-    const entries = dirents
-      .filter((dirent) => isListableEntry(dirent.name))
-      .map((dirent) => directoryEntry(relPath, dirent));
+    return projectDirectory(relPath, dirents.map(projectDirent));
+  }
+
+  /** Project names already enumerated inside the authorized directory. */
+  export function projectDirectory(
+    relPath: string,
+    children: readonly Pick<Entry, "name" | "kind">[]
+  ): Entry[] {
+    const entries = children
+      .filter((entry) => isListableEntry(entry.name))
+      .map((entry) => directoryEntry(relPath, entry));
     entries.sort((a, b) => {
       if (a.kind === "directory" && b.kind !== "directory") return -1;
       if (b.kind === "directory" && a.kind !== "directory") return 1;
@@ -198,7 +206,7 @@ export namespace workspaceFs {
         const dirent = await dir.read();
         if (dirent === null) return;
         if (!isListableEntry(dirent.name)) continue;
-        yield directoryEntry(relPath, dirent);
+        yield directoryEntry(relPath, projectDirent(dirent));
       }
     } finally {
       try {
@@ -531,19 +539,28 @@ function isListableEntry(name: string): boolean {
   );
 }
 
-function directoryEntry(relPath: string, dirent: Dirent): workspaceFs.Entry {
+function projectDirent(
+  dirent: Dirent
+): Pick<workspaceFs.Entry, "name" | "kind"> {
   let kind: workspaceFs.Entry["kind"];
   if (dirent.isDirectory()) kind = "directory";
   else if (dirent.isFile()) kind = "file";
   else if (dirent.isSymbolicLink()) kind = "symlink";
   else kind = "other";
+  return { name: dirent.name, kind };
+}
+
+function directoryEntry(
+  relPath: string,
+  entry: Pick<workspaceFs.Entry, "name" | "kind">
+): workspaceFs.Entry {
   // Build a posix-style relPath even on Windows for client consistency. The
   // daemon-side resolveInside uses path.resolve (platform-aware) on write.
   const child =
     relPath === "" || relPath === "."
-      ? dirent.name
-      : `${relPath.replace(/\\/g, "/").replace(/\/+$/, "")}/${dirent.name}`;
-  return { name: dirent.name, rel_path: child, kind };
+      ? entry.name
+      : `${relPath.replace(/\\/g, "/").replace(/\/+$/, "")}/${entry.name}`;
+  return { ...entry, rel_path: child };
 }
 
 /**

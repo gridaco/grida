@@ -300,6 +300,13 @@ The owning client supplies live process controls and any kernel launch profile.
 The process rejects unproven hard links, mounts, and paths outside the granted
 directory. The existing Desktop HTTP route still owns Range and MIME handling.
 
+A first input with `listDirectory: true` instead lists one directory. An empty
+`path` selects the registered root. The worker reports immediate names and
+entry kinds as one JSON line and exits. Directory entries are classified
+without following child symlinks. A listing above 8,192 entries or 2 MiB
+returns a limit error before writing any output. The client owns display
+filtering, path presentation, and sorting.
+
 The workspace and scratch modules provide host-owned filesystem building blocks.
 Workspace membership records named roots and a primary default. Independent
 grants bind to captured native directory identities. Restored targets require

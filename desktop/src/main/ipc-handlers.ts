@@ -562,7 +562,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         !workspaceIdValue(id) ||
         typeof relative !== "string" ||
         Buffer.byteLength(relative) > 4096 ||
-        (kind !== "text" && kind !== "bytes")
+        (kind !== "text" && kind !== "bytes" && kind !== "directory")
       )
         throw new Error("workspace_read_invalid");
       const { sender, senderFrame: frame } = event;
@@ -574,12 +574,19 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         controller.abort()
       );
       try {
-        const file = await agentSidecarClient.readWorkspaceFile(
-          id,
-          relative,
-          kind,
-          controller.signal
-        );
+        const result =
+          kind === "directory"
+            ? await agentSidecarClient.readWorkspaceDirectory(
+                id,
+                relative,
+                controller.signal
+              )
+            : await agentSidecarClient.readWorkspaceFile(
+                id,
+                relative,
+                kind,
+                controller.signal
+              );
         if (
           controller.signal.aborted ||
           sender.isDestroyed() ||
@@ -588,7 +595,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
           !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN)
         )
           throw new Error("workspace_read_unavailable");
-        return file;
+        return result;
       } finally {
         unwatch();
       }

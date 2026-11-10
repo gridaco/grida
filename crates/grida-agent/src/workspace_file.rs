@@ -1,5 +1,6 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — ranged reads from one authorized native directory.
 
+mod directory;
 mod stdio;
 pub use stdio::serve_stdio;
 

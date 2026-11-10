@@ -142,18 +142,29 @@ export namespace agentSidecarClient {
     kind: "text" | "bytes",
     signal: AbortSignal
   ) {
-    const workers = nativeWorkspaceMedia();
-    if (workers) {
-      if (!catalog) throw new Error("workspace_read_catalog_unavailable");
-      const reads = (nativeReads ??= new NativeWorkspaceReads(
-        catalog,
-        workers
-      ));
-      return await reads.read(id, relative, kind, signal);
-    }
+    const reads = nativeWorkspaceReader();
+    if (reads) return await reads.read(id, relative, kind, signal);
     return kind === "text"
       ? await client().workspaces.read_file(id, relative)
       : await client().workspaces.read_file_bytes(id, relative);
+  }
+
+  export async function readWorkspaceDirectory(
+    id: string,
+    relative: string,
+    signal: AbortSignal
+  ) {
+    const reads = nativeWorkspaceReader();
+    return reads
+      ? await reads.list(id, relative, signal)
+      : await client().workspaces.readdir(id, relative);
+  }
+
+  function nativeWorkspaceReader(): NativeWorkspaceReads | undefined {
+    const workers = nativeWorkspaceMedia();
+    if (!workers) return undefined;
+    if (!catalog) throw new Error("workspace_read_catalog_unavailable");
+    return (nativeReads ??= new NativeWorkspaceReads(catalog, workers));
   }
 
   /** Main-owned endpoint operations keep native grant approval and the

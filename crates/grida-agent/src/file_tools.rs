@@ -331,4 +331,4 @@ impl FileTools {
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod native;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-pub(crate) use native::{open_root_file, verify_open_path};
+pub(crate) use native::{open_root_directory, open_root_file, verify_open_path};

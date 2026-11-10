@@ -335,23 +335,26 @@ function WelcomeSurface({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const ids = await Promise.all(
-        workspaces.map(async (w) => {
-          try {
-            const entries = await workspacesNs.readdir(w.id);
-            return entries.some(
-              (e) => e.rel_path === dotcanvas.MANIFEST_FILENAME
-            )
-              ? w.id
-              : null;
-          } catch {
-            return null;
-          }
-        })
-      );
-      if (!cancelled) {
-        setCanvasIds(new Set(ids.filter((x): x is string => x !== null)));
+      const ids = new Set<string>();
+      // The native reader has finite workers. Leave room for open editors
+      // while checking every remembered workspace.
+      for (let index = 0; index < workspaces.length; index += 2) {
+        if (cancelled) return;
+        await Promise.all(
+          workspaces.slice(index, index + 2).map(async (w) => {
+            try {
+              const entries = await workspacesNs.readdir(w.id);
+              if (
+                entries.some((e) => e.rel_path === dotcanvas.MANIFEST_FILENAME)
+              )
+                ids.add(w.id);
+            } catch {
+              // Unavailable folders remain available as ordinary workspace rows.
+            }
+          })
+        );
       }
+      if (!cancelled) setCanvasIds(ids);
     })();
     return () => {
       cancelled = true;
