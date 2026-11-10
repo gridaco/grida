@@ -33,19 +33,6 @@ const TOOLS_ONLY_CHANNELS = new Set<IpcChannel>([
   IPC_CHANNELS.MEDIA_OPEN_FOLDER,
 ]);
 
-const WORKBENCH_CHAT_CHANNELS = new Set<IpcChannel>([
-  IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
-  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
-  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
-  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
-]);
-
-const DOCUMENT_EDITOR_CHANNELS = new Set<IpcChannel>([
-  IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
-  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
-  IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
-]);
-
 const PROJECT_CONFIGURATION_CHANNELS = new Set<IpcChannel>([
   IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
   IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT,
@@ -62,13 +49,6 @@ const PROJECT_CONFIGURATION_CHANNELS = new Set<IpcChannel>([
  * in {@link DesktopEntryWindow.ipcRoleFor} and never reach this policy.
  */
 export namespace ipc_admission {
-  export function isDeckChat(channel: IpcChannel): boolean {
-    return (
-      channel.startsWith("grida:native-chat:") &&
-      !WORKBENCH_CHAT_CHANNELS.has(channel)
-    );
-  }
-
   export function allows({
     role,
     channel,
@@ -107,13 +87,9 @@ export namespace ipc_admission {
           return (
             pathname === "/desktop/workspace" ||
             (pathname === "/desktop/file" &&
-              (selectedDocument
-                ? DOCUMENT_EDITOR_CHANNELS.has(channel) ||
-                  (isDeckChat(channel) &&
-                    !PROJECT_CONFIGURATION_CHANNELS.has(channel))
-                : isDeckChat(channel) &&
-                  (!nestedDeck ||
-                    !PROJECT_CONFIGURATION_CHANNELS.has(channel))))
+              channel !== IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN &&
+              (!(selectedDocument || nestedDeck) ||
+                !PROJECT_CONFIGURATION_CHANNELS.has(channel)))
           );
         }
         if (

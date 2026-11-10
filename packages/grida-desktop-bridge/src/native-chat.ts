@@ -456,6 +456,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   readonly deck?: true;
   /** This host also offers native chat for the exact selected nested deck. */
   readonly nestedDeck?: true;
+  /** The file window can lend its active slide's live SVG text selection. */
+  readonly deckSvgText?: true;
   /** This native package offers chat for the exact selected standalone SVG. */
   readonly document?: true;
   available(): Promise<boolean>;

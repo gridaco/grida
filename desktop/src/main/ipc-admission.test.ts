@@ -109,9 +109,12 @@ describe("ipc_admission", () => {
     expect(deck).toContain(IPC_CHANNELS.NATIVE_CHAT_SUBMIT);
     for (const channel of [
       IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
-      IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
       IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
       IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
+    ])
+      expect(deck).toContain(channel);
+    for (const channel of [
+      IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
       ...nativeExternal,
     ]) {
       expect(deck).not.toContain(channel);
@@ -130,7 +133,7 @@ describe("ipc_admission", () => {
     }
   });
 
-  it("keeps nested decks on scoped native chat without workspace configuration or live editor endpoints", () => {
+  it("admits nested deck text edits within the file chat scope", () => {
     const deck = allChannels.filter((channel) =>
       ipc_admission.allows({
         role: "main",
@@ -144,6 +147,8 @@ describe("ipc_admission", () => {
         IPC_CHANNELS.NATIVE_CHAT_STATUS,
         IPC_CHANNELS.NATIVE_CHAT_LIST,
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
+        IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
+        IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
       ])
     );
     for (const channel of [
@@ -151,9 +156,7 @@ describe("ipc_admission", () => {
       IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT,
       IPC_CHANNELS.NATIVE_CHAT_SAVE_CONTEXT_LIMIT,
       IPC_CHANNELS.NATIVE_CHAT_SUBMIT_CONFIGURATION,
-      IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
       IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
-      IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT_RESULT,
       ...nativeExternal,
     ])
       expect(deck).not.toContain(channel);

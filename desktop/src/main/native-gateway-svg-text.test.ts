@@ -17,9 +17,9 @@ const origin = "https://editor.fixture.invalid";
 const READ = "svg_read_selected_text";
 const REPLACE = "svg_replace_selected_text";
 
-it.runIf(Boolean(resources))(
-  "correlates selected SVG read and replacement through the built native process",
-  async () => {
+it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
+  "correlates selected SVG text through the built native process in the %s",
+  async (surface) => {
     const root = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-gateway-svg-")
     );
@@ -87,10 +87,44 @@ it.runIf(Boolean(resources))(
         stateDirectory: path.join(root, "state"),
         cwd,
       });
-      const active = { workspaceId: "workspace", chat };
-      const ipc = new NativeChatIpc(origin, () => active);
+      const project = "eac20941e6a410aa";
+      const deck = surface !== "workbench";
+      const nested = surface === "nested deck";
+      const workspaceId = nested ? "deck-fixture" : project;
+      const identity = { device: "1", inode: "2", birthTimeNs: "3" };
+      const active = { workspaceId, chat, directoryIdentity: identity };
+      const grant = { workspaceId, root: cwd, identity, protected: [] };
+      const ipc = new NativeChatIpc(
+        origin,
+        () => active,
+        deck ? { admits: () => true, ensure: async () => {} } : undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        async () => grant,
+        false,
+        undefined,
+        nested
+          ? {
+              grant: async () => ({
+                ...grant,
+                parentWorkspaceId: project,
+                parentIdentity: identity,
+              }),
+              current: () => active,
+              ensure: async () => {},
+              close: async () => {},
+            }
+          : undefined
+      );
+      const fileRoute = `${origin}/desktop/file?id=${project}`;
       const frame = {
-        url: `${origin}/desktop/workspace?id=workspace`,
+        url: deck
+          ? nested
+            ? `${fileRoute}&path=decks%2FLaunch.canvas`
+            : fileRoute
+          : `${origin}/desktop/workspace?id=${project}`,
         send(channel: string, request: (typeof delivered)[number]) {
           if (channel !== IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT) return;
           delivered.push(request);
@@ -103,14 +137,18 @@ it.runIf(Boolean(resources))(
                   text: "Original",
                 }
               : { kind: "applied", path: "/poster.svg", saved: false };
-          ipc.replyEditorSvgText(
-            event,
-            request.attachmentId,
-            request.callId,
-            delivered.length === 3
-              ? { kind: "applied", path: "/poster.svg", saved: true }
-              : reply
-          );
+          void onRoute(() =>
+            ipc.replyEditorSvgText(
+              event,
+              request.attachmentId,
+              request.callId,
+              delivered.length === 3
+                ? deck
+                  ? { kind: "applied", path: "/other.svg", saved: false }
+                  : { kind: "applied", path: "/poster.svg", saved: true }
+                : reply
+            )
+          ).catch(() => {});
         },
       };
       const contents = Object.assign(new EventEmitter(), {
@@ -122,26 +160,51 @@ it.runIf(Boolean(resources))(
         sender: contents,
         senderFrame: frame,
       } as unknown as IpcMainInvokeEvent;
-      const attachment = await ipc.create(event);
-      ipc.publishEditorSurfaces(event, attachment.attachmentId, {
+      const onRoute = async <T>(invoke: () => T) =>
+        deck ? await ipc.deckRequest(event, invoke) : await invoke();
+      const attachment = await onRoute(() => ipc.create(event));
+      const snapshot = {
         active: "/poster.svg",
         open: ["/poster.svg"],
         truncated: false,
-      });
-      const submitted = await ipc.submit(
-        event,
-        attachment.attachmentId,
-        "svg-fixture-input",
-        "Change the selected text.",
-        "act",
-        undefined,
-        target
+      };
+      const deckOnlyError = deck ? "native_chat_editor_surfaces_invalid" : null;
+      const outcome = (invoke: () => void) =>
+        onRoute(invoke).then(
+          () => null,
+          (error: Error) => error.message
+        );
+      expect(
+        await outcome(() =>
+          ipc.publishEditorSurfaces(event, attachment.attachmentId, {
+            ...snapshot,
+            open: ["/poster.svg", "/other.svg"],
+          })
+        )
+      ).toBe(deckOnlyError);
+      expect(
+        await outcome(() =>
+          ipc.publishEditorSurfaces(event, attachment.attachmentId, snapshot, 1)
+        )
+      ).toBe(deckOnlyError);
+      await onRoute(() =>
+        ipc.publishEditorSurfaces(event, attachment.attachmentId, snapshot)
+      );
+      const submitted = await onRoute(() =>
+        ipc.submit(
+          event,
+          attachment.attachmentId,
+          "svg-fixture-input",
+          "Change the selected text.",
+          "act",
+          undefined,
+          target
+        )
       );
       await vi.waitFor(
         async () => {
-          const { snapshot } = await ipc.observe(
-            event,
-            attachment.attachmentId
+          const { snapshot } = await onRoute(() =>
+            ipc.observe(event, attachment.attachmentId)
           );
           expect(snapshot.current).toBeNull();
           expect(snapshot.latest).toMatchObject({
@@ -189,36 +252,40 @@ it.runIf(Boolean(resources))(
           }),
         ])
       );
-      const plan = await ipc.create(event);
-      await ipc.submit(
-        event,
-        plan.attachmentId,
-        "svg-plan-input",
-        "Plan a change.",
-        "plan"
+      const plan = await onRoute(() => ipc.create(event));
+      await onRoute(() =>
+        ipc.submit(
+          event,
+          plan.attachmentId,
+          "svg-plan-input",
+          "Plan a change.",
+          "plan"
+        )
       );
       await vi.waitFor(() => expect(offers).toHaveLength(4));
       expect(offers[3]).not.toContain(READ);
       expect(offers[3]).not.toContain(REPLACE);
       expect(delivered).toHaveLength(2);
-      const unknown = await ipc.create(event);
-      ipc.publishEditorSurfaces(event, unknown.attachmentId, {
-        active: "/poster.svg",
-        open: ["/poster.svg"],
-        truncated: false,
-      });
-      const attempted = await ipc.submit(
-        event,
-        unknown.attachmentId,
-        "svg-unverified-input",
-        "Change selected text again.",
-        "act",
-        undefined,
-        target
+      const unknown = await onRoute(() => ipc.create(event));
+      await onRoute(() =>
+        ipc.publishEditorSurfaces(event, unknown.attachmentId, snapshot)
+      );
+      const attempted = await onRoute(() =>
+        ipc.submit(
+          event,
+          unknown.attachmentId,
+          "svg-unverified-input",
+          "Change selected text again.",
+          "act",
+          undefined,
+          target
+        )
       );
       await vi.waitFor(
         async () => {
-          const { snapshot } = await ipc.observe(event, unknown.attachmentId);
+          const { snapshot } = await onRoute(() =>
+            ipc.observe(event, unknown.attachmentId)
+          );
           expect(snapshot.current).toBeNull();
           expect(snapshot.latest).toMatchObject({
             turnId: attempted.turnId,

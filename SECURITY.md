@@ -1023,10 +1023,13 @@ lazy reads, read-only mutation, and symlink escape refusal.
   workspace-relative paths. The read supplies editor context only and confers
   no file, network, or document-edit authority.
 - The separately negotiated [SVG text tools](crates/grida-agent/src/editor_surfaces/svg_text.rs)
-  capture one exact workbench selection for an immediate Act text input.
-  Main dispatches to the admitted frame and validates the bounded
+  capture one exact workbench, standalone SVG, or slide selection for an
+  immediate Act text input. Main dispatches to the admitted frame and validates the bounded
   [correlated response](desktop/src/main/native-editor-svg-text-replies.ts).
-  The [renderer owner](editor/scaffolds/desktop/workbench/workspace-svg-text.ts)
+  A deck may publish one bundle-relative slide and must reply for the same
+  observed slide. Main rechecks the deck's directory generation before sending
+  the call and accepting its reply.
+  The [renderer owner](editor/scaffolds/desktop/shared/selected-svg-text.ts)
   requires the captured editor, view, selection, and revision before the
   existing SVG text command can run. Its result is a live edit. The normal
   editor save remains a separate operation. An unverified mutation reply

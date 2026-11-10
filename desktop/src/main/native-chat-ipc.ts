@@ -7,6 +7,7 @@ import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
 import {
   NativeEditorSurfaces,
   NativeEditorSvgText,
+  type NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
 import { NativeEditorSvgTextReplies } from "./native-editor-svg-text-replies";
 import { NativeDocumentIdentityBusy } from "./native-document-files";
@@ -165,6 +166,7 @@ type Attachment = {
   readingArtifact?: boolean;
   deletion?: ReviewedDeletion;
   editorSurfaces?: NativeEditorSurfaceLease;
+  deckEditorSurface?: NativeEditorSurfaceSnapshot;
   side?: SideAttachment;
   reviewedConfiguration?: {
     input: NativeChatConfigurationInput;
@@ -245,6 +247,7 @@ type DeckFrame = {
   href: string;
   workspaceId: string;
   identity?: WorkspaceDirectoryIdentity;
+  recheck(): Promise<void>;
   release(): void;
 };
 
@@ -443,33 +446,25 @@ export class NativeChatIpc {
       return result;
     }
     const workspaceId = ipc_sender.rootDeckId(href);
-    const checkFrame = () => {
-      if (!frame || !href || !this.frameCurrent(sender, frame, href))
-        throw new Error("native_chat_scope_changed");
-    };
-    if (!frame || !href || !workspaceId)
+    if (
+      !frame ||
+      !href ||
+      !workspaceId ||
+      !this.frameCurrent(sender, frame, href)
+    )
       throw new Error("native_chat_scope_changed");
-    checkFrame();
     if (!this.startup) return await invoke();
     if (!this.deckWorkspace) throw new Error("native_chat_unavailable");
-    const deckWorkspace = this.deckWorkspace;
-    const binding = this.bindDeck(sender, frame, href, workspaceId);
-    const recheck = async () => {
-      const grant = await deckWorkspace(workspaceId).catch(() => null);
-      checkFrame();
-      if (
-        this.deckFrames.get(sender) !== binding ||
-        grant?.workspaceId !== workspaceId ||
-        (binding.identity && !sameDirectory(binding.identity, grant.identity))
-      ) {
-        binding.release();
-        throw new Error("native_chat_scope_changed");
-      }
-      binding.identity ??= grant.identity;
-    };
-    await recheck();
+    const binding = this.bindDeck(
+      sender,
+      frame,
+      href,
+      workspaceId,
+      this.deckWorkspace
+    );
+    await binding.recheck();
     const result = await invoke();
-    await recheck();
+    await binding.recheck();
     return result;
   }
 
@@ -565,7 +560,8 @@ export class NativeChatIpc {
     sender: WebContents,
     frame: WebFrameMain,
     href: string,
-    workspaceId: string
+    workspaceId: string,
+    resolve: (id: string) => Promise<WorkspaceMediaGrant>
   ): DeckFrame {
     const existing = this.deckFrames.get(sender);
     if (existing?.frame === frame && existing.href === href) return existing;
@@ -574,6 +570,19 @@ export class NativeChatIpc {
       frame,
       href,
       workspaceId,
+      recheck: async () => {
+        const grant = await resolve(workspaceId).catch(() => null);
+        if (
+          this.deckFrames.get(sender) !== binding ||
+          !this.frameCurrent(sender, frame, href) ||
+          grant?.workspaceId !== workspaceId ||
+          (binding.identity && !sameDirectory(binding.identity, grant.identity))
+        ) {
+          binding.release();
+          throw new Error("native_chat_scope_changed");
+        }
+        binding.identity ??= grant.identity;
+      },
       release: () => {
         if (this.deckFrames.get(sender) !== binding) return;
         this.deckFrames.delete(sender);
@@ -1273,8 +1282,13 @@ export class NativeChatIpc {
   ): void {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     const document = this.documentFrame(owner.sender, owner.frame);
-    if (this.nestedDeckFrame(owner.sender, owner.frame))
-      throw new Error("native_chat_editor_surfaces_invalid");
+    const rootDeck = this.deckFrames.get(owner.sender);
+    const deck =
+      this.nestedDeckFrame(owner.sender, owner.frame) ??
+      (rootDeck?.frame === owner.frame && rootDeck.href === owner.href
+        ? rootDeck
+        : undefined);
+    const file = document ?? deck;
     const snapshot = NativeEditorSurfaces.parse(value);
     if (
       !snapshot ||
@@ -1285,14 +1299,18 @@ export class NativeChatIpc {
     )
       throw new Error("native_chat_editor_surfaces_invalid");
     if (
-      document &&
+      file &&
       (revision !== undefined ||
         snapshot.truncated ||
         (snapshot.active === null
           ? snapshot.open.length !== 0
-          : snapshot.active !== DOCUMENT_SURFACE || snapshot.open.length !== 1))
+          : snapshot.open.length !== 1 ||
+            (document
+              ? snapshot.active !== DOCUMENT_SURFACE
+              : !snapshot.active.toLowerCase().endsWith(".svg"))))
     )
       throw new Error("native_chat_editor_surfaces_invalid");
+    if (deck) attachment.deckEditorSurface = snapshot;
     if (attachment.editorSurfaces) {
       attachment.editorSurfaces.update(snapshot, revision);
     } else {
@@ -1300,7 +1318,7 @@ export class NativeChatIpc {
         attachment.session,
         snapshot,
         () => this.revalidate(owner, attachment),
-        document
+        file
           ? undefined
           : (request) =>
               owner.frame.send(IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN, {
@@ -1309,7 +1327,9 @@ export class NativeChatIpc {
               }),
         revision,
         async (request) => {
-          if (document) await document.recheck();
+          const slide = attachment.deckEditorSurface;
+          if (deck && !slide?.active) return { kind: "unavailable" };
+          if (file) await file.recheck();
           const result = await this.svgTextReplies.dispatch(
             attachment.id,
             request,
@@ -1321,7 +1341,13 @@ export class NativeChatIpc {
               });
             }
           );
-          if (document) await document.recheck();
+          if (file) await file.recheck();
+          if (
+            deck &&
+            (attachment.deckEditorSurface !== slide ||
+              ("path" in result && result.path !== slide?.active))
+          )
+            throw new Error("native_chat_svg_text_unverified");
           return result;
         }
       );

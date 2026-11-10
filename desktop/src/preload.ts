@@ -146,16 +146,22 @@ function selectedDocumentChatRoute(): boolean {
   );
 }
 
+function liveSvgTextRoute(): boolean {
+  if (location.pathname === "/desktop/workspace" || selectedDocumentChatRoute())
+    return true;
+  const params = new URLSearchParams(location.search);
+  return (
+    location.pathname === "/desktop/file" &&
+    !location.hash &&
+    /^[a-f0-9]{16}$/.test(params.get("id") ?? "") &&
+    (params.size === 1 || (params.size === 2 && !!params.get("path")))
+  );
+}
+
 ipcRenderer.on(
   IPC_CHANNELS.NATIVE_CHAT_EDITOR_SVG_TEXT,
   (_event, value: unknown) => {
-    if (
-      (location.pathname !== "/desktop/workspace" &&
-        !selectedDocumentChatRoute()) ||
-      !value ||
-      typeof value !== "object"
-    )
-      return;
+    if (!liveSvgTextRoute() || !value || typeof value !== "object") return;
     const { attachmentId, callId, targetId, expiresAtMs, operation } =
       value as Record<string, unknown>;
     const action = NativeEditorSvgText.operation(operation);
@@ -519,6 +525,7 @@ const bridge: DesktopBridge = {
   nativeChat: {
     deck: true,
     nestedDeck: true,
+    deckSvgText: true,
     ...(selectedDocumentChatRoute() && { document: true as const }),
     available: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE),
     status: (start) =>
@@ -677,8 +684,7 @@ const bridge: DesktopBridge = {
         typeof invoke !== "function" ||
         nativeSvgTextHandlers.has(attachmentId) ||
         nativeSvgTextHandlers.size >= 16 ||
-        (location.pathname !== "/desktop/workspace" &&
-          !selectedDocumentChatRoute())
+        !liveSvgTextRoute()
       )
         throw new Error("native_chat_svg_text_unavailable");
       const handler = { href: location.href, invoke };
