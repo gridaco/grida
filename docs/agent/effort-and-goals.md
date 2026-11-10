@@ -1,0 +1,49 @@
+---
+title: Plan work, choose effort, and pursue a goal
+description: Choose how the agent works on the next message and give longer work a persistent objective.
+keywords: [agent effort, Ultra, Plan, Act, persistent goals, Grida Desktop]
+format: md
+---
+
+# Plan work, choose effort, and pursue a goal
+
+## Decide what the agent may do
+
+In a native workspace chat, choose **Plan** in **Mode for next message**
+to inspect allowed material and work out an approach. Send a new message in
+**Act** when you want the agent to carry out the work under the chat’s
+permissions. The mode applies to the message you send or queue. Guidance
+sent to the current turn keeps that turn’s mode.
+[Understand agent permissions](./permissions.md)
+
+## Choose how much effort to use
+
+When **Effort for next message** is available, choose **Standard** for the
+ordinary work allowance or **Ultra** for work that may benefit from an
+independent review. Either effort can be used with Plan or Act. Ultra can
+give one reviewer a separate text assignment while the main agent continues.
+The turn summary records whether the agent collected that reviewer’s findings.
+[Work with subagents](./subagents.md)
+
+## Keep an objective across turns
+
+1. In an idle chat with an empty queue, choose **Add goal**. Enter the
+   objective, the criteria for completion, and the work allowance.
+2. Select **Continue automatically within these limits** if the agent can
+   reserve further work as it progresses. Then choose **Start goal**. The goal
+   can pause for input or stop when its allowance runs out.
+3. When the goal is **Ready for your review**, compare the result with your
+   criteria. Choose **Confirm goal complete** when they are met. The chat
+   keeps the proposal and confirmation so you can return to them later.
+
+For example, set the goal “Find the open decisions in the project notes.”
+Ask for each decision and the section where it appears. Check the retained
+answer against the notes before confirming completion.
+[Inspect and save results](./results.md)
+
+Pause preserves the allowance already held for the task. Stop ends the active
+turn and leaves the goal visible. [Guide and interrupt work](./controls.md)
+
+Private native clients can use reviewed automatic verification, funded Ultra
+review, or an explicit check-in under the supported goal policies.
+[Use goals from a native client](./clients.md#work-toward-a-persistent-goal)

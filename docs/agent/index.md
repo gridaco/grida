@@ -52,9 +52,8 @@ eligible Act message. A persistent goal can keep a larger task's objective,
 success criteria, and work allowance visible across turns.
 
 - [Work with subagents](./subagents.md)
-- [Choose how much effort a task gets](./clients.md#choose-how-much-effort-a-task-gets)
+- [Plan work, choose effort, and pursue a goal](./effort-and-goals.md)
 - [Schedule a follow-up](./scheduled-work.md)
-- [Work toward a persistent goal](./clients.md#work-toward-a-persistent-goal)
 
 ## Use a native client
 
