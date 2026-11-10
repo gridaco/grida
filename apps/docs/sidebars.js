@@ -208,6 +208,7 @@ const docs = [
       "agent/permissions",
       "agent/models-and-usage",
       "agent/settings",
+      "agent/controls",
       "agent/subagents",
       "agent/scheduled-work",
       "agent/results",

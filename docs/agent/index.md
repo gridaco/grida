@@ -22,6 +22,7 @@ it. Available controls and inputs vary with the connection.
 3. Review requests for additional access as they appear. To change the
    direction of work, send a correction to the current turn. Queue a
    message when it belongs in the next turn. [Understand permissions](./permissions.md)
+   · [Guide and interrupt work](./controls.md)
 
 For example, ask in **Plan**, “Compare the two drafts and propose the
 smaller change.” Review the proposal, then choose **Act** and send a new
