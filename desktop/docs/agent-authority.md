@@ -408,10 +408,9 @@ serves media and provider settings. It withholds file, workspace, recents,
 chat, and command routes. Settings use the supplied directory and any
 replacement of legacy settings custody requires separate admission.
 
-Desktop keeps its existing SRT launch while the editor uses the sidecar's
-file, recents, and workspace routes. Open-file registration, workspace
-registration and lookup still use that owner. Compatibility profiles also
-stream ranged workspace media through it.
+Desktop keeps its existing SRT launch for the remaining compatibility
+services. Compatibility profiles use the sidecar for standalone document
+and workspace registration, file I/O, recents, and ranged workspace media.
 Main's workspace Trash helper covers one path-checked native operation.
 Moving file I/O out of the compatibility process requires equivalent
 per-workspace containment and the existing exact registered-handle checks.
@@ -424,7 +423,12 @@ can replace that file through one private sibling created for the request.
 It checks the captured identity and modification time before replacement
 and returns the new identity after verifying the write. Document bytes
 stream in bounded chunks without the workspace text writer's size limit.
-Desktop's standalone window still uses its compatibility route.
+On the packaged macOS arm64 native profile, Main registers the exact file
+opened through a trusted Desktop action and issues an opaque document ID.
+The standalone window's preload sends that ID over native IPC. Main checks
+the originating window and current top-level document route before work and
+before returning results. Navigation clears the read basis for saving. A
+changed file stops the save and leaves the editor's dirty content open.
 
 The native workspace reader can open one registered directory's file and
 stream an exact byte span from the descriptor used for metadata. It checks

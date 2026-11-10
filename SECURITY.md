@@ -1409,6 +1409,13 @@ Today:
   sibling content. [Built fixtures](desktop/src/main/selected-document-worker.test.ts)
   cover a direct child of a synthetic home, aliases and replacement, stale
   saves, and streaming above the separate workspace text limit.
+  The packaged macOS arm64 native profile registers trusted standalone opens
+  in the [Main file owner](desktop/src/main/native-document-files.ts). The
+  [IPC handlers](desktop/src/main/ipc-handlers.ts) require the exact assigned
+  window, top-level document route and document ID. Navigation revokes the
+  active request and invalidates the read basis for saving. Closing a window
+  does not release a dispatched save before its child exits. [Owner fixtures](desktop/src/main/native-document-files.test.ts)
+  cover retirement and uncertain writes.
 - [Host media error mapping](packages/grida-ai-agent/src/http/routes/media-generation-errors.ts) — callers supply safely projected SDK failures before logging/status adaptation. The mapper logs supplied details and must never receive raw upstream errors; provider details are removed by each operation and route boundary.
 - [Shared 3D operations](packages/grida-ai/src/three-d-client.ts) and [endpoint tests](packages/grida-ai/src/three-d-client.test.ts), and [lifecycle tests](packages/grida-ai/src/three-d-lifecycle.test.ts) — three explicit fal model contracts with private input/key snapshots and safe byte-only results. Authenticated queue URLs must use exact `queue.fal.run`; primary GLB downloads use the existing fal asset namespaces without credentials. The shared [media invocation](packages/grida-ai/src/media-request.ts) bounds the ten-minute generation, including key lookup, polling and download. JSON is capped at 1 MiB and GLB at 64 MiB with header/version/length checks; no paid retry, provider URL, raw error or filename reaches the result. The [3D host route](packages/grida-ai-agent/src/http/routes/three-d.ts), [its tests](packages/grida-ai-agent/src/http/routes/three-d.test.ts), [wire protocol](packages/grida-ai-agent/src/protocol/three-d.ts), and [composed-daemon storage proof](packages/grida-ai-agent/src/media-daemon.test.ts) retain wire admission, bounded base64 decoding, exclusive generation, fixed filenames and optional receipts. This replaces the former agent `fal-three-d.ts` adapter; it grants no new provider or GG authority.
 - [editor/lib/supabase/server.ts](editor/lib/supabase/server.ts) — `createClientFromBearer` (bearer-auth shim for existing private editor routes that allow Desktop-originated calls without browser cookies).
@@ -3520,6 +3527,8 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [confined media read](desktop/src/main/workspace-file-worker.ts),
   [exact document worker](crates/grida-agent/src/workspace_file/document.rs),
   [document isolation tests](desktop/src/main/selected-document-worker.test.ts),
+  [standalone file owner](desktop/src/main/native-document-files.ts),
+  [standalone file owner tests](desktop/src/main/native-document-files.test.ts),
   [private retained inputs](crates/grida-agent/src/scratch.rs),
   [native image input references](crates/grida-agent/src/host/images.rs),
   [native scratch image crop](crates/grida-agent/src/host/image_tools.rs),

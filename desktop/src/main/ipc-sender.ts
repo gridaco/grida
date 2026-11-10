@@ -22,6 +22,14 @@ export namespace ipc_sender {
     return parse(raw)?.pathname ?? null;
   }
 
+  export function isDocument(raw: string, docId: string): boolean {
+    const url = parse(raw);
+    const ids = url?.searchParams.getAll("docId");
+    return (
+      url?.pathname === "/desktop/file" && ids?.length === 1 && ids[0] === docId
+    );
+  }
+
   export function diagnostic(raw: string | undefined): string {
     if (!raw) return "<no frame>";
     const url = parse(raw);

@@ -62,6 +62,7 @@ import { ipc_sender } from "./ipc-sender";
 import { DesktopMediaHost } from "./media-host";
 import { DesktopMediaRoot } from "./media-root";
 import { NativeChatIpc, type ActiveNativeChat } from "./native-chat-ipc";
+import type { NativeDocumentFiles } from "./native-document-files";
 
 // `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
 // build-time constant once at module init rather than per call.
@@ -85,6 +86,8 @@ const legacyChatgptOAuth = createChatGptOAuthCoordinator({
 type RegisterIpcHandlersOptions = {
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
   recent_files?: Pick<RecentStore, "list" | "touch" | "pin" | "forget">;
+  document_files?: NativeDocumentFiles;
+  resolve_document_window?: (id: string) => BrowserWindow | undefined;
   resolve_native_chat?: (
     window: BrowserWindow,
     workspaceId: string
@@ -225,6 +228,39 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     if (!info) throw new Error("agent sidecar not ready");
     return info;
   });
+
+  guarded(IPC_CHANNELS.DOCUMENT_READ, (event, id: unknown) =>
+    documentRequest(event, id, (files, docId, owner) =>
+      files.read(docId, owner)
+    )
+  );
+  guarded(IPC_CHANNELS.DOCUMENT_WRITE, (event, id: unknown, content: unknown) =>
+    documentRequest(event, id, (files, docId, owner) =>
+      files.write(docId, content, owner)
+    )
+  );
+
+  function documentRequest<T>(
+    event: IpcMainInvokeEvent,
+    id: unknown,
+    run: (
+      files: NativeDocumentFiles,
+      id: string,
+      owner: { signal: AbortSignal; check: () => void }
+    ) => Promise<T>
+  ): Promise<T> {
+    const files = options.document_files;
+    const unavailable = "The selected document is unavailable.";
+    if (!files || typeof id !== "string") throw new Error(unavailable);
+    return windowRequest(
+      event,
+      unavailable,
+      (signal, check) => run(files, id, { signal, check }),
+      (window, url) =>
+        options.resolve_document_window?.(id) === window &&
+        ipc_sender.isDocument(url, id)
+    );
+  }
 
   guarded(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE, (event) =>
     nativeChat.available(event)
@@ -597,7 +633,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         (kind !== "text" && kind !== "bytes" && kind !== "directory")
       )
         throw new Error("workspace_read_invalid");
-      return await workspaceRequest(
+      return await windowRequest(
         event,
         "workspace_read_unavailable",
         async (signal) =>
@@ -635,7 +671,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
             !Number.isFinite(expectedMtime)))
       )
         throw new Error("workspace_write_invalid");
-      return await workspaceRequest(
+      return await windowRequest(
         event,
         "workspace_write_unavailable",
         (signal, check) =>
@@ -651,10 +687,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     }
   );
 
-  async function workspaceRequest<T>(
+  async function windowRequest<T>(
     event: IpcMainInvokeEvent,
     unavailable: string,
-    run: (signal: AbortSignal, check: () => void) => Promise<T>
+    run: (signal: AbortSignal, check: () => void) => Promise<T>,
+    owner?: (window: BrowserWindow, frameUrl: string) => boolean
   ): Promise<T> {
     const { sender, senderFrame: frame } = event;
     const window = BrowserWindow.fromWebContents(sender);
@@ -667,7 +704,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         sender.isDestroyed() ||
         frame !== sender.mainFrame ||
         options.resolve_ipc_role(window) !== "main" ||
-        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN)
+        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        (owner && !owner(window, frame.url))
       )
         throw new Error(unavailable);
     };

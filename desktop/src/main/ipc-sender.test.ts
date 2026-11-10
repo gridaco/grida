@@ -2,6 +2,22 @@
 import { describe, expect, it } from "vitest";
 import { ipc_sender } from "./ipc-sender";
 
+it("pins the standalone document route to one exact document query", () => {
+  const origin = "https://fixture.invalid";
+  expect(ipc_sender.isDocument(`${origin}/desktop/file?docId=a`, "a")).toBe(
+    true
+  );
+  expect(
+    ipc_sender.isDocument(`${origin}/desktop/file?docId=a&docId=b`, "a")
+  ).toBe(false);
+  expect(ipc_sender.isDocument(`${origin}/desktop/file?docId=b`, "a")).toBe(
+    false
+  );
+  expect(ipc_sender.isDocument(`${origin}/desktop/welcome?docId=a`, "a")).toBe(
+    false
+  );
+});
+
 describe("ipc_sender.isAllowed", () => {
   it.each([
     "https://grida.co/desktop",

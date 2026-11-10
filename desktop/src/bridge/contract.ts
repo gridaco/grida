@@ -34,6 +34,8 @@ export type {
   WorkspaceWriteFileResult,
 } from "@grida/desktop-bridge";
 
+export const NATIVE_DOCUMENT_ARGUMENT = "--grida-native-document";
+
 export const IPC_CHANNELS = {
   WINDOW_SET_DOCUMENT_EDITED: "grida:window:set-document-edited",
   WINDOW_SET_REPRESENTED_FILENAME: "grida:window:set-represented-filename",
@@ -137,6 +139,8 @@ export const IPC_CHANNELS = {
   DIALOG_SAVE_AS: "grida:dialog:save-as",
   SHELL_OPEN_EXTERNAL: "grida:shell:open-external",
   SHELL_SHOW_ITEM_IN_FOLDER: "grida:shell:show-item-in-folder",
+  DOCUMENT_READ: "grida:document:read",
+  DOCUMENT_WRITE: "grida:document:write",
   RECENT_LIST: "grida:recent:list",
   RECENT_TOUCH: "grida:recent:touch",
   RECENT_PIN: "grida:recent:pin",

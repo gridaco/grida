@@ -63,6 +63,10 @@ export class NativeWorkspaceCatalog {
     await this.ready;
   }
 
+  fileProtectionPaths(): readonly string[] {
+    return this.protectedPaths;
+  }
+
   list(): Promise<Workspace[]> {
     return this.run(async () => {
       this.requireDrainedWrites();

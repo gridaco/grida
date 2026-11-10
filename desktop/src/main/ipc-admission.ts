@@ -67,6 +67,12 @@ export namespace ipc_admission {
           return pathname === "/desktop/tools";
         }
         if (
+          channel === IPC_CHANNELS.DOCUMENT_READ ||
+          channel === IPC_CHANNELS.DOCUMENT_WRITE
+        ) {
+          return pathname === "/desktop/file";
+        }
+        if (
           channel.startsWith("grida:native-chat:") ||
           channel === IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES
         ) {

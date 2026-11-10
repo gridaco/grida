@@ -8,6 +8,7 @@ const nativeChat = allChannels.filter((channel) =>
   channel.startsWith("grida:native-chat:")
 );
 const workspacePublish = IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES;
+const documentFiles = [IPC_CHANNELS.DOCUMENT_READ, IPC_CHANNELS.DOCUMENT_WRITE];
 
 describe("ipc_admission", () => {
   it("gives sign-in only browser launch and read-only title-bar state", () => {
@@ -49,9 +50,27 @@ describe("ipc_admission", () => {
     expect(allowedFor("main", "/desktop/tools")).toEqual(
       allChannels.filter(
         (channel) =>
-          !nativeChat.includes(channel) && channel !== workspacePublish
+          !nativeChat.includes(channel) &&
+          channel !== workspacePublish &&
+          !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
     );
+  });
+
+  it("admits document I/O only from the main standalone file route", () => {
+    for (const channel of documentFiles) {
+      expect(allowedFor("main", "/desktop/file")).toContain(channel);
+      for (const route of [
+        "/desktop/file/other",
+        "/desktop/workspace",
+        "/desktop/welcome",
+      ]) {
+        expect(allowedFor("main", route)).not.toContain(channel);
+      }
+      expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+        channel
+      );
+    }
   });
 
   it("admits native chat only on the exact main workspace route", () => {

@@ -34,6 +34,7 @@ import type {
 import {
   DESKTOP_BRIDGE_PROTOCOL,
   IPC_CHANNELS,
+  NATIVE_DOCUMENT_ARGUMENT,
   type ConfirmOptions,
   type DesktopBridge,
   type DesktopHostAppInfo,
@@ -59,6 +60,7 @@ function getCliArg(name: string): string | undefined {
 
 const appVersion = getCliArg("grida-version") ?? "0.0.0";
 const appPlatform = process.platform;
+const nativeDocument = process.argv.includes(NATIVE_DOCUMENT_ARGUMENT);
 
 function isDesktopPath(pathname: string): boolean {
   return (
@@ -914,8 +916,14 @@ const bridge: DesktopBridge = {
   },
 
   files: {
-    read: (docId) => agentClient.files.read(docId),
-    write: (docId, content) => agentClient.files.write(docId, content),
+    read: (docId) =>
+      nativeDocument
+        ? ipcRenderer.invoke(IPC_CHANNELS.DOCUMENT_READ, docId)
+        : agentClient.files.read(docId),
+    write: (docId, content) =>
+      nativeDocument
+        ? ipcRenderer.invoke(IPC_CHANNELS.DOCUMENT_WRITE, docId, content)
+        : agentClient.files.write(docId, content),
   },
 
   recent: {

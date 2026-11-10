@@ -45,8 +45,13 @@ import { NativeDesktopAgent } from "./main/native-desktop-agent";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { NativeMcpLaunch } from "./main/native-mcp-launch";
 import { NativeEditorMcpExport } from "./main/native-editor-mcp-export";
-import { nativeWorkspaceCatalog } from "./main/workspace-media-access";
+import {
+  nativeWorkspaceCatalog,
+  nativeWorkspaceMedia,
+} from "./main/workspace-media-access";
 import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
+import { NativeDocumentFiles } from "./main/native-document-files";
+import { ipc_sender } from "./main/ipc-sender";
 
 // GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
 // handler, NOT here at module top. It must run AFTER `open-file` has fired:
@@ -133,6 +138,7 @@ registerWorkspaceMediaScheme();
 // registered through this controller only after it reaches `main`.
 let entryWindow: DesktopEntryWindow | null = null;
 let nativeDesktopAgent: NativeDesktopAgent | undefined;
+let nativeDocuments: NativeDocumentFiles | undefined;
 let managedLegacyStart: ReturnType<typeof startOwnedLegacyWriter> | undefined;
 let recentFiles = agentSidecarClient.recent;
 let nativeQuitDrain: Promise<void> | undefined;
@@ -266,10 +272,8 @@ app.on("browser-window-focus", () => {
 const pendingFiles: string[] = [];
 const pendingAuthCallbacks: string[] = [];
 
-// Live document windows, keyed by agent-server-assigned docId. Used so that
-// re-opening an already-open file focuses the existing window instead
-// of spawning a duplicate. (The agent server returns the same docId for the
-// same normalized path; see `@grida/daemon`'s file registry.)
+// The selected owner assigns an opaque document ID. A second OS open of the
+// same file focuses its existing window rather than duplicating its edits.
 const documentWindows = new Map<string, BrowserWindow>();
 
 /**
@@ -312,17 +316,20 @@ function attach_dirty_close_handler(window: BrowserWindow) {
 }
 
 async function openDocumentWindowForPath(filePath: string) {
-  if (!agentSidecarInfo) {
+  const owner = nativeDocuments;
+  if (!owner && !agentSidecarInfo) {
     console.warn("[grida] cannot open file: agent sidecar not ready");
     return;
   }
   let docId: string;
   try {
-    docId = await agentSidecarClient.registerPath(filePath);
+    docId = owner
+      ? await owner.register(filePath)
+      : await agentSidecarClient.registerPath(filePath);
   } catch (err) {
     // Surface, don't silently drop — a dropped open with no feedback is
     // exactly what made the "open while running" bug hard to diagnose.
-    console.error("[grida] /files/register failed:", err);
+    console.error("[grida] document registration failed:", err);
     dialog.showErrorBox(
       "Couldn't open file",
       `Grida couldn't open this file.\n\n${
@@ -334,17 +341,17 @@ async function openDocumentWindowForPath(filePath: string) {
 
   // Dedup: same path → same docId → focus existing window.
   const existing = documentWindows.get(docId);
-  if (existing && !existing.isDestroyed()) {
-    if (existing.isMinimized()) existing.restore();
-    existing.focus();
-    return;
-  }
-
   // Registration above is asynchronous. Authentication or onboarding may
   // have changed while it was in flight; queue rather than letting a late
   // document window escape the entry admission gate.
   if (!entryWindow?.isMain) {
+    if (!existing || existing.isDestroyed()) owner?.release(docId);
     if (!pendingFiles.includes(filePath)) pendingFiles.push(filePath);
+    return;
+  }
+  if (existing && !existing.isDestroyed()) {
+    if (existing.isMinimized()) existing.restore();
+    existing.focus();
     return;
   }
 
@@ -352,12 +359,25 @@ async function openDocumentWindowForPath(filePath: string) {
     app,
     base_url: EDITOR_BASE_URL,
     doc_id: docId,
+    native: owner !== undefined,
   });
-  if (!entryWindow.registerSecondary(window)) return;
+  if (!entryWindow.registerSecondary(window)) {
+    owner?.release(docId);
+    return;
+  }
   documentWindows.set(docId, window);
+  const unwatch =
+    owner &&
+    ipc_sender.watchNavigation(window.webContents, () =>
+      owner.invalidate(docId)
+    );
   attach_dirty_close_handler(window);
   window.on("closed", () => {
-    documentWindows.delete(docId);
+    unwatch?.();
+    if (documentWindows.get(docId) === window) {
+      documentWindows.delete(docId);
+      owner?.release(docId);
+    }
   });
 
   // macOS proxy-icon in title bar. Safe to call cross-platform — Electron
@@ -418,7 +438,7 @@ function handleFilePath(filePath: string) {
     return;
   }
   if (
-    !agentSidecarInfo ||
+    ((!nativeDocuments || isCanvas) && !agentSidecarInfo) ||
     !startup_window.canDispatchLaunchIntent({
       app_ready: app.isReady(),
       entry_main: entryWindow?.isMain ?? false,
@@ -634,6 +654,14 @@ app.on("ready", async () => {
             options
           );
       await workspaceCatalog.initialize();
+      const documentWorkers = nativeWorkspaceMedia();
+      if (documentWorkers) {
+        nativeDocuments = new NativeDocumentFiles(
+          workspaceCatalog.fileProtectionPaths(),
+          app.getPath("home"),
+          documentWorkers
+        );
+      }
       recentFiles = new RecentStore(app.getPath("userData"), {
         privateFile: true,
       });
@@ -719,6 +747,8 @@ app.on("ready", async () => {
   registerIpcHandlers({
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
     recent_files: recentFiles,
+    document_files: nativeDocuments,
+    resolve_document_window: (id) => documentWindows.get(id),
     publish_workspace_surfaces: (event, snapshot) =>
       nativeEditorMcp?.publish(event, snapshot) ?? Promise.resolve(false),
     ...(native && {
