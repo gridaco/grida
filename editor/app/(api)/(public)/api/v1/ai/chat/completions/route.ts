@@ -25,6 +25,7 @@
  */
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { verifyGgToken } from "@/lib/auth/gg-token";
+import { gatewayChatRequestId } from "@/lib/ai/gateway-product";
 import { grida, gridaProviderOptions } from "@/lib/ai/server";
 import {
   decodeRequest,
@@ -62,12 +63,18 @@ export async function POST(request: Request) {
 
     const decoded = decodeRequest(req);
     const model = grida.languageModel(req.model) as LanguageModelV3;
+    const nativeChatBilling =
+      decoded.stream &&
+      model.provider === "gg" &&
+      request.headers.get("x-grida-billing-receipt") === "1";
     const callOptions = {
       ...decoded.callOptions,
+      ...(nativeChatBilling && { abortSignal: request.signal }),
       providerOptions: gridaProviderOptions({
         organizationId: claims.org,
         feature: "v1/ai/chat",
         awaitIngest: false,
+        ...(nativeChatBilling && { nativeChatBillingReceipt: true }),
       }),
     };
 
@@ -81,15 +88,9 @@ export async function POST(request: Request) {
     // GG admission completes inside doStream before any SSE bytes are written.
     // A blocked organization still receives the native error response.
     const { stream, response } = await model.doStream(callOptions);
-    const upstreamRequestId =
-      model.provider === "gg" &&
-      request.headers.get("x-grida-billing-receipt") === "1"
-        ? new Headers(response?.headers).get("x-request-id")
-        : null;
-    const gatewayRequestId =
-      upstreamRequestId && /^req_[A-Za-z0-9_-]{1,124}$/.test(upstreamRequestId)
-        ? upstreamRequestId
-        : undefined;
+    const gatewayRequestId = nativeChatBilling
+      ? gatewayChatRequestId(new Headers(response?.headers).get("x-request-id"))
+      : undefined;
     return new Response(
       stream.pipeThrough(
         streamEncoder(req.model, {

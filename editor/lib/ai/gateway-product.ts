@@ -14,6 +14,14 @@ export type GatewayContext = {
   feature: string;
   transactionId?: string;
 };
+
+// Native chat can refresh pending billing after inference finishes.
+const NATIVE_CHAT_BILLING_TIMEOUT_MS = 500;
+
+export function gatewayChatRequestId(value: string | null) {
+  return value && /^req_[A-Za-z0-9_-]{1,124}$/.test(value) ? value : undefined;
+}
+
 export class GatewayProductError extends Error {
   readonly isRetryable = false;
   constructor(
@@ -183,10 +191,16 @@ export async function gatewayWait(
   }
   throw new GatewayProductError(504, "result_pending", id);
 }
-async function charge(ctx: GatewayContext, id: string | null) {
+async function charge(
+  ctx: GatewayContext,
+  id: string | null,
+  signal?: AbortSignal
+) {
   if (!id) throw new GatewayProductError(502, "missing_request_identity");
   try {
-    const job = await gatewayJob(ctx, id);
+    signal?.throwIfAborted();
+    const job = await gatewayJob(ctx, id, signal);
+    signal?.throwIfAborted();
     return {
       requestId: id,
       billingStatus: job.billing.status,
@@ -197,6 +211,20 @@ async function charge(ctx: GatewayContext, id: string | null) {
     // throw away an already delivered result or encourage paid regeneration.
     return { requestId: id, billingStatus: "pending", chargedMills: null };
   }
+}
+
+function nativeChatCharge(
+  ctx: GatewayContext,
+  id: string | null,
+  requestSignal?: AbortSignal
+) {
+  const requestId = gatewayChatRequestId(id);
+  if (!requestId) return undefined;
+  const timeout = AbortSignal.timeout(NATIVE_CHAT_BILLING_TIMEOUT_MS);
+  const signal = requestSignal
+    ? AbortSignal.any([requestSignal, timeout])
+    : timeout;
+  return charge(ctx, requestId, signal);
 }
 export function gatewayCostMills(metadata: unknown): number | undefined {
   const gg = (
@@ -340,6 +368,9 @@ export function gatewayLanguageModel(modelId: string): LanguageModelV3 {
     },
     async doStream(options) {
       const d = delegate(options);
+      const nativeChatBilling =
+        d.ctx.feature === "v1/ai/chat" &&
+        options.providerOptions?.grida?.nativeChatBillingReceipt === true;
       try {
         const value = await d.model.doStream(options);
         return {
@@ -353,7 +384,17 @@ export function gatewayLanguageModel(modelId: string): LanguageModelV3 {
                     warnings: [...part.warnings, ...vendorWarnings(options)],
                   });
                 } else if (part.type === "finish") {
-                  const metadata = await charge(d.ctx, d.identity());
+                  const metadata = nativeChatBilling
+                    ? await nativeChatCharge(
+                        d.ctx,
+                        d.identity(),
+                        options.abortSignal
+                      )
+                    : await charge(d.ctx, d.identity());
+                  if (!metadata) {
+                    controller.enqueue(part);
+                    return;
+                  }
                   controller.enqueue({
                     ...part,
                     providerMetadata: {

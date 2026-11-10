@@ -13,7 +13,7 @@
  * fail); 402 is a clean pre-stream response; 404 before any provider
  * call.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { ProductBilling } from "@/lib/platform/product-billing";
 
 // Rate limits are pinned by their own module; route tests must NEVER
@@ -52,6 +52,7 @@ const h = vi.hoisted(() => ({
   retryAfter: null as number | null,
   downstreamLimit: false,
   upstreamRequestId: null as string | null,
+  useRealGateway: false,
 }));
 
 vi.mock("@/lib/platform/product-consumer", () => ({
@@ -113,7 +114,10 @@ vi.mock("@/lib/ai/gateway-product", async (orig) => {
   });
   return {
     ...real,
-    gatewayLanguageModel: fakeLanguageModel,
+    gatewayLanguageModel: (modelId: string) =>
+      h.useRealGateway
+        ? real.gatewayLanguageModel(modelId)
+        : fakeLanguageModel(modelId),
     vercelAiGateway: {
       languageModel: fakeLanguageModel,
       imageModel: () => {
@@ -170,7 +174,7 @@ async function mintedToken(): Promise<string> {
 }
 
 beforeEach(() => {
-  process.env.GG_TOKEN_SECRET = SECRET;
+  vi.stubEnv("GG_TOKEN_SECRET", SECRET);
   h.generate = null;
   h.parts = [];
   h.lastCallOptions = null;
@@ -178,6 +182,7 @@ beforeEach(() => {
   h.retryAfter = null;
   h.downstreamLimit = false;
   h.upstreamRequestId = null;
+  h.useRealGateway = false;
   mockedAdmission.mockReset();
   mockedCompletion.mockReset();
   mockedAdmission.mockImplementation(async (context) => ({
@@ -211,6 +216,11 @@ beforeEach(() => {
   }));
 });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
+
 const PROMPT: LanguageModelV3CallOptions["prompt"] = [
   { role: "system", content: "be helpful" },
   { role: "user", content: [{ type: "text", text: "weather in Seoul?" }] },
@@ -230,6 +240,159 @@ const TOOLS: LanguageModelV3CallOptions["tools"] = [
 ];
 
 describe("POST /api/v1/ai/chat/completions (contract)", () => {
+  it.each([
+    ["timeout", "req_native", "pending", "TimeoutError"],
+    ["cancelled", "req_native", "pending", "AbortError"],
+    ["unavailable", "req_native", "pending", undefined],
+    ["settled", "req_native", "settled", undefined],
+    ["missing identity", null, undefined, undefined],
+    ["invalid identity", "req_invalid.id", undefined, undefined],
+  ])(
+    "finishes the opted-in native Gateway stream when billing is %s",
+    async (observation, requestId, expectedBilling, abortName) => {
+      h.useRealGateway = true;
+      const origin = "http://127.0.0.1:8080";
+      const workloadToken = "a".repeat(43);
+      vi.stubEnv("GRIDA_AI_GATEWAY_ORIGIN", origin);
+      vi.stubEnv("GRIDA_AI_GATEWAY_ALLOW_LOCAL", "1");
+      vi.stubEnv("GRIDA_AI_GATEWAY_KEY_ID", "product-test");
+      vi.stubEnv("GRIDA_AI_GATEWAY_TOKEN", workloadToken);
+      const request = new AbortController();
+      let posted = 0;
+      const observed: {
+        url: string;
+        method: string;
+        organization: string | null;
+      }[] = [];
+      let observedAbort: string | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string, init: RequestInit) => {
+          const headers = new Headers(init.headers);
+          expect(headers.get("authorization")).toBe(`Bearer ${workloadToken}`);
+          expect(headers.get("x-grida-organization-id")).toBe(String(ORG));
+          if (url === `${origin}/internal/grida/v1/chat/completions`) {
+            posted++;
+            expect(init.method).toBe("POST");
+            expect(JSON.parse(String(init.body))).not.toHaveProperty(
+              "nativeChatBillingReceipt"
+            );
+            const frames = [
+              { choices: [{ index: 0, delta: { content: "Finished." } }] },
+              { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
+              {
+                choices: [],
+                usage: {
+                  prompt_tokens: 8,
+                  completion_tokens: 2,
+                  total_tokens: 10,
+                },
+              },
+            ];
+            return new Response(
+              frames
+                .map((frame) => `data: ${JSON.stringify(frame)}\n\n`)
+                .join("") + "data: [DONE]\n\n",
+              {
+                headers: {
+                  "content-type": "text/event-stream",
+                  ...(requestId && { "x-request-id": requestId }),
+                },
+              }
+            );
+          }
+          observed.push({
+            url,
+            method: init.method ?? "GET",
+            organization: headers.get("x-grida-organization-id"),
+          });
+          if (observation === "unavailable")
+            return new Response(null, { status: 503 });
+          if (observation === "settled")
+            return Response.json({
+              id: requestId,
+              request_id: requestId,
+              result_status: "unavailable",
+              billing: { status: "settled", charged_mills: "0" },
+            });
+          const { signal } = init;
+          if (!signal) throw new Error("Missing billing read signal");
+          const held = new Promise<Response>((_resolve, reject) => {
+            signal.addEventListener(
+              "abort",
+              () => {
+                observedAbort = signal.reason?.name;
+                reject(signal.reason);
+              },
+              { once: true }
+            );
+          });
+          if (observation === "cancelled") request.abort();
+          return held;
+        })
+      );
+      const response = await POST(
+        new Request("http://grida.test/api/v1/ai/chat/completions", {
+          method: "POST",
+          signal: request.signal,
+          headers: {
+            authorization: `Bearer ${await mintedToken()}`,
+            "content-type": "application/json",
+            "x-grida-billing-receipt": "1",
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [{ role: "user", content: "fixture" }],
+            stream: true,
+            stream_options: { include_usage: true },
+          }),
+        })
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-request-id")).toBe(
+        expectedBilling ? requestId : null
+      );
+      const stream = await response.text();
+      expect(stream).toContain("Finished.");
+      expect(stream.endsWith("data: [DONE]\n\n")).toBe(true);
+      const frames = stream
+        .split("\n\n")
+        .filter((part) => part.startsWith("data: {"))
+        .map((part) => JSON.parse(part.slice(6)));
+      expect(frames.find((frame) => frame.usage)?.usage).toMatchObject({
+        prompt_tokens: 8,
+        completion_tokens: 2,
+      });
+      const finish = frames.find(
+        (frame) => frame.choices[0]?.finish_reason === "stop"
+      );
+      expect(finish).toBeDefined();
+      expect(finish.grida_billing).toEqual(
+        expectedBilling
+          ? {
+              version: 1,
+              request_id: requestId,
+              status: expectedBilling,
+              charged_mills: expectedBilling === "settled" ? "0" : null,
+            }
+          : undefined
+      );
+      expect(observed).toEqual(
+        expectedBilling
+          ? [
+              {
+                url: `${origin}/internal/grida/v1/jobs/${requestId}`,
+                method: "GET",
+                organization: String(ORG),
+              },
+            ]
+          : []
+      );
+      expect(posted).toBe(1);
+      expect(observedAbort).toBe(abortName);
+    }
+  );
+
   it.each([
     {
       optIn: true,

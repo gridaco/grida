@@ -2092,6 +2092,9 @@ levels into one.
    with a matching job request ID. The [native Gateway adapter](crates/grida-agent/src/gg.rs)
    checks that identity against the observed response header and binds the
    evidence to the captured scope. Pending observations carry no amount.
+   On opted-in native chat streams, the route bounds the terminal billing
+   read and cancels it with the caller. An unavailable read leaves the
+   original inference finish and usage intact and a valid receipt pending.
    The early request ID remains available on cancellation, and generic
    compatible endpoints have no Gateway receipt decoder.
    The private [billing lookup](crates/grida-agent/src/acp/extensions/gateway_billing.rs)
