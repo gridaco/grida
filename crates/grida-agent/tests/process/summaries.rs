@@ -1,5 +1,6 @@
 use super::lifecycle::{
-    prompt_request, session_snapshot, task_basis, terminate_shared_server, wait_for_snapshot,
+    prompt_request, queue_basis, session_snapshot, task_basis, terminate_shared_server,
+    wait_for_snapshot,
 };
 use super::*;
 
@@ -11,6 +12,7 @@ async fn connect(url: &str) -> SharedSocket {
         .unwrap();
     let mut request = extension_initialize();
     request["clientCapabilities"]["_meta"][SUMMARY] = 1.into();
+    request["clientCapabilities"]["_meta"]["co.grida/session/compact"] = 1.into();
     let response = ws_rpc(&mut socket, 1, "initialize", request).await;
     assert_eq!(response["result"]["agentCapabilities"]["_meta"][SUMMARY], 1);
     socket
@@ -35,6 +37,7 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
         Reply::Finished("Finished and ready to review."),
         Reply::Stop("length"),
         Reply::Hold("Partial answer."),
+        Reply::Stop("length"),
     ])
     .await;
     let (first, url) = shared_server(&state, &endpoint.url).await;
@@ -91,6 +94,31 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
         }
         retained.push((turn.to_owned(), result.clone()));
     }
+    let stopped = session_snapshot(&mut socket, session).await;
+    let resumed = ws_rpc(
+        &mut socket,
+        7,
+        "_co.grida/session/resume-queue",
+        queue_basis(&stopped, session, "resume-for-compaction"),
+    )
+    .await;
+    assert!(resumed.get("result").is_some(), "{resumed}");
+    let compaction = ws_rpc(
+        &mut socket,
+        8,
+        "_co.grida/session/compact",
+        json!({"sessionId":session,"requestId":"unavailable-summary"}),
+    )
+    .await;
+    assert_eq!(compaction["result"]["status"], "failed", "{compaction}");
+    endpoint.request().await;
+    let turn = compaction["result"]["turnId"].as_str().unwrap();
+    let fallback = summary(&mut socket, session, turn).await;
+    assert_eq!(fallback["result"]["status"], "failed");
+    assert_eq!(fallback["result"]["text"], "The turn failed.");
+    assert!(fallback["result"]["toolActivity"].is_null());
+    assert!(fallback["result"]["unresolvedOperations"].is_null());
+    retained.push((turn.to_owned(), fallback["result"].clone()));
     drop(socket);
     terminate_shared_server(first).await;
 
