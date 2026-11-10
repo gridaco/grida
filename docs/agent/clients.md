@@ -375,6 +375,21 @@ Open supplies the parent session and a request ID. Ask supplies the returned sid
 chat ID, a request ID, and text, and returns a completion account. Close supplies
 the side chat ID. These IDs work only on the connection that opened the chat.
 
+## Set the context input limit
+
+Open **Context limit** in the native Desktop workspace chat to see its current
+default. A provider that supports exact request counting can use a custom token
+limit. Choose **Save limit** and confirm the value. The new default applies to
+future accepted messages. Work already accepted keeps its captured setting.
+The current Gateway and ChatGPT subscription profiles can inspect the limit
+and return an existing valid override to **Automatic**.
+
+To ask the agent to change the default with a compatible provider, select
+**Act** and **Review settings permission on next Act send**. Write a short
+message and confirm it when Desktop asks. That permission covers the context
+input limit for this message. To change a queued message with this permission,
+withdraw it and review a new send.
+
 ## Attach a PNG to a message
 
 When the native Desktop chat advertises image input, choose **Add PNG**,

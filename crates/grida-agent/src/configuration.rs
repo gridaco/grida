@@ -27,6 +27,7 @@ pub struct ConfigurationInspection {
     pub file_revision: Option<Fingerprint>,
     pub file_diagnostic: Option<Error>,
     pub active: ConfigurationSnapshot,
+    pub exact_input_counting: bool,
 }
 
 pub struct Configuration {
@@ -76,6 +77,7 @@ impl Configuration {
             file_revision,
             file_diagnostic,
             active: active.clone(),
+            exact_input_counting: false,
         })
     }
 

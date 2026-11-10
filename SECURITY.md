@@ -936,6 +936,12 @@ lazy reads, read-only mutation, and symlink escape refusal.
   chat attachment. Organization derives its target from the frame's exact
   attachment, forwards the metadata revision, and revalidates the attachment
   after the native reply.
+  The [configuration adapter](desktop/src/main/native-agent-configuration.ts)
+  keeps file revisions in Main. An owner-bound context-limit change requires a
+  native confirmation of its exact value. Conversational permission requires a
+  separate native confirmation bound to the exact Act input and chat attachment.
+  Navigation retires both reviews. The renderer receives the active value and
+  support status through the guarded bridge.
   Native startup accepts only a start flag. Main resolves the workspace from
   the admitted route and rechecks that scope before returning readiness.
   Navigation invalidates an outstanding reply. A failed native startup reports

@@ -77,6 +77,7 @@ async fn explicit_configuration_permission_changes_future_defaults_through_model
     .await;
     assert_eq!(settled["latest"]["status"], "succeeded");
     let inspected = ws_rpc(&mut socket, 4, "_co.grida/config/inspect", json!({})).await;
+    assert_eq!(inspected["result"]["exact_input_counting"], false);
     assert_eq!(
         inspected["result"]["active"]["defaults"]["context"]["max_input_tokens"],
         64000
@@ -93,6 +94,20 @@ async fn explicit_configuration_permission_changes_future_defaults_through_model
         "change"
     );
     assert!(input["result"]["settings"]["maxInputTokens"].is_null());
+    let changed_permission = ws_rpc(
+        &mut socket,
+        51,
+        "_co.grida/session/submit",
+        json!({
+            "sessionId":session,"inputId":"change-default",
+            "prompt":[{"type":"text","text":"Use a 64000-token input limit for future tasks."}]
+        }),
+    )
+    .await;
+    assert_eq!(
+        changed_permission["error"]["data"],
+        "submission_configuration_permission_changed"
+    );
     let later = ws_rpc(
         &mut socket,
         6,

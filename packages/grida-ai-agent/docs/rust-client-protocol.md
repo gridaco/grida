@@ -442,6 +442,10 @@ require all three configuration capabilities and an explicit
 defaults to false and is retained with the accepted input. A request for changes
 without those capabilities fails before acceptance. Queue inspection reports
 the captured `configurationPermission` as `disabled`, `inspect` or `change`.
+Retry preserves the effective configuration write permission for the input.
+Configuration inspection reports `exact_input_counting` for the selected
+provider profile. The flag describes a supported counting route. Each prepared
+request must still return an exact count before an explicit limit can be used.
 
 ## Acceptance before claiming compatibility
 

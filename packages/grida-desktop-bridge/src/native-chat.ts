@@ -14,6 +14,24 @@ export type NativeChatImageInput = Readonly<{
   operatingRegime: NativeChatOperatingRegime;
 }>;
 
+export type NativeContextLimit = Readonly<{
+  reviewId: string;
+  limit: number | null;
+  exactCounting: boolean;
+  source: "active" | "pending" | "invalid";
+}>;
+
+export type NativeContextLimitResult = Readonly<{
+  limit: number | null;
+  disposition: "applied" | "observed";
+}>;
+
+export type NativeChatConfigurationInput = Readonly<{
+  action: "submit" | "enqueue";
+  inputId: string;
+  text: string;
+}>;
+
 export type NativeChatPage = Readonly<{
   sessionIds: readonly string[];
   titles?: readonly Readonly<{ sessionId: string; title: string }>[];
@@ -128,6 +146,7 @@ export type NativeChatQueueItem = Readonly<{
   preview: string | null;
   goalStart?: NativeChatGoalRequest;
   operatingRegime?: NativeChatOperatingRegime;
+  allowsConfigurationChange?: true;
 }>;
 
 export type NativeChatQueuePage = Readonly<{
@@ -325,6 +344,15 @@ export type DesktopNativeChat = {
   submitImage?(
     attachmentId: string,
     input: NativeChatImageInput
+  ): Promise<NativeChatAcceptance>;
+  contextLimit?(): Promise<NativeContextLimit>;
+  saveContextLimit?(
+    reviewId: string,
+    limit: number | null
+  ): Promise<NativeContextLimitResult>;
+  submitWithConfigurationReview?(
+    attachmentId: string,
+    input: NativeChatConfigurationInput
   ): Promise<NativeChatAcceptance>;
   inputReceipt(
     attachmentId: string,

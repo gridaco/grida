@@ -6,7 +6,13 @@ import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import { Textarea } from "@app/ui/components/textarea";
 import { MessageAction } from "@app/ui/ai-elements/message";
-import { ArrowDownIcon, ArrowUpIcon, PencilIcon, XIcon } from "lucide-react";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  PencilIcon,
+  SlidersHorizontalIcon,
+  XIcon,
+} from "lucide-react";
 import {
   Conversation,
   ConversationContent,
@@ -25,6 +31,7 @@ import { QueuedMessageRows } from "../shared/queued-messages";
 import { NativeGoalPanel } from "./native-goal-panel";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
 import { NativeTurnSummary } from "./native-turn-summary";
+import { NativeContextLimitPanel } from "./native-context-limit-panel";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
 const MAX_DRAFT_BYTES = 512 * 1024;
@@ -166,6 +173,19 @@ export function NativeAgentPane({
             Side chat
           </Button>
         )}
+        {controller.hasContextLimit && (
+          <Button
+            type="button"
+            size="icon-xs"
+            variant="ghost"
+            aria-label="Context limit"
+            title="Context limit"
+            disabled={state.contextLimitBusy}
+            onClick={() => void controller.toggleContextLimit()}
+          >
+            <SlidersHorizontalIcon className="size-3.5" />
+          </Button>
+        )}
         <Button
           type="button"
           variant="ghost"
@@ -284,6 +304,9 @@ export function NativeAgentPane({
           )}
         </div>
       )}
+      {state.contextLimitOpen && (
+        <NativeContextLimitPanel controller={controller} state={state} />
+      )}
       <Conversation
         className="min-h-0 flex-1"
         initial="instant"
@@ -368,7 +391,7 @@ export function NativeAgentPane({
               id: item.inputId,
               text: item.goalStart
                 ? `Goal: ${item.preview ?? item.goalStart.objective}`
-                : `${item.operatingRegime === "plan" ? "Plan: " : ""}${item.preview ?? "Queued input with other content"}`,
+                : `${item.operatingRegime === "plan" ? "Plan: " : item.allowsConfigurationChange ? "Settings permitted: " : ""}${item.preview ?? "Queued input with other content"}`,
             }))}
             actions={(inputId, index) => {
               const position = queue.offset + index;
@@ -380,6 +403,7 @@ export function NativeAgentPane({
                       queueDisabled ||
                       !!state.queueDraft ||
                       !!queue.items[index].goalStart ||
+                      !!queue.items[index].allowsConfigurationChange ||
                       !bridge.queuedText ||
                       !bridge.editQueue ||
                       queue.items[index].preview === null
@@ -563,6 +587,19 @@ export function NativeAgentPane({
         />
       )}
       <div className="shrink-0 p-3">
+        {state.reviewConfiguration && (
+          <Button
+            type="button"
+            size="xs"
+            variant="secondary"
+            className="mb-1"
+            disabled={state.acting}
+            aria-label="Cancel settings review"
+            onClick={() => controller.setConfigurationReview(false)}
+          >
+            Settings review on send
+          </Button>
+        )}
         {state.imageInput && (
           <input
             key={`png-${state.scope}`}

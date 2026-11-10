@@ -1764,6 +1764,17 @@ impl Host {
                 "submission_wakeup_permission_changed",
             ));
         }
+        let requested = request
+            .configuration_permission
+            .for_regime(settings.operating_regime);
+        if (settings.configuration_permission == crate::ConfigurationPermission::Change)
+            != (requested == crate::ConfigurationPermission::Change)
+        {
+            return Err(problem(
+                ErrorKind::Conflict,
+                "submission_configuration_permission_changed",
+            ));
+        }
         Ok(Some(DurableSubmission {
             session: request.session.clone(),
             input: request.id.clone(),
@@ -1801,7 +1812,11 @@ impl Host {
     }
 
     pub async fn configuration_inspect(&self) -> Result<ConfigurationInspection> {
-        self.with_configuration(Configuration::inspect).await
+        let mut inspection = self.with_configuration(Configuration::inspect).await?;
+        inspection.exact_input_counting = self.execution.as_ref().is_some_and(|execution| {
+            matches!(&execution.authorization.credential, Credential::Http(transport) if transport.supports_exact_input_counting())
+        });
+        Ok(inspection)
     }
 
     pub async fn configuration_update(

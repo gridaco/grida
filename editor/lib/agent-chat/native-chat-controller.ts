@@ -24,6 +24,7 @@ import type {
   NativeChatTextUpdate,
   NativeChatTurnSummary,
   NativeChatUpdate,
+  NativeContextLimit,
 } from "@grida/desktop-bridge";
 import { NativeSideChatController } from "./native-side-chat-controller";
 
@@ -31,6 +32,7 @@ const POLL_MS = 500;
 const RECENTS_LIMIT = 12;
 const MAX_LIVE_BYTES = 1024 * 1024;
 const MAX_PNG_BYTES = 256 * 1024;
+const MAX_CONFIGURATION_MESSAGE_BYTES = 1024;
 const utf8 = new TextEncoder();
 
 export type NativeChatView = Readonly<{
@@ -54,6 +56,12 @@ export type NativeChatView = Readonly<{
   imageInput: boolean;
   imageReading: boolean;
   imageDraft: Readonly<{ name: string; size: number }> | null;
+  contextLimitOpen: boolean;
+  contextLimit: NativeContextLimit | null;
+  contextLimitDraft: string;
+  contextLimitBusy: boolean;
+  contextLimitError: string | null;
+  reviewConfiguration: boolean;
   observation: NativeChatObservation | null;
   turnSummary: NativeChatTurnSummary | null;
   approvals: readonly NativeChatApproval[];
@@ -108,6 +116,7 @@ type Scope = {
     mode: "submit" | "enqueue";
     operatingRegime?: NativeChatOperatingRegime;
     image?: ArrayBuffer;
+    reviewConfiguration: boolean;
   };
   awaitingTurn?: string;
 };
@@ -130,6 +139,12 @@ const EMPTY: NativeChatView = Object.freeze({
   imageInput: false,
   imageReading: false,
   imageDraft: null,
+  contextLimitOpen: false,
+  contextLimit: null,
+  contextLimitDraft: "",
+  contextLimitBusy: false,
+  contextLimitError: null,
+  reviewConfiguration: false,
   observation: null,
   turnSummary: null,
   approvals: [],
@@ -310,6 +325,12 @@ export class NativeChatController {
       imageInput: false,
       imageReading: false,
       imageDraft: null,
+      contextLimitOpen: false,
+      contextLimit: null,
+      contextLimitDraft: "",
+      contextLimitBusy: false,
+      contextLimitError: null,
+      reviewConfiguration: false,
       observation: null,
       turnSummary: null,
       approvals: [],
@@ -366,7 +387,8 @@ export class NativeChatController {
       this.view.imageInput &&
       !this.view.loading &&
       !this.view.acting &&
-      !this.view.steering
+      !this.view.steering &&
+      !this.view.reviewConfiguration
     );
   }
 
@@ -423,6 +445,127 @@ export class NativeChatController {
     if (!this.bridge.acceptsPng || !this.bridge.submitImage) return;
     const supported = await this.bridge.acceptsPng().catch(() => false);
     if (this.owns(scope)) this.update({ imageInput: supported === true });
+  }
+
+  get hasContextLimit(): boolean {
+    return !!this.bridge.contextLimit && !!this.bridge.saveContextLimit;
+  }
+
+  get canReviewConfiguration(): boolean {
+    return (
+      !!this.scope &&
+      !!this.bridge.submitWithConfigurationReview &&
+      this.view.contextLimit?.exactCounting === true &&
+      this.view.contextLimit.source !== "invalid" &&
+      this.view.operatingRegime === "act" &&
+      !this.view.steering &&
+      !this.view.acting &&
+      !this.scope.image &&
+      !this.scope.imageRead
+    );
+  }
+
+  setConfigurationReview(requested: boolean): void {
+    if (!this.view.acting && (!requested || this.canReviewConfiguration))
+      this.update({ reviewConfiguration: requested });
+  }
+
+  async toggleContextLimit(): Promise<void> {
+    if (!this.hasContextLimit || this.view.contextLimitBusy) return;
+    const open = !this.view.contextLimitOpen;
+    this.update({ contextLimitOpen: open });
+    if (open) await this.refreshContextLimit();
+  }
+
+  changeContextLimitDraft(draft: string): void {
+    if (!this.view.contextLimitBusy) this.update({ contextLimitDraft: draft });
+  }
+
+  async refreshContextLimit(): Promise<void> {
+    const scope = this.scope;
+    if (!scope || !this.bridge.contextLimit || this.view.contextLimitBusy)
+      return;
+    this.update({ contextLimitBusy: true, contextLimitError: null });
+    try {
+      const contextLimit = await this.bridge.contextLimit();
+      if (this.owns(scope))
+        this.update({
+          contextLimit,
+          contextLimitDraft: contextLimit.limit?.toString() ?? "",
+          ...((!contextLimit.exactCounting ||
+            contextLimit.source === "invalid") && {
+            reviewConfiguration: false,
+          }),
+        });
+    } catch {
+      if (this.owns(scope))
+        this.update({
+          contextLimitError: "Couldn't read the context input limit.",
+        });
+    } finally {
+      if (this.owns(scope)) this.update({ contextLimitBusy: false });
+    }
+  }
+
+  async saveContextLimit(reset = false): Promise<void> {
+    const scope = this.scope;
+    const basis = this.view.contextLimit;
+    const draft = this.view.contextLimitDraft;
+    if (
+      !scope ||
+      !basis ||
+      basis.source === "invalid" ||
+      (!reset && !basis.exactCounting) ||
+      !this.bridge.saveContextLimit ||
+      this.view.contextLimitBusy
+    )
+      return;
+    const limit = reset ? null : Number(draft);
+    if (
+      !reset &&
+      (!/^[0-9]+$/.test(draft) || !Number.isSafeInteger(limit) || limit! < 1)
+    ) {
+      this.update({
+        contextLimitError: "Enter a positive whole number of tokens.",
+      });
+      return;
+    }
+    this.update({ contextLimitBusy: true, contextLimitError: null });
+    let refresh = false;
+    try {
+      const result = await this.bridge.saveContextLimit(basis.reviewId, limit);
+      if (!this.owns(scope)) return;
+      this.update({
+        contextLimit: { ...basis, limit: result.limit, source: "active" },
+      });
+      refresh = true;
+    } catch (error) {
+      if (!this.owns(scope)) return;
+      if (
+        error instanceof Error &&
+        error.message.includes("config_revision_changed")
+      ) {
+        refresh = true;
+      } else {
+        this.update({
+          contextLimitError: describe(
+            error,
+            "Couldn't confirm the setting change. Check the current value."
+          ),
+        });
+      }
+    } finally {
+      if (this.owns(scope)) this.update({ contextLimitBusy: false });
+    }
+    if (refresh && this.owns(scope)) {
+      await this.refreshContextLimit();
+      if (this.owns(scope) && this.view.contextLimit?.limit !== limit)
+        this.update({
+          contextLimitDraft: draft,
+          contextLimitError:
+            "The default changed. Review it before saving again.",
+        });
+    }
   }
 
   get canOrganizeChats(): boolean {
@@ -561,6 +704,7 @@ export class NativeChatController {
       !!this.bridge.steer &&
       !this.scope?.image &&
       !this.scope?.imageRead &&
+      !this.view.reviewConfiguration &&
       !!turn &&
       !turn.cancelled &&
       (turn.disposition === "running" || turn.disposition === "suspended")
@@ -736,7 +880,10 @@ export class NativeChatController {
 
   selectOperatingRegime(operatingRegime: NativeChatOperatingRegime): void {
     if (this.bridge.submitInRegime && !this.view.acting && !this.view.steering)
-      this.update({ operatingRegime });
+      this.update({
+        operatingRegime,
+        ...(operatingRegime === "plan" && { reviewConfiguration: false }),
+      });
   }
 
   async submit(text: string): Promise<void> {
@@ -746,8 +893,19 @@ export class NativeChatController {
     if (this.view.steering) return this.submitSteering(scope, text);
     const mode = this.needsQueue ? "enqueue" : "submit";
     const image = scope.image;
+    const reviewConfiguration = this.view.reviewConfiguration;
+    if (reviewConfiguration && !this.canReviewConfiguration)
+      throw new Error("native_context_limit_unavailable");
+    if (
+      reviewConfiguration &&
+      utf8.encode(text).length > MAX_CONFIGURATION_MESSAGE_BYTES
+    ) {
+      const error = "Use a message of at most 1 KiB for settings review.";
+      this.update({ error });
+      throw new Error(error);
+    }
     const operatingRegime =
-      image || this.bridge.submitInRegime
+      image || reviewConfiguration || this.bridge.submitInRegime
         ? this.view.operatingRegime
         : undefined;
     this.update({ acting: true, error: null });
@@ -760,17 +918,31 @@ export class NativeChatController {
           : undefined;
       if (retained && retained.operatingRegime !== operatingRegime)
         throw new Error("native_chat_pending_regime_changed");
+      if (retained && retained.reviewConfiguration !== reviewConfiguration)
+        throw new Error("native_context_limit_pending_review_changed");
       const pending: NonNullable<Scope["pending"]> = retained ?? {
         text,
         inputId: crypto.randomUUID(),
         mode,
         operatingRegime,
         image,
+        reviewConfiguration,
       };
       scope.pending = pending;
       let accepted;
       try {
-        if (pending.image) {
+        if (pending.reviewConfiguration) {
+          if (!this.bridge.submitWithConfigurationReview)
+            throw new Error("native_context_limit_unavailable");
+          accepted = await this.bridge.submitWithConfigurationReview(
+            attachment.attachmentId,
+            {
+              action: pending.mode,
+              inputId: pending.inputId,
+              text: pending.text,
+            }
+          );
+        } else if (pending.image) {
           if (!this.bridge.submitImage || !pending.operatingRegime)
             throw new Error("image_input_unavailable");
           accepted = await this.bridge.submitImage(attachment.attachmentId, {
@@ -802,6 +974,7 @@ export class NativeChatController {
         }
       } catch (error) {
         this.attachment(scope);
+        if (pending.reviewConfiguration) throw error;
         // A lost acknowledgement does not authorize sending a second input.
         accepted = await this.bridge
           .inputReceipt(attachment.attachmentId, pending.inputId)
@@ -811,6 +984,8 @@ export class NativeChatController {
       }
       scope.pending = undefined;
       if (this.owns(scope)) {
+        if (pending.reviewConfiguration)
+          this.update({ reviewConfiguration: false });
         if (pending.image && scope.image === pending.image) {
           scope.image = undefined;
           this.update({ imageDraft: null });
@@ -820,15 +995,20 @@ export class NativeChatController {
         await this.refresh(scope);
       }
     } catch (error) {
-      if (
+      const reviewDeclined =
         error instanceof Error &&
-        /session_(queue_waiting|prompt_in_progress|admission_paused|turn_requires_recovery)/.test(
-          error.message
-        )
+        error.message.includes("native_context_limit_review_declined");
+      if (
+        reviewDeclined ||
+        (error instanceof Error &&
+          /session_(queue_waiting|prompt_in_progress|admission_paused|turn_requires_recovery)/.test(
+            error.message
+          ))
       )
         scope.pending = undefined;
       if (this.owns(scope)) {
         this.update({
+          ...(reviewDeclined && { reviewConfiguration: false }),
           error: describe(
             error,
             "Couldn't confirm the send. Your draft is still here."
@@ -895,7 +1075,10 @@ export class NativeChatController {
       !this.bridge.queuedText ||
       this.view.acting ||
       this.view.queueDraft ||
-      scope.observation?.snapshot.pendingGoalId === inputId
+      scope.observation?.snapshot.pendingGoalId === inputId ||
+      this.view.queue?.items.some(
+        (item) => item.inputId === inputId && item.allowsConfigurationChange
+      )
     )
       return;
     this.update({ acting: true, error: null });
@@ -946,7 +1129,11 @@ export class NativeChatController {
       !this.bridge.editQueue ||
       this.view.acting ||
       (action.action === "replace" &&
-        scope.observation.snapshot.pendingGoalId === action.inputId)
+        (scope.observation.snapshot.pendingGoalId === action.inputId ||
+          this.view.queue?.items.some(
+            (item) =>
+              item.inputId === action.inputId && item.allowsConfigurationChange
+          )))
     )
       return;
     const observationId =
@@ -1746,6 +1933,12 @@ function describe(error: unknown, fallback: string): string {
     return "This chat's current provider does not accept PNG inputs.";
   if (error.message.includes("native_agent_frame_limit"))
     return "This message exceeds the connection limit. Shorten it and try again.";
+  if (error.message.includes("native_context_limit_review_declined"))
+    return "Settings review cancelled.";
+  if (error.message.includes("native_context_limit_pending_review_changed"))
+    return "Retry with the original settings permission, or edit the message to send a new one.";
+  if (error.message.includes("native_context_limit_unavailable"))
+    return "This workspace cannot apply a hard context input limit with the selected provider.";
   return fallback;
 }
 

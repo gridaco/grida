@@ -9,7 +9,11 @@ import type {
 } from "@grida/desktop-bridge";
 import { describe, expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "../bridge/contract";
-import { NativeChatIpc, type ActiveNativeChat } from "./native-chat-ipc";
+import {
+  NativeChatIpc,
+  type ActiveNativeChat,
+  type ConfigurationReview,
+} from "./native-chat-ipc";
 import type { NativeChatSession } from "./native-agent-chat";
 
 const ORIGIN = "https://fixture.invalid";
@@ -48,7 +52,12 @@ function windowAt(url = WORKSPACE_URL) {
   };
 }
 
-function setup() {
+function setup(
+  confirm?: (
+    sender: WebContents,
+    review: ConfigurationReview
+  ) => Promise<boolean>
+) {
   const first = windowAt();
   const second = windowAt();
   const scopes = new Map<WebContents, ActiveNativeChat>();
@@ -147,6 +156,18 @@ function setup() {
       };
     },
     acceptsPng: false,
+    async inspectContextLimit() {
+      return {
+        limit: null,
+        exactCounting: true,
+        source: "active",
+        revision: null,
+      };
+    },
+    async updateContextLimit() {},
+    async sendConfiguration(session, input) {
+      return this.submit(session, input.inputId, input.text);
+    },
     async submitImage(session) {
       return this.submit(session, "image-input", "Describe image.");
     },
@@ -268,7 +289,12 @@ function setup() {
     advance: () => {
       position += 1;
     },
-    ipc: new NativeChatIpc(ORIGIN, (sender) => scopes.get(sender) ?? null),
+    ipc: new NativeChatIpc(
+      ORIGIN,
+      (sender) => scopes.get(sender) ?? null,
+      undefined,
+      confirm
+    ),
     emit: (sessionId: string, update: NativeChatStreamUpdate) => {
       for (const listener of listeners.get(sessionId) ?? []) listener(update);
     },
@@ -276,6 +302,131 @@ function setup() {
 }
 
 describe("native chat IPC", () => {
+  it("keeps the revision private and only retries the exact reviewed context update", async () => {
+    const confirm = vi.fn<
+      (sender: WebContents, review: ConfigurationReview) => Promise<boolean>
+    >(async () => true);
+    const { ipc, first, second, chat } = setup(confirm);
+    const update = vi.spyOn(chat, "updateContextLimit");
+    const inspected = await ipc.contextLimit(first.event);
+    expect(inspected).toEqual({
+      reviewId: expect.any(String),
+      limit: null,
+      exactCounting: true,
+      source: "active",
+    });
+    await expect(
+      ipc.saveContextLimit(second.event, inspected.reviewId, 1024)
+    ).rejects.toThrow("native_context_limit_review_unavailable");
+    const saved = await ipc.saveContextLimit(
+      first.event,
+      inspected.reviewId,
+      1024
+    );
+    expect(saved).toEqual({ limit: 1024, disposition: "applied" });
+    expect(
+      await ipc.saveContextLimit(first.event, inspected.reviewId, 1024)
+    ).toEqual(saved);
+    await expect(
+      ipc.saveContextLimit(first.event, inspected.reviewId, 4096)
+    ).rejects.toThrow("native_context_limit_review_reused");
+    expect(confirm).toHaveBeenCalledExactlyOnceWith(first.sender, {
+      kind: "limit",
+      limit: 1024,
+    });
+    expect(update).toHaveBeenCalledExactlyOnceWith(
+      { limit: null, exactCounting: true, source: "active", revision: null },
+      1024
+    );
+  });
+
+  it("allows Automatic recovery on an unsupported provider and labels an observed timeout outcome", async () => {
+    const confirm = vi.fn<
+      (sender: WebContents, review: ConfigurationReview) => Promise<boolean>
+    >(async () => true);
+    const { ipc, first, chat } = setup(confirm);
+    const inspect = vi.spyOn(chat, "inspectContextLimit").mockResolvedValue({
+      limit: 2048,
+      exactCounting: false,
+      source: "active",
+      revision: Array(32).fill(2),
+    });
+    const update = vi
+      .spyOn(chat, "updateContextLimit")
+      .mockRejectedValueOnce(new Error("native_agent_request_timeout"));
+    const initial = await ipc.contextLimit(first.event);
+    await expect(
+      ipc.saveContextLimit(first.event, initial.reviewId, 4096)
+    ).rejects.toThrow("native_context_limit_unavailable");
+    expect(confirm).not.toHaveBeenCalled();
+    inspect.mockResolvedValue({
+      limit: null,
+      exactCounting: false,
+      source: "active",
+      revision: Array(32).fill(3),
+    });
+    await expect(
+      ipc.saveContextLimit(first.event, initial.reviewId, null)
+    ).resolves.toEqual({ limit: null, disposition: "observed" });
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  it("reviews an exact Act input once and refuses a late or rewritten message", async () => {
+    const confirm = vi.fn<
+      (sender: WebContents, review: ConfigurationReview) => Promise<boolean>
+    >(async () => true);
+    const { ipc, first, chat } = setup(confirm);
+    const opened = await ipc.create(first.event);
+    const input = {
+      action: "submit",
+      inputId: randomUUID(),
+      text: "Change the future context limit.",
+    } as const;
+    const send = vi
+      .spyOn(chat, "sendConfiguration")
+      .mockRejectedValueOnce(new Error("fixture lost reply"));
+    await expect(
+      ipc.submitWithConfigurationReview(first.event, opened.attachmentId, input)
+    ).rejects.toThrow("fixture lost reply");
+    const accepted = await ipc.submitWithConfigurationReview(
+      first.event,
+      opened.attachmentId,
+      input
+    );
+    expect(accepted.inputId).toBe(input.inputId);
+    expect(
+      await ipc.submitWithConfigurationReview(
+        first.event,
+        opened.attachmentId,
+        input
+      )
+    ).toEqual(accepted);
+    await expect(
+      ipc.submitWithConfigurationReview(first.event, opened.attachmentId, {
+        ...input,
+        text: "Another message",
+      })
+    ).rejects.toThrow("native_context_limit_review_reused");
+    expect(confirm).toHaveBeenCalledExactlyOnceWith(first.sender, {
+      kind: "message",
+      text: input.text,
+    });
+    expect(send).toHaveBeenCalledTimes(2);
+
+    const delayed = Promise.withResolvers<boolean>();
+    confirm.mockReturnValueOnce(delayed.promise);
+    const later = ipc.submitWithConfigurationReview(
+      first.event,
+      opened.attachmentId,
+      { ...input, inputId: randomUUID() }
+    );
+    await vi.waitFor(() => expect(confirm).toHaveBeenCalledTimes(2));
+    first.contents.emit("did-start-navigation", { isMainFrame: true });
+    delayed.resolve(true);
+    await expect(later).rejects.toThrow("native_chat_attachment_unavailable");
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   it("reports PNG capability only in the current workspace and rejects late delivery", async () => {
     const { ipc, first, second, chat, scopes } = setup();
     expect(ipc.acceptsPng(first.event)).toBe(false);

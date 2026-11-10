@@ -443,6 +443,20 @@ const bridge: DesktopBridge = {
     observe: (attachmentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_OBSERVE, attachmentId),
     acceptsPng: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_PNG),
+    contextLimit: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT),
+    saveContextLimit: (reviewId, limit) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SAVE_CONTEXT_LIMIT,
+        reviewId,
+        limit
+      ),
+    submitWithConfigurationReview: (attachmentId, input) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_CONFIGURATION,
+        attachmentId,
+        input
+      ),
     submitImage: (attachmentId, input) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT_IMAGE,

@@ -205,6 +205,10 @@ impl HttpTransport {
         self.replay_binding.as_ref()
     }
 
+    pub(crate) fn supports_exact_input_counting(&self) -> bool {
+        self.protocol == ProviderProtocol::Responses
+    }
+
     pub async fn validate_credential(&self) -> Result<()> {
         if let Some(credential) = &self.credential {
             credential.validate().await?;
@@ -219,7 +223,7 @@ impl HttpTransport {
         if operation == &self.operation {
             return Ok(self.target.clone());
         }
-        if self.protocol == ProviderProtocol::Responses
+        if self.supports_exact_input_counting()
             && operation == &TransportOperation::OpenAiResponsesInputTokens
         {
             let mut target = self.target.clone();

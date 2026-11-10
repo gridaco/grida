@@ -7,6 +7,7 @@ import type {
   NativeChatApprovalDecision,
   NativeChatCatalogChange,
   NativeChatCatalogEntry,
+  NativeChatConfigurationInput,
   NativeChatControlReceipt,
   NativeChatGoalControl,
   NativeChatGoalReceipt,
@@ -28,6 +29,10 @@ import type {
 } from "@grida/desktop-bridge";
 import type { NativeApprovalReview } from "./native-agent-permissions";
 import {
+  NativeAgentConfiguration,
+  type ContextLimitBasis,
+} from "./native-agent-configuration";
+import {
   NativeAgentGoals,
   type NativeGoalInspection,
 } from "./native-agent-goals";
@@ -41,6 +46,7 @@ import {
 } from "./native-agent-process";
 
 const CAPABILITIES = {
+  ...NativeAgentConfiguration.capabilities,
   "co.grida/session/submit": 1,
   "co.grida/session/operating-regime": 1,
   "co.grida/session/enqueue": 1,
@@ -144,6 +150,7 @@ type QueuePosition = Readonly<{
   inputPosition: number;
   goalStart?: NativeChatGoalRequest;
   operatingRegime?: NativeChatOperatingRegime;
+  allowsConfigurationChange?: true;
 }>;
 const observed = new WeakMap<
   NativeChatSnapshot,
@@ -157,6 +164,9 @@ type TranscriptCapture = {
 };
 
 export class NativeAgentChat {
+  private readonly configuration = new NativeAgentConfiguration(
+    (method, params) => this.process.request(method, params, 10_000)
+  );
   private readonly goals = new NativeAgentGoals((method, params) =>
     this.process.request(method, params)
   );
@@ -411,7 +421,8 @@ export class NativeAgentChat {
     inputId: string,
     text: string,
     operatingRegime?: NativeChatOperatingRegime,
-    image?: ReturnType<typeof pngPrompt>
+    image?: ReturnType<typeof pngPrompt>,
+    allowConfigurationChanges = false
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     identity(inputId);
@@ -421,10 +432,71 @@ export class NativeAgentChat {
         inputId,
         prompt: [...textPrompt(text), ...(image ? [image] : [])],
         ...(operatingRegime && { operatingRegime }),
+        ...(allowConfigurationChanges && { allowConfigurationChanges }),
       }),
       sessionId,
       inputId
     );
+  }
+
+  inspectContextLimit(): Promise<ContextLimitBasis> {
+    this.requireOpen();
+    return this.configuration.inspect();
+  }
+
+  updateContextLimit(
+    basis: ContextLimitBasis,
+    limit: number | null
+  ): Promise<void> {
+    this.requireOpen();
+    return this.configuration.update(basis, limit);
+  }
+
+  async sendConfiguration(
+    session: NativeChatSession,
+    input: NativeChatConfigurationInput
+  ): Promise<NativeChatAcceptance> {
+    try {
+      return await this.send(
+        input.action,
+        session,
+        input.inputId,
+        input.text,
+        "act",
+        undefined,
+        true
+      );
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        error.message !== "native_agent_request_timeout"
+      )
+        throw error;
+      const sessionId = this.requireAttached(session);
+      const retained = await this.process
+        .request("_co.grida/session/input", {
+          sessionId,
+          inputId: input.inputId,
+        })
+        .then(object)
+        .catch(() => {
+          throw error;
+        });
+      this.requireAttached(session);
+      const settings = object(retained.settings);
+      const part =
+        Array.isArray(retained.prompt) && retained.prompt.length === 1
+          ? object(retained.prompt[0])
+          : null;
+      if (
+        settings.configurationPermission !== "change" ||
+        settings.operatingRegime !== "act" ||
+        part?.type !== "text" ||
+        part.text !== input.text
+      )
+        throw new Error("native_context_limit_receipt_mismatch");
+      return acceptance(retained.receipt, sessionId, input.inputId);
+    }
   }
 
   async inputReceipt(
@@ -553,6 +625,9 @@ export class NativeAgentChat {
         preview,
         ...(row.goalStart && { goalStart: row.goalStart }),
         ...(row.operatingRegime && { operatingRegime: row.operatingRegime }),
+        ...(row.allowsConfigurationChange && {
+          allowsConfigurationChange: true as const,
+        }),
       });
     }
     return {
@@ -573,7 +648,7 @@ export class NativeAgentChat {
     const row = observed
       .get(snapshot)!
       .queue.find((item) => item.inputId === inputId);
-    if (!row || row.goalStart)
+    if (!row || row.goalStart || row.allowsConfigurationChange)
       throw new Error("native_chat_queue_input_unavailable");
     const input = await this.readQueueInput(sessionId, row);
     this.requireAttached(session);
@@ -610,6 +685,8 @@ export class NativeAgentChat {
       if (change.action === "replace") {
         if (queue[index].goalStart)
           throw new Error("queued_goal_requires_withdrawal");
+        if (queue[index].allowsConfigurationChange)
+          throw new Error("queued_configuration_requires_withdrawal");
         const prompt = textPrompt(change.text);
         const input = await this.readQueueInput(sessionId, queue[index]);
         this.requireAttached(session);
@@ -1227,6 +1304,9 @@ function queuePositions(
       inputPosition: revision(row.inputPosition),
       ...(settings.operatingRegime === "plan" && {
         operatingRegime: "plan" as const,
+      }),
+      ...(settings.configurationPermission === "change" && {
+        allowsConfigurationChange: true as const,
       }),
       ...(settings.goalStart === undefined
         ? {}
