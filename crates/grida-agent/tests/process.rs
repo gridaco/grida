@@ -659,6 +659,7 @@ async fn embedded_run_and_restart_inspect_through_built_executable() {
     assert_eq!(output[0]["kind"], "accepted");
     assert_eq!(output[1]["disposition"], "succeeded");
     assert_eq!(output[1]["account"]["text"], "Hello from the fixture.");
+    assert!(output[1].get("gateway_billing").is_none());
     assert_eq!(output[0]["turn_id"], output[1]["turn_id"]);
     let request = endpoint.request().await;
     assert_eq!(request["model"], "fixture-model");

@@ -942,6 +942,39 @@ fn chat_control() -> agent_kit_core::inference::RequestControl {
     }
 }
 
+#[test]
+fn gg_billing_receipt_header_is_only_allowed_on_the_fixed_chat_post() {
+    let path = super::gg_chat::CHAT_PATH;
+    let header = super::gg_chat::BILLING_RECEIPT_HEADER;
+    let mut valid = chat_request();
+    let target = Url::parse(&valid.url).unwrap();
+    assert!(snapshot(Route::Gg, &target, &mut valid).is_ok());
+    for (route, method, target) in [
+        (Route::Gg, Method::GET, format!("{API}{path}")),
+        (Route::Gg, Method::POST, format!("{API}{path}?option=1")),
+        (
+            Route::Gg,
+            Method::POST,
+            format!("{API}/api/v1/ai/operations"),
+        ),
+        (Route::Vercel, Method::POST, format!("{API}{path}")),
+    ] {
+        let mut request = chat_request();
+        request.method = method;
+        assert!(snapshot(route, &Url::parse(&target).unwrap(), &mut request).is_err());
+    }
+    let mut invalid = chat_request();
+    invalid
+        .headers
+        .insert(header, HeaderValue::from_static("2"));
+    assert!(snapshot(Route::Gg, &target, &mut invalid).is_err());
+    let mut duplicate = chat_request();
+    duplicate
+        .headers
+        .append(header, HeaderValue::from_static("1"));
+    assert!(snapshot(Route::Gg, &target, &mut duplicate).is_err());
+}
+
 #[tokio::test]
 async fn gg_chat_rejects_other_destinations_and_expired_grants_before_connect() {
     use agent_kit_providers::TransportFailure::Unavailable;

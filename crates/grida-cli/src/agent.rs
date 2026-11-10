@@ -6,7 +6,8 @@ use crate::{AgentAction, AgentCommand, ExternalAgentCommand, account, host, http
 use agent_kit_core::inference::RequestControl;
 use agent_kit_core::{BoxFuture, Error as CoreError, ErrorKind, Result as CoreResult};
 use agent_kit_providers::{
-    StreamingTransport, TransportFailure, TransportRequest, TransportResponse,
+    StreamingTransport, TerminalReceiptDecoder, TransportFailure, TransportRequest,
+    TransportResponse,
 };
 use grida_agent::gg::{GgConnection, GgGrantRenewal};
 use grida_agent::host::{GgOptions, Host};
@@ -66,6 +67,10 @@ impl StreamingTransport for GgTransport {
                 .map_err(|_| TransportFailure::Unavailable)?;
             self.http.stream_gg_chat(request, control).await
         })
+    }
+
+    fn terminal_receipt_decoder(&self) -> Option<Arc<TerminalReceiptDecoder>> {
+        Some(self.connection.terminal_receipt_decoder())
     }
 }
 

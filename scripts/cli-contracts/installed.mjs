@@ -202,6 +202,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
   let renewalGate;
   let chatOrganization = organization;
   let chatStatus = 200;
+  let chatBilling = "settled";
   const chatRequests = [];
   const respond = (res, value, status = 200) => {
     res.writeHead(status, { "content-type": "application/json" });
@@ -285,6 +286,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
       if (req.url === "/api/v1/ai/chat/completions") {
         assert.equal(req.headers.authorization, `Bearer ${issuedGrant}`);
         assert.equal(req.headers.accept, "text/event-stream");
+        assert.equal(req.headers["x-grida-billing-receipt"], "1");
         assert.equal(req.method, "POST");
         const body = JSON.parse(bytes);
         assert.equal(body.model, "openai/fixture-chat");
@@ -300,9 +302,22 @@ export async function proveInstalled({ binary, launcher, workdir }) {
           );
           return;
         }
+        const requestId = `req_fixture_chat_${chatRequests.length}`;
+        const gridaBilling =
+          chatBilling === "missing"
+            ? {}
+            : {
+                grida_billing: {
+                  version: 1,
+                  request_id:
+                    chatBilling === "mismatched" ? "req_other" : requestId,
+                  status: chatBilling === "pending" ? "pending" : "settled",
+                  charged_mills: chatBilling === "pending" ? null : "0",
+                },
+              };
         res.writeHead(200, {
           "content-type": "text/event-stream",
-          "x-request-id": "fixture-gg-chat",
+          "x-request-id": requestId,
         });
         res.write(
           `data: ${JSON.stringify({
@@ -319,6 +334,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
           `data: ${JSON.stringify({
             id: "fixture-gg-chat",
             choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+            ...gridaBilling,
           })}\n\ndata: ${JSON.stringify({
             id: "fixture-gg-chat",
             choices: [],
@@ -490,6 +506,24 @@ export async function proveInstalled({ binary, launcher, workdir }) {
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line));
+    const checkBilling = (record, kind, chargedMills) => {
+      const { attempts, omittedAttempts } = record.gateway_billing;
+      assert.equal(attempts.length, 1);
+      assert.equal(omittedAttempts, 0);
+      const [attempt] = attempts;
+      assert.equal(typeof attempt.operationId, "string");
+      assert.equal(typeof attempt.attemptId, "string");
+      assert.equal(attempt.refreshable, false);
+      assert.equal(attempt.kind, kind);
+      assert.equal(attempt.chargedMills, chargedMills);
+    };
+    const billingReads = () =>
+      [...counts.entries()].reduce(
+        (total, [route, count]) =>
+          total + (route.startsWith("/api/v1/ai/jobs") ? count : 0),
+        0
+      );
+    const readsBefore = billingReads();
     issuedGrant = "synthetic.agent.first";
     const [accepted, finished] = records(
       await run(task, { stdin: "Remember this fixture." })
@@ -498,6 +532,7 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     assert.equal(finished.kind, "finished");
     assert.equal(finished.turn_id, accepted.turn_id);
     assert.equal(finished.disposition, "succeeded");
+    checkBilling(finished, "settled", "0");
     assert.equal(chatRequests.length, 1);
 
     issuedGrant = "synthetic.agent.near-expiry";
@@ -697,9 +732,25 @@ export async function proveInstalled({ binary, launcher, workdir }) {
     );
     issuedGrant = grant;
     grantLifetimeMs = 600_000;
+    for (const [scenario, expected] of [
+      ["pending", "pending"],
+      ["missing", "unavailable"],
+      ["mismatched", "unavailable"],
+    ]) {
+      chatBilling = scenario;
+      const [, finished] = records(
+        await run([...task, "--prompt", `Check ${scenario} billing.`])
+      );
+      assert.equal(finished.disposition, "succeeded");
+      assert.equal(finished.account.text, "Scoped reply");
+      checkBilling(finished, expected);
+    }
+    assert.equal(chatRequests.length, 7);
+    assert.equal(billingReads(), readsBefore);
     checks.push(
       "installed_native_agent_scoped_chat",
-      "installed_native_agent_renewal"
+      "installed_native_agent_renewal",
+      "installed_native_agent_billing_receipt"
     );
   }
   async function cancelAt(route, argv) {

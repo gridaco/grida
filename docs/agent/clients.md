@@ -202,6 +202,12 @@ printf '%s' 'Explain this concept briefly.' | target/debug/grida agent run \
   --no-input
 ```
 
+The final JSON event can include `gateway_billing` with the recorded charge for
+each model request. A settled charge is a decimal string in mills, including
+`"0"` for a confirmed zero charge. Pending or unavailable evidence means the
+final charge is unknown to this run. The command reports the evidence carried
+by the response and makes no follow-up billing query.
+
 For an ACP client, use `target/debug/grida agent serve --stdio` with the same
 provider, model, organization, and state-directory options. The client supplies
 the project directory when opening a session. Keep the same model, account, and

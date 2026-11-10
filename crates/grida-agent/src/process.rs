@@ -215,6 +215,13 @@ async fn run_once(
         "disposition": disposition,
         "account": account,
     });
+    if account.is_some()
+        && let Some(billing) = host
+            .headless_gateway_billing(accepted.session, accepted.turn)
+            .await
+    {
+        finished["gateway_billing"] = json!(billing);
+    }
     if let Some(pending) = interactions {
         if !pending.questions.questions.is_empty() {
             finished["questions"] = json!(pending.questions.questions);

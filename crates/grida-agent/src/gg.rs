@@ -113,7 +113,7 @@ impl SupervisedGg {
         let attempt = operation.attempts.iter().find(|item| &item.id == attempt)?;
         Some(match &attempt.outcome {
             Some(OperationOutcome::Inference(outcome))
-                if self.owns_retained_inference(operation) =>
+                if owns_retained_inference(&self.binding, operation) =>
             {
                 attempt_request_id(outcome).map(str::to_owned)
             }
@@ -121,62 +121,72 @@ impl SupervisedGg {
         })
     }
 
-    fn owns_retained_inference(&self, operation: &OperationState) -> bool {
-        let OperationInput::Inference(request) = &operation.record.input else {
-            return false;
-        };
-        let binding = request.binding();
-        binding.provider == self.binding.provider
-            && binding.authority == operation.record.grants.authority
-            && binding.authority.principal == self.binding.authority.principal
-            && binding.authority.scope == self.binding.authority.scope
-    }
-
     pub(crate) fn owns_retained_turn(&self, state: &TurnState) -> bool {
         state.operations().values().any(|operation| {
-            !operation.attempts.is_empty() && self.owns_retained_inference(operation)
+            !operation.attempts.is_empty() && owns_retained_inference(&self.binding, operation)
         })
     }
 
     pub(crate) fn retained_billing(&self, state: &TurnState) -> Option<GatewayBillingProjection> {
-        let mut attempts = Vec::new();
-        let mut omitted_attempts = 0;
-        // The operation map and each operation's attempt order are retained.
-        for operation in state
-            .operations()
-            .values()
-            .filter(|op| self.owns_retained_inference(op))
-        {
-            for attempt in &operation.attempts {
-                if attempts.len() >= MAX_SUMMARY_BILLING_ATTEMPTS {
-                    omitted_attempts += 1;
-                    continue;
-                }
-                let retained = match &attempt.outcome {
-                    Some(OperationOutcome::Inference(outcome)) => {
-                        attempt_request_id(outcome).map(|id| (id, outcome))
-                    }
-                    _ => None,
-                };
-                let billing = retained
-                    .and_then(|(id, outcome)| {
-                        retained_billing_receipt(self.scope, id, outcome.terminal_receipt.as_ref()?)
-                    })
-                    .unwrap_or(GatewayBillingRead::Unavailable);
-                attempts.push(GatewayBillingAttempt {
-                    operation_id: operation.record.id.clone(),
-                    attempt_id: attempt.id.clone(),
-                    refreshable: retained.is_some()
-                        && !matches!(billing, GatewayBillingRead::Settled { .. }),
-                    billing,
-                });
-            }
-        }
-        (!attempts.is_empty()).then_some(GatewayBillingProjection {
-            attempts,
-            omitted_attempts,
-        })
+        retained_billing(&self.binding, self.scope, state, true)
     }
+}
+
+fn owns_retained_inference(owner: &ProviderBinding, operation: &OperationState) -> bool {
+    let OperationInput::Inference(request) = &operation.record.input else {
+        return false;
+    };
+    let binding = request.binding();
+    binding.provider == owner.provider
+        && binding.authority == operation.record.grants.authority
+        && binding.authority.principal == owner.authority.principal
+        && binding.authority.scope == owner.authority.scope
+}
+
+fn retained_billing(
+    owner: &ProviderBinding,
+    scope: Fingerprint,
+    state: &TurnState,
+    allow_refresh: bool,
+) -> Option<GatewayBillingProjection> {
+    let mut attempts = Vec::new();
+    let mut omitted_attempts = 0;
+    // The operation map and each operation's attempt order are retained.
+    for operation in state
+        .operations()
+        .values()
+        .filter(|operation| owns_retained_inference(owner, operation))
+    {
+        for attempt in &operation.attempts {
+            if attempts.len() >= MAX_SUMMARY_BILLING_ATTEMPTS {
+                omitted_attempts += 1;
+                continue;
+            }
+            let retained = match &attempt.outcome {
+                Some(OperationOutcome::Inference(outcome)) => {
+                    attempt_request_id(outcome).map(|id| (id, outcome))
+                }
+                _ => None,
+            };
+            let billing = retained
+                .and_then(|(id, outcome)| {
+                    retained_billing_receipt(scope, id, outcome.terminal_receipt.as_ref()?)
+                })
+                .unwrap_or(GatewayBillingRead::Unavailable);
+            attempts.push(GatewayBillingAttempt {
+                operation_id: operation.record.id.clone(),
+                attempt_id: attempt.id.clone(),
+                refreshable: allow_refresh
+                    && retained.is_some()
+                    && !matches!(billing, GatewayBillingRead::Settled { .. }),
+                billing,
+            });
+        }
+    }
+    (!attempts.is_empty()).then_some(GatewayBillingProjection {
+        attempts,
+        omitted_attempts,
+    })
 }
 
 impl StreamingTransport for SupervisedGg {
@@ -208,11 +218,12 @@ impl StreamingTransport for SupervisedGg {
     }
 
     fn terminal_receipt_decoder(&self) -> Option<Arc<TerminalReceiptDecoder>> {
-        let scope = self.scope;
-        Some(Arc::new(move |request, frame| {
-            gateway_billing_receipt(scope, request, frame)
-        }))
+        Some(terminal_receipt_decoder(self.scope))
     }
+}
+
+fn terminal_receipt_decoder(scope: Fingerprint) -> Arc<TerminalReceiptDecoder> {
+    Arc::new(move |request, frame| gateway_billing_receipt(scope, request, frame))
 }
 
 #[derive(Deserialize)]
@@ -525,6 +536,15 @@ impl GgConnection {
     /// The configured account API origin, with no path or credential.
     pub fn api_origin(&self) -> String {
         self.target.origin().ascii_serialization()
+    }
+
+    /// Decode billing evidence carried by the fixed chat response for this scope.
+    pub fn terminal_receipt_decoder(&self) -> Arc<TerminalReceiptDecoder> {
+        terminal_receipt_decoder(self.scope)
+    }
+
+    pub(crate) fn retained_billing(&self, state: &TurnState) -> Option<GatewayBillingProjection> {
+        retained_billing(&self.binding, self.scope, state, false)
     }
 
     /// Authorize a request addressed to this live chat binding.

@@ -3436,7 +3436,9 @@ generation receipts without a fixed projection.
    be lower. The hosted 3D request alone receives a 780-second lifecycle allowance.
    The separate native agent transport admits the exact GG chat-completions
    POST at the grant's registered origin. It reuses address validation, TLS and
-   HTTP framing, and bounds the live stream by bytes and deadline. The media
+   HTTP framing, and bounds the live stream by bytes and deadline. Its billing
+   receipt opt-in has a single fixed header value on that POST. The terminal
+   evidence must match the dispatch request ID and captured scope. The media
    lane retains its separate routes.
    The separate signed-upload branch permits only HTTPS PUT to
    `tripo-data.s3.us-west-2.amazonaws.com`, an `application/octet-stream` byte

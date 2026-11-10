@@ -12,7 +12,8 @@ use grida_agent::gg::GgChatRequest;
 use std::time::{Duration, SystemTime};
 use tokio_util::sync::CancellationToken;
 
-const CHAT_PATH: &str = "/api/v1/ai/chat/completions";
+pub(super) const CHAT_PATH: &str = "/api/v1/ai/chat/completions";
+pub(super) const BILLING_RECEIPT_HEADER: &str = "x-grida-billing-receipt";
 const CHAT_TIMEOUT: Duration = Duration::from_secs(120);
 
 impl Transport {
@@ -109,6 +110,9 @@ pub(super) fn chat_http_request(
     request
         .headers
         .insert("accept", HeaderValue::from_static("text/event-stream"));
+    request
+        .headers
+        .insert(BILLING_RECEIPT_HEADER, HeaderValue::from_static("1"));
     request
 }
 

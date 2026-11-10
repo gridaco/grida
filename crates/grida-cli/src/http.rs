@@ -697,6 +697,13 @@ fn snapshot(route: Route, target: &Url, request: &mut Request) -> Result<()> {
             Route::Token => matches!(name, "accept" | "content-type"),
             Route::Logout => matches!(name, "accept" | "content-type" | "authorization" | "apikey"),
             Route::Account => matches!(name, "accept" | "content-type" | "authorization"),
+            Route::Gg if name == gg_chat::BILLING_RECEIPT_HEADER => {
+                target.path() == gg_chat::CHAT_PATH
+                    && target.query().is_none()
+                    && request.method == Method::POST
+                    && value.as_bytes() == b"1"
+                    && request.headers.get_all(name).iter().count() == 1
+            }
             Route::Vercel => {
                 common
                     || name == "authorization"

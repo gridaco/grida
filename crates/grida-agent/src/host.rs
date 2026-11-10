@@ -874,6 +874,23 @@ impl Host {
         Ok((outcome, artifacts, image_generation, billing))
     }
 
+    pub(crate) async fn headless_gateway_billing(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+    ) -> Option<crate::gg::GatewayBillingProjection> {
+        let gateway = self.gg_connection.clone()?;
+        self.store
+            .inspect_turn_with(session, turn, move |state| {
+                Ok(state
+                    .outcome()
+                    .and_then(|_| gateway.retained_billing(state)))
+            })
+            .await
+            .ok()
+            .flatten()
+    }
+
     pub(crate) async fn read_crop_artifact(
         &self,
         session: SessionId,
