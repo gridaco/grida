@@ -1,0 +1,26 @@
+name: Library migration tools
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Test offline migration preparation
+        run: python -m unittest discover -s scripts/library-migration -p 'test_*.py'
+      - name: Test optional local Library importer
+        run: python -m unittest discover -s .agents/skills/opt-library/scripts -p 'test_*.py'
