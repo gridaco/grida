@@ -48,6 +48,9 @@ to offer and how to deliver questions to its clients.
 Completion accounts expose typed output-limit, refusal, and step-limit reasons
 for client adapters. Provider failure classifications remain available in the
 account, with context exhaustion separate from output-limit exhaustion.
+Each new account also counts tool operations by their recorded final
+disposition. Recovered and stopped turns retain successful partial work without
+counting a replay twice. Earlier accounts can omit those counts.
 Reviewed default-setting definitions live here, while the
 native host owns their persistence and user operations.
 

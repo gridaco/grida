@@ -73,6 +73,8 @@ pub struct Account {
     pub steps: u32,
     pub unresolved: Vec<OperationId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_activity: Option<ToolActivity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_reason: Option<StopReason>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failure: Option<Error>,
@@ -84,6 +86,36 @@ pub struct Account {
     pub goal: Option<goals::ProgressAccount>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub completion_checks: Vec<hooks::CheckEvidence>,
+}
+
+/// Final dispositions of recorded tool operations, counted once per operation.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ToolActivity {
+    pub succeeded: usize,
+    pub failed: usize,
+    pub cancelled: usize,
+    pub unresolved: usize,
+}
+
+impl ToolActivity {
+    fn from_turn(view: &TurnView) -> Self {
+        let mut counts = Self::default();
+        for operation in view.state.operations().values() {
+            if !matches!(operation.record.input, OperationInput::Tool(_)) {
+                continue;
+            }
+            match operation.outcome() {
+                Some(OperationOutcome::Tool(result)) => match result.status {
+                    OutcomeStatus::Succeeded => counts.succeeded += 1,
+                    OutcomeStatus::Failed => counts.failed += 1,
+                    OutcomeStatus::Cancelled => counts.cancelled += 1,
+                    OutcomeStatus::Uncertain => counts.unresolved += 1,
+                },
+                _ => counts.unresolved += 1,
+            }
+        }
+        counts
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -812,6 +844,7 @@ impl Master {
                     text: text.into(),
                     steps,
                     unresolved,
+                    tool_activity: Some(ToolActivity::from_turn(&view)),
                     stop_reason,
                     failure: inference_failure.and_then(|failure| {
                         let kind = match failure.code.as_str() {

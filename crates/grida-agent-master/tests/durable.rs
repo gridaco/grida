@@ -983,12 +983,9 @@ async fn committed_tool_results_are_reused_and_reach_the_next_model_request() {
         .verify(CommitReceipt::Settled(receipt.clone()))
         .await
         .unwrap();
-    assert_eq!(
-        read_account(receipt.outcome.account.as_ref().unwrap())
-            .unwrap()
-            .steps,
-        2
-    );
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.steps, 2);
+    assert_eq!(account.tool_activity.unwrap().succeeded, 1);
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
     assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
     let requests = fixture.provider.requests.lock().unwrap();
@@ -1042,6 +1039,8 @@ async fn stopping_a_recovered_turn_publishes_tool_result_recorded_before_interru
         panic!("expected stopped settlement")
     };
     assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.tool_activity.unwrap().succeeded, 1);
     reopened
         .verify(CommitReceipt::Settled(receipt))
         .await
@@ -1728,12 +1727,11 @@ async fn stopping_a_deferred_turn_keeps_completed_results_and_withdraws_input() 
         panic!("expected cancelled settlement")
     };
     assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
-    assert!(
-        read_account(receipt.outcome.account.as_ref().unwrap())
-            .unwrap()
-            .unresolved
-            .is_empty()
-    );
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert!(account.unresolved.is_empty());
+    let tools = account.tool_activity.unwrap();
+    assert_eq!(tools.succeeded, 1);
+    assert_eq!(tools.cancelled, 1);
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
     assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
     assert_eq!(gate.calls.load(Ordering::SeqCst), 2);
