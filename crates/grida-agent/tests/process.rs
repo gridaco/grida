@@ -61,6 +61,9 @@ mod side_chats;
 #[cfg(unix)]
 #[path = "process/skills.rs"]
 mod skills;
+#[cfg(unix)]
+#[path = "process/summaries.rs"]
+mod summaries;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/wakeups.rs"]
 mod wakeups;

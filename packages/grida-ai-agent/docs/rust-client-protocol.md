@@ -107,6 +107,12 @@ history. The host captures the effective choice with the input. Omission uses
 the launch default. A Plan launch refuses Act, and an exact retry cannot change
 the accepted regime. Queue edits preserve Plan's narrower scope.
 
+Negotiate `co.grida/session/turn-summary` to read one settled turn using an
+attached `sessionId` and exact `turnId`. Its bounded text, typed outcome, tool
+dispositions, unresolved count, and check statuses come from the retained
+account. Earlier accounts may omit tool counts. A missing summary uses the
+recorded terminal status as a fallback.
+
 A queue basis contains `sessionId`, `requestId`, and
 `expectedSessionRevision`. A task basis adds `turnId` and
 `expectedControlRevision`. Snapshot returns the ordered queue and turn

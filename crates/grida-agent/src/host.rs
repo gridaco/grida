@@ -582,6 +582,18 @@ impl Host {
         self.store.inspect(id).await
     }
 
+    pub(crate) async fn settled_outcome(
+        &self,
+        session: SessionId,
+        turn: TurnId,
+    ) -> Result<TurnOutcome> {
+        self.store
+            .inspect_turn(session, turn)
+            .await?
+            .outcome
+            .ok_or_else(|| problem(ErrorKind::Unavailable, "turn_summary_unavailable"))
+    }
+
     pub async fn start_prompt(&self, request: PromptRequest) -> Result<AcceptedRun> {
         self.launch_prompt(request, false, false).await
     }

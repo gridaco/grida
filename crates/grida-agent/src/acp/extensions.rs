@@ -8,6 +8,7 @@ mod lifecycle;
 mod questions;
 mod side_chats;
 mod skills;
+mod summaries;
 mod wakeups;
 
 use super::{ConnectionSessions, host_error, prompt_part, prompt_parts, unavailable};
@@ -79,6 +80,7 @@ fn capability_keys(reviewer: bool) -> impl Iterator<Item = &'static str> {
         .chain(history::CAPABILITIES)
         .chain([compaction::COMPACT])
         .chain([skills::CATALOG])
+        .chain([summaries::SUMMARY])
         .chain(goals::CAPABILITIES)
         .chain(side_chats::capabilities(reviewer))
         .chain(wakeups::capabilities(reviewer))
@@ -327,6 +329,7 @@ pub(super) fn handlers(
         .with_connection_builder(history::handlers(host.clone(), sessions.clone()))
         .with_connection_builder(compaction::handlers(host.clone(), sessions.clone()))
         .with_connection_builder(skills::handlers(host.clone(), sessions.clone()))
+        .with_connection_builder(summaries::handlers(host.clone(), sessions.clone()))
         .with_connection_builder(goals::handlers(
             host.clone(),
             sessions.clone(),

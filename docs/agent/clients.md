@@ -260,6 +260,31 @@ clients on the exact numeric loopback address. It supports MCP revisions
 The headless service offers `surface_open`. Its result reports that no
 presentation was requested because no editor is attached.
 
+## Use tools from a local MCP server
+
+Source-built `run` and `serve --stdio` can opt into tools on one trusted
+numeric-loopback server using the stateless MCP 2026-07-28 profile. Supply
+these options alongside your usual provider, state directory, and model.
+
+```sh
+target/debug/grida-agent serve --stdio \
+  --state-dir /absolute/path/to/agent-state \
+  --endpoint "$GRIDA_AGENT_ENDPOINT" --model "$GRIDA_AGENT_MODEL" \
+  --mcp-endpoint http://127.0.0.1:8766/mcp \
+  --mcp-token-env GRIDA_OUTBOUND_MCP_TOKEN \
+  --mcp-source local --mcp-tool surface_open
+```
+
+Set the named environment variable to the server's bearer token. Use a separate
+variable from any model credential. Repeat `--mcp-tool` for each tool you trust
+the agent to invoke in Act. A Plan-only launch skips discovery. A Plan message
+submitted to an Act host has no MCP tools.
+
+Retained work keeps its original tool connection. If that connection closes,
+Stop is still available for a suspended turn. A lost reply after a tool call
+leaves an uncertain result. Reconcile it before sending new work that would
+repeat the effect.
+
 ## Ask in a temporary side chat
 
 Choose **Side chat** in an attached native Desktop chat. Ask in its separate
@@ -321,6 +346,11 @@ accepted settings. A changed provider credential can make the retained task
 unavailable for resumption. Stop pauses queue advancement, which you can
 reopen separately with Resume Queue. Opening a session after restart only
 loads its retained state.
+
+Negotiate `co.grida/session/turn-summary` to read a settled turn by its
+`sessionId` and `turnId`. The response reports the retained answer or a status
+fallback, recorded tool dispositions, unresolved operations, and any completion
+checks. The same record is available after reopening the chat.
 
 Negotiate both question operations to enable question tools for new inputs.
 An answer can resume suspended work when its other conditions allow execution.
