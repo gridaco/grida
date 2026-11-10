@@ -144,15 +144,28 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
     let session = created["result"]["sessionId"].as_str().unwrap();
     let mut retained = Vec::new();
     for (index, (status, text)) in expected.into_iter().enumerate() {
+        let input = format!("input-{index}");
+        // A settled turn can still be releasing its worker. Enqueue the
+        // next input, then read its exact turn after it reaches the provider.
         let accepted = ws_rpc(
             &mut socket,
             index as u64 + 3,
-            "_co.grida/session/submit",
-            prompt_request(session, &format!("input-{index}"), "Run the fixture."),
+            "_co.grida/session/enqueue",
+            prompt_request(session, &input, "Run the fixture."),
         )
         .await;
-        let turn = accepted["result"]["turnId"].as_str().unwrap();
+        assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
         endpoint.request().await;
+        let receipt = ws_rpc(
+            &mut socket,
+            90,
+            "_co.grida/session/input",
+            json!({"sessionId":session,"inputId":input}),
+        )
+        .await;
+        let turn = receipt["result"]["receipt"]["turnId"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{receipt}"));
         if status == "cancelled" {
             let pending = summary(&mut socket, session, turn).await;
             assert!(
