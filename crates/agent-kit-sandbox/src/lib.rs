@@ -195,6 +195,17 @@ impl Sandbox {
 }
 
 impl PreparedProcess {
+    /// Verify the reviewed digest against the executable bound by preparation.
+    pub fn verify_executable(&self, executable: &TrustedExecutable) -> Result<()> {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        return self.native.verify_executable(executable);
+        #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+        {
+            let _ = executable;
+            Err(unavailable())
+        }
+    }
+
     /// Identity of the process input and the exact native paths captured in
     /// this preparation. Output limits, deadlines and private temporary
     /// directories are execution bounds rather than part of this identity.

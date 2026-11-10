@@ -1,12 +1,15 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — trusted launch-only permission input.
 
 use crate::command::CommandLimits;
-use crate::permissions::{AccessRule, CommandProfile, DirectoryAccess, PermissionProfile};
+use crate::permissions::{
+    AccessRule, CommandProfile, CompletionHook, DirectoryAccess, PermissionProfile,
+};
 use crate::workspace::{DirectorySpec, ProtectedRoots, WorkspaceSnapshot, validate_absolute};
-use agent_kit_core::{BindingId, Error, ErrorKind, Result};
+use agent_kit_core::{BindingId, Error, ErrorKind, Fingerprint, Result};
 use agent_kit_sandbox::{
     DeniedAccess, Installation, ProtectedPath, Sandbox, Termination, TrustedExecutable,
 };
+use grida_agent_master::hooks::CheckMode;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -30,6 +33,7 @@ struct ProfileFile {
     #[serde(default)]
     protected_paths: Vec<PathBuf>,
     command: Option<Command>,
+    before_completion: Option<BeforeCompletion>,
 }
 
 #[derive(Deserialize)]
@@ -61,6 +65,53 @@ struct Command {
 struct Executable {
     path: PathBuf,
     sha256: [u8; 32],
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BeforeCompletion {
+    executable: Executable,
+    #[serde(default)]
+    arguments: Vec<String>,
+    mode: CheckMode,
+    timeout_ms: u32,
+}
+
+impl BeforeCompletion {
+    fn reviewed(self, command: Option<&Command>) -> Result<CompletionHook> {
+        let command = command.ok_or_else(invalid)?;
+        let executable = self.executable;
+        validate_absolute(&executable.path)?;
+        let timeout = Duration::from_millis(u64::from(self.timeout_ms));
+        if executable.path.canonicalize().map_err(|_| invalid())? != executable.path
+            || timeout.is_zero()
+            || timeout > COMMAND_LIMITS.timeout
+            || self.arguments.len() > 64
+            || self.arguments.iter().map(String::len).sum::<usize>() > 8 * 1024
+            || self
+                .arguments
+                .iter()
+                .any(|argument| argument.contains('\0'))
+        {
+            return Err(invalid());
+        }
+        let revision = Fingerprint::of(&(
+            &executable.path,
+            executable.sha256,
+            &self.arguments,
+            self.mode,
+            self.timeout_ms,
+            command.helper.sha256,
+            command.bubblewrap.as_ref().map(|entry| entry.sha256),
+        ))?;
+        Ok(CompletionHook {
+            executable: executable.into(),
+            arguments: self.arguments,
+            mode: self.mode,
+            timeout,
+            revision,
+        })
+    }
 }
 
 impl From<Executable> for TrustedExecutable {
@@ -98,6 +149,13 @@ pub fn load_permission_profile(
         read_write.push(home.join(".grida"));
     }
     let mut write = vec![std::env::current_exe().map_err(|_| unavailable())?];
+    let completion = profile
+        .before_completion
+        .map(|hook| hook.reviewed(profile.command.as_ref()))
+        .transpose()?;
+    if let Some(hook) = &completion {
+        write.push(hook.executable.path.clone());
+    }
     let command = if let Some(command) = profile.command {
         validate_command_paths(&command)?;
         write.push(command.helper.path.clone());
@@ -158,13 +216,17 @@ pub fn load_permission_profile(
         Some(profile.primary),
         &protected,
     )?;
-    Ok(Arc::new(PermissionProfile::with_denials(
+    let profile = PermissionProfile::with_denials(
         profile.revision,
         Arc::new(workspace),
         rules,
         denials,
         command,
-    )?))
+    )?;
+    Ok(Arc::new(match completion {
+        Some(hook) => profile.with_completion_hook(hook)?,
+        None => profile,
+    }))
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]

@@ -12,7 +12,7 @@ use agent_kit_core::{
 };
 use agent_kit_sandbox::{
     Backend, Completion, Descendants, ExecutionScope, PreparedProcess, ProcessEvidence,
-    ProcessSpec, RunningProcess, Sandbox, StopReason, Termination,
+    ProcessSpec, RunningProcess, Sandbox, StopReason, Termination, TrustedExecutable,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -78,7 +78,7 @@ pub enum CommandAccess {
 }
 
 type ResolveCommand = dyn Fn(&Invocation) -> Result<AuthorizedCommand> + Send + Sync;
-type SpawnCommand =
+pub(crate) type SpawnCommand =
     dyn Fn(PreparedProcess, CancellationToken) -> Result<RunningProcess> + Send + Sync;
 
 enum CommandScope {
@@ -90,6 +90,19 @@ pub(crate) struct AuthorizedCommand {
     pub scope: ExecutionScope,
     pub expected: Fingerprint,
     pub spawn: Arc<SpawnCommand>,
+}
+
+pub(crate) struct ReviewedCommand {
+    pub spec: ProcessSpec,
+    pub scope: ExecutionScope,
+    pub executable: TrustedExecutable,
+    pub spawn: Arc<SpawnCommand>,
+}
+
+enum ProcessAdmission {
+    Fixed,
+    Captured(Fingerprint, Arc<SpawnCommand>),
+    Reviewed(TrustedExecutable, Arc<SpawnCommand>),
 }
 
 impl CommandTool {
@@ -163,6 +176,69 @@ impl CommandTool {
         })
     }
 
+    pub(crate) async fn invoke_reviewed(
+        &self,
+        invocation: &Invocation,
+        context: InvocationContext,
+        command: ReviewedCommand,
+        project: fn(ProcessEvidence, usize) -> (ToolOutcome, bool),
+    ) -> ToolOutcome {
+        self.run_process(
+            invocation,
+            context,
+            command.scope,
+            command.spec,
+            ProcessAdmission::Reviewed(command.executable, command.spawn),
+            project,
+        )
+        .await
+    }
+
+    async fn run_process(
+        &self,
+        invocation: &Invocation,
+        context: InvocationContext,
+        mut scope: ExecutionScope,
+        spec: ProcessSpec,
+        admission: ProcessAdmission,
+        project: fn(ProcessEvidence, usize) -> (ToolOutcome, bool),
+    ) -> ToolOutcome {
+        let now = Instant::now();
+        scope.valid_until = scope.valid_until.min(now + spec.timeout);
+        if let Some(deadline) = context.deadline {
+            scope.valid_until = scope.valid_until.min(deadline);
+        }
+        if context.cancellation.is_cancelled() || scope.valid_until <= now {
+            return cancelled_before_launch();
+        }
+        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+            return ToolOutcome::failed("command_runtime_unavailable");
+        };
+        let cancellation = context.cancellation.child_token();
+        let _request_stop_on_drop = cancellation.clone().drop_guard();
+        let identity = CommandIdentity {
+            operation: invocation.id().clone(),
+            attempt: context.attempt,
+        };
+        if let Err(error) = self.activity.register(
+            identity.clone(),
+            invocation.fingerprint(),
+            cancellation.clone(),
+        ) {
+            return ToolOutcome::failed(&error.code);
+        }
+        let (send, receive) = oneshot::channel();
+        let sandbox = Arc::clone(&self.sandbox);
+        let activity = Arc::clone(&self.activity);
+        runtime.spawn(async move {
+            let (outcome, verified) =
+                execute(sandbox, spec, scope, admission, cancellation, project).await;
+            activity.finish(&identity.operation, outcome.clone(), verified);
+            let _ = send.send(outcome);
+        });
+        receive.await.unwrap_or_else(|_| ToolOutcome::uncertain())
+    }
+
     /// Close this scope's command admission, request stop, and await cleanup.
     ///
     /// A deadline leaves the supervisors owned by this capability. A later
@@ -230,48 +306,26 @@ impl Tool for CommandTool {
             if maximum == 0 {
                 return ToolOutcome::failed("command_output_limit_unavailable");
             }
-            let now = Instant::now();
-            let (mut scope, authorization) = match &self.scope {
-                CommandScope::Fixed(scope) => ((**scope).clone(), None),
+            let (scope, admission) = match &self.scope {
+                CommandScope::Fixed(scope) => ((**scope).clone(), ProcessAdmission::Fixed),
                 CommandScope::Authorized(resolve) => match resolve(&invocation) {
-                    Ok(authority) => (authority.scope, Some((authority.expected, authority.spawn))),
+                    Ok(authority) => (
+                        authority.scope,
+                        ProcessAdmission::Captured(authority.expected, authority.spawn),
+                    ),
                     Err(error) => return ToolOutcome::failed(&error.code),
                 },
             };
-            scope.valid_until = scope.valid_until.min(now + self.timeout);
-            if let Some(deadline) = context.deadline {
-                scope.valid_until = scope.valid_until.min(deadline);
-            }
-            if context.cancellation.is_cancelled() || scope.valid_until <= now {
-                return cancelled_before_launch();
-            }
-            let Ok(runtime) = tokio::runtime::Handle::try_current() else {
-                return ToolOutcome::failed("command_runtime_unavailable");
-            };
-            let cancellation = context.cancellation.child_token();
-            let _request_stop_on_drop = cancellation.clone().drop_guard();
-            let identity = CommandIdentity {
-                operation: invocation.id().clone(),
-                attempt: context.attempt,
-            };
-            if let Err(error) = self.activity.register(
-                identity.clone(),
-                invocation.fingerprint(),
-                cancellation.clone(),
-            ) {
-                return ToolOutcome::failed(&error.code);
-            }
             let spec = arguments.into_spec(self.timeout, maximum);
-            let (send, receive) = oneshot::channel();
-            let sandbox = Arc::clone(&self.sandbox);
-            let activity = Arc::clone(&self.activity);
-            runtime.spawn(async move {
-                let (outcome, verified) =
-                    execute(sandbox, spec, scope, authorization, cancellation).await;
-                activity.finish(&identity.operation, outcome.clone(), verified);
-                let _ = send.send(outcome);
-            });
-            receive.await.unwrap_or_else(|_| ToolOutcome::uncertain())
+            self.run_process(
+                &invocation,
+                context,
+                scope,
+                spec,
+                admission,
+                project_command,
+            )
+            .await
         })
     }
 
@@ -516,8 +570,9 @@ async fn execute(
     sandbox: Arc<Sandbox>,
     spec: ProcessSpec,
     scope: ExecutionScope,
-    authorization: Option<(Fingerprint, Arc<SpawnCommand>)>,
+    admission: ProcessAdmission,
     cancellation: CancellationToken,
+    project: fn(ProcessEvidence, usize) -> (ToolOutcome, bool),
 ) -> (ToolOutcome, bool) {
     let maximum = spec.max_output_bytes;
     let stop = cancellation.clone();
@@ -533,12 +588,18 @@ async fn execute(
         if stop.is_cancelled() {
             return Ok(None);
         }
-        match authorization {
-            None => prepared.spawn(stop),
-            Some((expected, spawn)) => {
+        match admission {
+            ProcessAdmission::Fixed => prepared.spawn(stop),
+            ProcessAdmission::Captured(expected, spawn) => {
                 if prepared.capture_fingerprint()? != expected {
                     return Err(Error::new(ErrorKind::Conflict, "command_capture_changed"));
                 }
+                spawn(prepared, stop)
+            }
+            ProcessAdmission::Reviewed(executable, spawn) => {
+                prepared
+                    .verify_executable(&executable)
+                    .map_err(|error| Error::new(error.kind, "reviewed_executable_changed"))?;
                 spawn(prepared, stop)
             }
         }
@@ -570,7 +631,15 @@ fn cancelled_before_launch() -> ToolOutcome {
     }
 }
 
-fn project(evidence: ProcessEvidence, maximum: usize) -> (ToolOutcome, bool) {
+fn project_command(evidence: ProcessEvidence, maximum: usize) -> (ToolOutcome, bool) {
+    project_process(evidence, maximum, true)
+}
+
+pub(crate) fn project_process(
+    evidence: ProcessEvidence,
+    maximum: usize,
+    include_streams: bool,
+) -> (ToolOutcome, bool) {
     let backend = match evidence.support.backend {
         Backend::Seatbelt => "seatbelt",
         Backend::Bubblewrap => "bubblewrap",
@@ -610,9 +679,11 @@ fn project(evidence: ProcessEvidence, maximum: usize) -> (ToolOutcome, bool) {
     let stdout = String::from_utf8_lossy(&evidence.stdout);
     let stderr = String::from_utf8_lossy(&evidence.stderr);
     let mut content = Vec::new();
-    for (label, stream) in [("stdout", &stdout), ("stderr", &stderr)] {
-        if !stream.is_empty() {
-            content.push(ResultContent::Text(format!("{label}:\n{stream}")));
+    if include_streams {
+        for (label, stream) in [("stdout", &stdout), ("stderr", &stderr)] {
+            if !stream.is_empty() {
+                content.push(ResultContent::Text(format!("{label}:\n{stream}")));
+            }
         }
     }
     let details = json!({
@@ -771,7 +842,7 @@ mod tests {
             descendants: Descendants::ProcessGroupSignalled,
             temporary_removed: true,
         };
-        let (outcome, verified) = project(evidence, 512);
+        let (outcome, verified) = project_command(evidence, 512);
         assert!(verified);
         assert_eq!(outcome.status, OutcomeStatus::Succeeded);
         assert!(outcome.truncated);

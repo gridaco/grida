@@ -106,6 +106,32 @@ final answer on newly accepted tasks. The host records the check and its
 decision in the completion account. Keep the same launch setting when
 resuming those tasks. Stop can still settle them when the check is unavailable.
 
+On a supported native command host, a trusted `--permission-profile` may also
+declare one `beforeCompletion` command for Act turns. The primary directory
+must already grant `commandRead: "allow"`. The reviewed executable must have a
+canonical absolute path outside the workspace and be covered by the declared
+read-only runtime paths. The profile records its SHA-256 as 32 byte values.
+This is the shape of the optional profile field.
+
+```text
+beforeCompletion
+  executable  { path, sha256 }
+  arguments   [literal argument strings]
+  mode        "required" or "observe"
+  timeoutMs   1 through 30000
+```
+
+The command receives a bounded versioned `before_completion` JSON event on
+stdin. For a successful decision, it must exit zero and print one JSON object
+on stdout, either `{"decision":"allow"}` or
+`{"decision":"deny","reason":"Verification failed."}`. Required failures
+block completion. Observational failures appear in the retained check account.
+The command has read-only workspace access, private temporary storage, no
+network access, and no inherited provider environment. The host passes the
+configured arguments literally. Changed executable bytes or a changed profile
+cannot substitute for the retained check. Pause and Stop keep ordinary command
+cleanup and uncertain outcomes keep their original attempt identity.
+
 | Exit | Meaning                                              |
 | ---- | ---------------------------------------------------- |
 | 0    | Successful run, inspection, or clean stdio shutdown  |

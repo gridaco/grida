@@ -129,6 +129,14 @@ resuming those tasks. You can still Stop a retained task when the check is
 unavailable. The check uses the recorded answer and preserves any work the
 agent already completed.
 
+A trusted native permission profile can also set one command to check an Act
+turn before it completes. Use a reviewed executable with a read-only workspace
+scope. A required check blocks completion when it rejects or fails. An
+observational check records its result and leaves the completion decision in
+place. Plan does not run the command. Resuming uses the selected definition,
+and an interrupted command with an uncertain result is never repeated
+automatically. [Native launch profile](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md)
+
 ## Use your Grida login
 
 On macOS or Linux, the source-built `grida` CLI can run an explicitly selected

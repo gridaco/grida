@@ -1,7 +1,7 @@
 //! GRIDA-SEC-004 / GRIDA-SEC-014 — host-selected roots and exact action approvals.
 
 use crate::command::{
-    AuthorizedCommand, CommandAccess, CommandArguments, CommandLimits, CommandTool,
+    AuthorizedCommand, CommandAccess, CommandArguments, CommandLimits, CommandTool, ReviewedCommand,
 };
 use crate::file_tools::{FileAuthority, FileTools, read_request};
 use crate::workspace::{DirectoryBinding, DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
@@ -15,13 +15,17 @@ use agent_kit_core::{
     OperationId, PrincipalId, Result, SchemaId, ScopeId, SessionId, ToolId, TurnId, WaitId,
 };
 use agent_kit_runtime::{AdmissionContext, ToolAdmission, ToolDecision, ToolGate};
-use agent_kit_sandbox::{DeniedAccess, ExecutionScope, ProtectedPath, Sandbox, Termination};
+use agent_kit_sandbox::{
+    DeniedAccess, ExecutionScope, ProcessSpec, ProtectedPath, Sandbox, Termination,
+    TrustedExecutable,
+};
 use agent_kit_store_sqlite::SqliteStore;
+use grida_agent_master::hooks::CheckMode;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 const REQUEST: &str = "grida.agent.approval";
 const ANSWER: &str = "grida.agent.approval.answer";
@@ -53,6 +57,15 @@ pub struct CommandProfile {
     pub limits: CommandLimits,
 }
 
+#[derive(Clone)]
+pub(crate) struct CompletionHook {
+    pub executable: TrustedExecutable,
+    pub arguments: Vec<String>,
+    pub mode: CheckMode,
+    pub timeout: Duration,
+    pub revision: Fingerprint,
+}
+
 /// The host selects this profile independently of any chat or ACP cwd.
 pub struct PermissionProfile {
     workspace: Arc<WorkspaceSnapshot>,
@@ -60,6 +73,7 @@ pub struct PermissionProfile {
     protected: Arc<ProtectedRoots>,
     command_denials: Vec<ProtectedPath>,
     command: Option<CommandProfile>,
+    completion_hook: Option<CompletionHook>,
     revision: BindingId,
     identity: Fingerprint,
     context: String,
@@ -176,10 +190,38 @@ impl PermissionProfile {
             protected,
             command_denials,
             command,
+            completion_hook: None,
             revision,
             identity,
             context,
         })
+    }
+
+    pub(crate) fn with_completion_hook(mut self, mut hook: CompletionHook) -> Result<Self> {
+        let command = self.command.as_ref().ok_or_else(command_unavailable)?;
+        let primary = self.workspace.permission_directory(None, &self.protected)?;
+        if self
+            .directories
+            .get(&primary.spec().id)
+            .is_none_or(|rules| rules.command_read != AccessRule::Allow)
+            || hook.timeout > command.limits.timeout
+            || self
+                .workspace
+                .directories()
+                .any(|directory| hook.executable.path.starts_with(directory.root()))
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "completion_hook_scope_invalid",
+            ));
+        }
+        hook.revision = Fingerprint::of(&(self.identity, hook.revision))?;
+        self.completion_hook = Some(hook);
+        Ok(self)
+    }
+
+    pub(crate) fn completion_hook(&self) -> Option<&CompletionHook> {
+        self.completion_hook.as_ref()
     }
 
     pub fn matches_primary(&self, cwd: &std::path::Path) -> bool {
@@ -397,6 +439,49 @@ struct Ready {
 }
 
 impl TurnPermissions {
+    pub(crate) fn review_completion_command(
+        self: &Arc<Self>,
+        grants: GrantSelection,
+        stdin: Vec<u8>,
+        maximum: usize,
+    ) -> Result<ReviewedCommand> {
+        let hook = self
+            .profile
+            .completion_hook()
+            .ok_or_else(command_unavailable)?;
+        let primary = self.captured_directory(None)?;
+        let cwd = primary.root().to_owned();
+        let scope = self
+            .profile
+            .command_scope(grants, cwd.clone(), CommandAccess::Read)?;
+        let owner = self.clone();
+        Ok(ReviewedCommand {
+            spec: ProcessSpec {
+                executable: hook.executable.path.clone(),
+                arguments: hook.arguments.clone(),
+                cwd,
+                environment: BTreeMap::new(),
+                stdin,
+                timeout: hook.timeout,
+                max_output_bytes: maximum,
+            },
+            scope,
+            executable: hook.executable.clone(),
+            spawn: Arc::new(move |prepared, cancellation| {
+                let primary = owner
+                    .profile
+                    .workspace
+                    .permission_directory(None, &owner.profile.protected)?;
+                let state = owner.state()?;
+                if state.revoked.contains(&primary.spec().id) {
+                    return Err(revoked());
+                }
+                validate_working_root(&prepared, primary)?;
+                prepared.spawn(cancellation)
+            }),
+        })
+    }
+
     pub fn handles(&self, selection: &GrantSelection) -> bool {
         selection == &self.files || selection == &self.commands
     }

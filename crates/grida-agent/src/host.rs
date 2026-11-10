@@ -1096,9 +1096,29 @@ impl Host {
             .allow_wakeups
             .then(|| wakeups::WakeupAccess::bind(self.clone(), claim.lease.binding()))
             .transpose()?;
+        let mut authority = execution.authority.clone();
+        let mut inventory = Inventory::new();
+        let command = match &permission_scope {
+            Some(permissions) if prepared.operating_regime.is_act() => {
+                permissions.insert(&mut inventory, &mut authority.tools)?
+            }
+            Some(permissions) => {
+                permissions.insert_file_tools(&mut inventory, &mut authority.tools)?;
+                None
+            }
+            None => None,
+        };
         let completion = prepared
             .completion_authorized
-            .then(|| completion_checks::CompletionAccess::bind(claim.lease.binding()))
+            .then(|| {
+                completion_checks::CompletionAccess::bind(
+                    self,
+                    claim.lease.binding(),
+                    prepared.operating_regime,
+                    permission_scope.as_ref(),
+                    command.as_ref(),
+                )
+            })
             .transpose()?;
         let host_tools = prepared
             .host_tools
@@ -1163,19 +1183,7 @@ impl Host {
                 runtime.as_ref().unwrap_or(&execution.runtime),
             )
             .await?;
-        let mut authority = execution.authority.clone();
         let operations = opened.turn.operations();
-        let mut inventory = Inventory::new();
-        let command = match permission_scope {
-            Some(permissions) if prepared.operating_regime.is_act() => {
-                permissions.insert(&mut inventory, &mut authority.tools)?
-            }
-            Some(permissions) => {
-                permissions.insert_file_tools(&mut inventory, &mut authority.tools)?;
-                None
-            }
-            None => None,
-        };
         if let Some(image) = image {
             image.insert(&mut inventory, &mut authority.tools)?;
         }
@@ -1450,7 +1458,7 @@ impl Host {
                     completion_checks: if child_work {
                         None
                     } else {
-                        self.capture_completion_checks()?
+                        self.capture_completion_checks(operating_regime)?
                     },
                 },
             )?,
@@ -1628,7 +1636,9 @@ impl Host {
             return Err(problem(ErrorKind::InvalidInput, "invalid_master_limits"));
         }
         let completion_authorized = completion_checks.is_some() && !cancellation_only;
-        if completion_authorized && completion_checks != self.capture_completion_checks()? {
+        if completion_authorized
+            && completion_checks != self.capture_completion_checks(operating_regime)?
+        {
             return Err(problem(
                 ErrorKind::Unavailable,
                 "completion_check_profile_unavailable",

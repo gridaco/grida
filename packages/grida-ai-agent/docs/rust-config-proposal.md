@@ -72,11 +72,12 @@ have their existing owners and are excluded from this initial schema.
 
 ## Hook definitions
 
-Hooks add a structured configuration surface after the initial scalar setting.
-Their [behavior contract](https://grida.co/docs/wg/ai/agent/hooks) defines the
-execution boundaries. The host owns registration, inspection, enable/disable,
-and trust through the same validated configuration service. Hook definitions
-have a separate field review before entering the writable schema.
+The [hook behavior contract](https://grida.co/docs/wg/ai/agent/hooks) defines
+execution boundaries. The native host currently accepts one reviewed
+`beforeCompletion` command in its trusted launch permission profile. Its
+definition binds a canonical executable and digest, literal arguments, mode,
+timeout and the captured read-only command scope. The command runs only for
+Act work. Plan leaves it disabled.
 
 Review event names, exact matchers, command/executable binding, source and
 revision, scope, timeout, output/context bounds, required-check behavior, and
@@ -85,10 +86,10 @@ definitions and command handlers. Project/plugin discovery is a later source
 adapter with review of new or changed executable content. Accepted work keeps
 its selected definitions, while revocation still takes effect before execution.
 
-The agent can explain or prepare a requested definition through typed host
-operations. Executable trust remains a distinct user/host decision. Provider
-credentials and execution authority retain their separate custody. The concrete
-file representation and operation schema are fixed with the hook slice.
+The user-writable configuration service keeps its scalar setting. Hook
+registration, inspection, and editing through that service require a separate
+field review. Executable trust remains a distinct user or host decision.
+Provider credentials and execution authority retain their separate custody.
 
 ## Effective configuration
 

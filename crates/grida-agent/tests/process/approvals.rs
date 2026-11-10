@@ -12,16 +12,16 @@ mod confinement;
 const LIST: &str = "co.grida/session/approvals";
 const ANSWER: &str = "co.grida/session/answer-approval";
 
-struct Fixture {
+pub(super) struct Fixture {
     _base: TempDir,
     state: PathBuf,
-    primary: PathBuf,
+    pub(super) primary: PathBuf,
     extra: PathBuf,
-    profile: PathBuf,
+    pub(super) profile: PathBuf,
 }
 
 impl Fixture {
-    fn new(command: bool) -> Self {
+    pub(super) fn new(command: bool) -> Self {
         let base = tempfile::tempdir().unwrap();
         let root = base.path().canonicalize().unwrap();
         let state = root.join("state");
@@ -75,7 +75,7 @@ impl Fixture {
         }
     }
 
-    fn process(&self, endpoint: &str, mode: &str) -> Command {
+    pub(super) fn process(&self, endpoint: &str, mode: &str) -> Command {
         let mut process = executable();
         process.arg(mode);
         configured(&mut process, &self.state, endpoint);

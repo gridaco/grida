@@ -1152,11 +1152,16 @@ Today:
 - The native [turn summary](crates/grida-agent/src/acp/extensions/summaries.rs) requires a negotiated capability and an attached chat. It reads the exact settled turn and projects bounded plain text, tool disposition counts, unresolved counts, and check statuses. Raw operations, arguments, and provider state stay in the host.
 - [Native goal host](crates/grida-agent/src/host/goals.rs) binds goal tools to the exact session, reserved turn, and goal revision. The tools read captured goal metadata or record a proposal. Their grant cannot authorize workspace, command, or provider operations. Explicit goal acceptance retains the selected permissions and uses the ordinary queue and turn owner.
 - The native [wake-up ACP extension](crates/grida-agent/src/acp/extensions/wakeups.rs) requires private stdio, a negotiated capability, and an attached session. The [timer host](crates/grida-agent/src/host/wakeups.rs) binds an explicit opt-in to its admitted turn, resolves the exact wait, and uses ordinary continuation authority. Restart recovery requires a separate identified request. [Process tests](crates/grida-agent/tests/process/wakeups.rs) cover private scope, ownership, cancellation, and restart.
-- The native [completion check](crates/grida-agent/src/host/completion_checks.rs)
-  requires trusted launch selection and an exact turn-bound grant. It reads a
-  bounded recorded answer without filesystem, command, or network access. The
-  handler stays outside the model's tool inventory. [Process tests](crates/grida-agent/tests/process/hooks.rs)
-  cover captured selection, refusal after a launch change, and Stop without the handler.
+- Native [completion checks](crates/grida-agent/src/host/completion_checks.rs)
+  require trusted launch selection and an exact turn-bound grant. The built-in
+  text check uses only the bounded recorded answer. An optional command in the
+  [launch profile](crates/grida-agent/src/launch_permissions.rs) runs in Act under
+  the existing read-only primary scope and no-network [command supervisor](crates/grida-agent/src/command.rs).
+  It receives literal arguments and bounded event input without inherited
+  credentials. [Native preparation](crates/agent-kit-sandbox/src/native.rs)
+  verifies the reviewed digest against the bound executable identity before
+  spawn. Both checks stay outside the model's tool inventory. [Process tests](crates/grida-agent/tests/process/hooks.rs)
+  cover refusal after a launch change, interruption, and exact retained attempts.
 - [Private side-chat controls](crates/grida-agent/src/acp/extensions/side_chats.rs)
   require negotiation and an attached parent. The [side-chat owner](crates/grida-agent/src/host/side_chats.rs)
   keeps a separate in-memory journal, uses only the selected inference authority,

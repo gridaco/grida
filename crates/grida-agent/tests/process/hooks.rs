@@ -1,11 +1,134 @@
 //! GRIDA-SEC-004 — Built native completion authority and restart controls.
 
-use super::approvals::Stdio as PrivateStdio;
+use super::approvals::{Fixture, Stdio as PrivateStdio};
 use super::lifecycle::{prompt_request, task_basis};
 use super::*;
+use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::PathBuf;
 
 const CHECK: &str = "require-completion-text";
 const FLAG: &str = "--require-completion-text";
+const COMMAND_CHECK: &str = "before-completion-command";
+
+fn hook(fixture: &Fixture, path: &str, arguments: &[&str], mode: &str, changed: bool) -> PathBuf {
+    let path = Path::new(path).canonicalize().unwrap();
+    let mut sha256: [u8; 32] = Sha256::digest(fs::read(&path).unwrap()).into();
+    if changed {
+        sha256[0] ^= 1;
+    }
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["directories"][0]["commandRead"] = json!("allow");
+    profile["beforeCompletion"] = json!({
+        "executable": {"path":path,"sha256":sha256}, "arguments":arguments,
+        "mode":mode, "timeoutMs":20_000,
+    });
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    PathBuf::from(profile["command"]["temporaryParent"].as_str().unwrap())
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn configured_completion_command_records_only_its_reviewed_decision() {
+    let cases = [
+        (
+            r#"{"decision":"allow"}"#,
+            "required",
+            false,
+            "act",
+            0,
+            "allowed",
+        ),
+        (
+            r#"{"decision":"deny","reason":"Verification failed."}"#,
+            "required",
+            false,
+            "act",
+            1,
+            "denied",
+        ),
+        (
+            "unknown output",
+            "required",
+            false,
+            "act",
+            1,
+            "invalid_reply",
+        ),
+        (
+            "unknown output",
+            "observe",
+            false,
+            "act",
+            0,
+            "invalid_reply",
+        ),
+        (
+            r#"{"decision":"allow"}"#,
+            "required",
+            true,
+            "act",
+            1,
+            "failed",
+        ),
+        (
+            r#"{"decision":"deny","reason":"Must not run."}"#,
+            "required",
+            false,
+            "plan",
+            0,
+            "",
+        ),
+    ];
+    let mut endpoint = Endpoint::start(
+        cases
+            .iter()
+            .map(|_| Reply::Finished("Fixture answer."))
+            .collect(),
+    )
+    .await;
+    for (reply, mode, changed, regime, exit, check) in cases {
+        let fixture = Fixture::new(true);
+        let temporary = hook(&fixture, "/usr/bin/printf", &["%s", reply], mode, changed);
+        let output = timeout(
+            WAIT,
+            fixture
+                .process(&endpoint.url, "run")
+                .args(["--mode", regime, "--prompt", "Prepare the answer."])
+                .arg("--cwd")
+                .arg(&fixture.primary)
+                .output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let results = records(&output.stdout);
+        assert_eq!(
+            output.status.code(),
+            Some(exit),
+            "{results:?} {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let account = &results[1]["account"];
+        if check.is_empty() {
+            assert!(account.get("completion_checks").is_none(), "{account}");
+        } else {
+            let evidence = &account["completion_checks"][0];
+            assert_eq!(evidence["check"], COMMAND_CHECK);
+            assert_eq!(evidence["status"], check, "{account}");
+            assert!(evidence["operation"].is_string());
+            if changed {
+                assert_eq!(evidence["reason"], "reviewed_executable_changed");
+            }
+            assert!(!account.to_string().contains("unknown output"));
+        }
+        let request = endpoint.request().await;
+        assert!(!request.to_string().contains("before_completion_command"));
+        assert!(endpoint.requests.try_recv().is_err());
+        assert!(fs::read_dir(temporary).unwrap().next().is_none());
+    }
+    endpoint.done().await;
+}
 
 #[tokio::test]
 async fn a_required_completion_check_records_its_decision_without_offering_a_tool() {
@@ -74,6 +197,10 @@ async fn server(state: &Path, endpoint: &str, enabled: bool) -> PrivateStdio {
     if enabled {
         command.arg(FLAG);
     }
+    connect(command).await
+}
+
+async fn connect(mut command: Command) -> PrivateStdio {
     let child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -90,6 +217,111 @@ async fn server(state: &Path, endpoint: &str, enabled: bool) -> PrivateStdio {
     let initialized = client.request("initialize", capabilities).await;
     assert_eq!(initialized["result"]["protocolVersion"], 1);
     client
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn interrupting_a_native_hook_cleans_up_and_a_changed_profile_cannot_resume_it() {
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("A candidate that must be checked."),
+        Reply::Finished("A candidate that must be checked."),
+        Reply::Finished("A candidate that must be checked."),
+    ])
+    .await;
+    for (action, changed) in [("stop", false), ("pause", false), ("pause", true)] {
+        let fixture = Fixture::new(true);
+        let temporary = hook(&fixture, "/bin/sleep", &["10"], "required", false);
+        let mut command = fixture.process(&endpoint.url, "serve");
+        command.arg("--stdio");
+        let mut host = connect(command).await;
+        let session = start(&mut host, &fixture.primary).await;
+        endpoint.request().await;
+        timeout(WAIT, async {
+            while fs::read_dir(&temporary).unwrap().next().is_none() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        let working = snapshot(&mut host, &session).await;
+        let receipt = host
+            .request(
+                &format!("_co.grida/session/{action}"),
+                task_basis(&working, &session, action),
+            )
+            .await;
+        assert!(receipt.get("error").is_none(), "{receipt}");
+        let stopped = wait_for(&mut host, &session, |view| {
+            if action == "pause" {
+                view["current"]["disposition"] == "suspended"
+            } else {
+                view["current"].is_null() && view["latest"]["status"] == "cancelled"
+            }
+        })
+        .await;
+        host.close().await;
+        assert!(fs::read_dir(&temporary).unwrap().next().is_none());
+        assert!(endpoint.requests.try_recv().is_err());
+        if action == "stop" {
+            continue;
+        }
+
+        if changed {
+            hook(&fixture, "/bin/sleep", &["11"], "required", false);
+        }
+        let mut command = fixture.process(&endpoint.url, "serve");
+        command.arg("--stdio");
+        let mut reopened = connect(command).await;
+        load(&mut reopened, &session, &fixture.primary).await;
+        let resume = reopened
+            .request(
+                "_co.grida/session/resume",
+                json!({
+                    "task":task_basis(&stopped,&session,"resume"),
+                    "expectedEpoch":stopped["current"]["epoch"],
+                    "expectedJournalPosition":stopped["current"]["journalPosition"],
+                }),
+            )
+            .await;
+        if changed {
+            assert_eq!(
+                resume["error"]["data"], "completion_check_profile_unavailable",
+                "{resume}"
+            );
+            let stop = reopened
+                .request(
+                    "_co.grida/session/stop",
+                    task_basis(&stopped, &session, "stop-later"),
+                )
+                .await;
+            assert!(stop.get("error").is_none(), "{stop}");
+            wait_for(&mut reopened, &session, |view| {
+                view["latest"]["status"] == "cancelled"
+            })
+            .await;
+        } else {
+            assert!(resume.get("error").is_none(), "{resume}");
+            let finished = wait_for(&mut reopened, &session, |view| {
+                assert!(
+                    fs::read_dir(&temporary).unwrap().next().is_none(),
+                    "hook redispatched"
+                );
+                view["current"].is_null()
+            })
+            .await;
+            assert!(
+                matches!(
+                    finished["latest"]["status"].as_str(),
+                    Some("failed" | "uncertain")
+                ),
+                "{finished}"
+            );
+        }
+        assert!(fs::read_dir(&temporary).unwrap().next().is_none());
+        assert!(endpoint.requests.try_recv().is_err());
+        reopened.close().await;
+    }
+    endpoint.done().await;
 }
 
 async fn snapshot(client: &mut PrivateStdio, session: &str) -> Value {

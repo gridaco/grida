@@ -149,42 +149,46 @@ impl Trusted {
     }
 
     fn check(&self) -> Result<()> {
-        let file = OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW)
-            .open(self.bound.path())
-            .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_launcher_missing"))?;
-        let metadata = file
-            .metadata()
-            .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_launcher_missing"))?;
-        if !metadata.is_file()
-            || metadata.len() > MAX_TRUSTED_BINARY
-            || metadata.mode() & 0o6000 != 0
-            || metadata.mode() & 0o111 == 0
-            || metadata.mode() & 0o022 != 0
-            || metadata.dev() != self.bound.identity.device
-            || metadata.ino() != self.bound.identity.inode
-        {
-            return Err(refused(ErrorKind::Unavailable, "sandbox_launcher_identity"));
-        }
-        let mut digest = Sha256::new();
-        let mut reader = file.take(MAX_TRUSTED_BINARY + 1);
-        let mut bytes = [0; 16 * 1024];
-        loop {
-            let read = reader
-                .read(&mut bytes)
-                .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_launcher_identity"))?;
-            if read == 0 {
-                break;
-            }
-            digest.update(&bytes[..read]);
-        }
-        let digest: [u8; 32] = digest.finalize().into();
-        if digest != self.executable.sha256 || !self.bound.identity.matches() {
-            return Err(refused(ErrorKind::Unavailable, "sandbox_launcher_identity"));
-        }
-        Ok(())
+        check_executable(&self.bound, &self.executable)
     }
+}
+
+fn check_executable(bound: &Bound, executable: &TrustedExecutable) -> Result<()> {
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW)
+        .open(bound.path())
+        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_launcher_missing"))?;
+    let metadata = file
+        .metadata()
+        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_launcher_missing"))?;
+    if !metadata.is_file()
+        || metadata.len() > MAX_TRUSTED_BINARY
+        || metadata.mode() & 0o6000 != 0
+        || metadata.mode() & 0o111 == 0
+        || metadata.mode() & 0o022 != 0
+        || metadata.dev() != bound.identity.device
+        || metadata.ino() != bound.identity.inode
+    {
+        return Err(refused(ErrorKind::Unavailable, "sandbox_launcher_identity"));
+    }
+    let mut digest = Sha256::new();
+    let mut reader = file.take(MAX_TRUSTED_BINARY + 1);
+    let mut bytes = [0; 16 * 1024];
+    loop {
+        let read = reader
+            .read(&mut bytes)
+            .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_launcher_identity"))?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&bytes[..read]);
+    }
+    let digest: [u8; 32] = digest.finalize().into();
+    if digest != executable.sha256 || !bound.identity.matches() {
+        return Err(refused(ErrorKind::Unavailable, "sandbox_launcher_identity"));
+    }
+    Ok(())
 }
 
 pub(super) struct Installation {
@@ -517,6 +521,17 @@ fn support(termination: Termination) -> Result<Support> {
 pub(super) use process::Running;
 
 impl Prepared {
+    pub(super) fn verify_executable(&self, executable: &TrustedExecutable) -> Result<()> {
+        let bound = self
+            .anchors
+            .get(1)
+            .ok_or_else(|| refused(ErrorKind::InvalidState, "sandbox_capture_process_required"))?;
+        if bound.path() != executable.path {
+            return Err(refused(ErrorKind::Conflict, "sandbox_executable_changed"));
+        }
+        check_executable(bound, executable)
+    }
+
     pub(super) fn capture_fingerprint(&self) -> Result<Fingerprint> {
         let Task::Command {
             executable,
