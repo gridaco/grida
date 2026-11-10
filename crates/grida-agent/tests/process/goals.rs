@@ -182,14 +182,26 @@ async fn the_user_can_confirm_only_exact_accounted_goal_work_after_restart() {
     );
     let early_control = confirm(reviewed, "confirm-goal", turn);
 
-    let ordinary = ws_rpc(
-        &mut client,
-        7,
-        "_co.grida/session/submit",
-        json!({"sessionId":session,"inputId":"ordinary-work",
-            "prompt":[{"type":"text","text":"An unrelated follow-up."}]}),
-    )
-    .await;
+    // A settled snapshot can precede release of the owned worker. Keep the
+    // input identity unchanged while waiting for admission.
+    let ordinary = timeout(WAIT, async {
+        loop {
+            let response = ws_rpc(
+                &mut client,
+                7,
+                "_co.grida/session/submit",
+                json!({"sessionId":session,"inputId":"ordinary-work",
+                    "prompt":[{"type":"text","text":"An unrelated follow-up."}]}),
+            )
+            .await;
+            if response["error"]["data"] != "session_prompt_in_progress" {
+                break response;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the settled Goal must release its execution slot");
     assert_eq!(ordinary["result"]["inputId"], "ordinary-work", "{ordinary}");
     let request = endpoint.request().await;
     assert!(
