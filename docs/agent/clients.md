@@ -694,8 +694,10 @@ identified submit. An identified submit reports the same accepted input as
 queued while the summary runs. The host keeps the most recent turn verbatim
 and preserves queue order and input settings. If the summary attempt fails,
 work can continue with the previous context. Standard ACP `session/prompt`
-still waits for its user turn to finish. The automatic trigger uses the size
-of earlier text. The provider can still report a context limit.
+still waits for its user turn to finish. Automatic compaction uses the size
+of earlier text. For supported direct OpenAI Responses models, it can also
+use a previous request's reported input count and the verified model window.
+The provider can still report a context limit on the next request.
 
 After a successful compaction, future model requests use the summary and any
 turns it did not cover. If the history is too large for one summary request,
