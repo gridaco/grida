@@ -12,7 +12,7 @@ import { LegacyChatSourceLease } from "./legacy-chat-source-lease";
 const electron = vi.hoisted(() => ({ temp: "", userData: "", media: "" }));
 vi.mock("electron", () => ({
   app: {
-    on: () => {},
+    once: () => {},
     getPath: (name: "temp" | "userData") => electron[name],
     hasSingleInstanceLock: () => true,
   },

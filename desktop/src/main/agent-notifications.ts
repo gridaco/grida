@@ -164,7 +164,7 @@ async function handleEvent(
 
 /**
  * Start the resilient subscription loop. Call once after the agent
- * sidecar supervisor reports ready; stops itself on `before-quit`.
+ * sidecar supervisor reports ready; stops itself on `will-quit`.
  *
  * The loop re-attaches with capped backoff whenever the SSE ends or the
  * sidecar is unreachable (supervisor restart window). Events lost while
@@ -176,7 +176,7 @@ export function startAgentNotifications(
 ): void {
   let stopped = false;
   const controller = new AbortController();
-  app.on("before-quit", () => {
+  app.once("will-quit", () => {
     stopped = true;
     controller.abort();
   });

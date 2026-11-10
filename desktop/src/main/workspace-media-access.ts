@@ -44,6 +44,6 @@ export function nativeWorkspaceMedia() {
     ]),
     workers,
   };
-  app.once("before-quit", () => workers.close());
+  app.once("will-quit", () => workers.close());
   return owner;
 }

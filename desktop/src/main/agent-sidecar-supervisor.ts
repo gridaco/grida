@@ -22,7 +22,7 @@
  *      `ensureInitialized` is a no-op on subsequent calls (proxies
  *      stay up).
  *
- *   3. On `before-quit`: kill the child, `await dispose()` to tear
+ *   3. On `will-quit`: stop the child and dispose of the sandbox to tear
  *      srt's proxies down.
  *
  * Switching from `utilityProcess.fork` to `child_process.spawn`
@@ -148,14 +148,14 @@ export class AgentSidecarSupervisor {
 
   constructor(options: { agent?: boolean } = {}) {
     this.agentEnabled = options.agent !== false;
-    app.on("before-quit", () => {
+    app.once("will-quit", () => {
       this.isShuttingDown = true;
       if (this.restartTimer) {
         clearTimeout(this.restartTimer);
         this.restartTimer = null;
       }
       this.stop();
-      // Fire-and-forget — Electron's `before-quit` doesn't await
+      // Fire-and-forget — Electron's `will-quit` doesn't await
       // listeners. `dispose()` is best-effort; the OS reclaims srt's
       // proxy sockets at process exit regardless.
       void dispose();

@@ -799,10 +799,9 @@ app.on("activate", () => {
   });
 });
 
-app.on("before-quit", () => {
-  // Belt-and-suspenders — supervisor also listens for this event, and
-  // terminal PTYs / workspace watches are also torn down per-window on
-  // webContents teardown.
+app.once("will-quit", () => {
+  // A dirty window can cancel quit. Keep shared services available until
+  // Electron confirms that all windows have closed.
   closeChatGptOAuth();
   stopAgentSidecar();
   disposeAllTerminals();
@@ -810,6 +809,11 @@ app.on("before-quit", () => {
 });
 
 app.on("will-quit", (event) => {
+  if (accountRevalidationTimer) {
+    clearTimeout(accountRevalidationTimer);
+    accountRevalidationTimer = null;
+  }
+  entryWindow?.beginShutdown();
   if (!nativeDesktopAgent || nativeQuitReady) return;
   event.preventDefault();
   nativeQuitDrain ??= nativeDesktopAgent
@@ -819,6 +823,8 @@ app.on("will-quit", (event) => {
     })
     .finally(() => {
       nativeQuitReady = true;
-      app.quit();
+      // Electron still handles the canceled quit while a fast drain settles
+      // in microtasks. Retry after the native event has returned.
+      setImmediate(() => app.quit());
     });
 });

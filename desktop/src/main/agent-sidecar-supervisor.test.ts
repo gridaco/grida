@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("electron", () => ({
   app: {
-    on: vi.fn<
+    once: vi.fn<
       (event: string, listener: (...args: unknown[]) => void) => void
     >(),
     getPath: vi.fn<(name: string) => string>((name) =>

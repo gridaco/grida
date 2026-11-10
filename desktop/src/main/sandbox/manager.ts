@@ -12,7 +12,7 @@
  *   2. `wrap(cmd)` — `SandboxManager.wrapWithSandbox(cmd)`. Returns
  *      the wrapped shell-string the supervisor `spawn`s with
  *      `shell: true`.
- *   3. `dispose()` — `SandboxManager.reset()` on `before-quit` so
+ *   3. `dispose()` — `SandboxManager.reset()` on `will-quit` so
  *      the proxy servers and any mtimes get cleaned up.
  *   4. macOS violation pump — taps `SandboxViolationStore` and
  *      forwards events to `console.error` with an `[agent-sidecar:srt]`
@@ -104,7 +104,7 @@ export function cleanupAfterCommand(): void {
 }
 
 /**
- * `before-quit` cleanup. Tears down srt's proxy servers; safe to
+ * `will-quit` cleanup. Tears down srt's proxy servers; safe to
  * call even if `ensureInitialized` was never called (no-ops).
  */
 export async function dispose(): Promise<void> {
