@@ -1494,16 +1494,19 @@ Today:
   runtime read-only and preserves the fixed private pipes and Node IPC socket.
   After the previous settings writer retires, preparation binds the exact
   source directory and copies only its bounded endpoint configuration into an
-  owner-only sibling of the provider store. The original file and credential
-  custody stay with their existing owners. Later endpoint deletions survive
-  preparation retries. [Settings fixtures](desktop/src/main/retained-media-settings.test.ts)
+  owner-only child of the agent data directory. The canonical provider store
+  remains under its own provider home, which can differ from agent data.
+  The child accesses only the retained settings and provider store within
+  those roots. Later endpoint deletions survive preparation retries.
+  [Settings fixtures](desktop/src/main/retained-media-settings.test.ts)
   cover exact bytes, aliases, interruption, and source identity.
   The first credential operation asks the current strict child’s private
   [network host](desktop/src/main/agent-network-host.ts) to prepare shared
-  custody from the original, identity-checked directory. The fixed request
-  and correlated result carry no path or key. A failed preparation can retry
-  through the original owner. Drain waits for admitted custody work and
-  suppresses a result after retirement.
+  custody. Main checks the identities of the original agent data, provider
+  home and provider store before using the existing custody operation. The
+  fixed request and correlated result carry no path or key. A failed
+  preparation can retry through the original owner. Drain waits for admitted
+  custody work and suppresses a result after retirement.
   The [media composition](desktop/src/sidecar/daemon.ts) withholds unrelated
   routes under that launch scope. Main selects it after admitting a packaged
   macOS arm64 native chat profile. The [child-held writer lock](desktop/src/retained-media-owner.ts)

@@ -36,13 +36,24 @@ const SYSTEM_METADATA = [
 export namespace RetainedMediaLaunch {
   export type Options = Readonly<{
     executable: string;
-    settings: string;
+    agentData: string;
     providerHome: string;
     media: string;
     temporary: string;
     editorBaseUrl: string;
     mediaOnly?: boolean;
   }>;
+
+  export async function prepareProviderHome(source: string): Promise<void> {
+    requireQualifiedPlatform();
+    const home = privateDirectory(source);
+    await refuseAdditionalAccess(home);
+    const provider = path.join(home, "providers");
+    await files.mkdir(provider, { mode: 0o700 }).catch((error) => {
+      if (error.code !== "EEXIST") throw error;
+    });
+    await refuseAdditionalAccess(privateDirectory(provider));
+  }
 
   /** The caller has retired the original settings writer before preparing this partition. */
   export async function prepareSettings(source: string): Promise<string> {
@@ -208,13 +219,13 @@ export namespace RetainedMediaLaunch {
    */
   export function start(input: Options) {
     const plan = prepare(input);
-    const source = privateDirectory(input.providerHome);
-    const provider = path.join(source, "providers");
-    const sourceIdentity = fileIdentity(fs.lstatSync(source, { bigint: true }));
-    const providerIdentity = fileIdentity(
-      fs.lstatSync(provider, { bigint: true })
-    );
-    const custody = new SecretsStore(new AuthStore(source), source);
+    const { agentData, providerHome } = input;
+    const provider = path.join(providerHome, "providers");
+    const roots = [...new Set([agentData, providerHome, provider])];
+    const identity = (root: string) =>
+      fileIdentity(fs.lstatSync(privateDirectory(root), { bigint: true }));
+    const identities = roots.map(identity);
+    const custody = new SecretsStore(new AuthStore(agentData), providerHome);
     const child = spawn(
       SANDBOX,
       [...plan.sandboxArgs, plan.executable, ...plan.sidecarArgs],
@@ -228,18 +239,13 @@ export namespace RetainedMediaLaunch {
     return Object.freeze({
       child,
       prepareProviderCustody: async () => {
-        await refuseAdditionalAccess(source);
+        await Promise.all(roots.map(refuseAdditionalAccess));
         if (
           !child.connected ||
           child.killed ||
           child.exitCode !== null ||
           child.signalCode !== null ||
-          fileIdentity(
-            fs.lstatSync(privateDirectory(source), { bigint: true })
-          ) !== sourceIdentity ||
-          fileIdentity(
-            fs.lstatSync(privateDirectory(provider), { bigint: true })
-          ) !== providerIdentity
+          roots.some((root, index) => identity(root) !== identities[index])
         )
           throw new Error("provider_custody_unavailable");
         await custody.prepareSharedCustody();
@@ -275,8 +281,9 @@ export namespace RetainedMediaLaunch {
     const asar = regular(path.join(resources, "app.asar"), false, physicalFs);
     regular(SANDBOX, true);
     regular(ACL_READER, true);
-    const settings = privateDirectory(input.settings);
-    const providerHome = canonical(input.providerHome);
+    const agent = privateDirectory(input.agentData);
+    const settings = privateDirectory(path.join(agent, SETTINGS_DIRECTORY));
+    const providerHome = privateDirectory(input.providerHome);
     const provider = privateDirectory(path.join(providerHome, "providers"));
     const media = privateDirectory(input.media);
     const temporary = privateDirectory(input.temporary);

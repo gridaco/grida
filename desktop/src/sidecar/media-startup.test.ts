@@ -57,9 +57,9 @@ describe.skipIf(
   it("refuses overlapping, missing, aliased, or public authority roots", async () => {
     const scope = await packagedScope();
     try {
-      const { settings, temporary } = scope.options;
+      const { temporary } = scope.options;
       expect(() =>
-        RetainedMediaLaunch.prepare({ ...scope.options, media: settings })
+        RetainedMediaLaunch.prepare({ ...scope.options, media: scope.settings })
       ).toThrow("retained_media_scope_overlap");
       expect(() =>
         RetainedMediaLaunch.prepare({
@@ -72,6 +72,14 @@ describe.skipIf(
       expect(() =>
         RetainedMediaLaunch.prepare({ ...scope.options, temporary: alias })
       ).toThrow("retained_media_path_invalid");
+      await expect(
+        RetainedMediaLaunch.prepareProviderHome(alias)
+      ).rejects.toThrow("retained_media_path_invalid");
+      await expect(
+        fs.stat(path.join(temporary, "providers"))
+      ).rejects.toMatchObject({
+        code: "ENOENT",
+      });
       await fs.chmod(temporary, 0o755);
       expect(() => RetainedMediaLaunch.prepare(scope.options)).toThrow(
         "retained_media_directory_invalid"
@@ -153,10 +161,7 @@ describe.skipIf(
       expect(providerRequests).toBe(1);
       expect(
         JSON.parse(
-          await fs.readFile(
-            path.join(scope.options.settings, "endpoints.json"),
-            "utf8"
-          )
+          await fs.readFile(path.join(scope.settings, "endpoints.json"), "utf8")
         )
       ).toEqual([config]);
     } finally {
@@ -215,7 +220,7 @@ describe.skipIf(
       await fs.mkdir(temporary, { mode: 0o700 });
       const launch = {
         ...options,
-        settings,
+        agentData: profile.agent,
         providerHome: profile.agent,
         media: profile.media,
         temporary,
@@ -323,22 +328,22 @@ describe.skipIf(
     }
   });
 
-  it("keeps historical credentials dormant until an exact custody request and retries an interrupted adoption", async () => {
-    const scope = await packagedScope();
+  it("keeps historical credentials in their split-root custody until an exact request and retries an interrupted adoption", async () => {
+    const scope = await packagedScope(false);
     let active: Sidecar | undefined;
     try {
-      const { providerHome } = scope.options;
+      const { agentData, providerHome } = scope.options;
       const config = {
         id: "local_fixture",
         base_url: "http://127.0.0.1:11434/v1",
         models: [{ id: "fixture-model" }],
       };
-      const legacySettings = path.join(providerHome, "endpoints.json");
+      const legacySettings = path.join(agentData, "endpoints.json");
       const original = Buffer.from(`${JSON.stringify([config], null, 4)}\n`);
       await fs.writeFile(legacySettings, original, { mode: 0o600 });
-      const legacyAuth = path.join(providerHome, "auth.json");
+      const legacyAuth = path.join(agentData, "auth.json");
       const legacyRemnant = path.join(
-        providerHome,
+        agentData,
         ".auth.json.0123456789abcdef.tmp"
       );
       const oauth = {
@@ -358,14 +363,15 @@ describe.skipIf(
         "providers",
         "credentials.toml"
       );
-      const options = {
-        ...scope.options,
-        settings: await RetainedMediaLaunch.prepareSettings(providerHome),
-      };
-      expect(
-        await fs.readFile(path.join(options.settings, "endpoints.json"))
-      ).toEqual(original);
-      const wrongSource = path.join(options.settings, "auth.json");
+      const settings = await RetainedMediaLaunch.prepareSettings(agentData);
+      expect(await fs.readFile(path.join(settings, "endpoints.json"))).toEqual(
+        original
+      );
+      expect((await fs.readdir(settings)).sort()).toEqual([
+        ".source",
+        "endpoints.json",
+      ]);
+      const wrongSource = path.join(providerHome, "auth.json");
       const wrongKey = "synthetic-wrong-source";
       const wrongAuth = JSON.stringify({
         vercel: { type: "api", key: wrongKey },
@@ -379,7 +385,7 @@ describe.skipIf(
           return response;
         }
       );
-      active = await Sidecar.startRetained(options, providerTransport);
+      active = await Sidecar.startRetained(scope.options, providerTransport);
       expect(
         await (await active.post("/providers/endpoints/list")).json()
       ).toEqual([config]);
@@ -421,10 +427,10 @@ describe.skipIf(
       await active.stop();
       active = undefined;
 
-      expect(await RetainedMediaLaunch.prepareSettings(providerHome)).toBe(
-        options.settings
+      expect(await RetainedMediaLaunch.prepareSettings(agentData)).toBe(
+        settings
       );
-      active = await Sidecar.startRetained(options, providerTransport);
+      active = await Sidecar.startRetained(scope.options, providerTransport);
       expect(
         await (await active.post("/providers/endpoints/list")).json()
       ).toEqual([]);
@@ -435,6 +441,11 @@ describe.skipIf(
       ).toEqual({ has: true });
       expect(await fs.readFile(legacySettings)).toEqual(original);
       expect(await fs.readFile(credentials)).toEqual(canonical);
+      expect(await fs.readFile(wrongSource, "utf8")).toBe(wrongAuth);
+      const retainedEntries = await fs.readdir(settings);
+      expect(retainedEntries).not.toContain("auth.json");
+      expect(retainedEntries).not.toContain("credentials.toml");
+      expect(retainedEntries).not.toContain("providers");
       expect(JSON.parse(await fs.readFile(legacyAuth, "utf8"))).toEqual({
         chatgpt: oauth,
       });
@@ -485,7 +496,7 @@ describe.skipIf(
     }
   });
 
-  it("denies direct network and out-of-scope files under the same kernel profile", async () => {
+  it("denies direct network, legacy chats and scratch under the split-root kernel profile", async () => {
     const scope = await packagedScope();
     const listener = net.createServer();
     let child: ChildProcess | undefined;
@@ -504,8 +515,21 @@ describe.skipIf(
       const address = listener.address();
       assert(address && typeof address !== "string");
       const outside = path.join(scope.root, "outside.txt");
+      const database = path.join(scope.options.agentData, "sessions.db");
+      const scratch = path.join(scope.root, "legacy-scratch", "input.png");
+      const credentials = path.join(
+        scope.options.providerHome,
+        "providers",
+        "credentials.toml"
+      );
       const probe = path.join(scope.options.temporary, "probe.cjs");
       await fs.writeFile(outside, "outside the retained scope");
+      await fs.writeFile(database, "retained chat", { mode: 0o600 });
+      await fs.mkdir(path.dirname(scratch), { mode: 0o700 });
+      await fs.writeFile(scratch, "retained input", { mode: 0o600 });
+      await fs.writeFile(credentials, "synthetic credential store", {
+        mode: 0o600,
+      });
       await fs.symlink(outside, path.join(scope.options.temporary, "alias"));
       await fs.writeFile(
         probe,
@@ -529,6 +553,11 @@ describe.skipIf(
               read: result(() => fs.readFileSync(process.argv[2])),
               alias: result(() => fs.readFileSync("alias")),
               write: result(() => fs.writeFileSync(process.argv[2], "modified")),
+              readDatabase: result(() => fs.readFileSync(process.argv[4])),
+              writeDatabase: result(() => fs.writeFileSync(process.argv[4], "modified")),
+              readScratch: result(() => fs.readFileSync(process.argv[5])),
+              removeScratch: result(() => fs.unlinkSync(process.argv[5])),
+              readCredentials: result(() => fs.readFileSync(process.argv[6])),
               exec: spawnSync("/bin/sh", ["-c", "exit 0"]).error?.code ?? "allowed",
               own: result(() => fs.writeFileSync("own", "yes")),
             };
@@ -545,6 +574,9 @@ describe.skipIf(
           probe,
           outside,
           String(address.port),
+          database,
+          scratch,
+          credentials,
         ],
         {
           cwd: plan.cwd,
@@ -570,12 +602,17 @@ describe.skipIf(
         }
       );
       expect(result.own).toBe("allowed");
+      expect(result.readCredentials).toBe("allowed");
       for (const operation of [
         "connect",
         "listen",
         "read",
         "alias",
         "write",
+        "readDatabase",
+        "writeDatabase",
+        "readScratch",
+        "removeScratch",
         "exec",
       ]) {
         assert.match(result[operation], /^(?:EACCES|EPERM)$/, operation);
@@ -584,6 +621,11 @@ describe.skipIf(
       expect(await exited).toBe(0);
       expect(await fs.readFile(outside, "utf8")).toBe(
         "outside the retained scope"
+      );
+      expect(await fs.readFile(database, "utf8")).toBe("retained chat");
+      expect(await fs.readFile(scratch, "utf8")).toBe("retained input");
+      expect(await fs.readFile(credentials, "utf8")).toBe(
+        "synthetic credential store"
       );
     } finally {
       clearTimeout(deadline);
@@ -596,29 +638,34 @@ describe.skipIf(
   });
 });
 
-async function packagedScope() {
+async function packagedScope(prepareSettings = true) {
   assert(packagedExecutable);
   const root = await fs.realpath(
     await fs.mkdtemp(path.join(os.tmpdir(), "grida-retained-media-"))
   );
+  const providerHome = path.join(root, "custody");
+  const agentData = path.join(providerHome, "agent");
   const options = {
     executable: packagedExecutable,
-    settings: path.join(root, "settings"),
-    providerHome: path.join(root, "custody"),
+    agentData,
+    providerHome,
     media: path.join(root, "media"),
     temporary: path.join(root, "temporary"),
     editorBaseUrl: origin,
   };
   for (const directory of [
-    options.settings,
-    options.providerHome,
-    path.join(options.providerHome, "providers"),
+    providerHome,
+    agentData,
     options.media,
     options.temporary,
   ]) {
     await fs.mkdir(directory, { mode: 0o700 });
   }
-  return { root, options };
+  await RetainedMediaLaunch.prepareProviderHome(providerHome);
+  const settings = prepareSettings
+    ? await RetainedMediaLaunch.prepareSettings(agentData)
+    : path.join(agentData, "retained-settings");
+  return { root, options, settings };
 }
 
 describe("built Desktop media startup", () => {

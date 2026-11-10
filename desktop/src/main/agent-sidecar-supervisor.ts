@@ -225,25 +225,17 @@ export class AgentSidecarSupervisor {
       throw new Error("retained_media_profile_unavailable");
     this.retainedMedia ??= (async () => {
       await source;
-      if (this.user_data_path !== this.provider_home)
-        throw new Error("retained_media_profile_unavailable");
-      const settings = await RetainedMediaLaunch.prepareSettings(
-        this.user_data_path
-      );
+      await RetainedMediaLaunch.prepareSettings(this.user_data_path);
+      await RetainedMediaLaunch.prepareProviderHome(this.provider_home);
       const temporary = path.join(app.getPath("temp"), "retained-media");
-      for (const directory of [
-        path.join(this.provider_home, "providers"),
-        temporary,
-      ]) {
-        await fs.promises
-          .mkdir(directory, { mode: 0o700 })
-          .catch((error: NodeJS.ErrnoException) => {
-            if (error.code !== "EEXIST") throw error;
-          });
-      }
+      await fs.promises
+        .mkdir(temporary, { mode: 0o700 })
+        .catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== "EEXIST") throw error;
+        });
       return Object.freeze({
         executable: process.execPath,
-        settings,
+        agentData: this.user_data_path,
         providerHome: this.provider_home,
         media: this.media_root,
         temporary,
