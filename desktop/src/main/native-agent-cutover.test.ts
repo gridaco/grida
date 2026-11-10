@@ -25,7 +25,7 @@ vi.mock("electron", () => ({
 vi.mock("../env", () => ({ EDITOR_BASE_URL: "https://grida.co" }));
 vi.mock("./media-root", () => ({
   DesktopMediaRoot: {
-    get current() {
+    current() {
       return electron.media;
     },
   },
@@ -117,6 +117,52 @@ function writeLegacy(database: string, scratchBase: string): void {
 }
 
 describe.skipIf(!supported)("Native Desktop cold start", () => {
+  it("retries a managed cutoff against the same acknowledged writer", async () => {
+    const test = await fixture();
+    const lease = new LegacyChatSourceLease({
+      userDataPath: test.legacy,
+      scratchBase: test.scratchBase,
+    });
+    const writer = await lease.claimManagedWriter();
+    writeLegacy(test.database, test.scratchBase);
+    const verifyWriterAdmission = vi.fn<LegacyChatWriterAdmission>(
+      async (identity, claim) =>
+        identity.sourceId === writer.sourceId &&
+        identity.scratchId === writer.scratchId &&
+        claim === writer.claimId
+    );
+    const admission = {
+      requireDrainedClaim: true as const,
+      verifyWriterAdmission,
+    };
+    await expect(test.prepare(undefined, admission)).rejects.toThrow(
+      "legacy_chat_source_dirty"
+    );
+    expect(verifyWriterAdmission).not.toHaveBeenCalled();
+    expect(fs.existsSync(test.archiveRoot)).toBe(false);
+    await writer.completeDrain(async (claim) => claim === writer.claimId);
+
+    const command = path.join(test.scratchBase, "commands", "undrained");
+    fs.mkdirSync(command, { recursive: true, mode: 0o700 });
+    await expect(test.prepare(undefined, admission)).rejects.toThrow(
+      "legacy_chat_command_drain_unverified"
+    );
+    expect(fs.existsSync(test.checkpoint)).toBe(false);
+    fs.rmdirSync(command);
+    await test.prepare(undefined, admission);
+    const checkpoint = fs.readFileSync(test.checkpoint);
+    await test.prepare(undefined, admission);
+    expect(fs.readFileSync(test.checkpoint)).toEqual(checkpoint);
+    expect(verifyWriterAdmission.mock.calls.map(([, claim]) => claim)).toEqual([
+      writer.claimId,
+      writer.claimId,
+      writer.claimId,
+    ]);
+    await expect(lease.claimManagedWriter()).rejects.toThrow(
+      "legacy_chat_source_retired"
+    );
+  });
+
   it("refuses an absent source on the existing-data path", async () => {
     const test = await fixture();
     await expect(test.prepare()).rejects.toThrow(

@@ -100,6 +100,7 @@ type OwnedLegacyWriter = Readonly<{
 }>;
 type OwnedLegacyGeneration = {
   desktopUserDataPath: string;
+  managed: boolean;
   claim?: LegacyChatWriter;
 };
 
@@ -169,6 +170,8 @@ export class AgentSidecarSupervisor {
   constructor(options: { agent?: boolean } = {}) {
     this.agentEnabled = options.agent !== false;
     app.once("will-quit", () => {
+      // Managed Main awaits the exact writer drain before exiting.
+      if (this.ownedLegacy?.managed) return;
       this.isShuttingDown = true;
       if (this.restartTimer) {
         clearTimeout(this.restartTimer);
@@ -206,7 +209,10 @@ export class AgentSidecarSupervisor {
 
   /** Start one legacy generation for a Main-owned isolated profile. */
   async startOwnedLegacyWriter(): Promise<OwnedLegacyWriter> {
-    const data = process.env.GRIDA_AGENT_USER_DATA;
+    const managed = NativeDesktopProfile.managedPredecessor();
+    const data = managed
+      ? NativeDesktopProfile.agentData()
+      : process.env.GRIDA_AGENT_USER_DATA;
     if (
       !app.hasSingleInstanceLock() ||
       !isSupportedPlatform() ||
@@ -221,6 +227,7 @@ export class AgentSidecarSupervisor {
     this.legacyLaunchStarted = true;
     const owned: OwnedLegacyGeneration = {
       desktopUserDataPath: app.getPath("userData"),
+      managed,
     };
     this.ownedLegacy = owned;
     await NativeDesktopProfile.configure(app);
@@ -235,9 +242,13 @@ export class AgentSidecarSupervisor {
     return Object.freeze({
       connection,
       drain: async () => {
-        await this.drain();
-        await claim.completeDrain(async (id) => id === claimId);
-        return receipt;
+        try {
+          await this.drain();
+          await claim.completeDrain(async (id) => id === claimId);
+          return receipt;
+        } finally {
+          if (managed) await dispose();
+        }
       },
     });
   }
@@ -526,14 +537,40 @@ export class AgentSidecarSupervisor {
     }
     const coldSource = await this.coldStartSource;
     let legacyPolicyRoots: readonly string[] = [];
-    if (coldSource && NativeDesktopProfile.selected()) {
+    if (
+      (coldSource && NativeDesktopProfile.selected()) ||
+      this.ownedLegacy?.managed
+    ) {
       const legacy = NativeDesktopProfile.legacyRoots(app);
-      if (legacy.overlaps(path.dirname(coldSource.desktopUserDataPath)))
+      if (legacy.overlaps(path.dirname(app.getPath("userData"))))
         throw new Error("native_desktop_profile_invalid");
       // The sidecar cannot stat the denied lexical symlink. Main resolves it
       // before confinement, while the file registry rechecks target aliases.
       this.legacyStateRoots = legacy.canonicalPaths();
       legacyPolicyRoots = [...legacy.metadataPaths(), ...this.legacyStateRoots];
+    }
+    const controls = NativeDesktopProfile.managedCutoverControls();
+    if (controls.length) {
+      const { LegacyChatSourceLease } =
+        await import("./legacy-chat-source-lease");
+      const custody = [
+        ...controls,
+        LegacyChatSourceLease.controlRoot(this.user_data_path),
+        ...(coldSource
+          ? [
+              coldSource.scratchBase,
+              ...[
+                "chat-archive",
+                "sessions.db",
+                "sessions.db-wal",
+                "sessions.db-shm",
+                "sessions.db-journal",
+              ].map((name) => path.join(this.user_data_path, name)),
+            ]
+          : []),
+      ];
+      this.legacyStateRoots = [...this.legacyStateRoots, ...custody];
+      legacyPolicyRoots = [...legacyPolicyRoots, ...custody];
     }
     const policy = DesktopAgentSandboxPolicy.build({
       userData: this.user_data_path,
@@ -682,10 +719,13 @@ export class AgentSidecarSupervisor {
         await import("./legacy-chat-source-lease");
       if (generation !== this.nextGeneration || this.isShuttingDown)
         throw new Error("agent sidecar startup was cancelled");
-      this.ownedLegacy.claim = await new LegacyChatSourceLease({
+      const lease = new LegacyChatSourceLease({
         userDataPath: this.user_data_path,
         scratchBase: this.scratchBase,
-      }).claimFreshWriter();
+      });
+      this.ownedLegacy.claim = this.ownedLegacy.managed
+        ? await lease.claimManagedWriter()
+        : await lease.claimFreshWriter();
       // From this admission barrier on, only verified child drain can
       // clear the claim. The child owns initial database and scratch work.
       if (generation !== this.nextGeneration || this.isShuttingDown)

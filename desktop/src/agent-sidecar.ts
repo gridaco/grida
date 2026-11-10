@@ -162,7 +162,7 @@ const legacyStateRoots = process.argv
 if (
   legacyStateRoots.length > 0 &&
   (legacyStateRoots.length > 24 ||
-    !workspaceCatalog ||
+    (!workspaceCatalog && ownedLegacyWriter !== "1") ||
     legacyStateRoots.some(
       (root) => !root.startsWith("/") || Buffer.byteLength(root) > 4096
     ))
@@ -247,6 +247,7 @@ async function main() {
             scratch_base: requiredScratchBase!,
             skills_root: skillsRoot,
             sandbox_enforced: sandboxEnforced,
+            owned_legacy_writer: ownedLegacyWriter === "1",
             shell_executor:
               sandboxEnforced && ownedLegacyWriter === undefined
                 ? network.shellExecutor

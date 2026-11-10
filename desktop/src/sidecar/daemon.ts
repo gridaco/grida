@@ -28,17 +28,27 @@ export namespace DesktopDaemon {
           scratch_base: string;
           skills_root?: string;
           sandbox_enforced: boolean;
+          owned_legacy_writer?: boolean;
           shell_executor?: ShellExecutor;
         };
   };
 
   export async function create(opts: Options): Promise<DaemonServer> {
+    const { agent } = opts;
+    const ownedLegacy = typeof agent === "object" && agent.owned_legacy_writer;
+    if (ownedLegacy && (!agent.sandbox_enforced || agent.shell_executor)) {
+      throw new Error("owned_legacy_writer_scope_invalid");
+    }
     if (opts.retained_media_scope && opts.agent !== "native-chat") {
       throw new Error("retained_media_scope_invalid");
     }
     if (
-      (opts.workspace_catalog || opts.protected_file_roots) &&
-      (opts.agent !== "native-chat" || opts.retained_media_scope)
+      (opts.workspace_catalog && opts.agent !== "native-chat") ||
+      (opts.protected_file_roots &&
+        opts.agent !== "native-chat" &&
+        !ownedLegacy) ||
+      (opts.retained_media_scope &&
+        (opts.workspace_catalog || opts.protected_file_roots))
     )
       throw new Error("workspace_catalog_scope_invalid");
     const shared: MediaDaemonOptions = {
@@ -79,6 +89,7 @@ export namespace DesktopDaemon {
     return createAgentDaemon({
       ...shared,
       scratch_base: opts.agent.scratch_base,
+      ...(ownedLegacy ? { retain_session_scratch: true } : {}),
       skills_root: opts.agent.skills_root,
       sandbox_enforced: opts.agent.sandbox_enforced,
       shell_executor: opts.agent.sandbox_enforced

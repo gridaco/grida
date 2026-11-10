@@ -12,7 +12,10 @@ import {
   createChatGptOAuthCoordinator,
   type ChatGptOAuthCoordinator,
 } from "./chatgpt-oauth";
-import { NativeAgentCutover } from "./native-agent-cutover";
+import {
+  NativeAgentCutover,
+  type ExistingCutoff,
+} from "./native-agent-cutover";
 import type { NativeChatGptHost } from "./native-chatgpt-host";
 import type { NativeDesktopProfile } from "./native-desktop-profile";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
@@ -24,6 +27,12 @@ type Subscription = Readonly<{
   oauth: ChatGptOAuthCoordinator;
 }>;
 type SubscriptionSignOut = ReturnType<ChatGptOAuthCoordinator["signOut"]>;
+type LaunchOptions = Readonly<{
+  provider: NativeDesktopProfile.Provider;
+  openExternal: (url: string) => Promise<void>;
+  workspaceCatalogRoot?: string;
+  mcp?: NativeMcpLaunch;
+}>;
 
 export class NativeDesktopAgent {
   readonly chatgptOAuth?: Pick<
@@ -94,14 +103,36 @@ export class NativeDesktopAgent {
   static async prepareFresh(
     account: DesktopAccountSession,
     resourcesPath: string,
-    options?: Readonly<{
-      provider: NativeDesktopProfile.Provider;
-      openExternal: (url: string) => Promise<void>;
-      workspaceCatalogRoot?: string;
-      mcp?: NativeMcpLaunch;
-    }>
+    options?: LaunchOptions
   ) {
-    const cutover = await NativeAgentCutover.prepareFresh();
+    return this.compose(
+      await NativeAgentCutover.prepareFresh(),
+      account,
+      resourcesPath,
+      options
+    );
+  }
+
+  static async prepareExisting(
+    account: DesktopAccountSession,
+    resourcesPath: string,
+    existing: ExistingCutoff,
+    options: LaunchOptions
+  ) {
+    return this.compose(
+      await NativeAgentCutover.prepare(existing),
+      account,
+      resourcesPath,
+      options
+    );
+  }
+
+  private static async compose(
+    cutover: NativeAgentCutover,
+    account: DesktopAccountSession,
+    resourcesPath: string,
+    options?: LaunchOptions
+  ) {
     let subscription: Subscription | undefined;
     if (options?.provider === "chatgpt") {
       const { userDataPath, network } = await nativeAgentSubscriptionSettings();

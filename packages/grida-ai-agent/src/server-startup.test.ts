@@ -26,6 +26,53 @@ afterEach(async () => {
 });
 
 describe("agent tenant startup", () => {
+  it("keeps exact managed scratch across launch while ordinary startup still sweeps", async () => {
+    const base = await fs.mkdtemp(
+      path.join(os.tmpdir(), "grida-managed-scratch-")
+    );
+    cleanup.push(() => fs.rm(base, { recursive: true, force: true }));
+    const state = path.join(base, "state");
+    const scratch = path.join(base, "scratch");
+    const folder = path.join(scratch, "sessions", "ses_fixture", "scratch");
+    const file = path.join(folder, "source.txt");
+    await fs.mkdir(state, { mode: 0o700 });
+    await fs.mkdir(folder, { recursive: true, mode: 0o700 });
+    await fs.writeFile(file, "exact source", { mode: 0o600 });
+    const auth = new AuthStore(state);
+    const services: DaemonServices = {
+      user_data_path: state,
+      files: new FileRegistry(),
+      recent: new RecentStore(state),
+      workspaces: new WorkspaceRegistry(state),
+      media: null,
+      auth,
+      secrets: new SecretsStore(auth),
+    };
+    const options = {
+      scratch_base: scratch,
+      capabilities: { agent: false, providers: false },
+    };
+    expect(() =>
+      createAgentTenant({ ...options, retain_session_scratch: true })
+    ).toThrow("managed_scratch_authority_invalid");
+    const managed = createAgentTenant({
+      ...options,
+      retain_session_scratch: true,
+      sandbox_enforced: true,
+    }).register(new Hono(), services);
+    try {
+      expect(await fs.readFile(file, "utf8")).toBe("exact source");
+    } finally {
+      await managed.cleanup?.();
+    }
+    const ordinary = createAgentTenant(options).register(new Hono(), services);
+    try {
+      await expect(fs.stat(file)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await ordinary.cleanup?.();
+    }
+  });
+
   it("uses host startup authority to recover queues when the agent mounts", async () => {
     const baseDir = await fs.mkdtemp(
       path.join(os.tmpdir(), "grida-agent-startup-")

@@ -9,6 +9,7 @@ import { NativeFirstProfile } from "./native-first-profile";
 const roots: string[] = [];
 const ordinary = { supported: true, allowBirth: false };
 const provisioning = { ...ordinary, allowBirth: true };
+const predecessor = { ...provisioning, legacyPredecessor: true };
 
 function fixture() {
   const appData = fs.mkdtempSync(
@@ -26,6 +27,43 @@ afterEach(() => {
   for (const root of roots.splice(0))
     fs.rmSync(root, { recursive: true, force: true });
 });
+
+it.skipIf(!process.geteuid?.())(
+  "selects a previously enrolled predecessor and makes promotion exact and sticky",
+  () => {
+    const { appData, legacy, source } = fixture();
+    const enrolled = NativeFirstProfile.open(appData, legacy, predecessor)!;
+    expect(enrolled.mode).toBe("legacy");
+    expect(NativeFirstProfile.open(appData, legacy, predecessor)).toEqual(
+      enrolled
+    );
+    const successor = NativeFirstProfile.open(appData, legacy, ordinary)!;
+    expect(successor.mode).toBe("cutover");
+    const promotion = {
+      sourceId: "a".repeat(64),
+      scratchId: "b".repeat(64),
+      claimId: "f345a176-3d02-45ab-b2af-1f44f6fa44e1",
+    };
+    expect(() =>
+      NativeFirstProfile.beginPromotion(enrolled, promotion)
+    ).toThrow("native_first_profile_invalid");
+    NativeFirstProfile.beginPromotion(successor, promotion);
+    NativeFirstProfile.beginPromotion(successor, promotion);
+    expect(() => NativeFirstProfile.open(appData, legacy, predecessor)).toThrow(
+      "native_first_profile_invalid"
+    );
+    expect(NativeFirstProfile.open(appData, legacy, ordinary)).toEqual(
+      successor
+    );
+    expect(() =>
+      NativeFirstProfile.beginPromotion(successor, {
+        ...promotion,
+        claimId: "d3c5bcb1-555b-4374-ad7e-716cf44b1d7c",
+      })
+    ).toThrow("native_first_profile_invalid");
+    expect(fs.readFileSync(source, "utf8")).toBe("existing data");
+  }
+);
 
 it.skipIf(!process.geteuid?.())(
   "only the managed build can create a scope, and ordinary Stable can reopen it",

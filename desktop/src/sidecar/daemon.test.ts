@@ -103,6 +103,42 @@ describe("Desktop daemon composition", () => {
     expect(mocks.agent).not.toHaveBeenCalled();
   });
 
+  it("protects owned legacy state only with a confined, command-free writer", async () => {
+    const agent = {
+      scratch_base: "/synthetic/scratch",
+      sandbox_enforced: true,
+      owned_legacy_writer: true,
+    };
+    const options = { ...common, protected_file_roots: ["/synthetic/control"] };
+    await expect(
+      DesktopDaemon.create({
+        ...options,
+        agent: { ...agent, owned_legacy_writer: false },
+      })
+    ).rejects.toThrow("workspace_catalog_scope_invalid");
+    await expect(
+      DesktopDaemon.create({
+        ...options,
+        agent: { ...agent, sandbox_enforced: false },
+      })
+    ).rejects.toThrow("owned_legacy_writer_scope_invalid");
+    await expect(
+      DesktopDaemon.create({
+        ...options,
+        agent: { ...agent, shell_executor: vi.fn<ShellExecutor>() },
+      })
+    ).rejects.toThrow("owned_legacy_writer_scope_invalid");
+    await DesktopDaemon.create({ ...options, agent });
+    expect(mocks.agent).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        protected_file_roots: options.protected_file_roots,
+        retain_session_scratch: true,
+        shell_executor: undefined,
+        external_agent_execution: "disabled",
+      })
+    );
+  });
+
   it("withholds finite-command authority without the host sandbox attestation", async () => {
     await DesktopDaemon.create({
       ...common,

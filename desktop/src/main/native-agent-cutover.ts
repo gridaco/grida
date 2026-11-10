@@ -38,8 +38,9 @@ type Launch = Omit<NativeAgentChatLaunch, "stateDirectory">;
 type HistoricalScratchEvidence = Readonly<
   Parameters<LegacyChatWriterAdmission>[0] & { tempRoot: string }
 >;
-type ExistingCutoff = Readonly<{
+export type ExistingCutoff = Readonly<{
   verifyWriterAdmission: LegacyChatWriterAdmission;
+  requireDrainedClaim?: true;
   /** Captured by the trusted owner of the exact historical launch and drain. */
   historicalScratch?: HistoricalScratchEvidence;
   credentialHome?: string;
@@ -233,7 +234,8 @@ async function retireLegacy(
   let cutoff: Ready["archive"] = null;
   await new LegacyChatSourceLease(source).retire({
     requestId,
-    verifyWriterAdmission: async (identity) => {
+    requireDrainedClaim: existing.requireDrainedClaim,
+    verifyWriterAdmission: async (identity, drainedClaimId) => {
       if (
         historical &&
         (historical.sourceId !== identity.sourceId ||
@@ -241,7 +243,7 @@ async function retireLegacy(
       ) {
         throw new Error("native_chat_cutover_historical_scratch_mismatch");
       }
-      return await existing.verifyWriterAdmission(identity);
+      return await existing.verifyWriterAdmission(identity, drainedClaimId);
     },
     verifyArchive: async (retained) => {
       if (previous && (!retained || retained.archiveId !== previous.archiveId))

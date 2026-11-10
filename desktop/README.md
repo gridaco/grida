@@ -163,8 +163,30 @@ Stable builds that support the receipt open the same profile through normal
 startup and updates. Managed deployment must keep installed versions at or above
 the first version that understands the receipt. An invalid or incomplete profile
 stops startup before Electron initializes the ordinary browser profile. Enrollment
-starts an isolated Gateway profile. Existing chat archives still require the
-separate legacy writer and archive checks.
+starts an isolated Gateway profile.
+
+For a managed legacy-to-native deployment, a packaged macOS arm64 Stable
+predecessor built with `GRIDA_MANAGED_LEGACY_PREDECESSOR=1` instead enrolls a
+separate kind of profile at that same isolated location. It holds the source
+claim before starting its confined chat sidecar. Command and external-agent
+execution are unavailable in this predecessor. Clean quit acknowledges the
+exact writer and permits another predecessor launch. A selector-aware Stable
+successor archives the acknowledged chat and scratch before opening fresh
+native chats. Once promotion starts, the predecessor refuses that profile. A
+successor can retry after interrupted archival. An unacknowledged writer makes
+the profile unavailable for promotion.
+
+The managed predecessor preserves session scratch across clean restarts so the
+archive can include it. Explicit chat deletion still removes its scratch.
+Per-request upload limits still apply.
+
+This handoff applies to chats created inside the managed predecessor profile.
+Managed deployment needs a version floor that recognizes the legacy enrollment
+and respects its promotion record.
+Ordinary legacy profiles need separate proof of writer custody and historical
+scratch provenance. The managed handoff keeps the browser, media, projects and
+provider data in place. Native workspace registrations and recents use their
+own stores.
 
 For a disposable native chat run, launch a development or Insiders build
 with `--native-chat` and `--user-data-dir` set to a precreated owner-only

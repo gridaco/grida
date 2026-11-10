@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   LegacyChatSourceLease,
   type LegacyChatRetirement,
+  type LegacyChatWriterAdmission,
 } from "./legacy-chat-source-lease";
 
 const supported = process.platform === "darwin" || process.platform === "linux";
@@ -84,6 +85,43 @@ async function childAt(source: { userDataPath: string; scratchBase: string }) {
 }
 
 describe.skipIf(!supported)("cooperative legacy chat source lease", () => {
+  it("promotes only the last verified managed generation and retains it after retirement", async () => {
+    const { lease } = await fixture();
+    const verifyWriterAdmission = vi.fn<LegacyChatWriterAdmission>(
+      async () => true
+    );
+    const retire = {
+      ...request(),
+      requireDrainedClaim: true as const,
+      verifyWriterAdmission,
+    };
+    await expect(lease.retire(retire)).rejects.toThrow(
+      "legacy_chat_source_drained_claim_required"
+    );
+    const first = await lease.claimManagedWriter();
+    await first.completeDrain(async (claim) => claim === first.claimId);
+    const next = await lease.claimManagedWriter();
+    await expect(lease.retire(retire)).rejects.toThrow(
+      "legacy_chat_source_dirty"
+    );
+    expect(verifyWriterAdmission).not.toHaveBeenCalled();
+    await next.completeDrain(async (claim) => claim === next.claimId);
+    retire.verifyArchive.mockRejectedValueOnce(
+      new Error("archival interrupted")
+    );
+    await expect(lease.retire(retire)).rejects.toThrow("archival interrupted");
+    const receipt = await lease.retire(retire);
+    expect(await lease.retire(retire)).toEqual(receipt);
+    expect(verifyWriterAdmission.mock.calls.map(([, claim]) => claim)).toEqual([
+      next.claimId,
+      next.claimId,
+      next.claimId,
+    ]);
+    await expect(lease.claimManagedWriter()).rejects.toThrow(
+      "legacy_chat_source_retired"
+    );
+  });
+
   it("refuses mutable legacy state before claiming a fresh owned writer", async () => {
     const { source, lease } = await fixture();
     const command = path.join(source.scratchBase, "commands", "unknown-owner");

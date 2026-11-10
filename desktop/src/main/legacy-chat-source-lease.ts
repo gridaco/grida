@@ -22,12 +22,18 @@ type Source = Readonly<{ userDataPath: string; scratchBase: string }>;
 type Identity = Readonly<{ sourceId: string; scratchId: string }>;
 /** Trusted deployment evidence that every supported writer obeys this gate. */
 export type LegacyChatWriterAdmission = (
-  identity: Identity
+  identity: Identity,
+  drainedClaimId?: string
 ) => Promise<boolean>;
 type State =
   | { kind: "clean"; claimId: string | null }
   | { kind: "active"; claimId: string }
-  | { kind: "retired"; requestId: string; archiveId: string | null };
+  | {
+      kind: "retired";
+      requestId: string;
+      archiveId: string | null;
+      drainedClaimId?: string;
+    };
 
 export type LegacyChatRetirement = Readonly<
   Identity & { requestId: string; archiveId: string | null }
@@ -43,6 +49,7 @@ export type LegacyChatWriter = Readonly<
 
 type Retirement = Readonly<{
   requestId: string;
+  requireDrainedClaim?: true;
   verifyWriterAdmission: LegacyChatWriterAdmission;
   /** Verify the prior archive or capture and verify a new one. Null proves absence. */
   verifyArchive(retained: LegacyChatRetirement | null): Promise<string | null>;
@@ -60,24 +67,35 @@ export class LegacyChatSourceLease {
     this.source = Object.freeze({ ...source });
   }
 
+  static controlRoot(userDataPath: string): string {
+    return path.join(userDataPath, DIRECTORY);
+  }
+
   claimWriter(): Promise<LegacyChatWriter> {
-    return this.claim(false);
+    return this.claim("existing");
   }
 
   /** Admit the first writer of a controlled source before any scratch sweep. */
   claimFreshWriter(): Promise<LegacyChatWriter> {
-    return this.claim(true);
+    return this.claim("first");
   }
 
-  private async claim(fresh: boolean): Promise<LegacyChatWriter> {
+  /** Main has selected the same managed source before admitting this writer. */
+  claimManagedWriter(): Promise<LegacyChatWriter> {
+    return this.claim("managed");
+  }
+
+  private async claim(
+    admission: "first" | "managed" | "existing"
+  ): Promise<LegacyChatWriter> {
     const claimId = randomUUID();
     const identity = await this.transaction(async (db, current, identity) => {
       if (current.kind === "retired") throw failure("retired");
       if (current.kind === "active") throw failure("dirty");
-      if (fresh) {
-        if (current.claimId !== null) throw failure("not_fresh");
+      if (admission === "first" && current.claimId !== null)
+        throw failure("not_fresh");
+      if (admission !== "existing" && current.claimId === null)
         await requireUnusedSource(this.source);
-      }
       writeState(db, { kind: "active", claimId });
       return identity;
     });
@@ -120,7 +138,13 @@ export class LegacyChatSourceLease {
       if (current.kind === "active") throw failure("dirty");
       if (current.kind === "retired" && current.requestId !== requestId)
         throw failure("retirement_changed");
-      if ((await verifyWriterAdmission(identity)) !== true)
+      const drainedClaimId =
+        current.kind === "retired"
+          ? current.drainedClaimId
+          : (current.claimId ?? undefined);
+      if (request.requireDrainedClaim && !drainedClaimId)
+        throw failure("drained_claim_required");
+      if ((await verifyWriterAdmission(identity, drainedClaimId)) !== true)
         throw failure("writer_admission_unverified");
       const retained =
         current.kind === "retired"
@@ -137,7 +161,7 @@ export class LegacyChatSourceLease {
       )
         throw failure("archive_unverified");
       if (retained) return retained;
-      writeState(db, { kind: "retired", requestId, archiveId });
+      writeState(db, { kind: "retired", requestId, archiveId, drainedClaimId });
       return Object.freeze({ ...identity, requestId, archiveId });
     });
   }
@@ -256,7 +280,8 @@ function readState(db: DatabaseSync, identity: Identity): State {
       (state.kind === "active" && validId(state.claimId)) ||
       (state.kind === "retired" &&
         validId(state.requestId) &&
-        validArchive(state.archiveId))
+        validArchive(state.archiveId) &&
+        (state.drainedClaimId === undefined || validId(state.drainedClaimId)))
     )
   )
     throw failure("unsafe_state");

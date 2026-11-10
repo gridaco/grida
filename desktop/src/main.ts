@@ -17,6 +17,7 @@ import {
 } from "./branding";
 import {
   startAgentSidecar,
+  startOwnedLegacyWriter,
   getAgentSidecarInfo,
   getAgentSidecarMode,
   stopAgentSidecar,
@@ -91,7 +92,11 @@ app.commandLine.appendSwitch("js-flags", "--expose-gc");
 app.setName(RUNTIME_APP_NAME);
 if (app.isPackaged && !IS_INSIDERS) {
   try {
-    NativeDesktopProfile.prepareFirst(app, MANAGED_NATIVE_FIRST === 1);
+    NativeDesktopProfile.prepareFirst(
+      app,
+      MANAGED_NATIVE_FIRST === 1,
+      MANAGED_LEGACY_PREDECESSOR === 1
+    );
   } catch {
     console.error("[grida] The managed Desktop profile could not be verified.");
     // Waiting for ready would let Chromium initialize the default profile.
@@ -128,6 +133,7 @@ registerWorkspaceMediaScheme();
 // registered through this controller only after it reaches `main`.
 let entryWindow: DesktopEntryWindow | null = null;
 let nativeDesktopAgent: NativeDesktopAgent | undefined;
+let managedLegacyStart: ReturnType<typeof startOwnedLegacyWriter> | undefined;
 let recentFiles = agentSidecarClient.recent;
 let nativeQuitDrain: Promise<void> | undefined;
 let nativeEditorMcp: NativeEditorMcpExport | undefined;
@@ -602,17 +608,32 @@ app.on("ready", async () => {
         provider
       );
       workspaceCatalog = nativeWorkspaceCatalog();
+      const options = {
+        provider,
+        mcp,
+        openExternal: (url: string) => shell.openExternal(url),
+        workspaceCatalogRoot: path.dirname(workspaceCatalog.directory),
+      };
+      nativeDesktopAgent = NativeDesktopProfile.managedCutover()
+        ? await NativeDesktopAgent.prepareExisting(
+            accountSession,
+            process.resourcesPath,
+            {
+              requireDrainedClaim: true,
+              verifyWriterAdmission: async (identity, claimId) => {
+                if (!claimId) return false;
+                NativeDesktopProfile.beginPromotion({ ...identity, claimId });
+                return true;
+              },
+            },
+            options
+          )
+        : await NativeDesktopAgent.prepareFresh(
+            accountSession,
+            process.resourcesPath,
+            options
+          );
       await workspaceCatalog.initialize();
-      nativeDesktopAgent = await NativeDesktopAgent.prepareFresh(
-        accountSession,
-        process.resourcesPath,
-        {
-          provider,
-          mcp,
-          openExternal: (url) => shell.openExternal(url),
-          workspaceCatalogRoot: path.dirname(workspaceCatalog.directory),
-        }
-      );
       recentFiles = new RecentStore(app.getPath("userData"), {
         privateFile: true,
       });
@@ -638,7 +659,9 @@ app.on("ready", async () => {
     } catch {
       dialog.showErrorBox(
         "Native chat could not start",
-        "Use a fresh Desktop profile with a separate Grida agent data directory."
+        NativeDesktopProfile.managedCutover()
+          ? "The managed legacy profile could not be verified for archival."
+          : "Use a fresh Desktop profile with a separate Grida agent data directory."
       );
       app.quit();
       return;
@@ -747,7 +770,12 @@ app.on("ready", async () => {
   // approval UI—sit in front of the required Grida account entry flow.
   const sidecarStartup = (async (): Promise<boolean> => {
     try {
-      agentSidecarInfo = await startAgentSidecar(workspaceCatalog?.directory);
+      if (NativeDesktopProfile.managedPredecessor()) {
+        managedLegacyStart = startOwnedLegacyWriter();
+        agentSidecarInfo = (await managedLegacyStart).connection;
+      } else {
+        agentSidecarInfo = await startAgentSidecar(workspaceCatalog?.directory);
+      }
       console.log(
         `[grida] agent sidecar ready on 127.0.0.1:${agentSidecarInfo.port}`
       );
@@ -868,7 +896,7 @@ app.once("will-quit", () => {
   // A dirty window can cancel quit. Keep shared services available until
   // Electron confirms that all windows have closed.
   closeChatGptOAuth();
-  stopAgentSidecar();
+  if (!managedLegacyStart) stopAgentSidecar();
   disposeAllTerminals();
   void disposeAllWorkspaceWatches();
 });
@@ -879,17 +907,20 @@ app.on("will-quit", (event) => {
     accountRevalidationTimer = null;
   }
   entryWindow?.beginShutdown();
-  if ((!nativeDesktopAgent && !nativeEditorMcp) || nativeQuitReady) return;
+  if (
+    (!nativeDesktopAgent && !nativeEditorMcp && !managedLegacyStart) ||
+    nativeQuitReady
+  )
+    return;
   event.preventDefault();
   nativeQuitDrain ??= Promise.allSettled([
     nativeDesktopAgent?.close(),
     nativeEditorMcp?.close(),
+    managedLegacyStart?.then((writer) => writer.drain()),
   ])
     .then((outcomes) => {
       if (outcomes.some((outcome) => outcome.status === "rejected"))
-        console.error(
-          "[grida] native workspace shutdown could not be verified"
-        );
+        console.error("[grida] local agent shutdown could not be verified");
     })
     .finally(() => {
       nativeQuitReady = true;

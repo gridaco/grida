@@ -17,8 +17,13 @@ export namespace NativeDesktopProfile {
   let first: NativeFirstProfile.Paths | undefined;
 
   /** Runs before Electron chooses the browser/session store and instance lock. */
-  export function prepareFirst(app: HostApp, allowBirth: boolean): void {
+  export function prepareFirst(
+    app: HostApp,
+    allowBirth: boolean,
+    legacyPredecessor = false
+  ): void {
     if (first) throw invalidProfile();
+    if (allowBirth && legacyPredecessor) throw invalidProfile();
     const supported =
       process.platform === "darwin" &&
       process.arch === "arm64" &&
@@ -40,7 +45,11 @@ export namespace NativeDesktopProfile {
           app,
           realpathSync.native(app.getPath("temp"))
         )),
-      { supported, allowBirth }
+      {
+        supported,
+        allowBirth: allowBirth || legacyPredecessor,
+        legacyPredecessor,
+      }
     );
     if (!scope || !protectedLegacy) return;
     app.setPath("userData", scope.browser);
@@ -55,13 +64,34 @@ export namespace NativeDesktopProfile {
     return first !== undefined;
   }
 
+  export function managedPredecessor(): boolean {
+    return first?.mode === "legacy";
+  }
+
+  export function managedCutover(): boolean {
+    return first?.mode === "cutover";
+  }
+
+  export function beginPromotion(
+    promotion: NativeFirstProfile.Promotion
+  ): void {
+    if (!first) throw invalidProfile();
+    NativeFirstProfile.beginPromotion(first, promotion);
+  }
+
+  export function managedCutoverControls(): readonly string[] {
+    return first && first.mode !== "native"
+      ? NativeFirstProfile.controlFiles(first)
+      : [];
+  }
+
   export function agentData(): string | undefined {
     return first?.agent ?? process.env.GRIDA_AGENT_USER_DATA;
   }
 
   export function selected(): boolean {
     return (
-      first !== undefined ||
+      (first !== undefined && first.mode !== "legacy") ||
       (process.argv.includes("--native-chat") &&
         !process.argv.includes("--disable-agent") &&
         (process.defaultApp === true ||
@@ -80,7 +110,7 @@ export namespace NativeDesktopProfile {
   /** Shared live path denials for this admitted preview profile. */
   export function legacyRoots(app: Pick<App, "getPath">): ProtectedRoots {
     const roots = admitted.get(app);
-    if (!selected() || !roots) throw invalidProfile();
+    if ((!first && !selected()) || !roots) throw invalidProfile();
     return roots;
   }
 
@@ -92,13 +122,17 @@ export namespace NativeDesktopProfile {
         {
           supported: true,
           allowBirth: false,
+          legacyPredecessor: managedPredecessor(),
         }
       );
       if (
         !scope ||
         scope.root !== first.root ||
+        scope.mode !== first.mode ||
         app.getPath("userData") !== first.browser ||
-        app.getPath("sessionData") !== first.browser
+        app.getPath("sessionData") !== first.browser ||
+        app.getPath("temp") !== first.temp ||
+        app.getPath("documents") !== first.projects
       )
         throw invalidProfile();
       return "gateway";

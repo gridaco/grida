@@ -48,7 +48,11 @@ import { openSessionsDb } from "./session/db";
 import { SessionsStore } from "./session/store";
 import { AgentRuntime } from "./runtime";
 import { StreamRegistry } from "./runtime/stream-registry";
-import { defaultScratchBase, sweepScratch } from "./session/scratch";
+import {
+  defaultScratchBase,
+  prepareScratchAuthority,
+  sweepScratch,
+} from "./session/scratch";
 import { DirectoryScopeRegistry } from "./session/directory-scopes";
 import type { ProviderHttpTransport } from "./providers/http";
 import { MediaHost } from "./media-host";
@@ -156,6 +160,8 @@ export type AgentTenantOptions = {
    * sandbox) injects its own.
    */
   scratch_base?: string;
+  /** Preserve inputs when the host exclusively owns a managed legacy source. */
+  retain_session_scratch?: true;
   /**
    * Catalog model id the agent's `generate_image` tool produces with — the
    * user's selected image model (host config). The tool is prompt-only, so the
@@ -251,6 +257,16 @@ export type AgentTenantOptions = {
  * config store, the runtime + in-flight stream registry).
  */
 export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
+  if (
+    opts.retain_session_scratch &&
+    (!opts.scratch_base ||
+      opts.sandbox_enforced !== true ||
+      opts.shell_executor ||
+      opts.allow_unsandboxed_shell ||
+      (opts.external_agent_execution &&
+        opts.external_agent_execution !== "disabled"))
+  )
+    throw new Error("managed_scratch_authority_invalid");
   const caps = {
     secrets: opts.capabilities?.secrets ?? true,
     agent: opts.capabilities?.agent ?? true,
@@ -386,7 +402,9 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       // underneath a running command by a still-in-flight async sweep.
       const scratchBase =
         opts.scratch_base ?? defaultScratchBase(services.user_data_path);
-      sweepScratch(scratchBase, services.user_data_path);
+      if (opts.retain_session_scratch)
+        prepareScratchAuthority(scratchBase, services.user_data_path);
+      else sweepScratch(scratchBase, services.user_data_path);
       const runtime = new AgentRuntime({
         secrets: services.secrets,
         endpoints: endpointsStore,
@@ -515,6 +533,8 @@ export type AgentDaemonOptions = AgentTenantOptions & {
   projects_root?: string;
   /** Daemon-frame field: host-injected root for durable generated media. */
   media_root?: string;
+  /** Additional host-owned file roots excluded from the daemon file routes. */
+  protected_file_roots?: readonly string[];
   /** Host/client HTTP perimeter policy for CORS + Referer checks. */
   http_access: DaemonHttpAccess;
   /** Loopback host to bind. Default `127.0.0.1`. */
@@ -551,6 +571,7 @@ export function agentTenantOptionsFromDaemon(
     provider_home: _providerHome,
     projects_root: _projectsRoot,
     media_root: _mediaRoot,
+    protected_file_roots: _protectedFileRoots,
     http_access: _httpAccess,
     hostname: _hostname,
     port: _port,
@@ -573,6 +594,7 @@ export function createAgentDaemon(opts: AgentDaemonOptions): DaemonServer {
     provider_home: opts.provider_home,
     projects_root: opts.projects_root,
     media_root: opts.media_root,
+    protected_file_roots: opts.protected_file_roots,
     http_access: opts.http_access,
     hostname: opts.hostname,
     port: opts.port,
