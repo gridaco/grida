@@ -1,40 +1,32 @@
-// GRIDA-SEC-004 — built ACP command permission and Linux confinement cases.
+// GRIDA-SEC-004 — built ACP command permission and native confinement cases.
 use super::*;
-use std::net::{Ipv4Addr, Ipv6Addr};
 use std::os::unix::fs::symlink;
-use std::os::unix::net::{UnixListener, UnixStream};
-
-const PROBE_EXECUTABLE: &str = "command-socket-probe";
-const PROBE_TEST: &str = "approvals::linux::approved_command_stays_in_scope_after_alias_retarget";
-const PROBE_SOCKET: &str = "GRIDA_AGENT_TEST_COMMAND_SOCKET";
-const PROBE_PORT: &str = "GRIDA_AGENT_TEST_COMMAND_PORT";
-const SOCKET_DENIALS: &str = "Unix, IPv4, and IPv6 socket creation denied";
 
 #[test]
-#[ignore = "requires a reviewed native helper and working Linux bubblewrap"]
+#[ignore = "requires a reviewed native helper and working Seatbelt or bubblewrap"]
 fn approved_command_stays_in_scope_after_alias_retarget() {
-    // Run the exact same test binary as a socket probe inside the command's
-    // namespace. The parent requires its marker in the actual tool result.
-    let executable = std::env::current_exe().unwrap();
-    if executable
-        .file_name()
-        .is_some_and(|name| name == PROBE_EXECUTABLE)
-    {
-        verify_socket_denials();
+    #[cfg(target_os = "linux")]
+    if socket_probe::is_child() {
+        socket_probe::verify_denials();
         return;
     }
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap()
-        .block_on(approve_scoped_command(executable));
+        .block_on(approve_scoped_command());
 }
 
-async fn approve_scoped_command(executable: PathBuf) {
+async fn approve_scoped_command() {
     let fixture = Fixture::new(true);
     let contained = fixture.extra.join("contained");
     let attached = fixture.extra.join("attached");
-    let protected = fixture._base.path().join("protected");
+    let protected = fixture
+        ._base
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join("protected");
     let secret = protected.join("input");
     let forbidden = protected.join("forbidden-write");
     fs::create_dir(&contained).unwrap();
@@ -46,24 +38,22 @@ async fn approve_scoped_command(executable: PathBuf) {
     profile["protectedPaths"] = json!([protected]);
     fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
 
-    let probe = fixture.extra.join(PROBE_EXECUTABLE);
-    fs::copy(executable, &probe).unwrap();
-    fs::set_permissions(&probe, fs::Permissions::from_mode(0o700)).unwrap();
-    let socket = fixture.extra.join("listener.sock");
-    let _unix = UnixListener::bind(&socket).unwrap();
-    let tcp = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
     let args = json!({
         "directory":"extra","access":"read_write","program":"/bin/bash","cwd":fixture.extra,
-        "env":{(PROBE_SOCKET):socket,(PROBE_PORT):tcp.local_addr().unwrap().port().to_string()},
         "args":["-c",r#"
             if (: < "$1") 2>/dev/null; then exit 41; fi
             if (: < attached/input) 2>/dev/null; then exit 42; fi
             if (printf denied > "$2") 2>/dev/null; then exit 43; fi
-            test -S "$3" || exit 44
-            "./$4" --exact "$5" --include-ignored --nocapture --test-threads=1 || exit 45
+            if (printf denied > attached/forbidden-write) 2>/dev/null; then exit 44; fi
+            if [ "$#" -gt 2 ]; then
+                test -S "$3" || exit 45
+                "./$4" --exact "$5" --include-ignored --nocapture --test-threads=1 || exit 46
+            fi
             printf selected >> effect
-        "#,"scope-fixture",secret,forbidden,socket,PROBE_EXECUTABLE,PROBE_TEST],
+        "#,"scope-fixture",secret,forbidden],
     });
+    #[cfg(target_os = "linux")]
+    let (args, _listeners) = socket_probe::bind(args, &fixture.extra);
     let mut endpoint = Endpoint::start(vec![
         Reply::Tool("run_command", Box::leak(args.to_string().into_boxed_str())),
         Reply::Finished("Command complete."),
@@ -92,13 +82,21 @@ async fn approve_scoped_command(executable: PathBuf) {
         .unwrap();
     let outcome: Value = serde_json::from_str(tool["content"].as_str().unwrap()).unwrap();
     assert_eq!(outcome["status"], "succeeded", "{outcome}");
-    assert!(
-        outcome["content"].to_string().contains(SOCKET_DENIALS),
-        "{outcome}"
-    );
-    assert_eq!(outcome["structured"]["backend"], "bubblewrap");
+    #[cfg(target_os = "linux")]
+    {
+        socket_probe::assert_denied(&outcome);
+        assert_eq!(outcome["structured"]["backend"], "bubblewrap");
+        assert_eq!(outcome["structured"]["descendants"], "namespace_ended");
+    }
+    #[cfg(target_os = "macos")]
+    {
+        assert_eq!(outcome["structured"]["backend"], "seatbelt");
+        assert_eq!(
+            outcome["structured"]["descendants"],
+            "process_group_signalled"
+        );
+    }
     assert_eq!(outcome["structured"]["completion"]["code"], 0);
-    assert_eq!(outcome["structured"]["descendants"], "namespace_ended");
     assert_eq!(outcome["structured"]["cleanup_verified"], true);
     assert_eq!(fs::read(fixture.extra.join("effect")).unwrap(), b"selected");
     assert!(!forbidden.exists());
@@ -111,18 +109,7 @@ async fn approve_scoped_command(executable: PathBuf) {
     endpoint.done().await;
 }
 
-fn verify_socket_denials() {
-    let socket = std::env::var_os(PROBE_SOCKET).unwrap();
-    let port: u16 = std::env::var(PROBE_PORT).unwrap().parse().unwrap();
-    let unix = UnixStream::connect(socket).unwrap_err();
-    let ipv4 = std::net::TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap_err();
-    let ipv6 = std::net::TcpStream::connect((Ipv6Addr::LOCALHOST, port)).unwrap_err();
-    for error in [unix, ipv4, ipv6] {
-        assert_eq!(error.raw_os_error(), Some(libc::EPERM), "{error}");
-    }
-    println!("{SOCKET_DENIALS}");
-}
-
+#[cfg(target_os = "linux")]
 #[tokio::test]
 #[ignore = "requires a reviewed native helper and working Linux bubblewrap"]
 async fn stopping_an_approved_command_stops_its_detached_work() {
@@ -207,4 +194,62 @@ async fn stopping_an_approved_command_stops_its_detached_work() {
     );
     assert!(endpoint.requests.try_recv().is_err());
     endpoint.done().await;
+}
+
+#[cfg(target_os = "linux")]
+mod socket_probe {
+    use super::*;
+    use std::net::{Ipv4Addr, Ipv6Addr, TcpListener, TcpStream};
+    use std::os::unix::net::{UnixListener, UnixStream};
+
+    const EXECUTABLE: &str = "command-socket-probe";
+    const TEST: &str =
+        "approvals::confinement::approved_command_stays_in_scope_after_alias_retarget";
+    const SOCKET: &str = "GRIDA_AGENT_TEST_COMMAND_SOCKET";
+    const PORT: &str = "GRIDA_AGENT_TEST_COMMAND_PORT";
+    const DENIALS: &str = "Unix, IPv4, and IPv6 socket creation denied";
+
+    pub(super) fn is_child() -> bool {
+        std::env::current_exe()
+            .unwrap()
+            .file_name()
+            .is_some_and(|name| name == EXECUTABLE)
+    }
+
+    // Reuse the same test binary inside the command's namespace. Its parent
+    // keeps both listeners open and requires the probe marker in the tool result.
+    pub(super) fn bind(mut args: Value, workspace: &Path) -> (Value, (UnixListener, TcpListener)) {
+        let probe = workspace.join(EXECUTABLE);
+        fs::copy(std::env::current_exe().unwrap(), &probe).unwrap();
+        fs::set_permissions(&probe, fs::Permissions::from_mode(0o700)).unwrap();
+        let socket = workspace.join("listener.sock");
+        let unix = UnixListener::bind(&socket).unwrap();
+        let tcp = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        args["env"] = json!({(SOCKET):socket,(PORT):tcp.local_addr().unwrap().port().to_string()});
+        args["args"].as_array_mut().unwrap().extend([
+            json!(socket),
+            json!(EXECUTABLE),
+            json!(TEST),
+        ]);
+        (args, (unix, tcp))
+    }
+
+    pub(super) fn verify_denials() {
+        let socket = std::env::var_os(SOCKET).unwrap();
+        let port: u16 = std::env::var(PORT).unwrap().parse().unwrap();
+        let unix = UnixStream::connect(socket).unwrap_err();
+        let ipv4 = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap_err();
+        let ipv6 = TcpStream::connect((Ipv6Addr::LOCALHOST, port)).unwrap_err();
+        for error in [unix, ipv4, ipv6] {
+            assert_eq!(error.raw_os_error(), Some(libc::EPERM), "{error}");
+        }
+        println!("{DENIALS}");
+    }
+
+    pub(super) fn assert_denied(outcome: &Value) {
+        assert!(
+            outcome["content"].to_string().contains(DENIALS),
+            "{outcome}"
+        );
+    }
 }

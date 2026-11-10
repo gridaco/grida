@@ -6,9 +6,8 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use tokio::process::{ChildStdin, ChildStdout};
 
-#[cfg(target_os = "linux")]
-#[path = "approvals/linux.rs"]
-mod linux;
+#[path = "approvals/confinement.rs"]
+mod confinement;
 
 const LIST: &str = "co.grida/session/approvals";
 const ANSWER: &str = "co.grida/session/answer-approval";

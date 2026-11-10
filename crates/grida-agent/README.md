@@ -353,20 +353,22 @@ Continuation rechecks the launch profile and native identity before dispatch.
 Unverified command cleanup surfaces uncertainty and stops automatic queue
 advancement.
 
-Run the opt-in ACP approval fixtures on Linux with Bash, `setsid`, and a
-trusted non-setuid bubblewrap installation that supports unprivileged user and
-PID namespaces. From the workspace root, build and select the private helper.
+Run the opt-in ACP approval fixtures on macOS with Bash and Seatbelt. On
+Linux, use Bash, `setsid`, and a trusted non-setuid bubblewrap installation
+with unprivileged user and PID namespaces. On Linux, set
+`AGENT_KIT_TEST_BWRAP` to the bubblewrap executable's canonical path.
+From the workspace root, build and select the private helper.
 
 ```sh
 cargo build --locked -p agent-kit-sandbox --bin agent-kit-sandbox-helper
 GRIDA_AGENT_TEST_SANDBOX_HELPER="$PWD/target/debug/agent-kit-sandbox-helper" \
-  AGENT_KIT_TEST_BWRAP=/usr/bin/bwrap \
   cargo test --locked -p grida-agent --test process -- approvals:: --include-ignored --test-threads=1
 ```
 
-The Linux cases retarget a folder alias into a protected root before approval,
-exercise local socket denials, and stop detached work through private ACP.
-They use synthetic loopback provider responses and disposable files.
+The suite retargets a folder alias into a protected root while review is
+pending. The Linux cases also exercise local socket denials and stop detached
+work through private ACP. The fixtures use synthetic loopback provider
+responses and disposable files.
 
 Persistent goals are available through negotiated ACP and the embedded Host.
 The initial work and explicitly authorized automatic follow-ups use the same
