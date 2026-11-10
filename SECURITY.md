@@ -904,6 +904,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   A disconnected child stops serving attachments. The workspace can be reopened
   after the process owner observes exit. Reopening does not replay interrupted
   provider work, and the old provider connection is released before launch.
+  A failed launch closes provider egress and retains workspace ownership if the
+  exact child's termination is unverified. The child and its pipes must close
+  before a replacement can start. [Quarantine fixtures](desktop/src/main/native-workspace-agents.test.ts)
+  verify late close, refusal of duplicate launch, and unverified drain.
 - [Native Desktop composition](desktop/src/main/native-desktop-agent.ts) looks
   up the selected workspace in the retained sidecar registry before launch.
   It binds the main-owned Gateway connection and scoped read profile, withdraws

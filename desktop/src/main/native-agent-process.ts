@@ -39,6 +39,23 @@ type Pending = {
   timer: ReturnType<typeof setTimeout>;
 };
 
+/** Exact child custody after the bounded stop attempt has run out of time. */
+export class NativeAgentTerminationPending extends Error {
+  readonly terminated: Promise<void>;
+  private observed = false;
+
+  constructor(exited: Promise<unknown>) {
+    super("native_agent_shutdown_unverified");
+    this.terminated = exited.then(() => {
+      this.observed = true;
+    });
+  }
+
+  get hasExited(): boolean {
+    return this.observed;
+  }
+}
+
 export class NativeAgentProcess {
   readonly permissions?: NativeAgentPermissions;
   private readonly pending = new Map<number, Pending>();
@@ -293,8 +310,15 @@ export class NativeAgentProcess {
     if (exit && !this.ready) return;
     if (exit?.code === 0 && exit.signal === null) return;
     if (!exit) {
-      this.child.kill("SIGKILL");
-      await bounded(this.exited, KILL_TIMEOUT_MS);
+      try {
+        this.child.kill("SIGKILL");
+      } catch {
+        // A signal failure is not evidence that the child has closed.
+      }
+      const forced = await bounded(this.exited, KILL_TIMEOUT_MS);
+      if (!forced && !this.observedExit)
+        throw new NativeAgentTerminationPending(this.exited);
+      if (!this.ready) return;
     }
     throw new Error("native_agent_shutdown_unverified");
   }

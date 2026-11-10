@@ -5,6 +5,7 @@ import type {
   NativeAgentChatLaunch,
 } from "./native-agent-chat";
 import type { NativeAgentCutover } from "./native-agent-cutover";
+import { NativeAgentTerminationPending } from "./native-agent-process";
 import type { ActiveNativeChat } from "./native-chat-ipc";
 
 const MAX_LIVE_WORKSPACES = 8;
@@ -79,9 +80,7 @@ export class NativeWorkspaceAgents {
     });
     const slot: Slot = { root, opened, visible };
     this.slots.set(id, slot);
-    void opened.catch(() => {
-      if (this.slots.get(id) === slot) this.slots.delete(id);
-    });
+    void opened.catch((error: unknown) => this.retireSlot(id, slot, error));
     return visible;
   }
 
@@ -106,26 +105,53 @@ export class NativeWorkspaceAgents {
         release: candidate.release,
       };
     } catch (error) {
-      candidate.release?.();
+      try {
+        candidate.release?.();
+      } catch (releaseError) {
+        // A provider cleanup failure must preserve the exact child watcher.
+        if (!(error instanceof NativeAgentTerminationPending))
+          throw releaseError;
+      }
       throw error;
     }
   }
 
   private async drain(): Promise<void> {
     const closed = await Promise.allSettled(
-      [...this.slots.values()].map(async (slot) => {
-        const owner = await slot.opened.catch(() => undefined);
+      [...this.slots].map(async ([id, slot]) => {
+        const owner = await slot.opened.catch((error: unknown) => {
+          if (
+            error instanceof NativeAgentTerminationPending &&
+            !error.hasExited
+          )
+            throw error;
+          return undefined;
+        });
         if (!owner) return;
         try {
           await owner.active.chat.close();
+          this.retireSlot(id, slot);
+        } catch (error) {
+          this.retireSlot(id, slot, error);
+          throw error;
         } finally {
           owner.release?.();
         }
       })
     );
-    this.slots.clear();
     if (closed.some((result) => result.status === "rejected"))
       throw new Error("native_workspace_shutdown_unverified");
+  }
+
+  private retireSlot(id: string, slot: Slot, error?: unknown): void {
+    const remove = () => {
+      if (this.slots.get(id) === slot) this.slots.delete(id);
+    };
+    // Startup can fail before a chat attachment exists. Keep the workspace
+    // occupied until the exact child and its pipes have closed.
+    if (error instanceof NativeAgentTerminationPending && !error.hasExited)
+      void error.terminated.then(remove);
+    else remove();
   }
 }
 
