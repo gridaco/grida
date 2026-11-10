@@ -111,6 +111,13 @@ input-token cap is configured. Counting sends the captured input to the same
 provider under the same credential and deadline. Unsupported counting and
 over-limit input return a persisted failure before generation.
 
+For a local llama.cpp text server, add `--llama-cpp-input-count` with
+`--provider openai-compatible` and a direct numeric loopback `/v1` endpoint
+such as `http://127.0.0.1:8080/v1`. When a cap applies, the host sends the
+complete prepared text and tool request to the server's count route before
+generation. A missing or invalid count leaves the turn failed before
+generation. This launch option keeps its own saved connection identity.
+
 `run` reads one UTF-8 prompt from stdin or `--prompt`, with a 512 KiB
 input bound. `--session SESSION_ID` continues a settled session in its
 original workspace and provider selection. A changed output allowance
@@ -349,8 +356,8 @@ A changed provider credential blocks dispatch for that retained task.
 
 The host reads `config.toml` from its private state directory and retains an
 immutable defaults snapshot with each accepted input. A setting change applies
-to later inputs. The current compatible adapter rejects an explicit input-token
-cap before generation when it cannot establish a hard bound.
+to later inputs. A compatible connection without exact counting rejects an
+explicit input-token cap before generation.
 
 A private stdio supervisor can give workers with separate chat stores one
 workspace configuration. They share the workspace's existing `config.toml`

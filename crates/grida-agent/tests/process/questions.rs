@@ -479,6 +479,7 @@ async fn answer_before_a_deferred_step_suspends_keeps_its_resume_wake() {
             credential_home: None,
             credential_env: None,
             compatible_output_limit_field: None,
+            llama_cpp_input_count: false,
             max_output_tokens: 1024,
         }),
     )

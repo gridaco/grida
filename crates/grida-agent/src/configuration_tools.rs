@@ -398,6 +398,7 @@ mod tests {
                 protocol: ProviderProtocol::OpenAiCompatible,
                 max_output_tokens: 128,
                 compatible_output_limit_field: None,
+                llama_cpp_input_count: false,
             }),
         )
         .unwrap();

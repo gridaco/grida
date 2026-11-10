@@ -1,20 +1,21 @@
 mod stream;
 
 use crate::wire::{
-    RateRejectionEvidence, function_name, image_data_url, image_profile, short_identity,
-    text_profile, tool_result, tool_result_payload,
+    RateRejectionEvidence, check_count_control, count_failure, count_openai_input, function_name,
+    image_data_url, image_profile, short_identity, text_profile, tool_result, tool_result_payload,
 };
 use crate::{
     InputImageResolver, StreamLimits, StreamingTransport, TransportOperation, TransportRequest,
 };
 use agent_kit_core::inference::{
-    InferenceControl, InferenceRequest, InferenceRun, InputFormat, ModelCapabilities,
-    PreparedRequest, Provider, ProviderBinding,
+    FailureKind, InferenceControl, InferenceFailure, InferenceRequest, InferenceRun, InputFormat,
+    InputMeasurement, ModelCapabilities, PreparedRequest, Provider, ProviderBinding,
+    RequestControl,
 };
 use agent_kit_core::messages::{
     Content, Message, ResultContent, Retention, Role, ToolArguments, ToolResult,
 };
-use agent_kit_core::{Error, ErrorKind, ModelId, Result, ToolId};
+use agent_kit_core::{BoxFuture, Error, ErrorKind, ModelId, Result, ToolId};
 use serde_json::{Value, json};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
@@ -42,6 +43,7 @@ pub struct OpenAiCompatible {
     images: Option<Arc<InputImageResolver>>,
     retained_png_tool_results: bool,
     rate_rejection_evidence: RateRejectionEvidence,
+    llama_cpp_input_count: bool,
 }
 
 impl OpenAiCompatible {
@@ -82,6 +84,7 @@ impl OpenAiCompatible {
             images,
             retained_png_tool_results: false,
             rate_rejection_evidence: RateRejectionEvidence::None,
+            llama_cpp_input_count: false,
         })
     }
 
@@ -99,6 +102,34 @@ impl OpenAiCompatible {
     pub fn with_admission_rate_limit_evidence(mut self) -> Self {
         self.rate_rejection_evidence = RateRejectionEvidence::CodeAndType;
         self
+    }
+
+    /// Use the reviewed llama.cpp input-count route for this bound text profile.
+    /// The host verifies the endpoint and owns the operation allowlist.
+    pub fn with_llama_cpp_input_count(mut self) -> Result<Self> {
+        if self
+            .models
+            .values()
+            .any(|model| !text_profile(&model.capabilities))
+        {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "input_measurement_unavailable",
+            ));
+        }
+        self.llama_cpp_input_count = true;
+        Ok(self)
+    }
+
+    fn prepared_model(&self, request: &PreparedRequest) -> Result<&ModelProfile> {
+        let profile = self.model(&request.request().model)?;
+        if request.binding() != &self.binding || request.capabilities() != &profile.capabilities {
+            return Err(Error::new(
+                ErrorKind::Conflict,
+                "prepared_provider_binding_changed",
+            ));
+        }
+        Ok(profile)
     }
 
     fn model(&self, model: &ModelId) -> Result<&ModelProfile> {
@@ -230,14 +261,39 @@ impl Provider for OpenAiCompatible {
         PreparedRequest::from_validated(request, self.binding.clone(), profile.capabilities.clone())
     }
 
+    fn measure_input_async<'a>(
+        &'a self,
+        request: &'a PreparedRequest,
+        control: RequestControl,
+    ) -> BoxFuture<'a, std::result::Result<InputMeasurement, InferenceFailure>> {
+        Box::pin(async move {
+            if !self.llama_cpp_input_count {
+                return Err(count_failure(
+                    "input_measurement_unavailable",
+                    FailureKind::Configuration,
+                ));
+            }
+            check_count_control(&control)?;
+            let encoded = self
+                .prepared_model(request)
+                .and_then(|profile| self.encode(request.request(), profile, true))
+                .map_err(|error| count_failure(&error.code, FailureKind::Configuration))?;
+            count_openai_input(
+                self.transport.as_ref(),
+                TransportRequest {
+                    binding: self.binding.clone(),
+                    operation: TransportOperation::LlamaCppChatInputTokens,
+                    body: encoded.body,
+                    max_response_bytes: self.limits.max_response_bytes,
+                },
+                control,
+            )
+            .await
+        })
+    }
+
     fn start(&self, request: PreparedRequest, control: InferenceControl) -> Result<InferenceRun> {
-        let profile = self.model(&request.request().model)?;
-        if request.binding() != &self.binding || request.capabilities() != &profile.capabilities {
-            return Err(Error::new(
-                ErrorKind::Conflict,
-                "prepared_provider_binding_changed",
-            ));
-        }
+        let profile = self.prepared_model(&request)?;
         let encoded = self.encode(request.request(), profile, true)?;
         let transport = Arc::clone(&self.transport);
         let limits = self.limits;

@@ -33,6 +33,11 @@ Remote counting sends the prepared input to the selected provider under the
 same authority and deadline as generation. An estimate cannot certify this
 hard limit.
 
+Source-built native clients can count requests on Responses connections and
+on a supported local llama.cpp text connection explicitly launched with
+`--llama-cpp-input-count`. The llama.cpp option requires a direct numeric
+loopback `/v1` endpoint. It does not discover or change the model's capacity.
+
 The limit remains subject to actual model capacity and host constraints. A larger
 value does not enlarge the model's context window. Remove `max_input_tokens` to
 restore automatic budgeting. Zero is invalid.

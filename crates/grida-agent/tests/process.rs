@@ -97,6 +97,7 @@ struct Endpoint {
 enum Reply {
     Finished(&'static str),
     InputCount(u64),
+    InvalidInputCount,
     RateLimited {
         code: &'static str,
         retry_after: &'static [&'static str],
@@ -197,14 +198,16 @@ async fn fixture_request(
     let mut stream = BufReader::new(stream);
     let mut line = String::new();
     stream.read_line(&mut line).await.unwrap();
-    let path = match protocol {
-        ProviderProtocol::OpenAiCompatible => "/v1/chat/completions",
-        ProviderProtocol::Responses if matches!(&reply, Reply::InputCount(_)) => {
-            "/v1/responses/input_tokens"
+    let count = matches!(&reply, Reply::InputCount(_) | Reply::InvalidInputCount);
+    let path = match (protocol, count) {
+        (ProviderProtocol::OpenAiCompatible, true) => "/v1/chat/completions/input_tokens",
+        (ProviderProtocol::OpenAiCompatible, false) => "/v1/chat/completions",
+        (ProviderProtocol::Responses, true) => "/v1/responses/input_tokens",
+        (ProviderProtocol::Responses, false) => "/v1/responses",
+        (ProviderProtocol::Anthropic, _) => "/v1/messages",
+        (ProviderProtocol::Gemini, _) => {
+            "/v1beta/models/fixture-model:streamGenerateContent?alt=sse"
         }
-        ProviderProtocol::Responses => "/v1/responses",
-        ProviderProtocol::Anthropic => "/v1/messages",
-        ProviderProtocol::Gemini => "/v1beta/models/fixture-model:streamGenerateContent?alt=sse",
     };
     assert_eq!(line, format!("POST {path} HTTP/1.1\r\n"));
     let mut length = None;
@@ -266,10 +269,18 @@ async fn fixture_request(
             .unwrap();
         return;
     }
-    if let Reply::InputCount(tokens) = reply {
-        assert_eq!(protocol, ProviderProtocol::Responses);
+    let count_body = match reply {
+        Reply::InputCount(tokens) => {
+            Some(json!({"object":"response.input_tokens","input_tokens":tokens}))
+        }
+        Reply::InvalidInputCount => {
+            Some(json!({"object":"response.input_tokens","input_tokens":"unavailable"}))
+        }
+        _ => None,
+    };
+    if let Some(body) = count_body {
         assert_eq!(accept.as_deref(), Some("application/json"));
-        let body = json!({"object":"response.input_tokens","input_tokens":tokens}).to_string();
+        let body = body.to_string();
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
             body.len()
@@ -346,7 +357,9 @@ fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
         Reply::Finished(text) => (text, Some("stop")),
         Reply::Hold(text) => (text, None),
         Reply::Stop(reason) => ("", Some(reason)),
-        Reply::InputCount(_) => unreachable!("count responses use the JSON endpoint"),
+        Reply::InputCount(_) | Reply::InvalidInputCount => {
+            unreachable!("count responses use the JSON endpoint")
+        }
         Reply::RateLimited { .. } => unreachable!("rate limits use an HTTP error response"),
         #[cfg(unix)]
         Reply::RawHttp(_) => unreachable!("raw responses include their own HTTP headers"),
@@ -524,6 +537,102 @@ fn records(bytes: &[u8]) -> Vec<Value> {
         .lines()
         .map(|line| serde_json::from_str(line).unwrap())
         .collect()
+}
+
+#[tokio::test]
+async fn local_compatible_count_admits_exact_limit_for_the_complete_chat_request() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    responses::input_limit(&state, 32);
+    let mut endpoint = Endpoint::start(vec![
+        Reply::InputCount(32),
+        Reply::Finished("Counted local reply."),
+    ])
+    .await;
+    let mut command = executable();
+    command.arg("run");
+    configured(&mut command, &state, &endpoint.url);
+    command.arg("--cwd").arg(workspace.path()).args([
+        "--llama-cpp-input-count",
+        "--questions",
+        "--prompt",
+        "Count this input",
+    ]);
+    let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        records(&output.stdout)[1]["account"]["text"],
+        "Counted local reply."
+    );
+    let count = endpoint.request().await;
+    assert_eq!(count, endpoint.request().await);
+    assert_eq!(count["model"], "fixture-model");
+    assert!(
+        count["messages"].as_array().unwrap().iter().any(|message| {
+            message["role"] == "user" && message["content"] == "Count this input"
+        })
+    );
+    assert!(count["tools"].as_array().unwrap().iter().any(|tool| {
+        tool["function"]["name"] == "question" && tool["function"]["parameters"].is_object()
+    }));
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn local_compatible_count_denies_unverified_or_excessive_input_before_generation() {
+    for (enabled, replies, code) in [
+        (false, vec![], "input_measurement_unavailable"),
+        (
+            true,
+            vec![Reply::InvalidInputCount],
+            "input_measurement_invalid",
+        ),
+        (true, vec![Reply::InputCount(33)], "input_token_limit"),
+    ] {
+        let temporary = TempDir::new().unwrap();
+        let state = temporary.path().join("agent-state");
+        let workspace = TempDir::new().unwrap();
+        responses::input_limit(&state, 32);
+        let mut endpoint = Endpoint::start(replies).await;
+        let mut command = executable();
+        command.arg("run");
+        configured(&mut command, &state, &endpoint.url);
+        command
+            .arg("--cwd")
+            .arg(workspace.path())
+            .args(["--prompt", "Check input before generation"]);
+        if enabled {
+            command.arg("--llama-cpp-input-count");
+        }
+        let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(1),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let result = records(&output.stdout);
+        let account = &result[1]["account"];
+        assert_eq!(account["inference_failure"]["code"], code);
+        for field in ["observations", "unreported_attempts"] {
+            assert!(
+                account["inference_usage"][field]
+                    .as_array()
+                    .unwrap()
+                    .is_empty()
+            );
+        }
+        if enabled {
+            endpoint.request().await;
+        }
+        assert!(endpoint.requests.try_recv().is_err());
+        endpoint.done().await;
+    }
 }
 
 #[tokio::test]
@@ -999,6 +1108,7 @@ async fn dropping_admission_waiter_leaves_the_worker_under_host_ownership() {
             protocol: ProviderProtocol::OpenAiCompatible,
             credential_home: None,
             compatible_output_limit_field: None,
+            llama_cpp_input_count: false,
             endpoint: endpoint.url.clone(),
             model: ModelId::new("fixture-model").unwrap(),
             credential_env: None,
@@ -1570,6 +1680,7 @@ async fn retry_reports_a_previously_accepted_unclaimed_input_without_starting_it
         protocol: ProviderProtocol::OpenAiCompatible,
         credential_home: None,
         compatible_output_limit_field: None,
+        llama_cpp_input_count: false,
         endpoint: "http://127.0.0.1:1/v1".into(),
         model: ModelId::new("fixture-model").unwrap(),
         credential_env: None,
@@ -2076,6 +2187,7 @@ async fn compatible_paths_with_different_dispatch_targets_have_distinct_session_
         protocol: ProviderProtocol::OpenAiCompatible,
         credential_home: None,
         compatible_output_limit_field: None,
+        llama_cpp_input_count: false,
     };
     let host = Host::open(&state, Some(options("http://127.0.0.1:1/v1"))).unwrap();
     let session = host.new_session(workspace.path().into()).await.unwrap();

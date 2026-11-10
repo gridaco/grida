@@ -1443,6 +1443,7 @@ mod tests {
                 protocol: ProviderProtocol::OpenAiCompatible,
                 credential_home: None,
                 compatible_output_limit_field: None,
+                llama_cpp_input_count: false,
             }),
         )
         .unwrap()
@@ -1513,6 +1514,7 @@ mod tests {
             protocol: ProviderProtocol::OpenAiCompatible,
             credential_home: None,
             compatible_output_limit_field: None,
+            llama_cpp_input_count: false,
         };
         let host = Host::open(&state, Some(options()))
             .unwrap()
@@ -1649,6 +1651,7 @@ mod tests {
                 protocol: ProviderProtocol::OpenAiCompatible,
                 credential_home: None,
                 compatible_output_limit_field: None,
+                llama_cpp_input_count: false,
             }),
         )
         .unwrap()
@@ -1722,6 +1725,7 @@ mod tests {
                 protocol: ProviderProtocol::OpenAiCompatible,
                 credential_home: None,
                 compatible_output_limit_field: Some(CompatibleOutputLimitField::MaxTokens),
+                llama_cpp_input_count: false,
             }),
         )
         .unwrap()
@@ -1809,6 +1813,7 @@ mod tests {
                 protocol: ProviderProtocol::OpenAiCompatible,
                 credential_home: None,
                 compatible_output_limit_field: None,
+                llama_cpp_input_count: false,
             }),
         )
         .unwrap()

@@ -2791,7 +2791,9 @@ impl Execution {
                     PROVIDER_LIMITS,
                     image_resolver,
                 )?;
-                Arc::new(if compatible_tool_images {
+                Arc::new(if options.llama_cpp_input_count {
+                    provider.with_llama_cpp_input_count()?
+                } else if compatible_tool_images {
                     provider.with_retained_png_tool_results()
                 } else {
                     provider

@@ -180,6 +180,7 @@ fn command() -> Command {
                             "credential-env",
                             "credential-home",
                             "compatible-output-limit-field",
+                            "llama-cpp-input-count",
                         ])
                         .hide(true),
                 )
@@ -193,6 +194,7 @@ fn command() -> Command {
                             "credential-env",
                             "credential-home",
                             "compatible-output-limit-field",
+                            "llama-cpp-input-count",
                             "max-output-tokens",
                         ])
                         .hide(true),
@@ -405,6 +407,12 @@ fn launch(command: Command) -> Command {
                 .help("Select the output-limit field for an OpenAI-compatible endpoint"),
         )
         .arg(
+            Arg::new("llama-cpp-input-count")
+                .long("llama-cpp-input-count")
+                .action(ArgAction::SetTrue)
+                .help("Use the llama.cpp text request counter on a direct numeric-loopback /v1 endpoint"),
+        )
+        .arg(
             Arg::new("max-output-tokens")
                 .long("max-output-tokens")
                 .value_name("TOKENS")
@@ -484,6 +492,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         return Ok(0);
     }
     let provider = ProviderOptions {
+        llama_cpp_input_count: args.get_flag("llama-cpp-input-count"),
         compatible_output_limit_field: args.get_one::<String>("compatible-output-limit-field").map(
             |value| match value.as_str() {
                 "max-completion-tokens" => CompatibleOutputLimitField::MaxCompletionTokens,

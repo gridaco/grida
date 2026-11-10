@@ -24,6 +24,7 @@ fn options(endpoint: &Endpoint) -> ProviderOptions {
         credential_home: None,
         max_output_tokens: 1024,
         compatible_output_limit_field: None,
+        llama_cpp_input_count: false,
     }
 }
 

@@ -5,7 +5,8 @@ use crate::{
 };
 use agent_kit_core::inference::{
     DispatchEvidence, FailureKind, InferenceControl, InferenceFailure, InferenceStatus,
-    InferenceUpdate, MeasurementKind, Modality, ModelCapabilities, ProviderEvent, UsageObservation,
+    InferenceUpdate, InputMeasurement, MeasurementKind, Modality, ModelCapabilities, ProviderEvent,
+    RequestControl, UsageObservation,
 };
 use agent_kit_core::messages::{MediaRef, ResultContent, ToolResult};
 use agent_kit_core::{
@@ -18,6 +19,9 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt::Write;
 use std::sync::Arc;
+use std::time::Instant;
+
+const COUNT_RESPONSE_BYTES: usize = 4096;
 
 pub(crate) enum Incoming {
     Receipt(Envelope),
@@ -250,11 +254,74 @@ fn receipt(id: String) -> Option<Envelope> {
     .ok()
 }
 
-pub(crate) async fn read_http_error(
-    response: TransportResponse,
-    maximum: usize,
-) -> InferenceFailure {
-    read_http_failure(response, maximum, RateRejectionEvidence::None).await
+pub(crate) fn check_count_control(
+    control: &RequestControl,
+) -> std::result::Result<(), InferenceFailure> {
+    if control.cancellation.is_cancelled() {
+        return Err(count_failure("cancelled", FailureKind::Cancelled));
+    }
+    if control
+        .deadline
+        .is_some_and(|deadline| deadline <= Instant::now())
+    {
+        return Err(count_failure("deadline", FailureKind::Cancelled));
+    }
+    Ok(())
+}
+
+pub(crate) async fn count_openai_input(
+    transport: &dyn StreamingTransport,
+    mut request: TransportRequest,
+    control: RequestControl,
+) -> std::result::Result<InputMeasurement, InferenceFailure> {
+    let maximum = request.max_response_bytes.min(COUNT_RESPONSE_BYTES);
+    request.max_response_bytes = maximum;
+    let mut response = transport
+        .send(request, control)
+        .await
+        .map_err(|failure| match failure {
+            TransportFailure::Unavailable => {
+                count_failure("input_measurement_unavailable", FailureKind::Configuration)
+            }
+            TransportFailure::Interrupted => {
+                count_failure("input_measurement_interrupted", FailureKind::Transient)
+            }
+        })?;
+    if !(200..300).contains(&response.status) {
+        return Err(read_http_failure(response, maximum, RateRejectionEvidence::None).await);
+    }
+    let invalid = || count_failure("input_measurement_invalid", FailureKind::Protocol);
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.body.next().await {
+        let chunk = chunk
+            .map_err(|_| count_failure("input_measurement_interrupted", FailureKind::Transient))?;
+        if chunk.is_empty() || chunk.len() > maximum.saturating_sub(bytes.len()) {
+            return Err(invalid());
+        }
+        bytes.extend(chunk);
+    }
+    #[derive(Deserialize)]
+    struct CountResponse {
+        object: String,
+        input_tokens: u64,
+    }
+    let count: CountResponse = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
+    if count.object != "response.input_tokens" {
+        return Err(invalid());
+    }
+    Ok(InputMeasurement {
+        tokens: count.input_tokens,
+        kind: MeasurementKind::Exact,
+    })
+}
+
+pub(crate) fn count_failure(code: &str, kind: FailureKind) -> InferenceFailure {
+    InferenceFailure {
+        kind,
+        code: code.into(),
+        retry_after_ms: None,
+        dispatch: None,
+    }
 }
 
 async fn read_http_failure(

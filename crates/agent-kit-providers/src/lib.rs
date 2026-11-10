@@ -41,6 +41,7 @@ pub enum TransportOperation {
     ChatCompletions,
     OpenAiResponses,
     OpenAiResponsesInputTokens,
+    LlamaCppChatInputTokens,
     AnthropicMessages,
     GeminiStreamGenerateContent { model: ModelId },
 }

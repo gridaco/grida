@@ -88,6 +88,8 @@ pub struct ProviderOptions {
     pub credential_home: Option<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compatible_output_limit_field: Option<CompatibleOutputLimitField>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub llama_cpp_input_count: bool,
 }
 
 pub struct HttpTransport {
@@ -99,6 +101,7 @@ pub struct HttpTransport {
     replay_binding: Option<BindingId>,
     selection: Fingerprint,
     dispatch: Dispatch,
+    llama_cpp_input_count: bool,
 }
 
 enum Dispatch {
@@ -118,6 +121,14 @@ impl HttpTransport {
             ));
         }
         let base = provider_base(&options.endpoint)?;
+        if options.llama_cpp_input_count
+            && (!options.protocol.is_compatible()
+                || supervised.is_some()
+                || !base.host_str().is_some_and(is_numeric_loopback_host)
+                || !matches!(base.path(), "/v1" | "/v1/"))
+        {
+            return Err(invalid("llama_cpp_input_count_requires_direct_loopback"));
+        }
         let (target, operation) = provider_route(base.clone(), options.protocol, &options.model)?;
         let configured_key = supervised
             .as_ref()
@@ -139,6 +150,11 @@ impl HttpTransport {
             base.as_str().strip_suffix('/').unwrap_or(base.as_str()),
             source_identity,
         ))?;
+        let lineage = if options.llama_cpp_input_count {
+            Fingerprint::of(&(lineage, "llama-cpp-chat-input-count-v1"))?
+        } else {
+            lineage
+        };
         let selection = match options.compatible_output_limit_field {
             Some(CompatibleOutputLimitField::MaxTokens) => {
                 Fingerprint::of(&(lineage, &options.model, "max_tokens"))?
@@ -197,6 +213,7 @@ impl HttpTransport {
             replay_binding,
             selection,
             dispatch,
+            llama_cpp_input_count: options.llama_cpp_input_count,
         })
     }
 
@@ -213,11 +230,11 @@ impl HttpTransport {
     }
 
     pub(crate) fn supports_exact_input_counting(&self) -> bool {
-        self.protocol == ProviderProtocol::Responses
+        self.protocol == ProviderProtocol::Responses || self.llama_cpp_input_count
     }
 
     pub(crate) fn verified_context_window(&self, model: &ModelId) -> Option<NonZeroU64> {
-        if !self.supports_exact_input_counting() {
+        if self.protocol != ProviderProtocol::Responses {
             return None;
         }
         responses_context_window(&self.target, model)
@@ -281,8 +298,10 @@ impl HttpTransport {
         if operation == &self.operation {
             return Ok(self.target.clone());
         }
-        if self.supports_exact_input_counting()
-            && operation == &TransportOperation::OpenAiResponsesInputTokens
+        if (self.protocol == ProviderProtocol::Responses
+            && operation == &TransportOperation::OpenAiResponsesInputTokens)
+            || (self.llama_cpp_input_count
+                && operation == &TransportOperation::LlamaCppChatInputTokens)
         {
             let mut target = self.target.clone();
             target
@@ -349,7 +368,8 @@ impl StreamingTransport for HttpTransport {
             headers.insert(
                 ACCEPT,
                 HeaderValue::from_static(match request.operation {
-                    TransportOperation::OpenAiResponsesInputTokens => "application/json",
+                    TransportOperation::OpenAiResponsesInputTokens
+                    | TransportOperation::LlamaCppChatInputTokens => "application/json",
                     _ => "text/event-stream",
                 }),
             );
@@ -584,11 +604,13 @@ fn provider_base(endpoint: &str) -> Result<Url> {
 }
 
 fn is_loopback_host(host: &str) -> bool {
-    host == "localhost"
-        || host
-            .trim_matches(['[', ']'])
-            .parse::<IpAddr>()
-            .is_ok_and(|address| address.to_canonical().is_loopback())
+    host == "localhost" || is_numeric_loopback_host(host)
+}
+
+fn is_numeric_loopback_host(host: &str) -> bool {
+    host.trim_matches(['[', ']'])
+        .parse::<IpAddr>()
+        .is_ok_and(|address| address.to_canonical().is_loopback())
 }
 
 fn provider_route(
@@ -660,6 +682,7 @@ mod tests {
             protocol,
             credential_home: None,
             compatible_output_limit_field: None,
+            llama_cpp_input_count: false,
         }
     }
 
@@ -763,6 +786,49 @@ mod tests {
         assert_eq!(
             compatible.request_target(&TransportOperation::OpenAiResponsesInputTokens),
             Err(TransportFailure::Unavailable)
+        );
+    }
+
+    #[test]
+    fn llama_cpp_count_requires_explicit_fixed_numeric_loopback_route() {
+        let state = tempfile::tempdir().unwrap();
+        let mut settings = options(ProviderProtocol::OpenAiCompatible);
+        let unselected = HttpTransport::new(state.path(), &settings, None).unwrap();
+        let count = TransportOperation::LlamaCppChatInputTokens;
+        assert!(!unselected.supports_exact_input_counting());
+        assert_eq!(
+            unselected.request_target(&count),
+            Err(TransportFailure::Unavailable)
+        );
+
+        settings.llama_cpp_input_count = true;
+        let selected = HttpTransport::new(state.path(), &settings, None).unwrap();
+        assert_ne!(selected.selection(), unselected.selection());
+        assert_ne!(
+            selected.binding().authority.scope,
+            unselected.binding().authority.scope
+        );
+        assert!(selected.supports_exact_input_counting());
+        assert_eq!(
+            selected.request_target(&count).unwrap().as_str(),
+            "http://127.0.0.1:1/v1/chat/completions/input_tokens"
+        );
+        for endpoint in [
+            "http://localhost:1/v1",
+            "https://openrouter.ai/api/v1",
+            "http://127.0.0.1:1/elsewhere",
+        ] {
+            settings.endpoint = endpoint.into();
+            let error = HttpTransport::new(state.path(), &settings, None)
+                .err()
+                .unwrap();
+            assert_eq!(error.code, "llama_cpp_input_count_requires_direct_loopback");
+        }
+        settings.endpoint = "http://[::1]:1/v1/".into();
+        let ipv6 = HttpTransport::new(state.path(), &settings, None).unwrap();
+        assert_eq!(
+            ipv6.request_target(&count).unwrap().as_str(),
+            "http://[::1]:1/v1/chat/completions/input_tokens"
         );
     }
 

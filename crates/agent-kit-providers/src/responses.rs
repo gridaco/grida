@@ -1,17 +1,16 @@
 mod stream;
 
 use crate::wire::{
-    function_name, image_data_url, image_profile, read_http_error, short_identity, text_profile,
-    tool_result,
+    check_count_control, count_failure, count_openai_input, function_name, image_data_url,
+    image_profile, short_identity, text_profile, tool_result,
 };
 use crate::{
-    InputImageResolver, StreamLimits, StreamingTransport, TransportFailure, TransportOperation,
-    TransportRequest,
+    InputImageResolver, StreamLimits, StreamingTransport, TransportOperation, TransportRequest,
 };
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceRequest, InferenceRun, InputFormat,
-    InputMeasurement, MeasurementKind, ModelCapabilities, PreparedRequest, Provider,
-    ProviderBinding, RequestControl,
+    InputMeasurement, ModelCapabilities, PreparedRequest, Provider, ProviderBinding,
+    RequestControl,
 };
 use agent_kit_core::messages::{
     Content, Message, MessagePhase, ProvenanceKind, ProviderState, ResultContent, Role, ToolResult,
@@ -20,14 +19,10 @@ use agent_kit_core::{
     BindingId, BoxFuture, Envelope, Error, ErrorKind, Fingerprint, ModelId, ProviderId, Result,
     SchemaId, ToolCallId, ToolId,
 };
-use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use std::time::Instant;
-
-const COUNT_RESPONSE_BYTES: usize = 4096;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -399,15 +394,7 @@ impl Responses {
                 FailureKind::Configuration,
             ));
         }
-        if control.cancellation.is_cancelled() {
-            return Err(count_failure("cancelled", FailureKind::Cancelled));
-        }
-        if control
-            .deadline
-            .is_some_and(|deadline| deadline <= Instant::now())
-        {
-            return Err(count_failure("deadline", FailureKind::Cancelled));
-        }
+        check_count_control(&control)?;
         let body = (|| {
             let profile = self.prepared_model(request)?;
             let scope = self.scope(&request.request().model, profile);
@@ -415,48 +402,17 @@ impl Responses {
             self.encode_body(&body)
         })()
         .map_err(|error| count_failure(&error.code, FailureKind::Configuration))?;
-        let maximum = self.limits.max_response_bytes.min(COUNT_RESPONSE_BYTES);
-        let mut response = self
-            .transport
-            .send(
-                TransportRequest {
-                    binding: self.binding.clone(),
-                    operation: TransportOperation::OpenAiResponsesInputTokens,
-                    body,
-                    max_response_bytes: maximum,
-                },
-                control,
-            )
-            .await
-            .map_err(|failure| match failure {
-                TransportFailure::Unavailable => {
-                    count_failure("input_measurement_unavailable", FailureKind::Configuration)
-                }
-                TransportFailure::Interrupted => {
-                    count_failure("input_measurement_interrupted", FailureKind::Transient)
-                }
-            })?;
-        if !(200..300).contains(&response.status) {
-            return Err(read_http_error(response, maximum).await);
-        }
-        let mut bytes = Vec::new();
-        while let Some(chunk) = response.body.next().await {
-            let chunk = chunk.map_err(|_| {
-                count_failure("input_measurement_interrupted", FailureKind::Transient)
-            })?;
-            if chunk.is_empty() || chunk.len() > maximum.saturating_sub(bytes.len()) {
-                return Err(invalid_count());
-            }
-            bytes.extend(chunk);
-        }
-        let count: CountResponse = serde_json::from_slice(&bytes).map_err(|_| invalid_count())?;
-        if count.object != "response.input_tokens" {
-            return Err(invalid_count());
-        }
-        Ok(InputMeasurement {
-            tokens: count.input_tokens,
-            kind: MeasurementKind::Exact,
-        })
+        count_openai_input(
+            self.transport.as_ref(),
+            TransportRequest {
+                binding: self.binding.clone(),
+                operation: TransportOperation::OpenAiResponsesInputTokens,
+                body,
+                max_response_bytes: self.limits.max_response_bytes,
+            },
+            control,
+        )
+        .await
     }
 }
 
@@ -510,25 +466,6 @@ impl Provider for Responses {
             )
         }))
     }
-}
-
-#[derive(Deserialize)]
-struct CountResponse {
-    object: String,
-    input_tokens: u64,
-}
-
-fn count_failure(code: &str, kind: FailureKind) -> InferenceFailure {
-    InferenceFailure {
-        kind,
-        code: code.into(),
-        retry_after_ms: None,
-        dispatch: None,
-    }
-}
-
-fn invalid_count() -> InferenceFailure {
-    count_failure("input_measurement_invalid", FailureKind::Protocol)
 }
 
 struct EncodedRequest {
