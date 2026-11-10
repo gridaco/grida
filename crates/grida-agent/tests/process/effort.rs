@@ -18,14 +18,31 @@ async fn run(endpoint: &str, effort: &str, mode: &str) -> Vec<Value> {
     let root = TempDir::new().unwrap();
     let workspace = root.path().join("workspace");
     std::fs::create_dir(&workspace).unwrap();
+    run_in(
+        &root.path().join("state"),
+        &workspace,
+        endpoint,
+        effort,
+        mode,
+    )
+    .await
+}
+
+async fn run_in(
+    state: &Path,
+    workspace: &Path,
+    endpoint: &str,
+    effort: &str,
+    mode: &str,
+) -> Vec<Value> {
     let mut command = executable();
     command.arg("run");
-    configured(&mut command, &root.path().join("state"), endpoint);
+    configured(&mut command, state, endpoint);
     let output = timeout(
         WAIT,
         command
             .arg("--cwd")
-            .arg(&workspace)
+            .arg(workspace)
             .args([
                 "--effort",
                 effort,
@@ -52,9 +69,51 @@ async fn run(endpoint: &str, effort: &str, mode: &str) -> Vec<Value> {
     records(&output.stdout)
 }
 
+async fn verify_review_summary(
+    state: &Path,
+    workspace: &Path,
+    endpoint: &str,
+    record: &Value,
+    collected: bool,
+) {
+    let session = record["session_id"].as_str().unwrap();
+    let (host, url) = shared_server(state, endpoint).await;
+    let mut socket = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    let mut capabilities = extension_initialize();
+    capabilities["clientCapabilities"]["_meta"]["co.grida/session/turn-summary"] = 1.into();
+    ws_rpc(&mut socket, 1, "initialize", capabilities).await;
+    let loaded = ws_rpc(
+        &mut socket,
+        2,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace,"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("error").is_none(), "{loaded}");
+    let summary = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/turn-summary",
+        json!({"sessionId":session,"turnId":record["turn_id"]}),
+    )
+    .await;
+    assert_eq!(
+        summary["result"]["reviewFindingsCollected"], collected,
+        "{summary}"
+    );
+    assert!(summary["result"]["child"].is_null());
+    drop(socket);
+    terminate_shared_server(host).await;
+}
+
 #[tokio::test]
 async fn built_ultra_delegates_and_collects_in_plan_and_act() {
     for mode in ["plan", "act"] {
+        let root = TempDir::new().unwrap();
+        let workspace = TempDir::new().unwrap();
+        let state = root.path().join("state");
         let (release, ready) = oneshot::channel();
         let release = Arc::new(Mutex::new(Some(release)));
         let ready = Arc::new(Mutex::new(Some(ready)));
@@ -78,7 +137,7 @@ async fn built_ultra_delegates_and_collects_in_plan_and_act() {
             Reply::Finished("Integrated the independently verified finding."),
         ])
         .await;
-        let records = run(&endpoint.url, "ultra", mode).await;
+        let records = run_in(&state, workspace.path(), &endpoint.url, "ultra", mode).await;
         assert_eq!(
             records[1]["account"]["independent_review"]["findings_collected"],
             true
@@ -121,6 +180,7 @@ async fn built_ultra_delegates_and_collects_in_plan_and_act() {
                 .to_string()
                 .contains("sponsored_subagent_slot_used")
         );
+        verify_review_summary(&state, workspace.path(), &endpoint.url, &records[0], true).await;
         endpoint.done().await;
     }
 }
@@ -142,6 +202,9 @@ async fn built_standard_does_not_offer_review_tools() {
 
 #[tokio::test]
 async fn finished_ultra_account_discloses_uncollected_review() {
+    let root = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = root.path().join("state");
     let (child_requested, finish) = oneshot::channel();
     let child_requested = Arc::new(Mutex::new(Some(child_requested)));
     let finish = Arc::new(Mutex::new(Some(finish)));
@@ -172,12 +235,13 @@ async fn finished_ultra_account_discloses_uncollected_review() {
         next(),
     ])
     .await;
-    let result = run(&endpoint.url, "ultra", "act").await;
+    let result = run_in(&state, workspace.path(), &endpoint.url, "ultra", "act").await;
     assert_eq!(
         result[1]["account"]["independent_review"]["findings_collected"],
         false
     );
     assert!(result[1]["account"]["independent_review"]["child"].is_string());
+    verify_review_summary(&state, workspace.path(), &endpoint.url, &result[0], false).await;
     endpoint.done().await;
 }
 

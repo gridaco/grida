@@ -40,6 +40,8 @@ pub(super) struct SummaryResponse {
     tool_activity: Option<ToolActivity>,
     checks: Vec<CheckStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    review_findings_collected: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     token_usage: Option<ReportedTokenUsage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     artifacts: Option<Vec<CropArtifact>>,
@@ -74,6 +76,10 @@ impl SummaryResponse {
             token_usage: account
                 .as_ref()
                 .and_then(|account| ReportedTokenUsage::from_usage(&account.inference_usage)),
+            review_findings_collected: account
+                .as_ref()
+                .and_then(|account| account.independent_review.as_ref())
+                .map(|review| review.findings_collected),
             checks: account.map_or_else(Vec::new, |account| {
                 account
                     .completion_checks
