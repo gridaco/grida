@@ -8,6 +8,8 @@ use tokio::process::{ChildStdin, ChildStdout};
 
 #[path = "approvals/confinement.rs"]
 mod confinement;
+#[path = "approvals/deployments.rs"]
+mod deployments;
 #[path = "approvals/reviewer.rs"]
 mod reviewer;
 

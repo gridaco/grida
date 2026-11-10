@@ -321,6 +321,12 @@ state directory. The listener accepts numeric loopback addresses, the exact
 local authority and `/acp` path, and native connections with an absent `Origin`
 header.
 
+Share the token only with clients you trust to access this host's saved chats
+and configured capabilities. Give each independent principal a separate
+process, state directory, listener, token, and provider and workspace grants.
+If the host processes need isolation from each other, deploy them with
+separate OS identities or equivalent filesystem and network boundaries.
+
 Each WebSocket text message carries one ACP JSON-RPC object. Closing a client
 connection detaches its observers while the host continues its accepted work.
 Stopping the service requests suspension of the work it owns.

@@ -259,6 +259,14 @@ address, the exact local authority and `/acp` path, and an absent `Origin`
 header. The bearer grants access to this host's state directory. Session
 attachment still checks the selected workspace.
 
+Each listener has one trusted authority profile. Clients using its bearer
+share the host's saved chats, selected provider and applicable permission
+profile. Run a separate process with its own listener, bearer, state directory,
+provider credentials and permission profile for each independent principal.
+The deployment owner supplies separate OS identities or equivalent filesystem
+and network isolation when the host processes themselves require containment.
+Native command confinement applies to the commands and their descendants.
+
 The binding carries one ACP JSON-RPC object per WebSocket text message and
 bounds message size, outstanding requests, clients, and delivery time.
 Losing one client detaches its observers. The service retains ownership of
