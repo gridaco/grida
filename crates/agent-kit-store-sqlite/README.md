@@ -31,6 +31,16 @@ same transaction that claims the input and issues ownership.
 Derived driver controls bind an opaque caller intent before computing the new
 state. An exact retry returns the original receipt even after later changes.
 
+`claim_from_operation` atomically creates a session, accepts its first input,
+reserves its opaque driver state, and claims its first turn. It requires an
+owned source turn with the captured open control revision and the exact
+running tool invocation and attempt. The destination session must be absent.
+The caller supplies stable destination identities across competing source
+operations. Each source operation can record only one destination.
+An exact repeat observes the committed destination turn even after the
+source owner has released its lease. Repeating a claim never issues another
+lease. Recovery of released work remains explicit.
+
 The optional owner-defined catalog projects immutable session configuration
 into a scope fingerprint. It indexes the scope at creation and upgrades earlier
 records without reading their turns. A scoped page returns at most 32 entries

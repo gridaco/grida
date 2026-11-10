@@ -1,5 +1,8 @@
 mod support;
 
+#[path = "store/operation_claim.rs"]
+mod operation_claim;
+
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::turn::{

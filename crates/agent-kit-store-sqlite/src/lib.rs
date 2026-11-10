@@ -10,10 +10,11 @@ use agent_kit_core::driver_state::{DriverStateChange, DriverStateSnapshot};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlReader, ControlRevision, ControlSnapshot,
-    JournalAction, JournalChange, TurnBinding, TurnJournal, TurnState, bind_lease,
+    JournalAction, JournalChange, OperationInput, TurnBinding, TurnJournal, TurnState, bind_lease,
 };
 use agent_kit_core::{
-    BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, Result, SessionId, TurnId,
+    AttemptId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId, Result,
+    SessionId, TurnId,
 };
 use agent_kit_sessions::{
     Acceptance, ClaimOutcome, ClaimRequest, ClaimedTurn, ControlReceipt, ControlRequest,
@@ -38,6 +39,28 @@ const MAX_HISTORY_TURNS: i64 = 4_096;
 const MAX_HISTORY_RECORDS: usize = 4_096;
 const MAX_HISTORY_BYTES: usize = 8 * 1024 * 1024;
 const MAX_HISTORY_SCAN_BYTES: usize = 128 * 1024 * 1024;
+const OPERATION_CLAIM: &str = "operation-claim";
+
+/// The exact running tool attempt allowed to create one independent turn.
+#[derive(Clone, Debug, Serialize)]
+pub struct OperationClaimSource {
+    pub binding: TurnBinding,
+    pub control: ControlRevision,
+    pub operation: OperationId,
+    pub attempt: AttemptId,
+    pub action: Fingerprint,
+}
+
+/// Create a fresh session and claim its first input from a running operation.
+/// The caller selects the destination identities and the opaque driver state.
+#[derive(Clone, Debug, Serialize)]
+pub struct OperationClaim {
+    pub source: OperationClaimSource,
+    pub create: CreateSession,
+    pub claim: ClaimRequest,
+    pub input: Submission,
+    pub driver_state: DriverStateChange,
+}
 
 const SCHEMA: &str = "
 CREATE TABLE sessions (
@@ -150,6 +173,12 @@ struct SessionRecord {
 
 #[derive(Serialize, Deserialize)]
 struct ClaimRecord {
+    turn: TurnId,
+}
+
+#[derive(Deserialize, Serialize)]
+struct OperationClaimRecord {
+    session: SessionId,
     turn: TurnId,
 }
 
@@ -496,6 +525,75 @@ impl SqliteStore {
         self.acquire(request, Some(change), Some(input)).await
     }
 
+    /// Atomically create and claim one independent turn from a live tool
+    /// operation. The destination must be absent, and each source operation
+    /// records at most one destination, including across writer epochs.
+    /// Repeat the exact request to inspect a committed claim without another
+    /// lease. Any further execution requires a separate explicit recovery.
+    pub async fn claim_from_operation(&self, request: OperationClaim) -> Result<ClaimOutcome> {
+        if request.create.id != request.claim.session
+            || request.create.id == request.source.binding.session
+            || request.claim.expected_revision != SessionRevision(0)
+            || !matches!(&request.claim.selection, TurnSelection::New { inputs, .. } if inputs == std::slice::from_ref(&request.input.id))
+        {
+            return Err(error(ErrorKind::InvalidInput, "invalid_operation_claim"));
+        }
+        let inner = Arc::clone(&self.inner);
+        let prepared = execute(Arc::clone(&inner), move |inner, connection| {
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(database_error)?;
+            let fingerprint = Fingerprint::of(&request)?;
+            let source_key = operation_claim_key(&request.source)?;
+            let source_session = &request.source.binding.session;
+            if let Some(receipt) = lookup_request::<OperationClaimRecord>(
+                &transaction,
+                source_session,
+                OPERATION_CLAIM,
+                &source_key,
+                fingerprint,
+            )? {
+                let state = load_turn(&transaction, &receipt.session, &receipt.turn)?;
+                return Ok(PreparedClaim::Existing(turn_view(inner, &state)?));
+            }
+            let _source_owner = require_operation_owner(inner, &transaction, &request.source)?;
+            record_creation(
+                &transaction,
+                &request.create,
+                inner.catalog,
+                Fingerprint::of(&request.create)?,
+            )?;
+            let prepared = prepare_claim(
+                inner,
+                &transaction,
+                request.claim,
+                Some(request.driver_state),
+                Some(request.input),
+            )?;
+            let PreparedClaim::Acquired(claim) = &prepared else {
+                return Err(error(
+                    ErrorKind::Conflict,
+                    "operation_claim_destination_exists",
+                ));
+            };
+            save_request(
+                &transaction,
+                source_session,
+                OPERATION_CLAIM,
+                &source_key,
+                fingerprint,
+                &OperationClaimRecord {
+                    session: claim.binding.session.clone(),
+                    turn: claim.binding.turn.clone(),
+                },
+            )?;
+            transaction.commit().map_err(commit_error)?;
+            Ok(prepared)
+        })
+        .await?;
+        finish_claim(inner, prepared)
+    }
+
     fn accept(
         &self,
         session_id: SessionId,
@@ -544,146 +642,206 @@ impl SqliteStore {
                 let transaction = connection
                     .transaction_with_behavior(TransactionBehavior::Immediate)
                     .map_err(database_error)?;
-                let fingerprint = match (&state_change, &submission) {
-                    (change, Some(input)) => Fingerprint::of(&(&request, change, input))?,
-                    (Some(change), None) => Fingerprint::of(&(&request, change))?,
-                    (None, None) => Fingerprint::of(&request)?,
-                };
-                if let Some(receipt) = lookup_request::<ClaimRecord>(
-                    &transaction,
-                    &request.session,
-                    "claim",
-                    &request.id,
-                    fingerprint,
-                )? {
-                    let state = load_turn(&transaction, &request.session, &receipt.turn)?;
-                    return Ok(PreparedClaim::Existing(turn_view(inner, &state)?));
+                let prepared =
+                    prepare_claim(inner, &transaction, request, state_change, submission)?;
+                if matches!(&prepared, PreparedClaim::Acquired(_)) {
+                    transaction.commit().map_err(commit_error)?;
                 }
-                let mut session = load_session(&transaction, &request.session)?;
-                require_revision(&session, request.expected_revision)?;
-                if session.paused {
-                    return Err(error(ErrorKind::InvalidState, "session_admission_paused"));
-                }
-                let (state, inputs) = match &request.selection {
-                    TurnSelection::New { turn, inputs } => {
-                        if session.active_turn.is_some() {
-                            return Err(error(ErrorKind::Conflict, "session_turn_active"));
-                        }
-                        if inputs.is_empty() || inputs.len() > MAX_PENDING_INPUTS as usize {
-                            return Err(error(ErrorKind::InvalidInput, "invalid_input_selection"));
-                        }
-                        let unique: BTreeSet<_> = inputs.iter().collect();
-                        if unique.len() != inputs.len() {
-                            return Err(error(ErrorKind::InvalidInput, "duplicate_input_selection"));
-                        }
-                        let exists: bool = transaction.query_row(
-                            "SELECT EXISTS(SELECT 1 FROM turns WHERE session=?1 AND id=?2)",
-                            params![request.session.as_str(), turn.as_str()],
-                            |row| row.get(0),
-                        ).map_err(database_error)?;
-                        if exists {
-                            return Err(error(ErrorKind::Conflict, "turn_exists"));
-                        }
-                        if let Some(change) = state_change {
-                            session.driver_state.apply(change)?;
-                        }
-                        if let Some(input) = submission {
-                            let waiting: bool = transaction.query_row(
-                                "SELECT EXISTS(SELECT 1 FROM submissions WHERE session=?1 AND queue_order IS NOT NULL)",
-                                [request.session.as_str()],
-                                |row| row.get(0),
-                            ).map_err(database_error)?;
-                            if waiting {
-                                return Err(error(ErrorKind::Conflict, "session_queue_waiting"));
-                            }
-                            let receipt = insert_input(&transaction, &request.session, &mut session, &input, None)?;
-                            save_request(
-                                &transaction, &request.session, "submit", &input.id,
-                                Fingerprint::of(&input)?, &receipt,
-                            )?;
-                        }
-                        let state = TurnState::with_driver_state(TurnBinding {
-                            session: request.session.clone(),
-                            turn: turn.clone(),
-                            epoch: 1,
-                        }, session.driver_state.clone())?;
-                        let mut selected = Vec::with_capacity(inputs.len());
-                        for id in inputs {
-                            let input = load_input(&transaction, &request.session, id)?;
-                            match input.disposition {
-                                InputDisposition::Queued => {}
-                                InputDisposition::Claimed { .. } | InputDisposition::Completed { .. } => {
-                                    return Err(error(ErrorKind::Conflict, "input_already_claimed"));
-                                }
-                                InputDisposition::Superseded { .. } | InputDisposition::Withdrawn => {
-                                    return Err(error(ErrorKind::Conflict, "input_not_queued"));
-                                }
-                            }
-                            selected.push(input.input);
-                        }
-                        transaction.execute(
-                            "INSERT INTO turns(session,id,snapshot) VALUES(?1,?2,?3)",
-                            params![request.session.as_str(), turn.as_str(), encode_snapshot(&state)?],
-                        ).map_err(database_error)?;
-                        for (order, id) in inputs.iter().enumerate() {
-                            transaction.execute(
-                                "UPDATE submissions SET turn_id=?3,turn_order=?4,queue_order=NULL WHERE session=?1 AND id=?2",
-                                params![request.session.as_str(), id.as_str(), turn.as_str(), order as i64],
-                            ).map_err(database_error)?;
-                        }
-                        (state, selected)
-                    }
-                    TurnSelection::Resume { turn, epoch, position }
-                    | TurnSelection::ResumePaused { turn, epoch, position, .. } => {
-                        if session.active_turn.as_ref() != Some(turn) {
-                            return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
-                        }
-                        let mut state = load_turn(&transaction, &request.session, turn)?;
-                        if !state.is_suspended() || state.position() != *position || state.binding().epoch != *epoch {
-                            return Err(error(ErrorKind::Conflict, "suspension_mismatch"));
-                        }
-                        require_released(inner, state.binding())?;
-                        if let TurnSelection::ResumePaused { control_revision, .. } = &request.selection {
-                            if state.controls().revision != *control_revision || !state.controls().paused || state.controls().cancelled {
-                                return Err(error(ErrorKind::Conflict, "pause_state_changed"));
-                            }
-                            state.apply(JournalChange::new(
-                                ChangeId::new(Fingerprint::of(&("resume-control", &request.id))?.bytes().iter().map(|byte| format!("{byte:02x}")).collect::<String>())?, state.binding().clone(), state.position(), *control_revision,
-                                vec![JournalAction::Control(ControlDirective::Resume)],
-                            )?)?;
-                        }
-                        if !state.controls().admits_work() {
-                            return Err(error(ErrorKind::InvalidState, "turn_admission_closed"));
-                        }
-                        rebind(&mut state)?;
-                        save_turn(&transaction, &state)?;
-                        let inputs = turn_inputs(&transaction, &request.session, turn)?;
-                        (state, inputs)
-                    }
-                };
-                let owner = register_owner(inner, state.binding())?;
-                session.active_turn = Some(state.binding().turn.clone());
-                bump_revision(&mut session)?;
-                save_session(&transaction, &request.session, &session)?;
-                save_request(
-                    &transaction,
-                    &request.session,
-                    "claim",
-                    &request.id,
-                    fingerprint,
-                    &ClaimRecord { turn: state.binding().turn.clone() },
-                )?;
-                transaction.commit().map_err(commit_error)?;
-                Ok(PreparedClaim::Acquired(Acquired {
-                    binding: state.binding().clone(),
-                    configuration: session.configuration,
-                    inputs,
-                    owner,
-                }))
-            }).await?;
+                Ok(prepared)
+            })
+            .await?;
             finish_claim(inner, prepared)
         })
     }
+}
+
+fn prepare_claim(
+    inner: &Inner,
+    transaction: &Transaction<'_>,
+    request: ClaimRequest,
+    state_change: Option<DriverStateChange>,
+    submission: Option<Submission>,
+) -> Result<PreparedClaim> {
+    let fingerprint = match (&state_change, &submission) {
+        (change, Some(input)) => Fingerprint::of(&(&request, change, input))?,
+        (Some(change), None) => Fingerprint::of(&(&request, change))?,
+        (None, None) => Fingerprint::of(&request)?,
+    };
+    if let Some(receipt) = lookup_request::<ClaimRecord>(
+        transaction,
+        &request.session,
+        "claim",
+        &request.id,
+        fingerprint,
+    )? {
+        let state = load_turn(transaction, &request.session, &receipt.turn)?;
+        return Ok(PreparedClaim::Existing(turn_view(inner, &state)?));
+    }
+    let mut session = load_session(transaction, &request.session)?;
+    require_revision(&session, request.expected_revision)?;
+    if session.paused {
+        return Err(error(ErrorKind::InvalidState, "session_admission_paused"));
+    }
+    let (state, inputs) = match &request.selection {
+        TurnSelection::New { turn, inputs } => {
+            if session.active_turn.is_some() {
+                return Err(error(ErrorKind::Conflict, "session_turn_active"));
+            }
+            if inputs.is_empty() || inputs.len() > MAX_PENDING_INPUTS as usize {
+                return Err(error(ErrorKind::InvalidInput, "invalid_input_selection"));
+            }
+            let unique: BTreeSet<_> = inputs.iter().collect();
+            if unique.len() != inputs.len() {
+                return Err(error(ErrorKind::InvalidInput, "duplicate_input_selection"));
+            }
+            let exists: bool = transaction
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM turns WHERE session=?1 AND id=?2)",
+                    params![request.session.as_str(), turn.as_str()],
+                    |row| row.get(0),
+                )
+                .map_err(database_error)?;
+            if exists {
+                return Err(error(ErrorKind::Conflict, "turn_exists"));
+            }
+            if let Some(change) = state_change {
+                session.driver_state.apply(change)?;
+            }
+            if let Some(input) = submission {
+                let waiting: bool = transaction.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM submissions WHERE session=?1 AND queue_order IS NOT NULL)",
+                    [request.session.as_str()],
+                    |row| row.get(0),
+                ).map_err(database_error)?;
+                if waiting {
+                    return Err(error(ErrorKind::Conflict, "session_queue_waiting"));
+                }
+                let receipt =
+                    insert_input(transaction, &request.session, &mut session, &input, None)?;
+                save_request(
+                    transaction,
+                    &request.session,
+                    "submit",
+                    &input.id,
+                    Fingerprint::of(&input)?,
+                    &receipt,
+                )?;
+            }
+            let state = TurnState::with_driver_state(
+                TurnBinding {
+                    session: request.session.clone(),
+                    turn: turn.clone(),
+                    epoch: 1,
+                },
+                session.driver_state.clone(),
+            )?;
+            let mut selected = Vec::with_capacity(inputs.len());
+            for id in inputs {
+                let input = load_input(transaction, &request.session, id)?;
+                match input.disposition {
+                    InputDisposition::Queued => {}
+                    InputDisposition::Claimed { .. } | InputDisposition::Completed { .. } => {
+                        return Err(error(ErrorKind::Conflict, "input_already_claimed"));
+                    }
+                    InputDisposition::Superseded { .. } | InputDisposition::Withdrawn => {
+                        return Err(error(ErrorKind::Conflict, "input_not_queued"));
+                    }
+                }
+                selected.push(input.input);
+            }
+            transaction
+                .execute(
+                    "INSERT INTO turns(session,id,snapshot) VALUES(?1,?2,?3)",
+                    params![
+                        request.session.as_str(),
+                        turn.as_str(),
+                        encode_snapshot(&state)?
+                    ],
+                )
+                .map_err(database_error)?;
+            for (order, id) in inputs.iter().enumerate() {
+                transaction.execute(
+                    "UPDATE submissions SET turn_id=?3,turn_order=?4,queue_order=NULL WHERE session=?1 AND id=?2",
+                    params![request.session.as_str(), id.as_str(), turn.as_str(), order as i64],
+                ).map_err(database_error)?;
+            }
+            (state, selected)
+        }
+        TurnSelection::Resume {
+            turn,
+            epoch,
+            position,
+        }
+        | TurnSelection::ResumePaused {
+            turn,
+            epoch,
+            position,
+            ..
+        } => {
+            if session.active_turn.as_ref() != Some(turn) {
+                return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
+            }
+            let mut state = load_turn(transaction, &request.session, turn)?;
+            if !state.is_suspended()
+                || state.position() != *position
+                || state.binding().epoch != *epoch
+            {
+                return Err(error(ErrorKind::Conflict, "suspension_mismatch"));
+            }
+            require_released(inner, state.binding())?;
+            if let TurnSelection::ResumePaused {
+                control_revision, ..
+            } = &request.selection
+            {
+                if state.controls().revision != *control_revision
+                    || !state.controls().paused
+                    || state.controls().cancelled
+                {
+                    return Err(error(ErrorKind::Conflict, "pause_state_changed"));
+                }
+                state.apply(JournalChange::new(
+                    ChangeId::new(
+                        Fingerprint::of(&("resume-control", &request.id))?
+                            .bytes()
+                            .iter()
+                            .map(|byte| format!("{byte:02x}"))
+                            .collect::<String>(),
+                    )?,
+                    state.binding().clone(),
+                    state.position(),
+                    *control_revision,
+                    vec![JournalAction::Control(ControlDirective::Resume)],
+                )?)?;
+            }
+            if !state.controls().admits_work() {
+                return Err(error(ErrorKind::InvalidState, "turn_admission_closed"));
+            }
+            rebind(&mut state)?;
+            save_turn(transaction, &state)?;
+            let inputs = turn_inputs(transaction, &request.session, turn)?;
+            (state, inputs)
+        }
+    };
+    let owner = register_owner(inner, state.binding())?;
+    session.active_turn = Some(state.binding().turn.clone());
+    bump_revision(&mut session)?;
+    save_session(transaction, &request.session, &session)?;
+    save_request(
+        transaction,
+        &request.session,
+        "claim",
+        &request.id,
+        fingerprint,
+        &ClaimRecord {
+            turn: state.binding().turn.clone(),
+        },
+    )?;
+    Ok(PreparedClaim::Acquired(Acquired {
+        binding: state.binding().clone(),
+        configuration: session.configuration,
+        inputs,
+        owner,
+    }))
 }
 
 impl SessionStore for SqliteStore {
@@ -702,15 +860,7 @@ impl SessionStore for SqliteStore {
             )? {
                 return Ok(receipt);
             }
-            let receipt = insert_session(&transaction, &request, inner.catalog)?;
-            save_request(
-                &transaction,
-                &request.id,
-                "create",
-                &request.request,
-                fingerprint,
-                &receipt,
-            )?;
+            let receipt = record_creation(&transaction, &request, inner.catalog, fingerprint)?;
             transaction.commit().map_err(commit_error)?;
             Ok(receipt)
         })
@@ -1023,6 +1173,77 @@ fn insert_session(
         session: request.id.clone(),
         revision: SessionRevision(0),
     })
+}
+
+fn record_creation(
+    transaction: &Transaction<'_>,
+    request: &CreateSession,
+    catalog: Option<catalog::ScopeProjection>,
+    fingerprint: Fingerprint,
+) -> Result<SessionCreated> {
+    let receipt = insert_session(transaction, request, catalog)?;
+    save_request(
+        transaction,
+        &request.id,
+        "create",
+        &request.request,
+        fingerprint,
+        &receipt,
+    )?;
+    Ok(receipt)
+}
+
+fn operation_claim_key(source: &OperationClaimSource) -> Result<ChangeId> {
+    let fingerprint = Fingerprint::of(&(&source.binding.turn, &source.operation))?;
+    ChangeId::new(
+        fingerprint
+            .bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>(),
+    )
+}
+
+fn require_operation_owner(
+    inner: &Inner,
+    transaction: &Transaction<'_>,
+    source: &OperationClaimSource,
+) -> Result<Arc<()>> {
+    let binding = &source.binding;
+    let session = load_session(transaction, &binding.session)?;
+    if session.active_turn.as_ref() != Some(&binding.turn) {
+        return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
+    }
+    let state = load_turn(transaction, &binding.session, &binding.turn)?;
+    require_binding(&state, binding)?;
+    if state.controls().revision != source.control {
+        return Err(error(ErrorKind::Conflict, "stale_control_revision"));
+    }
+    if state.is_suspended() || !state.controls().admits_work() {
+        return Err(error(
+            ErrorKind::InvalidState,
+            "operation_claim_source_closed",
+        ));
+    }
+    let matches = state
+        .operations()
+        .get(&source.operation)
+        .is_some_and(|operation| {
+            matches!(&operation.record.input, OperationInput::Tool(invocation) if invocation.fingerprint() == source.action)
+                && operation.attempts.last().is_some_and(|attempt| {
+                    attempt.id == source.attempt && attempt.outcome.is_none()
+                })
+        });
+    if !matches {
+        return Err(error(
+            ErrorKind::Conflict,
+            "operation_claim_source_mismatch",
+        ));
+    }
+    // Keep the exact owner's liveness through this transaction, including
+    // the interval between checking the source and publishing the claim.
+    live_owner(inner, binding)?
+        .ok_or_else(|| error(ErrorKind::Conflict, "operation_claim_source_not_owned"))
 }
 
 fn load_session(connection: &Connection, id: &SessionId) -> Result<SessionRecord> {
@@ -1634,13 +1855,17 @@ fn turn_view(inner: &Inner, state: &TurnState) -> Result<TurnView> {
 }
 
 fn has_owner(inner: &Inner, binding: &TurnBinding) -> Result<bool> {
+    Ok(live_owner(inner, binding)?.is_some())
+}
+
+fn live_owner(inner: &Inner, binding: &TurnBinding) -> Result<Option<Arc<()>>> {
     let owners = inner
         .owners
         .lock()
         .map_err(|_| error(ErrorKind::Unavailable, "store_owners_poisoned"))?;
     Ok(owners
         .get(&(binding.session.clone(), binding.turn.clone()))
-        .is_some_and(|owner| owner.strong_count() > 0))
+        .and_then(Weak::upgrade))
 }
 
 fn require_released(inner: &Inner, binding: &TurnBinding) -> Result<()> {
