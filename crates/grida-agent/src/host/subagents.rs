@@ -1,8 +1,13 @@
 //! GRIDA-SEC-004 — parent-scoped, independently authorized child assignments.
 
 use super::*;
+use agent_kit_sessions::InputView;
 use agent_kit_store_sqlite::InputObservation;
 use grida_agent_master::subagents::{self, Allocation, Assignment, Profile};
+
+const MESSAGE_SCHEMA: &str = "grida.agent.subagent.message";
+const MAX_PENDING_MESSAGES: usize = 16;
+const MAX_MESSAGE_BYTES: usize = 4 * 1024;
 
 pub struct SubagentInspection {
     pub parent: SessionId,
@@ -12,9 +17,11 @@ pub struct SubagentInspection {
     pub revision: SessionRevision,
     pub admission_paused: bool,
     pub queued: Vec<ChangeId>,
+    pub pending_messages: Vec<ChangeId>,
     pub current: Option<TurnView>,
     pub latest: Option<TurnView>,
     pub assignment: Option<SubagentWork>,
+    pub message: Option<SubagentMessageReceipt>,
 }
 
 pub struct SubagentWork {
@@ -23,6 +30,7 @@ pub struct SubagentWork {
     pub max_generation_steps: u32,
     pub disposition: InputDisposition,
     pub turn: Option<TurnView>,
+    pub message_inputs: Vec<ChangeId>,
 }
 
 pub struct SubagentAssignment {
@@ -31,6 +39,29 @@ pub struct SubagentAssignment {
     pub parent_turn: TurnId,
     pub input: ChangeId,
     pub instructions: String,
+}
+
+pub struct SubagentMessage {
+    pub parent: SessionId,
+    pub child: SessionId,
+    pub input: ChangeId,
+    pub text: String,
+}
+
+pub struct SubagentMessageReceipt {
+    pub parent: SessionId,
+    pub child: SessionId,
+    pub input: ChangeId,
+    pub position: u64,
+    pub disposition: InputDisposition,
+    pub text: String,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RetainedMessage {
+    parent: SessionId,
+    text: String,
 }
 
 impl Host {
@@ -116,6 +147,12 @@ impl Host {
         let profile = child_profile(&parent, &view)?;
         let parts = vec![PromptPart::Text { text: instructions }];
         if let Some(previous) = previous {
+            if is_message(&previous.input.input) {
+                return Err(problem(
+                    ErrorKind::Conflict,
+                    "subagent_assignment_identity_reused",
+                ));
+            }
             let stored: StoredPrompt = decode_input(&previous.input.input)?;
             if !images::same_prompt(&stored.parts, &parts)
                 || stored
@@ -137,13 +174,18 @@ impl Host {
             {
                 self.kick_queue(child.clone()).await;
             }
-            return subagent_work(previous, stored);
+            return self.subagent_work(child, previous, stored).await;
         }
 
         self.check_execution(&view)?;
         profile.require_authority(&self.execution()?.authority.inference.authority)?;
         let allocation = profile.allocation(&view.driver_state)?;
-        if usize::from(allocation.reserved) + view.queued.len()
+        if usize::from(allocation.reserved)
+            + view
+                .queued
+                .iter()
+                .filter(|input| !is_message(&input.input))
+                .count()
             >= usize::from(allocation.work_turns)
         {
             return Err(problem(
@@ -183,6 +225,113 @@ impl Host {
             max_generation_steps: subagents::INFERENCE_STEPS_PER_ASSIGNMENT,
             disposition: InputDisposition::Queued,
             turn: None,
+            message_inputs: Vec::new(),
+        })
+    }
+
+    /// Retain an informational input without scheduling or steering a turn.
+    pub async fn send_subagent_message(
+        &self,
+        message: SubagentMessage,
+    ) -> Result<SubagentMessageReceipt> {
+        self.owned_control(move |host| async move { host.accept_subagent_message(message).await })
+            .await
+    }
+
+    async fn accept_subagent_message(
+        &self,
+        message: SubagentMessage,
+    ) -> Result<SubagentMessageReceipt> {
+        self.require_subagents()?;
+        let SubagentMessage {
+            parent,
+            child,
+            input,
+            text,
+        } = message;
+        validate_message(&text)?;
+        let retained = RetainedMessage {
+            parent: parent.clone(),
+            text,
+        };
+        let submission = Submission {
+            id: input.clone(),
+            payload: encode(MESSAGE_SCHEMA, 1, &retained)?,
+        };
+        let _admission = self.configuration_admission.lock().await;
+        let (view, previous) = self
+            .store
+            .inspect_with_input(child.clone(), input.clone())
+            .await
+            .map_err(child_observation_error)?;
+        let profile = child_profile(&parent, &view)?;
+        if let Some(previous) = previous {
+            if previous.input.input != submission {
+                return Err(problem(
+                    ErrorKind::Conflict,
+                    "subagent_message_identity_reused",
+                ));
+            }
+            return Ok(message_receipt(child, previous.input, retained));
+        }
+        self.check_execution(&view)?;
+        profile.require_authority(&self.execution()?.authority.inference.authority)?;
+        if view
+            .queued
+            .iter()
+            .filter(|input| is_message(&input.input))
+            .count()
+            >= MAX_PENDING_MESSAGES
+        {
+            return Err(problem(
+                ErrorKind::LimitExceeded,
+                "subagent_message_queue_limit",
+            ));
+        }
+        let accepted = self
+            .store
+            .submit_at_revision(child.clone(), submission, view.revision)
+            .await?;
+        Ok(SubagentMessageReceipt {
+            parent,
+            child,
+            input,
+            position: accepted.position,
+            disposition: InputDisposition::Queued,
+            text: retained.text,
+        })
+    }
+
+    async fn subagent_work(
+        &self,
+        child: SessionId,
+        accepted: InputObservation,
+        stored: StoredPrompt,
+    ) -> Result<SubagentWork> {
+        let assignment = stored
+            .subagent
+            .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_missing"))?;
+        let max_generation_steps = stored
+            .max_steps
+            .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_limit_missing"))?;
+        let message_inputs = if let Some(turn) = &accepted.turn {
+            self.store
+                .turn_submissions(child, turn.binding.turn.clone())
+                .await?
+                .into_iter()
+                .filter(is_message)
+                .map(|message| message.id)
+                .collect()
+        } else {
+            Vec::new()
+        };
+        Ok(SubagentWork {
+            input: accepted.input.input.id,
+            parent_turn: assignment.parent_turn,
+            max_generation_steps,
+            disposition: accepted.input.disposition,
+            turn: accepted.turn,
+            message_inputs,
         })
     }
 
@@ -220,7 +369,7 @@ impl Host {
         input: Option<ChangeId>,
     ) -> Result<SubagentInspection> {
         self.require_subagents()?;
-        let (view, profile, assignment) = match input {
+        let (view, profile, assignment, message) = match input {
             Some(input) => {
                 let (view, accepted) = self
                     .store
@@ -231,12 +380,23 @@ impl Host {
                 let accepted = accepted.ok_or_else(|| {
                     problem(ErrorKind::Unavailable, "subagent_assignment_unavailable")
                 })?;
-                let stored: StoredPrompt = decode_input(&accepted.input.input)?;
-                (view, profile, Some(subagent_work(accepted, stored)?))
+                if is_message(&accepted.input.input) {
+                    let retained = read_message(profile.parent(), &accepted.input.input)?;
+                    (
+                        view,
+                        profile,
+                        None,
+                        Some(message_receipt(child.clone(), accepted.input, retained)),
+                    )
+                } else {
+                    let stored: StoredPrompt = decode_input(&accepted.input.input)?;
+                    let work = self.subagent_work(child.clone(), accepted, stored).await?;
+                    (view, profile, Some(work), None)
+                }
             }
             None => {
                 let (view, profile) = self.subagent_view(&parent, child.clone()).await?;
-                (view, profile, None)
+                (view, profile, None, None)
             }
         };
         Ok(SubagentInspection {
@@ -248,12 +408,20 @@ impl Host {
             admission_paused: view.admission_paused,
             queued: view
                 .queued
+                .iter()
+                .filter(|input| !is_message(&input.input))
+                .map(|input| input.input.id.clone())
+                .collect(),
+            pending_messages: view
+                .queued
                 .into_iter()
+                .filter(|input| is_message(&input.input))
                 .map(|input| input.input.id)
                 .collect(),
             current: view.current,
             latest: view.latest,
             assignment,
+            message,
         })
     }
 
@@ -409,18 +577,91 @@ fn child_profile(parent: &SessionId, view: &SessionView) -> Result<Profile> {
         .ok_or_else(|| problem(ErrorKind::Unavailable, "subagent_unavailable"))
 }
 
-fn subagent_work(accepted: InputObservation, stored: StoredPrompt) -> Result<SubagentWork> {
-    let assignment = stored
-        .subagent
-        .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_missing"))?;
-    let max_generation_steps = stored
-        .max_steps
-        .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_limit_missing"))?;
-    Ok(SubagentWork {
-        input: accepted.input.input.id,
-        parent_turn: assignment.parent_turn,
-        max_generation_steps,
-        disposition: accepted.input.disposition,
-        turn: accepted.turn,
-    })
+pub(super) fn is_message(input: &Submission) -> bool {
+    input.payload.schema().as_str() == MESSAGE_SCHEMA
+}
+
+pub(super) fn queued_work(view: &SessionView) -> Option<&Submission> {
+    view.queued
+        .iter()
+        .map(|input| &input.input)
+        .find(|input| !is_message(input))
+}
+
+/// A selected child turn contains its pending messages in queue order and
+/// exactly one runnable assignment at the end.
+pub(super) fn assignment_input(inputs: &[Submission], child: bool) -> Result<&Submission> {
+    let invalid = || problem(ErrorKind::InvalidState, "retained_input_selection_invalid");
+    let (assignment, messages) = inputs.split_last().ok_or_else(invalid)?;
+    if is_message(assignment)
+        || (!messages.is_empty() && (!child || !messages.iter().all(is_message)))
+    {
+        return Err(invalid());
+    }
+    Ok(assignment)
+}
+
+pub(super) fn selected_messages(profile: &Profile, inputs: &[Submission]) -> Result<Vec<Message>> {
+    let (_, messages) = inputs
+        .split_last()
+        .ok_or_else(|| problem(ErrorKind::InvalidState, "retained_input_selection_invalid"))?;
+    if messages.len() > MAX_PENDING_MESSAGES {
+        return Err(problem(
+            ErrorKind::InvalidState,
+            "subagent_message_queue_limit",
+        ));
+    }
+    messages
+        .iter()
+        .map(|input| {
+            let retained = read_message(profile.parent(), input)?;
+            let mut message = prompt_input(&input.id, &[PromptPart::Text { text: format!(
+            "Informational context from the parent chat for the current assignment:\n{}",
+            retained.text,
+        ) }])?.remove(0);
+            message.provenance = Provenance {
+                source: format!("subagent-parent/{}", retained.parent),
+                kind: ProvenanceKind::Supplied,
+                fingerprint: Some(Fingerprint::of(input)?),
+            };
+            Ok(message)
+        })
+        .collect()
+}
+
+fn read_message(parent: &SessionId, input: &Submission) -> Result<RetainedMessage> {
+    if !is_message(input) || input.payload.version() != 1 {
+        return Err(problem(ErrorKind::InvalidState, "subagent_message_invalid"));
+    }
+    let retained: RetainedMessage = decode_input(input)?;
+    if &retained.parent != parent {
+        return Err(problem(
+            ErrorKind::InvalidState,
+            "subagent_message_parent_changed",
+        ));
+    }
+    validate_message(&retained.text)?;
+    Ok(retained)
+}
+
+fn validate_message(text: &str) -> Result<()> {
+    if text.trim().is_empty() || text.len() > MAX_MESSAGE_BYTES {
+        return Err(problem(ErrorKind::InvalidInput, "subagent_message_invalid"));
+    }
+    Ok(())
+}
+
+fn message_receipt(
+    child: SessionId,
+    input: InputView,
+    message: RetainedMessage,
+) -> SubagentMessageReceipt {
+    SubagentMessageReceipt {
+        parent: message.parent,
+        child,
+        input: input.input.id,
+        position: input.position,
+        disposition: input.disposition,
+        text: message.text,
+    }
 }

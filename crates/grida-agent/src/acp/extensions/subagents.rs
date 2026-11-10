@@ -1,11 +1,15 @@
 //! GRIDA-SEC-004 — delegated child operations require a private parent attachment.
 
 use super::*;
-use crate::host::{SubagentAssignment, SubagentInspection, SubagentWork, TurnControl};
+use crate::host::{
+    SubagentAssignment, SubagentInspection, SubagentMessage, SubagentMessageReceipt, SubagentWork,
+    TurnControl,
+};
 use grida_agent_master::subagents::Allocation;
 
 const CREATE: &str = "co.grida/subagent/create";
 const ASSIGN: &str = "co.grida/subagent/assign";
+const SEND_MESSAGE: &str = "co.grida/subagent/send-message";
 const INSPECT: &str = "co.grida/subagent/inspect";
 const STOP: &str = "co.grida/subagent/stop";
 const PAUSE: &str = "co.grida/subagent/pause";
@@ -18,6 +22,7 @@ pub(super) fn capabilities(available: bool) -> impl Iterator<Item = &'static str
     [
         CREATE,
         ASSIGN,
+        SEND_MESSAGE,
         INSPECT,
         STOP,
         PAUSE,
@@ -55,6 +60,40 @@ struct Assign {
     parent_turn_id: TurnId,
     input_id: ChangeId,
     instructions: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/subagent/send-message", response = MessageReceipt)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SendMessage {
+    parent_session_id: SessionId,
+    child_id: SessionId,
+    input_id: ChangeId,
+    text: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+struct MessageReceipt {
+    parent_session_id: SessionId,
+    child_id: SessionId,
+    input_id: ChangeId,
+    input_position: u64,
+    disposition: InputDisposition,
+    text: String,
+}
+
+impl From<SubagentMessageReceipt> for MessageReceipt {
+    fn from(receipt: SubagentMessageReceipt) -> Self {
+        Self {
+            parent_session_id: receipt.parent,
+            child_id: receipt.child,
+            input_id: receipt.input,
+            input_position: receipt.position,
+            disposition: receipt.disposition,
+            text: receipt.text,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -152,9 +191,11 @@ struct Inspection {
     session_revision: SessionRevision,
     admission_paused: bool,
     queued_input_ids: Vec<ChangeId>,
+    pending_message_ids: Vec<ChangeId>,
     current: Option<TurnSummary>,
     latest: Option<TurnSummary>,
     assignment: Option<Assignment>,
+    message: Option<MessageReceipt>,
 }
 
 impl From<SubagentInspection> for Inspection {
@@ -168,11 +209,13 @@ impl From<SubagentInspection> for Inspection {
             session_revision: view.revision,
             admission_paused: view.admission_paused,
             queued_input_ids: view.queued,
+            pending_message_ids: view.pending_messages,
             current: view.current.map(TurnSummary::from),
             latest: view.latest.map(TurnSummary::from),
             assignment: view
                 .assignment
                 .map(|work| Assignment::from_work(child_id, work)),
+            message: view.message.map(MessageReceipt::from),
         }
     }
 }
@@ -184,6 +227,7 @@ struct Assignment {
     parent_turn_id: TurnId,
     input_id: ChangeId,
     max_generation_steps: u32,
+    message_input_ids: Vec<ChangeId>,
     disposition: InputDisposition,
     turn: Option<TurnSummary>,
     result: Option<summaries::SummaryResponse>,
@@ -201,6 +245,7 @@ impl Assignment {
             parent_turn_id: work.parent_turn,
             input_id: work.input,
             max_generation_steps: work.max_generation_steps,
+            message_input_ids: work.message_inputs,
             disposition: work.disposition,
             turn: work.turn.map(TurnSummary::from),
             result,
@@ -212,6 +257,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
     let create = (host.clone(), sessions.clone());
     let assign = (host.clone(), sessions.clone());
     let inspect = (host.clone(), sessions.clone());
+    let message = (host.clone(), sessions.clone());
     let stop = (host.clone(), sessions.clone());
     let pause = (host.clone(), sessions.clone());
     let resume = (host.clone(), sessions.clone());
@@ -263,19 +309,42 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
             on_receive_request!(),
         )
         .on_receive_request(
+            async move |request: SendMessage, responder, _| {
+                let result = async {
+                    require(&message.1, SEND_MESSAGE, Some(&request.parent_session_id))?;
+                    let receipt = message
+                        .0
+                        .send_subagent_message(SubagentMessage {
+                            parent: request.parent_session_id.clone(),
+                            child: request.child_id,
+                            input: request.input_id,
+                            text: request.text,
+                        })
+                        .await
+                        .map_err(host_error)?;
+                    require(&message.1, SEND_MESSAGE, Some(&request.parent_session_id))?;
+                    Ok(MessageReceipt::from(receipt))
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
             async move |request: Inspect, responder, _| {
                 let result = async {
                     require(&inspect.1, INSPECT, Some(&request.parent_session_id))?;
-                    inspect
+                    let view = inspect
                         .0
                         .inspect_subagent(
-                            request.parent_session_id,
+                            request.parent_session_id.clone(),
                             request.child_id,
                             request.input_id,
                         )
                         .await
-                        .map(Inspection::from)
-                        .map_err(host_error)
+                        .map_err(host_error)?;
+                    require(&inspect.1, INSPECT, Some(&request.parent_session_id))?;
+                    Ok(Inspection::from(view))
                 }
                 .await;
                 responder.respond_with_result(result)

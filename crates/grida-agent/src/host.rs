@@ -28,7 +28,9 @@ pub(crate) use images::is_retained_image;
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use permissions::{Approvals, PendingApproval};
 pub use questions::{PendingQuestion, Questions};
-pub use subagents::{SubagentAssignment, SubagentInspection, SubagentWork};
+pub use subagents::{
+    SubagentAssignment, SubagentInspection, SubagentMessage, SubagentMessageReceipt, SubagentWork,
+};
 pub use wakeups::{ScheduledWakeup, WakeupStatus, Wakeups};
 
 use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
@@ -897,6 +899,7 @@ impl Host {
         };
         let view = self.store.inspect(session.clone()).await?;
         self.check_execution(&view)?;
+        let subagent = session_configuration(&view)?.subagent;
         let (claim_request, input, acceptance, history) = match launch {
             Launch::Prompt {
                 id, parts, policy, ..
@@ -916,7 +919,7 @@ impl Host {
                     session.clone(),
                     turn.clone(),
                     view.revision,
-                    input.id.clone(),
+                    vec![input.id.clone()],
                 )?;
                 (
                     WorkerClaim::Select(claim),
@@ -927,8 +930,8 @@ impl Host {
             }
             Launch::Queued => {
                 require_idle(&view)?;
-                let next = match view.queued.first() {
-                    Some(next) => next.input.clone(),
+                let next = match subagents::queued_work(&view) {
+                    Some(next) => next.clone(),
                     None => {
                         let Some(next) = self.goal_continuation(&view).await? else {
                             return Ok(None);
@@ -937,12 +940,17 @@ impl Host {
                     }
                 };
                 let history = self.provider_history(session.clone(), None).await?;
-                let claim = new_claim(
-                    session.clone(),
-                    turn.clone(),
-                    view.revision,
-                    next.id.clone(),
-                )?;
+                let mut selected = Vec::new();
+                if subagent.is_some() {
+                    selected.extend(
+                        view.queued
+                            .iter()
+                            .filter(|input| subagents::is_message(&input.input))
+                            .map(|input| input.input.id.clone()),
+                    );
+                }
+                selected.push(next.id.clone());
+                let claim = new_claim(session.clone(), turn.clone(), view.revision, selected)?;
                 (WorkerClaim::Select(claim), Some(next), None, history)
             }
             resume @ (Launch::Resume(_) | Launch::ResumeAnswered(_)) => {
@@ -963,12 +971,7 @@ impl Host {
                     .store
                     .turn_submissions(session.clone(), turn.clone())
                     .await?;
-                let [input] = inputs.as_slice() else {
-                    return Err(problem(
-                        ErrorKind::InvalidState,
-                        "retained_input_selection_invalid",
-                    ));
-                };
+                let input = subagents::assignment_input(&inputs, subagent.is_some())?;
                 (
                     WorkerClaim::Select(request),
                     Some(input.clone()),
@@ -990,7 +993,6 @@ impl Host {
             .as_ref()
             .map(|input| self.prepare_input(execution, input, InputAuthority::RequireCaptured))
             .transpose()?;
-        let subagent = session_configuration(&view)?.subagent;
         if prepared
             .as_ref()
             .is_some_and(|input| input.subagent != subagent.is_some())
@@ -1060,16 +1062,19 @@ impl Host {
         let mut prepared = match prepared {
             Some(prepared) => prepared,
             None => {
-                let [input] = claim.inputs.as_slice() else {
-                    return Err(problem(
-                        ErrorKind::Uncertain,
-                        "retained_input_selection_invalid",
-                    ));
-                };
+                let input = subagents::assignment_input(&claim.inputs, subagent.is_some())
+                    .map_err(|_| {
+                        problem(ErrorKind::Uncertain, "retained_input_selection_invalid")
+                    })?;
                 self.prepare_input(execution, input, InputAuthority::CancellationOnly)
                     .map_err(|_| problem(ErrorKind::Uncertain, "retained_input_unavailable"))?
             }
         };
+        if let Some(profile) = &subagent {
+            let mut messages = subagents::selected_messages(profile, &claim.inputs)?;
+            messages.append(&mut prepared.messages);
+            prepared.messages = messages;
+        }
         let permission_scope = prepared
             .permission_capture
             .as_ref()
@@ -1677,7 +1682,9 @@ impl Host {
             self.kick_resumed_goal(&view).await;
             return;
         }
-        if view.queued.is_empty() && self.goal_continuation(&view).await.ok().flatten().is_none() {
+        if subagents::queued_work(&view).is_none()
+            && self.goal_continuation(&view).await.ok().flatten().is_none()
+        {
             return;
         }
         let Ok(turn) = TurnId::new(uuid()) else {
@@ -2478,16 +2485,13 @@ fn new_claim(
     session: SessionId,
     turn: TurnId,
     revision: SessionRevision,
-    input: ChangeId,
+    inputs: Vec<ChangeId>,
 ) -> Result<ClaimRequest> {
     Ok(ClaimRequest {
         id: change_id()?,
         session,
         expected_revision: revision,
-        selection: TurnSelection::New {
-            turn,
-            inputs: vec![input],
-        },
+        selection: TurnSelection::New { turn, inputs },
     })
 }
 

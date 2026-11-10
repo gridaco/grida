@@ -349,7 +349,7 @@ impl Host {
         self.owned_control(move |host| async move {
             let admission = host.configuration_admission.lock().await;
             let view = host.store.inspect(session.clone()).await?;
-            if view.current.is_none() && !view.queued.is_empty() {
+            if view.current.is_none() && super::subagents::queued_work(&view).is_some() {
                 host.check_ready_capacity(&session).await?;
             }
             let receipt = host

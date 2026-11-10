@@ -460,7 +460,7 @@ with `mcp_client::McpClient::connect` and `Host::with_mcp_client`.
 
 Use `serve --stdio --subagents` with a direct provider and an Act launch.
 During ACP initialization, negotiate version 1 separately for
-`co.grida/subagent/create`, `assign`, `inspect`, `pause`, `resume`,
+`co.grida/subagent/create`, `assign`, `send-message`, `inspect`, `pause`, `resume`,
 `steer`, `stop`, `resume-queue`, and `withdraw`. Callers attach to the
 parent through the ordinary session API. Children have their own stable IDs
 and history and are absent from ordinary chat listing and load.
@@ -472,10 +472,18 @@ and history and are absent from ordinary chat listing and load.
   `inputId`, and text `instructions`. The parent turn must have settled
   in Act. Assignments wait in acceptance order within the remaining work-turn
   allowance. A follow-up reuses the child's prior context.
+- Send Message supplies `parentSessionId`, `childId`, `inputId`, and up to
+  4 KiB of `text`. Up to 16 messages can wait for the next approved assignment.
+  Messages are retained in order as informational context and leave the
+  child's execution and allowance unchanged. An exact retry returns the
+  original input position and its current disposition.
 - Inspect supplies the parent and child IDs and an optional `inputId`.
-  That input selects its original turn and retained result, even after
-  follow-up work. Inspect also reports `queuedInputIds` and `admissionPaused`.
-  Inspection never starts work.
+  For an assignment it returns the original turn, retained result, and
+  `messageInputIds` selected for that turn. For a message it returns the exact
+  text and delivery disposition. A claimed or completed disposition identifies
+  the assigned turn. Evidence of model input comes from that turn's inference
+  record. Inspect also reports `queuedInputIds`, `pendingMessageIds`, and
+  `admissionPaused`. Inspection leaves execution unchanged.
 - Pause and Stop supply the parent and child IDs, child `turnId`, a fresh
   `requestId`, and the observed `expectedSessionRevision` and
   `expectedControlRevision`. Stop ends the active assignment and holds
@@ -496,8 +504,9 @@ generation steps with the selected output-token allowance per step. The
 assignment receipt exposes `maxGenerationSteps`. The child receives its
 own history and the supplied instructions. It has no workspace tools, MCP, goals,
 scheduled work, or model-driven delegation. The settled parent turn provides
-attribution. Resuming a turn or queue, steering, and new assignments require
+attribution. Resuming a turn or queue, steering, new messages, and new assignments require
 the original verified provider principal and scope. A launch without that
-continuity can inspect, withdraw queued inputs, pause, or stop retained work.
+continuity can inspect, retry an existing message receipt, withdraw queued
+inputs, pause, or stop retained work.
 Shared funding and active parent-tree controls belong to a separate delegation
 composition.

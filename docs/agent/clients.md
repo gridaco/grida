@@ -365,6 +365,12 @@ receipt. New assignments allow up to two generation steps. A continuation
 uses the same assignment and its remaining steps. Reserved work still counts
 after interruption. Resuming, steering, and assigning new work require the
 same verified provider authority.
+
+Send a message with the parent and child IDs and its own input ID to share
+information for the next assignment. An idle child stays idle, and a running
+child keeps its current assignment. Inspect the message to see whether it is
+waiting or which assignment selected it. The delivery receipt records that
+selection. Model input is recorded separately on the turn.
 See the [native host request fields](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md).
 
 ## Ask in a temporary side chat

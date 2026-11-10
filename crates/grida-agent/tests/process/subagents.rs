@@ -5,6 +5,7 @@ use super::*;
 
 const CREATE: &str = "_co.grida/subagent/create";
 const ASSIGN: &str = "_co.grida/subagent/assign";
+const SEND_MESSAGE: &str = "_co.grida/subagent/send-message";
 const INSPECT: &str = "_co.grida/subagent/inspect";
 const STOP: &str = "_co.grida/subagent/stop";
 const PAUSE: &str = "_co.grida/subagent/pause";
@@ -12,9 +13,10 @@ const RESUME: &str = "_co.grida/subagent/resume";
 const STEER: &str = "_co.grida/subagent/steer";
 const RESUME_QUEUE: &str = "_co.grida/subagent/resume-queue";
 const WITHDRAW: &str = "_co.grida/subagent/withdraw";
-const CAPABILITIES: [&str; 9] = [
+const CAPABILITIES: [&str; 10] = [
     CREATE,
     ASSIGN,
+    SEND_MESSAGE,
     INSPECT,
     STOP,
     PAUSE,
@@ -96,6 +98,10 @@ fn assign(parent: &str, child: &str, parent_turn: &str, input: &str, text: &str)
         "parentSessionId":parent,"childId":child,"parentTurnId":parent_turn,
         "inputId":input,"instructions":text,
     })
+}
+
+fn note(parent: &str, child: &str, input: &str, text: &str) -> Value {
+    json!({"parentSessionId":parent,"childId":child,"inputId":input,"text":text})
 }
 
 async fn inspect(client: &mut PrivateStdio, parent: &str, child: &str, input: &str) -> Value {
@@ -312,6 +318,250 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
 }
 
 #[tokio::test]
+async fn child_messages_wait_for_an_assignment_and_keep_the_exact_delivery_after_restart() {
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let (release, wait) = tokio::sync::oneshot::channel();
+    let mut provider = Endpoint::start(vec![
+        Reply::Finished("Parent completed."),
+        Reply::Release("First child finding.", wait),
+        Reply::Finished("Second child finding."),
+    ])
+    .await;
+    let mut first = serve(&state, &provider.url).await;
+    let parent = new_session(&mut first, workspace.path()).await;
+    let parent_turn = settle_parent(&mut first, &parent).await;
+    provider.request().await;
+    let created = first.request(CREATE, create(&parent)).await;
+    let child = created["result"]["childId"].as_str().unwrap();
+    let other = new_session(&mut first, workspace.path()).await;
+    let unrelated = first
+        .request(
+            SEND_MESSAGE,
+            note(&other, child, "first-note", "Wrong parent"),
+        )
+        .await;
+    assert_eq!(unrelated["error"]["data"], "subagent_unavailable");
+    let first_note = note(&parent, child, "first-note", "First contextual fact.");
+    let oversized = first
+        .request(
+            SEND_MESSAGE,
+            note(&parent, child, "large-note", &"x".repeat(4 * 1024 + 1)),
+        )
+        .await;
+    assert_eq!(oversized["error"]["data"], "subagent_message_invalid");
+    let receipt = first.request(SEND_MESSAGE, first_note.clone()).await;
+    let receipt = &receipt["result"];
+    assert_eq!(receipt["disposition"]["kind"], "queued");
+    assert_eq!(receipt["text"], "First contextual fact.");
+    let second_note = note(&parent, child, "second-note", "Second contextual fact.");
+    let second = first.request(SEND_MESSAGE, second_note.clone()).await;
+    assert_eq!(
+        second["result"]["disposition"]["kind"], "queued",
+        "{second}"
+    );
+    let mismatched = first
+        .request(
+            ASSIGN,
+            assign(
+                &parent,
+                child,
+                &parent_turn,
+                "first-note",
+                "Treat the note as work.",
+            ),
+        )
+        .await;
+    assert_eq!(
+        mismatched["error"]["data"],
+        "subagent_assignment_identity_reused"
+    );
+    let view = inspect(&mut first, &parent, child, "first-note").await;
+    assert_eq!(
+        view["pendingMessageIds"],
+        json!(["first-note", "second-note"])
+    );
+    assert_eq!(view["queuedInputIds"], json!([]));
+    assert_eq!(view["message"], *receipt);
+    assert_eq!(view["allocation"]["reserved"], 0);
+    assert!(view["current"].is_null());
+    assert!(provider.requests.try_recv().is_err());
+    first.close().await;
+
+    let mut reopened = serve(&state, &provider.url).await;
+    load_parent(&mut reopened, &parent, workspace.path()).await;
+    let work = assign(
+        &parent,
+        child,
+        &parent_turn,
+        "first-work",
+        "First approved assignment.",
+    );
+    let accepted = reopened.request(ASSIGN, work.clone()).await;
+    assert_eq!(
+        accepted["result"]["disposition"]["kind"], "queued",
+        "{accepted}"
+    );
+    let request = provider.request().await;
+    let messages = request["messages"].to_string();
+    let first = messages.find("First contextual fact.").unwrap();
+    let second = messages.find("Second contextual fact.").unwrap();
+    let task = messages.find("First approved assignment.").unwrap();
+    assert!(first < second && second < task, "{messages}");
+    assert!(messages.contains("Informational context from the parent chat"));
+    assert!(!messages.contains("Parent-only context."));
+    let busy_note = note(&parent, child, "busy-note", "Context sent while busy.");
+    let queued = reopened.request(SEND_MESSAGE, busy_note.clone()).await;
+    assert_eq!(queued["result"]["disposition"]["kind"], "queued");
+    let claimed = inspect(&mut reopened, &parent, child, "first-note").await;
+    assert_eq!(claimed["message"]["disposition"]["kind"], "claimed");
+    assert_eq!(claimed["pendingMessageIds"], json!(["busy-note"]));
+    assert_eq!(claimed["allocation"]["reserved"], 1);
+    assert!(!messages.contains("Context sent while busy."));
+    release.send(()).unwrap();
+    let finished = wait_for(&mut reopened, &parent, child, "first-work", |view| {
+        view["assignment"]["disposition"]["kind"] == "completed"
+    })
+    .await;
+    let turn = &finished["assignment"]["turn"]["turnId"];
+    assert_eq!(
+        finished["assignment"]["messageInputIds"],
+        json!(["first-note", "second-note"])
+    );
+    assert_eq!(finished["pendingMessageIds"], json!(["busy-note"]));
+    assert!(finished["current"].is_null());
+    let delivered = reopened.request(SEND_MESSAGE, first_note.clone()).await;
+    assert_eq!(
+        delivered["result"]["inputPosition"],
+        receipt["inputPosition"]
+    );
+    assert_eq!(
+        delivered["result"]["disposition"],
+        json!({"kind":"completed", "turn":turn})
+    );
+    assert_eq!(
+        reopened.request(ASSIGN, work).await["result"],
+        finished["assignment"]
+    );
+    assert!(
+        timeout(Duration::from_millis(100), provider.requests.recv())
+            .await
+            .is_err()
+    );
+    reopened.close().await;
+
+    let mut followup = serve(&state, &provider.url).await;
+    load_parent(&mut followup, &parent, workspace.path()).await;
+    assert_eq!(
+        followup.request(SEND_MESSAGE, busy_note).await["result"],
+        queued["result"]
+    );
+    let accepted = followup
+        .request(
+            ASSIGN,
+            assign(
+                &parent,
+                child,
+                &parent_turn,
+                "second-work",
+                "Second approved assignment.",
+            ),
+        )
+        .await;
+    assert_eq!(
+        accepted["result"]["disposition"]["kind"], "queued",
+        "{accepted}"
+    );
+    let request = provider.request().await;
+    let messages = request["messages"].to_string();
+    assert_eq!(messages.matches("First contextual fact.").count(), 1);
+    assert_eq!(messages.matches("Second contextual fact.").count(), 1);
+    assert_eq!(messages.matches("Context sent while busy.").count(), 1);
+    assert!(
+        messages.find("Context sent while busy.").unwrap()
+            < messages.find("Second approved assignment.").unwrap()
+    );
+    let finished = wait_for(&mut followup, &parent, child, "second-work", |view| {
+        view["assignment"]["disposition"]["kind"] == "completed"
+    })
+    .await;
+    assert_eq!(
+        finished["assignment"]["messageInputIds"],
+        json!(["busy-note"])
+    );
+    assert_eq!(finished["pendingMessageIds"], json!([]));
+    assert_eq!(finished["allocation"]["reserved"], 2);
+    followup.close().await;
+
+    let mut rotated = serve_with_key(&state, &provider.url, "rotated-fixture-key").await;
+    load_parent(&mut rotated, &parent, workspace.path()).await;
+    assert_eq!(
+        rotated.request(SEND_MESSAGE, first_note.clone()).await["result"],
+        delivered["result"]
+    );
+    let different = rotated
+        .request(
+            SEND_MESSAGE,
+            note(&parent, child, "first-note", "Changed body."),
+        )
+        .await;
+    assert_eq!(
+        different["error"]["data"],
+        "subagent_message_identity_reused"
+    );
+    let denied = rotated
+        .request(
+            SEND_MESSAGE,
+            note(&parent, child, "new-note", "Wrong provider authority."),
+        )
+        .await;
+    assert_eq!(denied["error"]["data"], "subagent_authority_changed");
+    assert!(provider.requests.try_recv().is_err());
+    rotated.close().await;
+
+    provider.done().await;
+}
+
+#[tokio::test]
+async fn shared_connections_cannot_negotiate_child_message_delivery() {
+    let temporary = TempDir::new().unwrap();
+    let mut provider = Endpoint::start(vec![]).await;
+    let mut command = executable();
+    command.args([
+        "serve",
+        "--listen",
+        "ws://127.0.0.1:0/acp",
+        "--server-token-env",
+        "GRIDA_AGENT_SUBAGENT_FIXTURE_TOKEN",
+        "--max-output-tokens",
+        "128",
+    ]);
+    configured(&mut command, &temporary.path().join("state"), &provider.url);
+    command.env("GRIDA_AGENT_SUBAGENT_FIXTURE_TOKEN", SERVER_TOKEN);
+    let (child, url) = spawn_shared_server(command).await;
+    let mut socket = connect_shared(&url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    let mut request = extension_initialize();
+    request["clientCapabilities"]["_meta"][&SEND_MESSAGE[1..]] = 1.into();
+    let ready = ws_rpc(&mut socket, 1, "initialize", request).await;
+    assert!(ready["result"]["agentCapabilities"]["_meta"][&SEND_MESSAGE[1..]].is_null());
+    let denied = ws_rpc(
+        &mut socket,
+        2,
+        SEND_MESSAGE,
+        note("parent", "child", "note", "data"),
+    )
+    .await;
+    assert_eq!(denied["error"]["code"], -32601, "{denied}");
+    assert!(provider.requests.try_recv().is_err());
+    drop(socket);
+    super::lifecycle::terminate_shared_server(child).await;
+    provider.done().await;
+}
+
+#[tokio::test]
 async fn paused_child_accepts_exact_steering_and_resumes_the_same_assignment_after_restart() {
     let temporary = TempDir::new().unwrap();
     let workspace = TempDir::new().unwrap();
@@ -329,6 +579,18 @@ async fn paused_child_accepts_exact_steering_and_resumes_the_same_assignment_aft
     provider.request().await;
     let created = first.request(CREATE, create(&parent)).await;
     let child = created["result"]["childId"].as_str().unwrap().to_owned();
+    let note = first
+        .request(
+            SEND_MESSAGE,
+            note(
+                &parent,
+                &child,
+                "supporting-note",
+                "A retained supporting fact.",
+            ),
+        )
+        .await;
+    assert_eq!(note["result"]["disposition"]["kind"], "queued", "{note}");
     let accepted = first
         .request(
             ASSIGN,
@@ -387,6 +649,7 @@ async fn paused_child_accepts_exact_steering_and_resumes_the_same_assignment_aft
     let request = provider.request().await;
     let messages = request["messages"].to_string();
     assert!(messages.contains("Investigate the point."));
+    assert_eq!(messages.matches("A retained supporting fact.").count(), 1);
     assert!(messages.contains("Use this correction."));
     assert!(!messages.contains("Parent-only context."));
     assert!(request["tools"].as_array().is_none_or(Vec::is_empty));
@@ -405,6 +668,10 @@ async fn paused_child_accepts_exact_steering_and_resumes_the_same_assignment_aft
     assert_eq!(settled["assignment"]["result"]["steps"], 2);
     assert_eq!(settled["allocation"]["reserved"], 1);
     assert_eq!(settled["assignment"]["parentTurnId"], parent_turn);
+    assert_eq!(
+        settled["assignment"]["messageInputIds"],
+        json!(["supporting-note"])
+    );
     reopened.close().await;
 
     let mut replacement = serve_with_key(&state, &provider.url, "other-fixture-principal").await;

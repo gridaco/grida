@@ -1052,9 +1052,12 @@ lazy reads, read-only mutation, and symlink escape refusal.
 - [Private subagent controls](crates/grida-agent/src/acp/extensions/subagents.rs)
   require an attached parent and a trusted opt-in launch. The
   [host](crates/grida-agent/src/host/subagents.rs) rechecks the child's
-  retained parent link, verified provider scope, and exact settled sponsoring
-  turn. Pause, Resume, Steer, and Stop target an exact child turn and use the
-  ordinary revision checks. Stop atomically holds the child queue. Resume,
+  retained parent link and verified provider scope before new delivery. Work
+  assignments also require the exact settled sponsoring turn. Informational
+  messages retain their own receipts and wait for an approved assignment to
+  claim them as attributed user data. Message delivery and exact receipt retry
+  leave execution unchanged. Pause, Resume, Steer, and Stop target an exact
+  child turn and use the ordinary revision checks. Stop atomically holds the child queue. Resume,
   queue release and Steer revalidate provider continuity. Child creation holds
   the session admission lock through the parent check and durable insertion.
   The [allocation policy](crates/grida-agent-master/src/subagents.rs)
