@@ -647,6 +647,14 @@ fn records(stdout: &[u8]) -> Vec<Value> {
 async fn identified_external_reopens_exact_receipt_without_a_second_peer() {
     let fixture = Fixture::new(false);
     let profile = fixture.identified_profile("complete");
+    let mut document: Value = serde_json::from_slice(&fs::read(&profile).unwrap()).unwrap();
+    let protected_root = profile.parent().unwrap().join("protected");
+    document["protectedPaths"] = json!(
+        (0..36)
+            .map(|index| protected_root.join(format!("location-{index}")))
+            .collect::<Vec<_>>()
+    );
+    fs::write(&profile, serde_json::to_vec(&document).unwrap()).unwrap();
     let id = Uuid::new_v4();
     let launched = fixture
         .identified_command(&profile, id)

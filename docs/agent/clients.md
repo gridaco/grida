@@ -352,6 +352,9 @@ local receipt. [Run a local ACP peer from the CLI](../cli/agent.md#run-a-local-a
 
 ### Use the Local agent preview in Desktop
 
+Installed Linux Desktop packages are still being qualified for this
+workflow.
+
 An explicitly provisioned Linux native preview shows **Local agent** in the
 selected workspace. Open it, enter one text request, and select **Run**. The
 dialog names the reviewed peer and shows its offline, read-only workspace

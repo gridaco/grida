@@ -35,6 +35,11 @@ use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
+// The host may include Desktop's inherited protection roots. Keep the profile
+// bound below the native sandbox's aggregate location limit with room for the
+// selected workspace, runtime paths and host-added denials.
+const MAX_PROTECTED_PATHS: usize = 64;
+
 pub struct RunOptions {
     pub state_directory: PathBuf,
     pub profile: PathBuf,
@@ -310,7 +315,7 @@ fn load_driver(
         || profile.arguments.iter().map(String::len).sum::<usize>() > 8 * 1024
         || profile.arguments.iter().any(|arg| arg.contains('\0'))
         || profile.runtime_paths.len() > 32
-        || profile.protected_paths.len() > 32
+        || profile.protected_paths.len() > MAX_PROTECTED_PATHS
         || cfg!(target_os = "linux") != profile.bubblewrap.is_some()
     {
         return Err(invalid_profile());
