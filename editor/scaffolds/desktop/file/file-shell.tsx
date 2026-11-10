@@ -11,10 +11,8 @@
  *   - **the editor** — the SVG canvas vs the slides deck.
  * The chrome (title bar + chat-left AI sidebar) is shared.
  *
- * The AI sidebar is mounted ONCE and bound to whichever editor is active via a
- * stable `AgentFs` whose mount is re-pointed (see {@link ./active-editor-agent-fs}).
- * In deck mode that's the active slide's editor — switching slides re-points the
- * agent while the conversation stays put.
+ * A root deck can use its registered workspace's native chat. The standalone
+ * document sidebar binds the current editor through a stable `AgentFs`.
  */
 
 "use client";
@@ -27,11 +25,13 @@ import {
   ResizablePanelGroup,
 } from "@app/ui/components/resizable";
 import { CurrentArtifactSurfaceHost } from "@/lib/desktop/current-artifact-surface-host";
+import { useDesktopBridge } from "@/lib/desktop/bridge";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import { AISidebarChat } from "../ai-sidebar/chat";
 import { TitleBar } from "../chrome/title-bar";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { WorkspaceChangesProvider } from "../workbench/workspace-changes";
+import { NativeAgentPaneGate } from "../workbench/native-agent-pane";
 import { CANVAS_PATH } from "../ai-sidebar/agent-fs-binding";
 import { useActiveEditorAgentFs } from "./active-editor-agent-fs";
 import { SingleFileSvgSurface, type FileMeta } from "./single-file-svg-surface";
@@ -64,6 +64,7 @@ export function DesktopFileShell({
     : workspaceId
       ? "deck"
       : "empty";
+  const bridge = useDesktopBridge();
 
   const { fs, setActiveEditor } = useActiveEditorAgentFs();
   const currentSurfacePath =
@@ -108,6 +109,13 @@ export function DesktopFileShell({
     );
   }
 
+  const legacyChat =
+    mode === "deck" ? (
+      <AISidebarChat workspaceId={workspaceId} surfaceHost={surfaceHost} />
+    ) : (
+      <AISidebarChat fs={fs} surfaceHost={surfaceHost} />
+    );
+  const nativeChat = bridge?.nativeChat;
   return (
     <div className="flex h-svh w-full flex-col bg-background">
       <TitleBar>
@@ -121,20 +129,16 @@ export function DesktopFileShell({
           minSize={SIDEBAR_MIN_SIZE}
           maxSize={SIDEBAR_MAX_SIZE}
         >
-          <aside className="h-full w-full">
-            {/* Deck mode is WORKSPACE-bound: the agent gets a server-side fs over
-                the `.canvas` dir (sees the manifest + every slide). Single-file
-                mode resolves fs tools client-side against the in-memory editor. */}
-            {/* The agent discovers skills from disk (repo-root `skills/` +
-                workspace `.claude/skills`) and advertises them itself — a
-                `.canvas` bundle loads the dotcanvas/slides skill on demand. */}
-            {mode === "deck" ? (
-              <AISidebarChat
+          <aside className="flex h-full w-full flex-col">
+            {mode === "deck" && workspaceId && !basePath && nativeChat?.deck ? (
+              <NativeAgentPaneGate
+                bridge={nativeChat}
                 workspaceId={workspaceId}
-                surfaceHost={surfaceHost}
+                initialSession={null}
+                legacy={legacyChat}
               />
             ) : (
-              <AISidebarChat fs={fs} surfaceHost={surfaceHost} />
+              legacyChat
             )}
           </aside>
         </ResizablePanel>

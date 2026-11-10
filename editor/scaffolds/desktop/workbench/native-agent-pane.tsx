@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
-import type { DesktopNativeChat } from "@grida/desktop-bridge";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import type {
+  DesktopNativeChat,
+  NativeChatReadiness,
+} from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import { Textarea } from "@app/ui/components/textarea";
@@ -55,6 +65,84 @@ const selectionMemory = {
   setItem: (key: string, value: string) =>
     window.localStorage.setItem(key, value),
 };
+
+export function NativeAgentPaneGate({
+  bridge,
+  workspaceId,
+  initialSession,
+  editorSurfaces,
+  legacy,
+}: {
+  bridge: DesktopNativeChat;
+  workspaceId: string;
+  initialSession: string | null;
+  editorSurfaces?: WorkspaceSurfaceHost;
+  legacy: ReactNode;
+}) {
+  const [attempt, setAttempt] = useState(0);
+  const [selection, setSelection] = useState<{
+    bridge: DesktopNativeChat;
+    attempt: number;
+    readiness: NativeChatReadiness | null;
+  }>();
+  useEffect(
+    () =>
+      NativeChatController.watchReadiness(bridge, (readiness) =>
+        setSelection({ bridge, attempt, readiness })
+      ),
+    [bridge, attempt]
+  );
+  const readiness =
+    selection?.bridge === bridge && selection.attempt === attempt
+      ? selection.readiness
+      : undefined;
+  if (readiness === "legacy") return legacy;
+  if (readiness === undefined || readiness === "native-starting")
+    return (
+      <div role="status" className="px-3 py-2 text-xs text-muted-foreground">
+        {readiness === "native-starting"
+          ? "Starting native chat…"
+          : "Checking chat availability…"}
+      </div>
+    );
+  if (readiness !== "native-ready")
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 text-xs">
+        <span role="alert" className="text-destructive">
+          {readiness === null
+            ? "Couldn't check chat availability."
+            : nativeChatUnavailableMessage[readiness]}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onClick={() => setAttempt((current) => current + 1)}
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  return (
+    <NativeAgentPane
+      key={initialSession}
+      bridge={bridge}
+      workspaceId={workspaceId}
+      initialSession={initialSession}
+      editorSurfaces={editorSurfaces}
+    />
+  );
+}
+
+const nativeChatUnavailableMessage = {
+  "native-unavailable": "Native chat is unavailable.",
+  "native-provider-key-required":
+    "Add an API key for the selected provider in Desktop settings, then retry.",
+  "native-provider-model-unavailable":
+    "The selected model is unavailable. Check the model configured for this Desktop profile.",
+  "native-provider-endpoint-approval-required":
+    "Save the selected endpoint in Desktop settings and approve its address, then retry.",
+} as const;
 
 export function NativeAgentPane({
   bridge,

@@ -14,6 +14,10 @@ want the agent to use, or select the relevant material in an attached
 editor. Use **Plan** to investigate and **Act** to carry out changes with
 the tools and access available to the chat. [Understand agent permissions](./permissions.md)
 
+On a Desktop build with native deck chat, open the `.canvas` bundle itself to
+start or reopen a chat for that deck. The chat uses the bundle's registered
+workspace. Ask about its files by name while you work in the slide editor.
+
 ## Attach an image
 
 If the connection offers **Add PNG**, select one PNG up to 256 KiB and

@@ -122,12 +122,7 @@ import {
   findPendingApproval,
   type PendingApproval,
 } from "../shared/agent-approval";
-import type {
-  DesktopNativeChat,
-  NativeChatReadiness,
-} from "@grida/desktop-bridge";
-import { NativeChatController } from "@/lib/agent-chat/native-chat-controller";
-import { NativeAgentPane } from "./native-agent-pane";
+import { NativeAgentPaneGate } from "./native-agent-pane";
 import { NativeExternalAgentPanel } from "./native-external-agent-panel";
 import styles from "./agent-pane.module.css";
 
@@ -179,6 +174,7 @@ type AgentPaneContentProps = Omit<AgentPaneProps, "className">;
 
 function AgentPaneRoute(props: AgentPaneContentProps) {
   const bridge = useDesktopBridge();
+  const initialSession = useSearchParams().get("session");
   if (!bridge) return null;
   return (
     <>
@@ -192,7 +188,10 @@ function AgentPaneRoute(props: AgentPaneContentProps) {
         <NativeAgentPaneGate
           key={props.workspace.id}
           bridge={bridge.nativeChat}
-          legacy={props}
+          workspaceId={props.workspace.id}
+          initialSession={initialSession}
+          editorSurfaces={props.surfaceHost}
+          legacy={<AgentPaneContent {...props} />}
         />
       ) : (
         <AgentPaneContent {...props} />
@@ -200,79 +199,6 @@ function AgentPaneRoute(props: AgentPaneContentProps) {
     </>
   );
 }
-
-function NativeAgentPaneGate({
-  bridge,
-  legacy,
-}: {
-  bridge: DesktopNativeChat;
-  legacy: AgentPaneContentProps;
-}) {
-  const params = useSearchParams();
-  const [attempt, setAttempt] = useState(0);
-  const [selection, setSelection] = useState<{
-    bridge: DesktopNativeChat;
-    attempt: number;
-    readiness: NativeChatReadiness | null;
-  }>();
-  useEffect(
-    () =>
-      NativeChatController.watchReadiness(bridge, (readiness) =>
-        setSelection({ bridge, attempt, readiness })
-      ),
-    [bridge, attempt]
-  );
-  const readiness =
-    selection?.bridge === bridge && selection.attempt === attempt
-      ? selection.readiness
-      : undefined;
-  if (readiness === "legacy") return <AgentPaneContent {...legacy} />;
-  if (readiness === undefined || readiness === "native-starting")
-    return (
-      <div role="status" className="px-3 py-2 text-xs text-muted-foreground">
-        {readiness === "native-starting"
-          ? "Starting native chat…"
-          : "Checking chat availability…"}
-      </div>
-    );
-  if (readiness !== "native-ready")
-    return (
-      <div className="flex items-center gap-2 px-3 py-2 text-xs">
-        <span role="alert" className="text-destructive">
-          {readiness === null
-            ? "Couldn't check chat availability."
-            : nativeChatUnavailableMessage[readiness]}
-        </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          onClick={() => setAttempt((current) => current + 1)}
-        >
-          Retry
-        </Button>
-      </div>
-    );
-  return (
-    <NativeAgentPane
-      key={params.get("session")}
-      bridge={bridge}
-      workspaceId={legacy.workspace.id}
-      initialSession={params.get("session")}
-      editorSurfaces={legacy.surfaceHost}
-    />
-  );
-}
-
-const nativeChatUnavailableMessage = {
-  "native-unavailable": "Native chat is unavailable.",
-  "native-provider-key-required":
-    "Add an API key for the selected provider in Desktop settings, then retry.",
-  "native-provider-model-unavailable":
-    "The selected model is unavailable. Check the model configured for this Desktop profile.",
-  "native-provider-endpoint-approval-required":
-    "Save the selected endpoint in Desktop settings and approve its address, then retry.",
-} as const;
 
 function AgentPaneContent({
   workspace,
