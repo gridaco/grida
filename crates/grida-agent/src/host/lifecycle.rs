@@ -372,17 +372,19 @@ impl Host {
 
     pub async fn pause(&self, control: TurnControl) -> Result<ControlReceipt> {
         self.owned_control(move |host| async move {
-            host.control_sponsorship(ControlRequest {
-                id: control.request,
-                session: control.session,
-                expected_revision: control.expected_session,
-                action: SessionControl::Turn {
-                    turn: control.turn,
-                    expected: control.expected_control,
-                    directive: ControlDirective::Pause,
-                },
-            })
-            .await
+            Ok(host
+                .control_sponsorship(ControlRequest {
+                    id: control.request,
+                    session: control.session,
+                    expected_revision: control.expected_session,
+                    action: SessionControl::Turn {
+                        turn: control.turn,
+                        expected: control.expected_control,
+                        directive: ControlDirective::Pause,
+                    },
+                })
+                .await?
+                .source)
         })
         .await
     }

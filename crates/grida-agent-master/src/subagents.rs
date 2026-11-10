@@ -33,6 +33,8 @@ pub struct Profile {
 pub struct Sponsorship {
     pub parent_turn: TurnId,
     pub operation: OperationId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub admission: Option<Fingerprint>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -293,6 +295,7 @@ mod tests {
         let sponsor = |operation: &str| Sponsorship {
             parent_turn: turn.clone(),
             operation: OperationId::new(operation).unwrap(),
+            admission: None,
         };
         let owner = authority("owner", "initial");
         let first =
@@ -351,6 +354,7 @@ mod tests {
             Sponsorship {
                 parent_turn: TurnId::new("turn").unwrap(),
                 operation: OperationId::new("operation").unwrap(),
+                admission: None,
             },
             &authority("owner", "binding"),
         )

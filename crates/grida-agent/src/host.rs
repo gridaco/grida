@@ -68,7 +68,7 @@ use agent_kit_sessions::{
     InputDisposition, RecoveryRequest, SessionControl, SessionRevision, SessionStore, SessionView,
     Submission, TurnDisposition, TurnSelection, TurnView,
 };
-use agent_kit_store_sqlite::SqliteStore;
+use agent_kit_store_sqlite::{OperationClaim, OperationPairReceipt, SqliteStore};
 use grida_agent_master::configuration::SettingChange;
 use grida_agent_master::hooks::CompletionChecks;
 use grida_agent_master::{Master, MasterAuthority, MasterConfig, MasterOutcome, OperatingRegime};
@@ -339,6 +339,7 @@ enum Launch {
         publish_text: bool,
     },
     Queued,
+    Sponsored(Box<OperationClaim>),
     Compact(ChangeId),
     RecoverCompaction(RecoveryRequest),
     Resume(ClaimRequest),
@@ -884,6 +885,10 @@ impl Host {
         if self.work.lock().await.closed {
             return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
         }
+        let launch = match launch {
+            Launch::Sponsored(request) => return self.admit_sponsored(*request).await,
+            other => other,
+        };
         let maintenance_claim = match &launch {
             Launch::Compact(request) => {
                 return self.admit_compaction(session, turn, request.clone()).await;
@@ -998,6 +1003,7 @@ impl Host {
             Launch::Compact(_) | Launch::RecoverCompaction(_) => {
                 return Err(problem(ErrorKind::InvalidState, "compaction_plan_missing"));
             }
+            Launch::Sponsored(_) => unreachable!("sponsored launch handled before session lookup"),
         };
         let prepared = input
             .as_ref()
@@ -1328,14 +1334,9 @@ impl Host {
             work.closed
         };
         if closing {
-            control(
-                &self.store,
-                session.clone(),
-                turn.clone(),
-                ControlDirective::Pause,
-            )
-            .await
-            .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_pause_failed"))?;
+            control(self, session.clone(), turn.clone(), ControlDirective::Pause)
+                .await
+                .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_pause_failed"))?;
         }
         Ok((opened, closing))
     }
@@ -1949,7 +1950,8 @@ impl Host {
                 .await?;
             host.release_timer(&session, &turn).await;
             host.kick_stopped(session, turn).await;
-            Ok(receipt)
+            host.kick_sponsored_stop(&receipt).await;
+            Ok(receipt.source)
         })
         .await
     }
@@ -2029,14 +2031,17 @@ impl Host {
     }
 
     pub async fn cancel(&self, session: SessionId, turn: TurnId) -> Result<()> {
-        control(
-            &self.store,
+        let receipt = control(
+            self,
             session.clone(),
             turn.clone(),
             ControlDirective::Cancel,
         )
         .await?;
         self.release_timer(&session, &turn).await;
+        if let Some(receipt) = &receipt {
+            self.kick_sponsored_stop(receipt).await;
+        }
         Ok(())
     }
 
@@ -2069,13 +2074,7 @@ impl Host {
         let result = tokio::time::timeout_at(deadline, async {
             for (session, turn, admitted, _) in &active {
                 if *admitted {
-                    control(
-                        &self.store,
-                        session.clone(),
-                        turn.clone(),
-                        ControlDirective::Pause,
-                    )
-                    .await?;
+                    control(self, session.clone(), turn.clone(), ControlDirective::Pause).await?;
                 }
             }
             if let Some(gg) = &self.gg_connection {
@@ -2502,14 +2501,17 @@ async fn drive(
 }
 
 async fn control(
-    store: &SqliteStore,
+    host: &Host,
     session: SessionId,
     turn: TurnId,
     directive: ControlDirective,
-) -> Result<()> {
+) -> Result<Option<OperationPairReceipt>> {
     for _ in 0..4 {
-        let session_view = store.inspect(session.clone()).await?;
-        let turn_view = store.inspect_turn(session.clone(), turn.clone()).await?;
+        let session_view = host.store.inspect(session.clone()).await?;
+        let turn_view = host
+            .store
+            .inspect_turn(session.clone(), turn.clone())
+            .await?;
         // A worker can still be releasing its lease after durable suspension.
         // Host shutdown preserves the recorded pause state of that waiting task.
         if matches!(turn_view.disposition, TurnDisposition::Settled)
@@ -2519,7 +2521,7 @@ async fn control(
                     || turn_view.controls.paused
                     || turn_view.controls.cancelled))
         {
-            return Ok(());
+            return Ok(None);
         }
         if session_view
             .current
@@ -2529,8 +2531,8 @@ async fn control(
         {
             return Err(problem(ErrorKind::Conflict, "control_turn_changed"));
         }
-        let result = store
-            .control(agent_kit_sessions::ControlRequest {
+        let result = host
+            .control_sponsorship(agent_kit_sessions::ControlRequest {
                 id: change_id()?,
                 session: session.clone(),
                 expected_revision: session_view.revision,
@@ -2542,7 +2544,7 @@ async fn control(
             })
             .await;
         match result {
-            Ok(_) => return Ok(()),
+            Ok(receipt) => return Ok(Some(receipt)),
             Err(error) if error.kind == ErrorKind::Conflict => continue,
             Err(error) => return Err(error),
         }

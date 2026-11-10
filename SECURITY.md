@@ -1097,7 +1097,14 @@ lazy reads, read-only mutation, and symlink escape refusal.
   [process fixtures](crates/grida-agent/tests/process/subagents.rs) check
   attachment scope, restart, exact result attribution, and allowance reuse.
 - A sponsored child profile binds one funded slot to an exact source turn
-  and tool operation. Parent Pause and Stop apply through the
+  and tool operation. Starting that child checks the admitted operation's
+  definition, arguments, grant, and attempt. The
+  [claim transaction](crates/agent-kit-store-sqlite/src/lib.rs)
+  verifies current source ownership and controls before admitting a worker.
+  The child uses the captured model and operating regime with a separate
+  text-only assignment and no tool grants. Exact start retries observe the
+  retained assignment without redispatch. Parent Pause and Stop, including
+  cancellation and shutdown, apply through the
   [operation pair transaction](crates/agent-kit-store-sqlite/src/control_pair.rs),
   which verifies the exact child claim or fences the absent slot. The
   child's product state distinguishes independent and ancestor pause causes.
