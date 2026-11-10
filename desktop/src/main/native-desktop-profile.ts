@@ -59,7 +59,8 @@ export namespace NativeDesktopProfile {
       () => (protectedLegacy ??= new ProtectedRoots(legacyLocations())),
       {
         supported,
-        allowBirth: !mediaOnly && (allowBirth || legacyPredecessor),
+        allowBirth:
+          !mediaOnly && (legacyPredecessor || (supported && allowBirth)),
         legacyPredecessor,
         hasLegacyInstall: legacyPredecessor
           ? undefined

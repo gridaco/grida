@@ -204,6 +204,85 @@ it.runIf(process.platform === "darwin" && process.arch === "arm64")(
 );
 
 it.runIf(process.platform === "darwin" && process.arch === "arm64")(
+  "preserves ordinary launch overrides before enrollment and refuses them after enrollment",
+  async () => {
+    const fixture = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-native-enrollment-")
+    );
+    const home = path.join(fixture, "home");
+    const appData = path.join(home, "Library", "Application Support");
+    const setPath = vi.fn<App["setPath"]>();
+    const getSwitchValue = vi.fn<App["commandLine"]["getSwitchValue"]>(
+      () => ""
+    );
+    const app = {
+      commandLine: { getSwitchValue },
+      getPath: (name: Parameters<App["getPath"]>[0]) =>
+        name === "appData" ? appData : name === "home" ? home : fixture,
+      setPath,
+    };
+    const argv = process.argv;
+    try {
+      vi.resetModules();
+      const { NativeDesktopProfile: profile } =
+        await import("./native-desktop-profile");
+      vi.stubEnv("GRIDA_HOME", path.join(home, ".grida"));
+      await fs.mkdir(appData, { recursive: true, mode: 0o700 });
+
+      vi.stubEnv("GRIDA_AGENT_USER_DATA", path.join(fixture, "agent"));
+      profile.prepareFirst(app, true);
+      expect(() => profile.prepareFirst(app, false, true)).toThrow(
+        "native_first_profile_invalid"
+      );
+      vi.stubEnv("GRIDA_AGENT_USER_DATA", undefined);
+
+      getSwitchValue.mockReturnValueOnce(path.join(fixture, "browser"));
+      profile.prepareFirst(app, true);
+      process.argv = [
+        ...argv,
+        "--user-data-dir",
+        path.join(fixture, "browser"),
+      ];
+      profile.prepareFirst(app, true);
+      process.argv = [...argv, "--native-chat"];
+      profile.prepareFirst(app, true);
+      process.argv = argv;
+
+      const arch = Object.getOwnPropertyDescriptor(process, "arch")!;
+      Object.defineProperty(process, "arch", { ...arch, value: "x64" });
+      try {
+        profile.prepareFirst(app, true);
+      } finally {
+        Object.defineProperty(process, "arch", arch);
+      }
+      expect(profile.firstSelected()).toBe(false);
+      expect(setPath).not.toHaveBeenCalled();
+      expect(await fs.readdir(appData)).toEqual([]);
+
+      profile.prepareFirst(app, true);
+      expect(profile.firstSelected()).toBe(true);
+      const record = path.join(appData, "Grida Native", "profile.json");
+      const original = await fs.readFile(record);
+
+      vi.resetModules();
+      const { NativeDesktopProfile: reopen } =
+        await import("./native-desktop-profile");
+      getSwitchValue.mockReturnValueOnce(path.join(fixture, "browser"));
+      setPath.mockClear();
+      expect(() => reopen.prepareFirst(app, true)).toThrow(
+        "native_first_profile_invalid"
+      );
+      expect(setPath).not.toHaveBeenCalled();
+      expect(await fs.readFile(record)).toEqual(original);
+    } finally {
+      process.argv = argv;
+      vi.unstubAllEnvs();
+      await fs.rm(fixture, { recursive: true, force: true });
+    }
+  }
+);
+
+it.runIf(process.platform === "darwin" && process.arch === "arm64")(
   "opens only a verified existing native profile for a disabled agent",
   async () => {
     const fixture = await fs.mkdtemp(

@@ -73,6 +73,12 @@ it.skipIf(!process.geteuid?.())(
     expect(
       NativeFirstProfile.open(appData, lazyLegacy, ordinary)
     ).toBeUndefined();
+    expect(
+      NativeFirstProfile.open(appData, lazyLegacy, {
+        ...ordinary,
+        supported: false,
+      })
+    ).toBeUndefined();
     expect(lazyLegacy).not.toHaveBeenCalled();
     expect(fs.readdirSync(appData)).toEqual(["Grida"]);
     const paths = NativeFirstProfile.open(appData, legacy, provisioning)!;

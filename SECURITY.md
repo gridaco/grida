@@ -1350,10 +1350,11 @@ Today:
   an explicitly enabled Stable build can create it. First-time native enrollment
   probes the [known legacy locations](desktop/src/main/native-desktop-profile.ts)
   before creating any directories. Existing or inaccessible locations leave
-  ordinary startup in place. Selector-aware Stable
-  startup verifies the receipt and sets both Electron storage paths before
-  readiness or sidecar ownership. Unverified enrollment terminates before
-  readiness. Managed deployment enforces a selector-aware minimum version.
+  ordinary startup in place. An ineligible launch without a managed receipt
+  also uses its ordinary profile. Selector-aware Stable verifies an existing
+  receipt and the eligible launch before setting both Electron storage paths.
+  Unverified enrollment terminates before readiness. Managed deployment
+  enforces a selector-aware minimum version.
 - An explicitly provisioned macOS arm64 Stable predecessor can enroll an
   isolated managed legacy profile. It resumes that source only after a clean
   claim. A selector-aware Stable successor requires the last acknowledged

@@ -32,7 +32,7 @@ export namespace NativeFirstProfile {
     return [path.join(paths.root, RECORD), path.join(paths.root, PROMOTION)];
   }
 
-  /** The build grants birth only. Subsequent selection follows the record. */
+  /** Birth requires launch admission. Subsequent selection follows the record. */
   export function open(
     appData: string,
     legacy: () => ProtectedRoots,
