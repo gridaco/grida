@@ -65,6 +65,61 @@ it("holds upload until dispatch and rechecks the live route grant", async () => 
   egress.close();
 });
 
+it("allows only the opted-in loopback count route through the live provider grant", async () => {
+  const countTarget = target + "/input_tokens";
+  const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => null);
+  const openCount = open({
+    target: countTarget,
+    headers: [
+      ["accept", "application/json"],
+      ["content-type", "application/json"],
+    ],
+  });
+  const plain = new NativeProviderEgress(
+    { prepare },
+    "openai-compatible",
+    endpoint,
+    "fixture"
+  );
+  expect(await plain.exchange(openCount)).toEqual({ status: "unavailable" });
+  expect(prepare).not.toHaveBeenCalled();
+  plain.close();
+
+  expect(
+    () =>
+      new NativeProviderEgress(
+        { prepare },
+        "openai-compatible",
+        "http://localhost:1/v1",
+        "fixture",
+        true
+      )
+  ).toThrow("native_provider_input_count_unavailable");
+  const counted = new NativeProviderEgress(
+    { prepare },
+    "openai-compatible",
+    endpoint,
+    "fixture",
+    true
+  );
+  expect(await counted.exchange(open({ target: countTarget }))).toEqual({
+    status: "unavailable",
+  });
+  expect(
+    await counted.exchange({ ...openCount, target: countTarget + "?extra=1" })
+  ).toEqual({ status: "unavailable" });
+  expect(await counted.exchange(openCount)).toEqual({ status: "accepted" });
+  expect(prepare).not.toHaveBeenCalled();
+  expect(await counted.exchange({ id, action: "dispatch" })).toEqual({
+    status: "unavailable",
+  });
+  expect(prepare).toHaveBeenCalledExactlyOnceWith(
+    countTarget,
+    expect.any(Headers)
+  );
+  counted.close();
+});
+
 it("bounds uploads and projects a bounded response stream with no replay", async () => {
   const bytes = Buffer.alloc(65_536, 72);
   const fetch = vi.fn<() => Promise<Response>>(

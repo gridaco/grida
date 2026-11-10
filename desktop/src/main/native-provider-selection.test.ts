@@ -103,6 +103,34 @@ it("refuses missing selections, models and approval", async () => {
   );
 });
 
+it("retains ordinary connection choices at capacity when local counting is enabled", async () => {
+  const owner = settings();
+  const endpoints = Array.from({ length: 4 }, (_, index) => ({
+    id: `local-${index}`,
+    base_url: base,
+    models: Array.from({ length: 64 }, (_, model) => ({
+      id: `model-${model}`,
+    })),
+    default_model_id: "model-0",
+  }));
+  const select = (id: string, model?: string, counting?: true) =>
+    NativeProviderSelection.configuredEndpoint(id, model, owner, counting);
+  owner.list.mockResolvedValue(endpoints);
+  const ordinary = await NativeChatProfiles.configuredChoices(
+    endpoints,
+    select
+  );
+  expect(ordinary.choices).toHaveLength(256);
+  const optedIn = [
+    { ...endpoints[0], input_counting: "llama.cpp" as const },
+    ...endpoints.slice(1),
+  ];
+  owner.list.mockResolvedValue(optedIn);
+  await expect(
+    NativeChatProfiles.configuredChoices(optedIn, select)
+  ).resolves.toEqual(ordinary);
+});
+
 it.each([
   "http://192.168.0.8:11434/v1",
   "http://127.0.0.1.example.test/v1",

@@ -403,6 +403,18 @@ export class NativeDesktopAgent {
           profile.id
         )
           return configured;
+        const counted = await agentSidecarClient
+          .nativeConfiguredEndpoint(profile.providerId, profile.modelId, true)
+          .catch(() => null);
+        check();
+        if (counted?.llamaCppInputCount) {
+          const configuredCount = NativeChatProfiles.configuredLaunch(counted);
+          if (
+            NativeChatProfiles.binding(profile.providerId, configuredCount) ===
+            profile.id
+          )
+            return configuredCount;
+        }
       }
       throw new Error("native_chat_profile_changed");
     };

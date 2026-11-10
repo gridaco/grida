@@ -72,6 +72,8 @@ export type EndpointProviderConfig = {
   label?: string;
   /** OpenAI-compatible base URL, e.g. `http://localhost:11434/v1`. */
   base_url: string;
+  /** Explicit request-counting protocol for a supported local text server. */
+  input_counting?: "llama.cpp";
   /** Models this endpoint serves. */
   models: EndpointModelEntry[];
   /**
@@ -260,6 +262,21 @@ export function parseEndpointBaseUrl(
   return { ok: true, base_url: trimmed, url };
 }
 
+/** The count route has the same authority as an exact numeric-loopback `/v1` base. */
+export function allowsLlamaCppInputCounting(url: URL): boolean {
+  return (
+    (url.protocol === "http:" || url.protocol === "https:") &&
+    !url.username &&
+    !url.password &&
+    !url.href.includes("?") &&
+    !url.href.includes("#") &&
+    (url.pathname === "/v1" || url.pathname === "/v1/") &&
+    (url.hostname === "[::1]" ||
+      /^127\.\d+\.\d+\.\d+$/.test(url.hostname) ||
+      /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/.test(url.hostname))
+  );
+}
+
 /** Bounds that keep a config a config (not an unbounded blob). */
 const MAX_MODELS = 64;
 const MAX_MODEL_ID_LEN = 128;
@@ -309,6 +326,17 @@ export function validateEndpointProviderConfig(
 
   const baseUrl = parseEndpointBaseUrl(c.base_url);
   if (!baseUrl.ok) return baseUrl;
+  const inputCounting = c.input_counting;
+  if (
+    inputCounting !== undefined &&
+    (inputCounting !== "llama.cpp" || !allowsLlamaCppInputCounting(baseUrl.url))
+  ) {
+    return {
+      ok: false,
+      error:
+        "llama.cpp input counting requires a numeric loopback /v1 endpoint",
+    };
+  }
 
   if (!Array.isArray(c.models) || c.models.length > MAX_MODELS) {
     return { ok: false, error: `models must be an array of ≤ ${MAX_MODELS}` };
@@ -345,6 +373,7 @@ export function validateEndpointProviderConfig(
       id: c.id,
       label: typeof c.label === "string" && c.label ? c.label : undefined,
       base_url: baseUrl.base_url,
+      ...(inputCounting && { input_counting: inputCounting }),
       models: modelSpecs,
       default_model_id: defaultModelId,
     },

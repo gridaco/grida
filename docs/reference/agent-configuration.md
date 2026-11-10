@@ -45,6 +45,35 @@ restore automatic budgeting. Zero is invalid.
 An absent file selects the host's defaults. An existing file requires its schema
 version. Unknown fields, unsupported versions, and invalid values are rejected.
 
+## Configure local request counting
+
+In a managed native macOS Desktop profile, quit Desktop and set
+`"input_counting": "llama.cpp"` on the saved endpoint in
+`~/Library/Application Support/Grida Native/agent/retained-settings/endpoints.json`.
+This private file holds an array of endpoint entries. An entry can look like
+this.
+
+```json
+{
+  "id": "llama",
+  "base_url": "http://127.0.0.1:8080/v1",
+  "models": [{ "id": "local-model" }],
+  "input_counting": "llama.cpp"
+}
+```
+
+Start Desktop, approve the saved endpoint origin, and choose its
+**llama.cpp counting** connection for a new chat. Use a numeric loopback
+address and the `/v1` base path on a server that supports
+`POST /v1/chat/completions/input_tokens`. Desktop uses that route only when
+the counted chat has an input limit. It sends the same prepared text and
+tools that the generation request would use. A failed count or a request
+over the limit ends before generation.
+[llama.cpp token counting API](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#post-v1chatcompletionsinput_tokens-token-counting)
+
+The ordinary endpoint choice keeps its original binding. Removing the
+declaration makes saved counted chats unavailable until it is restored.
+
 ## Scope and activation
 
 Changes apply to later accepted inputs. Running and already accepted work retains

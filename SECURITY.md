@@ -1029,6 +1029,9 @@ lazy reads, read-only mutation, and symlink escape refusal.
   `max_tokens`.
   Main rejects invalid endpoint URLs and plain HTTP outside loopback before
   looking up a key or requesting endpoint approval.
+  An explicitly selected llama.cpp counting connection adds only the JSON
+  request-count route at the same approved numeric-loopback `/v1` endpoint.
+  It has a distinct saved identity and uses the original key and egress checks.
   The private profile record contains display labels and semantic IDs. It
   retains no endpoint URL or credential bytes. A changed connection cannot
   reopen history under a different owner. Switching models invalidates the

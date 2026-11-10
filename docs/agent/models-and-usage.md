@@ -32,6 +32,10 @@ When you select a configured compatible endpoint under **New chat with…**,
 the request uses `max_tokens`, including for Ollama. The saved **earlier chats**
 entry keeps the previous request format.
 
+A supported local llama.cpp endpoint can offer a separate **llama.cpp counting**
+connection. Select it for a new chat when you need a hard context input limit.
+[Configure local request counting](../reference/agent-configuration.md#configure-local-request-counting)
+
 Each chat keeps its original model connection. **Saved chats by model** reopens
 the chat list for that connection, and **Default connection** returns to the default
 list. Switching lists leaves existing work and pending questions in their

@@ -1,4 +1,5 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 / GRIDA-SEC-014 — bounded native provider HTTP.
+import { allowsLlamaCppInputCounting } from "@grida/agent";
 import { CHATGPT_RESPONSES_URL } from "../chatgpt-configuration";
 const UPLOAD_LIMIT = 1024 * 1024;
 const RESPONSE_LIMIT = 4 * 1024 * 1024;
@@ -59,9 +60,15 @@ export class NativeProviderEgress {
     private readonly network: NativeProviderNetwork,
     private readonly protocol: Protocol,
     endpoint: string,
-    model: string
+    model: string,
+    llamaCppInputCount?: true
   ) {
-    this.targets = providerTargets(protocol, endpoint, model);
+    this.targets = providerTargets(
+      protocol,
+      endpoint,
+      model,
+      llamaCppInputCount
+    );
   }
 
   async exchange(value: unknown): Promise<Reply> {
@@ -230,7 +237,12 @@ export class NativeProviderEgress {
   }
 }
 
-function providerTargets(protocol: Protocol, endpoint: string, model: string) {
+function providerTargets(
+  protocol: Protocol,
+  endpoint: string,
+  model: string,
+  llamaCppInputCount?: true
+) {
   const base = new URL(endpoint);
   if (
     !["http:", "https:"].includes(base.protocol) ||
@@ -240,6 +252,11 @@ function providerTargets(protocol: Protocol, endpoint: string, model: string) {
     base.hash
   )
     throw new Error("native_provider_endpoint_invalid");
+  if (
+    llamaCppInputCount &&
+    (protocol !== "openai-compatible" || !allowsLlamaCppInputCounting(base))
+  )
+    throw new Error("native_provider_input_count_unavailable");
   const prefix = base.pathname.replace(/\/$/, "");
   const routes = new Map<string, string>();
   const target = (suffix: string) => {
@@ -249,6 +266,11 @@ function providerTargets(protocol: Protocol, endpoint: string, model: string) {
   };
   if (protocol === "openai-compatible") {
     routes.set(target("chat/completions").href, "text/event-stream");
+    if (llamaCppInputCount)
+      routes.set(
+        target("chat/completions/input_tokens").href,
+        "application/json"
+      );
   } else if (protocol === "responses") {
     routes.set(target("responses").href, "text/event-stream");
     routes.set(target("responses/input_tokens").href, "application/json");

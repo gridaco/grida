@@ -84,6 +84,7 @@ export type {
 } from "./protocol/text-to-speech";
 export {
   OLLAMA_ENDPOINT_PRESET,
+  allowsLlamaCppInputCounting,
   isValidEndpointProviderId,
   mergeProbedModels,
   resolveEndpointModel,

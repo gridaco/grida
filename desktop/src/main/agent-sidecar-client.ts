@@ -224,15 +224,21 @@ export namespace agentSidecarClient {
 
   export function nativeConfiguredEndpoint(
     providerId: string,
-    modelId?: string
+    modelId?: string,
+    llamaCppInputCount?: true
   ) {
     const transport = client();
-    return NativeProviderSelection.configuredEndpoint(providerId, modelId, {
-      list: transport.providers.list_endpoints,
-      hasKey: transport.secrets.has,
-      network: nativeAgentEndpointNetwork,
-      credentialHome: nativeAgentByokSettings().credentialHome,
-    });
+    return NativeProviderSelection.configuredEndpoint(
+      providerId,
+      modelId,
+      {
+        list: transport.providers.list_endpoints,
+        hasKey: transport.secrets.has,
+        network: nativeAgentEndpointNetwork,
+        credentialHome: nativeAgentByokSettings().credentialHome,
+      },
+      llamaCppInputCount
+    );
   }
 
   export function nativeBuiltInByok(providerId: string, modelId: string) {

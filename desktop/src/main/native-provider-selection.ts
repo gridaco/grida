@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — resolve a native launch from Desktop settings.
 import {
+  allowsLlamaCppInputCounting,
   isValidEndpointProviderId,
   type EndpointProviderConfig,
 } from "@grida/agent";
@@ -28,6 +29,7 @@ export namespace NativeProviderSelection {
       | "credentialHome"
       | "configuredEndpointKey"
       | "imageGeneration"
+      | "llamaCppInputCount"
     > & {
       providerNetwork: NativeProviderNetwork;
     }
@@ -94,7 +96,8 @@ export namespace NativeProviderSelection {
   export async function configuredEndpoint(
     providerId: string,
     modelId: string | undefined,
-    settings: Settings
+    settings: Settings,
+    llamaCppInputCount?: true
   ): Promise<Launch> {
     const config = (await settings.list()).find(
       (entry) => entry.id === providerId
@@ -120,6 +123,12 @@ export namespace NativeProviderSelection {
       throw new Error("native_provider_endpoint_invalid");
     if (target.protocol === "http:" && !isLoopbackHost(target.hostname))
       throw new Error("native_provider_endpoint_https_required");
+    if (
+      llamaCppInputCount &&
+      (config.input_counting !== "llama.cpp" ||
+        !allowsLlamaCppInputCounting(target))
+    )
+      throw new Error("native_provider_input_count_unavailable");
 
     const hasKey = await settings.hasKey(config.id);
     if (hasKey && nativeVendorKeys.has(config.id))
@@ -129,17 +138,21 @@ export namespace NativeProviderSelection {
       : undefined;
     const network = await settings.network(config.id, endpoint);
     target.pathname = `${target.pathname.replace(/\/$/, "")}/chat/completions`;
+    const countTarget = llamaCppInputCount
+      ? `${target.href}/input_tokens`
+      : undefined;
     return {
       provider: "openai-compatible",
       endpoint,
       model,
+      ...(llamaCppInputCount && { llamaCppInputCount }),
       ...(credentialHome && {
         credentialHome,
         configuredEndpointKey: config.id,
       }),
       providerNetwork: {
         prepare: (url, headers) =>
-          url === target.href &&
+          (url === target.href || url === countTarget) &&
           (hasKey
             ? /^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
             : !headers.has("authorization"))

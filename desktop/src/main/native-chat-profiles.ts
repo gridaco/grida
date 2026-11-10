@@ -27,7 +27,11 @@ type Launch = Awaited<
   ReturnType<typeof NativeProviderSelection.configuredEndpoint>
 > &
   Pick<NativeAgentLaunch, "compatibleOutputLimitField">;
-type Resolve = (providerId: string, modelId?: string) => Promise<Launch>;
+type Resolve = (
+  providerId: string,
+  modelId?: string,
+  llamaCppInputCount?: true
+) => Promise<Launch>;
 
 export namespace NativeChatProfiles {
   export type Saved = NativeChatProfileChoice &
@@ -55,6 +59,9 @@ export namespace NativeChatProfiles {
           base.href,
           builtIn || launch.configuredEndpointKey ? "stored" : "anonymous",
           launch.model,
+          ...(launch.llamaCppInputCount
+            ? ["llama-cpp-chat-input-count-v1"]
+            : []),
         ])
       )
       .digest("hex");
@@ -136,27 +143,56 @@ export namespace NativeChatProfiles {
     resolve: Resolve
   ): Promise<{ choices: Saved[]; previousIds: string[] }> {
     const choices: Saved[] = [];
+    const countedChoices: Saved[] = [];
     const previousIds: string[] = [];
     for (const endpoint of endpoints.slice(0, MAX_ENDPOINTS)) {
       if (!isValidEndpointProviderId(endpoint.id)) continue;
       const eligible = await resolve(endpoint.id).catch(() => null);
       if (!eligible || eligible.endpoint !== endpoint.base_url) continue;
+      const counted =
+        endpoint.input_counting === "llama.cpp"
+          ? await resolve(endpoint.id, undefined, true).catch(() => null)
+          : null;
       for (const model of endpoint.models) {
         if (choices.length >= MAX_CHOICES) return { choices, previousIds };
         if (!modelId(model.id)) continue;
         const launch = { ...eligible, model: model.id };
         // The previous owner remains available only through its saved receipt.
         previousIds.push(binding(endpoint.id, launch));
-        choices.push({
+        const choice = {
           id: binding(endpoint.id, configuredLaunch(launch)),
           providerId: endpoint.id,
           modelId: model.id,
           connection: label(endpoint.label, endpoint.id),
           model: label(model.label, model.id),
-        });
+        };
+        choices.push(choice);
+        if (
+          counted?.llamaCppInputCount &&
+          counted.endpoint === endpoint.base_url &&
+          countedChoices.length < MAX_CHOICES
+        ) {
+          countedChoices.push({
+            ...choice,
+            id: binding(
+              endpoint.id,
+              configuredLaunch({ ...counted, model: model.id })
+            ),
+            connection: label(
+              `${choice.connection} (llama.cpp counting)`,
+              `${endpoint.id} (llama.cpp counting)`
+            ),
+          });
+        }
       }
     }
-    return { choices, previousIds };
+    return {
+      choices: [
+        ...choices,
+        ...countedChoices.slice(0, MAX_CHOICES - choices.length),
+      ],
+      previousIds,
+    };
   }
 
   export async function read(directory: string): Promise<Saved[]> {

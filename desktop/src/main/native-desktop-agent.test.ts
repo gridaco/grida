@@ -264,7 +264,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
 );
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
-  "uses the compatible output limit for new chats and reopens the previous owner",
+  "preserves earlier compatible chats and counts only the selected local profile",
   async () => {
     const base = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-compatible-chat-")
@@ -282,11 +282,31 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       base_url: "http://127.0.0.1:11434/v1",
       models: [{ id: "fixture" }],
     };
+    const countedConfig = { ...config, input_counting: "llama.cpp" as const };
+    let savedConfig: typeof config | typeof countedConfig = config;
     const requests: Record<string, unknown>[] = [];
+    const generated: Buffer[] = [];
+    const counts: Buffer[] = [];
+    let measuredTokens = 1000;
     const prepare: NativeProviderNetwork["prepare"] = (target, headers) => {
-      expect(target).toBe(config.base_url + "/chat/completions");
       expect(headers.get("authorization")).toBeNull();
+      const counting =
+        target === config.base_url + "/chat/completions/input_tokens";
+      expect(headers.get("accept")).toBe(
+        counting ? "application/json" : "text/event-stream"
+      );
+      if (counting) {
+        return async (body) => {
+          counts.push(body);
+          return Response.json({
+            object: "response.input_tokens",
+            input_tokens: measuredTokens,
+          });
+        };
+      }
+      expect(target).toBe(config.base_url + "/chat/completions");
       return async (body) => {
+        generated.push(body);
         requests.push(JSON.parse(body.toString()));
         return new Response(
           'data: {"id":"fixture","choices":[{"index":0,"delta":{"content":"Local endpoint answered."},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
@@ -329,14 +349,21 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         )
       );
       sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
-      sidecar.listProviderEndpoints.mockResolvedValue([config]);
+      sidecar.listProviderEndpoints.mockImplementation(async () => [
+        savedConfig,
+      ]);
       sidecar.nativeBuiltInByok.mockRejectedValue(new Error("no saved key"));
-      sidecar.nativeConfiguredEndpoint.mockImplementation((id, model) =>
-        NativeProviderSelection.configuredEndpoint(id, model, {
-          list: async () => [config],
-          hasKey: async () => false,
-          network: async () => ({ prepare }),
-        })
+      sidecar.nativeConfiguredEndpoint.mockImplementation((id, model, count) =>
+        NativeProviderSelection.configuredEndpoint(
+          id,
+          model,
+          {
+            list: async () => [savedConfig],
+            hasKey: async () => false,
+            network: async () => ({ prepare }),
+          },
+          count
+        )
       );
       const workspaces = new NativeWorkspaceCatalog({
         browserData: source.desktopUserDataPath,
@@ -392,6 +419,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         await chat.close();
       }
 
+      savedConfig = countedConfig;
       vi.resetModules();
       agent = await launch();
       const { choices, saved } = await agent.profiles(workspace.id);
@@ -402,9 +430,14 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           available: true,
         }),
       ]);
-      expect(choices).toHaveLength(1);
-      const [{ id: newId }] = choices;
+      expect(choices.map(({ connection }) => connection)).toEqual([
+        "local",
+        "local (llama.cpp counting)",
+      ]);
+      const [{ id: newId }, { id: countedId }] = choices;
       expect(newId).not.toBe(oldId);
+      expect(countedId).not.toBe(newId);
+      expect(countedId).not.toBe(oldId);
       await agent.selectProfile(
         workspace.id,
         { kind: "saved", id: oldId },
@@ -461,6 +494,67 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         [4096, undefined],
         [undefined, 4096],
       ]);
+      expect(counts).toEqual([]);
+      expect((await newChat.inspectContextLimit()).exactCounting).toBe(false);
+
+      await agent.selectProfile(
+        workspace.id,
+        { kind: "new", id: countedId },
+        () => {}
+      );
+      const countedChat = agent.current(workspace.id, countedId)!.chat;
+      const basis = await countedChat.inspectContextLimit();
+      expect(basis.exactCounting).toBe(true);
+      await countedChat.updateContextLimit(basis, 1000);
+      const countedSession = await countedChat.create();
+      await countedChat.submit(countedSession, "counted", "Count this turn.");
+      await vi.waitFor(async () =>
+        expect((await countedChat.observe(countedSession)).latest?.status).toBe(
+          "succeeded"
+        )
+      );
+      expect(counts).toHaveLength(1);
+      expect(generated).toHaveLength(4);
+      expect(counts[0]).toEqual(generated[3]);
+      expect(requests[3]).toMatchObject({ model: "fixture", max_tokens: 4096 });
+
+      measuredTokens = 1001;
+      const tooLarge = await countedChat.create();
+      await countedChat.submit(
+        tooLarge,
+        "too-large",
+        "This exceeds the limit."
+      );
+      await vi.waitFor(async () =>
+        expect((await countedChat.observe(tooLarge)).latest?.status).toBe(
+          "failed"
+        )
+      );
+      expect(counts).toHaveLength(2);
+      expect(generated).toHaveLength(4);
+
+      await agent.close();
+      savedConfig = config;
+      vi.resetModules();
+      agent = await launch();
+      const after = await agent.profiles(workspace.id);
+      expect(after.choices.map(({ id }) => id)).toEqual([newId]);
+      expect(after.saved).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: oldId, available: true }),
+          expect.objectContaining({ id: newId, available: true }),
+          expect.objectContaining({ id: countedId, available: false }),
+        ])
+      );
+      await expect(
+        agent.selectProfile(
+          workspace.id,
+          { kind: "saved", id: countedId },
+          () => {}
+        )
+      ).rejects.toThrow("native_chat_profile_changed");
+      expect(counts).toHaveLength(2);
+      expect(generated).toHaveLength(4);
       expect(sidecar.nativeAgentGatewayConnection).not.toHaveBeenCalled();
     } finally {
       await agent?.close();

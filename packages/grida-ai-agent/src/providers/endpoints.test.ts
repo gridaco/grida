@@ -58,6 +58,37 @@ describe("validateEndpointProviderConfig", () => {
     }
   });
 
+  it("preserves only explicit numeric-loopback llama.cpp counting declarations", () => {
+    const enabled = { ...OLLAMA, input_counting: "llama.cpp" };
+    for (const base_url of [
+      "http://127.0.0.1:8080/v1",
+      "http://[::1]:8080/v1/",
+    ]) {
+      expect(
+        validateEndpointProviderConfig({ ...enabled, base_url })
+      ).toMatchObject({
+        ok: true,
+        config: { base_url, input_counting: "llama.cpp" },
+      });
+    }
+    for (const base_url of [
+      "http://localhost:8080/v1",
+      "https://192.168.0.8/v1",
+      "http://127.0.0.1:8080/custom/v1",
+      "http://127.0.0.1:8080/v1?",
+    ]) {
+      expect(validateEndpointProviderConfig({ ...enabled, base_url }).ok).toBe(
+        false
+      );
+    }
+    expect(
+      validateEndpointProviderConfig({
+        ...enabled,
+        input_counting: "automatic",
+      }).ok
+    ).toBe(false);
+  });
+
   it("rejects URL userinfo because endpoint credentials belong in SecretsStore", () => {
     for (const base_url of [
       "https://user@example.com/v1",

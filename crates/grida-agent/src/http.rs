@@ -123,11 +123,10 @@ impl HttpTransport {
         let base = provider_base(&options.endpoint)?;
         if options.llama_cpp_input_count
             && (!options.protocol.is_compatible()
-                || supervised.is_some()
                 || !base.host_str().is_some_and(is_numeric_loopback_host)
                 || !matches!(base.path(), "/v1" | "/v1/"))
         {
-            return Err(invalid("llama_cpp_input_count_requires_direct_loopback"));
+            return Err(invalid("llama_cpp_input_count_requires_numeric_loopback"));
         }
         let (target, operation) = provider_route(base.clone(), options.protocol, &options.model)?;
         let configured_key = supervised
@@ -822,7 +821,10 @@ mod tests {
             let error = HttpTransport::new(state.path(), &settings, None)
                 .err()
                 .unwrap();
-            assert_eq!(error.code, "llama_cpp_input_count_requires_direct_loopback");
+            assert_eq!(
+                error.code,
+                "llama_cpp_input_count_requires_numeric_loopback"
+            );
         }
         settings.endpoint = "http://[::1]:1/v1/".into();
         let ipv6 = HttpTransport::new(state.path(), &settings, None).unwrap();

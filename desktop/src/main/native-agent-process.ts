@@ -70,6 +70,7 @@ export type NativeAgentLaunch = {
   model: string;
   maxOutputTokens?: number;
   compatibleOutputLimitField?: "max-tokens";
+  llamaCppInputCount?: true;
   credentialHome?: string;
   configuredEndpointKey?: string;
   workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
@@ -409,7 +410,8 @@ export class NativeAgentProcess {
           options.providerNetwork,
           options.subscriptionScope ? "chatgpt-subscription" : options.provider,
           options.endpoint,
-          options.model
+          options.model,
+          options.llamaCppInputCount
         )
       : undefined;
     const capabilities: Record<string, 1> = {
@@ -418,6 +420,8 @@ export class NativeAgentProcess {
     };
     if (options.gatewayJobBilling && !options.gatewayScope)
       throw new Error("native_agent_gateway_profile_invalid");
+    if (options.llamaCppInputCount && !providerEgress)
+      throw new Error("native_provider_input_count_unavailable");
     if (providerEgress) capabilities[NativeProviderEgress.capability] = 1;
     if (imageGeneration) capabilities[NativeImageGeneration.capability] = 1;
     const requestDeletion =
@@ -444,6 +448,7 @@ export class NativeAgentProcess {
     if (options.credentialHome)
       args.push("--credential-home", options.credentialHome);
     if (providerEgress) args.push("--supervised-provider");
+    if (options.llamaCppInputCount) args.push("--llama-cpp-input-count");
     if (imageGeneration)
       args.push("--desktop-image-generation", imageGeneration.binding);
     if (options.workspaceConfiguration) {
