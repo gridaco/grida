@@ -64,6 +64,13 @@ type BrowserAttachment = Pick<File, "name" | "size" | "arrayBuffer">;
 type TransferredAttachment =
   | { kind: "file"; file: BrowserAttachment & Pick<File, "type"> }
   | { kind: "directory" };
+type AttachmentSource =
+  | { kind: "file"; file: BrowserAttachment }
+  | {
+      kind: "library";
+      name: string;
+      readPng: (maxBytes: number) => Promise<ArrayBuffer>;
+    };
 type SelectedAttachment = Readonly<{
   kind: AttachmentKind;
   name: string;
@@ -667,16 +674,38 @@ export class NativeChatController {
     await this.pickAttachment(scopeId, kind, file);
   }
 
-  async pickAttachment(
+  pickAttachment(
     scopeId: number,
     kind: AttachmentKind,
     file: BrowserAttachment
+  ): Promise<void> {
+    return this.readAttachment(scopeId, kind, { kind: "file", file });
+  }
+
+  pickLibraryImage(
+    scopeId: number,
+    name: string,
+    readPng: (maxBytes: number) => Promise<ArrayBuffer>
+  ): Promise<void> {
+    return this.readAttachment(scopeId, "png", {
+      kind: "library",
+      name,
+      readPng,
+    });
+  }
+
+  private async readAttachment(
+    scopeId: number,
+    kind: AttachmentKind,
+    source: AttachmentSource
   ): Promise<void> {
     const scope = this.scope;
     if (!scope || scope.id !== scopeId || !this.canAttach(kind)) return;
     const read = {};
     scope.attachmentRead = read;
-    const draft = { kind, name: file.name.slice(0, 256), size: file.size };
+    const name = (
+      source.kind === "file" ? source.file.name : source.name
+    ).slice(0, 256);
     this.update({
       attachmentReading: true,
       attachmentNotice: null,
@@ -684,37 +713,54 @@ export class NativeChatController {
     });
     const ownsRead = () => this.owns(scope) && scope.attachmentRead === read;
     try {
-      if (
-        file.size > MAX_ATTACHMENT_BYTES ||
-        (kind === "png" && file.size <= 0)
-      )
-        throw new Error(
-          kind === "png" ? "image_size_limit" : "file_size_limit"
-        );
-      const bytes = await file.arrayBuffer();
+      let bytes: ArrayBuffer;
+      if (source.kind === "file") {
+        const { file } = source;
+        if (
+          file.size > MAX_ATTACHMENT_BYTES ||
+          (kind === "png" && file.size <= 0)
+        )
+          throw new Error(
+            kind === "png" ? "image_size_limit" : "file_size_limit"
+          );
+        bytes = await file.arrayBuffer();
+        if (bytes.byteLength !== file.size)
+          throw new Error(
+            kind === "png" ? "invalid_png_image" : "invalid_file_attachment"
+          );
+      } else {
+        bytes = await source.readPng(MAX_ATTACHMENT_BYTES);
+        if (bytes.byteLength <= 0 || bytes.byteLength > MAX_ATTACHMENT_BYTES)
+          throw new Error("image_size_limit");
+      }
       if (!ownsRead()) return;
-      if (bytes.byteLength !== file.size)
-        throw new Error(
-          kind === "png" ? "invalid_png_image" : "invalid_file_attachment"
-        );
       const original = scope.selectedAttachment ?? scope.pending?.attachment;
       const previous = original && new Uint8Array(original.bytes);
       if (
         original?.kind !== kind ||
-        (kind === "file" && original.name !== draft.name) ||
+        (kind === "file" && original.name !== name) ||
         previous?.byteLength !== bytes.byteLength ||
         !new Uint8Array(bytes).every((byte, index) => byte === previous[index])
       ) {
-        scope.selectedAttachment = { kind, name: draft.name, bytes };
+        scope.selectedAttachment = { kind, name, bytes };
         if (scope.pending?.attachment) scope.pending = undefined;
       } else scope.selectedAttachment = original;
-      this.update({ attachmentDraft: draft });
+      this.update({ attachmentDraft: { kind, name, size: bytes.byteLength } });
     } catch (error) {
       if (ownsRead()) {
+        if (source.kind === "library") {
+          this.update({
+            attachmentNotice:
+              "Couldn't add this Library image. Your current draft is still here.",
+          });
+          return;
+        }
         scope.selectedAttachment = undefined;
         this.update({
           attachmentDraft: {
-            ...draft,
+            kind,
+            name,
+            size: source.file.size,
             error: describe(
               error,
               kind === "png"

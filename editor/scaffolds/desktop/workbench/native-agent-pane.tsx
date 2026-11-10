@@ -16,6 +16,8 @@ import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import { Textarea } from "@app/ui/components/textarea";
 import { MessageAction } from "@app/ui/ai-elements/message";
+import { readLibraryAttachment } from "@/app/(library)/library/attachment";
+import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -39,6 +41,7 @@ import {
 } from "@/lib/agent-chat/native-chat-controller";
 import type { ComposerCatalog, ComposerController } from "@/kits/composer";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
+import { AgentLibraryAttachmentPicker } from "../shared/agent-library-attachment-picker";
 import {
   AgentComposerInput,
   type ComposerCommandAction,
@@ -186,6 +189,7 @@ export function NativeAgentPane({
   const draft = useRef<Pick<ComposerController, "appendText">>(null);
   const pngPicker = useRef<HTMLInputElement>(null);
   const filePicker = useRef<HTMLInputElement>(null);
+  const [libraryScope, setLibraryScope] = useState<number | null>(null);
   const side = state.sideChat;
   useEffect(() => {
     controller.connect(initialSession);
@@ -1096,6 +1100,21 @@ export function NativeAgentPane({
                     : "Add PNG"}
                 </Button>
               )}
+              {workspaceId && state.imageInput && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={
+                    state.attachmentReading || !controller.canAttach("png")
+                  }
+                  onClick={() => setLibraryScope(state.scope)}
+                >
+                  {state.attachmentDraft
+                    ? "Replace from Library"
+                    : "Add from Library"}
+                </Button>
+              )}
               {state.fileInput && (
                 <Button
                   type="button"
@@ -1195,6 +1214,27 @@ export function NativeAgentPane({
             ) : null
           }
         />
+        {workspaceId && state.imageInput && libraryScope === state.scope && (
+          <AgentLibraryAttachmentPicker
+            open
+            single
+            onOpenChange={(open) => {
+              if (!open) setLibraryScope(null);
+            }}
+            onAttach={([pin]) => {
+              if (!pin) return;
+              void controller.pickLibraryImage(
+                state.scope,
+                `Library: ${pin.title}`,
+                async (maxBytes) => {
+                  const source = await readLibraryAttachment(pin.id);
+                  if (!source) throw new Error("library_image_unavailable");
+                  return await encodeLibraryPng(source, maxBytes);
+                }
+              );
+            }}
+          />
+        )}
       </div>
     </div>
   );

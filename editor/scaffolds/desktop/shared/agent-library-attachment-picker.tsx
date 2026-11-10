@@ -18,10 +18,12 @@ export function AgentLibraryAttachmentPicker({
   open,
   onOpenChange,
   onAttach,
+  single = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAttach: (pins: DesignLibraryPin[]) => void;
+  single?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [picked, setPicked] = useState<DesignLibraryPin[]>([]);
@@ -30,13 +32,16 @@ export function AgentLibraryAttachmentPicker({
     [picked]
   );
 
-  const toggle = useCallback((pin: DesignLibraryPin) => {
-    setPicked((current) =>
-      current.some((item) => item.id === pin.id)
-        ? current.filter((item) => item.id !== pin.id)
-        : [...current, pin]
-    );
-  }, []);
+  const toggle = useCallback(
+    (pin: DesignLibraryPin) => {
+      setPicked((current) => {
+        if (current.some((item) => item.id === pin.id))
+          return current.filter((item) => item.id !== pin.id);
+        return single ? [pin] : [...current, pin];
+      });
+    },
+    [single]
+  );
 
   const setOpen = useCallback(
     (next: boolean) => {
@@ -64,7 +69,9 @@ export function AgentLibraryAttachmentPicker({
             Add from Library
           </DialogTitle>
           <DialogDescription>
-            Choose raster references to include with your next message.
+            {single
+              ? "Choose one image reference to include with your next message."
+              : "Choose raster references to include with your next message."}
           </DialogDescription>
         </DialogHeader>
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5">

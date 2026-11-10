@@ -39,6 +39,11 @@ export const IMAGE_ATTACHMENT_POLICY: ImageAttachmentPolicy = {
   loadTimeoutMs: 15_000,
 };
 
+export const LIBRARY_ATTACHMENT_SOURCE_LIMITS = {
+  bytes: 4 * 1024 * 1024,
+  pixels: 16 * 1024 * 1024,
+} as const;
+
 /** MIME types the canvas encoder can emit when pass-through is unavailable. */
 export const IMAGE_TRANSCODE_OUTPUT_MIMES = [
   "image/png",
@@ -192,6 +197,44 @@ export async function encodeImageFile(
     );
   } finally {
     bitmap.close?.();
+  }
+}
+
+/** Normalize already-captured Library bytes without opening a remote image. */
+export async function encodeLibraryPng(
+  source: { mime: string; bytes: ArrayBuffer },
+  maxBytes: number
+): Promise<ArrayBuffer> {
+  if (
+    !isSupportedImageType(source.mime) ||
+    source.bytes.byteLength === 0 ||
+    source.bytes.byteLength > LIBRARY_ATTACHMENT_SOURCE_LIMITS.bytes
+  )
+    throw new Error("library_image_unavailable");
+  const bitmap = await createImageBitmap(
+    new Blob([source.bytes], { type: source.mime })
+  );
+  try {
+    const { width, height } = bitmap;
+    if (width * height > LIBRARY_ATTACHMENT_SOURCE_LIMITS.pixels)
+      throw new Error("library_image_unavailable");
+    const encode = (maxEdge: number) =>
+      encodeRasterSource(
+        bitmap,
+        width,
+        height,
+        "reference.png",
+        { ...IMAGE_ATTACHMENT_POLICY, maxEdge, maxBytes },
+        ["image/png"]
+      );
+    const encoded = encode(768) ?? encode(240);
+    if (!encoded) throw new Error("library_image_unavailable");
+    const payload = encoded.url.slice("data:image/png;base64,".length);
+    return Uint8Array.from(atob(payload), (character) =>
+      character.charCodeAt(0)
+    ).buffer;
+  } finally {
+    bitmap.close();
   }
 }
 

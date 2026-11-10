@@ -551,6 +551,12 @@ with **GPT-5.6 Terra** and a saved OpenRouter key. Select it at launch with
 The Gateway, ChatGPT subscription, Vercel, and custom endpoint profiles offer
 text input. The provider receives the retained PNG when the conversation uses it.
 
+## Attach a Library image
+
+In a native workbench with image input, choose **Add from Library**, select
+one image, and write a message. Grida prepares a PNG for the chat. If an image
+cannot be added, your draft and any existing attachment stay in place.
+
 ## Attach a file for inspection
 
 In a native workspace chat, choose **Attach file** or drop or paste one file

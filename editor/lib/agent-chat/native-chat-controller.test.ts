@@ -1865,6 +1865,78 @@ it("keeps one selected file when a transfer is rejected and replaces it with a P
   controller.disconnect();
 });
 
+it("preserves an existing attachment on Library failure and submits only captured PNG bytes", async () => {
+  const { bridge, controller } = fixture();
+  let pngAvailable = false;
+  bridge.acceptsPng = async () => pngAvailable;
+  bridge.acceptsFile = async () => true;
+  bridge.submitFile = vi.fn<NonNullable<DesktopNativeChat["submitFile"]>>();
+  const submitImage = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>(
+    (sessionId, input) => bridge.submit(sessionId, input.inputId, input.text)
+  );
+  bridge.submitImage = submitImage;
+  await controller.select("chat-a");
+  const scope = controller.read().scope;
+  const bytes = Uint8Array.of(137, 80, 78, 71).buffer;
+  const available = vi.fn<(limit: number) => Promise<ArrayBuffer>>(
+    async () => bytes
+  );
+  await controller.pickLibraryImage(scope, "Library: Cedar", available);
+  expect(available).not.toHaveBeenCalled();
+
+  pngAvailable = true;
+  await controller.repair();
+  await controller.pickAttachment(scope, "file", {
+    name: "current.txt",
+    size: 1,
+    arrayBuffer: async () => Uint8Array.of(1).buffer,
+  });
+  const unavailable = Promise.withResolvers<ArrayBuffer>();
+  const loading = controller.pickLibraryImage(
+    scope,
+    "Library: Cedar",
+    () => unavailable.promise
+  );
+  expect(controller.canSubmit).toBe(false);
+  unavailable.reject(new Error("fixture Library object unavailable"));
+  await loading;
+  expect(controller.read()).toMatchObject({
+    attachmentDraft: { name: "current.txt", kind: "file" },
+    attachmentNotice:
+      "Couldn't add this Library image. Your current draft is still here.",
+    attachmentReading: false,
+  });
+  expect(controller.canSubmit).toBe(true);
+
+  await controller.pickLibraryImage(scope, "Library: Cedar", available);
+  expect(available).toHaveBeenCalledExactlyOnceWith(256 * 1024);
+  expect(controller.read()).toMatchObject({
+    attachmentDraft: { name: "Library: Cedar", kind: "png" },
+    attachmentNotice: null,
+  });
+  await controller.submit("Use this reference.");
+  expect(submitImage).toHaveBeenCalledExactlyOnceWith("chat-a", {
+    action: "submit",
+    inputId: expect.any(String),
+    text: "Use this reference.",
+    png: bytes,
+    operatingRegime: "act",
+  });
+  expect(bridge.submitFile).not.toHaveBeenCalled();
+
+  const late = Promise.withResolvers<ArrayBuffer>();
+  const oldSelection = controller.pickLibraryImage(
+    scope,
+    "Library: Late",
+    () => late.promise
+  );
+  await controller.select("chat-b");
+  late.resolve(bytes);
+  await oldSelection;
+  expect(controller.read().attachmentDraft).toBeNull();
+  controller.disconnect();
+});
+
 it("rechecks PNG capability before sending and only looks up an exact existing receipt after capability loss", async () => {
   const { bridge, controller } = fixture();
   let supportsPng = true;

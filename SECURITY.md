@@ -803,6 +803,13 @@ deny (provider CDNs still excluded). The alternative — proxying library images
 through `grida-workspace:` like generated media — was rejected: the library is
 first-party public read-only storage, and the product keeps its pins as URLs.
 
+For a native workbench chat attachment, the [Library selection action](<editor/app/(library)/library/attachment.ts>)
+requires an authenticated catalog UUID and reads its exact first-party bucket
+object with bounded size and time, without redirects. It checks the catalog
+metadata and recorded digest when available. The renderer encodes only those
+returned bytes as a bounded PNG and submits it through the existing native
+image intake. This selection grants no provider URL or filesystem access.
+
 **Auto-created projects (managed root).** The reference-first home lets a
 newcomer start without choosing a folder: it posts to `POST /workspaces/create`,
 which mints a new **empty** project directory (just the folder — no `.canvas`,
