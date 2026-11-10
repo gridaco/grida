@@ -9,6 +9,9 @@ import type {
   NativeChatCatalogEntry,
   NativeChatCommand,
   NativeChatCommandResult,
+  NativeChatRevisionInput,
+  NativeChatRevisionReceipt,
+  NativeChatRevisionTarget,
   NativeChatConfigurationInput,
   NativeChatControlReceipt,
   NativeChatGoalControl,
@@ -41,6 +44,7 @@ import {
 } from "./native-agent-configuration";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentCommands } from "./native-agent-commands";
+import { NativeAgentRevisions } from "./native-agent-revisions";
 import {
   NativeAgentGoals,
   type NativeGoalInspection,
@@ -174,6 +178,9 @@ type TranscriptCapture = {
 
 export class NativeAgentChat {
   private readonly chatCommands = new NativeAgentCommands((method, params) =>
+    this.process.request(method, params)
+  );
+  private readonly revisions = new NativeAgentRevisions((method, params) =>
     this.process.request(method, params)
   );
   private readonly configuration = new NativeAgentConfiguration(
@@ -320,6 +327,48 @@ export class NativeAgentChat {
     );
     this.requireAttached(session);
     return result;
+  }
+
+  prepareRevision(
+    attachment: object,
+    session: NativeChatSession,
+    snapshot: NativeChatSnapshot,
+    messageId: string,
+    check: (expectedSessionRevision?: number) => void
+  ): Promise<NativeChatRevisionTarget> {
+    this.requireObservation(session, snapshot);
+    if (!this.process.acceptsHistoryRevision)
+      throw new Error("native_chat_revision_unavailable");
+    return this.revisions.prepare(
+      attachment,
+      session,
+      snapshot,
+      messageId,
+      (revision) => {
+        this.requireAttached(session);
+        check(revision);
+      }
+    );
+  }
+
+  revise(
+    attachment: object,
+    session: NativeChatSession,
+    input: NativeChatRevisionInput,
+    check: (expectedSessionRevision?: number) => void
+  ): Promise<NativeChatRevisionReceipt> {
+    this.requireAttached(session);
+    return this.revisions.apply(
+      attachment,
+      session,
+      input.reviewId,
+      input.text,
+      input.operatingRegime,
+      (revision) => {
+        this.requireAttached(session);
+        check(revision);
+      }
+    );
   }
 
   async catalogEntry(
@@ -668,6 +717,9 @@ export class NativeAgentChat {
       sessionRevision: revision(result.sessionRevision),
       queuedInputs,
       ...(pending[0] && { pendingGoalId: pending[0].inputId }),
+      ...(this.process.acceptsHistoryRevision && {
+        historyRevisionAvailable: true as const,
+      }),
       ...(current?.disposition === "running" &&
         !current.paused &&
         !current.cancelled &&

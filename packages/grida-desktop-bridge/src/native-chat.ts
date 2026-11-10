@@ -106,6 +106,7 @@ export type NativeChatSnapshot = Readonly<{
   sessionRevision: number;
   queuedInputs: number;
   pendingGoalId?: string;
+  historyRevisionAvailable?: true;
   /** Earliest provider retry time in UTC milliseconds for the current turn. */
   retryNotBeforeMs?: number;
   admissionPaused: boolean;
@@ -116,6 +117,26 @@ export type NativeChatSnapshot = Readonly<{
 export type NativeChatObservation = Readonly<{
   observationId: string;
   snapshot: NativeChatSnapshot;
+}>;
+
+export type NativeChatRevisionTarget = Readonly<{
+  reviewId: string;
+  messageId: string;
+  text: string;
+  subsequentMessages: number;
+}>;
+
+export type NativeChatRevisionInput = Readonly<{
+  reviewId: string;
+  text: string;
+  operatingRegime: NativeChatOperatingRegime;
+}>;
+
+export type NativeChatRevisionReceipt = Readonly<{
+  sessionId: string;
+  view: number;
+  inputId: string;
+  inputPosition: number;
 }>;
 
 export type NativeChatWakeup = Readonly<{
@@ -368,6 +389,15 @@ export type DesktopNativeChat = {
     command: NativeChatCommand,
     requestId: string
   ): Promise<NativeChatCommandResult>;
+  prepareRevision?(
+    attachmentId: string,
+    observationId: string,
+    messageId: string
+  ): Promise<NativeChatRevisionTarget>;
+  revise?(
+    attachmentId: string,
+    input: NativeChatRevisionInput
+  ): Promise<NativeChatRevisionReceipt>;
   load(sessionId: string): Promise<NativeChatAttachment>;
   openSideChat?(
     attachmentId: string,

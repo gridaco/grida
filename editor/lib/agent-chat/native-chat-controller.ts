@@ -14,6 +14,8 @@ import type {
   NativeChatGoalRequest,
   NativeChatMessage,
   NativeChatObservation,
+  NativeChatRevisionInput,
+  NativeChatRevisionTarget,
   NativeChatOperatingRegime,
   NativeChatPage,
   NativeChatQuestion,
@@ -55,6 +57,8 @@ export type NativeChatView = Readonly<{
   commandRunning: NativeChatCommand | null;
   commandNotice: string | null;
   commandFork: string | null;
+  revisionDraft: (NativeChatRevisionTarget & { unverified: boolean }) | null;
+  revisionSubmitting: boolean;
   catalogDraft: Readonly<{
     text: string;
     basis: NativeChatCatalogEntry;
@@ -125,6 +129,7 @@ type Scope = {
   pendingGoalStart?: { key: string; inputId: string };
   pendingGoalControl?: NativeChatGoalControl;
   pendingCommand?: { command: NativeChatCommand; requestId: string };
+  pendingRevision?: NativeChatRevisionInput;
   replay: boolean;
   pending?: {
     text: string;
@@ -154,6 +159,8 @@ const EMPTY: NativeChatView = Object.freeze({
   commandRunning: null,
   commandNotice: null,
   commandFork: null,
+  revisionDraft: null,
+  revisionSubmitting: false,
   catalogDraft: null,
   messages: [],
   sideChat: null,
@@ -348,6 +355,8 @@ export class NativeChatController {
       commandRunning: null,
       commandNotice: null,
       commandFork: null,
+      revisionDraft: null,
+      revisionSubmitting: false,
       catalogDraft: null,
       messages: [],
       sideChat: null,
@@ -409,6 +418,8 @@ export class NativeChatController {
       !this.view.loading &&
       !this.view.acting &&
       !this.view.commandRunning &&
+      !this.view.revisionDraft &&
+      !this.view.revisionSubmitting &&
       !this.view.imageReading &&
       (!this.scope.image || this.view.imageInput) &&
       (this.view.steering
@@ -1316,6 +1327,126 @@ export class NativeChatController {
     }
   }
 
+  get canReviseHistory(): boolean {
+    const snapshot = this.scope?.observation?.snapshot;
+    const goal = this.view.goal?.goal?.state.status;
+    return (
+      !!this.bridge.prepareRevision &&
+      !!this.bridge.revise &&
+      !!snapshot?.historyRevisionAvailable &&
+      !snapshot.current &&
+      snapshot.queuedInputs === 0 &&
+      !snapshot.pendingGoalId &&
+      goal !== "active" &&
+      goal !== "blocked" &&
+      !this.view.loading &&
+      !this.view.repairing &&
+      !this.view.acting &&
+      !this.view.commandRunning &&
+      !this.view.revisionSubmitting
+    );
+  }
+
+  async prepareRevision(messageId: string): Promise<void> {
+    const scope = this.scope;
+    const observation = scope?.observation;
+    if (
+      !scope?.attachment ||
+      !observation ||
+      !this.bridge.prepareRevision ||
+      !this.canReviseHistory ||
+      this.view.revisionDraft ||
+      !scope.durable.some(
+        (message) => message.messageId === messageId && message.role === "user"
+      )
+    )
+      return;
+    this.update({ revisionSubmitting: true, error: null });
+    try {
+      const target = await this.bridge.prepareRevision(
+        scope.attachment.attachmentId,
+        observation.observationId,
+        messageId
+      );
+      if (!this.owns(scope)) return;
+      if (
+        target.messageId !== messageId ||
+        scope.observation?.snapshot.sessionRevision !==
+          observation.snapshot.sessionRevision
+      )
+        throw new Error("stale_session_revision");
+      this.update({ revisionDraft: { ...target, unverified: false } });
+    } catch (error) {
+      if (this.owns(scope)) this.update({ error: revisionError(error) });
+    } finally {
+      if (this.owns(scope)) this.update({ revisionSubmitting: false });
+    }
+  }
+
+  changeRevisionText(text: string): void {
+    const draft = this.view.revisionDraft;
+    if (draft && !draft.unverified && !this.view.revisionSubmitting)
+      this.update({ revisionDraft: { ...draft, text }, error: null });
+  }
+
+  cancelRevision(): void {
+    if (!this.view.revisionDraft?.unverified && !this.view.revisionSubmitting)
+      this.update({ revisionDraft: null, error: null });
+  }
+
+  async submitRevision(): Promise<void> {
+    const scope = this.scope;
+    const draft = this.view.revisionDraft;
+    const attachment = scope?.attachment;
+    if (
+      !scope ||
+      !attachment ||
+      !draft ||
+      !draft.text.trim() ||
+      !this.bridge.revise ||
+      this.view.revisionSubmitting
+    )
+      return;
+    if (!scope.pendingRevision && !this.canReviseHistory) {
+      this.update({ error: "Resolve the current work before resubmitting." });
+      return;
+    }
+    const input = (scope.pendingRevision ??= {
+      reviewId: draft.reviewId,
+      text: draft.text,
+      operatingRegime: this.view.operatingRegime,
+    });
+    this.update({ revisionSubmitting: true, error: null });
+    try {
+      const receipt = await this.bridge.revise(attachment.attachmentId, input);
+      if (!this.owns(scope)) return;
+      if (receipt.sessionId !== attachment.sessionId)
+        throw new Error("native_chat_revision_unverified");
+      scope.pendingRevision = undefined;
+      this.update({ revisionDraft: null });
+      // An observation already in flight may have started replaying the old view.
+      void Promise.resolve(scope.refreshing).then(() => {
+        if (!this.owns(scope)) return;
+        scope.replay = true;
+        void this.refresh(scope);
+      });
+    } catch (error) {
+      if (!this.owns(scope)) return;
+      const reason = error instanceof Error ? error.message : "";
+      const unverified =
+        reason.includes("native_chat_revision_unverified") ||
+        reason.includes("native_chat_revision_in_progress");
+      if (!unverified) scope.pendingRevision = undefined;
+      this.update({
+        revisionDraft: { ...draft, unverified },
+        error: revisionError(error),
+      });
+      if (unverified) void this.refresh(scope);
+    } finally {
+      if (this.owns(scope)) this.update({ revisionSubmitting: false });
+    }
+  }
+
   private async submitSteering(scope: Scope, text: string): Promise<void> {
     const attachment = this.attachment(scope);
     const observation = scope.observation;
@@ -1909,6 +2040,7 @@ export class NativeChatController {
           this.owns(scope) &&
           (scope.observation?.snapshot.current ||
             this.view.commandRunning === "compact" ||
+            this.view.revisionDraft?.unverified ||
             (scope.observation?.snapshot.queuedInputs &&
               !scope.observation.snapshot.admissionPaused) ||
             scope.replay ||
@@ -2381,6 +2513,32 @@ function commandError(command: NativeChatCommand, reason: string): string {
   return command === "compact"
     ? "Couldn't start compaction."
     : "Couldn't fork this chat.";
+}
+
+function revisionError(error: unknown): string {
+  const reason = error instanceof Error ? error.message : "";
+  if (
+    reason.includes("native_chat_revision_unverified") ||
+    reason.includes("native_chat_revision_in_progress")
+  )
+    return "Couldn't confirm the edit. Retry to check the same request.";
+  if (reason.includes("history_revision_target_unavailable"))
+    return "Only retained plain-text messages originally sent in this chat can be edited.";
+  if (reason.includes("history_revision_requires_goal_resolution"))
+    return "Resolve or clear the current goal before editing history.";
+  if (
+    reason.includes("history_revision_requires_idle") ||
+    reason.includes("history_revision_requires_empty_queue")
+  )
+    return "Finish or stop the current work and clear the queue before editing history.";
+  if (
+    reason.includes("stale_session_revision") ||
+    reason.includes("history_basis_changed")
+  )
+    return "The chat changed. Reopen the message before resubmitting.";
+  if (reason.includes("native_chat_revision_text_invalid"))
+    return "Enter a replacement message within the text limit.";
+  return "Couldn't revise this message.";
 }
 
 function deletedAttachment(error: unknown): boolean {

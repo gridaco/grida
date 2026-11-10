@@ -243,6 +243,121 @@ it.runIf(Boolean(packaged))(
 );
 
 it.runIf(Boolean(packaged))(
+  "reads and revises the selected earlier message through the built host",
+  async () => {
+    const test = fixture();
+    const requests: string[] = [];
+    const provider = createServer((request, response) => {
+      request.setEncoding("utf8");
+      let body = "";
+      request.on("data", (chunk: string) => {
+        body += chunk;
+      });
+      request.on("end", () => {
+        requests.push(body);
+        const chunk = (delta: unknown, reason: string | null) =>
+          `data: ${JSON.stringify({ id: `revision-${requests.length}`, choices: [{ index: 0, delta, finish_reason: reason }] })}\n\n`;
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        response.end(
+          chunk({ role: "assistant", content: "Recorded reply." }, null) +
+            chunk({}, "stop") +
+            "data: [DONE]\n\n"
+        );
+      });
+    });
+    provider.listen(0, "127.0.0.1");
+    let client: NativeAgentChat | undefined;
+    try {
+      await once(provider, "listening");
+      const address = provider.address();
+      if (!address || typeof address === "string")
+        throw new Error("fixture_listener_unavailable");
+      client = await NativeAgentChat.start({
+        resourcesPath: packaged!,
+        stateDirectory: test.stateDirectory,
+        cwd: test.cwd,
+        endpoint: `http://127.0.0.1:${address.port}/v1`,
+        provider: "openai-compatible",
+        model: "fixture",
+      });
+      const session = await client.create();
+      const settle = (turnId: string | null) =>
+        vi.waitFor(
+          async () => {
+            const snapshot = await client!.observe(session);
+            expect(snapshot.current).toBeNull();
+            expect(snapshot.latest).toMatchObject({
+              turnId,
+              status: "succeeded",
+            });
+            return snapshot;
+          },
+          { timeout: 5000 }
+        );
+      const original = "First input with its original text. ".repeat(12);
+      const first = await client.submit(session, "first", original);
+      await settle(first.turnId);
+      const later = await vi.waitFor(
+        () => client!.submit(session, "later", "Later original input."),
+        { timeout: 5000 }
+      );
+      const old = await settle(later.turnId);
+      expect(old.historyRevisionAvailable).toBe(true);
+      const transcript = await client.transcript(session);
+      const message = transcript.find((entry) => entry.text === original);
+      expect(message?.role).toBe("user");
+      const attachment = {};
+      const check = () => {};
+      const target = await client.prepareRevision(
+        attachment,
+        session,
+        old,
+        message!.messageId,
+        check
+      );
+      expect(target.text).toBe(original);
+      expect(target.subsequentMessages).toBe(3);
+      const input = {
+        reviewId: target.reviewId,
+        operatingRegime: "act",
+        text: "Revised first request.",
+      } as const;
+      const revised = await vi.waitFor(
+        () => client!.revise(attachment, session, input, check),
+        { timeout: 5000 }
+      );
+      expect(revised.sessionId).toBe(session.id);
+      expect(revised.view).toBeGreaterThan(old.sessionRevision);
+      await expect(
+        client.revise(attachment, session, input, check)
+      ).resolves.toEqual(revised);
+      const replacement = await vi.waitFor(async () => {
+        const accepted = await client!.inputReceipt(session, revised.inputId);
+        expect(accepted.turnId).toEqual(expect.any(String));
+        return accepted;
+      });
+      await settle(replacement.turnId);
+      expect(
+        (await client.transcript(session)).map((entry) => entry.text)
+      ).toEqual(["Revised first request.", "Recorded reply."]);
+      expect(requests).toHaveLength(3);
+      expect(requests[2]).toContain("Revised first request.");
+      expect(requests[2]).not.toContain("Later original input.");
+    } finally {
+      await client?.close();
+      if (provider.listening) {
+        const closed = once(provider, "close");
+        provider.close();
+        provider.closeAllConnections();
+        await closed;
+      }
+      test.close();
+    }
+  },
+  30_000
+);
+
+it.runIf(Boolean(packaged))(
   "lists detached workspace pages and restores a renamed archive after restart",
   async () => {
     const test = fixture();

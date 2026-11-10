@@ -23,6 +23,8 @@ import type {
   NativeChatQueuePage,
   NativeChatQueueReceipt,
   NativeChatReadiness,
+  NativeChatRevisionReceipt,
+  NativeChatRevisionTarget,
   NativeChatSideAnswer,
   NativeChatSideContext,
   NativeChatSnapshot,
@@ -106,6 +108,8 @@ export type ActiveNativeChat = Readonly<{
         | "ownsSession"
         | "commands"
         | "runCommand"
+        | "prepareRevision"
+        | "revise"
         | "readArtifact"
         | "acceptsWakeups"
         | "submitWithWakeup"
@@ -327,6 +331,55 @@ export class NativeChatIpc {
     );
     this.revalidate(owner, attachment);
     return result;
+  }
+
+  prepareRevision(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: unknown,
+    messageId: unknown
+  ): Promise<NativeChatRevisionTarget> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = requireObservation(attachment, observationId);
+    const chat = owner.active.chat;
+    if (!chat.prepareRevision || typeof messageId !== "string")
+      throw new Error("native_chat_revision_unavailable");
+    return chat.prepareRevision(
+      attachment,
+      attachment.session,
+      snapshot,
+      messageId,
+      (expected) => this.revalidateRevision(owner, attachment, expected)
+    );
+  }
+
+  revise(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    value: unknown
+  ): Promise<NativeChatRevisionReceipt> {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    const input = record(value);
+    if (
+      !chat.revise ||
+      !input ||
+      Object.keys(input).length !== 3 ||
+      !token(input.reviewId) ||
+      typeof input.text !== "string" ||
+      (input.operatingRegime !== "act" && input.operatingRegime !== "plan")
+    )
+      throw new Error("native_chat_revision_unavailable");
+    return chat.revise(
+      attachment,
+      attachment.session,
+      {
+        reviewId: input.reviewId,
+        text: input.text,
+        operatingRegime: input.operatingRegime,
+      },
+      (expected) => this.revalidateRevision(owner, attachment, expected)
+    );
   }
 
   async catalogEntry(
@@ -1342,6 +1395,20 @@ export class NativeChatIpc {
       throw new Error("native_chat_attachment_unavailable");
     this.revalidate(owner, attachment);
     return { owner, attachment };
+  }
+
+  private revalidateRevision(
+    owner: Owner,
+    attachment: Attachment,
+    expected?: number
+  ): void {
+    this.revalidate(owner, attachment);
+    if (expected === undefined) return;
+    const latest = attachment.latestObservation;
+    if (latest?.sessionRevision !== expected)
+      throw new Error("stale_session_revision");
+    if (latest.current || latest.queuedInputs)
+      throw new Error("history_revision_requires_idle");
   }
 
   private revalidate(owner: Owner, attachment?: Attachment): void {

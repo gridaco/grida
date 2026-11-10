@@ -35,6 +35,7 @@ import { NativeGoalPanel } from "./native-goal-panel";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
 import { NativeTurnSummary } from "./native-turn-summary";
 import { NativeContextLimitPanel } from "./native-context-limit-panel";
+import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
 const COMMAND_DESCRIPTIONS = {
@@ -84,6 +85,7 @@ export function NativeAgentPane({
     return () => controller.disconnect();
   }, [controller, initialSession]);
   const snapshot = state.observation?.snapshot;
+  const editHistory = controller.canReviseHistory && !state.revisionDraft;
   const turn = snapshot?.current;
   const running =
     turn?.disposition === "running" && !turn.paused && !turn.cancelled;
@@ -354,6 +356,14 @@ export function NativeAgentPane({
           {state.messages.map((message) => (
             <ChatMessageView
               key={message.messageId}
+              actions={
+                message.role === "user" && editHistory
+                  ? {
+                      onEdit: (messageId) =>
+                        void controller.prepareRevision(messageId),
+                    }
+                  : undefined
+              }
               message={{
                 id: message.messageId,
                 role: message.role,
@@ -381,6 +391,19 @@ export function NativeAgentPane({
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
+      {state.revisionDraft ? (
+        <NativeMessageRevisionPanel
+          draft={state.revisionDraft}
+          submitting={state.revisionSubmitting}
+          onChange={(text) => controller.changeRevisionText(text)}
+          onCancel={() => controller.cancelRevision()}
+          onSubmit={() => void controller.submitRevision()}
+        />
+      ) : state.revisionSubmitting ? (
+        <div role="status" className="px-3 pt-2 text-xs text-muted-foreground">
+          Opening edit…
+        </div>
+      ) : null}
       {side && (
         <NativeSideChatPanel
           controller={side}

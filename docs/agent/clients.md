@@ -534,6 +534,17 @@ by the connected host. Select one and send it on its own.
 
 ### Branch or revise a chat
 
+In the native Desktop workspace pane, hover or focus an earlier user message
+and choose **Edit and resubmit**. The editor opens its original text and
+shows how many later messages the edit replaces in the active chat. Use an
+idle chat with an empty queue and resolve any active Goal first. Only ordinary
+retained plain-text inputs in this chat are editable.
+
+Use **Resubmit** to accept the new input in the same chat. If its reply cannot
+be confirmed, choose **Retry edit** to check the exact request. The ordinary
+composer keeps its unsent draft. A paused queue requires **Resume queue** to
+start the replacement. The prior view remains available through ACP history.
+
 Read a history page to select a committed message and its basis. A fork creates
 a separate chat from that prefix while the source can continue running. Open
 the new chat to send its first prompt. The copied context includes portable text

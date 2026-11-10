@@ -30,6 +30,56 @@ const UPDATE = {
   replace: true,
 } as const;
 
+it("keeps an edit review on the current frame and latest observed revision", async () => {
+  const { ipc, chat, first, second } = setup();
+  const a = await ipc.load(first.event, "chat-a");
+  const b = await ipc.load(second.event, "chat-a");
+  const observe = chat.observe.bind(chat);
+  let revision = 4;
+  chat.observe = async (session) => ({
+    ...(await observe(session)),
+    current: null,
+    sessionRevision: revision,
+  });
+  const release = Promise.withResolvers<void>();
+  chat.prepareRevision = async (
+    _attachment,
+    _session,
+    snapshot,
+    messageId,
+    check
+  ) => {
+    check(snapshot.sessionRevision);
+    await release.promise;
+    check(snapshot.sessionRevision);
+    return {
+      reviewId: randomUUID(),
+      messageId,
+      text: "Original",
+      subsequentMessages: 1,
+    };
+  };
+  const observed = await ipc.observe(first.event, a.attachmentId);
+  expect(() =>
+    ipc.prepareRevision(
+      second.event,
+      b.attachmentId,
+      observed.observationId,
+      "message"
+    )
+  ).toThrow("native_chat_observation_unavailable");
+  const waiting = ipc.prepareRevision(
+    first.event,
+    a.attachmentId,
+    observed.observationId,
+    "message"
+  );
+  revision = 5;
+  await ipc.observe(first.event, a.attachmentId);
+  release.resolve();
+  await expect(waiting).rejects.toThrow("stale_session_revision");
+});
+
 it("scopes a scheduled check-in and its controls to the attached, observed turn", async () => {
   const { ipc, chat, first, second } = setup();
   const a = await ipc.load(first.event, "chat-a");

@@ -7,6 +7,8 @@ import type {
   NativeChatMessage,
   NativeChatObservation,
   NativeChatPage,
+  NativeChatRevisionInput,
+  NativeChatRevisionReceipt,
   NativeChatTurn,
   NativeChatTurnSummary,
   NativeChatUpdate,
@@ -245,6 +247,100 @@ it("restores and cancels an observed check-in, then continues its exact task", a
   await controller.select("other");
   expect(controller.read().scheduledWakeup).toBeNull();
   expect(controller.canControlWakeup("recover")).toBe(false);
+  controller.disconnect();
+});
+
+it("revises the exact earlier message and keeps the same receipt request after a lost reply", async () => {
+  const { bridge, controller, transcripts, running } = fixture();
+  const source = "revision-chat";
+  const first = {
+    messageId: "first",
+    role: "user",
+    text: "Original wording beyond the short preview. ".repeat(16),
+  } as const;
+  const later = {
+    messageId: "later",
+    role: "user",
+    text: "Later original input",
+  } as const;
+  transcripts.set(source, [first, later]);
+  const observe = bridge.observe.bind(bridge);
+  let supported = false;
+  bridge.observe = async (id) => {
+    const observation = await observe(id);
+    return supported
+      ? {
+          ...observation,
+          snapshot: { ...observation.snapshot, historyRevisionAvailable: true },
+        }
+      : observation;
+  };
+  const prepare = vi.fn<NonNullable<DesktopNativeChat["prepareRevision"]>>();
+  prepare.mockResolvedValue({
+    reviewId: "exact-review",
+    messageId: first.messageId,
+    text: first.text,
+    subsequentMessages: 1,
+  });
+  bridge.prepareRevision = prepare;
+  const revise =
+    vi.fn<
+      (
+        attachmentId: string,
+        input: NativeChatRevisionInput
+      ) => Promise<NativeChatRevisionReceipt>
+    >();
+  revise.mockRejectedValueOnce(new Error("native_chat_revision_unverified"));
+  revise.mockImplementationOnce(async () => {
+    transcripts.set(source, [
+      { messageId: "replacement", role: "user", text: "Revised first" },
+    ]);
+    return {
+      sessionId: source,
+      view: 4,
+      inputId: "replacement",
+      inputPosition: 3,
+    };
+  });
+  bridge.revise = revise;
+  controller.connect(null);
+  await controller.select(source);
+  expect(controller.canReviseHistory).toBe(false);
+  await controller.prepareRevision(first.messageId);
+  expect(prepare).not.toHaveBeenCalled();
+  supported = true;
+  await controller.repair();
+  expect(controller.canReviseHistory).toBe(true);
+  await controller.prepareRevision(first.messageId);
+  expect(prepare).toHaveBeenCalledWith(
+    source,
+    "observation-revision-chat",
+    first.messageId
+  );
+  expect(controller.read().revisionDraft?.text).toBe(first.text);
+  controller.changeRevisionText("Revised first");
+  await controller.submitRevision();
+  expect(controller.read().revisionDraft?.unverified).toBe(true);
+  controller.changeRevisionText("Do not change the request");
+  controller.cancelRevision();
+  expect(controller.read().revisionDraft?.text).toBe("Revised first");
+  running.add(source);
+  await vi.waitFor(async () => {
+    await controller.repair();
+    expect(controller.read().observation?.snapshot.current?.turnId).toBe(
+      "turn-revision-chat"
+    );
+    expect(controller.canReviseHistory).toBe(false);
+  });
+  await controller.submitRevision();
+  expect(revise.mock.calls[1]).toEqual(revise.mock.calls[0]);
+  await vi.waitFor(() =>
+    expect(controller.read().messages).toMatchObject([
+      { messageId: "replacement" },
+    ])
+  );
+  expect(controller.read().selected).toBe(source);
+  expect(controller.read().revisionDraft).toBeNull();
   controller.disconnect();
 });
 

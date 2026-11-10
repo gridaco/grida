@@ -56,6 +56,8 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_DELETE: "grida:native-chat:delete",
   NATIVE_CHAT_COMMANDS: "grida:native-chat:commands",
   NATIVE_CHAT_RUN_COMMAND: "grida:native-chat:run-command",
+  NATIVE_CHAT_PREPARE_REVISION: "grida:native-chat:prepare-revision",
+  NATIVE_CHAT_REVISE: "grida:native-chat:revise",
   NATIVE_CHAT_CREATE: "grida:native-chat:create",
   NATIVE_CHAT_LOAD: "grida:native-chat:load",
   NATIVE_CHAT_OPEN_SIDE: "grida:native-chat:open-side",

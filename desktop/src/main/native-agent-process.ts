@@ -7,6 +7,7 @@ import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
 import { NativeAgentCommands } from "./native-agent-commands";
+import { NativeAgentRevisions } from "./native-agent-revisions";
 import {
   NativeAgentPermissions,
   type NativeWorkspaceSelection,
@@ -75,6 +76,7 @@ export class NativeAgentProcess {
   private ready = false;
   private imageInput = false;
   private scheduledWakeups = false;
+  private historyRevision = false;
   private artifacts = false;
   private savedChatDeletion = false;
   private readonly commandCapabilities = new Set<string>();
@@ -137,6 +139,10 @@ export class NativeAgentProcess {
 
   get acceptsWakeups(): boolean {
     return this.connected && this.scheduledWakeups;
+  }
+
+  get acceptsHistoryRevision(): boolean {
+    return this.connected && this.historyRevision;
   }
 
   get acceptsArtifacts(): boolean {
@@ -262,6 +268,7 @@ export class NativeAgentProcess {
               _meta: {
                 ...capabilities,
                 ...NativeAgentCommands.capabilities,
+                ...NativeAgentRevisions.capabilities,
                 ...NativeAgentWakeups.capabilities,
                 [NativeAgentArtifacts.capability]: 1,
                 ...(requestDeletion && { [NativeAgentDeletion.capability]: 1 }),
@@ -287,6 +294,9 @@ export class NativeAgentProcess {
         object(agentCapabilities?.promptCapabilities)?.image === true;
       processOwner.scheduledWakeups = Object.keys(
         NativeAgentWakeups.capabilities
+      ).every((key) => advertised?.[key] === 1);
+      processOwner.historyRevision = Object.keys(
+        NativeAgentRevisions.capabilities
       ).every((key) => advertised?.[key] === 1);
       for (const key of Object.keys(NativeAgentCommands.capabilities)) {
         if (advertised?.[key] === 1) processOwner.commandCapabilities.add(key);

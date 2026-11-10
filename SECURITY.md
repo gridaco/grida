@@ -940,6 +940,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   only negotiated compact and fork controls for the attached chat. Main
   captures the fork basis and anchor together from bounded committed history
   and rechecks the attachment before dispatch and after the reply.
+  The [revision adapter](desktop/src/main/native-agent-revisions.ts) captures
+  the exact observed revision and history anchor in Main. Its opaque edit
+  token belongs to the current attachment. An unverified reply keeps both
+  request identities and the exact replacement text and mode for retry.
   The [configuration adapter](desktop/src/main/native-agent-configuration.ts)
   keeps file revisions in Main. An owner-bound context-limit change requires a
   native confirmation of its exact value. Conversational permission requires a

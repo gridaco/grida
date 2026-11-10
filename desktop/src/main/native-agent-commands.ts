@@ -4,11 +4,13 @@ import type {
   NativeChatCommandResult,
 } from "@grida/desktop-bridge";
 import type { NativeChatSession } from "./native-agent-chat";
+import { NativeAgentHistory } from "./native-agent-history";
+
+const { anchor: historyAnchor, basis, identity, object } = NativeAgentHistory;
 
 const COMPACT = "co.grida/session/compact";
 const HISTORY = "co.grida/session/history";
 const FORK = "co.grida/session/fork";
-const ID = /^[A-Za-z0-9_.:@/-]{1,256}$/;
 const MAX_RETAINED_FORKS = 16;
 const COMPACTION_STATES = [
   "running",
@@ -38,19 +40,11 @@ const UNVERIFIED = new Set([
   "native_chat_command_unverified",
 ]);
 
-type Anchor =
-  | { kind: "inherited"; message: string }
-  | { kind: "turn"; turn: string; message: string };
-type Basis = {
-  view: number;
-  tail: { turn: string; ordinal: number; position: number } | null;
-  fingerprint: readonly number[];
-};
 type ForkRequest = {
   sessionId: string;
   requestId: string;
-  expectedHistory: Basis;
-  anchor: Anchor;
+  expectedHistory: NativeAgentHistory.Basis;
+  anchor: NativeAgentHistory.Anchor;
 };
 
 export class NativeAgentCommands {
@@ -166,53 +160,4 @@ export class NativeAgentCommands {
       throw error;
     }
   }
-}
-
-function historyAnchor(value: unknown): Anchor | null {
-  const anchor = object(value);
-  if (!identity(anchor?.message)) return null;
-  if (anchor.kind === "inherited")
-    return { kind: "inherited", message: anchor.message };
-  if (anchor.kind === "turn" && identity(anchor.turn))
-    return { kind: "turn", turn: anchor.turn, message: anchor.message };
-  return null;
-}
-
-function basis(value: unknown): Basis | null {
-  const basis = object(value);
-  if (
-    !revision(basis?.view) ||
-    !Array.isArray(basis.fingerprint) ||
-    basis.fingerprint.length !== 32 ||
-    !basis.fingerprint.every((byte) => revision(byte) && byte <= 255)
-  )
-    return null;
-  const fingerprint: number[] = [...basis.fingerprint];
-  if (basis.tail === null) return { view: basis.view, tail: null, fingerprint };
-  const tail = object(basis.tail);
-  if (
-    !identity(tail?.turn) ||
-    !revision(tail.ordinal) ||
-    !revision(tail.position)
-  )
-    return null;
-  return {
-    view: basis.view,
-    tail: { turn: tail.turn, ordinal: tail.ordinal, position: tail.position },
-    fingerprint,
-  };
-}
-
-function object(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function identity(value: unknown): value is string {
-  return typeof value === "string" && ID.test(value);
-}
-
-function revision(value: unknown): value is number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }

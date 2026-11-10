@@ -54,6 +54,7 @@ import {
   MessageCircleQuestionIcon,
   PaperclipIcon,
   PanelsTopLeftIcon,
+  PencilIcon,
   RotateCcwIcon,
   SearchIcon,
   SparklesIcon,
@@ -110,8 +111,8 @@ const markdown = {
 } as const;
 
 /**
- * Shared class string for the hover/focus-revealed action rows (copy /
- * rewind / branch). The `pointer-events-none` while hidden is the important
+ * Shared class string for the hover/focus-revealed action rows. The
+ * `pointer-events-none` while hidden is the important
  * part: an `opacity-0` button is still hit-testable, so without it a tooltip
  * could open over actions the user can't even see. Gating pointer-events on
  * the same `group-hover` / `focus-within` states as opacity keeps
@@ -124,6 +125,8 @@ const revealOnHoverActions =
   "focus-within:opacity-100 focus-within:pointer-events-auto";
 
 export type ChatMessageActions = {
+  /** Open an editor for this user message. */
+  onEdit?: (messageId: string) => void;
   /** Soft-truncate the conversation to this user message (RFC `rewinding`). */
   onRewind?: (messageId: string) => void;
   /** Fork a new session at this user message (RFC `fork`). */
@@ -280,10 +283,19 @@ export function ChatMessageView({
         </MessageContent>
         {/* Subtle until hover so the transcript stays clean; right-aligned
             to sit under the user bubble. Copy is always available (a pure
-            clipboard action, never disabled); rewind/fork appear only
+            clipboard action, never disabled). History controls appear only
             when the host wires them. */}
         <MessageActions className={`ml-auto ${revealOnHoverActions}`}>
           <CopyMessageAction text={text} />
+          {actions?.onEdit && (
+            <MessageAction
+              tooltip="Edit and resubmit"
+              disabled={actions.disabled}
+              onClick={() => actions.onEdit?.(message.id)}
+            >
+              <PencilIcon />
+            </MessageAction>
+          )}
           {actions?.onRewind && (
             <MessageAction
               tooltip="Rewind to here"

@@ -241,6 +241,15 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, id: string, command: unknown, requestId: unknown) =>
       nativeChat.runCommand(event, id, command, requestId)
   );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_PREPARE_REVISION,
+    (event, id: string, observationId: unknown, messageId: unknown) =>
+      nativeChat.prepareRevision(event, id, observationId, messageId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_REVISE,
+    (event, id: string, input: unknown) => nativeChat.revise(event, id, input)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_CREATE, (event) => nativeChat.create(event));
   guarded(IPC_CHANNELS.NATIVE_CHAT_LOAD, (event, id: string) =>
     nativeChat.load(event, id)

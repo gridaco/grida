@@ -83,6 +83,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         onSessionUpdate: (params) => observed.push(params),
       });
       expect(agent.acceptsPng).toBe(false);
+      expect(agent.acceptsHistoryRevision).toBe(false);
       expect(agent.acceptsWakeups).toBe(false);
       expect(agent.acceptsArtifacts).toBe(false);
       expect(agent.acceptsSavedChatDeletion).toBe(false);
