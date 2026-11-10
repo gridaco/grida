@@ -49,7 +49,13 @@ async fn upgraded_projection_indexes_previously_hidden_records() {
     drop(store);
 
     let previous = rusqlite::Connection::open(&filename).unwrap();
-    previous.pragma_update(None, "user_version", 8).unwrap();
+    previous
+        .execute_batch(
+            "DROP INDEX session_retirements_pending;
+             ALTER TABLE session_retirements DROP COLUMN cleanup;
+             PRAGMA user_version=8;",
+        )
+        .unwrap();
     drop(previous);
     let store = SqliteStore::open_cataloged(filename, project).unwrap();
     assert_eq!(
