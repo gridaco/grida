@@ -36,6 +36,10 @@ target/debug/grida-agent run --state-dir "$GRIDA_AGENT_STATE" \
   --prompt 'Crop the image to the requested area.'
 ```
 
+Direct `gemini-3.8-flash` on `https://generativelanguage.googleapis.com/v1beta`
+also accepts a PNG in the prompt. Use `--provider gemini` with your Gemini API
+key environment variable. This profile sends the retained PNG as input.
+
 A private ACP client can reopen that run with the same state directory,
 provider and session ID. Use the absolute path to the state directory's
 `attachment-context` as the ACP working directory, then read its settled
@@ -105,6 +109,8 @@ that opaque history. The replay identity is separate from the live dispatch
 grant. Authenticated continuity uses private storage on macOS and Linux.
 Other platforms can use an explicit environment credential within the current
 process. That process-local binding cannot authorize opaque replay after restart.
+Direct `gemini-3.8-flash` also checks that retained function-call history has
+the required thought signature before sending it to Gemini.
 
 The Responses API adapter can count complete input before generation when an
 input-token cap is configured. Counting sends the captured input to the same

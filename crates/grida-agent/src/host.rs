@@ -2815,12 +2815,15 @@ impl Execution {
         let binding = transport.binding().clone();
         let mut capabilities = text_capabilities(options.protocol.as_str())?;
         let compatible_png = transport.accepts_compatible_png(&options.model);
+        let gemini_flash = transport.is_reviewed_gemini_flash();
         let image_profile = if options.protocol == ProviderProtocol::Responses
             && options.model.as_str() == "gpt-5.4"
         {
             Some("responses-image-tools-v1")
         } else if compatible_png {
             Some("openrouter-png-tools-v1")
+        } else if gemini_flash {
+            Some("gemini-flash-png-v1")
         } else {
             None
         };
@@ -2894,7 +2897,7 @@ impl Execution {
                 PROVIDER_LIMITS,
                 image_resolver,
             )?),
-            ProviderProtocol::Gemini => Arc::new(Gemini::new(
+            ProviderProtocol::Gemini => Arc::new(Gemini::with_image_resolver(
                 binding.clone(),
                 transport.replay_binding().cloned().ok_or_else(|| {
                     problem(ErrorKind::InvalidState, "provider_replay_binding_missing")
@@ -2903,11 +2906,12 @@ impl Execution {
                     options.model.clone(),
                     GeminiProfile {
                         capabilities,
-                        requires_tool_signatures: false,
+                        requires_tool_signatures: gemini_flash,
                     },
                 )]),
                 transport.clone(),
                 PROVIDER_LIMITS,
+                image_resolver,
             )?),
         };
         let mut execution = Self::compose(

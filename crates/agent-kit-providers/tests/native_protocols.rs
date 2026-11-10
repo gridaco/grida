@@ -6,12 +6,14 @@ use agent_kit_core::inference::{
     Provider, ProviderBinding,
 };
 use agent_kit_core::messages::{
-    Content, OutcomeStatus, ResultContent, Role, ToolArguments, ToolCall, ToolResult,
+    Content, MediaRef, OutcomeStatus, ResultContent, Retention, Role, ToolArguments, ToolCall,
+    ToolResult,
 };
-use agent_kit_core::{BindingId, ModelId, PrincipalId, ProviderId, ScopeId};
-use agent_kit_providers::{Anthropic, Gemini, GeminiProfile, TransportOperation};
+use agent_kit_core::{ArtifactId, BindingId, ErrorKind, ModelId, PrincipalId, ProviderId, ScopeId};
+use agent_kit_providers::{Anthropic, Gemini, GeminiProfile, StreamLimits, TransportOperation};
 use serde_json::{Value, json};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use support::{FixtureTransport, control, frame, limits, message, request, response, tool_request};
 
 fn binding(provider: &str) -> ProviderBinding {
@@ -282,6 +284,145 @@ fn gemini_candidate(parts: Vec<Value>, stop: Option<&str>) -> Value {
         candidate["finishReason"] = stop.into();
     }
     json!({"candidates":[candidate],"responseId":"same-id"})
+}
+
+#[tokio::test]
+async fn gemini_lowers_only_retained_user_pngs_and_resolves_bytes_at_dispatch() {
+    let transport = FixtureTransport::new([Ok(response(
+        [frame(gemini_candidate(
+            vec![json!({"text":"seen"})],
+            Some("STOP"),
+        ))],
+        false,
+    ))]);
+    let model = ModelId::new("gemini-3.8-flash").unwrap();
+    let mut capability = capabilities();
+    capability.input_modalities.insert(Modality::Image);
+    let png = MediaRef {
+        id: ArtifactId::new("image").unwrap(),
+        media_type: "image/png".into(),
+        locator: "private-locator".into(),
+        access_scope: BindingId::new("media").unwrap(),
+        retention: Retention::Retained,
+    };
+    let mut input = request();
+    input.model = model.clone();
+    input.messages[0].content = vec![
+        Content::Text("Before".into()),
+        Content::Media(png.clone()),
+        Content::Text("After".into()),
+    ];
+    let reads = Arc::new(AtomicUsize::new(0));
+    let count = reads.clone();
+    let adapter = Gemini::with_image_resolver(
+        binding("gemini"),
+        BindingId::new("stable-lineage").unwrap(),
+        [(
+            model.clone(),
+            GeminiProfile {
+                capabilities: capability,
+                requires_tool_signatures: true,
+            },
+        )]
+        .into(),
+        transport.clone(),
+        StreamLimits {
+            max_request_bytes: 512,
+            ..limits()
+        },
+        Some(Arc::new(move |media, limit| {
+            assert_eq!(media, &png);
+            assert_eq!(limit, 384);
+            if count.fetch_add(1, Ordering::Relaxed) == 0 {
+                Ok(vec![0x89, b'P', b'N', b'G'])
+            } else {
+                Ok(vec![0; limit + 1])
+            }
+        })),
+    )
+    .unwrap();
+    let mut jpeg = input.clone();
+    let Content::Media(media) = &mut jpeg.messages[0].content[1] else {
+        panic!("fixture requires media");
+    };
+    media.media_type = "image/jpeg".into();
+    assert_eq!(
+        adapter.prepare(jpeg).unwrap_err().code,
+        "unsupported_conversation_content"
+    );
+    let prepared = adapter.prepare(input).unwrap();
+    assert_eq!(reads.load(Ordering::Relaxed), 0);
+    let outcome = adapter
+        .start(prepared.clone(), control("image"))
+        .unwrap()
+        .finish()
+        .await;
+    assert_eq!(outcome.status, InferenceStatus::Completed);
+    assert_eq!(
+        sent(
+            &transport,
+            0,
+            TransportOperation::GeminiStreamGenerateContent { model }
+        )["contents"][0],
+        json!({"role":"user","parts":[
+            {"text":"Before"},
+            {"inlineData":{"mimeType":"image/png","data":"iVBORw=="}},
+            {"text":"After"}
+        ]})
+    );
+    let Err(error) = adapter.start(prepared, control("oversized")) else {
+        panic!("oversized image must stop before dispatch");
+    };
+    assert_eq!(error.kind, ErrorKind::LimitExceeded);
+    assert_eq!(reads.load(Ordering::Relaxed), 2);
+    assert_eq!(transport.requests.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn strict_gemini_refuses_retained_unsigned_first_call_before_replay_dispatch() {
+    let mut unsigned = gemini_parts();
+    unsigned[1]
+        .as_object_mut()
+        .unwrap()
+        .remove("thoughtSignature");
+    let transport = FixtureTransport::new([Ok(response(
+        [frame(gemini_candidate(unsigned, Some("STOP")))],
+        false,
+    ))]);
+    let permissive = Gemini::new(
+        binding("gemini"),
+        BindingId::new("stable-lineage").unwrap(),
+        [(
+            ModelId::new("model").unwrap(),
+            GeminiProfile {
+                capabilities: capabilities(),
+                requires_tool_signatures: false,
+            },
+        )]
+        .into(),
+        transport.clone(),
+        limits(),
+    )
+    .unwrap();
+    let mut next = tool_request();
+    let old = permissive
+        .start(permissive.prepare(next.clone()).unwrap(), control("old"))
+        .unwrap()
+        .finish()
+        .await;
+    assert_eq!(old.status, InferenceStatus::Completed);
+    let assistant = old.messages.into_iter().next().unwrap();
+    let calls = recorded_calls(&assistant);
+    assert_eq!(calls.len(), 2);
+    next.messages.push(assistant);
+    next.messages.push(tool_result(&calls[0], "r1", "first"));
+    next.messages.push(tool_result(&calls[1], "r2", "second"));
+    let strict = gemini(transport.clone(), binding("gemini"));
+    assert_eq!(
+        strict.prepare(next).unwrap_err().code,
+        "missing_tool_thought_signature"
+    );
+    assert_eq!(transport.requests.lock().unwrap().len(), 1);
 }
 
 #[tokio::test]

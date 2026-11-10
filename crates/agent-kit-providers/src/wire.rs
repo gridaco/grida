@@ -462,15 +462,25 @@ pub(crate) fn image_data_url(
     remaining: &mut usize,
 ) -> Result<String> {
     let mut url = format!("data:{};base64,", media.media_type);
+    append_image_base64(&mut url, media, resolver, remaining)?;
+    Ok(url)
+}
+
+pub(crate) fn append_image_base64(
+    data: &mut String,
+    media: &MediaRef,
+    resolver: Option<&InputImageResolver>,
+    remaining: &mut usize,
+) -> Result<()> {
     if let Some(resolver) = resolver {
         let bytes = resolver(media, *remaining)?;
         if bytes.is_empty() || bytes.len() > *remaining {
             return Err(Error::new(ErrorKind::LimitExceeded, "request_byte_limit"));
         }
         *remaining -= bytes.len();
-        STANDARD.encode_string(&bytes, &mut url);
+        STANDARD.encode_string(&bytes, data);
     }
-    Ok(url)
+    Ok(())
 }
 
 pub(crate) fn tool_result(result: &ToolResult) -> Result<Value> {

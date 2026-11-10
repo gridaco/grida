@@ -554,6 +554,7 @@ a new one.
 On macOS and Linux, a source-built `grida-agent run` can take one local PNG
 through `--input-png` on a compatible image profile. Omit the workspace
 directory and permission profile to process the image without a project.
+Direct Google Gemini `gemini-3.8-flash` also supports PNG prompts on this host.
 Image edits use a retained working copy. [Run locally with a PNG](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-locally)
 
 On macOS and Linux, the isolated native Desktop preview supports PNG input

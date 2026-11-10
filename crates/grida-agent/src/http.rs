@@ -249,6 +249,13 @@ impl HttpTransport {
             && openrouter_png_model(model)
     }
 
+    pub(crate) fn is_reviewed_gemini_flash(&self) -> bool {
+        self.protocol == ProviderProtocol::Gemini
+            && matches!(self.dispatch, Dispatch::Direct(_))
+            && self.target.as_str()
+                == "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse"
+    }
+
     pub async fn validate_credential(&self) -> Result<()> {
         if let Some(credential) = &self.credential {
             credential.validate().await?;
@@ -751,6 +758,46 @@ mod tests {
         }
         let unregistered = ModelId::new("openai/gpt-6.1-sol").unwrap();
         assert!(responses_context_window(&canonical, &unregistered).is_none());
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
+    fn gemini_png_intake_requires_the_reviewed_direct_route_and_model() {
+        let state = tempfile::tempdir().unwrap();
+        let origin = "https://generativelanguage.googleapis.com/v1beta";
+        let model = "gemini-3.8-flash";
+        let mut canonical = options(ProviderProtocol::Gemini);
+        canonical.endpoint = origin.into();
+        canonical.model = ModelId::new(model).unwrap();
+        let supervised = HttpTransport::new(
+            state.path(),
+            &canonical,
+            Some(SupervisedProvider::default()),
+        )
+        .unwrap();
+        assert!(!supervised.is_reviewed_gemini_flash());
+        for (index, (endpoint, selected, expected)) in [
+            (origin, model, true),
+            (origin, "gemini-3.7-flash", false),
+            ("https://generativelanguage.googleapis.com/v1", model, false),
+            (
+                "https://generativelanguage.googleapis.com:444/v1beta",
+                model,
+                false,
+            ),
+            ("http://127.0.0.1:1/v1beta", model, false),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut options = options(ProviderProtocol::Gemini);
+            options.endpoint = endpoint.into();
+            options.model = ModelId::new(selected).unwrap();
+            let host =
+                crate::host::Host::open(&state.path().join(index.to_string()), Some(options))
+                    .unwrap();
+            assert_eq!(host.accepts_images(), expected, "{endpoint}/{selected}");
+        }
     }
 
     #[test]

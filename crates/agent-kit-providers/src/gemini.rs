@@ -1,7 +1,9 @@
 mod stream;
 
-use crate::wire::{short_identity, text_profile, tool_result};
-use crate::{StreamLimits, StreamingTransport, TransportOperation, TransportRequest};
+use crate::wire::{append_image_base64, image_profile, short_identity, text_profile, tool_result};
+use crate::{
+    InputImageResolver, StreamLimits, StreamingTransport, TransportOperation, TransportRequest,
+};
 use agent_kit_core::inference::{
     InferenceControl, InferenceRequest, InferenceRun, InputFormat, ModelCapabilities,
     PreparedRequest, Provider, ProviderBinding,
@@ -23,13 +25,14 @@ pub struct GeminiProfile {
     pub requires_tool_signatures: bool,
 }
 
-/// Gemini GenerateContent with text and client-executed JSON tools.
+/// Gemini GenerateContent with text, explicitly supported PNGs, and client-executed JSON tools.
 pub struct Gemini {
     binding: ProviderBinding,
     replay_binding: BindingId,
     models: BTreeMap<ModelId, GeminiProfile>,
     transport: Arc<dyn StreamingTransport>,
     limits: StreamLimits,
+    images: Option<Arc<InputImageResolver>>,
 }
 
 impl Gemini {
@@ -42,6 +45,18 @@ impl Gemini {
         transport: Arc<dyn StreamingTransport>,
         limits: StreamLimits,
     ) -> Result<Self> {
+        Self::with_image_resolver(binding, replay_binding, models, transport, limits, None)
+    }
+
+    /// Permit retained user PNGs only on model profiles with the image modality.
+    pub fn with_image_resolver(
+        binding: ProviderBinding,
+        replay_binding: BindingId,
+        models: BTreeMap<ModelId, GeminiProfile>,
+        transport: Arc<dyn StreamingTransport>,
+        limits: StreamLimits,
+        images: Option<Arc<InputImageResolver>>,
+    ) -> Result<Self> {
         limits.validate()?;
         if models.is_empty()
             || !models.iter().all(|(model, profile)| {
@@ -53,7 +68,8 @@ impl Gemini {
                     && model.as_str().bytes().all(|byte| {
                         byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')
                     })
-                    && text_profile(&profile.capabilities)
+                    && (text_profile(&profile.capabilities)
+                        || (images.is_some() && image_profile(&profile.capabilities)))
             })
         {
             return Err(Error::new(
@@ -67,6 +83,7 @@ impl Gemini {
             models,
             transport,
             limits,
+            images,
         })
     }
 
@@ -76,7 +93,12 @@ impl Gemini {
             .ok_or_else(|| Error::new(ErrorKind::Unsupported, "model_unavailable"))
     }
 
-    fn encode(&self, request: &InferenceRequest) -> Result<EncodedRequest> {
+    fn encode(
+        &self,
+        request: &InferenceRequest,
+        profile: &GeminiProfile,
+        resolve_images: bool,
+    ) -> Result<EncodedRequest> {
         if request.extension.is_some() {
             return Err(Error::new(
                 ErrorKind::Unsupported,
@@ -87,6 +109,9 @@ impl Gemini {
         let mut contents = Vec::new();
         let mut pending = Vec::new();
         let mut results = BTreeMap::new();
+        let allow_images = image_profile(&profile.capabilities);
+        let image_resolver = self.images.as_deref().filter(|_| resolve_images);
+        let mut remaining_images = self.limits.max_request_bytes / 4 * 3;
         for message in &request.messages {
             if message.role == Role::Tool {
                 for part in &message.content {
@@ -105,15 +130,14 @@ impl Gemini {
                 ));
             }
 
-            let parts = if message.role == Role::Assistant {
-                if let Some(replay) = self.replay(request, message)? {
+            let parts = match self.replay(request, message, profile)? {
+                Some(replay) => {
                     pending = replay.calls;
                     replay.parts
-                } else {
-                    text_parts(message)?
                 }
-            } else {
-                text_parts(message)?
+                None => {
+                    message_parts(message, allow_images, image_resolver, &mut remaining_images)?
+                }
             };
             if message.role == Role::System {
                 system.extend(parts);
@@ -166,7 +190,15 @@ impl Gemini {
         Ok(EncodedRequest { body, names })
     }
 
-    fn replay(&self, request: &InferenceRequest, message: &Message) -> Result<Option<Replay>> {
+    fn replay(
+        &self,
+        request: &InferenceRequest,
+        message: &Message,
+        profile: &GeminiProfile,
+    ) -> Result<Option<Replay>> {
+        if message.role != Role::Assistant {
+            return Ok(None);
+        }
         let Some(Content::ProviderState(state)) = message.content.last() else {
             return Ok(None);
         };
@@ -185,6 +217,21 @@ impl Gemini {
         }
         let replay: Replay = serde_json::from_slice(state.payload.bytes())
             .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid_provider_state"))?;
+        if profile.requires_tool_signatures
+            && !replay.calls.is_empty()
+            && replay
+                .parts
+                .iter()
+                .find(|part| part.get("functionCall").is_some())
+                .and_then(|part| part.get("thoughtSignature"))
+                .and_then(Value::as_str)
+                .is_none_or(str::is_empty)
+        {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "missing_tool_thought_signature",
+            ));
+        }
         Ok(Some(replay))
     }
 
@@ -203,9 +250,10 @@ impl Provider for Gemini {
     }
 
     fn prepare(&self, request: InferenceRequest) -> Result<PreparedRequest> {
-        let capabilities = self.capabilities(&request.model)?;
+        let profile = self.model(&request.model)?;
+        let capabilities = profile.capabilities.clone();
         request.validate(&capabilities)?;
-        self.encode(&request)?;
+        self.encode(&request, profile, false)?;
         PreparedRequest::from_validated(request, self.binding.clone(), capabilities)
     }
 
@@ -217,7 +265,7 @@ impl Provider for Gemini {
                 "prepared_provider_binding_changed",
             ));
         }
-        let encoded = self.encode(request.request())?;
+        let encoded = self.encode(request.request(), profile, true)?;
         let transport = Arc::clone(&self.transport);
         let limits = self.limits;
         let stream_profile = stream::Profile {
@@ -314,11 +362,25 @@ fn function_name(tool: &ToolId) -> Result<String> {
     short_identity("tool", tool)
 }
 
-fn text_parts(message: &Message) -> Result<Vec<Value>> {
+fn message_parts(
+    message: &Message,
+    allow_images: bool,
+    resolver: Option<&InputImageResolver>,
+    remaining_images: &mut usize,
+) -> Result<Vec<Value>> {
     let mut parts = Vec::new();
     for part in &message.content {
         match part {
             Content::Text(text) => parts.push(json!({"text": text})),
+            Content::Media(media)
+                if message.role == Role::User
+                    && allow_images
+                    && media.media_type == "image/png" =>
+            {
+                let mut data = String::new();
+                append_image_base64(&mut data, media, resolver, remaining_images)?;
+                parts.push(json!({"inlineData": {"mimeType": "image/png", "data": data}}));
+            }
             // Interrupted reasoning summaries are display evidence and have no replay state.
             Content::Reasoning(_) if message.role == Role::Assistant => {}
             _ => {
