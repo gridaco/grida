@@ -134,6 +134,12 @@ send before the text or image enters the chat. The
 cover keeping the draft on a rejected replacement and reusing its input identity
 when the outcome is unknown.
 
+In a long chat, [earlier pages](../../../test/desktop-agent-chat-transcript-history.md)
+show their own messages, and returning to the latest page includes work that
+settled while browsing. The [controller case](../../../editor/lib/agent-chat/native-chat-controller.test.ts)
+holds an earlier read across settlement. The [Main case](../../../desktop/src/main/native-agent-process.test.ts)
+exercises overlapping replay requests and delayed chunks.
+
 The unsigned macOS ARM64 native Desktop preview at `85b6cf526` exercised
 the rendered workbench, packaged preload, Main, and the native child together.
 With a saved OpenRouter GPT-5.6 Terra profile, two files named `same.png`

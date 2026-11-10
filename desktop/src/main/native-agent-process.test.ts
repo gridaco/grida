@@ -2,8 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { NativeAgentChat } from "./native-agent-chat";
 import {
   NativeAgentProcess,
+  TRANSCRIPT_WINDOW,
   type NativeAgentLaunch,
 } from "./native-agent-process";
 
@@ -30,7 +32,11 @@ function launch(
   };
 }
 
-function fixture(source: string, initializationVersion = 1) {
+function fixture(
+  source: string,
+  initializationVersion = 1,
+  capabilities?: Record<string, number>
+) {
   const directory = state();
   const resources = path.join(directory.root, "native-agent");
   const receipt = path.join(directory.root, "exited");
@@ -45,7 +51,9 @@ const send = (value) => process.stdout.write(JSON.stringify({jsonrpc:'2.0',...va
 lines.on('line', line => {
   const request = JSON.parse(line);
   if (request.method === 'initialize') {
-    send({id:request.id,result:{protocolVersion:${initializationVersion},agentInfo:{name:'grida-agent'},agentCapabilities:{_meta:{'co.grida/session/history':1}}}});
+    const offered = ${JSON.stringify(capabilities ?? null)};
+    const meta = offered ? {...request.params?.clientCapabilities?._meta,...offered} : {'co.grida/session/history':1};
+    send({id:request.id,result:{protocolVersion:${initializationVersion},agentInfo:{name:'grida-agent'},agentCapabilities:{_meta:meta}}});
     return;
   }
   ${source}
@@ -124,6 +132,64 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       expect(fs.readFileSync(test.receipt, "utf8")).toBe("eof");
     } finally {
       test.close();
+    }
+  });
+
+  it("keeps a transcript page intact when a legacy replay overlaps it", async () => {
+    const test = fixture(
+      `
+      if (request.method === 'session/new') {
+        send({id:request.id,result:{sessionId:'chat'}});
+        return;
+      }
+      const capability = ${JSON.stringify(TRANSCRIPT_WINDOW)};
+      const read = request.params._meta?.[capability];
+      if (read?.kind !== 'read') {
+        send({id:request.id,result:{}});
+        return;
+      }
+      const chunk = (requestId, text) => send({method:'session/update',params:{
+        sessionId:'chat',_meta:{[capability]:{requestId}},
+        update:{sessionUpdate:'agent_message_chunk',messageId:'saved',content:{type:'text',text}},
+      }});
+      chunk('stale-read','Stale replay');
+      chunk(read.requestId,'Retained answer');
+      send({id:request.id,result:{_meta:{[capability]:{requestId:read.requestId,view:1,older:null}}}});
+      `,
+      1,
+      { [TRANSCRIPT_WINDOW]: 1 }
+    );
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...test.options,
+        cwd: fs.realpathSync(test.root),
+      });
+      const session = await chat.create();
+      const [page, replay] = await Promise.allSettled([
+        chat.transcriptPage(session),
+        chat.transcript(session),
+      ]);
+      expect(replay).toEqual({
+        status: "rejected",
+        reason: new Error("native_chat_transcript_replay_busy"),
+      });
+      expect(page).toEqual({
+        status: "fulfilled",
+        value: {
+          view: 1,
+          older: null,
+          messages: [
+            { messageId: "saved", role: "assistant", text: "Retained answer" },
+          ],
+        },
+      });
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        test.close();
+      }
     }
   });
 

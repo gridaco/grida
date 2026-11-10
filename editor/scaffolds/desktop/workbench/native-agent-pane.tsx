@@ -484,7 +484,9 @@ export function NativeAgentPane({
             state.messages.at(-1)?.role !== "assistant" && (
               <PendingTurnIndicator />
             )}
+          {/* See test/desktop-agent-chat-transcript-history.md. */}
           {!turn &&
+            !state.earlierMessages &&
             !state.loading &&
             !state.repairing &&
             state.turnSummary &&

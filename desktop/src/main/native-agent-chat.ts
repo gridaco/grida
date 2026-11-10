@@ -1289,8 +1289,9 @@ export class NativeAgentChat {
     const id = this.requireAttached(session);
     if (this.unverifiedTranscripts.has(id))
       throw new Error("native_chat_transcript_delivery_unverified");
-    const existing = this.transcripts.get(id)?.result;
-    if (existing) return existing;
+    const existing = this.transcripts.get(id);
+    if (existing?.result) return existing.result;
+    if (existing) throw new Error("native_chat_transcript_replay_busy");
     const capture: TranscriptCapture = {
       messages: new Map(),
       bytes: 0,
@@ -1320,7 +1321,9 @@ export class NativeAgentChat {
           this.unverifiedTranscripts.add(id);
         throw error;
       })
-      .finally(() => this.transcripts.delete(id));
+      .finally(() => {
+        if (this.transcripts.get(id) === capture) this.transcripts.delete(id);
+      });
     return capture.result;
   }
 

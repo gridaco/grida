@@ -17,7 +17,8 @@ pending question, approval, or interruption before continuing.
 Long chats open at the latest messages. Choose **Earlier messages** to step
 back through the conversation, and **Back to latest** to return to current
 work. Reading earlier messages leaves ongoing work running. If the history
-changes while you browse, start again from the latest messages.
+changes while you browse, start again from the latest messages. Current turn
+details appear with the latest messages.
 
 Choose **Rename chat** to change its title. **Archive chat** moves it out of the
 active list and lets any ongoing work continue. Open **Archived chats** to find
