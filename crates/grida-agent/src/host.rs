@@ -153,6 +153,7 @@ struct Work {
 enum ReadyWork {
     Queue(SessionId),
     Stop(SessionId, TurnId),
+    Sponsored(sponsorship::SponsoredWake),
     Answered {
         session: SessionId,
         turn: TurnId,
@@ -166,6 +167,7 @@ impl ReadyWork {
             Self::Queue(session) | Self::Stop(session, _) | Self::Answered { session, .. } => {
                 session
             }
+            Self::Sponsored(wake) => &wake.binding.session,
         }
     }
 
@@ -343,6 +345,7 @@ enum Launch {
     Compact(ChangeId),
     RecoverCompaction(RecoveryRequest),
     Resume(ClaimRequest),
+    ResumeSponsored(sponsorship::SponsoredWake),
     ResumeAnswered(JournalPosition),
     RecoverStopped(RecoveryRequest),
 }
@@ -755,6 +758,17 @@ impl Host {
                 Launch::ResumeAnswered(position) => Some((&worker_turn, *position)),
                 _ => None,
             };
+            let sponsored = match &launch {
+                Launch::ResumeSponsored(wake) => Some(wake.clone()),
+                _ => None,
+            };
+            let explicit_resume = matches!(
+                &launch,
+                Launch::Resume(ClaimRequest {
+                    selection: TurnSelection::ResumePaused { .. },
+                    ..
+                })
+            );
             let live = match &launch {
                 Launch::Prompt { publish_text, .. } => *publish_text,
                 _ => true,
@@ -764,7 +778,8 @@ impl Host {
             let admitted = match result {
                 Ok(Some(run)) => run,
                 Ok(None) => {
-                    host.finish_work(&worker_session, false, answered).await;
+                    host.finish_work(&worker_session, false, answered, sponsored.as_ref())
+                        .await;
                     let _ = admission_tx.send(Ok(None));
                     host.wake_ready().await;
                     return;
@@ -779,6 +794,7 @@ impl Host {
                         &worker_session,
                         error.kind == ErrorKind::Uncertain,
                         answered.filter(|_| !basis_changed),
+                        sponsored.as_ref().filter(|_| !basis_changed),
                     )
                     .await;
                     let _ = admission_tx.send(Err(error));
@@ -790,6 +806,9 @@ impl Host {
                 }
             };
             let _ = admission_tx.send(Ok(admitted.acceptance));
+            if explicit_resume {
+                host.wake_ready().await;
+            }
             let mut completion_tx = Some(completion_tx);
             let result = match admitted.work {
                 TurnWork::Conversation {
@@ -836,6 +855,7 @@ impl Host {
                 &worker_session,
                 result.is_err(),
                 settled.then_some((&worker_turn, JournalPosition(u64::MAX))),
+                sponsored.as_ref(),
             )
             .await;
             if let Some(completion_tx) = completion_tx {
@@ -859,7 +879,11 @@ impl Host {
             task.await;
         });
         work.ready.retain(|waiting| {
-            waiting.session() != &session || matches!(waiting, ReadyWork::Answered { .. })
+            waiting.session() != &session
+                || matches!(
+                    waiting,
+                    ReadyWork::Answered { .. } | ReadyWork::Sponsored(_)
+                )
         });
         work.active.insert(
             session,
@@ -968,11 +992,19 @@ impl Host {
                 let claim = new_claim(session.clone(), turn.clone(), view.revision, selected)?;
                 (WorkerClaim::Select(claim), Some(next), None, history)
             }
-            resume @ (Launch::Resume(_) | Launch::ResumeAnswered(_)) => {
+            resume @ (Launch::Resume(_)
+            | Launch::ResumeAnswered(_)
+            | Launch::ResumeSponsored(_)) => {
                 let request = match resume {
                     Launch::Resume(request) => request,
                     Launch::ResumeAnswered(_) => {
                         let Some(request) = self.answered_claim(session, turn, &view).await? else {
+                            return Ok(None);
+                        };
+                        request
+                    }
+                    Launch::ResumeSponsored(wake) => {
+                        let Some(request) = wake.claim(&view)? else {
                             return Ok(None);
                         };
                         request
@@ -1078,6 +1110,9 @@ impl Host {
                             if profile.sponsorship().is_some() =>
                         {
                             self.claim_sponsored_resume(request, &view, profile).await?
+                        }
+                        (TurnSelection::ResumePaused { .. }, None) => {
+                            self.claim_parent_resume(request, turn).await?
                         }
                         _ => self.store.claim(request).await?,
                     },
@@ -1807,12 +1842,30 @@ impl Host {
                     }
                     continue;
                 }
+                if let ReadyWork::Sponsored(wake) = &work.ready[index] {
+                    let wake = wake.clone();
+                    // An intervening message may stale the claim during
+                    // preflight. Keep this readiness until its worker checks it.
+                    if self
+                        .register(
+                            &mut work,
+                            wake.binding.session.clone(),
+                            wake.binding.turn.clone(),
+                            Launch::ResumeSponsored(wake),
+                        )
+                        .is_err()
+                    {
+                        work.ready.remove(index);
+                    }
+                    continue;
+                }
                 work.ready.remove(index)
             };
             match next {
                 Some(ReadyWork::Queue(session)) => self.kick_queue(session).await,
                 Some(ReadyWork::Stop(session, turn)) => self.kick_stopped(session, turn).await,
                 Some(ReadyWork::Answered { .. }) => unreachable!("answered wake registered above"),
+                Some(ReadyWork::Sponsored(_)) => unreachable!("sponsored wake registered above"),
                 None => return,
             }
         }
@@ -1823,6 +1876,7 @@ impl Host {
         session: &SessionId,
         unverified: bool,
         remove_answered: Option<(&TurnId, JournalPosition)>,
+        remove_sponsored: Option<&sponsorship::SponsoredWake>,
     ) {
         {
             let mut work = self.work.lock().await;
@@ -1832,6 +1886,11 @@ impl Host {
                 work.ready.retain(|ready| {
                     !(ready.wakes_answer(session, turn) && matches!(ready, ReadyWork::Answered { position, .. } if *position <= through))
                 });
+            }
+            if let Some(wake) = remove_sponsored {
+                work.ready.retain(
+                    |ready| !matches!(ready, ReadyWork::Sponsored(pending) if pending == wake),
+                );
             }
         }
         self.changed.notify_waiters();

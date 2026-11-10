@@ -412,7 +412,7 @@ impl Host {
         request: ClaimRequest,
         turn: TurnId,
     ) -> Result<TurnView> {
-        if let Some(view) = self.store.claim_receipt(request.clone()).await? {
+        if let Some(view) = self.resume_receipt(request.clone()).await? {
             return Ok(view);
         }
         let session = request.session.clone();
@@ -427,7 +427,7 @@ impl Host {
         };
         let ticket = match ticket {
             Ok(ticket) => ticket,
-            Err(error) => return self.store.claim_receipt(request).await?.ok_or(error),
+            Err(error) => return self.resume_receipt(request).await?.ok_or(error),
         };
         ticket
             .admission

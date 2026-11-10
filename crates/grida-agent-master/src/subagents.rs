@@ -54,6 +54,10 @@ impl SponsoredPause {
     pub fn effective(self) -> bool {
         self.independent || self.ancestor
     }
+
+    pub fn held_by_ancestor(self) -> bool {
+        self.ancestor
+    }
 }
 
 impl Profile {

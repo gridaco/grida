@@ -60,6 +60,8 @@ impl Host {
                 return Ok(receipt);
             }
             let session = request.session.clone();
+            let view = host.store.inspect(session.clone()).await?;
+            require_saved_workspace(&view.configuration, &cwd)?;
             {
                 let mut work = host.work.lock().await;
                 if work.closed {
@@ -89,8 +91,6 @@ impl Host {
         cwd: PathBuf,
         request: DeleteSession,
     ) -> Result<SessionDeleted> {
-        let view = self.store.inspect(request.session.clone()).await?;
-        require_saved_workspace(&view.configuration, &cwd)?;
         if self
             .store
             .has_catalog_entries(catalog::child_scope(&request.session)?)

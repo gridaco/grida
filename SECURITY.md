@@ -1110,6 +1110,12 @@ lazy reads, read-only mutation, and symlink escape refusal.
   child's product state distinguishes independent and ancestor pause causes.
   The [native host](crates/grida-agent/src/host/sponsorship.rs) returns the
   committed receipt on exact retries without advancing either control.
+  Parent Resume commits the related disposition with the parent lease.
+  An independent child Pause remains in force. A reopened child reclaims
+  its own lease from the related receipt's exact binding and driver revision.
+  Current launch and provider authority are checked before dispatch. A later
+  paired Pause or Stop fences an earlier wake. Replaying a committed Resume
+  can recover readiness after a lost response or process restart.
 - Native Desktop opts into named children through the trusted Gateway launch.
   Main derives the sponsor from the exact attached parent observation and
   retains that sponsor for an exact assignment retry. It checks child, input,

@@ -1,6 +1,7 @@
 //! GRIDA-SEC-004 — parent controls fence the exact funded child slot.
 
 use super::*;
+use agent_kit_core::driver_state::DriverStateRevision;
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::ToolArguments;
 use agent_kit_core::tools::{RecoveryKind, ToolDefinition};
@@ -18,6 +19,60 @@ use serde_json::json;
 const DELEGATE: &str = "delegate_review";
 const CHILD_INPUT: &str = "sponsored-assignment";
 const CHILD_TURN: &str = "sponsored-turn";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct SponsoredWake {
+    pub binding: TurnBinding,
+    state: DriverStateRevision,
+    request: ChangeId,
+}
+
+impl SponsoredWake {
+    fn from_receipt(receipt: &ControlReceipt) -> Result<Self> {
+        let record = receipt.turn.as_ref().ok_or_else(related_changed)?.record();
+        let state = receipt.driver_state_revision.ok_or_else(related_changed)?;
+        let digest = Fingerprint::of(&("sponsored-wake", &record.binding, &receipt.request))?;
+        let id =
+            uuid::Uuid::from_bytes(digest.bytes()[..16].try_into().expect("fingerprint prefix"));
+        Ok(Self {
+            binding: record.binding.clone(),
+            state,
+            request: ChangeId::new(format!("sponsored-wake/{id}"))?,
+        })
+    }
+
+    pub(super) fn claim(&self, view: &SessionView) -> Result<Option<ClaimRequest>> {
+        let Some(turn) = &view.current else {
+            return Ok(None);
+        };
+        if turn.binding != self.binding
+            || turn.disposition != TurnDisposition::Suspended
+            || !turn.controls.admits_work()
+            || view.driver_state.revision() != self.state
+        {
+            return Ok(None);
+        }
+        let profile = session_configuration(view)?
+            .subagent
+            .filter(|profile| profile.sponsorship().is_some())
+            .ok_or_else(related_changed)?;
+        if profile.sponsored_pause(&view.driver_state)?.effective() {
+            return Ok(None);
+        }
+        // A message may advance the session after the related control. The
+        // exact binding and driver revision preserve the original readiness.
+        Ok(Some(ClaimRequest {
+            id: self.request.clone(),
+            session: self.binding.session.clone(),
+            expected_revision: view.revision,
+            selection: TurnSelection::Resume {
+                turn: self.binding.turn.clone(),
+                epoch: self.binding.epoch,
+                position: turn.position,
+            },
+        }))
+    }
+}
 
 fn delegation_definition() -> Result<ToolDefinition> {
     Ok(ToolDefinition {
@@ -418,6 +473,103 @@ impl Host {
             .claim)
     }
 
+    pub(super) async fn claim_parent_resume(
+        &self,
+        request: ClaimRequest,
+        turn: &TurnId,
+    ) -> Result<ClaimOutcome> {
+        let slot = sponsored_identity(&request.session, turn)?;
+        let Some((child, profile)) = self.related_child(&request.session, turn, &slot).await?
+        else {
+            return self.store.claim(request).await;
+        };
+        let Some(current) = child
+            .current
+            .as_ref()
+            .filter(|turn| !turn.controls.cancelled)
+        else {
+            return self.store.claim(request).await;
+        };
+        if !profile
+            .sponsored_pause(&child.driver_state)?
+            .held_by_ancestor()
+        {
+            return self.store.claim(request).await;
+        }
+        let (change, pause) =
+            profile.set_sponsored_pause(&child.driver_state, PauseCause::Ancestor, false)?;
+        let ready = !pause.effective();
+        if ready && !self.subagents_available() {
+            return Err(problem(ErrorKind::Unsupported, "subagents_unavailable"));
+        }
+        let related = OperationRelatedControl::Apply {
+            operation: profile
+                .sponsorship()
+                .ok_or_else(related_changed)?
+                .operation
+                .clone(),
+            request: ControlRequest {
+                id: change_id()?,
+                session: child.session,
+                expected_revision: child.revision,
+                action: SessionControl::DriverState {
+                    change,
+                    turn: Some(agent_kit_sessions::TurnControl {
+                        turn: current.binding.turn.clone(),
+                        expected: current.controls.revision,
+                        directive: if ready {
+                            ControlDirective::Resume
+                        } else {
+                            ControlDirective::Pause
+                        },
+                    }),
+                },
+            },
+        };
+        // Reserve worker capacity before making a child ready. The database
+        // owns the commit and receipt even if this process is lost afterward.
+        let mut work = self.work.lock().await;
+        if ready {
+            work.check_sponsored_capacity(&slot)?;
+        }
+        let outcome = self
+            .store
+            .resume_with(request, ResumeCompanion::Related(related))
+            .await?;
+        if ready && let Some(related) = &outcome.related {
+            work.queue_sponsored(SponsoredWake::from_receipt(related)?);
+        }
+        Ok(outcome.claim)
+    }
+
+    pub(super) async fn resume_receipt(&self, request: ClaimRequest) -> Result<Option<TurnView>> {
+        if !matches!(&request.selection, TurnSelection::ResumePaused { .. }) {
+            return self.store.claim_receipt(request).await;
+        }
+        let Some(receipt) = self.store.resume_receipt(request).await? else {
+            return Ok(None);
+        };
+        if self.subagents_available()
+            && let Some(related) = &receipt.related
+        {
+            let wake = SponsoredWake::from_receipt(related)?;
+            let child = match self.store.inspect(wake.binding.session.clone()).await {
+                Ok(child) => child,
+                Err(error) if error.code == "session_missing" => return Ok(Some(receipt.turn)),
+                Err(error) => return Err(error),
+            };
+            if wake.claim(&child)?.is_some() {
+                {
+                    let mut work = self.work.lock().await;
+                    work.check_sponsored_capacity(&wake.binding.session)?;
+                    work.queue_sponsored(wake);
+                }
+                self.wake_ready().await;
+            }
+        }
+        Ok(Some(receipt.turn))
+    }
+
     async fn ordinary_control(&self, request: ControlRequest) -> Result<OperationPairReceipt> {
         Ok(OperationPairReceipt {
             source: self.store.control(request).await?,
@@ -432,29 +584,20 @@ impl Host {
         slot: &SessionId,
         stop: bool,
     ) -> Result<OperationRelatedControl> {
-        let child = match self.store.inspect(slot.clone()).await {
-            Ok(child) => child,
-            Err(error) if error.code == "session_missing" => {
-                return Ok(OperationRelatedControl::Absent {
-                    session: slot.clone(),
-                });
-            }
-            Err(error) => return Err(error),
+        let Some((child, profile)) = self
+            .related_child(&request.session, parent_turn, slot)
+            .await?
+        else {
+            return Ok(OperationRelatedControl::Absent {
+                session: slot.clone(),
+            });
         };
-        let unavailable = || problem(ErrorKind::Conflict, "sponsored_subagent_relation_changed");
-        let profile = session_configuration(&child)?
-            .subagent
-            .filter(|profile| profile.parent() == &request.session)
-            .ok_or_else(unavailable)?;
-        let sponsor = profile
-            .sponsorship()
-            .filter(|sponsor| &sponsor.parent_turn == parent_turn)
-            .ok_or_else(unavailable)?;
+        let sponsor = profile.sponsorship().ok_or_else(related_changed)?;
         let turn = child
             .current
             .as_ref()
             .or(child.latest.as_ref())
-            .ok_or_else(unavailable)?;
+            .ok_or_else(related_changed)?;
         if turn.disposition == TurnDisposition::Settled {
             return Ok(OperationRelatedControl::Settled {
                 operation: sponsor.operation.clone(),
@@ -490,6 +633,29 @@ impl Host {
         })
     }
 
+    async fn related_child(
+        &self,
+        parent: &SessionId,
+        turn: &TurnId,
+        slot: &SessionId,
+    ) -> Result<Option<(SessionView, Profile)>> {
+        let view = match self.store.inspect(slot.clone()).await {
+            Ok(view) => view,
+            Err(error) if error.code == "session_missing" => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        let profile = session_configuration(&view)?
+            .subagent
+            .filter(|profile| {
+                profile.parent() == parent
+                    && profile
+                        .sponsorship()
+                        .is_some_and(|sponsor| &sponsor.parent_turn == turn)
+            })
+            .ok_or_else(related_changed)?;
+        Ok(Some((view, profile)))
+    }
+
     pub(super) async fn kick_sponsored_stop(&self, receipt: &OperationPairReceipt) {
         if let Some(child) = &receipt.destination
             && let Some(turn) = &child.turn
@@ -501,8 +667,41 @@ impl Host {
     }
 }
 
+impl Work {
+    fn check_sponsored_capacity(&self, child: &SessionId) -> Result<()> {
+        if self.closed {
+            return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
+        }
+        if self.ready.len() >= MAX_READY_SESSIONS
+            && !self.ready.iter().any(
+                |item| matches!(item, ReadyWork::Sponsored(wake) if &wake.binding.session == child),
+            )
+        {
+            return Err(problem(ErrorKind::LimitExceeded, "host_ready_queue_limit"));
+        }
+        Ok(())
+    }
+
+    fn queue_sponsored(&mut self, wake: SponsoredWake) {
+        if self.ready.iter().any(|item| {
+            matches!(item, ReadyWork::Sponsored(pending)
+                if pending.binding.session == wake.binding.session && pending.state.0 >= wake.state.0)
+        }) {
+            return;
+        }
+        self.ready.retain(|item| {
+            !matches!(item, ReadyWork::Sponsored(pending) if pending.binding.session == wake.binding.session)
+        });
+        self.ready.push_back(ReadyWork::Sponsored(wake));
+    }
+}
+
 fn sponsored_slot_used() -> Error {
     problem(ErrorKind::Conflict, "sponsored_subagent_slot_used")
+}
+
+fn related_changed() -> Error {
+    problem(ErrorKind::Conflict, "sponsored_subagent_relation_changed")
 }
 
 #[cfg(test)]
@@ -513,12 +712,14 @@ mod tests {
     use agent_kit_core::tools::{
         Invocation, InvocationContext, RecoveryKind, Tool, ToolDefinition, ToolOutcome,
     };
-    use agent_kit_core::turn::{JournalAction, JournalChange, OperationInput, OperationRecord};
+    use agent_kit_core::turn::{
+        JournalAction, JournalChange, OperationInput, OperationOutcome, OperationRecord, TurnLease,
+    };
     use agent_kit_core::{AttemptId, ToolId};
     use agent_kit_store_sqlite::{OperationClaim, OperationClaimSource};
     use grida_agent_master::subagents::{Profile, Sponsorship};
     use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-    use tokio::net::TcpListener;
+    use tokio::net::{TcpListener, TcpStream};
 
     struct WorkTool(ToolDefinition);
 
@@ -651,6 +852,10 @@ mod tests {
 
     async fn synthetic_reply(listener: &TcpListener) -> serde_json::Value {
         let (stream, _) = listener.accept().await.unwrap();
+        answer_request(stream).await
+    }
+
+    async fn answer_request(stream: TcpStream) -> serde_json::Value {
         let mut stream = BufReader::new(stream);
         let mut size = None;
         loop {
@@ -680,6 +885,352 @@ mod tests {
             .await
             .unwrap();
         serde_json::from_slice(&body).unwrap()
+    }
+
+    async fn suspend(lease: TurnLease, mut actions: Vec<JournalAction>) {
+        let state = lease.journal().load().await.unwrap();
+        actions.push(JournalAction::Suspend);
+        lease
+            .journal()
+            .commit(
+                JournalChange::new(
+                    change_id().unwrap(),
+                    state.binding().clone(),
+                    state.position(),
+                    state.controls().revision,
+                    actions,
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+    }
+
+    fn turn_control(view: &SessionView) -> TurnControl {
+        let turn = view.current.as_ref().unwrap();
+        TurnControl {
+            request: change_id().unwrap(),
+            session: view.session.clone(),
+            turn: turn.binding.turn.clone(),
+            expected_session: view.revision,
+            expected_control: turn.controls.revision,
+        }
+    }
+
+    async fn paused_parent_and_child(
+        host: &Host,
+        root: &Path,
+        independent: bool,
+    ) -> (SessionView, SessionId) {
+        let instructions = "Check the retained result independently.";
+        let (owner, source) =
+            capture_delegation(host, root, OperatingRegime::Act, instructions).await;
+        let parent = source.binding.session.clone();
+        let child = sponsored_identity(&parent, &source.binding.turn).unwrap();
+        let work = host
+            .sponsored_claim(source.clone(), child.clone(), instructions)
+            .await
+            .unwrap();
+        let ClaimOutcome::Acquired(child_owner) =
+            host.store.claim_from_operation(work).await.unwrap()
+        else {
+            panic!("expected child lease");
+        };
+        if independent {
+            let view = host.store.inspect(child.clone()).await.unwrap();
+            host.pause(turn_control(&view)).await.unwrap();
+        }
+        let view = host.store.inspect(parent.clone()).await.unwrap();
+        host.pause(turn_control(&view)).await.unwrap();
+        suspend(
+            owner.lease,
+            vec![JournalAction::CompleteAttempt {
+                operation: source.operation,
+                attempt: source.attempt,
+                outcome: OperationOutcome::Tool(ToolOutcome::failed("fixture")),
+            }],
+        )
+        .await;
+        suspend(child_owner.lease, Vec::new()).await;
+        (host.store.inspect(parent).await.unwrap(), child)
+    }
+
+    #[tokio::test]
+    async fn parent_resume_starts_the_child_before_either_response() {
+        let root = tempfile::tempdir().unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let host = Host::open(
+            &root.path().join("state"),
+            Some(ProviderOptions {
+                endpoint: format!("http://{}/v1", listener.local_addr().unwrap()),
+                model: ModelId::new("fixture").unwrap(),
+                max_output_tokens: 1024,
+                credential_env: None,
+                protocol: ProviderProtocol::OpenAiCompatible,
+                credential_home: None,
+                compatible_output_limit_field: None,
+            }),
+        )
+        .unwrap()
+        .with_subagents();
+        let (parent, child) = paused_parent_and_child(&host, root.path(), false).await;
+        let current = parent.current.as_ref().unwrap();
+        host.resume(
+            turn_control(&parent),
+            current.binding.epoch,
+            current.position,
+        )
+        .await
+        .unwrap();
+        let requests = tokio::time::timeout(Duration::from_secs(5), async {
+            let (first, _) = listener.accept().await.unwrap();
+            let (second, _) = listener.accept().await.unwrap();
+            tokio::join!(answer_request(first), answer_request(second))
+        })
+        .await
+        .unwrap();
+        let messages = [
+            requests.0["messages"].to_string(),
+            requests.1["messages"].to_string(),
+        ];
+        assert_eq!(
+            messages
+                .iter()
+                .filter(|messages| messages.contains("Private parent context"))
+                .count(),
+            1
+        );
+        assert_eq!(
+            messages
+                .iter()
+                .filter(|messages| messages.contains("Check the retained result independently."))
+                .count(),
+            1
+        );
+        tokio::time::timeout(Duration::from_secs(5), async {
+            for session in [parent.session, child] {
+                loop {
+                    let view = host.store.inspect(session.clone()).await.unwrap();
+                    if view
+                        .latest
+                        .is_some_and(|turn| turn.disposition == TurnDisposition::Settled)
+                    {
+                        break;
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            }
+        })
+        .await
+        .unwrap();
+        host.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn parent_resume_replays_exact_child_readiness_after_restart() {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let options = || ProviderOptions {
+            endpoint: format!("http://{}/v1", listener.local_addr().unwrap()),
+            model: ModelId::new("fixture").unwrap(),
+            max_output_tokens: 1024,
+            credential_env: None,
+            protocol: ProviderProtocol::OpenAiCompatible,
+            credential_home: None,
+            compatible_output_limit_field: None,
+        };
+        let host = Host::open(&state, Some(options()))
+            .unwrap()
+            .with_subagents();
+        let (parent, child) = paused_parent_and_child(&host, root.path(), false).await;
+        let control = turn_control(&parent);
+        let current = parent.current.unwrap();
+        let request = ClaimRequest {
+            id: control.request.clone(),
+            session: parent.session,
+            expected_revision: parent.revision,
+            selection: TurnSelection::ResumePaused {
+                turn: current.binding.turn.clone(),
+                epoch: current.binding.epoch,
+                position: current.position,
+                control_revision: current.controls.revision,
+            },
+        };
+        {
+            let mut work = host.work.lock().await;
+            work.ready.extend(
+                (0..MAX_READY_SESSIONS).map(|index| {
+                    ReadyWork::Queue(SessionId::new(format!("full-{index}")).unwrap())
+                }),
+            );
+        }
+        let error = host
+            .claim_parent_resume(request.clone(), &current.binding.turn)
+            .await
+            .err()
+            .unwrap();
+        assert_eq!(error.code, "host_ready_queue_limit");
+        assert!(
+            host.store
+                .claim_receipt(request.clone())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        host.work.lock().await.ready.clear();
+        let ClaimOutcome::Acquired(reclaimed) = host
+            .claim_parent_resume(request.clone(), &current.binding.turn)
+            .await
+            .unwrap()
+        else {
+            panic!("expected parent lease");
+        };
+        assert!(matches!(
+            host.work.lock().await.ready.front(),
+            Some(ReadyWork::Sponsored(_))
+        ));
+        drop(reclaimed);
+        drop(host);
+
+        let unavailable = Host::open(&state, Some(options())).unwrap();
+        assert!(unavailable.resume_receipt(request).await.unwrap().is_some());
+        assert!(unavailable.work.lock().await.ready.is_empty());
+        unavailable.shutdown().await.unwrap();
+        drop(unavailable);
+
+        let host = Host::open(&state, Some(options()))
+            .unwrap()
+            .with_subagents();
+        let original_child = host
+            .store
+            .inspect(child.clone())
+            .await
+            .unwrap()
+            .current
+            .unwrap();
+        assert_eq!(original_child.disposition, TurnDisposition::Suspended);
+        assert!(original_child.controls.admits_work());
+        host.store
+            .submit(child.clone(), input("Retained supplemental note."))
+            .await
+            .unwrap();
+        let replay = || {
+            host.resume(
+                TurnControl {
+                    request: control.request.clone(),
+                    session: control.session.clone(),
+                    turn: control.turn.clone(),
+                    expected_session: control.expected_session,
+                    expected_control: control.expected_control,
+                },
+                current.binding.epoch,
+                current.position,
+            )
+        };
+        let (first, second) = tokio::join!(replay(), replay());
+        assert_eq!(first.unwrap().disposition, TurnDisposition::Interrupted);
+        assert_eq!(second.unwrap().disposition, TurnDisposition::Interrupted);
+        let request = tokio::time::timeout(Duration::from_secs(5), synthetic_reply(&listener))
+            .await
+            .unwrap();
+        assert!(
+            request["messages"]
+                .to_string()
+                .contains("Check the retained result independently.")
+        );
+        let child = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let view = host.store.inspect(child.clone()).await.unwrap();
+                if let Some(turn) = view
+                    .latest
+                    .filter(|turn| turn.disposition == TurnDisposition::Settled)
+                {
+                    break turn;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(child.binding.epoch, original_child.binding.epoch + 1);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), listener.accept())
+                .await
+                .is_err()
+        );
+        host.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn parent_resume_leaves_an_independent_pause_for_the_child_to_clear() {
+        let root = tempfile::tempdir().unwrap();
+        let host = Host::open(
+            &root.path().join("state"),
+            Some(ProviderOptions {
+                endpoint: "http://127.0.0.1:1/v1".into(),
+                model: ModelId::new("fixture").unwrap(),
+                max_output_tokens: 1024,
+                credential_env: None,
+                protocol: ProviderProtocol::OpenAiCompatible,
+                credential_home: None,
+                compatible_output_limit_field: None,
+            }),
+        )
+        .unwrap()
+        .with_subagents();
+        let (parent, child) = paused_parent_and_child(&host, root.path(), true).await;
+        let current = parent.current.unwrap();
+        let request = ClaimRequest {
+            id: change_id().unwrap(),
+            session: parent.session,
+            expected_revision: parent.revision,
+            selection: TurnSelection::ResumePaused {
+                turn: current.binding.turn.clone(),
+                epoch: current.binding.epoch,
+                position: current.position,
+                control_revision: current.controls.revision,
+            },
+        };
+        let ClaimOutcome::Acquired(parent) = host
+            .claim_parent_resume(request.clone(), &current.binding.turn)
+            .await
+            .unwrap()
+        else {
+            panic!("expected parent lease");
+        };
+        let child = host.store.inspect(child).await.unwrap();
+        let current = child.current.as_ref().unwrap();
+        let profile = session_configuration(&child).unwrap().subagent.unwrap();
+        let pause = profile.sponsored_pause(&child.driver_state).unwrap();
+        assert!(pause.effective());
+        assert!(!pause.held_by_ancestor());
+        assert!(current.controls.paused);
+        assert!(host.resume_receipt(request).await.unwrap().is_some());
+        assert!(host.work.lock().await.ready.is_empty());
+
+        let request = ClaimRequest {
+            id: change_id().unwrap(),
+            session: child.session.clone(),
+            expected_revision: child.revision,
+            selection: TurnSelection::ResumePaused {
+                turn: current.binding.turn.clone(),
+                epoch: current.binding.epoch,
+                position: current.position,
+                control_revision: current.controls.revision,
+            },
+        };
+        let ClaimOutcome::Acquired(reclaimed) = host
+            .claim_sponsored_resume(request, &child, &profile)
+            .await
+            .unwrap()
+        else {
+            panic!("expected child lease");
+        };
+        assert_eq!(reclaimed.lease.binding().epoch, current.binding.epoch + 1);
+        drop(reclaimed);
+        drop(parent);
+        host.shutdown().await.unwrap();
     }
 
     #[tokio::test]
