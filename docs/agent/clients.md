@@ -179,10 +179,15 @@ as the command and the arguments from the example above. Start a chat from
 the Agent Panel's new-thread menu. Zed 1.21.0 on macOS was verified opening a
 session and displaying a completed text reply through ACP stdio. [Zed custom agents](https://zed.dev/docs/ai/external-agents#custom-agents)
 
-Use `session/list` to discover saved chats for an absolute workspace `cwd`.
+Use `session/list` to discover unarchived chats for an absolute workspace `cwd`.
 Follow `nextCursor` with the same workspace to get the next page. The list
-shows chat identities in newest-created order. Choose a chat and call
-`session/load` to open its transcript. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
+shows chat identities and optional titles in newest-created order. Choose a
+chat and call `session/load` to open its transcript. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
+
+Clients can negotiate `co.grida/session/organize` to list archived chats in
+the same workspace. For an attached chat, read the current title, archive state,
+and revision before renaming, archiving, or restoring. Archiving leaves active
+work running. An archived chat can still be loaded by its ID.
 
 When a native chat owner is active in Desktop, the workspace Chat selector
 combines recent chats with saved chats from that workspace. Use **Older chats**
@@ -284,6 +289,36 @@ Retained work keeps its original tool connection. If that connection closes,
 Stop is still available for a suspended turn. A lost reply after a tool call
 leaves an uncertain result. Reconcile it before sending new work that would
 repeat the effect.
+
+## Assign work to a named subagent
+
+Start the source-built host with a direct provider and private stdio.
+
+```sh
+target/debug/grida-agent serve --stdio --subagents \
+  --state-dir "$GRIDA_AGENT_STATE" \
+  --endpoint "$GRIDA_AGENT_ENDPOINT" --model "$GRIDA_AGENT_MODEL" \
+  --credential-env OPENAI_API_KEY
+```
+
+Attach to the parent and finish an Act turn. Negotiate version 1 for
+`co.grida/subagent/create`, `assign`, `inspect`, and `stop` separately.
+
+1. Create the child with a display name, a creation request ID, and an
+   allowance of one to eight work turns. Retain the returned child ID.
+2. Assign text using the child ID, the settled parent turn ID, and a new
+   input ID. The child uses its own conversation history and receives no
+   workspace tools. When it is idle, assign a follow-up using the same child
+   ID and a new input ID.
+3. Inspect a particular input to read the result from its original child
+   turn. After restart, attach to the same parent to inspect its children.
+   If an assignment was interrupted, stop that child turn before giving it
+   new work. Its reserved work turn still counts against the allowance.
+
+Retry creation or assignment with the same ID and fields to recover its
+receipt. Follow-up work after restart requires the same verified provider
+authority. The launcher owns this text-only profile and its allowance.
+See the [native host request fields](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md).
 
 ## Ask in a temporary side chat
 

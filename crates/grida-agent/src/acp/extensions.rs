@@ -1,6 +1,7 @@
 //! Versioned product operations layered over standard ACP.
 
 pub(super) mod approvals;
+mod catalog;
 pub(super) mod compaction;
 mod goals;
 mod history;
@@ -86,6 +87,7 @@ fn capability_keys(reviewer: bool) -> impl Iterator<Item = &'static str> {
         .chain(wakeups::capabilities(reviewer))
 }
 
+        .chain([catalog::ORGANIZE])
 pub(super) fn configuration_permission(
     sessions: &Mutex<ConnectionSessions>,
     allow_changes: bool,
@@ -328,6 +330,7 @@ pub(super) fn handlers(
             host.clone(),
             sessions.clone(),
             image_intake,
+        .extend(catalog::handlers(host.clone(), sessions.clone()))
         ))
         .extend(wakeups::handlers(host.clone(), sessions.clone()))
         .extend(side_chats::handlers(

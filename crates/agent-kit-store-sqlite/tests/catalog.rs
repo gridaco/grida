@@ -160,7 +160,7 @@ async fn catalog_organization_upgrades_an_existing_index_and_fences_edits() {
     );
     assert_eq!(
         store.list_catalog(scope, 1, None).await.unwrap().entries,
-        [archived.clone()]
+        std::slice::from_ref(&archived)
     );
     assert_eq!(store.inspect(id.clone()).await.unwrap(), before);
     drop(store);

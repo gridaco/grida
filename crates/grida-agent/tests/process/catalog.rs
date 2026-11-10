@@ -1,4 +1,6 @@
-use super::lifecycle::{session_snapshot, terminate_shared_server};
+use super::lifecycle::{
+    prompt_request, session_snapshot, task_basis, terminate_shared_server, wait_for_snapshot,
+};
 use super::*;
 
 async fn catalog_client(url: &str) -> SharedSocket {
@@ -157,4 +159,156 @@ async fn standard_acp_catalog_discovers_saved_workspace_sessions_without_loading
     let with_fork = ws_rpc(&mut client, 13, "session/list", json!({"cwd":a.path()})).await;
     assert_eq!(ids(&with_fork["result"])[0], fork);
     terminate_shared_server(child).await;
+}
+
+async fn organizer(url: &str) -> SharedSocket {
+    let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
+        .await
+        .unwrap();
+    let mut request = extension_initialize();
+    request["clientCapabilities"]["_meta"]["co.grida/session/organize"] = 1.into();
+    let init = ws_rpc(&mut socket, 1, "initialize", request).await;
+    assert_eq!(
+        init["result"]["agentCapabilities"]["_meta"]["co.grida/session/organize"],
+        1
+    );
+    socket
+}
+
+#[tokio::test]
+async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let other = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![Reply::Hold("Work in progress.")]).await;
+    let (first, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = organizer(&url).await;
+    let session = new_session(&mut socket, 2, workspace.path()).await;
+    let accepted = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/submit",
+        prompt_request(&session, "one-input", "Start the work."),
+    )
+    .await;
+    let turn = accepted["result"]["turnId"].as_str().unwrap();
+    endpoint.request().await;
+    let incomplete = ws_rpc(
+        &mut socket,
+        31,
+        "_co.grida/session/organize",
+        json!({"sessionId":session,"revision":0,"archived":true}),
+    )
+    .await;
+    assert_eq!(incomplete["error"]["code"], -32602);
+    let draft =
+        json!({"sessionId":session,"revision":0,"title":"  Reusable work  ","archived":true});
+    let archived = ws_rpc(&mut socket, 4, "_co.grida/session/organize", draft.clone()).await;
+    assert_eq!(
+        archived["result"],
+        json!({"sessionId":session,"revision":1,"title":"Reusable work","archived":true})
+    );
+    let retry = ws_rpc(&mut socket, 5, "_co.grida/session/organize", draft).await;
+    assert_eq!(retry["result"], archived["result"]);
+    let stale = ws_rpc(
+        &mut socket,
+        6,
+        "_co.grida/session/organize",
+        json!({"sessionId":session,"revision":0,"title":"Stale edit","archived":false}),
+    )
+    .await;
+    assert_eq!(stale["error"]["data"], "session_catalog_revision_changed");
+    let snapshot = session_snapshot(&mut socket, &session).await;
+    assert_eq!(snapshot["current"]["turnId"], turn);
+    let active = ws_rpc(
+        &mut socket,
+        7,
+        "session/list",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert!(ids(&active["result"]).is_empty());
+    let other = ws_rpc(
+        &mut socket,
+        8,
+        "_co.grida/session/list-archived",
+        json!({"cwd":other.path()}),
+    )
+    .await;
+    assert!(ids(&other["result"]).is_empty());
+    let stop = ws_rpc(
+        &mut socket,
+        9,
+        "_co.grida/session/stop",
+        task_basis(&snapshot, &session, "stop-work"),
+    )
+    .await;
+    assert!(stop.get("error").is_none(), "{stop}");
+    wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null() && snapshot["latest"]["turnId"] == turn
+    })
+    .await;
+    drop(socket);
+    terminate_shared_server(first).await;
+
+    let (second, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = organizer(&url).await;
+    let list = ws_rpc(
+        &mut socket,
+        2,
+        "_co.grida/session/list-archived",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(ids(&list["result"]), [session.as_str()]);
+    assert_eq!(list["result"]["sessions"][0]["title"], "Reusable work");
+    let detached = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/catalog-entry",
+        json!({"sessionId":session}),
+    )
+    .await;
+    assert_eq!(detached["error"]["data"], "session_setup_required");
+    let loaded = ws_rpc(
+        &mut socket,
+        4,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("result").is_some(), "{loaded}");
+    let saved = ws_rpc(
+        &mut socket,
+        5,
+        "_co.grida/session/catalog-entry",
+        json!({"sessionId":session}),
+    )
+    .await;
+    assert_eq!(saved["result"], archived["result"]);
+    let restored = ws_rpc(
+        &mut socket,
+        6,
+        "_co.grida/session/organize",
+        json!({"sessionId":session,"revision":1,"title":"Reusable work","archived":false}),
+    )
+    .await;
+    assert_eq!(restored["result"]["revision"], 2);
+    assert_eq!(restored["result"]["archived"], false);
+    let active = ws_rpc(
+        &mut socket,
+        7,
+        "session/list",
+        json!({"cwd":workspace.path()}),
+    )
+    .await;
+    assert_eq!(ids(&active["result"]), [session.as_str()]);
+    assert_eq!(active["result"]["sessions"][0]["title"], "Reusable work");
+    assert_eq!(
+        session_snapshot(&mut socket, &session).await["latest"]["turnId"],
+        turn
+    );
+    endpoint.done().await;
+    terminate_shared_server(second).await;
 }

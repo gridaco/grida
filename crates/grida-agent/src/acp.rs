@@ -240,7 +240,7 @@ async fn serve_connection(
                     })?;
                     let after = request.cursor.as_deref().map(catalog_anchor).transpose()?;
                     let catalog = list_host
-                        .list_sessions(cwd, after)
+                        .list_sessions(cwd, false, after)
                         .await
                         .map_err(host_error)?;
                     catalog_response(catalog)
@@ -599,19 +599,22 @@ fn catalog_response(mut catalog: SessionCatalog) -> Result<ListSessionsResponse>
         .len();
     // Each standard record repeats the workspace path. Leave frame room for
     // the maximum escaped ID, keys, cursor, and the JSON-RPC envelope.
-    let page_limit = (transport::MAX_FRAME_BYTES / 2) / (cwd_bytes + 1024);
+    let page_limit = (transport::MAX_FRAME_BYTES / 2) / (cwd_bytes + 3072);
     if page_limit == 0 {
         return Err(Error::invalid_params().data("session_catalog_workspace_too_large"));
     }
-    if catalog.sessions.len() > page_limit {
-        catalog.sessions.truncate(page_limit);
-        catalog.next_after = catalog.sessions.last().cloned();
+    if catalog.entries.len() > page_limit {
+        catalog.entries.truncate(page_limit);
+        catalog.next_after = catalog.entries.last().map(|entry| entry.session.clone());
     }
     Ok(ListSessionsResponse::new(
         catalog
-            .sessions
+            .entries
             .into_iter()
-            .map(|id| SessionInfo::new(id.as_str().to_owned(), catalog.cwd.clone()))
+            .map(|entry| {
+                SessionInfo::new(entry.session.as_str().to_owned(), catalog.cwd.clone())
+                    .title(entry.label)
+            })
             .collect(),
     )
     .next_cursor(catalog.next_after.map(|id| format!("v1/{}", id.as_str()))))

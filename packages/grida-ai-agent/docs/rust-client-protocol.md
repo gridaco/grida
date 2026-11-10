@@ -36,10 +36,22 @@ Grida master in charge of native execution.
 
 The Grida profile advertises `sessionCapabilities.list` for standard v1
 `session/list` with an explicit absolute workspace `cwd`. The host canonicalizes
-that directory and reads the workspace's saved IDs in newest-created order.
-Pages contain at most 32 `SessionInfo` records with only the ID and working
-directory. Treat `nextCursor` as opaque and send it with the same workspace.
+that directory and reads the workspace's unarchived chats in newest-created
+order. Pages contain at most 32 `SessionInfo` records with the ID, working
+directory and optional title. Treat `nextCursor` as opaque and send it with
+the same workspace.
 Listing leaves attachment, execution, and history unchanged. [ACP session listing](https://agentclientprotocol.com/protocol/v1/session-list)
+
+Negotiate `co.grida/session/organize` version 1 for archived listing and
+catalog changes. `_co.grida/session/list-archived` accepts the standard
+workspace and cursor fields and returns the standard page shape.
+`_co.grida/session/catalog-entry` accepts an attached `sessionId` and
+returns `sessionId`, `title`, `archived`, and `revision`.
+`_co.grida/session/organize` replaces the title and archive state at that
+revision. Send a null title to clear it. An already-matching value succeeds
+without another write. On a revision conflict, read the current entry before
+asking the user to reapply the edit. Archiving and restoring preserve chat
+identity and leave execution controls unchanged.
 
 ## Standard messages and custom UX
 
