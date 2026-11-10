@@ -170,12 +170,12 @@ The build-time setting `GRIDA_MANAGED_NATIVE_FIRST=1` authorizes creating
 the known legacy Desktop profiles, Grida home directories, and scratch paths
 to be absent. If any are present, startup keeps using the ordinary profile.
 A private receipt binds its browser, agent, media, project and temporary
-directories. Subsequent
-Stable builds that support the receipt open the same profile through normal
-startup and updates. Managed deployment must keep installed versions at or above
-the first version that understands the receipt. An invalid or incomplete profile
-stops startup before Electron initializes the ordinary browser profile. Enrollment
-starts an isolated Gateway profile.
+directories. Selector-aware Stable builds reopen the same profile on startup.
+The deployment owner delivers managed upgrades and keeps installed versions at
+or above the first version that understands the receipt. Ordinary profiles use
+the public updater. An invalid or incomplete managed profile stops startup
+before Electron initializes the ordinary browser profile. Enrollment starts an
+isolated Gateway profile.
 
 In the packaged native workspace pane, **Model connection** can start a new
 chat on an approved saved compatible endpoint and reopen its own saved chat
@@ -201,7 +201,7 @@ archive can include it. Explicit chat deletion still removes its scratch.
 Per-request upload limits still apply.
 
 This handoff applies to chats created inside the managed predecessor profile.
-Managed deployment needs a version floor that recognizes the legacy enrollment
+The deployment owner selects a successor that recognizes the legacy enrollment
 and respects its promotion record.
 Ordinary legacy profiles need separate proof of writer custody and historical
 scratch provenance. The managed handoff keeps the browser, media, projects and

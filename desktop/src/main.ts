@@ -660,7 +660,9 @@ app.on("ready", async () => {
     app.isPackaged &&
     process.platform === "darwin" &&
     process.arch === "arm64";
-  if (!nativeProfile || NativeDesktopProfile.firstSelected())
+  // The managed delivery owner selects upgrades for every receipt-bound role,
+  // including the predecessor that still runs the legacy agent.
+  if (!nativeProfile && !NativeDesktopProfile.firstSelected())
     updateElectronApp({ notifyUser: true });
 
   if (USE_DEV_INSIDERS_BRANDING && process.platform === "darwin") {
