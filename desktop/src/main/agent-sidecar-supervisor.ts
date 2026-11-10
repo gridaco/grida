@@ -3,8 +3,8 @@
 /**
  * GRIDA-SEC-004 — AgentSidecar supervisor.
  *
- * Spawns and supervises the agent sidecar, now **inside `srt`**.
- * Lifecycle:
+ * Spawns and supervises the confined Desktop sidecar. The retained media
+ * service has its own native launcher. The compatibility lifecycle uses SRT:
  *
  *   1. On first `start()`:
  *      - Generate a 256-bit per-spawn Basic-Auth password.
@@ -49,20 +49,13 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { home } from "@grida/home";
-import {
-  ensureInitialized,
-  wrap,
-  dispose,
-  isSupportedPlatform,
-  checkDependencies,
-} from "./sandbox/manager";
 import { SidecarLogWriter } from "./sidecar-log";
 import { EDITOR_BASE_URL } from "../env";
 import { AgentNetworkAuthority } from "./agent-network-authority";
 import { AgentNetworkHost } from "./agent-network-host";
 import { AgentDaemonSocketHost } from "./agent-daemon-socket-host";
 import { DesktopAgentSandboxPolicy } from "./agent-sandbox-policy";
-import { AgentCommandHost, sweepAgentCommandTemps } from "./agent-command-host";
+import type { AgentCommandHost } from "./agent-command-host";
 import { DesktopMediaRoot } from "./media-root";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 import type { DesktopAccountSession } from "./account-session";
@@ -127,6 +120,8 @@ export class AgentSidecarSupervisor {
   private verifiedDrain: Promise<void> | undefined;
   private drainingChild: ChildProcess | null = null;
   private restartTimer: NodeJS.Timeout | null = null;
+  // A null value reserves the compatibility role while its module loads.
+  private compatibilitySandbox?: typeof import("./sandbox/manager") | null;
   private sandboxReady = false;
   private workspaceCatalog?: string;
   private legacyStateRoots: readonly string[] = [];
@@ -184,7 +179,7 @@ export class AgentSidecarSupervisor {
       // Fire-and-forget — Electron's `will-quit` doesn't await
       // listeners. `dispose()` is best-effort; the OS reclaims srt's
       // proxy sockets at process exit regardless.
-      void dispose();
+      void this.compatibilitySandbox?.dispose();
     });
   }
 
@@ -194,7 +189,9 @@ export class AgentSidecarSupervisor {
     if (this.ownedLegacy)
       throw new Error("owned_legacy_writer_already_selected");
     if (
-      (workspaceCatalog && (!this.coldStartSource || !isSupportedPlatform())) ||
+      (workspaceCatalog &&
+        (!this.coldStartSource ||
+          !(await this.loadCompatibilitySandbox()).isSupportedPlatform())) ||
       (this.sandboxReady && workspaceCatalog !== this.workspaceCatalog)
     )
       throw new Error("workspace_catalog_scope_invalid");
@@ -222,7 +219,7 @@ export class AgentSidecarSupervisor {
       this.agentEnabled ||
       this.ownedLegacy ||
       this.legacyLaunchStarted ||
-      this.sandboxReady ||
+      this.compatibilitySandbox !== undefined ||
       this.isShuttingDown
     )
       throw new Error("retained_media_profile_unavailable");
@@ -294,12 +291,19 @@ export class AgentSidecarSupervisor {
       : process.env.GRIDA_AGENT_USER_DATA;
     if (
       !app.hasSingleInstanceLock() ||
-      !isSupportedPlatform() ||
       !this.agentEnabled ||
       this.legacyLaunchStarted ||
       this.isShuttingDown ||
       !data ||
       data !== this.user_data_path
+    ) {
+      throw new Error("owned_legacy_writer_profile_unavailable");
+    }
+    const sandbox = await this.loadCompatibilitySandbox();
+    if (
+      !sandbox.isSupportedPlatform() ||
+      !this.agentEnabled ||
+      this.legacyLaunchStarted
     ) {
       throw new Error("owned_legacy_writer_profile_unavailable");
     }
@@ -326,7 +330,7 @@ export class AgentSidecarSupervisor {
           await claim.completeDrain(async (id) => id === claimId);
           return receipt;
         } finally {
-          if (managed) await dispose();
+          if (managed) await sandbox.dispose();
         }
       },
     });
@@ -570,11 +574,16 @@ export class AgentSidecarSupervisor {
    */
   private async initSandbox(): Promise<void> {
     if (this.sandboxReady) return;
+    const sandbox = await this.loadCompatibilitySandbox();
+    const commands =
+      this.agentEnabled && !this.ownedLegacy
+        ? await import("./agent-command-host")
+        : undefined;
     // Resolve temp in trusted Electron main before SRT rewrites the sidecar's
     // TMPDIR to its shared compatibility directory. Session scratch must live
     // outside those unconditional write defaults so a per-command deny of the
     // shared base can carve back exactly one session.
-    if (this.agentEnabled && !this.ownedLegacy) {
+    if (commands) {
       const { defaultScratchBase, prepareScratchAuthority } =
         await import("@grida/agent/sandbox");
       this.scratchBase = defaultScratchBase(
@@ -584,9 +593,9 @@ export class AgentSidecarSupervisor {
       // Establish the authority before listing/removal. Media-only startup
       // neither prepares nor sweeps any agent scratch directory.
       prepareScratchAuthority(this.scratchBase, this.user_data_path);
-      await sweepAgentCommandTemps(this.scratchBase);
+      await commands.sweepAgentCommandTemps(this.scratchBase);
     }
-    if (!isSupportedPlatform()) {
+    if (!sandbox.isSupportedPlatform()) {
       if (this.coldStartSource || this.ownedLegacy)
         throw new Error("native_retained_sidecar_sandbox_unavailable");
       // Windows or another unsupported platform. Log loudly and let
@@ -602,7 +611,7 @@ export class AgentSidecarSupervisor {
       this.sandboxReady = true;
       return;
     }
-    const deps = checkDependencies();
+    const deps = sandbox.checkDependencies();
     if (deps) {
       for (const warning of deps.warnings ?? []) {
         console.warn(`[agent-sidecar:srt] dep warning: ${warning}`);
@@ -666,7 +675,7 @@ export class AgentSidecarSupervisor {
       home: app.getPath("home"),
       ggHost: new URL(EDITOR_BASE_URL).hostname,
     });
-    await ensureInitialized({
+    await sandbox.ensureInitialized({
       network: {
         allowedDomains: policy.network.allowed_domains,
         deniedDomains: policy.network.denied_domains,
@@ -679,8 +688,8 @@ export class AgentSidecarSupervisor {
         denyWrite: policy.filesystem.deny_write,
       },
     });
-    if (this.scratchBase && !this.ownedLegacy) {
-      this.commandHost = new AgentCommandHost({
+    if (this.scratchBase && commands) {
+      this.commandHost = new commands.AgentCommandHost({
         scratchBase: this.scratchBase,
         userData: this.user_data_path,
         providerRoot: path.join(this.provider_home, "providers"),
@@ -690,6 +699,15 @@ export class AgentSidecarSupervisor {
       });
     }
     this.sandboxReady = true;
+  }
+
+  private async loadCompatibilitySandbox() {
+    if (!this.compatibilitySandbox) {
+      this.compatibilitySandbox = null;
+      this.compatibilitySandbox = await import("./sandbox/manager");
+    }
+    if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
+    return this.compatibilitySandbox;
   }
 
   /**
@@ -740,7 +758,11 @@ export class AgentSidecarSupervisor {
     // unsupported platforms, avoid shell quoting entirely and spawn
     // Electron-as-node with an argv array so Windows paths with spaces
     // work under cmd.exe.
-    const supportedSandbox = !retained && isSupportedPlatform();
+    const compatibility = retained ? undefined : this.compatibilitySandbox;
+    if (!retained && !compatibility)
+      throw new Error("agent_sidecar_sandbox_unavailable");
+    const sandbox = compatibility?.isSupportedPlatform() ? compatibility : null;
+    const supportedSandbox = sandbox !== null;
 
     const mode = this.agentEnabled
       ? "enabled"
@@ -788,7 +810,7 @@ export class AgentSidecarSupervisor {
       const cmd = [shellQuote(process.execPath), ...args.map(shellQuote)].join(
         " "
       );
-      wrappedCmd = await wrap(cmd);
+      wrappedCmd = await sandbox.wrap(cmd);
     }
     if (generation !== this.nextGeneration || this.isShuttingDown) {
       throw new Error("agent sidecar startup was cancelled");

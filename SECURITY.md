@@ -302,6 +302,12 @@ media-only startup. Main retains its native file, workspace, and recent-file
 owners and confines the media sidecar to its settings, custody, media, and
 temporary roots. This role opens neither chat store and cannot admit an
 unfinished legacy profile.
+The [supervisor](desktop/src/main/agent-sidecar-supervisor.ts) selects the
+native retained-media launcher without loading the compatibility sandbox.
+Compatibility startup loads its sandbox before preparing scratch or spawning
+the child. [Startup fixtures](desktop/src/main/retained-media-startup.test.ts)
+verify that an unavailable compatibility sandbox leaves native admission
+independent and refuses the ordinary launch.
 
 Shared image, video, audio and 3D operations and provider HTTP belong to
 [`@grida/ai`](packages/grida-ai/README.md). The tenant supplies narrow key/token

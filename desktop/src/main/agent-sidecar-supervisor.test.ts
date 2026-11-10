@@ -220,11 +220,10 @@ describe("AgentSidecarSupervisor recovery", () => {
 
   it("forwards disabled agent startup without scratch or skill arguments", async () => {
     const supervisor = new AgentSidecarSupervisor({ agent: false });
-    const state = supervisor as unknown as { spawnOne(): Promise<unknown> };
     // Inspect the exact wrapped argv, then stop before spawning a real child.
     vi.mocked(wrap).mockRejectedValueOnce(new Error("stop before spawn"));
 
-    await expect(state.spawnOne()).rejects.toThrow("stop before spawn");
+    await expect(supervisor.start()).rejects.toThrow("stop before spawn");
 
     const command = vi.mocked(wrap).mock.calls.at(-1)?.[0];
     expect(command).toContain("--agent=disabled");
