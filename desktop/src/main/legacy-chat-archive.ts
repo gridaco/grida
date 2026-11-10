@@ -2,7 +2,7 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { constants, type Stats } from "node:fs";
-import fs from "node:fs/promises";
+import fs, { type FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { backup, DatabaseSync } from "node:sqlite";
 import { setTimeout } from "node:timers/promises";
@@ -10,6 +10,9 @@ import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 const DB_NAME = "sessions.db";
+const WAL_SIDECARS = ["-wal", "-shm"] as const;
+const DB_SIDECARS = [...WAL_SIDECARS, "-journal"] as const;
+const READ_ONLY_MODE = 0o400;
 const ARCHIVE_NAME = "chat-archive";
 const MANIFEST_NAME = "manifest.json";
 const PENDING_NAME = ".pending";
@@ -52,7 +55,11 @@ type Receipt = {
   sessionCount: number;
   inputCaveats: readonly InputCaveat[];
 };
-type Seal = Readonly<{ requestId: string; expectedArchiveId?: string }>;
+type Seal = Readonly<{
+  requestId: string;
+  expectedArchiveId?: string;
+  requireReadOnlySource?: boolean;
+}>;
 
 /** Main-owned cutover evidence. The caller must close old chat admission, stop
  * the exact legacy writer and its scratch work, and prevent its restart for
@@ -90,6 +97,11 @@ export class LegacyChatArchive {
           !DIGEST.test(seal.expectedArchiveId))
       )
         throw new ArchiveFailure("invalid_source_seal");
+      if (
+        seal.requireReadOnlySource &&
+        (process.platform !== "darwin" || !process.geteuid?.())
+      )
+        throw new ArchiveFailure("unsupported_platform");
       const receipt = await this.snapshot(seal);
       if (!receipt) throw new ArchiveFailure("source_missing");
       return receipt;
@@ -120,11 +132,7 @@ export class LegacyChatArchive {
     checkSourceDirectory(directoryStat);
     const sourceDb = path.join(userData, DB_NAME);
     const databaseStat = await statIfPresent(sourceDb);
-    const sidecars = await Promise.all(
-      ["-wal", "-shm", "-journal"].map((suffix) =>
-        statIfPresent(sourceDb + suffix)
-      )
-    );
+    const sidecars = await sourceSidecars(sourceDb);
     if (!databaseStat) {
       if (sidecars.some(Boolean)) throw new ArchiveFailure("unsafe_source");
       if (await statIfPresent(path.join(userData, ARCHIVE_NAME))) {
@@ -136,35 +144,54 @@ export class LegacyChatArchive {
     for (const stat of [databaseStat, ...sidecars])
       if (stat) checkSourceFile(stat);
 
+    // SQLite guards the opened inode. Confirm that the configured directory
+    // and its database still name the same objects after archive I/O.
+    const confirmLocation = async () => {
+      const directory = await statIfPresent(this.source.userDataPath);
+      if (
+        !directory ||
+        !sameIdentity(directoryStat, directory) ||
+        (await fs.realpath(this.source.userDataPath)) !== userData
+      )
+        throw new ArchiveFailure("source_changed");
+      checkSourceDirectory(directory);
+      const database = await statIfPresent(sourceDb);
+      if (!database || !sameIdentity(databaseStat, database))
+        throw new ArchiveFailure("source_changed");
+      checkSourceFile(database);
+      return database;
+    };
+    const parent = path.join(userData, ARCHIVE_NAME);
+    if (
+      seal?.requireReadOnlySource &&
+      (databaseStat.mode & 0o7777) === READ_ONLY_MODE
+    ) {
+      await confirmReadOnlySource(sourceDb, databaseStat, confirmLocation);
+      const archived = readFrozenSeal(sourceDb, seal);
+      await checkArchiveRoot(parent);
+      const verified = await verifyArchive(parent, archived);
+      await confirmReadOnlySource(sourceDb, databaseStat, confirmLocation);
+      return verified;
+    }
+    if (seal?.requireReadOnlySource) await checkSourceFenceAcl(sourceDb);
     const guard = seal
       ? acquireSourceSealFence(sourceDb, seal)
       : await acquireWriterFence(sourceDb);
     let stage: string | undefined;
+    let pinnedSource: FileHandle | undefined;
+    let frozen: { receipt: Receipt; source: Stats } | undefined;
     try {
-      const current = await fs.lstat(sourceDb);
-      if (!sameIdentity(databaseStat, current))
-        throw new ArchiveFailure("source_changed");
-      // SQLite locks the opened inode. Check that the configured directory and
-      // its database still name the same objects after archive I/O.
-      const confirmLocation = async () => {
-        const directory = await statIfPresent(this.source.userDataPath);
-        if (
-          !directory ||
-          !sameIdentity(directoryStat, directory) ||
-          (await fs.realpath(this.source.userDataPath)) !== userData
-        )
-          throw new ArchiveFailure("source_changed");
-        checkSourceDirectory(directory);
-        const database = await statIfPresent(sourceDb);
-        if (!database || !sameIdentity(current, database))
-          throw new ArchiveFailure("source_changed");
-        checkSourceFile(database);
-        return database;
-      };
-      const parent = path.join(userData, ARCHIVE_NAME);
+      const current = await confirmLocation();
+      if (
+        seal?.requireReadOnlySource &&
+        (await sourceSidecars(sourceDb, WAL_SIDECARS)).some(Boolean)
+      )
+        throw new ArchiveFailure("source_fence_incomplete");
       if (seal) {
         const retained = readSourceSeal(guard, seal);
         if (retained) {
+          if (seal.requireReadOnlySource)
+            throw new ArchiveFailure("source_fence_incomplete");
           await checkArchiveRoot(parent);
           const verified = await verifyArchive(parent, retained);
           if (!sameSnapshot(current, await confirmLocation()))
@@ -248,24 +275,43 @@ export class LegacyChatArchive {
       }
       await syncDirectory(parent);
       await syncDirectory(userData);
-      if (seal) {
-        const verified = await verifyArchive(parent, receipt.id);
-        if (!sameSnapshot(current, await confirmLocation()))
+      if (!seal) return receipt;
+      const verified = await verifyArchive(parent, receipt.id);
+      if (seal.requireReadOnlySource) {
+        await checkSourceFenceAcl(sourceDb);
+        pinnedSource = await fs.open(sourceDb, READ_FLAGS);
+        if (!sameSnapshot(current, await pinnedSource.stat()))
           throw new ArchiveFailure("source_changed");
-        commitSourceSeal(guard, seal.requestId, verified.id);
-        readSourceSeal(guard, { ...seal, expectedArchiveId: verified.id });
-        await syncDirectory(userData);
-        await confirmLocation();
-        return verified;
       }
-      return receipt;
+      if (!sameSnapshot(current, await confirmLocation()))
+        throw new ArchiveFailure("source_changed");
+      commitSourceSeal(guard, seal.requestId, verified.id);
+      readSourceSeal(guard, { ...seal, expectedArchiveId: verified.id });
+      await syncDirectory(userData);
+      await confirmLocation();
+      if (!pinnedSource) return verified;
+      try {
+        await pinnedSource.chmod(READ_ONLY_MODE);
+        await pinnedSource.sync();
+      } catch {
+        throw new ArchiveFailure("source_fence_incomplete");
+      }
+      frozen = { receipt: verified, source: await pinnedSource.stat() };
     } finally {
       try {
         if (stage) await fs.rm(stage, { recursive: true, force: true });
       } finally {
-        guard.close();
+        // Closing another descriptor of the same inode can release SQLite's
+        // POSIX locks. The mode change keeps its descriptor until guard close.
+        try {
+          guard.close();
+        } finally {
+          await pinnedSource?.close();
+        }
       }
     }
+    await confirmReadOnlySource(sourceDb, frozen.source, confirmLocation);
+    return frozen.receipt;
   }
 }
 
@@ -274,6 +320,7 @@ type FailureCode =
   | "source_missing"
   | "source_changed"
   | "source_busy"
+  | "source_fence_incomplete"
   | "unsupported_platform"
   | "unsafe_archive"
   | "invalid_database"
@@ -314,9 +361,15 @@ async function acquireWriterFence(source: string): Promise<DatabaseSync> {
 }
 
 function acquireSourceSealFence(source: string, seal: Seal): DatabaseSync {
-  const probe = new DatabaseSync(source, { readOnly: true, timeout: 0 });
+  // This preliminary refusal check must not create WAL sidecars. The
+  // exclusive guard below reads and checks the actual state before archiving.
+  const probePath = seal.requireReadOnlySource
+    ? `${pathToFileURL(source).href}?mode=ro&immutable=1`
+    : source;
+  const probe = new DatabaseSync(probePath, { readOnly: true, timeout: 0 });
   try {
-    readSourceSeal(probe, seal);
+    if (readSourceSeal(probe, seal) && seal.requireReadOnlySource)
+      throw new ArchiveFailure("source_fence_incomplete");
   } catch (error) {
     if (sqliteBusy(error)) throw new ArchiveFailure("source_busy");
     throw error;
@@ -343,6 +396,63 @@ function acquireSourceSealFence(source: string, seal: Seal): DatabaseSync {
     if (sqliteBusy(error)) throw new ArchiveFailure("source_busy");
     throw error;
   }
+}
+
+function readFrozenSeal(sourceDb: string, seal: Seal): string {
+  const source = new DatabaseSync(sourceDb, {
+    readOnly: true,
+    timeout: 0,
+    allowExtension: false,
+  });
+  try {
+    const archived = readSourceSeal(source, seal);
+    if (
+      !archived ||
+      source.prepare("PRAGMA journal_mode").get()?.journal_mode !== "delete"
+    )
+      throw new ArchiveFailure("source_fence_incomplete");
+    return archived;
+  } finally {
+    source.close();
+  }
+}
+
+async function sourceSidecars(
+  sourceDb: string,
+  suffixes: readonly string[] = DB_SIDECARS
+) {
+  return Promise.all(
+    suffixes.map((suffix) => statIfPresent(sourceDb + suffix))
+  );
+}
+
+async function checkSourceFenceAcl(sourceDb: string): Promise<void> {
+  for (const target of [sourceDb, path.dirname(sourceDb)]) {
+    const { stdout } = await promisify(execFile)("/bin/ls", ["-ldeb", target], {
+      env: { LC_ALL: "C", LANG: "C" },
+      timeout: 2_000,
+      maxBuffer: 65_536,
+    });
+    if (!/^[d-][rwxstST-]{9}[@ ]/.test(stdout) || /^\s*\d+:/m.test(stdout))
+      throw new ArchiveFailure("unsafe_source");
+  }
+}
+
+async function confirmReadOnlySource(
+  sourceDb: string,
+  source: Stats,
+  confirmLocation: () => Promise<Stats>
+): Promise<void> {
+  if ((source.mode & 0o7777) !== READ_ONLY_MODE)
+    throw new ArchiveFailure("source_fence_incomplete");
+  await checkSourceFenceAcl(sourceDb);
+  if ((await sourceSidecars(sourceDb)).some(Boolean))
+    throw new ArchiveFailure("source_fence_incomplete");
+  const current = await confirmLocation();
+  if ((current.mode & 0o7777) !== READ_ONLY_MODE)
+    throw new ArchiveFailure("source_fence_incomplete");
+  if (!sameSnapshot(source, current))
+    throw new ArchiveFailure("source_changed");
 }
 
 function readSourceSeal(db: DatabaseSync, seal: Seal): string | null {

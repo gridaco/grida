@@ -278,7 +278,10 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
         ...fixtureAdmission,
         requestId,
         verifyArchive: async () => {
-          await archive.sealQuiesced({ requestId });
+          await archive.sealQuiesced({
+            requestId,
+            requireReadOnlySource: process.platform === "darwin",
+          });
           throw new Error("interrupted before lease commit");
         },
       })
@@ -294,6 +297,32 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     });
     await expect(lease.claimWriter()).rejects.toThrow("retired");
   });
+
+  it.skipIf(process.platform !== "darwin" || !process.geteuid?.())(
+    "withholds native readiness when the sealed source is still writable",
+    async () => {
+      const test = await fixture();
+      writeLegacy(test.database, test.scratchBase);
+      const source = {
+        userDataPath: test.legacy,
+        scratchBase: test.scratchBase,
+      };
+      const key = createHash("sha256")
+        .update(JSON.stringify([source.userDataPath, source.scratchBase]))
+        .digest("hex");
+      const archive = new LegacyChatArchive(source);
+      const original = await archive.sealQuiesced({
+        requestId: `desktop-native-chat-${key}`,
+      });
+      const bytes = fs.readFileSync(test.database);
+      await expect(test.prepare()).rejects.toThrow(
+        "Legacy chat archive: source_fence_incomplete"
+      );
+      expect(fs.existsSync(test.nativeState)).toBe(false);
+      expect(fs.readFileSync(test.database)).toEqual(bytes);
+      await expect(archive.verify(original.id)).resolves.toEqual(original);
+    }
+  );
 
   it.runIf(Boolean(nativeResources))(
     "rechecks the exact source seal and archive before publishing native readiness",
@@ -312,11 +341,15 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
         "Legacy chat archive: invalid_receipt"
       );
       fs.writeFileSync(file, original);
+      const mode = fs.lstatSync(test.database).mode & 0o7777;
+      expect(mode & 0o200).toBe(process.platform === "darwin" ? 0 : 0o200);
+      if (process.platform === "darwin") fs.chmodSync(test.database, 0o600);
       const source = new DatabaseSync(test.database);
       try {
         source.exec("PRAGMA user_version=3");
       } finally {
         source.close();
+        if (process.platform === "darwin") fs.chmodSync(test.database, mode);
       }
       await expect(prepared.startWorkspace("work", launch)).rejects.toThrow(
         "Legacy chat archive: invalid_source_seal"

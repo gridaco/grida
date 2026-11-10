@@ -214,6 +214,7 @@ async function retireLegacy(
       cutoff = await archive.sealQuiesced({
         requestId,
         expectedArchiveId: retained?.archiveId ?? undefined,
+        requireReadOnlySource: process.platform === "darwin",
       });
       return cutoff.id;
     },

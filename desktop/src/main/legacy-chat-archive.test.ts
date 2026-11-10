@@ -132,6 +132,106 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
     }
   });
 
+  it.skipIf(process.platform !== "darwin" || !process.geteuid?.())(
+    "reuses the archive from the same read-only source and refuses leftover SQLite state",
+    async () => {
+      const { archive, db } = await fixture();
+      createDatabase(db);
+      const legacy = new DatabaseSync(db);
+      try {
+        legacy.exec("PRAGMA journal_mode=WAL");
+      } finally {
+        legacy.close();
+      }
+      await expect(fs.lstat(`${db}-shm`)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+      const identity = await fs.lstat(db);
+      const options = { requestId: "frozen", requireReadOnlySource: true };
+      const receipt = await archive.sealQuiesced(options);
+      const frozen = await fs.lstat(db);
+      expect(frozen.ino).toBe(identity.ino);
+      expect(frozen.mode & 0o7777).toBe(0o400);
+      const before = await fs.readFile(db);
+      await expect(
+        archive.sealQuiesced({ ...options, expectedArchiveId: receipt.id })
+      ).resolves.toEqual(receipt);
+      expect(await fs.readFile(db)).toEqual(before);
+      await fs.writeFile(`${db}-journal`, "incomplete", { mode: 0o600 });
+      await expect(archive.sealQuiesced(options)).rejects.toThrow(
+        "Legacy chat archive: source_fence_incomplete"
+      );
+      expect(await fs.readFile(`${db}-journal`, "utf8")).toBe("incomplete");
+      expect(await fs.readFile(db)).toEqual(before);
+      await expect(archive.verify(receipt.id)).resolves.toEqual(receipt);
+    }
+  );
+
+  it.skipIf(process.platform !== "darwin" || !process.geteuid?.())(
+    "refuses an extended ACL before retiring the source",
+    async () => {
+      const { archive, db, archiveRoot } = await fixture();
+      createDatabase(db);
+      const acl = spawnSync("/bin/chmod", ["+a", "everyone allow write", db]);
+      expect(acl.status).toBe(0);
+      const before = await fs.readFile(db);
+      await expect(
+        archive.sealQuiesced({ requestId: "acl", requireReadOnlySource: true })
+      ).rejects.toThrow("Legacy chat archive: unsafe_source");
+      expect(await fs.readFile(db)).toEqual(before);
+      await expect(fs.lstat(archiveRoot)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+    }
+  );
+
+  it.skipIf(process.platform !== "darwin" || !process.geteuid?.())(
+    "preserves both copies when the source seal committed before the mode change failed",
+    async () => {
+      const { archive, db, archiveRoot } = await fixture();
+      createDatabase(db);
+      const canonical = await fs.realpath(db);
+      const open = fs.open;
+      const changeMode = vi
+        .spyOn(fs, "open")
+        .mockImplementation(async (...args) => {
+          const handle = await open(...args);
+          if (args[0] === canonical)
+            vi.spyOn(handle, "chmod").mockRejectedValueOnce(
+              new Error("injected mode failure")
+            );
+          return handle;
+        });
+      const options = { requestId: "incomplete", requireReadOnlySource: true };
+      try {
+        await expect(archive.sealQuiesced(options)).rejects.toThrow(
+          "Legacy chat archive: source_fence_incomplete"
+        );
+      } finally {
+        changeMode.mockRestore();
+      }
+      const [archiveId] = await fs.readdir(archiveRoot);
+      const source = new DatabaseSync(db);
+      try {
+        expect(source.prepare("PRAGMA user_version").get()?.user_version).toBe(
+          2_147_483_647
+        );
+        source.exec("INSERT INTO chat_sessions VALUES ('ses_unarchived')");
+      } finally {
+        source.close();
+      }
+      const before = await fs.readFile(db);
+      const mode = (await fs.lstat(db)).mode;
+      await expect(
+        archive.sealQuiesced({ ...options, expectedArchiveId: archiveId })
+      ).rejects.toThrow("Legacy chat archive: source_fence_incomplete");
+      expect(await fs.readFile(db)).toEqual(before);
+      expect((await fs.lstat(db)).mode).toBe(mode);
+      expect(await fs.readdir(archiveRoot)).toEqual([archiveId]);
+      expect((await archive.verify(archiveId)).sessionCount).toBe(2);
+    }
+  );
+
   it("recaptures an unsealed source and only reuses the archive named by its seal", async () => {
     const { archive, db } = await fixture();
     createDatabase(db);
