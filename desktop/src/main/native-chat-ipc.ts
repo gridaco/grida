@@ -289,9 +289,20 @@ export class NativeChatIpc {
           requireCurrent();
           try {
             await startup.ensure(workspaceId);
-          } catch {
+          } catch (error) {
             requireCurrent();
-            return "native-unavailable";
+            // Forward only known recovery states. Startup errors can contain
+            // private provider or host details.
+            switch (error instanceof Error ? error.message : null) {
+              case "native_provider_byok_key_missing":
+                return "native-provider-key-required";
+              case "native_provider_model_unavailable":
+                return "native-provider-model-unavailable";
+              case "native_provider_endpoint_not_approved":
+                return "native-provider-endpoint-approval-required";
+              default:
+                return "native-unavailable";
+            }
           }
           requireCurrent();
           return this.resolve(sender, workspaceId)?.workspaceId === workspaceId

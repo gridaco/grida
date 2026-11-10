@@ -1665,28 +1665,38 @@ it("captures effort separately from Plan or Act and preserves it across a lost s
   controller.disconnect();
 });
 
-it("uses the readiness probe and preserves native mode through startup failure", async () => {
-  const { bridge } = fixture();
-  const availability = vi.spyOn(bridge, "available");
-  const publish = vi.fn<(state: string | null) => void>();
-  const status = vi.fn<NonNullable<DesktopNativeChat["status"]>>();
-  status
-    .mockResolvedValueOnce("native-starting")
-    .mockResolvedValueOnce("native-unavailable");
-  const stop = NativeChatController.watchReadiness(
-    { ...bridge, status },
-    publish
-  );
-  await vi.waitFor(() => {
-    expect(publish.mock.calls).toEqual([
-      ["native-starting"],
-      ["native-unavailable"],
-    ]);
-  });
-  expect(status.mock.calls).toEqual([[], [true]]);
-  expect(availability).not.toHaveBeenCalled();
-  stop();
-});
+it.each([
+  ["native-unavailable", "native-unavailable"],
+  ["native-provider-key-required", "native-provider-key-required"],
+  ["native-provider-model-unavailable", "native-provider-model-unavailable"],
+  [
+    "native-provider-endpoint-approval-required",
+    "native-provider-endpoint-approval-required",
+  ],
+  ["legacy", "native-unavailable"],
+  ["native-future-status", "native-unavailable"],
+] as const)(
+  "keeps native mode when startup returns %s",
+  async (result, expected) => {
+    const { bridge } = fixture();
+    const availability = vi.spyOn(bridge, "available");
+    const publish = vi.fn<(state: string | null) => void>();
+    const status = vi.fn<NonNullable<DesktopNativeChat["status"]>>();
+    status
+      .mockResolvedValueOnce("native-starting")
+      .mockResolvedValueOnce(result as Awaited<ReturnType<typeof status>>);
+    const stop = NativeChatController.watchReadiness(
+      { ...bridge, status },
+      publish
+    );
+    await vi.waitFor(() => {
+      expect(publish.mock.calls).toEqual([["native-starting"], [expected]]);
+    });
+    expect(status.mock.calls).toEqual([[], [true]]);
+    expect(availability).not.toHaveBeenCalled();
+    stop();
+  }
+);
 
 it("keeps the old bridge's legacy selection and drops a disposed startup reply", async () => {
   const { bridge } = fixture();

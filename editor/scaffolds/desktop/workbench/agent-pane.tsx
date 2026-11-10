@@ -228,9 +228,9 @@ function NativeAgentPaneGate({
     return (
       <div className="flex items-center gap-2 px-3 py-2 text-xs">
         <span role="alert" className="text-destructive">
-          {readiness === "native-unavailable"
-            ? "Native chat is unavailable."
-            : "Couldn't check chat availability."}
+          {readiness === null
+            ? "Couldn't check chat availability."
+            : nativeChatUnavailableMessage[readiness]}
         </span>
         <Button
           type="button"
@@ -252,6 +252,16 @@ function NativeAgentPaneGate({
     />
   );
 }
+
+const nativeChatUnavailableMessage = {
+  "native-unavailable": "Native chat is unavailable.",
+  "native-provider-key-required":
+    "Add an API key for the selected provider in Desktop settings, then retry.",
+  "native-provider-model-unavailable":
+    "The selected model is unavailable. Check the model configured for this Desktop profile.",
+  "native-provider-endpoint-approval-required":
+    "Save the selected endpoint in Desktop settings and approve its address, then retry.",
+} as const;
 
 function AgentPaneContent({
   workspace,

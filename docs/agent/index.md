@@ -15,7 +15,7 @@ it. Available controls and inputs vary with the connection.
 ## Start a workspace chat
 
 1. Open a workspace and its chat pane with a model connection configured
-   for your build.
+   for your build. [Choose models and understand usage](./models-and-usage.md)
 2. Give the agent an objective and name the files or tabs that matter.
    Choose **Plan** to investigate and propose a change, or **Act** to do
    the work under the chat's permissions.

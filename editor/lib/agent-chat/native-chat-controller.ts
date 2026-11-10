@@ -260,11 +260,26 @@ export class NativeChatController {
             ? "native-ready"
             : "legacy";
         if (!watching) return;
-        publish(state);
-        if (watching && state === "native-starting" && bridge.status) {
-          const ready = await bridge.status(true);
-          if (watching)
-            publish(ready === "native-ready" ? ready : "native-unavailable");
+        if (state === "legacy") {
+          publish(state);
+          return;
+        }
+        let result: NativeChatReadiness = state;
+        if (state === "native-starting" && bridge.status) {
+          publish(state);
+          if (!watching) return;
+          result = await bridge.status(true);
+        }
+        if (!watching) return;
+        switch (result) {
+          case "native-ready":
+          case "native-provider-key-required":
+          case "native-provider-model-unavailable":
+          case "native-provider-endpoint-approval-required":
+            publish(result);
+            break;
+          default:
+            publish("native-unavailable");
         }
       } catch {
         if (watching) publish(null);

@@ -35,8 +35,11 @@ accept bounded inline mesh bytes, never input paths or provider URLs.
 Desktop still owns Electron IPC channel names, preload implementation, native
 window/dialog/shell behavior, and AgentHost supervision.
 
-`nativeChat` is an optional Desktop namespace. Check `available()` in the
-current workspace before using it. The app issues an attachment for each
+`nativeChat` is an optional Desktop namespace. Check `status()` in the
+current workspace. If it reports `native-starting`, call `status(true)` to
+start the workspace chat. Known setup failures are fixed readiness values.
+An unknown result after startup is unavailable. Older bridges use
+`available()`. The app issues an attachment for each
 renderer that creates or loads a chat. Submit keeps the caller's input ID.
 Pause, Resume, and Stop use an observation issued for that attachment.
 Streamed text carries message and turn IDs, a UTF-8 byte offset, and a

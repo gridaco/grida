@@ -97,7 +97,10 @@ export type NativeChatReadiness =
   | "legacy"
   | "native-starting"
   | "native-ready"
-  | "native-unavailable";
+  | "native-unavailable"
+  | "native-provider-key-required"
+  | "native-provider-model-unavailable"
+  | "native-provider-endpoint-approval-required";
 
 export type NativeChatTurn = Readonly<{
   turnId: string;
@@ -415,7 +418,11 @@ export type NativeChatUpdate =
 /** Available only for a main-selected native chat in the current workspace. */
 export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   available(): Promise<boolean>;
-  /** Starts the admitted workspace when requested and native mode is selected. */
+  /**
+   * Starts the admitted workspace when requested and native mode is selected.
+   * Setup failures are fixed readiness values. Treat an unrecognized value
+   * as unavailable and keep the selected native mode.
+   */
   status?(start?: boolean): Promise<NativeChatReadiness>;
   list(cursor?: string | null): Promise<NativeChatPage>;
   listArchived?(cursor?: string | null): Promise<NativeChatPage>;

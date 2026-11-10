@@ -1562,6 +1562,26 @@ describe("native chat IPC", () => {
     await expect(ipc.status(first.event, true)).resolves.toBe("native-ready");
   });
 
+  it.each([
+    ["native_provider_byok_key_missing", "native-provider-key-required"],
+    ["native_provider_model_unavailable", "native-provider-model-unavailable"],
+    [
+      "native_provider_endpoint_not_approved",
+      "native-provider-endpoint-approval-required",
+    ],
+    ["native_provider_byok_key_missing: private details", "native-unavailable"],
+  ])("returns a bounded recovery state for %s", async (message, readiness) => {
+    const { first } = setup();
+    const ipc = new NativeChatIpc(ORIGIN, () => null, {
+      admits: (sender) => sender === first.sender,
+      ensure: () => Promise.reject(new Error(message)),
+    });
+    await expect(ipc.status(first.event, true)).resolves.toBe(readiness);
+    await expect(ipc.available(first.event)).rejects.toThrow(
+      "native_chat_unavailable"
+    );
+  });
+
   it("rejects a startup reply after navigation even if the frame returns to the same URL", async () => {
     const { first, scopes, chat } = setup();
     scopes.delete(first.sender);
