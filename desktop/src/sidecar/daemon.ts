@@ -14,6 +14,7 @@ export namespace DesktopDaemon {
     password: string;
     user_data_path: string;
     provider_home?: string;
+    prepare_provider_custody?: () => Promise<void>;
     media_root: string;
     retained_media_scope?: boolean;
     workspace_catalog?: string;
@@ -43,6 +44,12 @@ export namespace DesktopDaemon {
       throw new Error("retained_media_scope_invalid");
     }
     if (
+      Boolean(opts.prepare_provider_custody) !==
+      Boolean(opts.retained_media_scope)
+    ) {
+      throw new Error("retained_media_custody_invalid");
+    }
+    if (
       (opts.workspace_catalog && opts.agent !== "native-chat") ||
       (opts.protected_file_roots &&
         opts.agent !== "native-chat" &&
@@ -55,6 +62,7 @@ export namespace DesktopDaemon {
       password: opts.password,
       user_data_path: opts.user_data_path,
       provider_home: opts.provider_home,
+      prepare_provider_custody: opts.prepare_provider_custody,
       media_root: opts.media_root,
       projects_root: opts.projects_root,
       workspace_catalog: opts.workspace_catalog,

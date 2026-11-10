@@ -74,6 +74,8 @@ export type MediaDaemonOptions = Omit<MediaTenantOptions, "capabilities"> & {
   user_data_path: string;
   /** Shared native provider home; omission keeps this host's credentials isolated. */
   provider_home?: string;
+  /** Prepare canonical credentials at the trusted legacy source owner. */
+  prepare_provider_custody?: () => Promise<void>;
   projects_root?: string;
   workspace_catalog?: string;
   protected_file_roots?: readonly string[];
@@ -97,6 +99,7 @@ export function createMediaDaemon(opts: MediaDaemonOptions): DaemonServer {
     password: opts.password,
     user_data_path: opts.user_data_path,
     provider_home: opts.provider_home,
+    prepare_provider_custody: opts.prepare_provider_custody,
     projects_root: opts.projects_root,
     workspace_catalog: opts.workspace_catalog,
     protected_file_roots: opts.protected_file_roots,

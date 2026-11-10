@@ -141,6 +141,25 @@ const frames: readonly AgentSidecarChannel.Frame[] = [
 ];
 
 describe("AgentSidecarChannel.parse", () => {
+  it("accepts only a correlated request and a boolean provider custody result", () => {
+    const request = { v: 1, type: "custody.prepare", requestId: "custody-1" };
+    const result = {
+      ...request,
+      type: "custody.result",
+      ready: false,
+    };
+    expect(AgentSidecarChannel.parse(request)).toEqual(request);
+    expect(AgentSidecarChannel.parse(result)).toEqual(result);
+    expect(() =>
+      AgentSidecarChannel.parse({ ...request, path: "/foreign" })
+    ).toThrow(/unknown frame field: path/);
+    expect(() =>
+      AgentSidecarChannel.parse({ ...result, key: "unexpected" })
+    ).toThrow(/unknown frame field: key/);
+    expect(() =>
+      AgentSidecarChannel.parse({ ...result, ready: "true" })
+    ).toThrow(/invalid custody status/);
+  });
   it("accepts the complete v1 frame vocabulary and preserves header pairs", () => {
     for (const frame of frames) {
       expect(AgentSidecarChannel.parse(frame)).toEqual(frame);

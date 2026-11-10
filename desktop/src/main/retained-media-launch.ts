@@ -4,6 +4,7 @@ import fs, { type BigIntStats } from "node:fs";
 import files from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { AuthStore, SecretsStore } from "@grida/daemon/server";
 
 const SANDBOX = "/usr/bin/sandbox-exec";
 const ACL_READER = "/bin/ls";
@@ -205,7 +206,14 @@ export namespace RetainedMediaLaunch {
    */
   export function start(input: Options) {
     const plan = prepare(input);
-    return spawn(
+    const source = privateDirectory(input.providerHome);
+    const provider = path.join(source, "providers");
+    const sourceIdentity = fileIdentity(fs.lstatSync(source, { bigint: true }));
+    const providerIdentity = fileIdentity(
+      fs.lstatSync(provider, { bigint: true })
+    );
+    const custody = new SecretsStore(new AuthStore(source), source);
+    const child = spawn(
       SANDBOX,
       [...plan.sandboxArgs, plan.executable, ...plan.sidecarArgs],
       {
@@ -215,6 +223,26 @@ export namespace RetainedMediaLaunch {
         shell: false,
       }
     );
+    return Object.freeze({
+      child,
+      prepareProviderCustody: async () => {
+        await refuseAdditionalAccess(source);
+        if (
+          !child.connected ||
+          child.killed ||
+          child.exitCode !== null ||
+          child.signalCode !== null ||
+          fileIdentity(
+            fs.lstatSync(privateDirectory(source), { bigint: true })
+          ) !== sourceIdentity ||
+          fileIdentity(
+            fs.lstatSync(privateDirectory(provider), { bigint: true })
+          ) !== providerIdentity
+        )
+          throw new Error("provider_custody_unavailable");
+        await custody.prepareSharedCustody();
+      },
+    });
   }
 
   export function prepare(input: Options) {

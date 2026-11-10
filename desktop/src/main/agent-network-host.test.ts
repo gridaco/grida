@@ -79,6 +79,59 @@ describe("AgentNetworkHost", () => {
     expect(harness.fatal).toHaveBeenCalledTimes(1);
   });
 
+  it("refuses provider custody on an ordinary sidecar channel", async () => {
+    const harness = createHarness({ fetch: vi.fn<() => Promise<Response>>() });
+    await harness.start();
+    await harness.sidecar.write({
+      v: 1,
+      type: "custody.prepare",
+      requestId: "wrong-role",
+    });
+    expect(harness.fatal).toHaveBeenCalledWith(
+      new Error("unexpected provider custody request")
+    );
+    expect(harness.frames.some(({ type }) => type === "custody.result")).toBe(
+      false
+    );
+  });
+
+  it("joins admitted provider custody work at drain without acknowledging it late", async () => {
+    const preparation = Promise.withResolvers<void>();
+    const entered = Promise.withResolvers<void>();
+    const harness = createHarness({
+      fetch: vi.fn<() => Promise<Response>>(),
+      prepareProviderCustody: async () => {
+        entered.resolve();
+        await preparation.promise;
+      },
+    });
+    await harness.start();
+    await harness.sidecar.write({
+      v: 1,
+      type: "custody.prepare",
+      requestId: "current",
+    });
+    await entered.promise;
+    const observed = vi.fn<() => void>();
+    const drained = harness.host.requestDrain().then(observed);
+    const shutdown = await harness.untilFrame("shutdown");
+    await harness.sidecar.write({
+      v: 1,
+      type: "shutdown.complete",
+      requestId: shutdown.requestId!,
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(observed).not.toHaveBeenCalled();
+    preparation.resolve();
+    await drained;
+    expect(observed).toHaveBeenCalledTimes(1);
+    expect(harness.frames.some(({ type }) => type === "custody.result")).toBe(
+      false
+    );
+    harness.host.close();
+    expect(harness.fatal).not.toHaveBeenCalled();
+  });
+
   it("reuses one nonpersistent Chromium network context across restarts", async () => {
     const setProxy = vi.fn<(config: unknown) => Promise<void>>(
       async () => undefined
@@ -1230,6 +1283,7 @@ function createHarness(adapter: {
   fetch: (url: string, init: RequestInit) => Promise<Response>;
   maxBufferedRequestBodyBytes?: number;
   commandExecutor?: ShellExecutor;
+  prepareProviderCustody?: () => Promise<void>;
 }) {
   const sidecarOutput = new PassThrough();
   const sidecarInput = new PassThrough();
@@ -1242,7 +1296,8 @@ function createHarness(adapter: {
     adapter,
     fatal,
     adapter.maxBufferedRequestBodyBytes,
-    adapter.commandExecutor
+    adapter.commandExecutor,
+    adapter.prepareProviderCustody
   );
   const sidecar = new AgentSidecarChannel.Writer(sidecarOutput);
   const decoder = new AgentSidecarChannel.Decoder();

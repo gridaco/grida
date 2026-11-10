@@ -90,6 +90,7 @@ export class AgentNetworkHost {
   >();
   private closed = false;
   private readyObserved = false;
+  private custodyWork?: Promise<void>;
   private dispatchedCommand = false;
   private drained = false;
   private drain:
@@ -108,8 +109,11 @@ export class AgentNetworkHost {
     private readonly adapter: NetworkAdapter,
     private readonly onFatal: (error: Error) => void,
     private readonly maxBufferedRequestBodyBytes = MAX_BUFFERED_REQUEST_BODY_BYTES,
-    private readonly commandExecutor?: ShellExecutor
+    private readonly commandExecutor?: ShellExecutor,
+    private readonly prepareProviderCustody?: () => Promise<void>
   ) {
+    if (commandExecutor && prepareProviderCustody)
+      throw new Error("invalid retained media authority");
     this.writer = new AgentSidecarChannel.Writer(output);
     input.on("data", (chunk: Buffer | string) => {
       if (this.closed) return;
@@ -132,6 +136,7 @@ export class AgentNetworkHost {
     authority: AgentNetworkAuthority;
     onFatal: (error: Error) => void;
     commandExecutor?: ShellExecutor;
+    prepareProviderCustody?: () => Promise<void>;
   }): Promise<AgentNetworkHost> {
     const networkSession = await AgentNetworkHost.networkSession();
     return new AgentNetworkHost(
@@ -141,7 +146,8 @@ export class AgentNetworkHost {
       AgentNetworkHost.electronAdapter(networkSession),
       args.onFatal,
       MAX_BUFFERED_REQUEST_BODY_BYTES,
-      args.commandExecutor
+      args.commandExecutor,
+      args.prepareProviderCustody
     );
   }
 
@@ -287,10 +293,10 @@ export class AgentNetworkHost {
 
   /** Correlate sidecar cleanup on the inherited pipe. The supervisor joins exit separately. */
   requestDrain(): Promise<void> {
-    if (this.drained) return Promise.resolve();
+    if (this.drained) return this.custodyWork ?? Promise.resolve();
     if (this.closed || !this.readyObserved || this.dispatchedCommand)
       return Promise.reject(new Error("agent_sidecar_drain_unverified"));
-    if (this.drain) return this.drain.promise;
+    if (this.drain) return this.waitForCustody(this.drain.promise);
     const requestId = randomUUID();
     const pending = Promise.withResolvers<void>();
     this.drain = {
@@ -306,7 +312,13 @@ export class AgentNetworkHost {
     void this.send({ v: 1, type: "shutdown", requestId }).catch((error) =>
       this.fail(asError(error))
     );
-    return pending.promise;
+    return this.waitForCustody(pending.promise);
+  }
+
+  private waitForCustody(drain: Promise<void>): Promise<void> {
+    return this.custodyWork
+      ? Promise.all([drain, this.custodyWork]).then(() => undefined)
+      : drain;
   }
 
   private static electronAdapter(networkSession: Session): NetworkAdapter {
@@ -372,9 +384,38 @@ export class AgentNetworkHost {
       case "command.abort":
         this.onCommandAbort(frame.requestId);
         return;
+      case "custody.prepare":
+        this.onCustodyPrepare(frame.requestId);
+        return;
       default:
         throw new Error(`unexpected sidecar frame: ${frame.type}`);
     }
+  }
+
+  private onCustodyPrepare(requestId: string) {
+    const prepare = this.prepareProviderCustody;
+    if (
+      !prepare ||
+      !this.readyObserved ||
+      this.drain ||
+      this.drained ||
+      this.custodyWork
+    )
+      throw new Error("unexpected provider custody request");
+    this.custodyWork = Promise.resolve()
+      .then(async () => {
+        if (this.closed || this.drain || this.drained) return;
+        const ready = await prepare().then(
+          () => true,
+          () => false
+        );
+        if (!this.closed && !this.drain && !this.drained)
+          await this.send({ v: 1, type: "custody.result", requestId, ready });
+      })
+      .catch((error) => this.fail(asError(error)))
+      .finally(() => {
+        this.custodyWork = undefined;
+      });
   }
 
   private onCommandRequest(

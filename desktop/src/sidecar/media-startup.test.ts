@@ -10,7 +10,6 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { AuthStore, SecretsStore } from "@grida/daemon/server";
 
 // Only the Electron fetch adapter is replaced. The real host validates grants
 // and carries requests/responses over the same bounded channel as Desktop.
@@ -162,7 +161,7 @@ describe.skipIf(
     }
   });
 
-  it("uses adopted settings with the existing canonical provider custody", async () => {
+  it("keeps historical credentials dormant until an exact custody request and retries an interrupted adoption", async () => {
     const scope = await packagedScope();
     let active: Sidecar | undefined;
     try {
@@ -175,14 +174,28 @@ describe.skipIf(
       const legacySettings = path.join(providerHome, "endpoints.json");
       const original = Buffer.from(`${JSON.stringify([config], null, 4)}\n`);
       await fs.writeFile(legacySettings, original, { mode: 0o600 });
-      const auth = new AuthStore(providerHome);
-      await new SecretsStore(auth, providerHome).set("elevenlabs", key);
+      const legacyAuth = path.join(providerHome, "auth.json");
+      const legacyRemnant = path.join(
+        providerHome,
+        ".auth.json.0123456789abcdef.tmp"
+      );
+      const oauth = {
+        type: "oauth",
+        access: "synthetic-access",
+        refresh: "synthetic-refresh",
+        expires: 100,
+      };
+      const historical = JSON.stringify({
+        elevenlabs: { type: "api", key },
+        chatgpt: oauth,
+      });
+      await fs.writeFile(legacyAuth, historical, { mode: 0o600 });
+      await fs.writeFile(legacyRemnant, "synthetic-remnant", { mode: 0o644 });
       const credentials = path.join(
         providerHome,
         "providers",
         "credentials.toml"
       );
-      const canonical = await fs.readFile(credentials);
       const options = {
         ...scope.options,
         settings: await RetainedMediaLaunch.prepareSettings(providerHome),
@@ -190,6 +203,12 @@ describe.skipIf(
       expect(
         await fs.readFile(path.join(options.settings, "endpoints.json"))
       ).toEqual(original);
+      const wrongSource = path.join(options.settings, "auth.json");
+      const wrongKey = "synthetic-wrong-source";
+      const wrongAuth = JSON.stringify({
+        vercel: { type: "api", key: wrongKey },
+      });
+      await fs.writeFile(wrongSource, wrongAuth, { mode: 0o600 });
       const discovery = ggContractFixture([]);
       const providerTransport = vi.fn<StartOptions["fetchProvider"]>(
         async (url) => {
@@ -202,11 +221,37 @@ describe.skipIf(
       expect(
         await (await active.post("/providers/endpoints/list")).json()
       ).toEqual([config]);
+      expect(await fs.readFile(legacyAuth, "utf8")).toBe(historical);
+      await expect(fs.stat(credentials)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+      const failed = await active.post("/secrets/has", {
+        provider_id: "elevenlabs",
+      });
+      expect(failed.status).toBe(500);
+      const failure = await failed.text();
+      expect(failure).toBe("Internal Server Error");
+      expect(failure).not.toContain(key);
+      expect(failure).not.toContain(legacyAuth);
+      expect(await fs.readFile(credentials, "utf8")).toContain(
+        'state = "pending"'
+      );
+      expect(JSON.parse(await fs.readFile(legacyAuth, "utf8"))).toEqual({
+        chatgpt: oauth,
+      });
+      await fs.chmod(legacyRemnant, 0o600);
       expect(
         await (
           await active.post("/secrets/has", { provider_id: "elevenlabs" })
         ).json()
       ).toEqual({ has: true });
+      await expect(fs.stat(legacyRemnant)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+      const canonical = await fs.readFile(credentials);
+      expect(canonical.toString()).toContain('state = "complete"');
+      expect(canonical.toString()).not.toContain(wrongKey);
+      expect(await fs.readFile(wrongSource, "utf8")).toBe(wrongAuth);
       expect(
         (await active.post("/providers/endpoints/delete", { id: config.id }))
           .status
@@ -228,6 +273,9 @@ describe.skipIf(
       ).toEqual({ has: true });
       expect(await fs.readFile(legacySettings)).toEqual(original);
       expect(await fs.readFile(credentials)).toEqual(canonical);
+      expect(JSON.parse(await fs.readFile(legacyAuth, "utf8"))).toEqual({
+        chatgpt: oauth,
+      });
       expect(providerTransport.mock.calls.map(([url]) => url).sort()).toEqual([
         "https://gateway.grida.ai/schemas/operations.json",
         "https://gateway.grida.ai/schemas/operations.json",
@@ -1034,7 +1082,8 @@ class Sidecar {
   private constructor(
     private readonly child: ChildProcess,
     fetchProvider: StartOptions["fetchProvider"],
-    private readonly legacy: boolean
+    private readonly legacy: boolean,
+    prepareProviderCustody?: () => Promise<void>
   ) {
     this.exit = new Promise((resolve, reject) => {
       child.once("error", reject);
@@ -1050,7 +1099,10 @@ class Sidecar {
       child.stdin!,
       new AgentNetworkAuthority(origin),
       { fetch: fetchProvider },
-      fatal
+      fatal,
+      undefined,
+      undefined,
+      prepareProviderCustody
     );
     this.sockets = new AgentDaemonSocketHost(child, fatal);
   }
@@ -1109,18 +1161,26 @@ class Sidecar {
     options: RetainedMediaLaunch.Options,
     fetchProvider: StartOptions["fetchProvider"]
   ): Promise<Sidecar> {
+    const launch = RetainedMediaLaunch.start(options);
     return await Sidecar.initialize(
-      RetainedMediaLaunch.start(options),
+      launch.child,
       fetchProvider,
-      false
+      false,
+      launch.prepareProviderCustody
     );
   }
   private static async initialize(
     child: ChildProcess,
     fetchProvider: StartOptions["fetchProvider"],
-    legacy: boolean
+    legacy: boolean,
+    prepareProviderCustody?: () => Promise<void>
   ) {
-    const sidecar = new Sidecar(child, fetchProvider, legacy);
+    const sidecar = new Sidecar(
+      child,
+      fetchProvider,
+      legacy,
+      prepareProviderCustody
+    );
     let startupTimer: ReturnType<typeof setTimeout>;
     const deadline = new Promise<never>((_resolve, reject) => {
       startupTimer = setTimeout(

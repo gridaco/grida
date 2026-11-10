@@ -227,6 +227,19 @@ export namespace AgentSidecarChannel {
     requestId: string;
   }>;
 
+  export type CustodyPrepareFrame = Readonly<{
+    v: typeof VERSION;
+    type: "custody.prepare";
+    requestId: string;
+  }>;
+
+  export type CustodyResultFrame = Readonly<{
+    v: typeof VERSION;
+    type: "custody.result";
+    requestId: string;
+    ready: boolean;
+  }>;
+
   export type HostToSidecarFrame =
     | BootstrapFrame
     | GrantUpdateFrame
@@ -238,6 +251,7 @@ export namespace AgentSidecarChannel {
     | CommandEndFrame
     | CommandAbortedFrame
     | CommandErrorFrame
+    | CustodyResultFrame
     | ShutdownFrame;
 
   export type SidecarToHostFrame =
@@ -250,6 +264,7 @@ export namespace AgentSidecarChannel {
     | RequestAbortFrame
     | ResponseCreditFrame
     | CommandRequestFrame
+    | CustodyPrepareFrame
     | CommandAbortFrame;
 
   export type Frame = HostToSidecarFrame | SidecarToHostFrame;
@@ -470,6 +485,16 @@ export namespace AgentSidecarChannel {
       case "shutdown.complete":
         expectExactKeys(frame, ["v", "type", "requestId"]);
         expectIdentifier(frame.requestId, "requestId");
+        break;
+      case "custody.prepare":
+        expectExactKeys(frame, ["v", "type", "requestId"]);
+        expectIdentifier(frame.requestId, "requestId");
+        break;
+      case "custody.result":
+        expectExactKeys(frame, ["v", "type", "requestId", "ready"]);
+        expectIdentifier(frame.requestId, "requestId");
+        if (typeof frame.ready !== "boolean")
+          throw protocolError("invalid custody status");
         break;
       default:
         throw protocolError(`unknown frame type: ${frame.type}`);

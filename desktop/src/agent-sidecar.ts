@@ -232,6 +232,10 @@ async function main() {
     password,
     user_data_path: requiredUserDataPath,
     provider_home: providerHome,
+    prepare_provider_custody:
+      retainedMediaScope === "1"
+        ? () => network.prepareProviderCustody()
+        : undefined,
     media_root: requiredMediaRoot,
     retained_media_scope: retainedMediaScope === "1",
     workspace_catalog: workspaceCatalog,

@@ -1357,6 +1357,12 @@ Today:
   custody stay with their existing owners. Later endpoint deletions survive
   preparation retries. [Settings fixtures](desktop/src/main/retained-media-settings.test.ts)
   cover exact bytes, aliases, interruption, and source identity.
+  The first credential operation asks the current strict child’s private
+  [network host](desktop/src/main/agent-network-host.ts) to prepare shared
+  custody from the original, identity-checked directory. The fixed request
+  and correlated result carry no path or key. A failed preparation can retry
+  through the original owner. Drain waits for admitted custody work and
+  suppresses a result after retirement.
   The [media composition](desktop/src/sidecar/daemon.ts) withholds unrelated
   routes under that launch scope. Packaged fixtures verify provider mediation,
   accepted-socket transfer, scope denials, and clean drain. Desktop's existing
