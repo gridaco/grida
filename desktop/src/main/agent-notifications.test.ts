@@ -1,6 +1,11 @@
+import { EventEmitter } from "node:events";
+import type { IpcMainInvokeEvent } from "electron";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { NativeChatLifecycle } from "./native-agent-chat";
-import { notifyNativeChat } from "./agent-notifications";
+import {
+  notifyNativeChat,
+  takeNativeNotificationFocus,
+} from "./agent-notifications";
 
 const host = vi.hoisted(() => ({
   focus: vi.fn<() => void>(),
@@ -43,9 +48,43 @@ const event: NativeChatLifecycle = {
 function navigation() {
   return {
     can_open: () => true,
+    admits: vi.fn<() => boolean>(() => true),
     register: vi.fn<(window: unknown) => boolean>(() => true),
     focus_entry: vi.fn<() => void>(),
   };
+}
+
+function workspaceWindow() {
+  const href = `https://editor.fixture.invalid/desktop/workspace?id=${workspaceId}`;
+  const send = vi.fn<(channel: string, payload: unknown) => void>();
+  const state = { url: href, loading: false, focused: false };
+  const frame = {
+    get url() {
+      return state.url;
+    },
+    isDestroyed: () => false,
+    detached: false,
+    send,
+  };
+  const sender = Object.assign(new EventEmitter(), {
+    getURL: () => state.url,
+    isDestroyed: () => false,
+    isLoadingMainFrame: () => state.loading,
+    mainFrame: frame,
+  });
+  const window = {
+    isDestroyed: () => false,
+    isFocused: () => state.focused,
+    isMinimized: () => false,
+    focus: vi.fn<() => void>(),
+    webContents: sender,
+  };
+  const take = (requestedFrame = frame) =>
+    takeNativeNotificationFocus({
+      sender,
+      senderFrame: requestedFrame,
+    } as unknown as IpcMainInvokeEvent);
+  return { href, send, state, frame, sender, window, take };
 }
 
 beforeEach(() => {
@@ -94,23 +133,12 @@ it("opens the exact saved chat on notification click and withdraws a retired cli
 
 it("suppresses watched work and user cancellation, and sends only the chat ID when clicked", () => {
   const nav = navigation();
-  const send = vi.fn<(channel: string, payload: unknown) => void>();
-  let focused = true;
-  host.windows.mockReturnValue([
-    {
-      isDestroyed: () => false,
-      isFocused: () => focused,
-      isMinimized: () => false,
-      focus: vi.fn<() => void>(),
-      webContents: {
-        getURL: () =>
-          `https://editor.fixture.invalid/desktop/workspace?id=${workspaceId}`,
-        send,
-      },
-    },
-  ]);
+  const target = workspaceWindow();
+  const { send } = target;
+  target.state.focused = true;
+  host.windows.mockReturnValue([target.window]);
   notifyNativeChat(workspaceId, event, nav, () => true);
-  focused = false;
+  target.state.focused = false;
   notifyNativeChat(
     workspaceId,
     { ...event, kind: "settled", status: "cancelled" },
@@ -145,4 +173,71 @@ it("suppresses watched work and user cancellation, and sends only the chat ID wh
     session_id: event.sessionId,
     profile_id: profileId,
   });
+});
+
+it("retains only the latest click through a same-workspace load and serves it once to the exact top frame", () => {
+  const nav = navigation();
+  const target = workspaceWindow();
+  const profileId = "c".repeat(64);
+  target.state.loading = true;
+  host.windows.mockReturnValue([target.window]);
+  notifyNativeChat(workspaceId, event, nav, () => true);
+  host.click!();
+  notifyNativeChat(
+    workspaceId,
+    { ...event, sessionId: "last-chat" },
+    nav,
+    () => true,
+    profileId
+  );
+  host.click!();
+  expect(target.take()).toBeNull();
+  expect(target.send).not.toHaveBeenCalled();
+  target.sender.emit("did-start-navigation", {
+    isMainFrame: true,
+    isSameDocument: false,
+    url: target.href,
+  });
+  target.sender.emit("did-navigate", {}, target.href);
+  target.state.loading = false;
+  target.sender.emit("did-finish-load");
+  expect(target.send).not.toHaveBeenCalled();
+  expect(target.take({ ...target.frame })).toBeNull();
+  expect(target.take()).toEqual({ sessionId: "last-chat", profileId });
+  expect(target.take()).toBeNull();
+});
+
+it("withdraws pending focus after cross-workspace navigation, renderer loss or owner invalidation", () => {
+  const nav = navigation();
+  const target = workspaceWindow();
+  host.windows.mockReturnValue([target.window]);
+  let current = true;
+  const stage = () => {
+    notifyNativeChat(workspaceId, event, nav, () => current);
+    host.click!();
+  };
+  stage();
+  target.sender.emit("did-start-navigation", {
+    isMainFrame: true,
+    isSameDocument: true,
+    url: target.href.replace(workspaceId, "other-workspace"),
+  });
+  expect(target.take()).toBeNull();
+  stage();
+  target.state.url = target.href.replace(workspaceId, "other-workspace");
+  expect(target.take()).toBeNull();
+  target.state.url = target.href;
+  expect(target.take()).toBeNull();
+  stage();
+  target.sender.emit("render-process-gone");
+  expect(target.take()).toBeNull();
+  stage();
+  current = false;
+  expect(target.take()).toBeNull();
+  current = true;
+  stage();
+  nav.admits.mockReturnValue(false);
+  expect(target.take()).toBeNull();
+  nav.admits.mockReturnValue(true);
+  expect(target.take()).toBeNull();
 });

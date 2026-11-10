@@ -70,6 +70,7 @@ import type { NativeDocumentFiles } from "./native-document-files";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 import { NativeExternalRunIpc } from "./native-external-run-ipc";
 import type { NativeExternalRuns } from "./native-external-runs";
+import { takeNativeNotificationFocus } from "./agent-notifications";
 
 // `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
 // build-time constant once at module init rather than per call.
@@ -341,6 +342,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE, (event) =>
     nativeChat.available(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_TAKE_NOTIFICATION_FOCUS,
+    (event, ...args: unknown[]) => {
+      if (args.length)
+        throw new Error("native_chat_notification_focus_invalid");
+      return takeNativeNotificationFocus(event);
+    }
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_STATUS, (event, start?: boolean) =>
     nativeChat.status(event, start)

@@ -310,9 +310,9 @@ ipcRenderer.on(IPC_CHANNELS.WORKSPACE_COMMAND, (_event, command: unknown) => {
 
 // Main → renderer "bring this session into view" push (RFC `events`
 // §click-to-attend): a notification click focused this window; the agent
-// pane selects the named session. Same re-dispatch pattern as
-// WORKSPACE_COMMAND — only the structured-clone payload crosses, never the
-// Electron event object (GRIDA-SEC-004).
+// pane selects the named session. Native panes use this as a wake for the
+// guarded take; earlier renderers still read the payload. Only the payload
+// crosses, never the Electron event object (GRIDA-SEC-004).
 ipcRenderer.on(IPC_CHANNELS.AGENT_FOCUS_SESSION, (_event, payload: unknown) => {
   if (!isDesktopPath(location.pathname)) return;
   window.dispatchEvent(
@@ -530,6 +530,14 @@ const bridge: DesktopBridge = {
     available: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE),
     status: (start) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),
+    takeNotificationFocus: async () => {
+      if (location.pathname !== "/desktop/workspace") return null;
+      const href = location.href;
+      const target = await ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_TAKE_NOTIFICATION_FOCUS
+      );
+      return location.href === href ? target : null;
+    },
     list: (cursor) => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
     ...(!selectedDocumentChatRoute() && {
       profiles: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_PROFILES),

@@ -47,3 +47,6 @@ focus. Click the notification to reopen the matching chat on its original model
 connection. If a connection is changing or an attachment is still in the
 composer, the chat opens after that clears. If the original connection is
 unavailable, Desktop reports that before opening the chat.
+If the workspace chat is still starting, Desktop keeps the latest clicked
+notification until the chat connects. A workspace disconnect during delivery
+discards that target.

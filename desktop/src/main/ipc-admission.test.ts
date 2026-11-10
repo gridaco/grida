@@ -151,6 +151,19 @@ describe("ipc_admission", () => {
     }
   });
 
+  it("admits notification focus consumption only in the main workspace", () => {
+    const channel = IPC_CHANNELS.NATIVE_CHAT_TAKE_NOTIFICATION_FOCUS;
+    expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+    expect(allowedFor("main", "/desktop/file")).not.toContain(channel);
+    expect(allowedFor("main", "/desktop/settings")).not.toContain(channel);
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+      channel
+    );
+    expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+      channel
+    );
+  });
+
   it("admits nested deck text edits within the file chat scope", () => {
     const deck = allChannels.filter((channel) =>
       ipc_admission.allows({

@@ -166,6 +166,7 @@ let nativeExternalRuns: NativeExternalRuns | undefined;
 let nativeQuitReady = false;
 const windowAdmission = {
   can_open: () => entryWindow?.isMain ?? false,
+  admits: (window: BrowserWindow) => entryWindow?.ipcRoleFor(window) === "main",
   native_file_available: (filePath?: string) =>
     filePath === undefined
       ? nativeDocuments !== undefined

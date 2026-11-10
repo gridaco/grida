@@ -130,6 +130,8 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_SUBSCRIBE: "grida:native-chat:subscribe",
   NATIVE_CHAT_UNSUBSCRIBE: "grida:native-chat:unsubscribe",
   NATIVE_CHAT_UPDATE: "grida:native-chat:update",
+  NATIVE_CHAT_TAKE_NOTIFICATION_FOCUS:
+    "grida:native-chat:take-notification-focus",
   AGENT_FOCUS_SESSION: "grida:agent:focus-session",
   PROVIDER_ENDPOINT_SET: "grida:provider:endpoint:set",
   PROVIDER_ENDPOINT_DELETE: "grida:provider:endpoint:delete",

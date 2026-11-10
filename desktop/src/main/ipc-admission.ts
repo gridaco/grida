@@ -84,7 +84,10 @@ export namespace ipc_admission {
         if (TOOLS_ONLY_CHANNELS.has(channel)) {
           return pathname === "/desktop/tools";
         }
-        if (WORKBENCH_LIBRARY_CHANNELS.has(channel)) {
+        if (
+          WORKBENCH_LIBRARY_CHANNELS.has(channel) ||
+          channel === IPC_CHANNELS.NATIVE_CHAT_TAKE_NOTIFICATION_FOCUS
+        ) {
           return pathname === "/desktop/workspace";
         }
         if (

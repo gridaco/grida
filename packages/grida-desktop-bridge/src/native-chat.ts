@@ -496,6 +496,11 @@ export type NativeChatUpdate =
       reason: "delivery_limit" | "session_deleted";
     }>;
 
+export type NativeChatNotificationFocus = Readonly<{
+  sessionId: string;
+  profileId?: string;
+}>;
+
 /** Available for a native chat in the exact scope selected by Main. */
 export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   /** This host also accepts native chat requests from an admitted root deck. */
@@ -513,6 +518,8 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
    * as unavailable and keep the selected native mode.
    */
   status?(start?: boolean): Promise<NativeChatReadiness>;
+  /** Take the latest notification click for this workbench once, if still current. */
+  takeNotificationFocus?(): Promise<NativeChatNotificationFocus | null>;
   list(cursor?: string | null): Promise<NativeChatPage>;
   profiles?(): Promise<NativeChatProfileCatalog | null>;
   selectProfile?(selection: NativeChatProfileSelection): Promise<void>;

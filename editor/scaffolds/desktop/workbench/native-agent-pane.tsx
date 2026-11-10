@@ -39,7 +39,7 @@ import {
   NativeChatController,
   type NativeChatEditorSurfaces,
 } from "@/lib/agent-chat/native-chat-controller";
-import { useDesktopAgentFocusSession } from "@/lib/desktop/agent-focus-session";
+import { subscribeToNativeNotificationFocus } from "@/lib/desktop/agent-focus-session";
 import type { ComposerCatalog, ComposerController } from "@/kits/composer";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentLibraryAttachmentPicker } from "../shared/agent-library-attachment-picker";
@@ -186,9 +186,6 @@ export function NativeAgentPane({
     controller.read
   );
   const mentions = useWorkspaceFileMentions(workspaceId);
-  useDesktopAgentFocusSession((sessionId, profileId) => {
-    if (workspaceId) void controller.focusChat(sessionId, profileId);
-  });
   const catalog = useMemo(
     () => ({ commands: NO_COMMANDS, mentions }),
     [mentions]
@@ -208,8 +205,19 @@ export function NativeAgentPane({
         ? new URLSearchParams(window.location.hash.slice(1)).get("chat-profile")
         : null;
     controller.connect(initialSession, profile);
-    return () => controller.disconnect();
-  }, [controller, initialSession, workspaceId]);
+    const stopFocus =
+      workspaceId &&
+      subscribeToNativeNotificationFocus(
+        bridge,
+        workspaceId,
+        (sessionId, profileId) =>
+          void controller.focusChat(sessionId, profileId)
+      );
+    return () => {
+      if (stopFocus) stopFocus();
+      controller.disconnect();
+    };
+  }, [bridge, controller, initialSession, workspaceId]);
   const snapshot = state.observation?.snapshot;
   const editHistory = controller.canReviseHistory && !state.revisionDraft;
   const turn = snapshot?.current;

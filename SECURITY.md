@@ -1092,9 +1092,13 @@ lazy reads, read-only mutation, and symlink escape refusal.
   delivery and notification clicks by the current account, worker, chat and
   its model connection.
   [Main](desktop/src/main/agent-notifications.ts) supplies fixed copy and
-  routes clicks to the authorized workspace. A reopened workspace carries
-  the saved model selector in its local URL fragment. Selecting it still
-  requires ordinary workspace and saved-connection admission. Attention
+  routes clicks to the authorized workspace. An existing workbench can take
+  only its latest pending click from the exact current main frame after it
+  connects. Main rechecks the account, source worker, and workspace at take
+  and discards pending targets on scope change or renderer teardown. The
+  earlier push still supports older renderers. A reopened workspace carries
+  the saved model selector in its local URL fragment. Selecting any target
+  still requires ordinary workspace and saved-connection admission. Attention
   events are transient and grant no execution, transcript, or filesystem access.
 - [Native session listing](crates/grida-agent/src/host/catalog.rs) uses an
   explicit canonical workspace on the initialized ACP connection. The
