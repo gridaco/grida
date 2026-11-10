@@ -106,6 +106,7 @@ export class NativeWorkspaceAgents {
       if (!chat || chat.connected) return existing.visible;
       if (!chat.hasExited)
         throw new Error("native_workspace_disconnect_pending");
+      existing.stopping.abort();
     } else if (this.slots.size >= MAX_LIVE_WORKSPACES) {
       throw new Error("native_workspace_capacity_reached");
     }

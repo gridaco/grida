@@ -80,7 +80,7 @@ impl Host {
             work: Arc::default(),
             workers: Arc::default(),
             changed: Arc::default(),
-            live_text: broadcast::channel(UPDATE_CAPACITY).0,
+            live_updates: broadcast::channel(UPDATE_CAPACITY).0,
         };
         let session = host
             .new_session(session_configuration(&source)?.cwd)

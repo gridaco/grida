@@ -1053,6 +1053,14 @@ lazy reads, read-only mutation, and symlink escape refusal.
   assistant text from owned turns on negotiated private stdio. It checks
   attachment before serialization and uses the existing bounded ACP delivery
   window. Losing the observer or falling behind cannot cancel a turn.
+- Background attention uses a separate capability on the same private
+  connection. The observer projects only the attached chat, turn, and
+  verified settlement or approval wait. The
+  [Desktop worker owner](desktop/src/main/native-desktop-agent.ts) fences
+  delivery and notification clicks by the current account, worker, and chat.
+  [Main](desktop/src/main/agent-notifications.ts) supplies fixed copy and
+  routes clicks to the authorized workspace. Attention events are transient
+  and grant no execution, transcript, or filesystem access.
 - [Native session listing](crates/grida-agent/src/host/catalog.rs) uses an
   explicit canonical workspace on the initialized ACP connection. The
   [SQLite catalog](crates/agent-kit-store-sqlite/src/catalog.rs) queries that

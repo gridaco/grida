@@ -113,12 +113,36 @@ function fixture() {
     }),
   } satisfies Pick<NativeAgentCutover, "startWorkspace">;
   const release = vi.fn<() => void>();
-  const owners = new NativeWorkspaceAgents(cutover, async () => ({
-    launch,
+  const signals: AbortSignal[] = [];
+  const owners = new NativeWorkspaceAgents(cutover, async (_, signal) => {
+    signals.push(signal);
+    return { launch, release };
+  });
+  return {
+    launch: { ...launch, stateDirectory },
+    workspace,
+    owners,
     release,
-  }));
-  return { launch: { ...launch, stateDirectory }, workspace, owners, release };
+    signals,
+  };
 }
+
+it("retires the exited worker's callbacks before admitting a replacement", async () => {
+  const { workspace, owners, signals } = fixture();
+  const exited = child(1, { closeOnEof: true });
+  spawn
+    .mockReturnValueOnce(exited.handle)
+    .mockReturnValueOnce(child(1, { closeOnEof: true }).handle);
+  try {
+    await owners.open(workspace);
+    exited.close("SIGKILL");
+    expect(owners.current(workspace.id)).toBeNull();
+    await owners.open(workspace);
+    expect(signals.map((signal) => signal.aborted)).toEqual([true, false]);
+  } finally {
+    await owners.close();
+  }
+});
 
 it("keeps a live native worker bound to its selected directory generation", async () => {
   const { workspace, owners } = fixture();

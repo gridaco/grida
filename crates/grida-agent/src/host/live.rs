@@ -1,13 +1,59 @@
-//! Read-only text from turns owned independently of an ACP prompt request.
+//! Read-only updates from turns owned independently of an ACP prompt request.
 
+use super::RunResult;
 use agent_kit_core::inference::InferenceUpdate;
-use agent_kit_core::messages::{Content, Role};
+use agent_kit_core::messages::{Content, OutcomeStatus, Role};
 use agent_kit_core::turn::{OperationOutcome, TurnBinding};
-use agent_kit_core::{MessageId, SessionId, TurnId};
+use agent_kit_core::{MessageId, SessionId, TurnId, WaitId};
 use agent_kit_runtime::TurnUpdate;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use tokio::sync::broadcast;
+
+#[derive(Clone)]
+pub(crate) enum LiveUpdate {
+    Text(LiveText),
+    Lifecycle(Lifecycle),
+}
+
+#[derive(Clone)]
+pub(crate) struct Lifecycle {
+    pub session: SessionId,
+    pub turn: TurnId,
+    pub fact: LifecycleFact,
+}
+
+#[derive(Clone)]
+pub(crate) enum LifecycleFact {
+    Settled(OutcomeStatus),
+    ApprovalRequired(WaitId),
+}
+
+pub(super) fn publish_lifecycle(
+    sender: &broadcast::Sender<LiveUpdate>,
+    session: &SessionId,
+    turn: &TurnId,
+    result: &RunResult,
+) {
+    if sender.receiver_count() == 0 {
+        return;
+    }
+    let fact = match result {
+        RunResult::Settled(outcome) => LifecycleFact::Settled(outcome.status),
+        RunResult::InputRequired(pending) => {
+            let Some(approval) = pending.approvals.first() else {
+                return;
+            };
+            LifecycleFact::ApprovalRequired(approval.wait_id.clone())
+        }
+        RunResult::Suspended => return,
+    };
+    let _ = sender.send(LiveUpdate::Lifecycle(Lifecycle {
+        session: session.clone(),
+        turn: turn.clone(),
+        fact,
+    }));
+}
 
 #[derive(Clone)]
 pub(crate) struct LiveText {
@@ -20,13 +66,13 @@ pub(crate) struct LiveText {
 }
 
 pub(super) struct Publisher {
-    sender: broadcast::Sender<LiveText>,
+    sender: broadcast::Sender<LiveUpdate>,
     binding: TurnBinding,
     offsets: BTreeMap<MessageId, usize>,
 }
 
 impl Publisher {
-    pub(super) fn new(sender: broadcast::Sender<LiveText>, binding: TurnBinding) -> Self {
+    pub(super) fn new(sender: broadcast::Sender<LiveUpdate>, binding: TurnBinding) -> Self {
         Self {
             sender,
             binding,
@@ -75,13 +121,13 @@ impl Publisher {
         if self.sender.receiver_count() == 0 || text.is_empty() {
             return;
         }
-        let _ = self.sender.send(LiveText {
+        let _ = self.sender.send(LiveUpdate::Text(LiveText {
             session: self.binding.session.clone(),
             turn: self.binding.turn.clone(),
             message: message.clone(),
             offset,
             replace,
             text: Arc::from(text),
-        });
+        }));
     }
 }

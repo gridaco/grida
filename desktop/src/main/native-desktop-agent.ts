@@ -28,6 +28,7 @@ import { NativeProviderSelection } from "./native-provider-selection";
 import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
+import type { NativeChatLifecycle } from "./native-agent-chat";
 
 const DRAIN_TIMEOUT_MS = 35_000;
 type Subscription = Readonly<{
@@ -50,6 +51,11 @@ type LaunchOptions = Readonly<{
   workspaceGrant?: (id: string) => Promise<WorkspaceMediaGrant>;
   mcp?: NativeMcpLaunch;
   selectableProfiles?: boolean;
+  onLifecycle?: (
+    workspaceId: string,
+    event: NativeChatLifecycle,
+    current: () => boolean
+  ) => void;
 }>;
 
 export class NativeDesktopAgent {
@@ -79,7 +85,8 @@ export class NativeDesktopAgent {
     private readonly workspaceGrant?: LaunchOptions["workspaceGrant"],
     private readonly mcp?: NativeMcpLaunch,
     private readonly provider: NativeDesktopProfile.Provider = "gateway",
-    readonly selectableProfiles = false
+    readonly selectableProfiles = false,
+    private readonly onLifecycle?: LaunchOptions["onLifecycle"]
   ) {
     if (subscription) {
       const { oauth } = subscription;
@@ -177,7 +184,8 @@ export class NativeDesktopAgent {
       options?.workspaceGrant,
       options?.mcp,
       options?.provider,
-      options?.selectableProfiles
+      options?.selectableProfiles,
+      options?.onLifecycle
     );
   }
 
@@ -507,7 +515,9 @@ export class NativeDesktopAgent {
   }
 
   private newOwners(): NativeWorkspaceAgents {
-    return new NativeWorkspaceAgents(
+    const accountGeneration = this.accountGeneration;
+    const notify = this.onLifecycle;
+    const owners: NativeWorkspaceAgents = new NativeWorkspaceAgents(
       this.cutover,
       async (workspace, signal) => {
         const { provider, release } = await this.prepareProvider(signal);
@@ -531,6 +541,18 @@ export class NativeDesktopAgent {
               mcp: workspace.nestedDeck
                 ? undefined
                 : this.mcp?.forWorkspace(workspace.root),
+              onLifecycle:
+                !notify || workspace.nestedDeck
+                  ? undefined
+                  : (event, attached) => {
+                      const current = () =>
+                        attached() &&
+                        !signal.aborted &&
+                        this.accountGeneration === accountGeneration &&
+                        this.owners === owners &&
+                        this.current(workspace.id) !== null;
+                      if (current()) notify(workspace.id, event, current);
+                    },
             },
             release,
           };
@@ -540,6 +562,7 @@ export class NativeDesktopAgent {
         }
       }
     );
+    return owners;
   }
 
   private async workspaceLaunch(

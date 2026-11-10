@@ -10,6 +10,7 @@
  */
 
 import type { AgentLifecycleEvent } from "@grida/agent";
+import type { NativeChatLifecycle } from "./native-agent-chat";
 
 /** Title shown when the session row is unreadable or untitled. */
 export const FALLBACK_TITLE = "Grida Agent";
@@ -82,6 +83,24 @@ export namespace agent_notifications {
         return null;
       default:
         return silentOnUnknown(event);
+    }
+  }
+
+  export function decideNative(event: NativeChatLifecycle): Decision | null {
+    const title = FALLBACK_TITLE;
+    if (event.kind === "approval_required")
+      return { title, body: "Waiting for your approval" };
+    switch (event.status) {
+      case "succeeded":
+        return { title, body: "Turn completed" };
+      case "failed":
+        return { title, body: "Run failed" };
+      case "uncertain":
+        return { title, body: "Turn outcome needs review" };
+      case "cancelled":
+        return null;
+      default:
+        return silentOnUnknown(event.status);
     }
   }
 

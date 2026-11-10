@@ -35,7 +35,11 @@ import {
   registerWorkspaceMediaScheme,
   handleWorkspaceMediaProtocol,
 } from "./main/workspace-media-protocol";
-import { startAgentNotifications } from "./main/agent-notifications";
+import {
+  notifyNativeChat,
+  startAgentNotifications,
+} from "./main/agent-notifications";
+import type { NativeChatLifecycle } from "./main/native-agent-chat";
 import { protocol_router } from "./main/protocol-router";
 import { dirtyState } from "./main/dirty-state";
 import { open_handoff } from "./main/open-handoff";
@@ -679,6 +683,11 @@ app.on("ready", async () => {
         const options = {
           provider,
           mcp,
+          onLifecycle: (
+            workspaceId: string,
+            event: NativeChatLifecycle,
+            current: () => boolean
+          ) => notifyNativeChat(workspaceId, event, windowAdmission, current),
           openExternal: (url: string) => shell.openExternal(url),
           workspaceCatalogRoot: path.dirname(workspaceCatalog.directory),
           workspaceGrant: workspaceCatalog.fileGrant.bind(workspaceCatalog),

@@ -147,6 +147,8 @@ const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 const MAX_TRANSCRIPT_MESSAGES = 1024;
 const MAX_CATALOG_SESSIONS = 32;
 const MAX_TITLE_BYTES = 256;
+const LIFECYCLE = "co.grida/session/lifecycle";
+const RECENT_LIFECYCLE = 256;
 const MAX_QUEUE_INPUTS = 256;
 const QUEUE_PAGE_SIZE = 8;
 const QUEUE_PREVIEW_LENGTH = 2048;
@@ -159,7 +161,15 @@ export type NativeAgentChatLaunch = Omit<
 > & {
   /** Canonical workspace context selected by main for this process. */
   cwd: string;
+  onLifecycle?: (event: NativeChatLifecycle, current: () => boolean) => void;
 };
+
+export type NativeChatLifecycle = Readonly<
+  { sessionId: string; turnId: string } & (
+    | { kind: "settled"; status: NativeChatTurnSummary["status"] }
+    | { kind: "approval_required"; waitId: string }
+  )
+>;
 
 export type NativeChatSession = Readonly<{ id: string }>;
 type TaskBasis = Readonly<{
@@ -273,11 +283,15 @@ export class NativeAgentChat {
   private constructor(
     private readonly process: NativeAgentProcess,
     private readonly cwd: string,
-    private readonly scope: string
+    private readonly scope: string,
+    private readonly onLifecycle?: NativeAgentChatLaunch["onLifecycle"]
   ) {}
+
+  private readonly lifecycleSeen = new Set<string>();
 
   static async start({
     cwd,
+    onLifecycle,
     ...launch
   }: NativeAgentChatLaunch): Promise<NativeAgentChat> {
     if (
@@ -290,13 +304,16 @@ export class NativeAgentChat {
     let client: NativeAgentChat | undefined;
     const process = await NativeAgentProcess.start({
       ...launch,
-      capabilities: CAPABILITIES,
+      capabilities: onLifecycle
+        ? { ...CAPABILITIES, [LIFECYCLE]: 1 }
+        : CAPABILITIES,
       onSessionUpdate: (params) => client?.publish(params),
     });
     client = new NativeAgentChat(
       process,
       cwd,
-      JSON.stringify([launch.stateDirectory, cwd])
+      JSON.stringify([launch.stateDirectory, cwd]),
+      onLifecycle
     );
     return client;
   }
@@ -1566,6 +1583,7 @@ export class NativeAgentChat {
     this.sideChats.clear();
     this.attached.clear();
     this.listeners.clear();
+    this.lifecycleSeen.clear();
     return this.process.close();
   }
 
@@ -1591,6 +1609,16 @@ export class NativeAgentChat {
     try {
       const notification = object(params);
       const sessionId = identity(notification.sessionId);
+      const metadata = notification._meta
+        ? object(notification._meta)
+        : undefined;
+      const lifecycle = metadata?.[LIFECYCLE];
+      if (lifecycle !== undefined) {
+        const session = this.attached.get(sessionId);
+        if (!this.closed && this.onLifecycle && session)
+          this.publishLifecycle(session, lifecycle, notification.update);
+        return;
+      }
       const listeners = this.listeners.get(sessionId);
       const capture = this.transcripts.get(sessionId);
       if (!listeners && !capture) return;
@@ -1609,13 +1637,9 @@ export class NativeAgentChat {
         Buffer.byteLength(content.text) > MAX_UPDATE_BYTES
       )
         return;
-      const meta = notification._meta
-        ? object(notification._meta)["co.grida/session/updates"]
-        : undefined;
+      const meta = metadata?.["co.grida/session/updates"];
       if (meta === undefined) {
-        const replay = notification._meta
-          ? object(notification._meta)[TRANSCRIPT_WINDOW]
-          : undefined;
+        const replay = metadata?.[TRANSCRIPT_WINDOW];
         const requestId =
           replay === undefined ? undefined : identity(object(replay).requestId);
         if (capture && capture.requestId === requestId)
@@ -1646,6 +1670,46 @@ export class NativeAgentChat {
     } catch {
       // Unknown or unattributed ACP events do not enter the renderer bridge.
     }
+  }
+
+  private publishLifecycle(
+    session: NativeChatSession,
+    value: unknown,
+    projection: unknown
+  ): void {
+    const update = object(projection);
+    const content = object(update.content);
+    if (
+      update.sessionUpdate !== "agent_message_chunk" ||
+      content.type !== "text" ||
+      content.text !== ""
+    )
+      return;
+    const record = object(value);
+    if (Object.keys(record).length !== 3) return;
+    const turnId = identity(record.turnId);
+    const sessionId = session.id;
+    const { kind, status } = record;
+    let event: NativeChatLifecycle;
+    if (kind === "approval_required") {
+      event = { kind, sessionId, turnId, waitId: identity(record.waitId) };
+    } else if (
+      kind === "settled" &&
+      (status === "succeeded" ||
+        status === "failed" ||
+        status === "cancelled" ||
+        status === "uncertain")
+    ) {
+      event = { kind, sessionId, turnId, status };
+    } else return;
+    const key = JSON.stringify(event);
+    if (this.lifecycleSeen.has(key)) return;
+    this.lifecycleSeen.add(key);
+    if (this.lifecycleSeen.size > RECENT_LIFECYCLE) {
+      const oldest = this.lifecycleSeen.values().next().value;
+      if (oldest !== undefined) this.lifecycleSeen.delete(oldest);
+    }
+    this.onLifecycle?.(event, () => this.ownsSession(session));
   }
 
   private async control(

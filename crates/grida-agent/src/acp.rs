@@ -196,6 +196,7 @@ async fn serve_connection(
                     extensions::advertised(reviewer, subagents, deletion, effort, files);
                 if reviewer {
                     advertised.insert(live::CAPABILITY.into(), 1.into());
+                    advertised.insert(live::LIFECYCLE.into(), 1.into());
                 }
                 if let Some(provider) = &provider {
                     let capability = crate::supervised_provider::CAPABILITY;
@@ -270,15 +271,17 @@ async fn serve_connection(
                         .into_iter()
                         .filter(|key| advertised.contains_key(*key)),
                     );
-                    if reviewer
-                        && !sessions.live_started
-                        && meta
-                            .and_then(|meta| meta.get(live::CAPABILITY))
+                    let requested = |capability| {
+                        reviewer && meta
+                            .and_then(|meta| meta.get(capability))
                             .and_then(serde_json::Value::as_u64)
                             == Some(1)
-                    {
+                    };
+                    let text = requested(live::CAPABILITY);
+                    let lifecycle = requested(live::LIFECYCLE);
+                    if !sessions.live_started && (text || lifecycle) {
                         sessions.live_started = true;
-                        Some(initialized_host.observe_text())
+                        Some((initialized_host.observe_live(), text, lifecycle))
                     } else {
                         None
                     }
@@ -303,12 +306,14 @@ async fn serve_connection(
                             env!("CARGO_PKG_VERSION"),
                         )),
                 )?;
-                if let Some(updates) = updates {
+                if let Some((updates, text, lifecycle)) = updates {
                     connection.spawn(live::forward(
                         connection.clone(),
                         initialized_delivery.clone(),
                         initialized_sessions.clone(),
                         updates,
+                        text,
+                        lifecycle,
                     ))?;
                 }
                 Ok(())

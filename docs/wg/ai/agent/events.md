@@ -1,6 +1,6 @@
 ---
 title: Lifecycle Events
-description: The session-lifecycle event channel — the small, multi-subscriber surface through which the core announces turn-started / turn-finished / approval-requested moments to consumers that are not the chat renderer. Why an event surface and not consumer-specific wiring, the event vocabulary and its fields, volatility and ordering semantics, the projection over the host wire, the notification consumer policy (focus gating, click-to-attend), and the boundary against a user-facing hooks system.
+description: Session-scoped lifecycle facts, their delivery and ordering, and how a host uses them for background attention.
 keywords:
   [
     agent-system,
@@ -23,22 +23,11 @@ tags:
 
 # Lifecycle Events
 
-An agent system that runs turns produces a small number of moments a
-human cares about even when they are **not looking at the
-transcript**: a turn finished, a turn failed, a turn is blocked
-waiting for the user's approval. The chat renderer learns these
-moments from the channels it already holds — the chunk stream and the
-[session status](./session.md#session-status) back-channel. Everything
-that is _not_ the chat renderer — a desktop shell that wants to raise
-an OS notification, a status-bar or badge count, a logger, an
-automation — has had **no way to learn them at all**.
-
-This page owns that contract: the **lifecycle event channel** — a
-deliberately small, multi-subscriber event surface the core emits and
-any number of consumers read. It also specifies the first consumer
-(host notifications) closely enough that a second host can ship the
-same behavior, and draws the boundary against the larger thing this
-is _not_: a user-facing hooks system.
+A turn can finish, fail, or reach an approval while its chat view is
+closed. The turn owner can publish those facts after the corresponding
+state is committed. A desktop shell, status surface, or other authorized
+consumer subscribes independently of the chat's transcript stream.
+The channel is volatile. The session remains the source of record.
 
 The keywords **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**,
 **MAY** are used as in
@@ -88,8 +77,9 @@ evidence, not as the spec; the contract below stands on its own.
 
 ## The event vocabulary
 
-The channel carries **session-scoped lifecycle events**. The minimum
-vocabulary a conforming core emits:
+The channel carries **session-scoped lifecycle events**. A host that
+exposes execution edges uses the following vocabulary. An attention
+projection may select just the facts it needs.
 
 ### `turn-started`
 
@@ -171,32 +161,21 @@ it means a forged or replayed event can never _answer_ anything.
   blocking semantics is a hooks system — see
   [the boundary](#not-a-hooks-system) below.)
 
-## Projection over the host wire
+## Projection to consumers
 
-In-process subscription serves consumers living inside the agent
-server process. Most interesting consumers do not: a desktop shell's
-main process, a CLI status line, a web client. The host therefore
-MUST project the channel over its serving wire as a **host-wide
-event stream** — one subscription carrying every session's events,
-under the same authentication as the rest of the serving surface.
+The host chooses the transport and checks the recipient's authorized
+scope before sending any event. One subscription can cover all the
+sessions a consumer is allowed to observe, including sessions without
+an open view. A host with separate workspace workers can use one
+subscription per worker. Each worker checks session ownership before
+delivery.
 
-Packetization and transport (SSE, IPC, WebSocket, polling) are the
-host's choice, [as with the status
-transport](./turn-authority.md#what-this-guide-does-not-specify). The
-normative requirements are only:
-
-- the stream is **host-wide** (a notification consumer must not need
-  one subscription per session to learn that _any_ session wants
-  attention);
-- it is **authenticated** like every other route — the events name
-  sessions and reveal activity timing, which is user data;
-- it is **read-only** — nothing on this channel answers an approval
-  or starts a turn.
-
-The per-session [status channel](./session.md#session-status) is
-unchanged and remains the right channel for rendering one session's
-Stop/Send state; the events channel is additive and answers a
-different question ("what just happened, anywhere").
+An attention consumer needs only two facts, a verified settlement
+with its outcome or an outstanding approval wait. Both carry the chat
+and turn identity. The host may project those facts alone. A consumer
+that needs to render Stop or Send reads the
+[session status](./session.md#session-status). Event delivery is
+read-only and grants no authority to start a turn or answer approval.
 
 ## The first consumer: host notifications
 
@@ -244,11 +223,8 @@ The gate:
   app-level focus: suppress while the app is focused, notify while
   it is not.
 
-Focus gating is **entirely consumer-side**. The core does not know
-what focus is; events are emitted unconditionally and the consumer
-decides. (This is also why the channel is host-wide: the consumer
-needs events for sessions whose surfaces are closed — precisely the
-sessions most likely to need a notification.)
+Focus gating belongs to the consumer. Authorized attention facts can
+arrive for a chat whose view is closed.
 
 ### Click-to-attend
 

@@ -36,3 +36,10 @@ its approval controls. [Understand agent permissions](./permissions.md)
 Changes already made can remain in the workspace. Check **Turn summary**
 for the outcome, any partial work, and items that need review.
 [Inspect and save results](./results.md)
+
+## Return to background work
+
+With system notifications enabled, Desktop can tell you when a default
+workspace chat finishes or needs access approval while its window is
+away from focus. Click the notification to bring the workspace forward.
+When the chat pane is ready, it opens the matching chat.

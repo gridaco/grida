@@ -1,7 +1,7 @@
-//! GRIDA-SEC-004 — detached text observation for already attached sessions.
+//! GRIDA-SEC-004 — detached observation for already attached sessions.
 
 use super::{ConnectionSessions, Delivery};
-use crate::host::live::LiveText;
+use crate::host::live::{LifecycleFact, LiveUpdate};
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::v1::schema::{ContentChunk, SessionNotification, SessionUpdate};
 use agent_client_protocol::{Client, Result};
@@ -10,19 +10,22 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast::{Receiver, error::RecvError};
 
 pub(super) const CAPABILITY: &str = "co.grida/session/updates";
+pub(super) const LIFECYCLE: &str = "co.grida/session/lifecycle";
 const CHUNK_BYTES: usize = 8 * 1024;
 
 pub(super) async fn forward(
     connection: ConnectionTo<Client>,
     delivery: Arc<Delivery>,
     sessions: Arc<Mutex<ConnectionSessions>>,
-    mut updates: Receiver<LiveText>,
+    mut updates: Receiver<LiveUpdate>,
+    text_enabled: bool,
+    lifecycle_enabled: bool,
 ) -> Result<()> {
     let stream = async {
         loop {
             match updates.recv().await {
-                Ok(update) => {
-                    if !sessions.lock().unwrap().can_deliver(&update.session) {
+                Ok(LiveUpdate::Text(update)) => {
+                    if !text_enabled || !sessions.lock().unwrap().can_deliver(&update.session) {
                         continue;
                     }
                     let mut offset = update.offset;
@@ -44,6 +47,7 @@ pub(super) async fn forward(
                             &sessions,
                             &update.session,
                             chunk,
+                            CAPABILITY,
                             metadata,
                         )
                         .await?;
@@ -52,7 +56,33 @@ pub(super) async fn forward(
                         text = remaining;
                     }
                 }
+                Ok(LiveUpdate::Lifecycle(update)) => {
+                    if !lifecycle_enabled {
+                        continue;
+                    }
+                    let metadata = match update.fact {
+                        LifecycleFact::Settled(status) => {
+                            json!({"kind": "settled", "turnId": update.turn, "status": status})
+                        }
+                        LifecycleFact::ApprovalRequired(wait) => {
+                            json!({"kind": "approval_required", "turnId": update.turn, "waitId": wait})
+                        }
+                    };
+                    send(
+                        &connection,
+                        &delivery,
+                        &sessions,
+                        &update.session,
+                        ContentChunk::new("".to_owned().into()),
+                        LIFECYCLE,
+                        metadata,
+                    )
+                    .await?;
+                }
                 Err(RecvError::Lagged(_)) => {
+                    if !text_enabled {
+                        continue;
+                    }
                     let attached = sessions.lock().unwrap().attached.clone();
                     for session in attached {
                         send(
@@ -61,6 +91,7 @@ pub(super) async fn forward(
                             &sessions,
                             &session,
                             ContentChunk::new("".to_owned().into()),
+                            CAPABILITY,
                             json!({"resyncRequired": true}),
                         )
                         .await?;
@@ -82,6 +113,7 @@ async fn send(
     sessions: &Mutex<ConnectionSessions>,
     session: &agent_kit_core::SessionId,
     chunk: ContentChunk,
+    capability: &'static str,
     metadata: Value,
 ) -> Result<()> {
     delivery
@@ -96,7 +128,7 @@ async fn send(
                     SessionUpdate::AgentMessageChunk(chunk),
                 )
                 .meta(
-                    [(CAPABILITY.into(), metadata)]
+                    [(capability.into(), metadata)]
                         .into_iter()
                         .collect::<agent_client_protocol::v1::schema::Meta>(),
                 ),

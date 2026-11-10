@@ -451,7 +451,20 @@ export class NativeChatController {
     }
   }
 
-  async selectProfile(selection: NativeChatProfileSelection): Promise<void> {
+  async focusDefaultChat(sessionId: string): Promise<void> {
+    if (!this.catalogConnection || this.view.profileBusy || this.view.acting)
+      return;
+    if (this.profileId || this.view.profiles?.active) {
+      await this.selectProfile({ kind: "default" }, sessionId);
+      return;
+    }
+    await this.select(sessionId);
+  }
+
+  async selectProfile(
+    selection: NativeChatProfileSelection,
+    initialSession?: string
+  ): Promise<void> {
     const connection = this.catalogConnection;
     if (
       !connection ||
@@ -484,7 +497,9 @@ export class NativeChatController {
       });
       void this.listChats();
       void this.readProfiles();
-      await this.select(selection.kind === "new" ? null : saved.selected);
+      await this.select(
+        initialSession ?? (selection.kind === "new" ? null : saved.selected)
+      );
     } catch {
       if (this.catalogConnection === connection)
         this.update({

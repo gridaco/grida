@@ -1,14 +1,14 @@
 /**
- * Desktop notifications for agent lifecycle events — the first consumer
- * of the host-wide event channel (RFC `docs/wg/ai/agent/events.md`
- * §the first consumer).
+ * GRIDA-SEC-004 — route attention within the current authorized workspace.
+ *
+ * Main-process notifications for agent lifecycle events.
  *
  * Main-process owned, deliberately NOT renderer-driven: a turn can
  * finish (a queue drain) or block on an approval with no renderer
- * attached to the session at all — its window closed, the user
- * elsewhere. Main tails the agent sidecar's `GET /events` SSE (the same
- * authed loopback client the open-file flow uses), applies the
- * notification policy, and shows native `Notification`s.
+ * attached to the session at all. Main consumes native workspace
+ * lifecycle facts or, for the legacy runtime, the sidecar's authenticated
+ * `GET /events` stream. It applies the attention policy and shows native
+ * `Notification`s.
  *
  * The PURE policy (which events notify, the copy, the focus gate) lives
  * in `agent-notifications-policy.ts`, unit-tested headless. This module
@@ -29,25 +29,31 @@ import { app, BrowserWindow, Notification } from "electron";
 import type { AgentLifecycleEvent, ChatSessionRow } from "@grida/agent";
 import { agentSidecarClient } from "./agent-sidecar-client";
 import { agent_notifications } from "./agent-notifications-policy";
-import { findWindowByUrl } from "./window-focus";
 import { IPC_CHANNELS } from "../bridge/contract";
 import { open_workspace_window } from "../window";
 import { EDITOR_BASE_URL } from "../env";
+import type { NativeChatLifecycle } from "./native-agent-chat";
 
 const RETRY_INITIAL_MS = 1_000;
 const RETRY_MAX_MS = 10_000;
 
-/** URL needle identifying the workspace window — the same per-workspace
- *  dedup needle the menu/open flow uses with `focusWindowByUrl`. */
-function workspaceNeedle(workspaceId: string): string {
-  return `/desktop/workspace?id=${encodeURIComponent(workspaceId)}`;
-}
-
 function resolveSessionWindow(
-  session: ChatSessionRow | null
+  session: agent_notifications.SessionFacts | null
 ): BrowserWindow | null {
   if (!session?.workspace_id) return null;
-  return findWindowByUrl(workspaceNeedle(session.workspace_id));
+  const origin = new URL(EDITOR_BASE_URL).origin;
+  return (
+    BrowserWindow.getAllWindows().find((window) => {
+      if (window.isDestroyed()) return false;
+      const url = URL.parse(window.webContents.getURL());
+      return (
+        url?.origin === origin &&
+        url.pathname === "/desktop/workspace" &&
+        url.searchParams.getAll("id").length === 1 &&
+        url.searchParams.get("id") === session.workspace_id
+      );
+    }) ?? null
+  );
 }
 
 /**
@@ -63,7 +69,7 @@ type AgentNotificationNavigation = {
 
 function attendSession(
   sessionId: string,
-  session: ChatSessionRow | null,
+  session: agent_notifications.SessionFacts | null,
   navigation: AgentNotificationNavigation
 ) {
   if (!navigation.can_open()) {
@@ -130,7 +136,7 @@ async function handleEvent(
     ? { title: session.title, workspace_id: session.workspace_id }
     : null;
 
-  const target = resolveSessionWindow(session);
+  const target = resolveSessionWindow(facts);
   const suppressed = agent_notifications.suppressed(facts, {
     target_exists: target !== null,
     target_focused: target !== null && target.isFocused(),
@@ -140,15 +146,40 @@ async function handleEvent(
 
   const decision = agent_notifications.decide(event, facts);
   if (!decision) return;
+  showNotification(decision, () =>
+    attendSession(event.session_id, facts, navigation)
+  );
+}
+
+/** Native attention is already attributed to a verified, current worker. */
+export function notifyNativeChat(
+  workspaceId: string,
+  event: NativeChatLifecycle,
+  navigation: AgentNotificationNavigation,
+  current: () => boolean
+): void {
+  if (!navigation.can_open() || !current()) return;
+  const facts = { title: null, workspace_id: workspaceId };
+  const target = resolveSessionWindow(facts);
+  if (target?.isFocused()) return;
+  const decision = agent_notifications.decideNative(event);
+  if (decision)
+    showNotification(decision, () => {
+      if (current()) attendSession(event.sessionId, facts, navigation);
+    });
+}
+
+function showNotification(
+  decision: agent_notifications.Decision,
+  attend: () => void
+): void {
   if (!Notification.isSupported()) return;
 
   const notification = new Notification({
     title: decision.title,
     body: decision.body,
   });
-  notification.on("click", () =>
-    attendSession(event.session_id, session, navigation)
-  );
+  notification.on("click", attend);
   // macOS rejects notifications silently when the app's identity isn't
   // authorized (UNErrorDomain 1 — e.g. ad-hoc-signed dev builds, or the
   // user disabled the app in Notification Center). Without this listener

@@ -14,7 +14,7 @@ import {
   NativeAgentProcess,
   type NativeAgentLaunch,
 } from "./native-agent-process";
-import { NativeAgentChat } from "./native-agent-chat";
+import { NativeAgentChat, type NativeChatLifecycle } from "./native-agent-chat";
 import { NativeChatIpc } from "./native-chat-ipc";
 
 const supported = process.platform === "darwin" || process.platform === "linux";
@@ -295,6 +295,7 @@ it.runIf(Boolean(packaged) && supported)(
   async () => {
     const test = workspaceFixture();
     const provider = await fixtureProvider();
+    const notices: NativeChatLifecycle[] = [];
     const origin = "https://editor.fixture.invalid";
     const frame = {
       url: `${origin}/desktop/workspace?id=${test.workspace.id}`,
@@ -314,26 +315,41 @@ it.runIf(Boolean(packaged) && supported)(
     );
     let chat: NativeAgentChat | undefined;
     try {
-      chat = await NativeAgentChat.start({
+      const launch = {
         resourcesPath: packaged!,
         cwd: test.workspace.primary.path,
         stateDirectory: test.stateDirectory,
-        provider: "openai-compatible",
+        provider: "openai-compatible" as const,
         endpoint: provider.endpoint,
         model: "fixture",
         workspace: test.workspace,
-      });
+        onLifecycle: (notice: NativeChatLifecycle) => notices.push(notice),
+      };
+      chat = await NativeAgentChat.start(launch);
       const active = { workspaceId: test.workspace.id, chat };
       const ipc = new NativeChatIpc(origin, (candidate) =>
         candidate === sender ? active : null
       );
-      const { attachmentId } = await ipc.create(event);
-      await ipc.submit(
+      const initial = await ipc.create(event);
+      const { sessionId } = initial;
+      const accepted = await ipc.submit(
         event,
-        attachmentId,
+        initial.attachmentId,
         "fixture-input",
         "Read the reference"
       );
+      ipc.detach(event, initial.attachmentId);
+      await vi.waitFor(() =>
+        expect(notices).toEqual([
+          {
+            kind: "approval_required",
+            sessionId,
+            turnId: accepted.turnId,
+            waitId: expect.any(String),
+          },
+        ])
+      );
+      const { attachmentId } = await ipc.load(event, sessionId);
       const review = await vi.waitFor(
         async () => {
           const observed = await ipc.observe(event, attachmentId);
@@ -367,6 +383,14 @@ it.runIf(Boolean(packaged) && supported)(
         const observed = await ipc.observe(event, attachmentId);
         expect(observed.snapshot.latest?.status).toBe("succeeded");
       });
+      await vi.waitFor(() =>
+        expect(notices.at(-1)).toEqual({
+          kind: "settled",
+          sessionId,
+          turnId: accepted.turnId,
+          status: "succeeded",
+        })
+      );
       expect(provider.received).toHaveLength(2);
       expect(provider.received[1]).toContain("reviewed bridge fixture content");
       await expect(
@@ -379,6 +403,11 @@ it.runIf(Boolean(packaged) && supported)(
       await expect(
         ipc.answerApproval(event, attachmentId, review.reviewId, "approve_once")
       ).rejects.toThrow("native_chat_attachment_unavailable");
+      expect(notices).toHaveLength(2);
+      await chat.close();
+      chat = await NativeAgentChat.start(launch);
+      await chat.transcript(await chat.load(sessionId));
+      expect(notices).toHaveLength(2);
       expect(provider.received).toHaveLength(2);
     } finally {
       try {

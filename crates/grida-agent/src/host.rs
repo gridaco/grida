@@ -133,7 +133,7 @@ pub struct Host {
     work: Arc<Mutex<Work>>,
     workers: Arc<AtomicUsize>,
     changed: Arc<Notify>,
-    live_text: broadcast::Sender<live::LiveText>,
+    live_updates: broadcast::Sender<live::LiveUpdate>,
 }
 
 struct Execution {
@@ -646,12 +646,12 @@ impl Host {
             work: Arc::default(),
             workers: Arc::default(),
             changed: Arc::default(),
-            live_text: broadcast::channel(UPDATE_CAPACITY).0,
+            live_updates: broadcast::channel(UPDATE_CAPACITY).0,
         })
     }
 
-    pub(crate) fn observe_text(&self) -> broadcast::Receiver<live::LiveText> {
-        self.live_text.subscribe()
+    pub(crate) fn observe_live(&self) -> broadcast::Receiver<live::LiveUpdate> {
+        self.live_updates.subscribe()
     }
 
     /// Select the allowed regime for new work without widening retained work.
@@ -867,7 +867,7 @@ impl Host {
                 Launch::Prompt { publish_text, .. } => *publish_text,
                 _ => true,
             }
-            .then(|| host.live_text.clone());
+            .then(|| host.live_updates.clone());
             let identified = matches!(&launch, Launch::Identified { .. });
             let queue_admission = identified || matches!(&launch, Launch::Queued(_));
             let result = host.admit(&worker_session, &worker_turn, launch).await;
@@ -961,6 +961,9 @@ impl Host {
                 sponsored.as_ref(),
             )
             .await;
+            if let Ok(outcome) = &result {
+                live::publish_lifecycle(&host.live_updates, &worker_session, &worker_turn, outcome);
+            }
             if let Some(completion_tx) = completion_tx {
                 let _ = completion_tx.send(result);
             }
@@ -2782,7 +2785,7 @@ async fn drive(
     opened: agent_kit_runtime::OpenedTurn,
     input: Vec<Message>,
     updates: broadcast::Sender<TurnUpdate>,
-    live: Option<broadcast::Sender<live::LiveText>>,
+    live: Option<broadcast::Sender<live::LiveUpdate>>,
 ) -> Result<RunResult> {
     let agent_kit_runtime::OpenedTurn { turn, mut observer } = opened;
     let binding = observer.snapshot().state.binding().clone();

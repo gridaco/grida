@@ -39,6 +39,7 @@ import {
   NativeChatController,
   type NativeChatEditorSurfaces,
 } from "@/lib/agent-chat/native-chat-controller";
+import { useDesktopAgentFocusSession } from "@/lib/desktop/agent-focus-session";
 import type { ComposerCatalog, ComposerController } from "@/kits/composer";
 import { AgentApprovalPrompt } from "../shared/agent-approval";
 import { AgentLibraryAttachmentPicker } from "../shared/agent-library-attachment-picker";
@@ -182,6 +183,9 @@ export function NativeAgentPane({
     controller.read
   );
   const mentions = useWorkspaceFileMentions(workspaceId);
+  useDesktopAgentFocusSession((sessionId) => {
+    if (workspaceId) void controller.focusDefaultChat(sessionId);
+  });
   const catalog = useMemo(
     () => ({ commands: NO_COMMANDS, mentions }),
     [mentions]

@@ -2408,7 +2408,10 @@ describe("Native workspace chat controller", () => {
       profile = selection.kind === "default" ? null : selection.id;
     };
     bridge.list = async () => ({
-      sessionIds: [profile === null ? "default-chat" : "alternate-chat"],
+      sessionIds:
+        profile === null
+          ? ["default-chat", "background-chat"]
+          : ["alternate-chat"],
       nextCursor: null,
     });
     try {
@@ -2434,9 +2437,13 @@ describe("Native workspace chat controller", () => {
       expect(controller.read().messages).toEqual([]);
       await controller.select("alternate-chat");
       expect(controller.read().selected).toBe("alternate-chat");
-      await controller.selectProfile({ kind: "default" });
+      running.add("background-chat");
+      await controller.focusDefaultChat("background-chat");
+      expect(profile).toBeNull();
+      expect(controller.read().selected).toBe("background-chat");
+      expect(updates.has("background-chat")).toBe(true);
       await vi.waitFor(() =>
-        expect(controller.read().sessions).toEqual(["default-chat"])
+        expect(controller.read().sessions).toContain("default-chat")
       );
       await controller.select("default-chat");
       unavailable = true;
