@@ -164,7 +164,27 @@ struct Inner {
     owners: Mutex<BTreeMap<(SessionId, TurnId), Weak<()>>>,
     changed: Notify,
     catalog: Option<catalog::ScopeProjection>,
-    _lock: Option<File>,
+    // Drop SQLite before releasing the writer lock.
+    _lock: Option<WriterLock>,
+}
+
+struct WriterLock(File);
+
+impl WriterLock {
+    fn acquire(path: &Path) -> Result<Self> {
+        let file = open_private_file(path)?;
+        file.try_lock()
+            .map_err(|_| error(ErrorKind::Unavailable, "store_already_owned"))?;
+        Ok(Self(file))
+    }
+}
+
+impl Drop for WriterLock {
+    fn drop(&mut self) {
+        // A process between fork and exec can still hold the same file
+        // description. Release the lock even if that descriptor stays open.
+        let _ = self.0.unlock();
+    }
 }
 
 struct SessionRecord {
@@ -215,7 +235,7 @@ impl SqliteStore {
         connection
             .pragma_update(None, "temp_store", "MEMORY")
             .map_err(database_error)?;
-        Self::initialize(connection, None, None)
+        Self::initialize(None, connection, None)
     }
 
     /// Open a private application database with synchronous WAL commits.
@@ -250,20 +270,18 @@ impl SqliteStore {
                 path.file_name()
                     .ok_or_else(|| error(ErrorKind::InvalidInput, "store_filename_missing"))?,
             );
-        let lock_path = lock_path(&path);
-        let lock = open_private_file(&lock_path)?;
-        lock.try_lock()
-            .map_err(|_| error(ErrorKind::Unavailable, "store_already_owned"))?;
+        let lock = WriterLock::acquire(&lock_path(&path))?;
         let database = open_private_file(&path)?;
         drop(database);
         let connection = Connection::open(&path).map_err(database_error)?;
-        Self::initialize(connection, catalog, Some(lock))
+        Self::initialize(Some(lock), connection, catalog)
     }
 
     fn initialize(
+        // Parameters drop in reverse order on an initialization failure.
+        lock: Option<WriterLock>,
         mut connection: Connection,
         catalog: Option<catalog::ScopeProjection>,
-        lock: Option<File>,
     ) -> Result<Self> {
         connection
             .busy_timeout(Duration::from_secs(5))
@@ -2082,4 +2100,33 @@ fn require_private_directory(path: &Path) -> Result<()> {
     #[cfg(not(unix))]
     let _ = path;
     Ok(())
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn closing_the_store_releases_a_duplicated_writer_lock() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        let path = directory.path().join("sessions.sqlite");
+        let store = SqliteStore::open(&path).unwrap();
+        // A pre-exec child retains another reference to the same flock.
+        let inherited = store.inner._lock.as_ref().unwrap().0.try_clone().unwrap();
+        assert_eq!(
+            SqliteStore::open(&path).err().unwrap().code,
+            "store_already_owned",
+        );
+        drop(store);
+
+        let reopened = SqliteStore::open(&path).unwrap();
+        drop(inherited);
+        assert_eq!(
+            SqliteStore::open(&path).err().unwrap().code,
+            "store_already_owned",
+        );
+        drop(reopened);
+    }
 }
