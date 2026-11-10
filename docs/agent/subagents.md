@@ -33,6 +33,15 @@ For example, pause a review, ask the reviewer to use the latest draft, then
 resume it. When a control result is unconfirmed, **Retry last subagent control**
 resends the same action for the selected assignment.
 
+On connections that show **Send message**, use it to leave context for the
+child's next assignment. Sending a message leaves any current assignment
+running as before and uses no assignment allowance.
+
 **Stop subagent** ends the displayed active assignment and holds its queue.
-The [private ACP client guide](./clients.md#assign-work-to-a-named-subagent)
-covers informational messages and releasing a held queue.
+Select a waiting assignment and choose **Withdraw assignment** to remove it.
+Choose **Resume queue** when you want the remaining assignments to start in
+order. If a message or queue control is unconfirmed, the panel can retry it
+with the original request while the chat is still attached.
+
+See the [private ACP client guide](./clients.md#assign-work-to-a-named-subagent)
+for automation.

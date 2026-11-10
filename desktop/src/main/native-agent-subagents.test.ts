@@ -211,3 +211,123 @@ it("keeps the exact sponsor when an unverified assignment outlives its original 
     parentTurnId: "chosen-sponsor",
   });
 });
+
+it("binds optional child controls to their observed attachment and exact retry", async () => {
+  const request = vi.fn<(method: string, input: unknown) => Promise<unknown>>();
+  const adapter = new NativeAgentSubagents(request, turn);
+  const attachment = {};
+  const capabilities = { messaging: true, queue: true };
+  const held = {
+    ...inspection,
+    admissionPaused: true,
+    queuedInputIds: ["queued"],
+    pendingMessageIds: [],
+    observedAssignment: active,
+  };
+  request.mockResolvedValueOnce(held);
+  const oldPeer = await adapter.inspect(
+    attachment,
+    parent,
+    childId,
+    undefined,
+    check
+  );
+  expect(oldPeer.childControls).toBeUndefined();
+  request.mockResolvedValueOnce(held);
+  const observed = await adapter.inspect(
+    attachment,
+    parent,
+    childId,
+    undefined,
+    check,
+    true,
+    capabilities
+  );
+  expect(observed.childControls).toMatchObject({
+    available: ["message", "withdraw", "resume-queue"],
+    pendingMessages: 0,
+  });
+  const id = observed.childControls!.observationId;
+  const message = { kind: "message", text: "Context for later." };
+  const control = (requestId: string, input: unknown) =>
+    adapter.controlChild(
+      attachment,
+      parent,
+      id,
+      requestId,
+      input,
+      capabilities,
+      check
+    );
+  await expect(
+    adapter.controlChild({}, parent, id, "send", message, capabilities, check)
+  ).rejects.toThrow("native_chat_subagent_observation_unavailable");
+  await expect(
+    control("withdraw", { kind: "withdraw", inputId: "another" })
+  ).rejects.toThrow("native_chat_subagent_invalid_input");
+  await expect(
+    adapter.controlChild(
+      attachment,
+      parent,
+      id,
+      "send",
+      message,
+      { ...capabilities, messaging: false },
+      check
+    )
+  ).rejects.toThrow("native_chat_subagent_unavailable");
+  expect(request).toHaveBeenCalledTimes(2);
+  const receipt = {
+    parentSessionId: parent.id,
+    childId,
+    inputId: "send",
+    inputPosition: 9,
+    disposition: { kind: "queued" },
+    text: message.text,
+  };
+  request.mockResolvedValueOnce({ ...receipt, childId: "another-child" });
+  await expect(control("send", message)).rejects.toThrow(
+    "native_chat_subagent_unverified"
+  );
+  await expect(
+    control("send", { ...message, text: "Changed." })
+  ).rejects.toThrow("native_chat_subagent_identity_reused");
+  request.mockResolvedValueOnce(receipt);
+  await expect(control("send", message)).resolves.toBeUndefined();
+  expect(request.mock.calls[2]).toEqual(request.mock.calls[3]);
+
+  request.mockRejectedValueOnce(new Error("native_agent_request_timeout"));
+  const withdraw = { kind: "withdraw", inputId: "queued" };
+  await expect(control("withdraw", withdraw)).rejects.toThrow(
+    "native_chat_subagent_unverified"
+  );
+  // Later inspections can replace the display's basis while the retry keeps its own.
+  for (let sessionRevision = 8; sessionRevision < 28; sessionRevision++) {
+    request.mockResolvedValueOnce({ ...held, sessionRevision });
+    await adapter.inspect(
+      attachment,
+      parent,
+      childId,
+      undefined,
+      check,
+      true,
+      capabilities
+    );
+  }
+  request.mockResolvedValueOnce({
+    sessionId: childId,
+    requestId: "withdraw",
+    sessionRevision: 8,
+  });
+  await expect(control("withdraw", withdraw)).resolves.toBeUndefined();
+  expect(request.mock.calls[4]).toEqual(request.mock.calls.at(-1));
+  expect(request).toHaveBeenLastCalledWith("_co.grida/subagent/withdraw", {
+    queue: {
+      parentSessionId: parent.id,
+      childId,
+      requestId: "withdraw",
+      expectedSessionRevision: 7,
+    },
+    inputId: "queued",
+  });
+});

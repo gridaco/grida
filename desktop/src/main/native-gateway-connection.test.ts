@@ -786,7 +786,7 @@ it.skipIf(!resourcesPath)(
 );
 
 it.skipIf(!resourcesPath)(
-  "pauses, steers, resumes, and stops exact named work through the guarded Desktop bridge",
+  "controls exact named work, messages, and its held queue through the guarded Desktop bridge",
   async () => {
     const root = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-desktop-subagent-")
@@ -867,7 +867,7 @@ it.skipIf(!resourcesPath)(
       const create = {
         requestId: randomUUID(),
         name: "Reviewer",
-        workTurns: 3,
+        workTurns: 5,
       };
       const child = await ipc.createSubagent(first, aid, create);
       await expect(ipc.createSubagent(first, aid, create)).resolves.toEqual(
@@ -1069,6 +1069,77 @@ it.skipIf(!resourcesPath)(
         expect(cancellations).toBe(2);
       });
       expect(owner.dispatch).toHaveBeenCalledTimes(5);
+
+      const inspect = (inputId?: string) =>
+        ipc.inspectSubagent(first, aid, child.childId, inputId);
+      const heldQueue = (await inspect()).childControls!;
+      expect(heldQueue.available).toEqual(["message", "resume-queue"]);
+      const message = { kind: "message", text: "Use the author's checklist." };
+      const messageId = randomUUID();
+      await expect(
+        ipc.controlSubagentChild(
+          second,
+          attached.attachmentId,
+          heldQueue.observationId,
+          messageId,
+          message
+        )
+      ).rejects.toThrow("native_chat_subagent_observation_unavailable");
+      const childControl = (
+        observationId: string,
+        requestId: string,
+        control: unknown
+      ) =>
+        ipc.controlSubagentChild(first, aid, observationId, requestId, control);
+      await childControl(heldQueue.observationId, messageId, message);
+      await childControl(heldQueue.observationId, messageId, message);
+      expect((await inspect()).childControls?.pendingMessages).toBe(1);
+      expect(owner.dispatch).toHaveBeenCalledTimes(5);
+
+      const withdrawn = assign("Do not start this assignment.");
+      await ipc.assignSubagent(first, aid, withdrawn);
+      const stale = (await inspect(withdrawn.inputId)).childControls!;
+      const retained = assign("Use the retained assignment.");
+      await ipc.assignSubagent(first, aid, retained);
+      const withdraw = { kind: "withdraw", inputId: withdrawn.inputId };
+      await expect(
+        childControl(stale.observationId, randomUUID(), withdraw)
+      ).rejects.toThrow("stale_session_revision");
+      const withBoth = (await inspect(withdrawn.inputId)).childControls!;
+      const withdrawalId = randomUUID();
+      await childControl(withBoth.observationId, withdrawalId, withdraw);
+      await childControl(withBoth.observationId, withdrawalId, withdraw);
+      expect((await inspect(withdrawn.inputId)).child).toMatchObject({
+        admissionPaused: true,
+        queuedInputIds: [retained.inputId],
+        assignment: { disposition: "withdrawn" },
+      });
+      expect(owner.dispatch).toHaveBeenCalledTimes(5);
+
+      const afterWithdrawal = (await inspect()).childControls!;
+      const queueResumeId = randomUUID();
+      const resumeQueue = { kind: "resume-queue" };
+      await childControl(
+        afterWithdrawal.observationId,
+        queueResumeId,
+        resumeQueue
+      );
+      await vi.waitFor(async () => {
+        const next = await inspect(retained.inputId);
+        expect(next.child.assignment?.result?.status).toBe("succeeded");
+        expect(next.child.admissionPaused).toBe(false);
+        expect(next.childControls?.pendingMessages).toBe(0);
+      });
+      await childControl(
+        afterWithdrawal.observationId,
+        queueResumeId,
+        resumeQueue
+      );
+      expect(owner.dispatch).toHaveBeenCalledTimes(6);
+      const nextRequest = owner.dispatch.mock.calls[5][0].toString();
+      expect(nextRequest).toContain(message.text);
+      expect(nextRequest).toContain(retained.instructions);
+      expect(nextRequest).not.toContain(withdrawn.instructions);
     } finally {
       try {
         await chat?.close();

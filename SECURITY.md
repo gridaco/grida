@@ -1105,6 +1105,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   control, history, and execution revisions behind the token. Pause, Resume,
   Steer, and Stop revalidate the exact attachment before dispatch and after
   settlement. An exact retry uses the original request identity and basis.
+  Informational messages and queue controls use a separate bounded
+  child-observation token. Queue mutations use the captured revision and
+  selected input identity. The message result echoes the retained input
+  and text without dispatching an assignment.
   [Launch](desktop/src/main/native-desktop-agent.ts),
   [Main adapter](desktop/src/main/native-agent-subagents.ts),
   [IPC](desktop/src/main/native-chat-ipc.ts),

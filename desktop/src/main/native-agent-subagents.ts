@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type {
   NativeChatTurn,
   NativeSubagentAssignmentInput,
+  NativeSubagentChildControl,
   NativeSubagentCreate,
   NativeSubagentEntry,
   NativeSubagentObservation,
@@ -20,6 +21,8 @@ const PAGE_SIZE = 32;
 const MAX_WORK_TURNS = 8;
 const MAX_NAME_BYTES = 128;
 const MAX_INSTRUCTIONS_BYTES = 64 * 1024;
+const MAX_MESSAGE_BYTES = 4 * 1024;
+const MAX_PENDING_MESSAGES = 16;
 const MAX_PREVIEW_BYTES = 1024;
 const MAX_RESULT_BYTES = 8 * 1024;
 const MAX_TURN_OBSERVATIONS = 16;
@@ -68,9 +71,30 @@ type Sponsor = Readonly<{
   turnId: string;
 }>;
 
+type ChildCapabilities = Readonly<{ messaging: boolean; queue: boolean }>;
+
+type ObservedChild = Readonly<{
+  parent: NativeChatSession;
+  childId: string;
+  revision: number;
+  held: boolean;
+  queued: readonly string[];
+}>;
+
+type ChildChange = Readonly<{
+  observationId: string;
+  observed: ObservedChild;
+  control: NativeSubagentChildControl;
+}>;
+
 export class NativeAgentSubagents {
   private readonly turns = new WeakMap<object, Map<string, ObservedTurn>>();
   private readonly sponsors = new WeakMap<object, Map<string, Sponsor>>();
+  private readonly children = new WeakMap<object, Map<string, ObservedChild>>();
+  private readonly childChanges = new WeakMap<
+    object,
+    Map<string, ChildChange>
+  >();
 
   constructor(
     private readonly request: (
@@ -132,7 +156,8 @@ export class NativeAgentSubagents {
     childId: string,
     inputId: string | undefined,
     check: () => void,
-    allowTurnControls = false
+    allowTurnControls = false,
+    childCapabilities?: ChildCapabilities
   ): Promise<NativeSubagentObservation> {
     if (
       !identity(childId) ||
@@ -200,6 +225,15 @@ export class NativeAgentSubagents {
             allowTurnControls
           )
         : null;
+    const available: NativeSubagentChildControl["kind"][] = [];
+    const pendingMessages = childCapabilities?.messaging
+      ? identifiers(response.pendingMessageIds, MAX_PENDING_MESSAGES).length
+      : undefined;
+    if (childCapabilities?.messaging) available.push("message");
+    if (childCapabilities?.queue) {
+      if (queuedInputIds.length) available.push("withdraw");
+      if (response.admissionPaused) available.push("resume-queue");
+    }
     return {
       child: {
         childId,
@@ -212,6 +246,19 @@ export class NativeAgentSubagents {
         assignment,
       },
       stopObservationId,
+      ...(available.length && {
+        childControls: {
+          observationId: this.rememberChild(attachment, {
+            parent,
+            childId,
+            revision: response.sessionRevision,
+            held: response.admissionPaused,
+            queued: queuedInputIds,
+          }),
+          available,
+          ...(pendingMessages !== undefined && { pendingMessages }),
+        },
+      }),
       ...(allowTurnControls &&
         stopObservationId &&
         current && {
@@ -375,6 +422,103 @@ export class NativeAgentSubagents {
     check();
   }
 
+  async controlChild(
+    attachment: object,
+    parent: NativeChatSession,
+    observationId: string,
+    requestId: string,
+    value: unknown,
+    capabilities: ChildCapabilities,
+    check: () => void
+  ): Promise<void> {
+    const control = parseChildControl(value);
+    if (!identity(requestId)) throw invalidInput();
+    if (
+      !(control.kind === "message"
+        ? capabilities.messaging
+        : capabilities.queue)
+    )
+      throw new Error("native_chat_subagent_unavailable");
+    check();
+    let changes = this.childChanges.get(attachment);
+    const previous = changes?.get(requestId);
+    if (
+      previous &&
+      (previous.observationId !== observationId ||
+        JSON.stringify(previous.control) !== JSON.stringify(control))
+    )
+      throw new Error("native_chat_subagent_identity_reused");
+    const observed =
+      previous?.observed ?? this.children.get(attachment)?.get(observationId);
+    if (observed?.parent !== parent)
+      throw new Error("native_chat_subagent_observation_unavailable");
+    if (
+      (control.kind === "resume-queue" && !observed.held) ||
+      (control.kind === "withdraw" &&
+        !observed.queued.includes(control.inputId))
+    )
+      throw invalidInput();
+    if (!previous) {
+      if (!changes) this.childChanges.set(attachment, (changes = new Map()));
+      rememberBounded(changes, requestId, { observationId, observed, control });
+    }
+    const { childId, revision: expectedSessionRevision } = observed;
+    const target = { parentSessionId: parent.id, childId };
+    if (control.kind === "message") {
+      await this.change(
+        "_co.grida/subagent/send-message",
+        { ...target, inputId: requestId, text: control.text },
+        (reply) => {
+          if (
+            reply?.parentSessionId !== parent.id ||
+            reply.childId !== childId ||
+            reply.inputId !== requestId ||
+            reply.text !== control.text ||
+            !revision(reply.inputPosition) ||
+            !DISPOSITIONS.some(
+              (kind) => object(reply.disposition)?.kind === kind
+            )
+          )
+            throw invalidResponse();
+        }
+      );
+    } else {
+      const queue = { ...target, requestId, expectedSessionRevision };
+      await this.change(
+        `_co.grida/subagent/${control.kind}`,
+        control.kind === "withdraw"
+          ? { queue, inputId: control.inputId }
+          : queue,
+        (reply) => {
+          if (
+            reply?.sessionId !== childId ||
+            reply.requestId !== requestId ||
+            !revision(reply.sessionRevision) ||
+            reply.sessionRevision <= expectedSessionRevision
+          )
+            throw invalidResponse();
+        }
+      );
+    }
+    check();
+  }
+
+  private rememberChild(attachment: object, child: ObservedChild): string {
+    let children = this.children.get(attachment);
+    if (!children) this.children.set(attachment, (children = new Map()));
+    for (const [id, prior] of children) {
+      if (
+        prior.parent === child.parent &&
+        prior.childId === child.childId &&
+        prior.revision === child.revision
+      )
+        return id;
+    }
+    const id = randomUUID();
+    rememberBounded(children, id, child);
+    return id;
+  }
+
   private observedTurn(
     attachment: object,
     parent: NativeChatSession,
@@ -517,6 +661,25 @@ function parseTurnControl(value: unknown): NativeSubagentTurnControl {
   throw invalidInput();
 }
 
+function parseChildControl(value: unknown): NativeSubagentChildControl {
+  const entry = object(value);
+  if (entry) {
+    const fields = Object.keys(entry).length;
+    if (fields === 1 && entry.kind === "resume-queue")
+      return { kind: entry.kind };
+    if (fields === 2 && entry.kind === "withdraw" && identity(entry.inputId))
+      return { kind: entry.kind, inputId: entry.inputId };
+    if (
+      fields === 2 &&
+      entry.kind === "message" &&
+      boundedText(entry.text, MAX_MESSAGE_BYTES) &&
+      entry.text.trim()
+    )
+      return { kind: entry.kind, text: entry.text };
+  }
+  throw invalidInput();
+}
+
 function verifyTurnReceipt(
   reply: Record<string, unknown> | null,
   basis: TurnControlBasis,
@@ -538,15 +701,23 @@ function visibleTurn(turn: NativeChatTurn): NativeSubagentTurn {
   return { turnId, disposition, status, paused, cancelled };
 }
 
-function identifiers(value: unknown): string[] {
+function identifiers(value: unknown, limit = MAX_WORK_TURNS): string[] {
   if (
     !Array.isArray(value) ||
-    value.length > MAX_WORK_TURNS ||
-    !value.every(identity) ||
+    value.length > limit ||
+    !Array.from(value).every(identity) ||
     new Set(value).size !== value.length
   )
     throw invalidResponse();
   return [...value];
+}
+
+function rememberBounded<T>(map: Map<string, T>, id: string, value: T): void {
+  if (map.size >= MAX_TURN_OBSERVATIONS) {
+    const oldest = map.keys().next().value;
+    if (oldest) map.delete(oldest);
+  }
+  map.set(id, value);
 }
 
 function validWorkTurns(value: unknown): value is number {

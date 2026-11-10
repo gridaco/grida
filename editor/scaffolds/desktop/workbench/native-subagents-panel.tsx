@@ -20,6 +20,10 @@ export function NativeSubagentsPanel({
   const child = state.observation?.child;
   const assignment = child?.assignment;
   const controls = controller.turnControls;
+  const childControls = controller.childControls;
+  const retryChildControl = controller.retryableChildControl;
+  const pendingMessages = state.observation?.childControls?.pendingMessages;
+  const selectedInput = state.input;
   return (
     <section
       className="shrink-0 border-t px-3 py-2"
@@ -261,6 +265,103 @@ export function NativeSubagentsPanel({
                     </form>
                   )}
                 </div>
+              )}
+              {(childControls.includes("withdraw") ||
+                childControls.includes("resume-queue") ||
+                (retryChildControl && retryChildControl !== "message")) && (
+                <div className="flex flex-wrap gap-1">
+                  {childControls.includes("withdraw") && selectedInput && (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      disabled={state.acting}
+                      onClick={() =>
+                        void controller.controlChild({
+                          kind: "withdraw",
+                          inputId: selectedInput,
+                        })
+                      }
+                    >
+                      Withdraw assignment
+                    </Button>
+                  )}
+                  {childControls.includes("resume-queue") && (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      disabled={state.acting}
+                      onClick={() =>
+                        void controller.controlChild({ kind: "resume-queue" })
+                      }
+                    >
+                      Resume queue
+                    </Button>
+                  )}
+                  {retryChildControl && retryChildControl !== "message" && (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      disabled={state.acting}
+                      onClick={() => void controller.retryChildControl()}
+                    >
+                      {retryChildControl === "withdraw"
+                        ? "Retry withdrawal"
+                        : "Retry queue resume"}
+                    </Button>
+                  )}
+                </div>
+              )}
+              {(childControls.includes("message") ||
+                retryChildControl === "message") && (
+                <form
+                  key={`message/${child.childId}`}
+                  aria-label="Send a message to the selected subagent"
+                  className="grid gap-1"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const form = event.currentTarget;
+                    const text = new FormData(form).get("message");
+                    if (retryChildControl === "message") {
+                      void controller.retryChildControl().then((accepted) => {
+                        if (accepted) form.reset();
+                      });
+                    } else if (typeof text === "string") {
+                      void controller
+                        .controlChild({ kind: "message", text })
+                        .then((accepted) => {
+                          if (accepted) form.reset();
+                        });
+                    }
+                  }}
+                >
+                  <Textarea
+                    aria-label="Subagent message"
+                    name="message"
+                    required={retryChildControl !== "message"}
+                    placeholder="Context for the next assignment"
+                    className="min-h-14 resize-y text-xs"
+                    readOnly={state.acting || retryChildControl === "message"}
+                  />
+                  <div className="flex items-center justify-between gap-1">
+                    <p className="text-muted-foreground">
+                      Messages do not start work.
+                      {!!pendingMessages && ` ${pendingMessages} pending.`}
+                    </p>
+                    <Button
+                      type="submit"
+                      size="xs"
+                      variant="outline"
+                      disabled={state.acting}
+                    >
+                      {retryChildControl === "message"
+                        ? "Retry message"
+                        : "Send message"}
+                    </Button>
+                  </div>
+                </form>
               )}
               <form
                 key={child.childId}

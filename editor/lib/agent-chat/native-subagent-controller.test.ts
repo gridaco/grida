@@ -264,3 +264,78 @@ it("keeps a late assignment read out of a different selected child and closes wi
   expect(stop).not.toHaveBeenCalled();
   controller.dispose();
 });
+
+it("withdraws only the selected queued assignment and retries without refreshing its basis", async () => {
+  const control =
+    vi.fn<NonNullable<NativeSubagentClient["controlSubagentChild"]>>();
+  let basis = "held-queue";
+  control.mockImplementationOnce(async () => {
+    basis = "new-queue";
+    throw new Error("native_chat_subagent_unverified");
+  });
+  control.mockResolvedValue(undefined);
+  const controller = new NativeSubagentController(
+    {
+      listSubagents: async () => ({
+        children: [
+          { childId: "child", name: "Child" },
+          { childId: "other", name: "Other" },
+        ],
+        nextAfterChildId: null,
+      }),
+      inspectSubagent: async (_, childId) => ({
+        ...observed(childId),
+        child: {
+          ...observed(childId).child,
+          admissionPaused: true,
+          queuedInputIds: ["first", "second"],
+        },
+        childControls: {
+          observationId: basis,
+          available: ["message", "withdraw", "resume-queue"],
+          pendingMessages: 1,
+        },
+      }),
+      createSubagent: vi.fn<NativeSubagentClient["createSubagent"]>(),
+      assignSubagent: vi.fn<NativeSubagentClient["assignSubagent"]>(),
+      stopSubagent: vi.fn<NativeSubagentClient["stopSubagent"]>(),
+      controlSubagentChild: control,
+    },
+    "attachment",
+    () => parent
+  );
+  try {
+    controller.toggle();
+    await vi.waitFor(() => expect(controller.read().selected).toBe("child"));
+    await controller.select("child", "first");
+    await expect(
+      controller.controlChild({ kind: "withdraw", inputId: "second" })
+    ).resolves.toBe(false);
+    expect(control).not.toHaveBeenCalled();
+    const withdraw = { kind: "withdraw", inputId: "first" } as const;
+    await expect(controller.controlChild(withdraw)).resolves.toBe(false);
+    expect(controller.read().observation?.childControls?.observationId).toBe(
+      "new-queue"
+    );
+    expect(controller.retryableChildControl).toBe("withdraw");
+    expect(controller.childControls).toEqual([]);
+    await controller.select("other");
+    await expect(controller.retryChildControl()).resolves.toBe(false);
+    await controller.select("child", "second");
+    await expect(controller.retryChildControl()).resolves.toBe(true);
+    expect(control.mock.calls[0]).toEqual(control.mock.calls[1]);
+    expect(control.mock.calls[1]).toEqual([
+      "attachment",
+      "held-queue",
+      expect.any(String),
+      withdraw,
+    ]);
+    expect(controller.childControls).toEqual([
+      "message",
+      "withdraw",
+      "resume-queue",
+    ]);
+  } finally {
+    controller.dispose();
+  }
+});

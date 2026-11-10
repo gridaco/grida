@@ -48,11 +48,21 @@ export type NativeSubagentObservation = Readonly<{
   child: NativeSubagentInspection;
   stopObservationId: string | null;
   turnControls?: readonly NativeSubagentTurnControl["kind"][];
+  childControls?: Readonly<{
+    observationId: string;
+    available: readonly NativeSubagentChildControl["kind"][];
+    pendingMessages?: number;
+  }>;
 }>;
 
 export type NativeSubagentTurnControl =
   | Readonly<{ kind: "pause" | "resume" }>
   | Readonly<{ kind: "steer"; instructions: string }>;
+
+export type NativeSubagentChildControl =
+  | Readonly<{ kind: "message"; text: string }>
+  | Readonly<{ kind: "withdraw"; inputId: string }>
+  | Readonly<{ kind: "resume-queue" }>;
 
 export type NativeSubagentCreate = Readonly<{
   requestId: string;
@@ -95,5 +105,11 @@ export interface NativeSubagentClient {
     observationId: string,
     requestId: string,
     control: NativeSubagentTurnControl
+  ): Promise<void>;
+  controlSubagentChild?(
+    attachmentId: string,
+    observationId: string,
+    requestId: string,
+    control: NativeSubagentChildControl
   ): Promise<void>;
 }

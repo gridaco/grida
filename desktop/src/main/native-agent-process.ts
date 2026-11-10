@@ -37,6 +37,11 @@ const SUBAGENT_CAPABILITIES = {
   "co.grida/subagent/stop": 1,
 } as const;
 const CHILD_STEERING = "co.grida/subagent/steer";
+const CHILD_MESSAGING = "co.grida/subagent/send-message";
+const CHILD_QUEUE = [
+  "co.grida/subagent/resume-queue",
+  "co.grida/subagent/withdraw",
+] as const;
 
 export type NativeAgentLaunch = {
   resourcesPath: string;
@@ -97,6 +102,8 @@ export class NativeAgentProcess {
   private historyRevision = false;
   private namedChildren = false;
   private childTurnControls = false;
+  private childMessaging = false;
+  private childQueueControls = false;
   private artifacts = false;
   private savedChatDeletion = false;
   private editorSurfaces = false;
@@ -173,6 +180,14 @@ export class NativeAgentProcess {
 
   get acceptsSubagentTurnControls(): boolean {
     return this.acceptsSubagents && this.childTurnControls;
+  }
+
+  get acceptsSubagentMessaging(): boolean {
+    return this.acceptsSubagents && this.childMessaging;
+  }
+
+  get acceptsSubagentQueueControls(): boolean {
+    return this.acceptsSubagents && this.childQueueControls;
   }
 
   get acceptsArtifacts(): boolean {
@@ -305,6 +320,9 @@ export class NativeAgentProcess {
                 ...(options.subagents && {
                   ...SUBAGENT_CAPABILITIES,
                   [CHILD_STEERING]: 1,
+                  [CHILD_MESSAGING]: 1,
+                  [CHILD_QUEUE[0]]: 1,
+                  [CHILD_QUEUE[1]]: 1,
                 }),
                 ...NativeAgentWakeups.capabilities,
                 [NativeEditorSurfaceEndpoints.capability]: 1,
@@ -345,6 +363,10 @@ export class NativeAgentProcess {
           (key) => advertised?.[key] === 1
         );
       processOwner.childTurnControls = advertised?.[CHILD_STEERING] === 1;
+      processOwner.childMessaging = advertised?.[CHILD_MESSAGING] === 1;
+      processOwner.childQueueControls = CHILD_QUEUE.every(
+        (key) => advertised?.[key] === 1
+      );
       for (const key of Object.keys(NativeAgentCommands.capabilities)) {
         if (advertised?.[key] === 1) processOwner.commandCapabilities.add(key);
       }

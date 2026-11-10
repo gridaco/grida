@@ -307,6 +307,23 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     nativeChat.load(event, id)
   );
   guarded(
+    IPC_CHANNELS.NATIVE_CHAT_CONTROL_SUBAGENT_CHILD,
+    (
+      event,
+      id: string,
+      observationId: unknown,
+      requestId: unknown,
+      control: unknown
+    ) =>
+      nativeChat.controlSubagentChild(
+        event,
+        id,
+        observationId,
+        requestId,
+        control
+      )
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_OPEN_SIDE,
     (event, id: string, openId: string) =>
       nativeChat.openSideChat(event, id, openId)

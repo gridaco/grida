@@ -418,7 +418,11 @@ export class NativeAgentChat {
       childId,
       inputId,
       this.subagentScope(parent, check),
-      this.process.acceptsSubagentTurnControls
+      this.process.acceptsSubagentTurnControls,
+      {
+        messaging: this.process.acceptsSubagentMessaging,
+        queue: this.process.acceptsSubagentQueueControls,
+      }
     );
   }
 
@@ -489,6 +493,28 @@ export class NativeAgentChat {
       observationId,
       requestId,
       control,
+      this.subagentScope(parent, check)
+    );
+  }
+
+  controlSubagentChild(
+    attachment: object,
+    parent: NativeChatSession,
+    observationId: string,
+    requestId: string,
+    control: unknown,
+    check: () => void
+  ) {
+    return this.subagents.controlChild(
+      attachment,
+      parent,
+      observationId,
+      requestId,
+      control,
+      {
+        messaging: this.process.acceptsSubagentMessaging,
+        queue: this.process.acceptsSubagentQueueControls,
+      },
       this.subagentScope(parent, check)
     );
   }

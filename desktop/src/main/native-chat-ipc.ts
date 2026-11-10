@@ -120,6 +120,7 @@ export type ActiveNativeChat = Readonly<{
         | "assignSubagent"
         | "stopSubagent"
         | "controlSubagentTurn"
+        | "controlSubagentChild"
         | "readArtifact"
         | "acceptsWakeups"
         | "submitWithWakeup"
@@ -530,6 +531,31 @@ export class NativeChatIpc {
     if (!chat.controlSubagentTurn || !token(observationId) || !token(requestId))
       throw new Error("native_chat_subagent_invalid_input");
     return chat.controlSubagentTurn(
+      attachment,
+      attachment.session,
+      observationId,
+      requestId,
+      control,
+      () => this.revalidate(owner, attachment)
+    );
+  }
+
+  controlSubagentChild(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    observationId: unknown,
+    requestId: unknown,
+    control: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (
+      !chat.controlSubagentChild ||
+      !token(observationId) ||
+      !token(requestId)
+    )
+      throw new Error("native_chat_subagent_invalid_input");
+    return chat.controlSubagentChild(
       attachment,
       attachment.session,
       observationId,

@@ -1,5 +1,6 @@
 import type {
   NativeChatObservation,
+  NativeSubagentChildControl,
   NativeSubagentClient,
   NativeSubagentEntry,
   NativeSubagentObservation,
@@ -27,6 +28,12 @@ type PendingTurnControl = Readonly<{
   token: string;
   requestId: string;
   control: NativeSubagentTurnControl;
+}>;
+
+type PendingChildControl = Readonly<{
+  token: string;
+  requestId: string;
+  control: NativeSubagentChildControl;
 }>;
 
 const EMPTY: View = Object.freeze({
@@ -67,6 +74,10 @@ export class NativeSubagentController {
     requestId: string;
   };
   private pendingTurnControl?: PendingTurnControl;
+  private readonly pendingChildControls = new Map<
+    string,
+    PendingChildControl
+  >();
 
   constructor(
     private readonly client: NativeSubagentClient,
@@ -358,6 +369,92 @@ export class NativeSubagentController {
             error.message.includes("native_chat_subagent_unverified")
               ? pending
               : undefined;
+          throw error;
+        }
+      }
+    );
+  }
+
+  get childControls(): readonly NativeSubagentChildControl["kind"][] {
+    if (!this.client.controlSubagentChild || this.retryableChildControl)
+      return [];
+    const { observation, input } = this.view;
+    return (
+      observation?.childControls?.available.filter(
+        (kind) =>
+          kind !== "withdraw" ||
+          (input !== null && observation.child.queuedInputIds.includes(input))
+      ) ?? []
+    );
+  }
+
+  get retryableChildControl(): NativeSubagentChildControl["kind"] | undefined {
+    const selected = this.view.selected;
+    return selected
+      ? this.pendingChildControls.get(selected)?.control.kind
+      : undefined;
+  }
+
+  controlChild(control: NativeSubagentChildControl): Promise<boolean> {
+    const { observation, selected, input } = this.view;
+    const token = observation?.childControls?.observationId;
+    if (
+      !token ||
+      !selected ||
+      !this.childControls.includes(control.kind) ||
+      (control.kind === "withdraw" && control.inputId !== input)
+    )
+      return Promise.resolve(false);
+    if (
+      control.kind === "message" &&
+      (!control.text.trim() || utf8.encode(control.text).length > 4096)
+    ) {
+      this.update({ error: "Enter a message of at most 4 KiB." });
+      return Promise.resolve(false);
+    }
+    return this.sendChildControl(selected, {
+      token,
+      requestId: crypto.randomUUID(),
+      control: { ...control },
+    });
+  }
+
+  retryChildControl(): Promise<boolean> {
+    const selected = this.view.selected;
+    const pending = selected && this.pendingChildControls.get(selected);
+    return selected && pending
+      ? this.sendChildControl(selected, pending)
+      : Promise.resolve(false);
+  }
+
+  private sendChildControl(
+    childId: string,
+    pending: PendingChildControl
+  ): Promise<boolean> {
+    return this.act(
+      "Couldn't confirm the subagent action. Check the current state or retry the same action if offered.",
+      async () => {
+        try {
+          await this.client.controlSubagentChild!(
+            this.attachmentId,
+            pending.token,
+            pending.requestId,
+            pending.control
+          );
+          this.pendingChildControls.delete(childId);
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message.includes("native_chat_subagent_unverified")
+          ) {
+            if (this.pendingChildControls.size >= 16) {
+              const oldest = this.pendingChildControls.keys().next().value;
+              if (oldest) this.pendingChildControls.delete(oldest);
+            }
+            this.pendingChildControls.set(childId, pending);
+          } else {
+            this.pendingChildControls.delete(childId);
+          }
           throw error;
         }
       }
