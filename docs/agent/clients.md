@@ -820,6 +820,11 @@ retained queue until its first work turn is reserved. It appears as a goal
 after restart. To change it before work starts, remove it from the queue and
 start a new goal with the revised objective or allowance.
 
+After work starts, use **Edit goal** to change the objective or criteria
+while keeping the same goal and allowance. Editing stops any current goal
+turn and preserves its recorded work. A funded review uses the task controls
+before its goal can be edited.
+
 Start a goal in an idle chat with an empty queue. Supply an objective, its
 success criteria, and separate allowances for work turns and inference steps.
 Opt in to automatic continuation when you start the goal. The next reserved

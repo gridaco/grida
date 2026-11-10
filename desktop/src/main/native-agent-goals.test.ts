@@ -574,24 +574,31 @@ it.runIf(Boolean(packaged))(
       expect(resumed.turnId).toBe(turnId);
       await vi.waitFor(() => expect(endpoint.requests).toHaveLength(2));
       expect(endpoint.requests[1]).toContain("Plan is active.");
-      const stoppedTurn = await snapshot();
-      await ipc.control(event, attachmentId, {
-        observationId: stoppedTurn.observationId,
-        requestId: "stop-goal-work",
-        action: "stop",
+      const inProgress = await goal();
+      const revisedActive = await ipc.controlGoal(event, attachmentId, {
+        observationId: inProgress.observationId,
+        requestId: "revise-active-goal",
+        action: "revise",
+        objective: {
+          description: "Review the smaller export",
+          criteria: ["The export fits"],
+        },
       });
+      expect(revisedActive.turnId).toBe(turnId);
       await vi.waitFor(async () => {
         expect((await snapshot()).snapshot.current).toBeNull();
         expect((await goal()).goal).toEqual(
           expect.objectContaining({
             goalId: "first-goal",
+            objective: "Review the smaller export",
             state: { status: "blocked", reason: "uncertain_work" },
             reservation: expect.objectContaining({ uncertain: true }),
           })
         );
       });
 
-      attachmentId = (await ipc.create(event)).attachmentId;
+      const second = await ipc.create(event);
+      attachmentId = second.attachmentId;
       await ipc.startGoal(event, attachmentId, "second-goal", REQUEST);
       await vi.waitFor(() => expect(endpoint.requests).toHaveLength(4));
       expect(endpoint.requests[2]).not.toContain("Plan is active.");
@@ -603,8 +610,48 @@ it.runIf(Boolean(packaged))(
         });
         return inspected;
       });
-      await ipc.controlGoal(event, attachmentId, {
+      const revisedObjective = {
+        description: "Inspect the revised export",
+        criteria: ["Check its visible size"],
+      };
+      const change = {
         observationId: blocked.observationId,
+        requestId: "revise-goal",
+        action: "revise",
+        objective: revisedObjective,
+      };
+      const revised = await ipc.controlGoal(event, attachmentId, change);
+      await expect(
+        ipc.controlGoal(event, attachmentId, change)
+      ).resolves.toEqual(revised);
+      await expect(
+        ipc.controlGoal(event, attachmentId, {
+          ...change,
+          objective: {
+            ...revisedObjective,
+            description: "Different objective",
+          },
+        })
+      ).rejects.toThrow("request_identity_reused");
+      const updated = await goal();
+      expect(updated.goalRevision).toBe((blocked.goalRevision ?? 0) + 1);
+      expect(updated.goal).toMatchObject({
+        goalId: blocked.goal?.goalId,
+        objective: revisedObjective.description,
+        criteria: revisedObjective.criteria,
+        spent: blocked.goal?.spent,
+        remaining: blocked.goal?.remaining,
+        allowance: blocked.goal?.allowance,
+        state: { status: "active" },
+      });
+      await chat.close();
+      chat = await launch();
+      attachmentId = (await ipc.load(event, second.sessionId)).attachmentId;
+      const reopenedGoal = await goal();
+      expect(reopenedGoal.goal).toEqual(updated.goal);
+      expect(reopenedGoal.goalRevision).toBe(updated.goalRevision);
+      await ipc.controlGoal(event, attachmentId, {
+        observationId: reopenedGoal.observationId,
         requestId: "clear-goal",
         action: "clear",
       });

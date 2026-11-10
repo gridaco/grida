@@ -1287,6 +1287,83 @@ it.each([
   }
 );
 
+it("retries an accepted Goal revision exactly and refuses a stale changed draft", async () => {
+  const { bridge, controller } = fixture();
+  const original = {
+    description: "Check the export",
+    criteria: ["The export opens"],
+  };
+  const objective = {
+    description: "Check the revised export",
+    criteria: ["The page fits"],
+  };
+  const allowance = { workTurns: 3, inferenceSteps: 8 };
+  let goalRevision = 1;
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const value = await observe(id);
+    return {
+      ...value,
+      snapshot: { ...value.snapshot, sessionRevision: goalRevision + 1 },
+    };
+  };
+  bridge.startGoal = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
+  bridge.goal = async () => ({
+    observationId: `observed-goal-${goalRevision}`,
+    goalRevision,
+    goal: {
+      goalId: "goal",
+      objective: (goalRevision === 1 ? original : objective).description,
+      criteria: (goalRevision === 1 ? original : objective).criteria,
+      state: { status: "active" },
+      automatic: false,
+      paused: false,
+      progress: null,
+      allowance,
+      spent: { workTurns: 1, inferenceSteps: 2 },
+      remaining: { workTurns: 2, inferenceSteps: 6 },
+      reservation: null,
+    },
+  });
+  const control = vi.fn<NonNullable<DesktopNativeChat["controlGoal"]>>(
+    async (sessionId, change) => ({
+      sessionId,
+      requestId: change.requestId,
+      sessionRevision: 3,
+      stateRevision: 2,
+      turnId: null,
+      journalPosition: null,
+    })
+  );
+  control.mockImplementationOnce(async () => {
+    goalRevision = 2;
+    throw new Error("fixture lost the revision receipt");
+  });
+  bridge.controlGoal = control;
+  try {
+    await controller.select("chat-a");
+    const basis = {
+      scope: controller.read().scope,
+      goalId: "goal",
+      goalRevision: 1,
+    };
+    expect(await controller.reviseGoal(basis, objective)).toBe(false);
+    expect(controller.read().goal?.goalRevision).toBe(2);
+    expect(await controller.reviseGoal(basis, original)).toBe(false);
+    expect(control).toHaveBeenCalledTimes(1);
+    expect(controller.read().error).toContain("The goal changed");
+    expect(await controller.reviseGoal(basis, objective)).toBe(true);
+    expect(control.mock.calls[1]).toEqual(control.mock.calls[0]);
+    expect(control.mock.calls[0]?.[1]).toMatchObject({
+      observationId: "observed-goal-1",
+      action: "revise",
+      objective,
+    });
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it.each(["blocked", "cleared"] as const)(
   "uses task controls for funded Goal work and accounts for its exact held review when %s",
   async (heldStatus) => {

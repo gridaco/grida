@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore, type FormEvent } from "react";
 import type {
   NativeChatEffort,
   NativeChatGoal,
+  NativeChatGoalObjective,
   NativeChatTurn,
 } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
@@ -23,6 +24,12 @@ const BLOCKER = {
   uncertain_work: "Work outcome uncertain",
 } as const;
 
+type GoalRevisionDraft = NativeChatGoalObjective & {
+  scope: number;
+  goalId: string;
+  goalRevision: number;
+};
+
 export function NativeGoalPanel({
   controller,
   view,
@@ -32,7 +39,13 @@ export function NativeGoalPanel({
 }) {
   const [adding, setAdding] = useState(false);
   const [effort, setEffort] = useState<NativeChatEffort>("standard");
+  const [editing, setEditing] = useState<GoalRevisionDraft | null>(null);
   const goal = view.goal?.goal;
+  const goalRevision = view.goal?.goalRevision;
+  const revisionDraft =
+    editing?.scope === view.scope && editing.goalId === goal?.goalId
+      ? editing
+      : null;
   const review = goal?.review?.status === "pending" ? goal.review : null;
   const pending = view.observation?.snapshot.pendingGoalId;
   const goalTurn =
@@ -54,16 +67,14 @@ export function NativeGoalPanel({
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const fields = new FormData(event.currentTarget);
+    const objective = readObjective(fields);
     const namedChildId = namedReviewers
       ? String(fields.get("namedChildId") ?? "")
       : "";
     void controller
       .startGoal({
-        objective: String(fields.get("objective") ?? "").trim(),
-        criteria: String(fields.get("criteria") ?? "")
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter(Boolean),
+        objective: objective.description,
+        criteria: objective.criteria,
         allowance: {
           workTurns: Number(fields.get("workTurns")),
           inferenceSteps: Number(fields.get("inferenceSteps")),
@@ -76,6 +87,19 @@ export function NativeGoalPanel({
       })
       .then((accepted) => {
         if (accepted) setAdding(false);
+      });
+  };
+  const revise = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!revisionDraft) return;
+    const { scope, goalId, goalRevision } = revisionDraft;
+    void controller
+      .reviseGoal(
+        { scope, goalId, goalRevision },
+        readObjective(new FormData(event.currentTarget))
+      )
+      .then((accepted) => {
+        if (accepted) setEditing(null);
       });
   };
 
@@ -181,6 +205,27 @@ export function NativeGoalPanel({
           )}
           {!fundedTurn && goal.state.status !== "cleared" && (
             <div className="flex flex-wrap gap-1">
+              {goalRevision !== undefined &&
+                goal.state.status !== "complete" &&
+                !revisionDraft && (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    type="button"
+                    disabled={!controller.canControlGoal("revise")}
+                    onClick={() =>
+                      setEditing({
+                        scope: view.scope,
+                        goalId: goal.goalId,
+                        goalRevision,
+                        description: goal.objective,
+                        criteria: goal.criteria,
+                      })
+                    }
+                  >
+                    Edit goal
+                  </Button>
+                )}
               {canManageWork &&
               (goal.paused || goal.state.status === "blocked") ? (
                 <Button
@@ -226,29 +271,41 @@ export function NativeGoalPanel({
           )}
         </>
       )}
+      {revisionDraft && (
+        <form className="space-y-2" onSubmit={revise} aria-label="Edit goal">
+          <GoalObjectiveFields disabled={view.acting} initial={revisionDraft} />
+          {goalTurn && (
+            <p className="text-muted-foreground">
+              Saving stops the current goal turn. Its work still counts toward
+              the allowance.
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              size="xs"
+              variant="ghost"
+              type="button"
+              disabled={view.acting}
+              onClick={() => setEditing(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="xs"
+              type="submit"
+              disabled={!controller.canControlGoal("revise")}
+            >
+              Save goal
+            </Button>
+          </div>
+        </form>
+      )}
       {adding ? (
         <form className="space-y-2" onSubmit={submit}>
           <p className="text-muted-foreground">
             {view.operatingRegime === "plan" ? "Plan goal" : "Act goal"}
           </p>
-          <label className="block space-y-1">
-            <span>Objective</span>
-            <Textarea
-              name="objective"
-              required
-              rows={2}
-              disabled={view.acting}
-            />
-          </label>
-          <label className="block space-y-1">
-            <span>Success criteria, one per line</span>
-            <Textarea
-              name="criteria"
-              required
-              rows={2}
-              disabled={view.acting}
-            />
-          </label>
+          <GoalObjectiveFields disabled={view.acting} />
           <div className="grid grid-cols-2 gap-2">
             <label className="block space-y-1">
               <span>Work turns</span>
@@ -345,6 +402,49 @@ export function NativeGoalPanel({
         </Button>
       ) : null}
     </section>
+  );
+}
+
+function readObjective(fields: FormData): NativeChatGoalObjective {
+  return {
+    description: String(fields.get("objective") ?? "").trim(),
+    criteria: String(fields.get("criteria") ?? "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean),
+  };
+}
+
+function GoalObjectiveFields({
+  disabled,
+  initial,
+}: {
+  disabled: boolean;
+  initial?: NativeChatGoalObjective;
+}) {
+  return (
+    <>
+      <label className="block space-y-1">
+        <span>Objective</span>
+        <Textarea
+          name="objective"
+          required
+          rows={2}
+          disabled={disabled}
+          defaultValue={initial?.description}
+        />
+      </label>
+      <label className="block space-y-1">
+        <span>Success criteria, one per line</span>
+        <Textarea
+          name="criteria"
+          required
+          rows={2}
+          disabled={disabled}
+          defaultValue={initial?.criteria.join("\n")}
+        />
+      </label>
+    </>
   );
 }
 

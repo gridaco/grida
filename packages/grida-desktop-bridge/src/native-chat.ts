@@ -395,6 +395,7 @@ export type NativeChatGoal = Readonly<
 export type NativeChatGoalObservation = Readonly<{
   observationId: string | null;
   goal: NativeChatGoal | null;
+  goalRevision?: number;
 }>;
 
 export type NativeChatGoalAction =
@@ -404,11 +405,21 @@ export type NativeChatGoalAction =
   | "confirm_completion"
   | "reconcile_review";
 
+export type NativeChatGoalObjective = Readonly<{
+  description: string;
+  criteria: readonly string[];
+}>;
+
+export type NativeChatGoalChange = Readonly<
+  | { action: NativeChatGoalAction }
+  | { action: "revise"; objective: NativeChatGoalObjective }
+>;
+
 export type NativeChatGoalControl = Readonly<{
   observationId: string;
   requestId: string;
-  action: NativeChatGoalAction;
-}>;
+}> &
+  NativeChatGoalChange;
 
 export type NativeChatGoalReceipt = Readonly<{
   sessionId: string;

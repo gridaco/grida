@@ -2,6 +2,7 @@
 import type {
   NativeChatGoal,
   NativeChatGoalControl,
+  NativeChatGoalObjective,
   NativeChatGoalReceipt,
   NativeChatGoalRequest,
   NativeChatGoalStatus,
@@ -101,6 +102,15 @@ export class NativeAgentGoals {
         ? {}
         : { effort: member(row.effort, ["ultra"] as const) }),
     });
+  }
+
+  static readObjective(value: unknown): NativeChatGoalObjective {
+    const objective = object(value);
+    if (Object.keys(objective).length !== 2) throw invalid();
+    return {
+      description: text(objective.description, OBJECTIVE_LIMIT),
+      criteria: criteria(objective.criteria),
+    };
   }
 
   start(
@@ -262,6 +272,7 @@ export class NativeAgentGoals {
       "pause",
       "resume",
       "clear",
+      "revise",
       "confirm_completion",
       "reconcile_review",
     ] as const);
@@ -285,6 +296,7 @@ export class NativeAgentGoals {
         basis: inspection.basis,
         change: {
           action,
+          ...(change.action === "revise" && { objective: change.objective }),
           ...(action === "confirm_completion" && { turn: review?.turnId }),
           ...(action === "reconcile_review" && { turn: reservation?.turnId }),
         },

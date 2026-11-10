@@ -46,6 +46,11 @@ answer against the notes before confirming completion.
 Pause preserves the allowance already held for the task. Stop ends the active
 turn and leaves the goal visible. [Guide and interrupt work](./controls.md)
 
+Use **Edit goal** to revise the objective or success criteria of an active
+goal. Its used and held allowance carries forward. Saving during a goal turn
+stops that turn and keeps its recorded work. For a turn with a funded review,
+use the task controls before editing.
+
 When a native workspace Gateway connection offers **Effort for this goal**,
 choose **Ultra** to let one independent review share the goal's inference
 allowance. Use the task's Pause, Resume, or Stop controls during the funded

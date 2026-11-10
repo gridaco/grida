@@ -58,7 +58,10 @@ import type {
   NativeQuestionReview,
 } from "./native-agent-chat";
 import type { NativeApprovalReview } from "./native-agent-permissions";
-import type { NativeGoalInspection } from "./native-agent-goals";
+import {
+  NativeAgentGoals,
+  type NativeGoalInspection,
+} from "./native-agent-goals";
 import type { NativeSideChat } from "./native-agent-side-chats";
 import type {
   NativeEditorSurfaceLease,
@@ -2034,7 +2037,11 @@ export class NativeChatIpc {
           left.basis?.goal === right.basis?.goal &&
           left.basis?.revision === right.basis?.revision
       );
-    return { observationId: token, goal: inspection.goal };
+    return {
+      observationId: token,
+      goal: inspection.goal,
+      ...(inspection.basis && { goalRevision: inspection.basis.revision }),
+    };
   }
 
   async startGoal(
@@ -2062,27 +2069,34 @@ export class NativeChatIpc {
     const change = record(input);
     if (
       !change ||
-      Object.keys(change).length !== 3 ||
+      Object.keys(change).length !== (change.action === "revise" ? 4 : 3) ||
       !token(change.observationId) ||
       typeof change.requestId !== "string" ||
       (change.action !== "pause" &&
         change.action !== "resume" &&
         change.action !== "confirm_completion" &&
         change.action !== "reconcile_review" &&
+        change.action !== "revise" &&
         change.action !== "clear")
     )
       throw new Error("native_chat_goal_control_invalid");
     const inspection = attachment.goals.get(change.observationId);
     if (!inspection)
       throw new Error("native_chat_goal_observation_unavailable");
+    const reference = {
+      observationId: change.observationId,
+      requestId: change.requestId,
+    };
     const receipt = await owner.active.chat.controlGoal(
       attachment.session,
       inspection,
-      {
-        observationId: change.observationId,
-        requestId: change.requestId,
-        action: change.action,
-      }
+      change.action === "revise"
+        ? {
+            ...reference,
+            action: change.action,
+            objective: NativeAgentGoals.readObjective(change.objective),
+          }
+        : { ...reference, action: change.action }
     );
     this.revalidate(owner, attachment);
     return receipt;

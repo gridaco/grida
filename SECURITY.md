@@ -1122,6 +1122,9 @@ lazy reads, read-only mutation, and symlink escape refusal.
   acceptance of the objective and allowance. An explicitly selected
   check-in requires the negotiated scheduling controls and a Standard Act
   goal. It uses the first turn's captured allowance and authority.
+  Revising the objective or criteria uses the same attached observation and
+  request identity. The worker cancels any affected owned turn and retains
+  its recorded work and allowance.
   Completion confirmation requires a negotiated, attached user control. The
   inspected work turn and objective revision are retained behind the same
   scoped token. The owner commits the exact confirmation only while idle
