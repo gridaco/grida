@@ -354,6 +354,19 @@ to offer the same operation directly in Act. It takes the same workspace
 artifact path and returns the same outcome without an MCP connection.
 Plan leaves it unavailable. A resumed turn requires its captured tool set.
 
+### Read the live Desktop workbench
+
+An explicitly enabled disposable Desktop launch can export `surface_list_open`
+for one workspace. It returns the active file and bounded open-tab list as
+workspace-relative paths. The service runs independently of the built-in chat.
+Connect with the same Streamable HTTP authentication described above, using
+the dedicated export bearer. [Desktop launch options](https://github.com/gridaco/grida/blob/main/desktop/README.md)
+
+An attached workbench with no files open returns an empty view. Before the
+selected frame publishes, or after it navigates or closes, the endpoint reports
+that the workbench is unavailable. Start a new explicit export to select a
+replacement frame.
+
 ## Use tools from a local MCP server
 
 Source-built `run` and `serve --stdio` can opt into tools on one trusted

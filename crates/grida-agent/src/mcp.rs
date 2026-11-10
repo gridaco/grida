@@ -1,7 +1,7 @@
 //! GRIDA-SEC-004 — explicitly enabled MCP tools over authenticated loopback HTTP.
 
 use crate::surface_tools::{OPEN_SURFACE, headless_surface};
-use crate::tool_host::CapabilityGrant;
+use crate::tool_host::{CapabilityGrant, ToolHost};
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ResultContent};
 use agent_kit_core::{CancellationToken, Error, ErrorKind, Result, ToolId};
@@ -33,6 +33,8 @@ use subtle::ConstantTimeEq;
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 use zeroize::Zeroizing;
+
+mod editor;
 
 const MCP_PATH: &str = "/mcp";
 const MAX_CONNECTIONS: usize = 16;
@@ -82,8 +84,33 @@ pub async fn serve_headless(
     options: ListenOptions,
     shutdown: impl Future<Output = Result<()>>,
 ) -> Result<()> {
-    let host = headless_surface()?;
-    let surface = host.grant(&ToolId::new(OPEN_SURFACE)?)?;
+    serve_tool(options, headless_surface()?, OPEN_SURFACE, shutdown).await
+}
+
+/// Export the one live editor read owned by the private Desktop stdio peer.
+/// The HTTP listener has no model, chat, or agent store.
+pub async fn serve_editor(
+    options: ListenOptions,
+    shutdown: impl Future<Output = Result<()>>,
+) -> Result<()> {
+    let (host, pipe) = editor::tool()?;
+    let closing = async {
+        tokio::select! {
+            biased;
+            result = shutdown => result,
+            result = pipe.run(tokio::io::stdin(), tokio::io::stdout()) => result,
+        }
+    };
+    serve_tool(options, host, crate::editor_surfaces::LIST_OPEN, closing).await
+}
+
+async fn serve_tool(
+    options: ListenOptions,
+    host: ToolHost,
+    name: &str,
+    shutdown: impl Future<Output = Result<()>>,
+) -> Result<()> {
+    let surface = host.grant(&ToolId::new(name)?)?;
     let listener = TcpListener::bind(options.address)
         .await
         .map_err(|_| Error::new(ErrorKind::Unavailable, "mcp_listener_unavailable"))?;
@@ -95,7 +122,7 @@ pub async fn serve_headless(
     let closing = CancellationToken::new();
     let service = StreamableHttpService::new(
         move || {
-            Ok(HeadlessTools {
+            Ok(ExportedTool {
                 surface: surface.clone(),
             })
         },
@@ -196,11 +223,11 @@ fn reject(
     Some(response)
 }
 
-struct HeadlessTools {
+struct ExportedTool {
     surface: CapabilityGrant,
 }
 
-impl ServerHandler for HeadlessTools {
+impl ServerHandler for ExportedTool {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_server_info(
             Implementation::new("grida-tool-host", env!("CARGO_PKG_VERSION")),

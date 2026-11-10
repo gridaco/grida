@@ -1071,8 +1071,14 @@ lazy reads, read-only mutation, and symlink escape refusal.
   explicitly enabled local service to a numeric loopback address. It checks
   the exact authority and path, rejects browser origins, and authenticates each
   request before the SDK can route it. The bearer value is removed before
-  dispatch. This listener exposes only the selected headless capability and
-  opens no chat, provider, credential, or workspace store.
+  dispatch. The headless and live profiles each expose one reviewed capability
+  independently of chat, provider, and workspace storage.
+  [Main's live export owner](desktop/src/main/native-editor-mcp-export.ts)
+  captures a separate private bearer and the exact selected workspace. Only
+  its first current, authenticated workbench frame can publish bounded
+  workspace-relative paths. Navigation, destruction, sign-out, or identity
+  change withdraws the view without retargeting. The [private pipe](crates/grida-agent/src/mcp/editor.rs)
+  correlates each read and retires on framing, timeout, or connection failure.
 - The outbound [MCP client](crates/grida-agent/src/mcp_client.rs) captures
   only a trusted source's explicitly selected tools. Its
   [HTTP transport](crates/grida-agent/src/mcp_client/http.rs) sends the

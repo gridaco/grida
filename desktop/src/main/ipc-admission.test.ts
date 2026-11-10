@@ -7,6 +7,7 @@ const allChannels = Object.values(IPC_CHANNELS) as IpcChannel[];
 const nativeChat = allChannels.filter((channel) =>
   channel.startsWith("grida:native-chat:")
 );
+const workspacePublish = IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES;
 
 describe("ipc_admission", () => {
   it("gives sign-in only browser launch and read-only title-bar state", () => {
@@ -46,7 +47,10 @@ describe("ipc_admission", () => {
 
   it("admits the Tools route with its separate native media capabilities", () => {
     expect(allowedFor("main", "/desktop/tools")).toEqual(
-      allChannels.filter((channel) => !nativeChat.includes(channel))
+      allChannels.filter(
+        (channel) =>
+          !nativeChat.includes(channel) && channel !== workspacePublish
+      )
     );
   });
 
@@ -67,6 +71,22 @@ describe("ipc_admission", () => {
         )
       ).toBe(false);
     }
+  });
+
+  it("admits independent workbench publication only from the main workspace route", () => {
+    expect(allowedFor("main", "/desktop/workspace")).toContain(
+      workspacePublish
+    );
+    for (const route of [
+      "/desktop/file",
+      "/desktop/settings",
+      "/desktop/workspace/extra",
+    ]) {
+      expect(allowedFor("main", route)).not.toContain(workspacePublish);
+    }
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+      workspacePublish
+    );
   });
 
   it("keeps durable media capabilities exclusive to the exact Tools route", () => {

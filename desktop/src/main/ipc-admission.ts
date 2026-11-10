@@ -66,7 +66,10 @@ export namespace ipc_admission {
         if (TOOLS_ONLY_CHANNELS.has(channel)) {
           return pathname === "/desktop/tools";
         }
-        if (channel.startsWith("grida:native-chat:")) {
+        if (
+          channel.startsWith("grida:native-chat:") ||
+          channel === IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES
+        ) {
           return pathname === "/desktop/workspace";
         }
         return true;

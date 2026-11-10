@@ -1,5 +1,8 @@
 import type { AgentSurface } from "@grida/agent/surface";
-import { NativeEditorSurfaces } from "@grida/desktop-bridge";
+import {
+  NativeEditorSurfaces,
+  type NativeEditorSurfaceSnapshot,
+} from "@grida/desktop-bridge";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import type { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import type { EditorGroup } from "./editor-group";
@@ -99,6 +102,36 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
 
   subscribeToEditorSurfaces(listener: () => void): () => void {
     return this.group.subscribe(listener);
+  }
+
+  publishEditorSurfaces(
+    publish: (snapshot: NativeEditorSurfaceSnapshot) => Promise<boolean>
+  ): () => void {
+    let current = true;
+    let pending = false;
+    let dirty = false;
+    const flush = async () => {
+      while (current && dirty) {
+        dirty = false;
+        current =
+          (await publish(this.readEditorSurfaces()).catch(() => false)) &&
+          current;
+      }
+      pending = false;
+    };
+    const update = () => {
+      if (!current) return;
+      dirty = true;
+      if (pending) return;
+      pending = true;
+      void flush();
+    };
+    const unsubscribe = this.subscribeToEditorSurfaces(update);
+    update();
+    return () => {
+      current = false;
+      unsubscribe();
+    };
   }
 
   /**

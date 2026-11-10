@@ -99,6 +99,10 @@ type RegisterIpcHandlersOptions = {
   ) => ActiveNativeChat | null;
   /** Present when this main process has selected native chat mode. */
   ensure_native_chat?: (workspaceId: string) => Promise<void>;
+  publish_workspace_surfaces?: (
+    event: IpcMainInvokeEvent,
+    snapshot: unknown
+  ) => Promise<boolean>;
   native_chatgpt_oauth?: Pick<
     ChatGptOAuthCoordinator,
     "connect" | "cancel" | "status" | "signOut"
@@ -545,6 +549,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.ONBOARDING_WORKSPACE_CHOOSE, chooseWorkspace);
   guarded(IPC_CHANNELS.WORKSPACE_LIST, () =>
     agentSidecarClient.listWorkspaces()
+  );
+  guarded(
+    IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES,
+    (event, snapshot: unknown) =>
+      options.publish_workspace_surfaces?.(event, snapshot) ?? false
   );
   guarded(IPC_CHANNELS.WORKSPACE_CHOOSE, chooseWorkspace);
   guarded(IPC_CHANNELS.WORKSPACE_REOPEN, (_event, root: unknown) => {

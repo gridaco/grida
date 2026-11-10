@@ -870,6 +870,11 @@ const bridge: DesktopBridge = {
 
   workspaces: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_LIST),
+    publish_editor_surfaces: (snapshot) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES,
+        snapshot
+      ),
     choose: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_CHOOSE),
     open: (rootPath) =>
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_REOPEN, rootPath),

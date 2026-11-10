@@ -174,6 +174,20 @@ fn command() -> Command {
                 ),
         )
         .subcommand(
+            Command::new("serve-editor-mcp")
+                .hide(true)
+                .arg(
+                    Arg::new("listen")
+                        .long("listen")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("server-token-env")
+                        .long("server-token-env")
+                        .required(true),
+                ),
+        )
+        .subcommand(
             Command::new("inspect")
                 .about("Read a persisted session without running a prompt")
                 .arg(state_dir())
@@ -330,14 +344,18 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     if name == "workspace-file" {
         return grida_agent::workspace_file::serve_stdio().map(|()| 0);
     }
-    if name == "serve-mcp" {
+    if name == "serve-mcp" || name == "serve-editor-mcp" {
         let options = mcp::ListenOptions::from_environment(
             args.get_one::<String>("listen")
                 .expect("required listen address"),
             args.get_one::<String>("server-token-env")
                 .expect("required token environment"),
         )?;
-        mcp::serve_headless(options, process::shutdown_signal()).await?;
+        if name == "serve-editor-mcp" {
+            mcp::serve_editor(options, process::shutdown_signal()).await?;
+        } else {
+            mcp::serve_headless(options, process::shutdown_signal()).await?;
+        }
         return Ok(0);
     }
     let state_dir = args

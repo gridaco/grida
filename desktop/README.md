@@ -188,6 +188,22 @@ selection to that folder identity and its first authenticated Gateway account,
 organization and origin for this launch. Discovery runs when that workspace's
 native process starts. Plan prompts cannot use the discovered tools.
 
+To export a live workspace view to another local agent, place a separate
+64-character hexadecimal bearer in `native-mcp-export.bearer` under
+`--user-data-dir`. Use mode `0600` or `0400` and omit a trailing newline.
+Add these options to the disposable `--native-chat` launch:
+
+```sh
+--native-chat-export-mcp-root=/absolute/canonical/workspace \
+--native-chat-export-mcp-listen=http://127.0.0.1:8767/mcp
+```
+
+Connect your MCP client to that address with the export bearer. Open the
+selected workspace in Desktop to publish its open-tab view. Only the first
+admitted workbench frame for that exact folder can publish. Navigating away,
+closing the frame, or signing out withdraws the view for this launch. The
+listener offers `surface_list_open` independently of any model session.
+
 Add `--native-chat-provider=chatgpt` to explicitly select the experimental
 ChatGPT subscription profile for that disposable run. Use the existing Desktop
 ChatGPT sign-in with an eligible account. The launch uses its reviewed default

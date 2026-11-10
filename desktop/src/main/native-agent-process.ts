@@ -225,6 +225,29 @@ export class NativeAgentProcess {
       : [];
   }
 
+  static executable(resourcesPath: string): string {
+    if (!path.isAbsolute(resourcesPath))
+      throw new Error("native_agent_absolute_directory_required");
+    const resources = path.join(resourcesPath, "native-agent");
+    const executable = path.join(
+      resources,
+      process.platform === "win32" ? "grida-agent.exe" : "grida-agent"
+    );
+    const directory = fs.lstatSync(resources, { throwIfNoEntry: false });
+    const file = fs.lstatSync(executable, { throwIfNoEntry: false });
+    if (
+      !directory?.isDirectory() ||
+      !file?.isFile() ||
+      (process.platform !== "win32" &&
+        ((directory.mode & 0o022) !== 0 ||
+          (file.mode & 0o022) !== 0 ||
+          (file.mode & 0o111) === 0))
+    ) {
+      throw new Error("native_agent_installation_unavailable");
+    }
+    return executable;
+  }
+
   static async start(options: NativeAgentLaunch): Promise<NativeAgentProcess> {
     if (options.subagents && !options.gatewayScope)
       throw new Error("native_agent_subagents_gateway_required");
@@ -254,23 +277,7 @@ export class NativeAgentProcess {
         throw new Error("native_agent_absolute_directory_required");
       }
     }
-    const resources = path.join(options.resourcesPath, "native-agent");
-    const executable = path.join(
-      resources,
-      process.platform === "win32" ? "grida-agent.exe" : "grida-agent"
-    );
-    const directory = fs.lstatSync(resources, { throwIfNoEntry: false });
-    const file = fs.lstatSync(executable, { throwIfNoEntry: false });
-    if (
-      !directory?.isDirectory() ||
-      !file?.isFile() ||
-      (process.platform !== "win32" &&
-        ((directory.mode & 0o022) !== 0 ||
-          (file.mode & 0o022) !== 0 ||
-          (file.mode & 0o111) === 0))
-    ) {
-      throw new Error("native_agent_installation_unavailable");
-    }
+    const executable = NativeAgentProcess.executable(options.resourcesPath);
     const permissionProfile = options.workspace
       ? await NativeAgentPermissions.stage(
           options.stateDirectory,

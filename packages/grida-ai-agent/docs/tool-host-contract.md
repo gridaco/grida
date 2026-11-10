@@ -92,6 +92,14 @@ workbench returns an empty view. A detached or replaced workbench is unavailable
 An unverified reply supplies no editor data. The binding grants no filesystem
 access or document mutation.
 
+The disposable Desktop export uses the same `surface_list_open` definition,
+snapshot validation, and domain result through its authenticated MCP listener.
+The launcher selects an exact registered workspace and Main binds its first
+admitted workbench frame independently of chat. A bounded reverse stdio read
+asks Main for that frame's current published view on each tool call. Loss of
+the frame withdraws the view for the lifetime of the export. Losing the private
+stdio connection closes the listener.
+
 When the same workbench offers presentation, `surface_open` asks that exact
 frame to open a workspace artifact. Main binds the request to a call identity
 and the frame's last published view. The editor validates the target and

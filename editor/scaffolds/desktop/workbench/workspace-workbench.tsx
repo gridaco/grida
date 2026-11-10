@@ -180,6 +180,13 @@ export function WorkspaceWorkbench({
     activeRelPath && !isVirtualTab(activeRelPath) ? activeRelPath : null;
   const [restoreSettled, setRestoreSettled] = useState(false);
 
+  useEffect(() => {
+    if (restoreSettled)
+      return surfaceHost.publishEditorSurfaces(
+        workspacesNs.publishEditorSurfaces
+      );
+  }, [restoreSettled, surfaceHost]);
+
   // Workspace continuity is a one-shot host action. The persisted renderer
   // state supplies order + focus; the surface host still checks every path
   // against live bridge truth before restoring the editor group.

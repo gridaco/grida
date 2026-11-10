@@ -76,6 +76,7 @@ import type {
   DesktopHostAppId,
   DesktopHostAppInfo,
   MediaItem,
+  NativeEditorSurfaceSnapshot,
   NavigationState,
   Workspace,
   WorkspaceChangeEvent,
@@ -1142,6 +1143,16 @@ export namespace nav {
  *   if (paths?.[0]) await workspaces.openFolder(paths[0]);
  */
 export namespace workspaces {
+  export async function publishEditorSurfaces(
+    snapshot: NativeEditorSurfaceSnapshot
+  ): Promise<boolean> {
+    return (
+      (await getDesktopBridge()?.workspaces.publish_editor_surfaces?.(
+        snapshot
+      )) ?? false
+    );
+  }
+
   export async function list(): Promise<Workspace[]> {
     return await bridgeOrThrow().workspaces.list();
   }

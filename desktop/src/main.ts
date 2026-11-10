@@ -43,6 +43,7 @@ import { DesktopPreferences } from "./main/desktop-preferences";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { NativeMcpLaunch } from "./main/native-mcp-launch";
+import { NativeEditorMcpExport } from "./main/native-editor-mcp-export";
 import { nativeWorkspaceCatalog } from "./main/workspace-media-access";
 import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 
@@ -120,6 +121,7 @@ let entryWindow: DesktopEntryWindow | null = null;
 let nativeDesktopAgent: NativeDesktopAgent | undefined;
 let recentFiles = agentSidecarClient.recent;
 let nativeQuitDrain: Promise<void> | undefined;
+let nativeEditorMcp: NativeEditorMcpExport | undefined;
 let nativeQuitReady = false;
 const windowAdmission = {
   can_open: () => entryWindow?.isMain ?? false,
@@ -605,6 +607,24 @@ app.on("ready", async () => {
         privateFile: true,
       });
       agentSidecarClient.setWorkspaceCatalog(workspaceCatalog);
+      if (process.argv.includes("--native-chat")) {
+        const catalog = workspaceCatalog;
+        nativeEditorMcp = await NativeEditorMcpExport.start(
+          process.argv,
+          app.getPath("userData"),
+          process.resourcesPath,
+          {
+            editorOrigin: new URL(EDITOR_BASE_URL).origin,
+            admits: (sender) => {
+              const window = BrowserWindow.fromWebContents(sender);
+              return (
+                window !== null && entryWindow?.ipcRoleFor(window) === "main"
+              );
+            },
+            workspaceRoot: async (id) => (await catalog.fileGrant(id)).root,
+          }
+        );
+      }
     } catch {
       dialog.showErrorBox(
         "Native chat could not start",
@@ -645,6 +665,7 @@ app.on("ready", async () => {
       await authenticatedEntryReady;
     },
     clear_hosted_session: async () => {
+      nativeEditorMcp?.revoke();
       await Promise.all([
         agentSidecarClient.clearGridaGatewaySession(),
         nativeDesktopAgent?.clearAccount(),
@@ -665,6 +686,8 @@ app.on("ready", async () => {
   registerIpcHandlers({
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
     recent_files: recentFiles,
+    publish_workspace_surfaces: (event, snapshot) =>
+      nativeEditorMcp?.publish(event, snapshot) ?? Promise.resolve(false),
     ...(native && {
       resolve_native_chat: (_window, workspaceId) =>
         native.current(workspaceId),
@@ -846,12 +869,17 @@ app.on("will-quit", (event) => {
     accountRevalidationTimer = null;
   }
   entryWindow?.beginShutdown();
-  if (!nativeDesktopAgent || nativeQuitReady) return;
+  if ((!nativeDesktopAgent && !nativeEditorMcp) || nativeQuitReady) return;
   event.preventDefault();
-  nativeQuitDrain ??= nativeDesktopAgent
-    .close()
-    .catch(() => {
-      console.error("[grida] native workspace shutdown could not be verified");
+  nativeQuitDrain ??= Promise.allSettled([
+    nativeDesktopAgent?.close(),
+    nativeEditorMcp?.close(),
+  ])
+    .then((outcomes) => {
+      if (outcomes.some((outcome) => outcome.status === "rejected"))
+        console.error(
+          "[grida] native workspace shutdown could not be verified"
+        );
     })
     .finally(() => {
       nativeQuitReady = true;

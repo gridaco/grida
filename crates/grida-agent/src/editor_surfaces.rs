@@ -61,35 +61,13 @@ impl EditorSurfaces {
         present: bool,
     ) -> Result<ToolHost> {
         let mut capabilities = vec![(
-            CapabilityDefinition {
-                tool: ToolDefinition {
-                    id: ToolId::new(LIST_OPEN)?,
-                    version: 2,
-                    description: "Read the workspace editor's currently active file and open files. Paths are relative to the workspace root, shown with a leading slash.".into(),
-                    input: InputFormat::Json(json!({
-                        "type": "object",
-                        "additionalProperties": false
-                    })),
-                    max_input_bytes: 32,
-                    max_output_bytes: SNAPSHOT_BYTES + 512,
-                    recovery: RecoveryKind::Unavailable,
-                },
-                output_schema: json!({
-                    "type": "object",
-                    "properties": {
-                        "interactive": {"const": true},
-                        "active": {"type": ["string", "null"]},
-                        "open": {"type": "array", "items": {"type": "string"}, "maxItems": MAX_OPEN_PATHS},
-                        "truncated": {"type": "boolean"}
-                    },
-                    "required": ["interactive", "active", "open", "truncated"],
-                    "additionalProperties": false
-                }),
-                effect: CapabilityEffect::Read,
-            },
+            open_surfaces_definition()?,
             Arc::new(Observe {
                 owner: self.clone(),
-                request: Read { session_id: session.clone(), endpoint_id: endpoint.clone() },
+                request: Read {
+                    session_id: session.clone(),
+                    endpoint_id: endpoint.clone(),
+                },
             }) as Arc<dyn CapabilityExecutor>,
         )];
         if present {
@@ -119,6 +97,49 @@ impl EditorSurfaces {
     }
 }
 
+pub(crate) fn open_surfaces_definition() -> Result<CapabilityDefinition> {
+    Ok(CapabilityDefinition {
+                tool: ToolDefinition {
+                    id: ToolId::new(LIST_OPEN)?,
+                    version: 2,
+                    description: "Read the workspace editor's currently active file and open files. Paths are relative to the workspace root, shown with a leading slash.".into(),
+                    input: InputFormat::Json(json!({
+                        "type": "object",
+                        "additionalProperties": false
+                    })),
+                    max_input_bytes: 32,
+                    max_output_bytes: SNAPSHOT_BYTES + 512,
+                    recovery: RecoveryKind::Unavailable,
+                },
+                output_schema: json!({
+                    "type": "object",
+                    "properties": {
+                        "interactive": {"const": true},
+                        "active": {"type": ["string", "null"]},
+                        "open": {"type": "array", "items": {"type": "string"}, "maxItems": MAX_OPEN_PATHS},
+                        "truncated": {"type": "boolean"}
+                    },
+                    "required": ["interactive", "active", "open", "truncated"],
+                    "additionalProperties": false
+                }),
+                effect: CapabilityEffect::Read,
+            })
+}
+
+pub(crate) fn validate_open_surfaces_arguments(arguments: &Value) -> Result<()> {
+    if arguments
+        .as_object()
+        .is_some_and(|object| object.is_empty())
+    {
+        Ok(())
+    } else {
+        Err(Error::new(
+            ErrorKind::InvalidInput,
+            "invalid_editor_surface_arguments",
+        ))
+    }
+}
+
 struct Observe {
     owner: EditorSurfaces,
     request: Read,
@@ -126,17 +147,7 @@ struct Observe {
 
 impl CapabilityExecutor for Observe {
     fn validate(&self, arguments: &Value) -> Result<()> {
-        if arguments
-            .as_object()
-            .is_some_and(|object| object.is_empty())
-        {
-            Ok(())
-        } else {
-            Err(Error::new(
-                ErrorKind::InvalidInput,
-                "invalid_editor_surface_arguments",
-            ))
-        }
+        validate_open_surfaces_arguments(arguments)
     }
 
     fn invoke(&self, call: CapabilityCall) -> BoxFuture<'_, CapabilityReply> {
@@ -307,6 +318,27 @@ impl Snapshot {
         if self.session_id != request.session_id || self.endpoint_id != request.endpoint_id {
             return ToolOutcome::uncertain();
         }
+        OpenSurfacesSnapshot {
+            available: self.available,
+            active: self.active,
+            open: self.open,
+            truncated: self.truncated,
+        }
+        .outcome()
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct OpenSurfacesSnapshot {
+    available: bool,
+    active: Option<String>,
+    open: Vec<String>,
+    truncated: bool,
+}
+
+impl OpenSurfacesSnapshot {
+    pub(crate) fn outcome(self) -> ToolOutcome {
         if !self.available {
             return if self.active.is_none() && self.open.is_empty() && !self.truncated {
                 ToolOutcome::failed("editor_surface_endpoint_unavailable")

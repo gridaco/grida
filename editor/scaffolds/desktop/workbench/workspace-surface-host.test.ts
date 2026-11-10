@@ -152,6 +152,36 @@ describe("WorkspaceSurfaceHost.listOpen", () => {
     group.activate("b.canvas");
     expect(observe).toHaveBeenCalledTimes(4);
   });
+
+  it("publishes only the latest bounded view after an outstanding publication", async () => {
+    const { host, group } = createHost([]);
+    const first = Promise.withResolvers<boolean>();
+    type Publish = Parameters<WorkspaceSurfaceHost["publishEditorSurfaces"]>[0];
+    const publish = vi.fn<Publish>();
+    publish.mockReturnValueOnce(first.promise);
+    publish.mockResolvedValue(false);
+    const release = host.publishEditorSurfaces(publish);
+    try {
+      group.open("a.svg");
+      group.open("b.canvas");
+      expect(publish).toHaveBeenCalledExactlyOnceWith({
+        active: null,
+        open: [],
+        truncated: false,
+      });
+      first.resolve(true);
+      await vi.waitFor(() => expect(publish).toHaveBeenCalledTimes(2));
+      expect(publish).toHaveBeenLastCalledWith({
+        active: "/b.canvas",
+        open: ["/a.svg", "/b.canvas"],
+        truncated: false,
+      });
+      group.activate("a.svg");
+      expect(publish).toHaveBeenCalledTimes(2);
+    } finally {
+      release();
+    }
+  });
 });
 
 describe("WorkspaceSurfaceHost.restoreRelative", () => {

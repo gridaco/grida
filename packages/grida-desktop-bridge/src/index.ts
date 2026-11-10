@@ -63,6 +63,7 @@ import type {
 } from "@grida/daemon";
 
 import type { DesktopNativeChat } from "./native-chat";
+import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
 export type * from "./native-chat";
 export type * from "./native-subagents";
 export { NativeEditorSurfaces } from "./native-editor-surfaces";
@@ -319,6 +320,9 @@ export type DesktopBridge = {
   };
   workspaces: {
     list: () => Promise<Workspace[]>;
+    publish_editor_surfaces?: (
+      snapshot: NativeEditorSurfaceSnapshot
+    ) => Promise<boolean>;
     /** Open the exact directory selected in a native folder picker. */
     choose?: () => Promise<Workspace | null>;
     open: (rootPath: string) => Promise<Workspace>;

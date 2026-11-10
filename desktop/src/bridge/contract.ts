@@ -118,6 +118,7 @@ export const IPC_CHANNELS = {
   CHATGPT_SIGN_OUT: "grida:chatgpt:sign-out",
   WORKSPACE_COMMAND: "grida:workspace:command",
   WORKSPACE_LIST: "grida:workspace:list",
+  WORKSPACE_PUBLISH_EDITOR_SURFACES: "grida:workspace:publish-editor-surfaces",
   WORKSPACE_CHOOSE: "grida:workspace:choose",
   WORKSPACE_REOPEN: "grida:workspace:reopen",
   WORKSPACE_CREATE: "grida:workspace:create",
