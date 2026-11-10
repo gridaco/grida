@@ -205,6 +205,7 @@ const docs = [
     collapsed: true,
     link: { type: "doc", id: "agent/index" },
     items: [
+      "agent/permissions",
       "agent/subagents",
       "agent/scheduled-work",
       "agent/results",

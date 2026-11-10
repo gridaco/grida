@@ -14,14 +14,14 @@ it. Available controls and inputs vary with the connection.
 
 ## Start a workspace chat
 
-1. Open a workspace and its chat pane. Select a model connection that is
-   available in your build.
+1. Open a workspace and its chat pane with a model connection configured
+   for your build.
 2. Give the agent an objective and name the files or tabs that matter.
    Choose **Plan** to investigate and propose a change, or **Act** to do
    the work under the chat's permissions.
 3. Review requests for additional access as they appear. To change the
    direction of work, send a correction to the current turn. Queue a
-   message when it belongs in the next turn.
+   message when it belongs in the next turn. [Understand permissions](./permissions.md)
 
 For example, ask in **Plan**, “Compare the two drafts and propose the
 smaller change.” Review the proposal, then choose **Act** and send a new
