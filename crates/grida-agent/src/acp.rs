@@ -23,9 +23,10 @@ use agent_client_protocol::v1::schema::{
 use agent_client_protocol::{
     Agent, Channel, Error, Result, on_receive_notification, on_receive_request,
 };
+use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::{ChangeId, ErrorKind, SessionId, TurnId};
-use observation::Observation;
+use observation::{Observation, SessionObservation};
 use projection::Projection;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
@@ -114,7 +115,7 @@ struct ConnectionSessions {
     initialized: bool,
     attached: BTreeSet<SessionId>,
     active: BTreeMap<SessionId, TurnId>,
-    observing: BTreeMap<SessionId, usize>,
+    observing: BTreeMap<SessionId, SessionObservation>,
     catalog_observers: usize,
     retiring: BTreeSet<SessionId>,
     negotiated: BTreeSet<&'static str>,
@@ -363,27 +364,25 @@ async fn serve_connection(
                     Ok(id) => id,
                     Err(error) => return responder.respond_with_error(error),
                 };
-                let _observation = match Observation::begin(&load_sessions, Some(&id)) {
+                let _observation = match Observation::begin_replay(&load_sessions, &id) {
                     Ok(guard) => guard,
                     Err(error) => return responder.respond_with_error(error),
                 };
                 let result = async {
                     validate_session_setup(&request.mcp_servers, &request.additional_directories)?;
-                    {
-                        let sessions = load_sessions.lock().unwrap();
-                        sessions.ensure_capacity(Some(&id))?;
-                        if sessions.active.contains_key(&id) {
-                            return Err(unavailable("session_prompt_in_progress"));
-                        }
-                    }
-                    let snapshot = load_host
-                        .load_session(id.clone(), request.cwd)
+                    let mut replay = load_host
+                        .open_history_replay(id.clone(), request.cwd)
                         .await
                         .map_err(host_error)?;
                     let mut projection = Projection::new(request.session_id);
-                    projection
-                        .replay(&connection, &load_delivery, snapshot.messages)
-                        .await?;
+                    while let Some(records) = replay.next().await.map_err(host_error)? {
+                        let messages = records
+                            .into_iter()
+                            .map(|HistoryRecord::Message(message)| message);
+                        projection
+                            .replay(&connection, &load_delivery, messages)
+                            .await?;
+                    }
                     extensions::compaction::announce(
                         &load_sessions,
                         &id,

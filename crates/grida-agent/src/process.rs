@@ -246,7 +246,8 @@ async fn admit_run(host: &Host, options: RunOptions) -> Result<AcceptedRun> {
         parts.push(PromptPart::Image { image });
     }
     let session = if let Some(session) = options.session {
-        host.load_session(session.clone(), options.cwd).await?;
+        host.validate_session_workspace(session.clone(), options.cwd)
+            .await?;
         session
     } else {
         host.new_session(options.cwd).await?

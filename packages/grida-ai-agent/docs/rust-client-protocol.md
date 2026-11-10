@@ -237,7 +237,9 @@ may omit this field. Echo the basis as `expectedHistory` on later pages and
 writes. A changed basis requires a fresh history read. Anchors are
 scoped to the selected view and carry either a local turn and message ID or an
 inherited message ID. `view` can read an earlier retained view. Standard session
-load replays the current view in the same causal order.
+load captures the current view and streams its transcript in causal order.
+Replay uses bounded reads, with the active turn captured at the start of the
+operation. Model context assembly uses its own request limits.
 
 An attached client that negotiates `revision-target` can open an edit from an
 exact visible message ID in the current view. The reply binds the complete

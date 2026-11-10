@@ -2,6 +2,11 @@
 
 use super::*;
 
+pub(super) enum SessionObservation {
+    Shared(usize),
+    Replay,
+}
+
 pub(super) struct Observation {
     sessions: Arc<Mutex<ConnectionSessions>>,
     session: Option<SessionId>,
@@ -15,7 +20,16 @@ impl Observation {
         let mut state = sessions.lock().unwrap();
         if let Some(session) = session {
             state.ensure_observable(session)?;
-            *state.observing.entry(session.clone()).or_default() += 1;
+            let observation = state
+                .observing
+                .entry(session.clone())
+                .or_insert(SessionObservation::Shared(0));
+            match observation {
+                SessionObservation::Shared(count) => *count += 1,
+                SessionObservation::Replay => {
+                    return Err(unavailable("session_replay_in_progress"));
+                }
+            }
         } else {
             if !state.retiring.is_empty() {
                 return Err(unavailable("session_deletion_in_progress"));
@@ -27,19 +41,43 @@ impl Observation {
             session: session.cloned(),
         })
     }
+
+    pub(super) fn begin_replay(
+        sessions: &Arc<Mutex<ConnectionSessions>>,
+        session: &SessionId,
+    ) -> Result<Self> {
+        let mut state = sessions.lock().unwrap();
+        state.ensure_observable(session)?;
+        state.ensure_capacity(Some(session))?;
+        if state.active.contains_key(session) {
+            return Err(unavailable("session_prompt_in_progress"));
+        }
+        if state.observing.contains_key(session) {
+            return Err(unavailable("session_observation_in_progress"));
+        }
+        state
+            .observing
+            .insert(session.clone(), SessionObservation::Replay);
+        Ok(Self {
+            sessions: sessions.clone(),
+            session: Some(session.clone()),
+        })
+    }
 }
 
 impl Drop for Observation {
     fn drop(&mut self) {
         let mut state = self.sessions.lock().unwrap();
         if let Some(session) = &self.session {
-            let count = state
+            let observation = state
                 .observing
                 .get_mut(session)
                 .expect("registered observation");
-            *count -= 1;
-            if *count == 0 {
-                state.observing.remove(session);
+            match observation {
+                SessionObservation::Shared(count) if *count > 1 => *count -= 1,
+                _ => {
+                    state.observing.remove(session);
+                }
             }
         } else {
             state.catalog_observers -= 1;
@@ -108,5 +146,22 @@ mod tests {
         fence.revoke();
         drop(fence);
         assert!(Retirement::begin(&sessions, &session).unwrap().is_none());
+    }
+
+    #[test]
+    fn replay_excludes_a_second_load_or_prompt_only_for_its_session() {
+        let session = SessionId::new("session").unwrap();
+        let other = SessionId::new("other").unwrap();
+        let sessions = Arc::new(Mutex::new(ConnectionSessions::default()));
+        let prompt = Observation::begin(&sessions, Some(&session)).unwrap();
+        assert!(Observation::begin_replay(&sessions, &session).is_err());
+        drop(prompt);
+
+        let replay = Observation::begin_replay(&sessions, &session).unwrap();
+        assert!(Observation::begin_replay(&sessions, &session).is_err());
+        assert!(Observation::begin(&sessions, Some(&session)).is_err());
+        assert!(Observation::begin(&sessions, Some(&other)).is_ok());
+        drop(replay);
+        assert!(Observation::begin(&sessions, Some(&session)).is_ok());
     }
 }

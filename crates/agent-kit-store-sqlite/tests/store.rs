@@ -1325,10 +1325,10 @@ async fn input_observation_preserves_payload_and_disposition_after_reopen() {
 #[tokio::test]
 async fn oversized_history_is_refused_without_returning_a_partial_projection() {
     let (_directory, store) = store().await;
-    let records = (0..4_097)
+    let records: Vec<_> = (0..4_097)
         .map(|i| history_message(&format!("message-{i}"), "text"))
         .collect();
-    let turn = finish_history_turn(&store, session(), "large-turn", records).await;
+    let turn = finish_history_turn(&store, session(), "large-turn", records.clone()).await;
     assert_error(
         store.history(session(), None).await,
         ErrorKind::LimitExceeded,
@@ -1340,6 +1340,74 @@ async fn oversized_history_is_refused_without_returning_a_partial_projection() {
             .await
             .unwrap()
             .is_empty()
+    );
+    let mut replay = store
+        .open_history_replay(session(), |state| state.history().records().to_vec())
+        .await
+        .unwrap();
+    assert_eq!(replay.next().await.unwrap(), Some(records));
+    assert_eq!(replay.next().await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn paged_transcript_replay_freezes_the_active_tail_without_a_lease() {
+    let (_directory, store) = store().await;
+    let mut expected = Vec::new();
+    for i in 0..34 {
+        let name = format!("settled-{i}");
+        let record = history_message(&name, "before replay");
+        finish_history_turn(&store, session(), &name, vec![record.clone()]).await;
+        expected.push(record);
+    }
+    store
+        .submit(session(), submission("active", "hello"))
+        .await
+        .unwrap();
+    let active = claim(&store, "claim-active", vec![change("active")]).await;
+    let current = history_message("active", "observed at replay start");
+    commit(
+        &active,
+        "first",
+        vec![JournalAction::AppendHistory(vec![current.clone()])],
+    )
+    .await;
+    expected.push(current);
+
+    let mut replay = store
+        .open_history_replay(session(), |state| state.history().records().to_vec())
+        .await
+        .unwrap();
+    let mut restored = replay.next().await.unwrap().unwrap();
+    assert!(!restored.is_empty() && restored.len() < expected.len());
+    commit(
+        &active,
+        "finish",
+        vec![
+            JournalAction::AppendHistory(vec![history_message("late", "after capture")]),
+            JournalAction::Settle(TurnOutcome {
+                status: OutcomeStatus::Succeeded,
+                account: None,
+                evidence: vec![],
+            }),
+        ],
+    )
+    .await;
+    drop(active);
+    finish_history_turn(
+        &store,
+        session(),
+        "another-turn",
+        vec![history_message("another", "next turn")],
+    )
+    .await;
+
+    while let Some(page) = replay.next().await.unwrap() {
+        restored.extend(page);
+    }
+    assert_eq!(restored, expected);
+    assert_eq!(
+        store.history(session(), None).await.unwrap().len(),
+        expected.len() + 2
     );
 }
 

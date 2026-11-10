@@ -1,10 +1,10 @@
 //! Bounded history reads and retained views over immutable turn snapshots.
 
 use super::{
-    MAX_HISTORY_BYTES, MAX_HISTORY_RECORDS, MAX_HISTORY_SCAN_BYTES, MAX_HISTORY_TURNS, SqliteStore,
-    bump_revision, commit_error, database_error, decode, decode_turn, encode, error, execute,
-    has_live_session_owner, insert_input, insert_session, load_session, lookup_request,
-    require_revision, save_request, save_session, sql_number, unsigned,
+    Inner, MAX_HISTORY_BYTES, MAX_HISTORY_RECORDS, MAX_HISTORY_SCAN_BYTES, MAX_HISTORY_TURNS,
+    SqliteStore, bump_revision, commit_error, database_error, decode, decode_turn, encode, error,
+    execute, has_live_session_owner, insert_input, insert_session, load_session, load_turn,
+    lookup_request, require_revision, save_request, save_session, sql_number, unsigned,
 };
 use agent_kit_core::history::{History, HistoryPosition, HistoryRecord};
 use agent_kit_core::turn::{JournalPosition, TurnState};
@@ -96,7 +96,93 @@ pub struct HistoryRevised {
 
 type TurnProjection<'a> = dyn Fn(&TurnState) -> Vec<HistoryRecord> + 'a;
 
+const REPLAY_PAGE_TURNS: i64 = 32;
+
+/// A captured transcript interval. Settled turns are read in bounded pages;
+/// the mutable active turn is projected when the interval is opened.
+pub struct HistoryReplay {
+    inner: Arc<Inner>,
+    session: SessionId,
+    after: i64,
+    end: i64,
+    prefix: Option<Vec<HistoryRecord>>,
+    active: Option<Vec<HistoryRecord>>,
+    project: fn(&TurnState) -> Vec<HistoryRecord>,
+}
+
+impl HistoryReplay {
+    pub async fn next(&mut self) -> Result<Option<Vec<HistoryRecord>>> {
+        if let Some(prefix) = self.prefix.take() {
+            return Ok(Some(prefix));
+        }
+        if self.after >= self.end {
+            return Ok(self.active.take());
+        }
+        let session = self.session.clone();
+        let (after, end, project) = (self.after, self.end, self.project);
+        let (after, records) = execute(Arc::clone(&self.inner), move |_, connection| {
+            read_replay_page(connection, &session, after, end, project)
+        })
+        .await?;
+        self.after = after;
+        Ok(Some(records))
+    }
+}
+
 impl SqliteStore {
+    /// Capture the current view for observation without taking a turn lease.
+    /// The projection must be pure and keep settled history stable through
+    /// operation reconciliation.
+    pub async fn open_history_replay(
+        &self,
+        session: SessionId,
+        project: fn(&TurnState) -> Vec<HistoryRecord>,
+    ) -> Result<HistoryReplay> {
+        let replay_owner = Arc::clone(&self.inner);
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let state = load_session(connection, &session)?;
+            let (view, _) = select_view(connection, &session, HistorySelection::Current)?;
+            let mut end = connection
+                .query_row(
+                    "SELECT COALESCE(MAX(ordinal),?2) FROM turns
+                     WHERE session=?1 AND ordinal>?2 AND (?3 IS NULL OR ordinal<=?3)",
+                    params![session.as_str(), view.after, view.end],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(database_error)?;
+            let mut active = None;
+            if let Some(turn) = state.active_turn {
+                let ordinal = connection
+                    .query_row(
+                        "SELECT ordinal FROM turns WHERE session=?1 AND id=?2",
+                        params![session.as_str(), turn.as_str()],
+                        |row| row.get::<_, i64>(0),
+                    )
+                    .map_err(database_error)?;
+                if ordinal > view.after && ordinal <= end {
+                    if ordinal != end {
+                        return Err(error(
+                            ErrorKind::InvalidState,
+                            "history_active_turn_not_last",
+                        ));
+                    }
+                    active = Some(project(&load_turn(connection, &session, &turn)?));
+                    end -= 1;
+                }
+            }
+            Ok(HistoryReplay {
+                inner: replay_owner,
+                session,
+                after: view.after,
+                end,
+                prefix: view.seed.map(|seed| seed.records),
+                active,
+                project,
+            })
+        })
+        .await
+    }
+
     /// The projection runs under the store lock and must be pure.
     pub async fn retained_history_with(
         &self,
@@ -372,6 +458,50 @@ pub(super) fn select_view(
         None => return Err(error(ErrorKind::InvalidInput, "history_view_missing")),
     };
     Ok((selected, before))
+}
+
+fn read_replay_page(
+    connection: &Connection,
+    session: &SessionId,
+    mut after: i64,
+    end: i64,
+    project: fn(&TurnState) -> Vec<HistoryRecord>,
+) -> Result<(i64, Vec<HistoryRecord>)> {
+    load_session(connection, session)?;
+    let mut query = connection
+        .prepare(
+            "SELECT ordinal,id,snapshot FROM turns WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
+             ORDER BY ordinal LIMIT ?4",
+        )
+        .map_err(database_error)?;
+    let mut rows = query
+        .query(params![session.as_str(), after, end, REPLAY_PAGE_TURNS])
+        .map_err(database_error)?;
+    let mut records = Vec::new();
+    let mut scanned_bytes = 0;
+    let mut scanned_turns = 0;
+    while let Some(row) = rows.next().map_err(database_error)? {
+        let snapshot = row
+            .get_ref(2)
+            .map_err(database_error)?
+            .as_blob()
+            .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
+        // A single durable turn may exceed the target page size. Never split
+        // its projection or accumulate it alongside other large snapshots.
+        if scanned_turns != 0 && scanned_bytes + snapshot.len() > MAX_HISTORY_BYTES {
+            return Ok((after, records));
+        }
+        let turn = TurnId::new(row.get::<_, String>(1).map_err(database_error)?)?;
+        let state = decode_turn(snapshot, session, &turn)?;
+        records.extend(project(&state));
+        after = row.get(0).map_err(database_error)?;
+        scanned_turns += 1;
+        scanned_bytes += snapshot.len();
+    }
+    if scanned_turns < REPLAY_PAGE_TURNS {
+        after = end;
+    }
+    Ok((after, records))
 }
 
 fn read_history(

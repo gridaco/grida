@@ -449,10 +449,6 @@ pub enum RunResult {
     InputRequired(PendingInteractions),
 }
 
-pub struct SessionSnapshot {
-    pub messages: Vec<Message>,
-}
-
 #[derive(Serialize, Deserialize)]
 struct SessionConfiguration {
     cwd: PathBuf,
@@ -666,7 +662,11 @@ impl Host {
         Ok(session)
     }
 
-    pub async fn load_session(&self, id: SessionId, cwd: PathBuf) -> Result<SessionSnapshot> {
+    pub(crate) async fn validate_session_workspace(
+        &self,
+        id: SessionId,
+        cwd: PathBuf,
+    ) -> Result<()> {
         let session = self.store.inspect(id.clone()).await?;
         let configuration = session_configuration(&session)?;
         if configuration.subagent.is_some() {
@@ -675,15 +675,18 @@ impl Host {
         if configuration.cwd != canonical_workspace(&cwd)? {
             return Err(problem(ErrorKind::Conflict, "session_workspace_mismatch"));
         }
-        Ok(SessionSnapshot {
-            messages: self
-                .store
-                .history_with(id, None, grida_agent_master::history::project)
-                .await?
-                .into_iter()
-                .map(|HistoryRecord::Message(message)| message)
-                .collect(),
-        })
+        Ok(())
+    }
+
+    pub(crate) async fn open_history_replay(
+        &self,
+        id: SessionId,
+        cwd: PathBuf,
+    ) -> Result<agent_kit_store_sqlite::history::HistoryReplay> {
+        self.validate_session_workspace(id.clone(), cwd).await?;
+        self.store
+            .open_history_replay(id, grida_agent_master::history::project)
+            .await
     }
 
     pub async fn inspect(&self, id: SessionId) -> Result<SessionView> {

@@ -35,7 +35,7 @@ impl Projection {
         &mut self,
         connection: &ConnectionTo<Client>,
         delivery: &Delivery,
-        messages: Vec<Message>,
+        messages: impl IntoIterator<Item = Message>,
     ) -> Result<()> {
         for message in messages {
             self.message(connection, delivery, message).await?;
