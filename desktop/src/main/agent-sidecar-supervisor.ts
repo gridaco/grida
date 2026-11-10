@@ -111,6 +111,7 @@ export class AgentSidecarSupervisor {
   private drainingChild: ChildProcess | null = null;
   private restartTimer: NodeJS.Timeout | null = null;
   private sandboxReady = false;
+  private workspaceCatalog?: string;
   private scratchBase: string | null = null;
   private commandHost: AgentCommandHost | null = null;
   private readonly networkAuthority = new AgentNetworkAuthority(
@@ -167,8 +168,14 @@ export class AgentSidecarSupervisor {
     });
   }
 
-  async start(): Promise<AgentSidecarInfo> {
+  async start(workspaceCatalog?: string): Promise<AgentSidecarInfo> {
     if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
+    if (
+      (workspaceCatalog && (!this.coldStartSource || !isSupportedPlatform())) ||
+      (this.sandboxReady && workspaceCatalog !== this.workspaceCatalog)
+    )
+      throw new Error("workspace_catalog_scope_invalid");
+    this.workspaceCatalog = workspaceCatalog;
     if (this.agentEnabled) this.legacyLaunchStarted = true;
     if (this.info) return this.info.connection;
     if (this.restartTimer) {
@@ -468,6 +475,9 @@ export class AgentSidecarSupervisor {
       providerRoot: path.join(this.provider_home, "providers"),
       mediaRoot: this.media_root,
       desktopStateRoot: (await this.coldStartSource)?.desktopUserDataPath,
+      workspaceCatalogRoot: this.workspaceCatalog
+        ? path.dirname(this.workspaceCatalog)
+        : undefined,
       home: app.getPath("home"),
       ggHost: new URL(EDITOR_BASE_URL).hostname,
     });
@@ -562,6 +572,9 @@ export class AgentSidecarSupervisor {
       `--provider-home=${this.provider_home}`,
       `--media-root=${this.media_root}`,
       `--agent=${mode}`,
+      ...(this.workspaceCatalog
+        ? [`--workspace-catalog=${this.workspaceCatalog}`]
+        : []),
       ...(this.scratchBase ? [`--scratch-base=${this.scratchBase}`] : []),
       // Host-bundled skills dir (repo-root `skills/`) — the built-in skills the
       // agent advertises + loads on demand. Read-only; omitted if unresolved.
@@ -878,8 +891,10 @@ const supervisor = new AgentSidecarSupervisor({
   agent: !process.argv.includes("--disable-agent"),
 });
 
-export function startAgentSidecar(): Promise<AgentSidecarInfo> {
-  return supervisor.start();
+export function startAgentSidecar(
+  workspaceCatalog?: string
+): Promise<AgentSidecarInfo> {
+  return supervisor.start(workspaceCatalog);
 }
 
 export function sealLegacyChatForColdStart() {

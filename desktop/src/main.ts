@@ -42,6 +42,8 @@ import { DesktopEntryWindow } from "./main/desktop-entry-window";
 import { DesktopPreferences } from "./main/desktop-preferences";
 import { NativeDesktopAgent } from "./main/native-desktop-agent";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
+import { nativeWorkspaceCatalog } from "./main/workspace-media-access";
+import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 
 // GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
 // handler, NOT here at module top. It must run AFTER `open-file` has fired:
@@ -577,17 +579,25 @@ app.on("ready", async () => {
     fetch: async (url, init) =>
       (await session.defaultSession.fetch(url, init)) as Response,
   });
+  let workspaceCatalog: NativeWorkspaceCatalog | undefined;
   if (nativeProfile) {
     try {
       const provider = await NativeDesktopProfile.configure(app);
+      workspaceCatalog = nativeWorkspaceCatalog();
+      await workspaceCatalog.initialize();
       nativeDesktopAgent = await NativeDesktopAgent.prepareFresh(
         accountSession,
         process.resourcesPath,
-        { provider, openExternal: (url) => shell.openExternal(url) }
+        {
+          provider,
+          openExternal: (url) => shell.openExternal(url),
+          workspaceCatalogRoot: path.dirname(workspaceCatalog.directory),
+        }
       );
       recentFiles = new RecentStore(app.getPath("userData"), {
         privateFile: true,
       });
+      agentSidecarClient.setWorkspaceCatalog(workspaceCatalog);
     } catch {
       dialog.showErrorBox(
         "Native chat could not start",
@@ -697,7 +707,7 @@ app.on("ready", async () => {
   // approval UI—sit in front of the required Grida account entry flow.
   const sidecarStartup = (async (): Promise<boolean> => {
     try {
-      agentSidecarInfo = await startAgentSidecar();
+      agentSidecarInfo = await startAgentSidecar(workspaceCatalog?.directory);
       console.log(
         `[grida] agent sidecar ready on 127.0.0.1:${agentSidecarInfo.port}`
       );
@@ -709,7 +719,7 @@ app.on("ready", async () => {
       }
       // Now that the sidecar is up, serve `grida-workspace://` media requests
       // by proxying to its streamed `/workspaces/file` route (#924).
-      handleWorkspaceMediaProtocol();
+      handleWorkspaceMediaProtocol(workspaceCatalog);
       markAuthenticatedEntryReady();
       return true;
     } catch (err) {

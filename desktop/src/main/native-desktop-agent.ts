@@ -43,7 +43,8 @@ export class NativeDesktopAgent {
     private readonly cutover: NativeAgentCutover,
     private readonly account: DesktopAccountSession,
     private readonly resourcesPath: string,
-    private readonly subscription?: Subscription
+    private readonly subscription?: Subscription,
+    private readonly workspaceCatalogRoot?: string
   ) {
     if (subscription) {
       const { oauth } = subscription;
@@ -94,6 +95,7 @@ export class NativeDesktopAgent {
     options?: Readonly<{
       provider: NativeDesktopProfile.Provider;
       openExternal: (url: string) => Promise<void>;
+      workspaceCatalogRoot?: string;
     }>
   ) {
     const cutover = await NativeAgentCutover.prepareFresh();
@@ -112,7 +114,8 @@ export class NativeDesktopAgent {
       cutover,
       account,
       resourcesPath,
-      subscription
+      subscription,
+      options?.workspaceCatalogRoot
     );
   }
 
@@ -126,9 +129,7 @@ export class NativeDesktopAgent {
     if (this.closed || generation !== this.accountGeneration)
       throw new Error("native_workspace_closing");
     const owners = (this.owners ??= this.newOwners());
-    const workspace = (await agentSidecarClient.listWorkspaces()).find(
-      ({ id }) => id === workspaceId
-    );
+    const workspace = await agentSidecarClient.findWorkspace(workspaceId);
     if (!workspace) throw new Error("native_workspace_not_registered");
     await owners.open(workspace);
   }
@@ -194,7 +195,9 @@ export class NativeDesktopAgent {
               id,
               primary: { id: "project", name: "Project", path: root },
               additionalReadRoots: [],
-              protectedPaths: this.cutover.protectedPaths,
+              protectedPaths: this.workspaceCatalogRoot
+                ? [...this.cutover.protectedPaths, this.workspaceCatalogRoot]
+                : this.cutover.protectedPaths,
             },
           },
           release,

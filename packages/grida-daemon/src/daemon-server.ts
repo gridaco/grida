@@ -60,6 +60,7 @@ export type DaemonServerOptions = {
    * {@link ServerOptions} by the `...opts` spread below.
    */
   projects_root?: string;
+  workspace_catalog?: string;
   /**
    * Host-injected dedicated root for durable binary media. This is distinct
    * from the daemon's secret/session `user_data_path` and from workspaces.

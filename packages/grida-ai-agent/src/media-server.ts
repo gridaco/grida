@@ -75,6 +75,7 @@ export type MediaDaemonOptions = Omit<MediaTenantOptions, "capabilities"> & {
   /** Shared native provider home; omission keeps this host's credentials isolated. */
   provider_home?: string;
   projects_root?: string;
+  workspace_catalog?: string;
   media_root?: string;
   http_access: DaemonHttpAccess;
   hostname?: string;
@@ -96,6 +97,7 @@ export function createMediaDaemon(opts: MediaDaemonOptions): DaemonServer {
     user_data_path: opts.user_data_path,
     provider_home: opts.provider_home,
     projects_root: opts.projects_root,
+    workspace_catalog: opts.workspace_catalog,
     media_root: opts.media_root,
     http_access: opts.http_access,
     hostname: opts.hostname,

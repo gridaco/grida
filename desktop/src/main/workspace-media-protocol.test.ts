@@ -4,7 +4,6 @@ import { once } from "node:events";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { WorkspaceRegistry } from "@grida/daemon/server";
 
 const fixtures = vi.hoisted(() => ({
   native: undefined as ReturnType<
@@ -30,8 +29,6 @@ vi.mock("electron", () => ({
 vi.mock("./agent-sidecar-client", () => ({
   agentSidecarClient: {
     fetch: vi.fn<(path: string, init?: unknown) => Promise<Response>>(),
-    listWorkspaces:
-      vi.fn<() => Promise<Awaited<ReturnType<WorkspaceRegistry["list"]>>>>(),
     AgentSidecarNotReadyError: class extends Error {},
   },
 }));
@@ -56,7 +53,7 @@ vi.mock("node:child_process", async (load) => {
 
 import { agentSidecarClient } from "./agent-sidecar-client";
 import { WorkspaceFileWorkers } from "./workspace-file-worker";
-import { WorkspaceMediaRegistry } from "./workspace-media-registry";
+import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import {
   handleWorkspaceMediaProtocol,
   parseWorkspaceMediaUrl,
@@ -127,8 +124,8 @@ describe("parseWorkspaceMediaUrl (#924)", () => {
   });
 });
 
-function registeredHandler() {
-  handleWorkspaceMediaProtocol();
+function registeredHandler(catalog?: Pick<NativeWorkspaceCatalog, "grant">) {
+  handleWorkspaceMediaProtocol(catalog);
   return fixtures.handler!;
 }
 
@@ -161,7 +158,7 @@ describe.runIf(
   it("uses the built reader for 200, 206, 416 and MIME without admitting a saved entry", async () => {
     const fixture = await workspaceFixture();
     try {
-      const saved = await fixture.compatibility.open(fixture.workspace);
+      const saved = await fixture.seedWithoutAdmission();
       await fs.writeFile(
         path.join(fixture.workspace, "clip.mp4"),
         "0123456789"
@@ -305,29 +302,28 @@ async function workspaceFixture() {
   for (const directory of [workspace, storage, protectedRoot]) {
     await fs.mkdir(directory, { mode: 0o700 });
   }
-  const compatibility = new WorkspaceRegistry(storage);
-  const registry = new WorkspaceMediaRegistry([
-    storage,
-    protectedRoot,
-    path.join(root, "missing"),
-  ]);
+  const newCatalog = () =>
+    new NativeWorkspaceCatalog({
+      browserData: storage,
+      projectsRoot: path.join(root, "projects"),
+      protectedPaths: [protectedRoot, path.join(root, "missing")],
+    });
+  let catalog = newCatalog();
   const workers = new WorkspaceFileWorkers(resources!);
-  fixtures.native = { registry, workers };
+  fixtures.native = workers;
   fixtures.children.length = 0;
-  vi.mocked(agentSidecarClient.listWorkspaces).mockImplementation(() =>
-    compatibility.list()
-  );
   vi.mocked(agentSidecarClient.fetch).mockClear();
-  const handler = registeredHandler();
+  const handler = registeredHandler({ grant: (id) => catalog.grant(id) });
   return {
     workspace,
     protected: protectedRoot,
-    compatibility,
+    seedWithoutAdmission: async () => {
+      const saved = await catalog.openSelected(workspace);
+      catalog = newCatalog();
+      return saved;
+    },
     handler,
-    reopen: () =>
-      registry.register(workspace, (canonical) =>
-        compatibility.open(canonical)
-      ),
+    reopen: () => catalog.openSelected(workspace),
     request: (id: string, range?: string, signal?: AbortSignal) =>
       handler(
         new Request(`grida-workspace://workspace/${id}/clip.mp4`, {

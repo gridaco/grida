@@ -1148,6 +1148,14 @@ export namespace workspaces {
   export async function openFolder(rootPath: string): Promise<Workspace> {
     return await bridgeOrThrow().workspaces.open(rootPath);
   }
+  export async function chooseFolder(): Promise<Workspace | null> {
+    const bridge = bridgeOrThrow();
+    if (bridge.workspaces.choose) return await bridge.workspaces.choose();
+    const paths = await bridge.dialog.open({
+      properties: ["openDirectory", "createDirectory"],
+    });
+    return paths?.[0] ? await openFolder(paths[0]) : null;
+  }
   /**
    * Auto-create a fresh project — mint an EMPTY managed-root folder and
    * register it. No document is seeded: the agent creates whatever the task

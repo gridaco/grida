@@ -20,6 +20,7 @@ import { workspaceFileResponse } from "@grida/daemon/server";
 import { agentSidecarClient } from "./agent-sidecar-client";
 import { nativeWorkspaceMedia } from "./workspace-media-access";
 import { WorkspaceMediaError } from "./workspace-media-registry";
+import type { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 
 const SCHEME = "grida-workspace";
 // The authority is a fixed, data-less literal — both ids live in the path (see
@@ -53,7 +54,9 @@ export function registerWorkspaceMediaScheme(): void {
  * that arrives before the sidecar is up resolves to 503 (the viewer retries
  * naturally on the next load).
  */
-export function handleWorkspaceMediaProtocol(): void {
+export function handleWorkspaceMediaProtocol(
+  catalog?: Pick<NativeWorkspaceCatalog, "grant">
+): void {
   const native = nativeWorkspaceMedia();
   protocol.handle(SCHEME, async (request) => {
     const target = parseWorkspaceMediaUrl(request.url);
@@ -66,15 +69,13 @@ export function handleWorkspaceMediaProtocol(): void {
 
     try {
       if (native) {
-        const grant = await native.registry.grant(
-          target.workspaceId,
-          agentSidecarClient.listWorkspaces
-        );
-        const file = await native.workers.open(
-          grant,
-          target.relPath,
-          request.signal
-        );
+        if (!catalog)
+          throw new WorkspaceMediaError(
+            503,
+            "workspace_media_catalog_unavailable"
+          );
+        const grant = await catalog.grant(target.workspaceId);
+        const file = await native.open(grant, target.relPath, request.signal);
         try {
           return await workspaceFileResponse(
             target.relPath,

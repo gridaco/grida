@@ -21,6 +21,9 @@ import { LegacyChatArchive } from "../main/legacy-chat-archive";
 import { LegacyChatSourceLease } from "../main/legacy-chat-source-lease";
 import { DesktopMediaHost } from "../main/media-host";
 import { RetainedMediaLaunch } from "../main/retained-media-launch";
+import { NativeWorkspaceCatalog } from "../main/native-workspace-catalog";
+import { DesktopAgentSandboxPolicy } from "../main/agent-sandbox-policy";
+import { dispose, ensureInitialized, wrapArgv } from "../main/sandbox/manager";
 
 const desktop = fileURLToPath(new URL("../..", import.meta.url));
 const fixture = fileURLToPath(new URL("./testing/", import.meta.url));
@@ -295,6 +298,144 @@ async function packagedScope() {
 }
 
 describe("built Desktop media startup", () => {
+  it.runIf(process.platform === "darwin")(
+    "serves workspace files through the confined read-only catalog consumer",
+    async () => {
+      const root = await fs.realpath(
+        await fs.mkdtemp(path.join(os.tmpdir(), "grida-catalog-sidecar-"))
+      );
+      const browserData = path.join(root, "browser");
+      const userData = path.join(root, "state");
+      const mediaRoot = path.join(root, "media");
+      const workspace = path.join(root, "workspace");
+      const output = path.join(root, "build");
+      let sidecar: Sidecar | undefined;
+      try {
+        for (const directory of [browserData, userData, mediaRoot, workspace])
+          await fs.mkdir(directory, { mode: 0o700 });
+        const catalog = new NativeWorkspaceCatalog({
+          browserData,
+          projectsRoot: path.join(root, "projects"),
+          protectedPaths: [userData, mediaRoot],
+        });
+        const env = { HOME: root, TMPDIR: root };
+        await runBuild(root, output, env);
+        await fs.symlink(
+          path.join(desktop, "node_modules"),
+          path.join(root, "node_modules"),
+          "dir"
+        );
+        const runtime = await sidecarRuntime();
+        expect(runtime.electron).toBe(true);
+        const project = await catalog.openSelected(workspace);
+        const policy = DesktopAgentSandboxPolicy.build({
+          userData,
+          mediaRoot,
+          desktopStateRoot: browserData,
+          workspaceCatalogRoot: path.dirname(catalog.directory),
+          home: root,
+          ggHost: new URL(origin).hostname,
+        });
+        await ensureInitialized({
+          network: {
+            allowedDomains: policy.network.allowed_domains,
+            deniedDomains: policy.network.denied_domains,
+            allowLocalBinding: policy.network.allow_local_binding,
+          },
+          filesystem: {
+            denyRead: policy.filesystem.deny_read,
+            allowRead: policy.filesystem.allow_read,
+            allowWrite: policy.filesystem.allow_write,
+            denyWrite: policy.filesystem.deny_write,
+          },
+        });
+        const proof = path.join(root, "probe.cjs");
+        await fs.writeFile(
+          proof,
+          `
+          const assert = require("node:assert/strict");
+          const fs = require("node:fs");
+          const [catalog, sibling] = process.argv.slice(2);
+          fs.writeFileSync(sibling, "allowed");
+          assert.ok(fs.readFileSync(catalog).length > 0);
+          assert.throws(() => fs.writeFileSync(catalog, "denied"), {code:"EPERM"});
+          assert.throws(() => fs.renameSync(sibling, catalog), {code:"EPERM"});
+        `
+        );
+        const confined = (executable: string, argv: string[]) =>
+          wrapArgv([executable, ...argv].map(shellQuote).join(" "), {});
+        const probe = await confined(process.execPath, [
+          proof,
+          path.join(catalog.directory, "workspaces.json"),
+          path.join(root, "probe-control"),
+        ]);
+        const checked = spawn(probe.argv[0], probe.argv.slice(1), {
+          cwd: root,
+          env: { ...env, ...probe.env },
+          stdio: "inherit",
+        });
+        const deadline = setTimeout(() => checked.kill("SIGKILL"), 10_000);
+        try {
+          expect(
+            await new Promise((resolve, reject) => {
+              checked.once("error", reject);
+              checked.once("close", resolve);
+            })
+          ).toBe(0);
+        } finally {
+          clearTimeout(deadline);
+        }
+        sidecar = await Sidecar.start({
+          root,
+          output,
+          userData,
+          mediaRoot,
+          env,
+          runtime,
+          generation: 1,
+          nativeChat: true,
+          workspaceCatalog: { directory: catalog.directory, confined },
+          fetchProvider: async () => {
+            throw new Error("unexpected provider request");
+          },
+        });
+        expect(
+          (await sidecar.post("/workspaces/open", { path: workspace })).status
+        ).toBe(404);
+        const file = { workspace_id: project.id, rel_path: "draft.txt" };
+        expect(
+          (
+            await sidecar.post("/workspaces/writefile", {
+              ...file,
+              content: "edited",
+            })
+          ).status
+        ).toBe(200);
+        const read = await sidecar.post("/workspaces/readfile", file);
+        expect(await read.json()).toMatchObject({
+          content: "edited",
+          mtime: expect.any(Number),
+        });
+        await catalog.forget(project.id);
+        expect((await sidecar.post("/workspaces/readfile", file)).status).toBe(
+          404
+        );
+        expect(
+          await fs.readFile(path.join(workspace, "draft.txt"), "utf8")
+        ).toBe("edited");
+        expect(await fs.readdir(userData)).not.toContain("workspaces.json");
+      } finally {
+        try {
+          await sidecar?.stop();
+        } finally {
+          await dispose();
+          await fs.rm(root, { recursive: true, force: true });
+        }
+      }
+    },
+    120_000
+  );
+
   it("serves media through real private channels without agent startup or ambient networking", async () => {
     const root = await fs.mkdtemp(
       path.join(os.tmpdir(), "grida-media-startup-")
@@ -785,6 +926,16 @@ type StartOptions = {
   fetchProvider: (url: string, init: RequestInit) => Promise<Response>;
   generation: number;
   nativeChat?: boolean;
+  workspaceCatalog?: {
+    directory: string;
+    confined: (
+      executable: string,
+      argv: string[]
+    ) => Promise<{
+      argv: string[];
+      env: NodeJS.ProcessEnv;
+    }>;
+  };
   legacyScratch?: string;
 };
 
@@ -824,39 +975,49 @@ class Sidecar {
   }
   static async start(options: StartOptions): Promise<Sidecar> {
     await fs.rm(path.join(options.root, "allow-custody"), { force: true });
-    const child = spawn(
-      options.runtime.executable,
-      [
-        ...(options.legacyScratch
-          ? []
-          : ["--require", path.join(fixture, "media-startup-guard.cjs")]),
-        path.join(options.output, "sidecar.cjs"),
-        ...(options.legacyScratch
-          ? [
-              "--agent=enabled",
-              `--scratch-base=${options.legacyScratch}`,
-              `--skills-root=${options.legacyScratch}`,
-            ]
-          : [options.nativeChat ? "--agent=native-chat" : "--agent=disabled"]),
-        `--user-data=${options.userData}`,
-        `--media-root=${options.mediaRoot}`,
-        `--editor-base-url=${origin}`,
-      ],
-      {
-        cwd: options.root,
-        env: {
-          ...options.env,
-          ELECTRON_RUN_AS_NODE: "1",
-          GRIDA_MEDIA_STARTUP_ROOT: options.root,
-          GRIDA_MEDIA_STARTUP_STATE: options.userData,
-          GRIDA_MEDIA_STARTUP_REPORT: path.join(
-            options.root,
-            `guard-${options.generation}.json`
-          ),
-        },
-        stdio: ["pipe", "pipe", "pipe", "ipc"],
-      }
-    );
+    const argv = [
+      ...(options.legacyScratch
+        ? []
+        : ["--require", path.join(fixture, "media-startup-guard.cjs")]),
+      path.join(options.output, "sidecar.cjs"),
+      ...(options.legacyScratch
+        ? [
+            "--agent=enabled",
+            `--scratch-base=${options.legacyScratch}`,
+            `--skills-root=${options.legacyScratch}`,
+          ]
+        : [options.nativeChat ? "--agent=native-chat" : "--agent=disabled"]),
+      `--user-data=${options.userData}`,
+      `--media-root=${options.mediaRoot}`,
+      `--editor-base-url=${origin}`,
+      ...(options.workspaceCatalog
+        ? [
+            "--sandbox-enforced=1",
+            `--workspace-catalog=${options.workspaceCatalog.directory}`,
+          ]
+        : []),
+    ];
+    const launch = options.workspaceCatalog
+      ? await options.workspaceCatalog.confined(
+          options.runtime.executable,
+          argv
+        )
+      : { argv: [options.runtime.executable, ...argv], env: {} };
+    const child = spawn(launch.argv[0], launch.argv.slice(1), {
+      cwd: options.root,
+      env: {
+        ...options.env,
+        ...launch.env,
+        ELECTRON_RUN_AS_NODE: "1",
+        GRIDA_MEDIA_STARTUP_ROOT: options.root,
+        GRIDA_MEDIA_STARTUP_STATE: options.userData,
+        GRIDA_MEDIA_STARTUP_REPORT: path.join(
+          options.root,
+          `guard-${options.generation}.json`
+        ),
+      },
+      stdio: ["pipe", "pipe", "pipe", "ipc"],
+    });
     return await Sidecar.initialize(
       child,
       options.fetchProvider,
@@ -976,6 +1137,10 @@ class Sidecar {
       clearTimeout(timer);
     }
   }
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 async function runBuild(root: string, output: string, env: NodeJS.ProcessEnv) {

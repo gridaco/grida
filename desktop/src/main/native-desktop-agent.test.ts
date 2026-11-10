@@ -6,6 +6,7 @@ import path from "node:path";
 import { expect, it, vi } from "vitest";
 import { CHATGPT_RESPONSES_URL } from "../chatgpt-configuration";
 import { DesktopAccountSession } from "./account-session";
+import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 
 const sidecar = vi.hoisted(() => ({
@@ -21,9 +22,9 @@ const sidecar = vi.hoisted(() => ({
     vi.fn<
       typeof import("./agent-sidecar-supervisor").nativeAgentGatewayConnection
     >(),
-  listWorkspaces:
+  findWorkspace:
     vi.fn<
-      typeof import("./agent-sidecar-client").agentSidecarClient.listWorkspaces
+      typeof import("./agent-sidecar-client").agentSidecarClient.findWorkspace
     >(),
 }));
 
@@ -96,15 +97,13 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         userDataPath: source.userDataPath,
         network: { prepare },
       });
-      sidecar.listWorkspaces.mockResolvedValue([
-        {
-          id: "fixture-workspace",
-          root,
-          name: "Fixture",
-          opened_at: 0,
-          pinned: false,
-        },
-      ]);
+      const catalog = new NativeWorkspaceCatalog({
+        browserData: source.desktopUserDataPath,
+        projectsRoot: path.join(base, "projects"),
+        protectedPaths: [source.userDataPath],
+      });
+      const workspace = await catalog.openSelected(root);
+      sidecar.findWorkspace.mockImplementation((id) => catalog.find(id));
       const { NativeDesktopAgent } = await import("./native-desktop-agent");
       agent = await NativeDesktopAgent.prepareFresh(
         new DesktopAccountSession({
@@ -122,14 +121,14 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       });
       expect(JSON.stringify(status)).not.toContain("fixture-access");
 
-      await agent.ensure("fixture-workspace");
+      await agent.ensure(workspace.id);
       await agent.clearAccount();
-      expect(agent.current("fixture-workspace")).toBeNull();
+      expect(agent.current(workspace.id)).toBeNull();
       expect(await auth.getStoredOAuth("chatgpt")).toMatchObject({
         account_id: "fixture-account",
       });
-      await agent.ensure("fixture-workspace");
-      const chat = agent.current("fixture-workspace")!.chat;
+      await agent.ensure(workspace.id);
+      const chat = agent.current(workspace.id)!.chat;
       const session = await chat.create();
       await chat.submit(
         session,
@@ -149,8 +148,8 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       await expect(oauth.connect()).rejects.toThrow(
         "native_chatgpt_connection_unavailable"
       );
-      expect(agent.current("fixture-workspace")).toBeNull();
-      const replacement = agent.ensure("fixture-workspace");
+      expect(agent.current(workspace.id)).toBeNull();
+      const replacement = agent.ensure(workspace.id);
       const completed = vi.fn<() => void>();
       void replacement.then(completed, completed);
       await vi.waitFor(async () =>
@@ -167,8 +166,8 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         code: "chatgpt_not_signed_in",
       });
       await seed("fixture-reconnected");
-      await agent.ensure("fixture-workspace");
-      const reconnected = agent.current("fixture-workspace")!.chat;
+      await agent.ensure(workspace.id);
+      const reconnected = agent.current(workspace.id)!.chat;
       const fresh = await reconnected.create();
       await reconnected.submit(
         fresh,
@@ -182,11 +181,11 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       await vi.waitFor(() =>
         expect(quitWork.cancelled).toHaveBeenCalledTimes(1)
       );
-      expect(agent.current("fixture-workspace")).toBeNull();
+      expect(agent.current(workspace.id)).toBeNull();
       expect(quitCompleted).not.toHaveBeenCalled();
       quitWork.drain.resolve();
       await quit;
-      await expect(agent.ensure("fixture-workspace")).rejects.toThrow(
+      await expect(agent.ensure(workspace.id)).rejects.toThrow(
         "native_workspace_closing"
       );
       expect(await auth.getStoredOAuth("chatgpt")).toMatchObject({

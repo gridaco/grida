@@ -38,7 +38,7 @@ import {
   type AgentSidecarInfo,
 } from "./agent-sidecar-supervisor";
 import { NativeProviderSelection } from "./native-provider-selection";
-import { nativeWorkspaceMedia } from "./workspace-media-access";
+import type { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import { EDITOR_BASE_URL } from "../env";
 import { AgentTransport } from "@grida/agent/transport";
 import type { Workspace } from "@grida/daemon";
@@ -53,6 +53,12 @@ const EDITOR_ORIGIN = new URL(EDITOR_BASE_URL).origin;
 const REFERER = `${EDITOR_ORIGIN}/desktop`;
 
 export namespace agentSidecarClient {
+  let catalog: NativeWorkspaceCatalog | undefined;
+
+  export function setWorkspaceCatalog(owner: NativeWorkspaceCatalog): void {
+    if (catalog) throw new Error("workspace_catalog_already_bound");
+    catalog = owner;
+  }
   export class AgentSidecarNotReadyError extends Error {
     constructor() {
       super("agent sidecar info not available (not started yet)");
@@ -86,21 +92,45 @@ export namespace agentSidecarClient {
    * calls this) so the welcome window can `bridge.workspaces.list()` and
    * surface it without re-doing the dialog dance.
    *
-   * Native media captures the exact directory selected by Main. The
-   * compatibility registry still owns the workspace metadata.
+   * The native profile captures the exact directory selected by Main.
    */
   export async function openWorkspace(rootPath: string): Promise<Workspace> {
-    const transport = client();
-    const media = nativeWorkspaceMedia();
-    return media
-      ? await media.registry.register(rootPath, (root) =>
-          transport.workspaces.open(root)
-        )
-      : await transport.workspaces.open(rootPath);
+    return catalog
+      ? await catalog.openSelected(rootPath)
+      : await client().workspaces.open(rootPath);
   }
 
   export async function listWorkspaces(): Promise<Workspace[]> {
-    return await client().workspaces.list();
+    return catalog ? await catalog.list() : await client().workspaces.list();
+  }
+
+  export async function findWorkspace(id: string): Promise<Workspace | null> {
+    return catalog
+      ? await catalog.find(id)
+      : ((await listWorkspaces()).find((entry) => entry.id === id) ?? null);
+  }
+
+  export async function reopenWorkspace(root: string): Promise<Workspace> {
+    return catalog ? await catalog.reopen(root) : await openWorkspace(root);
+  }
+
+  export async function createWorkspace(name?: string): Promise<Workspace> {
+    return catalog
+      ? await catalog.create(name)
+      : await client().workspaces.create({ name });
+  }
+
+  export async function pinWorkspace(
+    id: string,
+    pinned: boolean
+  ): Promise<void> {
+    if (catalog) return await catalog.pin(id, pinned);
+    await client().workspaces.pin(id, pinned);
+  }
+
+  export async function forgetWorkspace(id: string): Promise<void> {
+    if (catalog) return await catalog.forget(id);
+    await client().workspaces.forget(id);
   }
 
   /** Main-owned endpoint operations keep native grant approval and the

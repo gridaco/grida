@@ -1263,6 +1263,18 @@ Today:
   recents routes and denies file contents and mutation under the browser
   directory. Compatibility launches retain the daemon store. Native startup
   leaves the legacy store in its original location.
+- The isolated native Desktop profile registers workspaces through the
+  [Main catalog](desktop/src/main/native-workspace-catalog.ts). The current
+  native folder picker or a Main-owned OS open admits a new directory.
+  Reopening from the renderer must match a registered canonical path and
+  directory identity. The catalog lives outside Chromium state under the
+  instance-locked profile. Its [bounded reader](packages/grida-daemon/src/workspaces/catalog-reader.ts)
+  validates each committed scope and the [directory identity](packages/grida-daemon/src/workspaces/directory-identity.ts).
+  The confined compatibility carrier mounts only its guarded file routes
+  for that catalog, and the sandbox denies writes to the catalog directory.
+  Native chat startup resolves the Main catalog, and the packaged range
+  reader opens the exact admitted directory. Existing profiles retain their
+  compatibility registry.
 - The [native workspace span reader](crates/grida-agent/src/workspace_file.rs)
   binds metadata and output to one descriptor. Its [private process](crates/grida-agent/src/workspace_file/stdio.rs)
   requires the registered directory identity and protected roots before

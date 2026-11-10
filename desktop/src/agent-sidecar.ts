@@ -134,6 +134,14 @@ const runtimeEditorBaseUrl = getCliArg("editor-base-url") ?? EDITOR_BASE_URL;
 // expose an unsandboxed shell.
 const sandboxEnforced = getCliArg("sandbox-enforced") === "1";
 const retainedMediaScope = getCliArg("retained-media-scope");
+const workspaceCatalog = getCliArg("workspace-catalog");
+if (
+  workspaceCatalog !== undefined &&
+  (!workspaceCatalog || agentMode !== "native-chat" || !sandboxEnforced)
+) {
+  console.error("[agent-sidecar] fatal: invalid workspace catalog scope");
+  process.exit(1);
+}
 if (
   retainedMediaScope !== undefined &&
   (retainedMediaScope !== "1" || agentMode !== "native-chat" || sandboxEnforced)
@@ -198,6 +206,7 @@ async function main() {
     provider_home: providerHome,
     media_root: requiredMediaRoot,
     retained_media_scope: retainedMediaScope === "1",
+    workspace_catalog: workspaceCatalog,
     projects_root: projectsRoot,
     editor_base_url: runtimeEditorBaseUrl,
     agent:

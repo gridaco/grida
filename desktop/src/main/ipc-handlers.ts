@@ -498,14 +498,62 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     const workspaces = await agentSidecarClient.listWorkspaces();
     return workspaces.find((workspace) => workspace.is_default) ?? null;
   });
-  guarded(IPC_CHANNELS.ONBOARDING_WORKSPACE_CHOOSE, async (event) => {
+  async function chooseWorkspace(event: IpcMainInvokeEvent) {
     const window = BrowserWindow.fromWebContents(event.sender);
-    if (!window) throw new Error("onboarding window is unavailable");
-    const result = await dialog.showOpenDialog(window, {
-      properties: ["openDirectory", "createDirectory"],
-    });
-    if (result.canceled || result.filePaths.length === 0) return null;
-    return await agentSidecarClient.openWorkspace(result.filePaths[0]);
+    const { sender, senderFrame: frame } = event;
+    const role = window && options.resolve_ipc_role(window);
+    if (!window || !role || !frame || frame !== sender.mainFrame)
+      throw new Error("workspace_picker_unavailable");
+    let current = true;
+    const revoke = ipc_sender.watchNavigation(sender, () => (current = false));
+    try {
+      const result = await dialog.showOpenDialog(window, {
+        properties: ["openDirectory", "createDirectory"],
+      });
+      if (
+        !current ||
+        sender.isDestroyed() ||
+        frame !== sender.mainFrame ||
+        options.resolve_ipc_role(window) !== role ||
+        !ipc_sender.isAllowed(frame.url, EDITOR_ORIGIN) ||
+        result.canceled ||
+        result.filePaths.length !== 1
+      )
+        return null;
+      return await agentSidecarClient.openWorkspace(result.filePaths[0]);
+    } finally {
+      revoke();
+    }
+  }
+  guarded(IPC_CHANNELS.ONBOARDING_WORKSPACE_CHOOSE, chooseWorkspace);
+  guarded(IPC_CHANNELS.WORKSPACE_LIST, () =>
+    agentSidecarClient.listWorkspaces()
+  );
+  guarded(IPC_CHANNELS.WORKSPACE_CHOOSE, chooseWorkspace);
+  guarded(IPC_CHANNELS.WORKSPACE_REOPEN, (_event, root: unknown) => {
+    if (typeof root !== "string" || !root || Buffer.byteLength(root) > 4096)
+      throw new Error("workspace_root_invalid");
+    return agentSidecarClient.reopenWorkspace(root);
+  });
+  guarded(IPC_CHANNELS.WORKSPACE_CREATE, (_event, name: unknown) => {
+    if (
+      name !== undefined &&
+      (typeof name !== "string" || Buffer.byteLength(name) > 4096)
+    )
+      throw new Error("workspace_name_invalid");
+    return agentSidecarClient.createWorkspace(name);
+  });
+  guarded(
+    IPC_CHANNELS.WORKSPACE_PIN,
+    (_event, id: unknown, pinned: unknown) => {
+      if (!workspaceIdValue(id) || typeof pinned !== "boolean")
+        throw new Error("workspace_pin_invalid");
+      return agentSidecarClient.pinWorkspace(id, pinned);
+    }
+  );
+  guarded(IPC_CHANNELS.WORKSPACE_FORGET, (_event, id: unknown) => {
+    if (!workspaceIdValue(id)) throw new Error("workspace_id_invalid");
+    return agentSidecarClient.forgetWorkspace(id);
   });
 
   const chatgptOAuth = options.native_chatgpt_oauth ?? legacyChatgptOAuth;
@@ -965,10 +1013,13 @@ async function confirmProviderOrigin(
 }
 
 async function findWorkspaceOrThrow(workspaceId: string) {
-  const workspaces = await agentSidecarClient.listWorkspaces();
-  const workspace = workspaces.find((item) => item.id === workspaceId);
+  const workspace = await agentSidecarClient.findWorkspace(workspaceId);
   if (!workspace) throw new Error(`workspace not found: ${workspaceId}`);
   return workspace;
+}
+
+function workspaceIdValue(id: unknown): id is string {
+  return typeof id === "string" && /^[a-f0-9]{16}$/.test(id);
 }
 
 function parsePreferredApps(raw: readonly unknown[]): HostAppId[] {

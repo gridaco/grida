@@ -40,7 +40,7 @@ export const MAX_BUFFERED_WORKSPACE_RESOURCE_BYTES = 8 * 1024 * 1024;
  */
 async function requireWorkspace(
   c: Context,
-  registry: WorkspaceRegistry,
+  registry: Pick<WorkspaceRegistry, "findById">,
   id: string
 ): Promise<Workspace | Response> {
   const ws = await registry.findById(id);
@@ -101,7 +101,13 @@ export function registerWorkspacesRoutes(
     await registry.forget(r.data.id);
     return c.json({});
   });
+  registerWorkspaceFileRoutes(app, registry);
+}
 
+export function registerWorkspaceFileRoutes(
+  app: Hono,
+  registry: Pick<WorkspaceRegistry, "findById">
+) {
   // ── filesystem surface ─────────────────────────────────────────
 
   // POST /workspaces/readdir { workspaceId, relPath? } → entries[]

@@ -10,12 +10,16 @@ import { makeBasicAuthGuard } from "./auth";
 import { registerHandshakeRoute } from "./routes/handshake";
 import { registerFilesRoutes } from "./routes/files";
 import { registerRecentRoutes } from "./routes/recent";
-import { registerWorkspacesRoutes } from "./routes/workspaces";
+import {
+  registerWorkspaceFileRoutes,
+  registerWorkspacesRoutes,
+} from "./routes/workspaces";
 import { FileRegistry } from "../files/registry";
 import { RecentStore } from "../files/recent";
 import { SecretsStore } from "../secrets";
 import { AuthStore } from "../auth/file";
 import { WorkspaceRegistry } from "../workspaces";
+import { WorkspaceCatalogReader } from "../workspaces/catalog-reader";
 import { MediaStore, type MediaPersistence } from "../media";
 import type { DaemonCapabilities } from "../protocol/handshake";
 
@@ -119,6 +123,8 @@ export type ServerOptions = {
    * that don't wire it (CLI/dev), where `createProject` throws.
    */
   projects_root?: string;
+  /** Host-owned scope source for the guarded file routes only. */
+  workspace_catalog?: string;
   /**
    * Host-provided dedicated root for durable binary media. Omitted on hosts
    * that do not offer this capability; never derived from a client request.
@@ -210,8 +216,20 @@ export function buildServer(opts: ServerOptions): BuiltServer {
   // Daemon-owned routes. Capabilities describe the route groups mounted.
   if (opts.capabilities.files) registerFilesRoutes(app, services.files);
   if (opts.capabilities.recent) registerRecentRoutes(app, services.recent);
-  if (opts.capabilities.workspaces)
+  if (opts.workspace_catalog !== undefined) {
+    if (opts.capabilities.workspaces)
+      throw new Error("workspace_catalog_writer_conflict");
+    registerWorkspaceFileRoutes(
+      app,
+      new WorkspaceCatalogReader(opts.workspace_catalog, [
+        opts.user_data_path,
+        secrets.directory,
+        ...(opts.media_root ? [opts.media_root] : []),
+      ])
+    );
+  } else if (opts.capabilities.workspaces) {
     registerWorkspacesRoutes(app, services.workspaces);
+  }
 
   // Tenants mount behind the same perimeter and report their capability
   // flags, which merge into the handshake response.

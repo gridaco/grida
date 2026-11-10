@@ -43,10 +43,10 @@ export class WorkspaceMediaRegistry {
   /** Called only on a trusted Main-originated folder registration. */
   async register(
     selection: string,
-    open: (root: string) => Promise<Workspace>
+    open: (root: string, identity: Identity) => Promise<Workspace>
   ): Promise<Workspace> {
     const captured = await this.directory(selection);
-    const workspace = await open(captured.root);
+    const workspace = await open(captured.root, captured.identity);
     const expectedId = crypto
       .createHash("sha256")
       .update(captured.root)

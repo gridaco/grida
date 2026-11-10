@@ -54,7 +54,12 @@ export namespace NativeDesktopProfile {
     const root = path.dirname(agentData);
     const systemTemp = await fs.realpath(app.getPath("temp"));
     const relative = path.relative(systemTemp, root);
-    const reserved = new Set(["media", "projects", "temp"]);
+    const reserved = new Set([
+      "media",
+      "projects",
+      "temp",
+      "workspace-catalog",
+    ]);
     if (
       !relative ||
       relative === ".." ||

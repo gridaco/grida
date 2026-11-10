@@ -45,6 +45,8 @@ export { Daemon } from "./daemon";
 // star) so the seam surface stays reviewable.
 export { ProtectedRoots } from "./protected-roots";
 export { WorkspaceRegistry, type Workspace } from "./workspaces";
+export { WorkspaceCatalogReader } from "./workspaces/catalog-reader";
+export type { WorkspaceDirectoryIdentity } from "./workspaces/directory-identity";
 export { workspaceFs } from "./workspaces/fs";
 export {
   workspaceFileResponse,

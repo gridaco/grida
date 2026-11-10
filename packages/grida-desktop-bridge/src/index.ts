@@ -319,6 +319,8 @@ export type DesktopBridge = {
   };
   workspaces: {
     list: () => Promise<Workspace[]>;
+    /** Open the exact directory selected in a native folder picker. */
+    choose?: () => Promise<Workspace | null>;
     open: (rootPath: string) => Promise<Workspace>;
     /**
      * Auto-create a fresh project (managed root, seeded `.canvas` board) and

@@ -179,7 +179,7 @@ async function handshake(): Promise<HandshakeResponse> {
   // The ready Desktop bridge exposes recents through Main in either mode.
   return {
     ...response,
-    capabilities: { ...response.capabilities, recent: true },
+    capabilities: { ...response.capabilities, recent: true, workspaces: true },
   };
 }
 
@@ -858,14 +858,17 @@ const bridge: DesktopBridge = {
   },
 
   workspaces: {
-    list: () => agentClient.workspaces.list(),
-    open: (rootPath) => agentClient.workspaces.open(rootPath),
-    create: (input) => agentClient.workspaces.create(input),
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_LIST),
+    choose: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_CHOOSE),
+    open: (rootPath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_REOPEN, rootPath),
+    create: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_CREATE, input?.name),
     pin: async (id, pinned) => {
-      await agentClient.workspaces.pin(id, pinned);
+      await ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_PIN, id, pinned);
     },
     forget: async (id) => {
-      await agentClient.workspaces.forget(id);
+      await ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_FORGET, id);
     },
     readdir: (workspaceId, relPath) =>
       agentClient.workspaces.readdir(workspaceId, relPath ?? ""),
