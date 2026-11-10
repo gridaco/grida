@@ -2,9 +2,12 @@
 
 pub mod catalog;
 pub mod context;
+mod control_pair;
 pub mod deletion;
 pub mod driver;
 pub mod history;
+
+pub use control_pair::{OperationPairControl, OperationPairReceipt, OperationRelatedControl};
 
 use agent_kit_core::driver_state::{DriverStateChange, DriverStateSnapshot};
 use agent_kit_core::history::HistoryRecord;
@@ -422,6 +425,20 @@ impl SqliteStore {
         .await
     }
 
+    /// Read the original receipt of an exact recorded control without applying it.
+    pub async fn control_receipt(&self, request: ControlRequest) -> Result<Option<ControlReceipt>> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            lookup_request(
+                connection,
+                &request.session,
+                "control",
+                &request.id,
+                Fingerprint::of(&request)?,
+            )
+        })
+        .await
+    }
+
     /// Read the immutable submissions selected by a turn without issuing a lease.
     pub async fn turn_submissions(
         &self,
@@ -544,7 +561,8 @@ impl SqliteStore {
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
             let fingerprint = Fingerprint::of(&request)?;
-            let source_key = operation_claim_key(&request.source)?;
+            let source_key =
+                operation_claim_key(&request.source.binding.turn, &request.source.operation)?;
             let source_session = &request.source.binding.session;
             if let Some(receipt) = lookup_request::<OperationClaimRecord>(
                 &transaction,
@@ -954,17 +972,7 @@ impl SessionStore for SqliteStore {
             )? {
                 return Ok(receipt);
             }
-            let session = load_session(&transaction, &request.session)?;
-            require_revision(&session, request.expected_revision)?;
-            let receipt = apply_control(&transaction, &request, session, None)?;
-            save_request(
-                &transaction,
-                &request.session,
-                "control",
-                &request.id,
-                fingerprint,
-                &receipt,
-            )?;
+            let receipt = record_control(&transaction, &request, fingerprint)?;
             transaction.commit().map_err(commit_error)?;
             inner.changed.notify_waiters();
             Ok(receipt)
@@ -1193,8 +1201,8 @@ fn record_creation(
     Ok(receipt)
 }
 
-fn operation_claim_key(source: &OperationClaimSource) -> Result<ChangeId> {
-    let fingerprint = Fingerprint::of(&(&source.binding.turn, &source.operation))?;
+fn operation_claim_key(turn: &TurnId, operation: &OperationId) -> Result<ChangeId> {
+    let fingerprint = Fingerprint::of(&(turn, operation))?;
     ChangeId::new(
         fingerprint
             .bytes()
@@ -1497,6 +1505,25 @@ fn apply_control(
         driver_state_revision: (state_revision != session.driver_state.revision())
             .then_some(session.driver_state.revision()),
     };
+    Ok(receipt)
+}
+
+fn record_control(
+    transaction: &Transaction<'_>,
+    request: &ControlRequest,
+    fingerprint: Fingerprint,
+) -> Result<ControlReceipt> {
+    let session = load_session(transaction, &request.session)?;
+    require_revision(&session, request.expected_revision)?;
+    let receipt = apply_control(transaction, request, session, None)?;
+    save_request(
+        transaction,
+        &request.session,
+        "control",
+        &request.id,
+        fingerprint,
+        &receipt,
+    )?;
     Ok(receipt)
 }
 

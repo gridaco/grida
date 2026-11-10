@@ -6,10 +6,14 @@ use agent_kit_core::messages::ToolArguments;
 use agent_kit_core::tools::{
     Inventory, Invocation, InvocationContext, RecoveryKind, Tool, ToolDefinition, ToolOutcome,
 };
-use agent_kit_core::turn::{ControlDirective, OperationInput, OperationRecord};
+use agent_kit_core::turn::{
+    ControlDirective, OperationInput, OperationOutcome, OperationRecord, TurnBinding,
+};
 use agent_kit_core::{AttemptId, BindingId, BoxFuture, OperationId, PrincipalId, ScopeId, ToolId};
-use agent_kit_sessions::SessionView;
-use agent_kit_store_sqlite::{OperationClaim, OperationClaimSource};
+use agent_kit_sessions::{SessionView, TurnControl};
+use agent_kit_store_sqlite::{
+    OperationClaim, OperationClaimSource, OperationPairControl, OperationRelatedControl,
+};
 
 struct WorkTool(ToolDefinition);
 
@@ -306,6 +310,420 @@ async fn lost_acknowledgment_reopens_only_the_existing_child_claim() {
         store.claim_from_operation(request).await.unwrap(),
         ClaimOutcome::Existing(view) if view.binding == *child.lease.binding()
     ));
+}
+
+async fn turn_control(
+    store: &SqliteStore,
+    binding: &TurnBinding,
+    id: &str,
+    directive: ControlDirective,
+) -> ControlRequest {
+    let view = store.inspect(binding.session.clone()).await.unwrap();
+    let current = view.current.unwrap();
+    assert_eq!(current.binding, *binding);
+    ControlRequest {
+        id: change(id),
+        session: binding.session.clone(),
+        expected_revision: view.revision,
+        action: SessionControl::Turn {
+            turn: binding.turn.clone(),
+            expected: current.controls.revision,
+            directive,
+        },
+    }
+}
+
+fn state_control(mut request: ControlRequest, revision: u64, value: &str) -> ControlRequest {
+    let SessionControl::Turn {
+        turn,
+        expected,
+        directive,
+    } = request.action
+    else {
+        panic!("expected a turn directive");
+    };
+    request.action = SessionControl::DriverState {
+        change: DriverStateChange {
+            expected: DriverStateRevision(revision),
+            value: Some(payload(value)),
+        },
+        turn: Some(TurnControl {
+            turn,
+            expected,
+            directive,
+        }),
+    };
+    request
+}
+
+async fn claim_destination(store: &SqliteStore, request: OperationClaim) -> ClaimedTurn {
+    let ClaimOutcome::Acquired(child) = store.claim_from_operation(request).await.unwrap() else {
+        panic!("expected an acquired destination");
+    };
+    child
+}
+
+#[tokio::test]
+async fn absence_control_and_related_claim_have_one_winner() {
+    let (_directory, store) = store().await;
+    let (parent, selected) = owning_operation(&store).await;
+    let claim = request(selected, "child");
+    let control = OperationPairControl {
+        source: turn_control(
+            &store,
+            parent.lease.binding(),
+            "pause",
+            ControlDirective::Pause,
+        )
+        .await,
+        related: OperationRelatedControl::Absent {
+            session: claim.create.id.clone(),
+        },
+    };
+    let (paused, claimed) = tokio::join!(
+        store.control_operation_pair(control.clone()),
+        store.claim_from_operation(claim.clone()),
+    );
+    let parent = store.inspect_turn(session(), turn()).await.unwrap();
+    match (paused, claimed) {
+        (Ok(receipt), Err(rejected)) => {
+            assert_eq!(rejected.code, "stale_control_revision");
+            assert!(parent.controls.paused);
+            assert_absent(store.inspect(claim.create.id).await);
+            assert_eq!(
+                store.operation_pair_receipt(control.source).await.unwrap(),
+                Some(receipt)
+            );
+        }
+        (Err(pause), Ok(ClaimOutcome::Acquired(child))) => {
+            assert_eq!(pause.code, "operation_pair_destination_exists");
+            assert_eq!(child.lease.binding().session, claim.create.id);
+            assert!(!parent.controls.paused);
+            assert_eq!(
+                store.operation_pair_receipt(control.source).await.unwrap(),
+                None
+            );
+        }
+        _ => panic!("the absence check and claim must serialize"),
+    }
+}
+
+#[tokio::test]
+async fn paired_receipts_replay_after_destination_changes_and_can_resume_both() {
+    let (directory, store) = store().await;
+    let (parent, selected) = owning_operation(&store).await;
+    let child = claim_destination(&store, request(selected.clone(), "child")).await;
+    let parent_binding = parent.lease.binding().clone();
+    let child_binding = child.lease.binding().clone();
+    let destination = state_control(
+        turn_control(
+            &store,
+            &child_binding,
+            "pause-child",
+            ControlDirective::Pause,
+        )
+        .await,
+        1,
+        "opaque-paired-pause",
+    );
+    let pause = OperationPairControl {
+        source: turn_control(
+            &store,
+            &parent_binding,
+            "pause-parent",
+            ControlDirective::Pause,
+        )
+        .await,
+        related: OperationRelatedControl::Apply {
+            operation: selected.operation.clone(),
+            request: destination.clone(),
+        },
+    };
+    let receipt = store.control_operation_pair(pause.clone()).await.unwrap();
+    assert_eq!(
+        store.control(destination).await.unwrap(),
+        receipt.destination.clone().unwrap(),
+    );
+    let later = state_control(
+        turn_control(
+            &store,
+            &child_binding,
+            "later-pause",
+            ControlDirective::Pause,
+        )
+        .await,
+        2,
+        "opaque-independent-pause",
+    );
+    store.control(later).await.unwrap();
+    commit(
+        &parent,
+        "suspend-parent",
+        vec![
+            JournalAction::CompleteAttempt {
+                operation: selected.operation.clone(),
+                attempt: selected.attempt,
+                outcome: OperationOutcome::Tool(ToolOutcome::failed("fixture")),
+            },
+            JournalAction::Suspend,
+        ],
+    )
+    .await;
+    commit(&child, "suspend-child", vec![JournalAction::Suspend]).await;
+    drop(parent);
+    drop(child);
+    drop(store);
+    let store = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    assert_eq!(
+        store
+            .operation_pair_receipt(pause.source.clone())
+            .await
+            .unwrap(),
+        Some(receipt.clone())
+    );
+    assert_eq!(
+        store.control_operation_pair(pause.clone()).await.unwrap(),
+        receipt
+    );
+    let mut altered = pause.clone();
+    altered.related = OperationRelatedControl::Absent {
+        session: child_binding.session.clone(),
+    };
+    assert_error(
+        store.control_operation_pair(altered).await,
+        ErrorKind::Conflict,
+        "request_identity_reused",
+    );
+    let mut altered = pause.source;
+    altered.expected_revision = receipt.source.revision;
+    assert_error(
+        store.operation_pair_receipt(altered).await,
+        ErrorKind::Conflict,
+        "request_identity_reused",
+    );
+    let resume = OperationPairControl {
+        source: turn_control(
+            &store,
+            &parent_binding,
+            "resume-parent",
+            ControlDirective::Resume,
+        )
+        .await,
+        related: OperationRelatedControl::Apply {
+            operation: selected.operation,
+            request: state_control(
+                turn_control(
+                    &store,
+                    &child_binding,
+                    "resume-child",
+                    ControlDirective::Resume,
+                )
+                .await,
+                3,
+                "opaque-resumed",
+            ),
+        },
+    };
+    store.control_operation_pair(resume).await.unwrap();
+    for binding in [parent_binding, child_binding.clone()] {
+        let view = store
+            .inspect_turn(binding.session, binding.turn)
+            .await
+            .unwrap();
+        assert!(!view.controls.paused);
+        assert_eq!(view.disposition, TurnDisposition::Suspended);
+        assert_eq!(view.binding.epoch, binding.epoch);
+    }
+    let child = store.inspect(child_binding.session).await.unwrap();
+    assert_eq!(child.driver_state.revision(), DriverStateRevision(4));
+    assert_eq!(child.driver_state.value(), Some(&payload("opaque-resumed")));
+}
+
+#[tokio::test]
+async fn paired_controls_roll_back_and_reject_independent_receipts() {
+    let (_directory, store) = store().await;
+    let (parent, selected) = owning_operation(&store).await;
+    let child = claim_destination(&store, request(selected.clone(), "child")).await;
+    let mut source = turn_control(
+        &store,
+        parent.lease.binding(),
+        "stop-parent",
+        ControlDirective::Cancel,
+    )
+    .await;
+    source.action = SessionControl::PauseAndCancel {
+        turn: turn(),
+        expected: selected.control,
+    };
+    let destination = state_control(
+        turn_control(
+            &store,
+            child.lease.binding(),
+            "stop-child",
+            ControlDirective::Cancel,
+        )
+        .await,
+        1,
+        "opaque-cancelled",
+    );
+    let mut stop = OperationPairControl {
+        source: source.clone(),
+        related: OperationRelatedControl::Apply {
+            operation: selected.operation,
+            request: destination.clone(),
+        },
+    };
+    let before = store.inspect(destination.session.clone()).await.unwrap();
+    stop.source.expected_revision = SessionRevision(0);
+    assert_error(
+        store.control_operation_pair(stop.clone()).await,
+        ErrorKind::Conflict,
+        "stale_session_revision",
+    );
+    assert_eq!(
+        store.inspect(destination.session.clone()).await.unwrap(),
+        before
+    );
+    assert_eq!(
+        store.operation_pair_receipt(source.clone()).await.unwrap(),
+        None
+    );
+    // A successful pair can use both original identities after the rollback.
+    stop.source = source.clone();
+    let receipt = store.control_operation_pair(stop).await.unwrap();
+    let parent = store.inspect(source.session.clone()).await.unwrap();
+    assert!(parent.admission_paused);
+    assert!(parent.current.unwrap().controls.cancelled);
+    let child = store.inspect(destination.session.clone()).await.unwrap();
+    assert_eq!(
+        child.driver_state.value(),
+        Some(&payload("opaque-cancelled"))
+    );
+    assert!(child.current.unwrap().controls.cancelled);
+    assert_eq!(
+        store.control(destination).await.unwrap(),
+        receipt.destination.unwrap()
+    );
+
+    let (_directory, store) = self::store().await;
+    let (parent, selected) = owning_operation(&store).await;
+    let source = turn_control(
+        &store,
+        parent.lease.binding(),
+        "standalone-pause",
+        ControlDirective::Pause,
+    )
+    .await;
+    let ordinary = store.control(source.clone()).await.unwrap();
+    assert_eq!(
+        store.operation_pair_receipt(source.clone()).await.unwrap(),
+        None
+    );
+    assert_eq!(
+        store.control_receipt(source.clone()).await.unwrap(),
+        Some(ordinary)
+    );
+    let mut changed = source.clone();
+    changed.expected_revision = SessionRevision(0);
+    assert_error(
+        store.control_receipt(changed).await,
+        ErrorKind::Conflict,
+        "request_identity_reused",
+    );
+    assert_error(
+        store
+            .control_operation_pair(OperationPairControl {
+                source,
+                related: OperationRelatedControl::Absent {
+                    session: request(selected, "child").create.id,
+                },
+            })
+            .await,
+        ErrorKind::Conflict,
+        "operation_pair_control_already_recorded",
+    );
+}
+
+#[tokio::test]
+async fn only_exact_related_controls_or_settled_destinations_are_accepted() {
+    let (_directory, store) = store().await;
+    let (parent, selected) = owning_operation(&store).await;
+    let child = claim_destination(&store, request(selected.clone(), "child")).await;
+    let destination = child.lease.binding();
+    let source = turn_control(
+        &store,
+        parent.lease.binding(),
+        "pause-parent",
+        ControlDirective::Pause,
+    )
+    .await;
+    for (operation, turn, code) in [
+        (
+            OperationId::new("unrelated").unwrap(),
+            destination.turn.clone(),
+            "operation_pair_claim_missing",
+        ),
+        (
+            selected.operation.clone(),
+            TurnId::new("wrong-turn").unwrap(),
+            "operation_pair_destination_mismatch",
+        ),
+        (
+            selected.operation.clone(),
+            destination.turn.clone(),
+            "operation_pair_destination_unsettled",
+        ),
+    ] {
+        assert_error(
+            store
+                .control_operation_pair(OperationPairControl {
+                    source: source.clone(),
+                    related: OperationRelatedControl::Settled {
+                        operation,
+                        session: destination.session.clone(),
+                        turn,
+                    },
+                })
+                .await,
+            ErrorKind::Conflict,
+            code,
+        );
+    }
+    commit(
+        &child,
+        "settle-child",
+        vec![JournalAction::Settle(TurnOutcome {
+            status: OutcomeStatus::Succeeded,
+            account: None,
+            evidence: vec![],
+        })],
+    )
+    .await;
+    let before = store.inspect(destination.session.clone()).await.unwrap();
+    let receipt = store
+        .control_operation_pair(OperationPairControl {
+            source,
+            related: OperationRelatedControl::Settled {
+                operation: selected.operation,
+                session: destination.session.clone(),
+                turn: destination.turn.clone(),
+            },
+        })
+        .await
+        .unwrap();
+    assert!(receipt.destination.is_none());
+    assert_eq!(
+        store.inspect(destination.session.clone()).await.unwrap(),
+        before
+    );
+    assert!(
+        store
+            .inspect_turn(session(), turn())
+            .await
+            .unwrap()
+            .controls
+            .paused
+    );
 }
 
 #[tokio::test]

@@ -41,6 +41,17 @@ An exact repeat observes the committed destination turn even after the
 source owner has released its lease. Repeating a claim never issues another
 lease. Recovery of released work remains explicit.
 
+`control_operation_pair` applies a source turn control in one transaction with
+an exact claimed destination control, a check that the claimed destination
+turn has settled, or a check that the supplied deterministic session identity
+is absent and unretired. The absence check proves only that identity is
+available. The caller chooses the same destination identity for competing
+claims. The store preserves opaque driver state and issues no lease.
+Exact retries return the original pair receipt even after later controls.
+`operation_pair_receipt` reads a committed pair by its original source control.
+`control_receipt` reads the ordinary control receipt. An independently
+recorded control cannot be joined into a pair later.
+
 The optional owner-defined catalog projects immutable session configuration
 into a scope fingerprint. It indexes the scope at creation and upgrades earlier
 records without reading their turns. A scoped page returns at most 32 entries
