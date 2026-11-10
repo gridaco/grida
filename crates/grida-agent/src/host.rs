@@ -1,5 +1,6 @@
 //! Product composition and ownership for native agent turns.
 
+mod approval_review;
 mod catalog;
 mod compaction;
 mod completion_checks;
@@ -1359,6 +1360,18 @@ impl Host {
         )?
         .with_history(prior)
         .with_input_limit(prepared.limit);
+        if !cancellation_only
+            && prepared.goal.is_none()
+            && permission_scope.is_some()
+            && let Some(profile) = self
+                .permissions
+                .as_ref()
+                .and_then(|profile| profile.automatic_read_review())
+        {
+            master = master.with_approval_reviewer(Arc::new(
+                approval_review::AutomaticReadReview::new(self, profile, execution),
+            ));
+        }
         if let Some(effort) = prepared.effort {
             master = master.with_effort(effort)?;
         }
@@ -2572,7 +2585,15 @@ async fn drive(
     let agent_kit_runtime::OpenedTurn { turn, mut observer } = opened;
     let binding = observer.snapshot().state.binding().clone();
     let mut live = live.map(|sender| live::Publisher::new(sender, binding.clone()));
+    let review = turn
+        .operations()
+        .operation_id(&grida_agent_master::approval_review::operation_key())?;
     let mut publish = |update| {
+        if matches!(&update, TurnUpdate::Inference { operation, .. } | TurnUpdate::Operation { operation, .. }
+            if operation == &review)
+        {
+            return;
+        }
         if let Some(live) = &mut live {
             live.update(&update);
         }

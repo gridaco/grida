@@ -20,6 +20,7 @@ use agent_kit_sandbox::{
     TrustedExecutable,
 };
 use agent_kit_store_sqlite::SqliteStore;
+use grida_agent_master::approval_review::ReadProfile;
 use grida_agent_master::hooks::CheckMode;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -75,6 +76,7 @@ pub struct PermissionProfile {
     command: Option<CommandProfile>,
     hooks_only: bool,
     completion_hook: Option<CompletionHook>,
+    automatic_read_review: Option<ReadProfile>,
     revision: BindingId,
     identity: Fingerprint,
     context: String,
@@ -193,6 +195,7 @@ impl PermissionProfile {
             command,
             hooks_only: false,
             completion_hook: None,
+            automatic_read_review: None,
             revision,
             identity,
             context,
@@ -232,6 +235,28 @@ impl PermissionProfile {
 
     pub(crate) fn completion_hook(&self) -> Option<&CompletionHook> {
         self.completion_hook.as_ref()
+    }
+
+    pub(crate) fn with_automatic_read_review(mut self, review: ReadProfile) -> Result<Self> {
+        review.validate()?;
+        if self
+            .directories
+            .get(&review.directory)
+            .map(|rules| rules.read)
+            != Some(AccessRule::Ask)
+        {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "automatic_read_review_requires_ask",
+            ));
+        }
+        self.identity = Fingerprint::of(&(self.identity, "automatic-read-review", &review))?;
+        self.automatic_read_review = Some(review);
+        Ok(self)
+    }
+
+    pub(crate) fn automatic_read_review(&self) -> Option<&ReadProfile> {
+        self.automatic_read_review.as_ref()
     }
 
     /// Resolve the pinned primary for launch context without granting access.
@@ -397,6 +422,8 @@ struct ApprovalAnswer {
     action: Fingerprint,
     scope: Fingerprint,
     decision: ApprovalDecision,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    review: Option<OperationId>,
 }
 
 pub(crate) fn is_approval(wait: &WaitRecord) -> bool {
@@ -415,6 +442,14 @@ pub fn read_approval(wait: &WaitRecord) -> Result<ApprovalRequest> {
 /// the existing revision-checked Resolve control. Exact retries use the same
 /// answer and do not dispatch a command.
 pub fn approval_answer(wait: &WaitRecord, decision: ApprovalDecision) -> Result<Envelope> {
+    reviewed_approval_answer(wait, decision, None)
+}
+
+pub(crate) fn reviewed_approval_answer(
+    wait: &WaitRecord,
+    decision: ApprovalDecision,
+    review: Option<OperationId>,
+) -> Result<Envelope> {
     let request = read_approval(wait)?;
     encode(
         ANSWER,
@@ -422,6 +457,7 @@ pub fn approval_answer(wait: &WaitRecord, decision: ApprovalDecision) -> Result<
             action: request.action,
             scope: request.scope,
             decision,
+            review,
         },
     )
 }

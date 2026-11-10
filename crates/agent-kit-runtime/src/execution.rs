@@ -407,7 +407,20 @@ impl TurnOperations {
         request: PreparedRequest,
         grants: GrantSelection,
     ) -> Result<InferenceOutcome> {
-        self.infer_updates(key, request, grants, None).await
+        self.infer_updates(key, request, grants, None, None).await
+    }
+
+    /// Execute ordinary inference with a caller-selected earlier deadline.
+    /// Cancellation and final evidence remain owned by this turn.
+    pub async fn infer_until(
+        &self,
+        key: OperationKey,
+        request: PreparedRequest,
+        grants: GrantSelection,
+        deadline: Instant,
+    ) -> Result<InferenceOutcome> {
+        self.infer_updates(key, request, grants, None, Some(deadline))
+            .await
     }
 
     pub(crate) async fn infer_updates(
@@ -416,6 +429,7 @@ impl TurnOperations {
         request: PreparedRequest,
         grants: GrantSelection,
         updates: Option<mpsc::Sender<ToolCall>>,
+        deadline_cap: Option<Instant>,
     ) -> Result<InferenceOutcome> {
         let id = self.operation_id(&key)?;
         self.inner.ensure_open()?;
@@ -465,6 +479,7 @@ impl TurnOperations {
             }
         };
         let deadline = Instant::now() + self.inner.services.limits.operation_timeout;
+        let deadline = deadline_cap.map_or(deadline, |cap| cap.min(deadline));
         let permit = tokio::select! {
             _ = owner.admission.cancellation.cancelled() => {
                 return self.reject_inference(&id, owner.admission.cancellation_code(), FailureKind::Cancelled).await;
@@ -581,7 +596,13 @@ impl TurnOperations {
             });
         }
         let mut outcome = run.finish().await;
-        if let Some(failure) = &mut outcome.failure
+        if deadline_cap.is_some()
+            && Instant::now() >= deadline
+            && owner.admission.interruption_code().is_none()
+        {
+            outcome.status = InferenceStatus::Interrupted;
+            outcome.failure = inference_failure("deadline", FailureKind::Cancelled).failure;
+        } else if let Some(failure) = &mut outcome.failure
             && outcome.status == InferenceStatus::Interrupted
             && failure.kind == FailureKind::Cancelled
             && let Some(code) = owner.admission.interruption_code()

@@ -463,6 +463,35 @@ Continuation rechecks the launch profile and native identity before dispatch.
 Unverified command cleanup surfaces uncertainty and stops automatic queue
 advancement.
 
+### Review one configured read
+
+A trusted launcher can add `automaticReadReview` to its permission profile
+for one exact UTF-8 file read in a directory whose `read` rule is `ask`:
+
+```json
+{
+  "automaticReadReview": {
+    "directory": "reference",
+    "relativePath": "brief.txt"
+  }
+}
+```
+
+The launch still asks about every other action that requires approval. An
+eligible turn can use one generation from its existing step budget for review,
+with up to 128 output tokens and a 10-second deadline. The reviewer receives
+the latest bounded user request from the inference that proposed the read and
+the relative path. It has no tools. The selected provider is the same as for
+the task, and usage is recorded with the turn. The review can approve or
+decline the exact pending action. The existing file authority still checks
+that action at execution, and an earlier manual decision takes precedence.
+
+An invalid or interrupted review leaves the approval available for manual
+resolution. Pending approvals can report `reviewFailure` as `timed_out`,
+`interrupted`, `unavailable`, or `invalid_reply`. The chat does not stream the
+reviewer's reply. Keep the same trusted profile when resuming. Goal work uses
+manual approval, and the Desktop permission picker does not select this profile.
+
 Run the opt-in ACP approval fixtures on macOS with Bash and Seatbelt. On
 Linux, use Bash, `setsid`, and a trusted non-setuid bubblewrap installation
 with unprivileged user and PID namespaces. On Linux, set

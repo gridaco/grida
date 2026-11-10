@@ -14,6 +14,8 @@ use agent_kit_core::turn::{ControlRevision, TurnState};
 pub struct PendingApproval {
     pub wait_id: agent_kit_core::WaitId,
     pub request: ApprovalRequest,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_failure: Option<grida_agent_master::approval_review::AskReason>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -272,6 +274,12 @@ pub(super) fn pending_approvals(state: &TurnState) -> Result<Approvals> {
             }
             Ok(PendingApproval {
                 wait_id: wait.id.clone(),
+                review_failure: grida_agent_master::approval_review::recorded_failure(
+                    state,
+                    &request.operation,
+                    request.action,
+                    request.scope,
+                )?,
                 request,
             })
         })

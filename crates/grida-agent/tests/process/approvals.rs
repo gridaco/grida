@@ -8,6 +8,8 @@ use tokio::process::{ChildStdin, ChildStdout};
 
 #[path = "approvals/confinement.rs"]
 mod confinement;
+#[path = "approvals/reviewer.rs"]
+mod reviewer;
 
 const LIST: &str = "co.grida/session/approvals";
 const ANSWER: &str = "co.grida/session/answer-approval";

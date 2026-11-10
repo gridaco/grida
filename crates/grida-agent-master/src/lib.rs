@@ -1,5 +1,6 @@
 //! Bounded conversational policy composed over the reusable execution runtime.
 
+pub mod approval_review;
 pub mod compaction;
 pub mod configuration;
 pub mod conversation_seed;
@@ -155,6 +156,7 @@ pub struct Master {
     effort: Option<effort::Policy>,
     goal_verifier: Option<Box<goals::settlement::Verifier>>,
     completion_checks: Option<CompletionChecksExecution>,
+    approval_reviewer: Option<Arc<dyn approval_review::Reviewer>>,
 }
 
 struct CompletionChecksExecution {
@@ -239,6 +241,7 @@ impl Master {
             effort: None,
             goal_verifier: None,
             completion_checks: None,
+            approval_reviewer: None,
         })
     }
 
@@ -286,6 +289,12 @@ impl Master {
         self
     }
 
+    /// Select the captured approval reviewer independently of tools and grants.
+    pub fn with_approval_reviewer(mut self, reviewer: Arc<dyn approval_review::Reviewer>) -> Self {
+        self.approval_reviewer = Some(reviewer);
+        self
+    }
+
     /// Accept evidence through a product verifier of recorded tool outcomes.
     /// The verifier must check the criterion against the outcome independently
     /// of the model's proposal and must not perform I/O or create effects.
@@ -306,6 +315,8 @@ impl Master {
                 self.effort.is_some() && !view.state.controls().cancelled,
             )?
         };
+        let reviewer = self.approval_reviewer.as_ref().filter(|_| max_steps > 1);
+        let max_steps = max_steps - u32::from(reviewer.is_some());
         let mut continuation = self.continuation(&turn)?;
         self.accept_input(&mut turn, input).await?;
         let view = turn.view();
@@ -524,11 +535,27 @@ impl Master {
                     return Err(error);
                 }
             };
-            if step
+            let deferred: Vec<_> = step
                 .tools
                 .iter()
-                .any(|tool| matches!(tool.outcome, InvokeOutcome::Deferred(_)))
-            {
+                .filter_map(|tool| match &tool.outcome {
+                    InvokeOutcome::Deferred(wait) => Some(wait.clone()),
+                    InvokeOutcome::Complete(_) => None,
+                })
+                .collect();
+            if !deferred.is_empty() {
+                let current = turn.view();
+                if current.state.controls().admits_work()
+                    && step.inference.status == InferenceStatus::Completed
+                    && step.inference.failure.is_none()
+                    && continuation.request_history == Some(current.state.history().position())
+                    && let Some(reviewer) = reviewer
+                    && reviewer
+                        .review(&turn.operations(), &current, &deferred)
+                        .await?
+                {
+                    continue;
+                }
                 let current = turn.view();
                 if current.state.controls().cancelled {
                     let outcome = self

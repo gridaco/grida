@@ -31,6 +31,7 @@ impl Turn {
             plan.request.clone(),
             plan.inference_grants.clone(),
             Some(sender),
+            None,
         );
         tokio::pin!(inference);
         let mut completed_inference = None;

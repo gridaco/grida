@@ -118,6 +118,11 @@ search, or `read: ask` to require approval. Listing a folder in the profile
 does not grant access by itself. A changed profile can block continuation
 of a retained task after restart.
 
+A trusted native launcher can opt into review for one configured file read.
+Every other action that requires approval still asks. If the review is
+interrupted, unavailable, or returns an invalid reply, the approval remains
+available for a manual answer. [Configure automatic read review](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#review-one-configured-read)
+
 [native permission profile]: https://github.com/gridaco/grida/tree/main/crates/grida-agent#filesystem-services
 
 ### Plan before carrying out a task

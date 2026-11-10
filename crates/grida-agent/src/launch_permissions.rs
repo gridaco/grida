@@ -9,7 +9,7 @@ use agent_kit_core::{BindingId, Error, ErrorKind, Fingerprint, Result};
 use agent_kit_sandbox::{
     DeniedAccess, Installation, ProtectedPath, Sandbox, Termination, TrustedExecutable,
 };
-use grida_agent_master::hooks::CheckMode;
+use grida_agent_master::{approval_review::ReadProfile, hooks::CheckMode};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -34,6 +34,7 @@ struct ProfileFile {
     protected_paths: Vec<PathBuf>,
     command: Option<Command>,
     before_completion: Option<BeforeCompletion>,
+    automatic_read_review: Option<ReadProfile>,
 }
 
 #[derive(Deserialize)]
@@ -225,6 +226,7 @@ pub fn load_permission_profile(
         Some(profile.primary),
         &protected,
     )?;
+    let selected_review = profile.automatic_read_review;
     let profile = PermissionProfile::with_denials(
         profile.revision,
         Arc::new(workspace),
@@ -232,8 +234,12 @@ pub fn load_permission_profile(
         denials,
         command,
     )?;
-    Ok(Arc::new(match completion {
+    let profile = match completion {
         Some(hook) => profile.with_completion_hook(hook, hooks_only)?,
+        None => profile,
+    };
+    Ok(Arc::new(match selected_review {
+        Some(review) => profile.with_automatic_read_review(review)?,
         None => profile,
     }))
 }
