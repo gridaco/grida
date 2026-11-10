@@ -8,8 +8,11 @@ export namespace RetainedMediaOwner {
 
   export async function acquire(settings: string): Promise<void> {
     const { DatabaseSync } = await import("node:sqlite");
-    const filename = path.join(settings, ".sidecar-owner.sqlite");
     const denied = new Error("retained_media_owner_unavailable");
+    // On POSIX, closing another descriptor for this inode can release the
+    // SQLite lock already held by this process.
+    if (lock) throw denied;
+    const filename = path.join(settings, ".sidecar-owner.sqlite");
     const fd = fs.openSync(
       filename,
       fs.constants.O_RDWR |
@@ -26,7 +29,6 @@ export namespace RetainedMediaOwner {
       }
     })();
     if (
-      lock ||
       !before.isFile() ||
       before.uid !== BigInt(process.geteuid!()) ||
       before.nlink !== 1n ||
