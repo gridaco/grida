@@ -48,6 +48,7 @@ export { WorkspaceRegistry, type Workspace } from "./workspaces";
 export { WorkspaceCatalogReader } from "./workspaces/catalog-reader";
 export type { WorkspaceDirectoryIdentity } from "./workspaces/directory-identity";
 export { workspaceFs } from "./workspaces/fs";
+export { MAX_BUFFERED_WORKSPACE_RESOURCE_BYTES } from "./http/routes/workspaces";
 export {
   workspaceFileResponse,
   type WorkspaceFileBody,

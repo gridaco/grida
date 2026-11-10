@@ -39,6 +39,8 @@ import {
 } from "./agent-sidecar-supervisor";
 import { NativeProviderSelection } from "./native-provider-selection";
 import type { NativeWorkspaceCatalog } from "./native-workspace-catalog";
+import { NativeWorkspaceReads } from "./native-workspace-reads";
+import { nativeWorkspaceMedia } from "./workspace-media-access";
 import { EDITOR_BASE_URL } from "../env";
 import { AgentTransport } from "@grida/agent/transport";
 import type { Workspace } from "@grida/daemon";
@@ -54,6 +56,7 @@ const REFERER = `${EDITOR_ORIGIN}/desktop`;
 
 export namespace agentSidecarClient {
   let catalog: NativeWorkspaceCatalog | undefined;
+  let nativeReads: NativeWorkspaceReads | undefined;
 
   export function setWorkspaceCatalog(owner: NativeWorkspaceCatalog): void {
     if (catalog) throw new Error("workspace_catalog_already_bound");
@@ -131,6 +134,26 @@ export namespace agentSidecarClient {
   export async function forgetWorkspace(id: string): Promise<void> {
     if (catalog) return await catalog.forget(id);
     await client().workspaces.forget(id);
+  }
+
+  export async function readWorkspaceFile(
+    id: string,
+    relative: string,
+    kind: "text" | "bytes",
+    signal: AbortSignal
+  ) {
+    const workers = nativeWorkspaceMedia();
+    if (workers) {
+      if (!catalog) throw new Error("workspace_read_catalog_unavailable");
+      const reads = (nativeReads ??= new NativeWorkspaceReads(
+        catalog,
+        workers
+      ));
+      return await reads.read(id, relative, kind, signal);
+    }
+    return kind === "text"
+      ? await client().workspaces.read_file(id, relative)
+      : await client().workspaces.read_file_bytes(id, relative);
   }
 
   /** Main-owned endpoint operations keep native grant approval and the

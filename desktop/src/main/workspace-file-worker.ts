@@ -25,15 +25,21 @@ export class WorkspaceFileWorkers {
   async open(
     grant: WorkspaceMediaGrant,
     relPath: string,
-    signal: AbortSignal
-  ): Promise<WorkspaceFileBody> {
+    signal: AbortSignal,
+    includeModified = false
+  ): Promise<WorkspaceFileBody & { mtime?: number }> {
     if (signal.aborted) throw cancelled();
     const executable = await installedAgent(this.resourcesPath);
     if (this.closed || this.active.size >= MAX_WORKERS) {
       throw new WorkspaceMediaError(503, "workspace_media_worker_capacity");
     }
     if (signal.aborted) throw cancelled();
-    const openFrame = JSON.stringify({ ...grant, path: relPath }) + "\n";
+    const openFrame =
+      JSON.stringify({
+        ...grant,
+        path: relPath,
+        ...(includeModified && { includeModified: true }),
+      }) + "\n";
     if (Buffer.byteLength(openFrame) > 32 * 1024) {
       throw new WorkspaceMediaError(400, "workspace_media_open_limit");
     }
@@ -68,11 +74,11 @@ export class WorkspaceFileWorkers {
     const deadline = setTimeout(abort, START_TIMEOUT_MS);
     try {
       child.stdin.write(openFrame);
-      const size = await readSize(output);
+      const metadata = await readMetadata(output, includeModified);
       if (signal.aborted) throw cancelled();
       let consumed = false;
       return {
-        size,
+        ...metadata,
         close: async () => {
           if (consumed) {
             abort();
@@ -153,7 +159,10 @@ function streamSpan(
   });
 }
 
-async function readSize(output: AsyncIterator<Buffer>): Promise<number> {
+async function readMetadata(
+  output: AsyncIterator<Buffer>,
+  includeModified: boolean
+): Promise<{ size: number; mtime?: number }> {
   let header = Buffer.alloc(0);
   for (;;) {
     const item = await output.next();
@@ -168,7 +177,7 @@ async function readSize(output: AsyncIterator<Buffer>): Promise<number> {
     if (
       !parsed ||
       typeof parsed !== "object" ||
-      Object.keys(parsed).length !== 1 ||
+      Object.keys(parsed).length !== (includeModified ? 2 : 1) ||
       !("size" in parsed) ||
       typeof parsed.size !== "string" ||
       !/^\d+$/.test(parsed.size)
@@ -177,7 +186,14 @@ async function readSize(output: AsyncIterator<Buffer>): Promise<number> {
     }
     const size = Number(parsed.size);
     if (!Number.isSafeInteger(size)) throw unavailable();
-    return size;
+    if (!includeModified) return { size };
+    if (
+      !("mtime" in parsed) ||
+      typeof parsed.mtime !== "number" ||
+      !Number.isFinite(parsed.mtime)
+    )
+      throw unavailable();
+    return { size, mtime: parsed.mtime };
   }
 }
 

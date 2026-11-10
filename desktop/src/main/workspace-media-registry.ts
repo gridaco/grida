@@ -40,6 +40,10 @@ export class WorkspaceMediaRegistry {
     this.denials = new ProtectedRoots(protectedPaths);
   }
 
+  protectedMetadataPaths(): readonly string[] {
+    return this.denials.metadataPaths();
+  }
+
   /** Called only on a trusted Main-originated folder registration. */
   async register(
     selection: string,
@@ -107,7 +111,7 @@ export class WorkspaceMediaRegistry {
       return {
         workspaceId: id,
         ...admitted.directory,
-        protected: this.denials.metadataPaths(),
+        protected: this.protectedMetadataPaths(),
       };
     } catch (error) {
       this.withdraw(id, admitted);

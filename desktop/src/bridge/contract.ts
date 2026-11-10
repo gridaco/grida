@@ -122,6 +122,7 @@ export const IPC_CHANNELS = {
   WORKSPACE_CREATE: "grida:workspace:create",
   WORKSPACE_PIN: "grida:workspace:pin",
   WORKSPACE_FORGET: "grida:workspace:forget",
+  WORKSPACE_READ: "grida:workspace:read",
   WORKSPACE_TRASH_ENTRY: "grida:workspace:trash-entry",
   WORKSPACE_SUBSCRIBE_CHANGES: "grida:workspace:subscribe-changes",
   WORKSPACE_UNSUBSCRIBE_CHANGES: "grida:workspace:unsubscribe-changes",

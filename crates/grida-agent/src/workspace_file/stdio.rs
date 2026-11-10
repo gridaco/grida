@@ -18,6 +18,8 @@ struct OpenRequest {
     identity: RootIdentity,
     protected: Vec<PathBuf>,
     path: PathBuf,
+    #[serde(default)]
+    include_modified: bool,
 }
 
 #[derive(Deserialize)]
@@ -43,6 +45,8 @@ impl RootIdentity {
 #[derive(Serialize)]
 struct Opened {
     size: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mtime: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -103,6 +107,9 @@ pub fn serve_stdio() -> Result<()> {
         &mut output,
         &Opened {
             size: opened.size().to_string(),
+            mtime: request
+                .include_modified
+                .then(|| milliseconds(opened.modified())),
         },
     )
     .map_err(|_| output_failed())?;
@@ -124,6 +131,17 @@ pub fn serve_stdio() -> Result<()> {
     .and_then(|_| output.flush())
     .map_err(|_| Error::new(ErrorKind::Unavailable, "workspace_file_stream_failed"))?;
     Ok(())
+}
+
+fn milliseconds(time: SystemTime) -> f64 {
+    let nanoseconds = match time.duration_since(UNIX_EPOCH) {
+        Ok(duration) => duration.as_nanos() as i128,
+        Err(before_epoch) => -(before_epoch.duration().as_nanos() as i128),
+    };
+    let seconds = nanoseconds.div_euclid(1_000_000_000);
+    let nanos = nanoseconds.rem_euclid(1_000_000_000);
+    // Match Node's stat.mtimeMs, including the fractional part used by writes.
+    seconds as f64 * 1_000.0 + nanos as f64 / 1_000_000.0
 }
 
 fn frame<T: for<'de> Deserialize<'de>>(input: &mut impl BufRead) -> Result<Option<T>> {

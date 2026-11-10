@@ -249,6 +249,18 @@ export namespace workspaceFs {
       });
     }
     const buf = await fs.readFile(abs);
+    return {
+      content: decodeText(workspace, relPath, buf),
+      mtime: stat.mtimeMs,
+    };
+  }
+
+  /** Decode authorized bytes with the editor's existing UTF-8 and BOM policy. */
+  export function decodeText(
+    workspace: Pick<Scope, "id">,
+    relPath: string,
+    buf: Uint8Array
+  ): string {
     // Binary detection: a null byte in the first 8 KiB is a reliable
     // heuristic for non-text content. The encoder round-trip would
     // catch the rest, but null-byte short-circuits the common case
@@ -264,9 +276,8 @@ export namespace workspaceFs {
       }
     }
     const decoder = new TextDecoder("utf-8", { fatal: true });
-    let content: string;
     try {
-      content = decoder.decode(buf);
+      return decoder.decode(buf);
     } catch {
       throw new Exception({
         code: "file-not-utf8",
@@ -274,7 +285,6 @@ export namespace workspaceFs {
         rel_path: relPath,
       });
     }
-    return { content, mtime: stat.mtimeMs };
   }
 
   /**

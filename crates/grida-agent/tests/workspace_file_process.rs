@@ -80,6 +80,38 @@ async fn opened(
 }
 
 #[tokio::test]
+async fn private_worker_supplies_fractional_mtime_only_when_requested() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    let file = root.join("draft.txt");
+    fs::write(&file, b"draft").unwrap();
+    let handle = fs::File::options().write(true).open(&file).unwrap();
+    handle
+        .set_times(
+            fs::FileTimes::new()
+                .set_modified(UNIX_EPOCH + std::time::Duration::new(1_700_000_000, 123_456_000)),
+        )
+        .unwrap();
+    let stat = handle.metadata().unwrap();
+    let mtime = stat.mtime() as f64 * 1_000.0 + stat.mtime_nsec() as f64 / 1_000_000.0;
+    assert_ne!(mtime.fract(), 0.0);
+    let mut child = launch(worker());
+    let mut open = request(&root, "draft.txt");
+    open["includeModified"] = json!(true);
+    let (mut input, mut output, metadata) = opened(&mut child, open).await;
+    assert_eq!(metadata, json!({"size":"5", "mtime":mtime}));
+    send(&mut input, json!({"offset":"0", "length":"5"})).await;
+    drop(input);
+    let mut bytes = Vec::new();
+    tokio::time::timeout(WAIT, output.read_to_end(&mut bytes))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(bytes, b"draft");
+    assert!(complete(child).await.status.success());
+}
+
+#[tokio::test]
 async fn private_worker_serves_a_binary_span_from_the_same_descriptor() {
     use std::io::{Seek, SeekFrom, Write};
 

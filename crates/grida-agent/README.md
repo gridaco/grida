@@ -291,7 +291,10 @@ the same opened file.
 The process accepts two bounded JSON lines on stdin. The first contains
 `workspaceId`, `root`, `identity`, `protected`, and `path`. The identity
 contains decimal strings `device`, `inode`, and `birthTimeNs`. Stdout reports
-`{"size":"…"}` as one JSON line. The second input contains decimal string
+`{"size":"…"}` as one JSON line. A first input with `includeModified: true`
+also receives `mtime`, the opened descriptor's modification time as fractional
+Unix milliseconds. It matches the existing editor write precondition.
+The second input contains decimal string
 `offset` and `length`, followed on stdout by exactly that byte span on success.
 The owning client supplies live process controls and any kernel launch profile.
 The process rejects unproven hard links, mounts, and paths outside the granted

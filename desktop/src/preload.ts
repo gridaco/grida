@@ -873,9 +873,19 @@ const bridge: DesktopBridge = {
     readdir: (workspaceId, relPath) =>
       agentClient.workspaces.readdir(workspaceId, relPath ?? ""),
     read_file: (workspaceId, relPath) =>
-      agentClient.workspaces.read_file(workspaceId, relPath),
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_READ,
+        workspaceId,
+        relPath,
+        "text"
+      ),
     read_file_bytes: (workspaceId, relPath) =>
-      agentClient.workspaces.read_file_bytes(workspaceId, relPath),
+      ipcRenderer.invoke(
+        IPC_CHANNELS.WORKSPACE_READ,
+        workspaceId,
+        relPath,
+        "bytes"
+      ),
     // #924 — the streamable media `src` for the read-only viewer. Pure string
     // build: a `grida-workspace://` URL the main-process protocol handler
     // resolves by proxying to the sidecar's streamed `/workspaces/file` route.

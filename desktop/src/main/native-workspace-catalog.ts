@@ -113,6 +113,20 @@ export class NativeWorkspaceCatalog {
     );
   }
 
+  /** Buffered reads may use the exact committed directory across restarts. */
+  fileGrant(id: string) {
+    return this.run(async () => {
+      const bound = await this.reader.resolve(id);
+      if (!bound) throw unavailable();
+      return {
+        workspaceId: bound.workspace.id,
+        root: bound.workspace.root,
+        identity: bound.identity,
+        protected: this.scopes.protectedMetadataPaths(),
+      };
+    });
+  }
+
   private async openRoot(
     root: string,
     priorIdentity?: WorkspaceDirectoryIdentity

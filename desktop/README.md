@@ -159,9 +159,13 @@ For a disposable native chat run, launch a development or Insiders build
 with `--native-chat` and `--user-data-dir` set to a precreated owner-only
 browser directory. Set `GRIDA_AGENT_USER_DATA` to a separate sibling directory
 under the same owner-only root in the system temporary directory. Chat uses a
-separate native store for each registered workspace. The retained sidecar owns
-files, endpoint settings and media. This profile requires an empty legacy chat
-source and defaults to the Grida account's Gateway connection.
+separate native store for each registered workspace. Main owns the workspace
+catalog. On packaged macOS arm64 builds, buffered editor reads and media Range
+reads use the confined native file worker. The buffered reader preserves the
+modification time used by the editor's stale-write check. The retained sidecar
+continues to serve directory listings, writes, endpoint settings and media.
+This profile requires an empty legacy chat source and defaults to the Grida
+account's Gateway connection.
 
 Add `--native-chat-provider=chatgpt` to explicitly select the experimental
 ChatGPT subscription profile for that disposable run. Use the existing Desktop
