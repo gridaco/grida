@@ -260,6 +260,157 @@ async fn private_client_sees_the_retry_deadline_and_can_stop_before_dispatch() {
     endpoint.done().await;
 }
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn paused_responses_retry_reopens_under_the_same_credential_only() {
+    use super::approvals::Stdio as StdioClient;
+    use super::lifecycle::{prompt_request, task_basis};
+
+    async fn start(state: &Path, endpoint: &str, key: &str) -> StdioClient {
+        let mut command = executable();
+        command.args(["serve", "--stdio", "--provider", "responses"]);
+        configured(&mut command, state, endpoint);
+        let mut client = StdioClient::from_child(
+            command
+                .env("GRIDA_AGENT_PROCESS_TEST_KEY", key)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap(),
+        );
+        let mut initialization = extension_initialize();
+        initialization["clientCapabilities"]["_meta"]["co.grida/session/turn-summary"] = 1.into();
+        let ready = client.request("initialize", initialization).await;
+        assert_eq!(ready["result"]["protocolVersion"], 1, "{ready}");
+        client
+    }
+
+    async fn snapshot(client: &mut StdioClient, session: &str) -> Value {
+        let reply = client
+            .request("_co.grida/session/snapshot", json!({"sessionId":session}))
+            .await;
+        reply
+            .get("result")
+            .unwrap_or_else(|| panic!("{reply}"))
+            .clone()
+    }
+
+    async fn wait_for(
+        client: &mut StdioClient,
+        session: &str,
+        ready: impl Fn(&Value) -> bool,
+    ) -> Value {
+        timeout(WAIT, async {
+            loop {
+                let snapshot = snapshot(client, session).await;
+                if ready(&snapshot) {
+                    return snapshot;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap()
+    }
+
+    for rotated in [false, true] {
+        let temp = TempDir::new().unwrap();
+        let state = temp.path().join("state");
+        let workspace = TempDir::new().unwrap();
+        let mut replies = vec![Reply::RateLimited {
+            code: "rate_limit_exceeded",
+            retry_after: &["5"],
+        }];
+        if !rotated {
+            replies.push(Reply::Finished("Recovered after restart."));
+        }
+        let mut endpoint =
+            Endpoint::start_protocol(ProviderProtocol::Responses, replies, Some(TEST_CREDENTIAL))
+                .await;
+        let mut first = start(&state, &endpoint.url, TEST_CREDENTIAL).await;
+        let attach = json!({"cwd":workspace.path(),"mcpServers":[]});
+        let created = first.request("session/new", attach.clone()).await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        let accepted = first
+            .request(
+                "_co.grida/session/submit",
+                prompt_request(session, "retry", "Check the original request."),
+            )
+            .await;
+        let turn = accepted["result"]["turnId"].as_str().unwrap();
+        let request = endpoint.request().await;
+        let waiting = wait_for(&mut first, session, |view| {
+            view["retryNotBeforeMs"].is_u64()
+        })
+        .await;
+        let due = &waiting["retryNotBeforeMs"];
+        let held = first
+            .request(
+                "_co.grida/session/pause",
+                task_basis(&waiting, session, "hold-retry"),
+            )
+            .await;
+        assert_eq!(held["result"]["turnId"], turn, "{held}");
+        let paused = wait_for(&mut first, session, |view| {
+            view["current"]["disposition"] == "suspended"
+        })
+        .await;
+        assert_eq!(&paused["retryNotBeforeMs"], due);
+        first.close().await;
+
+        let key = if rotated {
+            "rotated-fixture-key"
+        } else {
+            TEST_CREDENTIAL
+        };
+        let mut second = start(&state, &endpoint.url, key).await;
+        let mut load = attach;
+        load["sessionId"] = session.into();
+        let loaded = second.request("session/load", load).await;
+        assert!(loaded["result"].is_object(), "{loaded}");
+        let restored = snapshot(&mut second, session).await;
+        assert_eq!(restored, paused);
+        assert!(endpoint.requests.try_recv().is_err());
+        let resume = json!({
+            "task":task_basis(&restored,session,"resume-retry"),
+            "expectedEpoch":restored["current"]["epoch"],
+            "expectedJournalPosition":restored["current"]["journalPosition"],
+        });
+        let resumed = second
+            .request("_co.grida/session/resume", resume.clone())
+            .await;
+        if rotated {
+            assert_eq!(
+                resumed["error"]["data"], "retained_authority_changed",
+                "{resumed}"
+            );
+            assert_eq!(snapshot(&mut second, session).await, paused);
+        } else {
+            assert_eq!(resumed["result"]["turn"]["turnId"], turn, "{resumed}");
+            assert_eq!(
+                second.request("_co.grida/session/resume", resume).await["result"],
+                resumed["result"]
+            );
+            let ended = wait_for(&mut second, session, |view| view["current"].is_null()).await;
+            assert_eq!(ended["latest"]["status"], "succeeded", "{ended}");
+            assert!(ended.get("retryNotBeforeMs").is_none());
+            assert_eq!(endpoint.request().await, request);
+            let account = second
+                .request(
+                    "_co.grida/session/turn-summary",
+                    json!({"sessionId":session,"turnId":turn}),
+                )
+                .await;
+            assert_eq!(account["result"]["steps"], 2, "{account}");
+            assert_eq!(account["result"]["text"], "Recovered after restart.");
+        }
+        assert!(endpoint.requests.try_recv().is_err());
+        second.close().await;
+        endpoint.done().await;
+    }
+}
+
 #[tokio::test]
 async fn complete_input_is_counted_before_native_responses_generation() {
     let directory = TempDir::new().unwrap();

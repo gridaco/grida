@@ -1611,7 +1611,18 @@ async fn wait_for_retry(observer: &mut TurnObserver) -> u64 {
 
 #[tokio::test]
 async fn a_paused_retry_reopens_with_the_same_due_time_and_authority() {
-    for change_authority in [false, true] {
+    enum Change {
+        None,
+        LiveBinding,
+        Principal,
+        Scope,
+    }
+    for change in [
+        Change::None,
+        Change::LiveBinding,
+        Change::Principal,
+        Change::Scope,
+    ] {
         let fixture = Fixture::new(Script::AdmissionLimit(1_500));
         let store = fixture.store();
         let claim = fixture.claim(&store).await;
@@ -1650,8 +1661,14 @@ async fn a_paused_retry_reopens_with_the_same_due_time_and_authority() {
         drop(opened.observer);
         drop(store);
 
-        if change_authority {
-            fixture.provider.authority.lock().unwrap().binding = BindingId::new("renewed").unwrap();
+        {
+            let mut authority = fixture.provider.authority.lock().unwrap();
+            match change {
+                Change::None => {}
+                Change::LiveBinding => authority.binding = BindingId::new("renewed").unwrap(),
+                Change::Principal => authority.principal = PrincipalId::new("changed").unwrap(),
+                Change::Scope => authority.scope = ScopeId::new("changed").unwrap(),
+            }
         }
         let store = fixture.reopen().await;
         assert_eq!(
@@ -1709,7 +1726,7 @@ async fn a_paused_retry_reopens_with_the_same_due_time_and_authority() {
             panic!("the resumed retry must settle");
         };
         let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
-        if change_authority {
+        if matches!(change, Change::Principal | Change::Scope) {
             assert_eq!(receipt.outcome.status, OutcomeStatus::Failed);
             assert_eq!(account.failure.unwrap().code, "retry_authority_changed");
             assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);

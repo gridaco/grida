@@ -29,11 +29,12 @@ renewal preserves its provider, principal and scope. Its replacement receives a
 new operation identity and preserves the inference-step allowance. Dispatched attempts retain their recorded
 outcomes and uncertainty, including when new input races settlement.
 
-A verified Responses API rate-limit rejection with usable delay advice can
+A verified pre-execution rate-limit rejection with usable delay advice can
 reserve one retry within the turn's remaining inference steps. The master
-retains the due time and original provider and grants. The delay holds no
-inference permit, survives restart, and remains subject to Pause and Stop.
-Missing or unsupported advice, a delay beyond five seconds, changed grants,
+retains the due time, provider, principal, scope, and selected grant IDs. The
+delay holds no inference permit, survives restart, and remains subject to
+Pause and Stop. A reopened host revalidates its live authority before dispatch.
+Missing or unsupported advice, a delay beyond five seconds, changed authority,
 partial output, and uncertain dispatch end without automatic retry.
 
 The model history projection places responses before corrections absent from
