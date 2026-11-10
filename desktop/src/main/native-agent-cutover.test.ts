@@ -291,6 +291,14 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
   it("requires writer admission and the exact drained claim before publishing a cutoff", async () => {
     const test = await fixture();
     writeLegacy(test.database, test.scratchBase);
+    const { AgentSidecarSupervisor } =
+      await import("./agent-sidecar-supervisor");
+    const compatibility = new AgentSidecarSupervisor();
+    const marker = LegacyChatSourceLease.controlRoot(test.legacy);
+    await expect(
+      compatibility.assertCompatibilitySourceAvailable()
+    ).resolves.toBeUndefined();
+    expect(fs.existsSync(marker)).toBe(false);
     await expect(
       test.NativeAgentCutover.prepare({
         verifyWriterAdmission: async () => false,
@@ -298,6 +306,9 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     ).rejects.toThrow("writer_admission_unverified");
     expect(fs.existsSync(test.nativeState)).toBe(false);
     expect(fs.existsSync(test.archiveRoot)).toBe(false);
+    await expect(compatibility.start()).rejects.toThrow(
+      "legacy_chat_handoff_required"
+    );
     const lease = new LegacyChatSourceLease({
       userDataPath: test.legacy,
       scratchBase: test.scratchBase,
@@ -309,6 +320,21 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     const prepared = await test.prepare();
     expect(prepared.archive?.sessionCount).toBe(1);
     await expect(lease.claimWriter()).rejects.toThrow("retired");
+    await expect(compatibility.start()).rejects.toThrow(
+      "legacy_chat_handoff_required"
+    );
+    expect(
+      fs.readFileSync(
+        path.join(
+          test.scratchBase,
+          "sessions",
+          "ses_fixture",
+          "scratch",
+          "note.txt"
+        ),
+        "utf8"
+      )
+    ).toBe("four");
   });
 
   it("binds the attested historical scratch to the retired source and retry", async () => {

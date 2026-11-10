@@ -308,6 +308,12 @@ Compatibility startup loads its sandbox before preparing scratch or spawning
 the child. [Startup fixtures](desktop/src/main/retained-media-startup.test.ts)
 verify that an unavailable compatibility sandbox leaves native admission
 independent and refuses the ordinary launch.
+On macOS and Linux, ordinary startup also refuses a legacy chat source whose
+handoff control path exists or cannot be inspected. Main checks before starting
+the public updater, and the supervisor checks before scratch cleanup and child
+launch, including retries. This stop applies to compatibility media-only startup
+as well. The deployment owner must still exclude earlier binaries and drain
+running workers before taking custody of the source.
 
 Shared image, video, audio and 3D operations and provider HTTP belong to
 [`@grida/ai`](packages/grida-ai/README.md). The tenant supplies narrow key/token

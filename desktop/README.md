@@ -208,6 +208,12 @@ scratch provenance. The managed handoff keeps the browser, media, projects and
 provider data in place. Native workspace registrations and recents use their
 own stores.
 
+On macOS and Linux, Desktop refuses ordinary startup if the configured chat
+source has a handoff record or if Desktop cannot inspect its location. Open the
+profile with the build selected by the deployment owner to continue the handoff.
+The same restriction applies when starting ordinary Desktop with the agent
+disabled. An admitted native profile can still start its separate media service.
+
 For a disposable native chat run, launch a development or Insiders build
 with `--native-chat` and `--user-data-dir` set to a precreated owner-only
 browser directory. Set `GRIDA_AGENT_USER_DATA` to a separate sibling directory

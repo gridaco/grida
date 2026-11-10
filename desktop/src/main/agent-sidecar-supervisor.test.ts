@@ -42,10 +42,15 @@ import { AgentNetworkHost } from "./agent-network-host";
 import { AgentNetworkPolicy } from "../agent-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { RetainedMediaLaunch } from "./retained-media-launch";
+import { LegacyChatSourceLease } from "./legacy-chat-source-lease";
 import { ensureInitialized, wrap } from "./sandbox/manager";
+
+const supportsCutover =
+  process.platform === "darwin" || process.platform === "linux";
 
 describe("AgentSidecarSupervisor recovery", () => {
   beforeEach(() => {
+    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/compatibility-agent");
     vi.useFakeTimers();
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -211,6 +216,10 @@ describe("AgentSidecarSupervisor recovery", () => {
       const prepare = vi
         .spyOn(RetainedMediaLaunch, "prepareSettings")
         .mockResolvedValue(settings);
+      const prepareProviderHome = vi
+        .spyOn(RetainedMediaLaunch, "prepareProviderHome")
+        .mockResolvedValue(undefined);
+      await fs.mkdir(LegacyChatSourceLease.controlRoot(agent), { mode: 0o700 });
       const supervisor = new AgentSidecarSupervisor({ agent: false });
       const spawn = vi
         .fn<() => ReturnType<typeof supervisor.startRetainedMedia>>()
@@ -224,15 +233,16 @@ describe("AgentSidecarSupervisor recovery", () => {
         password: "fixture",
       });
       expect(prepare).toHaveBeenCalledExactlyOnceWith(agent);
+      expect(prepareProviderHome).toHaveBeenCalledExactlyOnceWith(agent);
       expect(spawn).toHaveBeenCalledOnce();
       expect(Reflect.get(supervisor, "coldStartSource")).toBeUndefined();
       expect(await Reflect.get(supervisor, "retainedMedia")).toMatchObject({
-        settings,
+        agentData: agent,
         providerHome: agent,
         temporary: path.join(temporary, "retained-media"),
         mediaOnly: true,
       });
-      expect(await fs.readdir(agent)).toEqual(["providers"]);
+      expect(await fs.readdir(agent)).toEqual(["legacy-chat-ownership"]);
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }
@@ -287,6 +297,85 @@ describe("AgentSidecarSupervisor recovery", () => {
     expect(command).not.toContain("--skills-root=");
     supervisor.stop();
   });
+
+  it.runIf(supportsCutover)(
+    "refuses disabled compatibility startup when source custody is present or cannot be inspected",
+    async () => {
+      const root = await fs.mkdtemp(
+        path.join(os.tmpdir(), "grida-compatibility-source-")
+      );
+      const agent = path.join(root, "agent");
+      const marker = LegacyChatSourceLease.controlRoot(agent);
+      vi.stubEnv("GRIDA_AGENT_USER_DATA", agent);
+      vi.mocked(wrap).mockClear();
+      try {
+        await fs.mkdir(agent);
+        await fs.symlink(path.join(root, "missing"), marker);
+        const supervisor = new AgentSidecarSupervisor({ agent: false });
+        await expect(supervisor.start()).rejects.toThrow(
+          "legacy_chat_handoff_required"
+        );
+        expect((await fs.lstat(marker)).isSymbolicLink()).toBe(true);
+        await fs.unlink(marker);
+        await fs.rmdir(agent);
+        await fs.writeFile(agent, "unexpected owner path");
+        await expect(supervisor.start()).rejects.toThrow(
+          "legacy_chat_handoff_required"
+        );
+        expect(await fs.readFile(agent, "utf8")).toBe("unexpected owner path");
+        expect(wrap).not.toHaveBeenCalled();
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.runIf(supportsCutover)(
+    "does not retry a compatibility child once the exact source is reserved",
+    async () => {
+      const root = await fs.mkdtemp(
+        path.join(os.tmpdir(), "grida-compatibility-retry-")
+      );
+      vi.stubEnv("GRIDA_AGENT_USER_DATA", root);
+      try {
+        const supervisor = new AgentSidecarSupervisor({ agent: false });
+        Object.assign(supervisor, {
+          compatibilitySandbox: await import("./sandbox/manager"),
+        });
+        const restart = supervisor as unknown as {
+          handleRestartFailure(error: unknown): void;
+          scheduleRestart(): void;
+          restartTimer: NodeJS.Timeout | null;
+        };
+        const failed = Promise.withResolvers<unknown>();
+        const handle = restart.handleRestartFailure.bind(restart);
+        vi.spyOn(restart, "handleRestartFailure").mockImplementation(
+          (error) => {
+            handle(error);
+            failed.resolve(error);
+          }
+        );
+        const marker = LegacyChatSourceLease.controlRoot(root);
+        vi.mocked(wrap)
+          .mockClear()
+          .mockImplementationOnce(async () => {
+            await fs.mkdir(marker);
+            return "exit 19";
+          });
+        restart.scheduleRestart();
+        await vi.advanceTimersByTimeAsync(250);
+        expect(await failed.promise).toMatchObject({
+          message: "legacy_chat_handoff_required",
+        });
+        expect(restart.restartTimer).toBeNull();
+        expect(supervisor.getInfo()).toBeNull();
+        expect(wrap).toHaveBeenCalledOnce();
+        expect(await fs.readdir(marker)).toEqual([]);
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
 
   it("binds native subscription settings only to the sealed source", async () => {
     vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/subscription-source");

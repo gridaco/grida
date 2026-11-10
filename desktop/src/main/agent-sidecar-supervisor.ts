@@ -98,6 +98,12 @@ type OwnedLegacyGeneration = {
   claim?: LegacyChatWriter;
 };
 
+class LegacyChatHandoffRequired extends Error {
+  constructor(cause?: unknown) {
+    super("legacy_chat_handoff_required", { cause });
+  }
+}
+
 export class AgentSidecarSupervisor {
   private agentEnabled: boolean;
   private legacyLaunchStarted = false;
@@ -197,6 +203,8 @@ export class AgentSidecarSupervisor {
       throw new Error("workspace_catalog_scope_invalid");
     this.workspaceCatalog = workspaceCatalog;
     if (this.agentEnabled) this.legacyLaunchStarted = true;
+    await this.assertCompatibilitySourceAvailable();
+    if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
     if (this.info) return this.info.connection;
     if (this.restartTimer) {
       clearTimeout(this.restartTimer);
@@ -206,6 +214,22 @@ export class AgentSidecarSupervisor {
       await this.initSandbox();
     }
     return await this.spawn();
+  }
+
+  /** Existing custody also covers an interrupted retirement with no receipt. */
+  async assertCompatibilitySourceAvailable(): Promise<void> {
+    if (process.platform !== "darwin" && process.platform !== "linux") return;
+    const { LegacyChatSourceLease } =
+      await import("./legacy-chat-source-lease");
+    try {
+      await fs.promises.lstat(
+        LegacyChatSourceLease.controlRoot(this.user_data_path)
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw new LegacyChatHandoffRequired(error);
+    }
+    throw new LegacyChatHandoffRequired();
   }
 
   async startRetainedMedia(): Promise<AgentSidecarInfo> {
@@ -589,6 +613,8 @@ export class AgentSidecarSupervisor {
       );
       // Establish the authority before listing/removal. Media-only startup
       // neither prepares nor sweeps any agent scratch directory.
+      await this.assertCompatibilitySourceAvailable();
+      if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
       prepareScratchAuthority(this.scratchBase, this.user_data_path);
       await commands.sweepAgentCommandTemps(this.scratchBase);
     }
@@ -839,6 +865,8 @@ export class AgentSidecarSupervisor {
       );
       wrappedCmd = await sandbox.wrap(cmd);
     }
+    if (!retained && !this.ownedLegacy)
+      await this.assertCompatibilitySourceAvailable();
     if (generation !== this.nextGeneration || this.isShuttingDown) {
       throw new Error("agent sidecar startup was cancelled");
     }
@@ -1112,7 +1140,7 @@ export class AgentSidecarSupervisor {
       `restart failed: ${err instanceof Error ? err.message : String(err)}`,
       "error"
     );
-    this.scheduleRestart();
+    if (!(err instanceof LegacyChatHandoffRequired)) this.scheduleRestart();
   }
 
   /**
@@ -1168,6 +1196,10 @@ export function startAgentSidecar(
   workspaceCatalog?: string
 ): Promise<AgentSidecarInfo> {
   return sidecar().start(workspaceCatalog);
+}
+
+export function assertCompatibilityChatSourceAvailable(): Promise<void> {
+  return sidecar().assertCompatibilitySourceAvailable();
 }
 
 export function startRetainedMediaSidecar(): Promise<AgentSidecarInfo> {

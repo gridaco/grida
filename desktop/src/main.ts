@@ -16,6 +16,7 @@ import {
   create_runtime_app_icon,
 } from "./branding";
 import {
+  assertCompatibilityChatSourceAvailable,
   startAgentSidecar,
   startRetainedMediaSidecar,
   closeRetainedMediaSidecar,
@@ -662,8 +663,19 @@ app.on("ready", async () => {
     process.arch === "arm64";
   // The managed delivery owner selects upgrades for every receipt-bound role,
   // including the predecessor that still runs the legacy agent.
-  if (!nativeProfile && !NativeDesktopProfile.firstSelected())
+  if (!nativeProfile && !NativeDesktopProfile.firstSelected()) {
+    try {
+      await assertCompatibilityChatSourceAvailable();
+    } catch {
+      dialog.showErrorBox(
+        "Grida chat storage is unavailable",
+        "Open this profile using the Desktop build selected for its chat handoff."
+      );
+      app.quit();
+      return;
+    }
     updateElectronApp({ notifyUser: true });
+  }
 
   if (USE_DEV_INSIDERS_BRANDING && process.platform === "darwin") {
     app.dock?.setIcon(create_runtime_app_icon());
