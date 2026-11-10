@@ -60,7 +60,7 @@ function getCliArg(name: string): string | undefined {
 
 const appVersion = getCliArg("grida-version") ?? "0.0.0";
 const appPlatform = process.platform;
-const nativeDocument = process.argv.includes(NATIVE_DOCUMENT_ARGUMENT);
+const nativeDocumentId = getCliArg(NATIVE_DOCUMENT_ARGUMENT);
 
 function isDesktopPath(pathname: string): boolean {
   return (
@@ -231,10 +231,20 @@ ipcRenderer.on(
 
 async function handshake(): Promise<HandshakeResponse> {
   const response = await agentClient.handshake();
-  // The ready Desktop bridge exposes recents through Main in either mode.
+  const docIds = new URLSearchParams(location.search).getAll("docId");
+  const attachedDocument =
+    nativeDocumentId !== undefined &&
+    location.pathname === "/desktop/file" &&
+    docIds.length === 1 &&
+    docIds[0] === nativeDocumentId;
   return {
     ...response,
-    capabilities: { ...response.capabilities, recent: true, workspaces: true },
+    capabilities: {
+      ...response.capabilities,
+      files: response.capabilities.files || attachedDocument,
+      recent: true,
+      workspaces: true,
+    },
   };
 }
 
@@ -917,11 +927,11 @@ const bridge: DesktopBridge = {
 
   files: {
     read: (docId) =>
-      nativeDocument
+      nativeDocumentId !== undefined
         ? ipcRenderer.invoke(IPC_CHANNELS.DOCUMENT_READ, docId)
         : agentClient.files.read(docId),
     write: (docId, content) =>
-      nativeDocument
+      nativeDocumentId !== undefined
         ? ipcRenderer.invoke(IPC_CHANNELS.DOCUMENT_WRITE, docId, content)
         : agentClient.files.write(docId, content),
   },

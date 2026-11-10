@@ -437,9 +437,10 @@ confirms the open file remains in scope before delivering each chunk.
 In-root symbolic aliases can resolve to regular files. Hard links without
 proven scope and cross-device targets are refused. On the packaged macOS
 arm64 native chat profile, Main captures the directory identity when the user
-opens a workspace through a trusted Desktop action. Reopen a saved workspace
-through **Open Folder** to admit its preview files after restarting Desktop.
-A changed directory also requires an explicit reopen. The native media route
+opens a workspace through a trusted Desktop action. After restarting Desktop,
+selecting **Open Recent** or a recent project reopens the exact registered
+folder for media previews. If the folder changed, select it through the native
+**Open Folder** picker to admit its current identity. The native media route
 requires a current registration and streams through a bounded pool of
 read-only Seatbelt workers. It preserves Range seeking and cancels the
 corresponding worker when the viewer cancels a request. A refused native read

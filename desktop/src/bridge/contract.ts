@@ -34,7 +34,7 @@ export type {
   WorkspaceWriteFileResult,
 } from "@grida/desktop-bridge";
 
-export const NATIVE_DOCUMENT_ARGUMENT = "--grida-native-document";
+export const NATIVE_DOCUMENT_ARGUMENT = "grida-native-document";
 
 export const IPC_CHANNELS = {
   WINDOW_SET_DOCUMENT_EDITED: "grida:window:set-document-edited",

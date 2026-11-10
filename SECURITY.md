@@ -1421,7 +1421,14 @@ Today:
   window, top-level document route and document ID. Navigation revokes the
   active request and invalidates the read basis for saving. Closing a window
   does not release a dispatched save before its child exits. [Owner fixtures](desktop/src/main/native-document-files.test.ts)
-  cover retirement and uncertain writes.
+  cover retirement and uncertain writes. The [preload](desktop/src/preload.ts)
+  advertises its local file capability only at the route with the ID assigned
+  to that window by Main.
+- The [native Open Recent menu](desktop/src/menu.ts) and [recent projects palette](editor/scaffolds/desktop/home/recent-projects-command.tsx)
+  reopen a saved project through the existing catalog before navigating.
+  A replaced folder requires a fresh native picker selection. [Menu](desktop/src/menu.test.ts)
+  and [Range](desktop/src/main/workspace-media-protocol.test.ts) fixtures
+  check refusal and the exact grant after restart.
 - [Host media error mapping](packages/grida-ai-agent/src/http/routes/media-generation-errors.ts) — callers supply safely projected SDK failures before logging/status adaptation. The mapper logs supplied details and must never receive raw upstream errors; provider details are removed by each operation and route boundary.
 - [Shared 3D operations](packages/grida-ai/src/three-d-client.ts) and [endpoint tests](packages/grida-ai/src/three-d-client.test.ts), and [lifecycle tests](packages/grida-ai/src/three-d-lifecycle.test.ts) — three explicit fal model contracts with private input/key snapshots and safe byte-only results. Authenticated queue URLs must use exact `queue.fal.run`; primary GLB downloads use the existing fal asset namespaces without credentials. The shared [media invocation](packages/grida-ai/src/media-request.ts) bounds the ten-minute generation, including key lookup, polling and download. JSON is capped at 1 MiB and GLB at 64 MiB with header/version/length checks; no paid retry, provider URL, raw error or filename reaches the result. The [3D host route](packages/grida-ai-agent/src/http/routes/three-d.ts), [its tests](packages/grida-ai-agent/src/http/routes/three-d.test.ts), [wire protocol](packages/grida-ai-agent/src/protocol/three-d.ts), and [composed-daemon storage proof](packages/grida-ai-agent/src/media-daemon.test.ts) retain wire admission, bounded base64 decoding, exclusive generation, fixed filenames and optional receipts. This replaces the former agent `fal-three-d.ts` adapter; it grants no new provider or GG authority.
 - [editor/lib/supabase/server.ts](editor/lib/supabase/server.ts) — `createClientFromBearer` (bearer-auth shim for existing private editor routes that allow Desktop-originated calls without browser cookies).

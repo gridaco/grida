@@ -155,7 +155,7 @@ describe.runIf(
     process.platform === "darwin" &&
     process.arch === "arm64"
 )("registered native workspace media", () => {
-  it("uses the built reader for 200, 206, 416 and MIME without admitting a saved entry", async () => {
+  it("reopens a remembered workspace and serves its exact media through the built reader", async () => {
     const fixture = await workspaceFixture();
     try {
       const saved = await fixture.seedWithoutAdmission();
@@ -165,7 +165,8 @@ describe.runIf(
       );
       expect((await fixture.request(saved.id)).status).toBe(403);
       expect(fixtures.children).toHaveLength(0);
-      const admitted = await fixture.reopen();
+      const admitted = await fixture.reopenRecent();
+      expect(admitted.id).toBe(saved.id);
       for (const [range, status, contentRange, bytes] of [
         [undefined, 200, null, "0123456789"],
         ["bytes=3-6", 206, "bytes 3-6/10", "3456"],
@@ -217,6 +218,9 @@ describe.runIf(
       expect(await changed.text()).toBe("workspace_media_registration_changed");
       expect(fixtures.children).toHaveLength(1);
       expect(agentSidecarClient.fetch).not.toHaveBeenCalled();
+      await expect(fixture.reopenRecent()).rejects.toThrow(
+        "workspace_not_registered"
+      );
       expect((await fixture.reopen()).id).toBe(admitted.id);
       expect(await (await fixture.request(admitted.id)).text()).toBe(
         "replacement"
@@ -324,6 +328,7 @@ async function workspaceFixture() {
     },
     handler,
     reopen: () => catalog.openSelected(workspace),
+    reopenRecent: () => catalog.reopen(workspace),
     request: (id: string, range?: string, signal?: AbortSignal) =>
       handler(
         new Request(`grida-workspace://workspace/${id}/clip.mp4`, {

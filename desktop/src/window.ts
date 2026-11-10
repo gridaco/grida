@@ -503,7 +503,7 @@ export function open_document_window({
     urlPath: `/desktop/file?docId=${encodeURIComponent(docId)}`,
     additionalArguments: buildDesktopArguments({
       app,
-      extra: native ? [NATIVE_DOCUMENT_ARGUMENT] : [],
+      extra: native ? [`--${NATIVE_DOCUMENT_ARGUMENT}=${docId}`] : [],
     }),
   });
 }

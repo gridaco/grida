@@ -254,6 +254,27 @@ function route_workspace_window(
   }
 }
 
+async function reopen_recent_workspace(
+  app: App,
+  workspace: { root: string },
+  admission?: DesktopWindowAdmission
+) {
+  if (admission && !admission.can_open()) {
+    admission.focus_entry();
+    return;
+  }
+  try {
+    const reopened = await agentSidecarClient.reopenWorkspace(workspace.root);
+    route_workspace_window(app, reopened, admission);
+  } catch {
+    if (admission && !admission.can_open()) return;
+    dialog.showErrorBox(
+      "Couldn't reopen project",
+      "The registered folder may have moved or changed. Select it again through Open Folder."
+    );
+  }
+}
+
 /**
  * The recent workspaces for File ▸ Open Recent — the SAME source the renderer's
  * ⌃R "Recent projects" palette uses (`workspaces.list()`), so the two stay in
@@ -346,7 +367,7 @@ async function rebuild_application_menu_locked(
   const recent: MenuItemConstructorOptions[] = recents.map((w) => ({
     label: w.name || w.root,
     enabled: opts?.windowAdmission?.can_open() ?? true,
-    click: () => route_workspace_window(app, w, opts?.windowAdmission),
+    click: () => void reopen_recent_workspace(app, w, opts?.windowAdmission),
   }));
   Menu.setApplicationMenu(create_menu(app, shell, { ...opts, recent }));
 }

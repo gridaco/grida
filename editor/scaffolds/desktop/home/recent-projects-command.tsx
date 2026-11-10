@@ -9,6 +9,7 @@
  */
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { FolderIcon, FolderOpenIcon } from "lucide-react";
 import {
   CommandDialog,
@@ -18,7 +19,10 @@ import {
   CommandItem,
   CommandList,
 } from "@app/ui/components/command";
-import type { Workspace } from "@/lib/desktop/bridge";
+import {
+  workspaces as workspaceBridge,
+  type Workspace,
+} from "@/lib/desktop/bridge";
 import { workspaceWorkbenchHref } from "@/scaffolds/desktop/workbench/workspace-workbench-url";
 
 export function RecentProjectsCommand({
@@ -35,24 +39,47 @@ export function RecentProjectsCommand({
   onOpenFolder: () => void;
 }) {
   const router = useRouter();
+  const [reopening, setReopening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const openProject = (w: Workspace) => {
-    onOpenChange(false);
-    router.push(
-      canvasIds.has(w.id)
-        ? `/desktop/file?id=${encodeURIComponent(w.id)}`
-        : workspaceWorkbenchHref(w)
-    );
+  const openProject = async (w: Workspace) => {
+    if (reopening) return;
+    setReopening(true);
+    setError(null);
+    try {
+      const reopened = await workspaceBridge.openFolder(w.root);
+      onOpenChange(false);
+      router.push(
+        canvasIds.has(reopened.id)
+          ? `/desktop/file?id=${encodeURIComponent(reopened.id)}`
+          : workspaceWorkbenchHref(reopened)
+      );
+    } catch {
+      setError(
+        "The registered folder may have moved or changed. Select it again through Open folder."
+      );
+    } finally {
+      setReopening(false);
+    }
   };
 
   return (
     <CommandDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(next) => {
+        if (reopening) return;
+        setError(null);
+        onOpenChange(next);
+      }}
       title="Recent projects"
       description="Search and open a recent project"
     >
       <CommandInput placeholder="Search projects…" />
+      {error && (
+        <p role="alert" className="px-3 py-2 text-xs text-destructive">
+          {error}
+        </p>
+      )}
       <CommandList>
         <CommandEmpty>No projects found.</CommandEmpty>
         {workspaces.length > 0 && (
@@ -61,7 +88,8 @@ export function RecentProjectsCommand({
               <CommandItem
                 key={w.id}
                 value={`${w.name} ${w.root}`}
-                onSelect={() => openProject(w)}
+                disabled={reopening}
+                onSelect={() => void openProject(w)}
               >
                 <FolderIcon className="text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate">{w.name}</span>
@@ -75,6 +103,7 @@ export function RecentProjectsCommand({
         <CommandGroup>
           <CommandItem
             value="open folder existing project"
+            disabled={reopening}
             onSelect={() => {
               onOpenChange(false);
               onOpenFolder();
