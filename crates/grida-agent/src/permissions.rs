@@ -73,6 +73,7 @@ pub struct PermissionProfile {
     protected: Arc<ProtectedRoots>,
     command_denials: Vec<ProtectedPath>,
     command: Option<CommandProfile>,
+    hooks_only: bool,
     completion_hook: Option<CompletionHook>,
     revision: BindingId,
     identity: Fingerprint,
@@ -190,6 +191,7 @@ impl PermissionProfile {
             protected,
             command_denials,
             command,
+            hooks_only: false,
             completion_hook: None,
             revision,
             identity,
@@ -197,7 +199,11 @@ impl PermissionProfile {
         })
     }
 
-    pub(crate) fn with_completion_hook(mut self, mut hook: CompletionHook) -> Result<Self> {
+    pub(crate) fn with_completion_hook(
+        mut self,
+        mut hook: CompletionHook,
+        hooks_only: bool,
+    ) -> Result<Self> {
         let command = self.command.as_ref().ok_or_else(command_unavailable)?;
         let primary = self.workspace.permission_directory(None, &self.protected)?;
         if self
@@ -214,6 +220,10 @@ impl PermissionProfile {
                 ErrorKind::InvalidInput,
                 "completion_hook_scope_invalid",
             ));
+        }
+        if hooks_only {
+            self.identity = Fingerprint::of(&(self.identity, "completion-only"))?;
+            self.hooks_only = true;
         }
         hook.revision = Fingerprint::of(&(self.identity, hook.revision))?;
         self.completion_hook = Some(hook);
@@ -486,7 +496,7 @@ impl TurnPermissions {
     }
 
     pub fn handles(&self, selection: &GrantSelection) -> bool {
-        selection == &self.files || selection == &self.commands
+        selection == &self.files || (!self.profile.hooks_only && selection == &self.commands)
     }
 
     pub(crate) fn insert_file_tools(
@@ -519,11 +529,16 @@ impl TurnPermissions {
         grants: &mut BTreeMap<ToolId, GrantSelection>,
     ) -> Result<Option<Arc<CommandTool>>> {
         self.insert_file_tools(inventory, grants)?;
-        let Some(command) = self.profile.command.as_ref().filter(|_| {
-            self.profile.directories.values().any(|rule| {
+        let model_commands = !self.profile.hooks_only
+            && self.profile.directories.values().any(|rule| {
                 rule.command_read != AccessRule::Deny || rule.command_read_write != AccessRule::Deny
-            })
-        }) else {
+            });
+        let Some(command) = self
+            .profile
+            .command
+            .as_ref()
+            .filter(|_| model_commands || self.profile.completion_hook.is_some())
+        else {
             return Ok(None);
         };
         let owner = self.clone();
@@ -532,8 +547,10 @@ impl TurnPermissions {
             command.limits,
             Arc::new(move |invocation| owner.command_authority(invocation)),
         )?);
-        inventory.insert(tool.clone())?;
-        grants.insert(tool.definition().id.clone(), self.commands.clone());
+        if model_commands {
+            inventory.insert(tool.clone())?;
+            grants.insert(tool.definition().id.clone(), self.commands.clone());
+        }
         Ok(Some(tool))
     }
 
@@ -581,7 +598,7 @@ impl TurnPermissions {
             return Err(denied());
         }
         let (directory, effect, command_capture, rule) = match invocation.definition().id.as_str() {
-            "run_command" if admission.grants == self.commands => {
+            "run_command" if !self.profile.hooks_only && admission.grants == self.commands => {
                 let command = self
                     .profile
                     .command
@@ -714,6 +731,9 @@ impl TurnPermissions {
     }
 
     fn command_authority(self: &Arc<Self>, invocation: &Invocation) -> Result<AuthorizedCommand> {
+        if self.profile.hooks_only {
+            return Err(denied());
+        }
         let state = self.state()?;
         let operation = invocation.id().clone();
         let action = invocation.fingerprint();

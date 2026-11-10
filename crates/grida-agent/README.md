@@ -122,6 +122,11 @@ beforeCompletion
   timeoutMs   1 through 30000
 ```
 
+Set `command.hooksOnly` to `true` to keep general command execution out of
+the model's tools while running this reviewed check. This setting requires
+`beforeCompletion` and the same primary `commandRead: "allow"` review.
+Omitting it preserves the profile's ordinary command permissions.
+
 The command receives a bounded versioned `before_completion` JSON event on
 stdin. For a successful decision, it must exit zero and print one JSON object
 on stdout, either `{"decision":"allow"}` or

@@ -1186,9 +1186,11 @@ Today:
   requires an unprivileged launch and proves the canonical system executable
   and its ancestors are root-owned, without non-owner write access or extended
   ACLs. A separate unprivileged profile cannot use its write grant to modify
-  these bytes. Both checks stay outside the model's tool inventory. [Process tests](crates/grida-agent/tests/process/hooks.rs)
-  cover refusal of a matching user-owned program, launch changes, interruption,
-  and exact retained attempts.
+  these bytes. Both checks stay outside the model's tool inventory. A trusted
+  hook-only profile also withholds the general command offer and its grant.
+  The private check retains the same sandbox and cleanup owner. [Process tests](crates/grida-agent/tests/process/hooks.rs)
+  cover hook-only launch, refusal of a matching user-owned program, launch
+  changes, interruption, and exact retained attempts.
 - [Private side-chat controls](crates/grida-agent/src/acp/extensions/side_chats.rs)
   require negotiation and an attached parent. The [side-chat owner](crates/grida-agent/src/host/side_chats.rs)
   keeps a separate in-memory journal, uses only the selected inference authority,

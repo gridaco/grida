@@ -58,6 +58,8 @@ struct Command {
     bubblewrap: Option<Executable>,
     runtime_paths: Vec<PathBuf>,
     temporary_parent: PathBuf,
+    #[serde(default)]
+    hooks_only: bool,
 }
 
 #[derive(Deserialize)]
@@ -153,6 +155,13 @@ pub fn load_permission_profile(
         .before_completion
         .map(|hook| hook.reviewed(profile.command.as_ref()))
         .transpose()?;
+    let hooks_only = profile
+        .command
+        .as_ref()
+        .is_some_and(|command| command.hooks_only);
+    if hooks_only && completion.is_none() {
+        return Err(invalid());
+    }
     if let Some(hook) = &completion {
         write.push(hook.executable.path.clone());
     }
@@ -224,7 +233,7 @@ pub fn load_permission_profile(
         command,
     )?;
     Ok(Arc::new(match completion {
-        Some(hook) => profile.with_completion_hook(hook)?,
+        Some(hook) => profile.with_completion_hook(hook, hooks_only)?,
         None => profile,
     }))
 }

@@ -146,11 +146,12 @@ agent already completed.
 
 A trusted native permission profile can also set one command to check an Act
 turn before it completes. Use a reviewed system executable with a read-only
-workspace scope. A required check blocks completion when it rejects or fails. An
-observational check records its result and leaves the completion decision in
-place. Plan does not run the command. Resuming uses the selected definition,
-and an interrupted command with an uncertain result is never repeated
-automatically. [Native launch profile](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md)
+workspace scope. Set `command.hooksOnly` to `true` in the trusted launch
+profile to keep general commands unavailable to the model. A required check
+blocks completion when it rejects or fails. An observational check records
+its result and leaves the completion decision in place. Resume uses the
+selected definition and preserves any uncertain result from an interrupted
+command for review. [Native launch profile](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md)
 
 ## Use your Grida login
 

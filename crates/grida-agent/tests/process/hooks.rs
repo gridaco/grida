@@ -32,6 +32,12 @@ fn hook(fixture: &Fixture, path: &str, arguments: &[&str], mode: &str, changed: 
     PathBuf::from(profile["command"]["temporaryParent"].as_str().unwrap())
 }
 
+fn select_hooks_only(fixture: &Fixture, enabled: bool) {
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["command"]["hooksOnly"] = json!(enabled);
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+}
+
 #[tokio::test]
 #[ignore = "requires a reviewed native helper and OS confinement"]
 async fn configured_completion_command_records_only_its_reviewed_decision() {
@@ -132,6 +138,81 @@ async fn configured_completion_command_records_only_its_reviewed_decision() {
         assert!(endpoint.requests.try_recv().is_err());
         assert!(fs::read_dir(temporary).unwrap().next().is_none());
     }
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn hooks_only_configures_a_real_check_without_offering_model_commands() {
+    let fixture = Fixture::new(true);
+    select_hooks_only(&fixture, true);
+    let rejected = timeout(
+        WAIT,
+        fixture
+            .process("http://127.0.0.1:1/v1", "run")
+            .args(["--prompt", "Prepare the answer."])
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(rejected.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8_lossy(&rejected.stderr).trim(),
+        "grida-agent: permission_profile_invalid"
+    );
+
+    let temporary = hook(
+        &fixture,
+        "/usr/bin/printf",
+        &[
+            "%s",
+            r#"{"decision":"deny","reason":"Independent check refused."}"#,
+        ],
+        "required",
+        false,
+    );
+    let mut endpoint = Endpoint::start(vec![Reply::Finished("Fixture answer.")]).await;
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .args(["--prompt", "Prepare the answer."])
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let results = records(&output.stdout);
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "{results:?} {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let account = &results[1]["account"];
+    assert_eq!(account["failure"]["code"], "completion_check_blocked");
+    let check = &account["completion_checks"][0];
+    assert_eq!(check["check"], COMMAND_CHECK);
+    assert_eq!(check["status"], "denied");
+    assert_eq!(check["reason"], "Independent check refused.");
+    assert!(check["operation"].is_string());
+    let request = endpoint.request().await;
+    let tools = request["tools"].as_array().unwrap();
+    assert!(
+        tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == "read_file")
+    );
+    assert!(tools.iter().all(|tool| !matches!(
+        tool["function"]["name"].as_str(),
+        Some("run_command" | "before_completion_command")
+    )));
+    assert!(fs::read_dir(temporary).unwrap().next().is_none());
     endpoint.done().await;
 }
 
@@ -276,15 +357,25 @@ async fn connect(mut command: Command) -> PrivateStdio {
 #[tokio::test]
 #[ignore = "requires a reviewed native helper and OS confinement"]
 async fn interrupting_a_native_hook_cleans_up_and_a_changed_profile_cannot_resume_it() {
-    let mut endpoint = Endpoint::start(vec![
-        Reply::Finished("A candidate that must be checked."),
-        Reply::Finished("A candidate that must be checked."),
-        Reply::Finished("A candidate that must be checked."),
-    ])
+    let cases = [
+        ("stop", false, true),
+        ("pause", false, false),
+        ("pause", false, true),
+        ("pause", true, true),
+    ];
+    let mut endpoint = Endpoint::start(
+        cases
+            .iter()
+            .map(|_| Reply::Finished("A candidate that must be checked."))
+            .collect(),
+    )
     .await;
-    for (action, changed) in [("stop", false), ("pause", false), ("pause", true)] {
+    for (action, changed, hooks_only) in cases {
         let fixture = Fixture::new(true);
         let temporary = hook(&fixture, "/bin/sh", &["-c", HEARTBEAT], "required", false);
+        if hooks_only {
+            select_hooks_only(&fixture, true);
+        }
         let mut command = fixture.process(&endpoint.url, "serve");
         command.arg("--stdio");
         let mut host = connect(command).await;
@@ -350,6 +441,10 @@ async fn interrupting_a_native_hook_cleans_up_and_a_changed_profile_cannot_resum
                 "required",
                 false,
             );
+        } else if !hooks_only {
+            // Explicit false must still match work accepted before this
+            // selector was present in the trusted launch profile.
+            select_hooks_only(&fixture, false);
         }
         let mut command = fixture.process(&endpoint.url, "serve");
         command.arg("--stdio");
