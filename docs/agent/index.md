@@ -38,7 +38,8 @@ and reported usage. [Inspect and save results](./results.md)
 
 Use a temporary side chat for a separate question about the current
 context, or branch a saved chat to explore another approach. A branch
-can still work with the same project files. [Ask in a side chat](./clients.md#ask-in-a-temporary-side-chat) · [Branch or revise a chat](./clients.md#branch-or-revise-a-chat)
+can still work with the same project files.
+[Return to work and manage chat history](./history.md)
 
 ## Give independent work a place
 
