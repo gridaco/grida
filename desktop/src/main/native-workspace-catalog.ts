@@ -1,13 +1,16 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — exact native workspace admission and sole writer.
 import { createHash } from "node:crypto";
+import type { BigIntStats } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
+  ProtectedRoots,
   WorkspaceCatalogReader,
   WorkspaceRegistry,
   type Workspace,
   type WorkspaceDirectoryIdentity,
 } from "@grida/daemon/server";
+import type { NativeExternalRuns } from "./native-external-runs";
 import {
   WorkspaceMediaRegistry,
   type WorkspaceMediaGrant,
@@ -22,12 +25,23 @@ type Options = Readonly<{
   protectedPaths: readonly string[];
 }>;
 
+type ExternalAccess = Readonly<{
+  privateDirectory: string;
+  temporaryDirectory: string;
+  workspace(id: string): Promise<WorkspaceMediaGrant>;
+}>;
+type ExternalOwner = Pick<NativeExternalRuns, "selection" | "close">;
+
 export class NativeWorkspaceCatalog {
   readonly directory: string;
   private readonly scopes: WorkspaceMediaRegistry;
   private readonly reader: WorkspaceCatalogReader;
   private readonly ready: Promise<void>;
   private readonly protectedPaths: readonly string[];
+  private readonly ordinaryDenials: ProtectedRoots;
+  private readonly externalScratch: string;
+  private external?: ExternalOwner;
+  private openingExternal = false;
   private registry: WorkspaceRegistry;
   private pending: Promise<unknown> = Promise.resolve();
   private pendingCount = 0;
@@ -36,11 +50,17 @@ export class NativeWorkspaceCatalog {
 
   constructor(private readonly options: Options) {
     this.directory = NativeWorkspaceCatalog.directoryFor(options.browserData);
-    this.protectedPaths = [
+    const ordinaryPaths = [
       ...options.protectedPaths,
       options.browserData,
       path.dirname(this.directory),
     ];
+    this.ordinaryDenials = new ProtectedRoots(ordinaryPaths);
+    this.externalScratch = path.join(
+      path.dirname(options.browserData),
+      ".grida-external-scratch"
+    );
+    this.protectedPaths = [...ordinaryPaths, this.externalScratch];
     this.scopes = new WorkspaceMediaRegistry(this.protectedPaths);
     this.reader = new WorkspaceCatalogReader(
       this.directory,
@@ -65,6 +85,66 @@ export class NativeWorkspaceCatalog {
 
   fileProtectionPaths(): readonly string[] {
     return this.protectedPaths;
+  }
+
+  async openExternalRuns<T extends ExternalOwner>(
+    open: (access: ExternalAccess) => Promise<T>
+  ): Promise<T> {
+    if (this.external || this.openingExternal) throw externalUnavailable();
+    this.openingExternal = true;
+    try {
+      const access = await this.run(async () => {
+        await assertPrivateDirectory(path.dirname(this.options.browserData));
+        const temporaryDirectory = this.externalScratch;
+        if (this.ordinaryDenials.overlaps(temporaryDirectory))
+          throw externalUnavailable();
+        const scratch = await ensurePrivateDirectory(temporaryDirectory);
+        await this.verifyExternalScratch(scratch);
+        const privateDirectory = path.join(
+          this.options.browserData,
+          "native-external"
+        );
+        await ensurePrivateDirectory(privateDirectory);
+        return {
+          privateDirectory,
+          temporaryDirectory,
+          workspace: (id: string) =>
+            this.run(async () => {
+              await this.verifyExternalScratch(scratch);
+              const grant = await this.resolveFileGrant(id);
+              return {
+                ...grant,
+                // The catalog still denies the container. Rust receives only
+                // a fresh per-run child of this dedicated scratch root.
+                protected: this.ordinaryDenials.metadataPaths(),
+              };
+            }),
+        };
+      });
+      const owner = await open(access);
+      this.external = owner;
+      return owner;
+    } finally {
+      this.openingExternal = false;
+    }
+  }
+
+  private async verifyExternalScratch(expected: BigIntStats): Promise<void> {
+    const scratch = await assertPrivateDirectory(this.externalScratch);
+    if (
+      this.ordinaryDenials.overlaps(this.externalScratch) ||
+      !sameDirectory(expected, scratch)
+    )
+      throw externalUnavailable();
+    const protectedDirectories = await Promise.all(
+      this.ordinaryDenials.canonicalPaths().map(directoryIfPresent)
+    );
+    if (
+      protectedDirectories.some(
+        (other) => other && sameDirectory(other, scratch)
+      )
+    )
+      throw externalUnavailable();
   }
 
   list(): Promise<Workspace[]> {
@@ -107,8 +187,12 @@ export class NativeWorkspaceCatalog {
     return this.run(() => this.mutate(() => this.registry.pin(id, pinned)));
   }
 
-  forget(id: string): Promise<void> {
-    return this.run(() => {
+  async forget(id: string): Promise<void> {
+    // Drain before joining the catalog queue. An admitted start may be
+    // completing its last exact grant check through that same queue.
+    if (this.external?.selection.workspaceId === id)
+      await this.external.close();
+    return await this.run(() => {
       this.requireDrainedWrites();
       return this.mutate(() => this.registry.forget(id));
     });
@@ -201,14 +285,8 @@ export class NativeWorkspaceCatalog {
 
   private async prepare() {
     await assertPrivateDirectory(this.options.browserData);
-    for (const directory of [path.dirname(this.directory), this.directory]) {
-      await fs
-        .mkdir(directory, { mode: 0o700 })
-        .catch((error: NodeJS.ErrnoException) => {
-          if (error.code !== "EEXIST") throw error;
-        });
-      await assertPrivateDirectory(directory);
-    }
+    for (const directory of [path.dirname(this.directory), this.directory])
+      await ensurePrivateDirectory(directory);
     await this.reader.verify();
   }
 
@@ -240,15 +318,46 @@ export class NativeWorkspaceCatalog {
 }
 
 async function assertPrivateDirectory(directory: string) {
-  const stat = await fs.lstat(directory);
+  const stat = await fs.lstat(directory, { bigint: true });
   if (
     !path.isAbsolute(directory) ||
     !stat.isDirectory() ||
-    stat.uid !== process.geteuid?.() ||
-    (stat.mode & 0o7777) !== 0o700 ||
+    stat.uid !== BigInt(process.geteuid?.() ?? -1) ||
+    (stat.mode & 0o7777n) !== 0o700n ||
     (await fs.realpath(directory)) !== directory
   )
     throw new Error("workspace_catalog_invalid");
+  return stat;
+}
+
+async function ensurePrivateDirectory(directory: string) {
+  await fs
+    .mkdir(directory, { mode: 0o700 })
+    .catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "EEXIST") throw error;
+    });
+  return assertPrivateDirectory(directory);
+}
+
+async function directoryIfPresent(location: string) {
+  try {
+    return await fs.stat(location, { bigint: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw error;
+  }
+}
+
+function sameDirectory(first: BigIntStats, second: BigIntStats) {
+  return (
+    first.dev === second.dev &&
+    first.ino === second.ino &&
+    first.birthtimeNs === second.birthtimeNs
+  );
+}
+
+function externalUnavailable() {
+  return new Error("native_external_workspace_scope_unavailable");
 }
 
 function unavailable(): Error {

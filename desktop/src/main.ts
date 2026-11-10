@@ -47,6 +47,7 @@ import { NativeDesktopAgent } from "./main/native-desktop-agent";
 import { NativeDesktopProfile } from "./main/native-desktop-profile";
 import { NativeMcpLaunch } from "./main/native-mcp-launch";
 import { NativeEditorMcpExport } from "./main/native-editor-mcp-export";
+import { NativeExternalRuns } from "./main/native-external-runs";
 import {
   nativeWorkspaceCatalog,
   nativeWorkspaceMedia,
@@ -145,6 +146,7 @@ let managedLegacyStart: ReturnType<typeof startOwnedLegacyWriter> | undefined;
 let recentFiles = agentSidecarClient.recent;
 let nativeQuitDrain: Promise<void> | undefined;
 let nativeEditorMcp: NativeEditorMcpExport | undefined;
+let nativeExternalRuns: NativeExternalRuns | undefined;
 let nativeQuitReady = false;
 const windowAdmission = {
   can_open: () => entryWindow?.isMain ?? false,
@@ -606,6 +608,20 @@ app.on("ready", async () => {
 
   // Keep a disposable profile on the build it was launched to exercise.
   const nativeProfile = NativeDesktopProfile.selected();
+  let externalProfile: string | undefined;
+  try {
+    externalProfile = NativeExternalRuns.launchProfile(
+      process.argv,
+      nativeProfile
+    );
+  } catch {
+    dialog.showErrorBox(
+      "External agent could not start",
+      "Use one trusted launch profile with an isolated native Linux workspace."
+    );
+    app.quit();
+    return;
+  }
   strictRetainedMedia =
     nativeProfile &&
     app.isPackaged &&
@@ -663,6 +679,16 @@ app.on("ready", async () => {
             options
           );
       await workspaceCatalog.initialize();
+      if (externalProfile) {
+        const profileFile = externalProfile;
+        nativeExternalRuns = await workspaceCatalog.openExternalRuns((access) =>
+          NativeExternalRuns.open({
+            ...access,
+            profileFile,
+            resourcesPath: process.resourcesPath,
+          })
+        );
+      }
       const documentWorkers = nativeWorkspaceMedia();
       if (documentWorkers) {
         nativeDocuments = new NativeDocumentFiles(
@@ -695,10 +721,14 @@ app.on("ready", async () => {
       }
     } catch {
       dialog.showErrorBox(
-        "Native chat could not start",
-        NativeDesktopProfile.managedCutover()
-          ? "The managed legacy profile could not be verified for archival."
-          : "Use a fresh Desktop profile with a separate Grida agent data directory."
+        externalProfile
+          ? "External agent could not start"
+          : "Native chat could not start",
+        externalProfile
+          ? "Check the private launch profile and its registered workspace."
+          : NativeDesktopProfile.managedCutover()
+            ? "The managed legacy profile could not be verified for archival."
+            : "Use a fresh Desktop profile with a separate Grida agent data directory."
       );
       app.quit();
       return;
@@ -739,6 +769,11 @@ app.on("ready", async () => {
       await Promise.all([
         agentSidecarClient.clearGridaGatewaySession(),
         nativeDesktopAgent?.clearAccount(),
+        nativeExternalRuns?.close().catch(() => {
+          console.error(
+            "[grida] external agent shutdown could not be verified"
+          );
+        }),
       ]);
     },
     on_role_change: (role) => {
@@ -958,6 +993,7 @@ app.on("will-quit", (event) => {
   if (
     (!nativeDesktopAgent &&
       !nativeEditorMcp &&
+      !nativeExternalRuns &&
       !managedLegacyStart &&
       !strictRetainedMedia) ||
     nativeQuitReady
@@ -967,6 +1003,7 @@ app.on("will-quit", (event) => {
   nativeQuitDrain ??= Promise.allSettled([
     nativeDesktopAgent?.close(),
     nativeEditorMcp?.close(),
+    nativeExternalRuns?.close(),
     managedLegacyStart?.then((writer) => writer.drain()),
     strictRetainedMedia ? closeRetainedMediaSidecar() : undefined,
   ])

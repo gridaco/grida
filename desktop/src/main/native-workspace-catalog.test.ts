@@ -8,6 +8,67 @@ import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import { WorkspaceWriteUnverified } from "./workspace-file-worker";
 
 it.runIf(process.platform !== "win32")(
+  "keeps external scratch reserved and preserves registration when external cleanup is unverified",
+  async () => {
+    const root = await fs.realpath(
+      await fs.mkdtemp(path.join(os.tmpdir(), "grida-workspace-external-"))
+    );
+    const browserData = path.join(root, "browser");
+    const project = path.join(root, "project");
+    const protectedRoot = path.join(root, "custody");
+    const scratch = path.join(root, ".grida-external-scratch");
+    try {
+      for (const directory of [browserData, project, protectedRoot])
+        await fs.mkdir(directory, { mode: 0o700 });
+      const options = {
+        browserData,
+        projectsRoot: path.join(root, "projects"),
+        protectedPaths: [protectedRoot],
+      };
+      const catalog = new NativeWorkspaceCatalog(options);
+      const selected = await catalog.openSelected(project);
+      let checkScratch: (() => Promise<unknown>) | undefined;
+      const open = () =>
+        catalog.openExternalRuns(async (access) => {
+          const grant = await access.workspace(selected.id);
+          expect(grant.protected).toContain(protectedRoot);
+          expect(grant.protected).not.toContain(scratch);
+          checkScratch = () => access.workspace(selected.id);
+          return {
+            selection: { workspaceId: selected.id, name: "Reviewed peer" },
+            close: async () => {
+              // The closing owner may be waiting for its final grant check.
+              await access.workspace(selected.id);
+              throw new Error("external_cleanup_unverified");
+            },
+          };
+        });
+      await fs.symlink(protectedRoot, scratch);
+      await expect(open()).rejects.toThrow(
+        "native_external_workspace_scope_unavailable"
+      );
+      await fs.unlink(scratch);
+      await open();
+      await expect(catalog.forget(selected.id)).rejects.toThrow(
+        "external_cleanup_unverified"
+      );
+      expect(await catalog.find(selected.id)).toEqual(selected);
+      await fs.rename(scratch, scratch + "-old");
+      await fs.mkdir(scratch, { mode: 0o700 });
+      await expect(checkScratch!()).rejects.toThrow(
+        "native_external_workspace_scope_unavailable"
+      );
+      const restarted = new NativeWorkspaceCatalog(options);
+      await expect(restarted.openSelected(scratch)).rejects.toThrow(
+        "workspace_media_root_denied"
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  }
+);
+
+it.runIf(process.platform !== "win32")(
   "holds Forget until an admitted save has drained",
   async () => {
     const root = await fs.realpath(

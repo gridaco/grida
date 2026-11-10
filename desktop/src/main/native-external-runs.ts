@@ -9,6 +9,7 @@ import { NativeAgentProcess } from "./native-agent-process";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const PROFILE_FLAG = "--native-external-acp-profile";
 const MAX_TEXT = 64 * 1024;
 const MAX_PROFILE = 64 * 1024;
 const MAX_PIPE = 1024 * 1024;
@@ -81,6 +82,28 @@ export class NativeExternalRuns {
     private readonly options: Options
   ) {}
 
+  static launchProfile(
+    argv: readonly string[],
+    native: boolean
+  ): string | undefined {
+    const separator = argv.indexOf("--");
+    const options = separator < 0 ? argv : argv.slice(0, separator);
+    const flags = options.filter(
+      (arg) => arg === PROFILE_FLAG || arg.startsWith(PROFILE_FLAG + "=")
+    );
+    if (!flags.length) return;
+    const value = flags[0].slice(PROFILE_FLAG.length + 1);
+    if (
+      process.platform !== "linux" ||
+      !native ||
+      !options.includes("--native-chat") ||
+      flags.length !== 1 ||
+      !absolute(value)
+    )
+      throw failure("profile_invalid");
+    return value;
+  }
+
   /** Compose only from a trusted launch under the application's single-instance owner. */
   static async open(options: Options): Promise<NativeExternalRuns> {
     if (process.platform !== "linux") throw failure("platform_unsupported");
@@ -102,6 +125,8 @@ export class NativeExternalRuns {
       ].some((location) => overlaps(location, options.temporaryDirectory))
     )
       throw failure("profile_invalid");
+    await syncDirectory(path.dirname(options.privateDirectory));
+    await syncDirectory(path.dirname(options.temporaryDirectory));
     const scope =
       "external-" +
       digest(

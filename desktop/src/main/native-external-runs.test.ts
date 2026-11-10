@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NativeExternalRuns } from "./native-external-runs";
+import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 
 const script = String.raw`
@@ -151,6 +152,106 @@ afterEach(() => vi.unstubAllGlobals());
 describe.skipIf(process.platform === "win32")(
   "Main-owned external ACP runs",
   () => {
+    it("admits only an explicit native Linux launcher option before the separator", () => {
+      const option = "--native-external-acp-profile=/private/reviewed.canvas";
+      linuxProcess();
+      expect(
+        NativeExternalRuns.launchProfile(["--native-chat", option], true)
+      ).toBe("/private/reviewed.canvas");
+      expect(
+        NativeExternalRuns.launchProfile(["--native-chat", "--", option], true)
+      ).toBeUndefined();
+      expect(() =>
+        NativeExternalRuns.launchProfile(["--native-chat", option], false)
+      ).toThrow("native_external_profile_invalid");
+      expect(() =>
+        NativeExternalRuns.launchProfile([option, "--", "--native-chat"], true)
+      ).toThrow("native_external_profile_invalid");
+      expect(() =>
+        NativeExternalRuns.launchProfile(
+          ["--native-chat", option, option],
+          true
+        )
+      ).toThrow("native_external_profile_invalid");
+      expect(() =>
+        NativeExternalRuns.launchProfile(
+          [
+            "--native-chat",
+            "--native-external-acp-profile",
+            "/private/reviewed.canvas",
+          ],
+          true
+        )
+      ).toThrow("native_external_profile_invalid");
+    });
+
+    it("uses the native catalog's protected scratch and drains the selected peer before Forget", async () => {
+      const test = fixture();
+      linuxProcess();
+      let owner: NativeExternalRuns | undefined;
+      try {
+        const browserData = test.options.privateDirectory;
+        const catalog = new NativeWorkspaceCatalog({
+          browserData,
+          projectsRoot: path.join(path.dirname(browserData), "projects"),
+          protectedPaths: [
+            test.options.temporaryDirectory,
+            test.options.profileFile,
+          ],
+        });
+        const open = () =>
+          catalog.openExternalRuns((access) =>
+            NativeExternalRuns.open({
+              ...access,
+              profileFile: test.options.profileFile,
+              resourcesPath: test.options.resourcesPath,
+            })
+          );
+        await expect(open()).rejects.toThrow("workspace_not_registered");
+        const workspace = await catalog.openSelected(test.grant.root);
+        fs.writeFileSync(
+          test.options.profileFile,
+          JSON.stringify({
+            ...test.profile,
+            workspaceId: workspace.id,
+          })
+        );
+        owner = await open();
+        const scratch = path.join(
+          path.dirname(browserData),
+          ".grida-external-scratch"
+        );
+        expect((await catalog.fileGrant(workspace.id)).protected).toContain(
+          scratch
+        );
+        await expect(catalog.openSelected(scratch)).rejects.toThrow(
+          "workspace_media_root_denied"
+        );
+        const alias = path.join(path.dirname(browserData), "scratch-alias");
+        fs.symlinkSync(scratch, alias);
+        await expect(catalog.openSelected(alias)).rejects.toThrow(
+          "workspace_media_root_denied"
+        );
+        const id = randomUUID();
+        await owner.start(id, "hold", current);
+        await vi.waitFor(async () =>
+          expect((await owner!.observe(id)).disposition).toBe("running")
+        );
+        await catalog.forget(workspace.id);
+        expect(await catalog.find(workspace.id)).toBeNull();
+        expect(await owner.observe(id)).toMatchObject({
+          disposition: "cancelled",
+          cleanupVerified: true,
+        });
+        await expect(
+          owner.start(randomUUID(), "replacement", current)
+        ).rejects.toThrow("native_external_closing");
+      } finally {
+        await owner?.close().catch(() => {});
+        test.close();
+      }
+    });
+
     it("reopens an exact lost receipt without dispatching the same run again", async () => {
       const test = fixture();
       linuxProcess();
