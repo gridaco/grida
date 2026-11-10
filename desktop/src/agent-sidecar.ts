@@ -58,6 +58,7 @@
 import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 import { AgentSidecarNetwork } from "./agent-sidecar-network";
 import { AgentSidecarDaemonSockets } from "./agent-sidecar-daemon-sockets";
+import { RetainedMediaOwner } from "./retained-media-owner";
 
 // Route Node's built-in `fetch` (undici) through whatever proxy is in
 // `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`. Without this, undici v6+
@@ -224,6 +225,8 @@ async function main() {
     console.error("[agent-sidecar] fatal: missing or short bootstrap password");
     process.exit(1);
   }
+  if (retainedMediaScope === "1")
+    await RetainedMediaOwner.acquire(requiredUserDataPath);
 
   // Dynamic by design: no package top-level console output may run before
   // stdout is reserved for the framed channel above.

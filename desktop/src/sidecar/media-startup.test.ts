@@ -290,6 +290,39 @@ describe.skipIf(
     }
   });
 
+  it("refuses a second owner before discovery and releases only on actual process exit", async () => {
+    const scope = await packagedScope();
+    let active: Sidecar | undefined;
+    try {
+      const discovery = ggContractFixture([]);
+      const provider = vi.fn<StartOptions["fetchProvider"]>(
+        async (url) =>
+          discovery.response(url) ?? new Response(null, { status: 403 })
+      );
+      active = await Sidecar.startRetained(scope.options, provider);
+      const replacement = vi.fn<StartOptions["fetchProvider"]>(
+        async (url) =>
+          discovery.response(url) ?? new Response(null, { status: 403 })
+      );
+      await expect(
+        Sidecar.startRetained(scope.options, replacement)
+      ).rejects.toThrow(/retained_media_owner_unavailable/);
+      expect(replacement).not.toHaveBeenCalled();
+      await expect(
+        fs.stat(
+          path.join(scope.options.providerHome, "providers", "credentials.toml")
+        )
+      ).rejects.toMatchObject({ code: "ENOENT" });
+      await active.terminate();
+      active = await Sidecar.startRetained(scope.options, replacement);
+      await vi.waitFor(() => expect(replacement).toHaveBeenCalledTimes(3));
+      await active.stop();
+    } finally {
+      await active?.stop(false);
+      await fs.rm(scope.root, { recursive: true, force: true });
+    }
+  });
+
   it("denies direct network and out-of-scope files under the same kernel profile", async () => {
     const scope = await packagedScope();
     const listener = net.createServer();
@@ -1083,7 +1116,7 @@ class Sidecar {
     private readonly child: ChildProcess,
     fetchProvider: StartOptions["fetchProvider"],
     private readonly legacy: boolean,
-    prepareProviderCustody?: () => Promise<void>
+    private readonly prepareProviderCustody?: () => Promise<void>
   ) {
     this.exit = new Promise((resolve, reject) => {
       child.once("error", reject);
@@ -1264,7 +1297,12 @@ class Sidecar {
         assert.equal(this.stderr.includes(ggToken), false);
         if (!this.legacy)
           assert.doesNotMatch(
-            this.stderr,
+            this.prepareProviderCustody
+              ? this.stderr.replace(
+                  /^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature.*$/m,
+                  ""
+                )
+              : this.stderr,
             /SQLite|scratch|skills-root|forbidden imports|forbidden network/
           );
       }
@@ -1276,6 +1314,17 @@ class Sidecar {
     } finally {
       this.network.close();
       clearTimeout(timer);
+    }
+  }
+
+  async terminate(): Promise<void> {
+    this.stopped = true;
+    this.sockets.close();
+    this.child.kill("SIGKILL");
+    try {
+      assert.deepEqual(await this.exit, { code: null, signal: "SIGKILL" });
+    } finally {
+      this.network.close();
     }
   }
 }

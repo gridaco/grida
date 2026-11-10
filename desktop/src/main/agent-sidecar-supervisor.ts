@@ -69,6 +69,7 @@ import type { DesktopAccountSession } from "./account-session";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import { AgentNetworkPolicy } from "../agent-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
+import { RetainedMediaLaunch } from "./retained-media-launch";
 import type { LegacyChatWriter } from "./legacy-chat-source-lease";
 
 export type AgentSidecarInfo = {
@@ -109,6 +110,8 @@ export class AgentSidecarSupervisor {
   private legacyLaunchStarted = false;
   private ownedLegacy?: OwnedLegacyGeneration;
   private coldStartSource?: Promise<LegacyChatSource>;
+  private retainedMedia?: Promise<RetainedMediaLaunch.Options>;
+  private retiringMedia?: Promise<void>;
   private child: ChildProcess | null = null;
   private activeGeneration = 0;
   private nextGeneration = 0;
@@ -170,8 +173,8 @@ export class AgentSidecarSupervisor {
   constructor(options: { agent?: boolean } = {}) {
     this.agentEnabled = options.agent !== false;
     app.once("will-quit", () => {
-      // Managed Main awaits the exact writer drain before exiting.
-      if (this.ownedLegacy?.managed) return;
+      // Main awaits the exact writer drain for these launch roles.
+      if (this.ownedLegacy?.managed || this.retainedMedia) return;
       this.isShuttingDown = true;
       if (this.restartTimer) {
         clearTimeout(this.restartTimer);
@@ -187,6 +190,7 @@ export class AgentSidecarSupervisor {
 
   async start(workspaceCatalog?: string): Promise<AgentSidecarInfo> {
     if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
+    if (this.retainedMedia) throw new Error("retained_media_already_selected");
     if (this.ownedLegacy)
       throw new Error("owned_legacy_writer_already_selected");
     if (
@@ -205,6 +209,78 @@ export class AgentSidecarSupervisor {
       await this.initSandbox();
     }
     return await this.spawn();
+  }
+
+  async startRetainedMedia(): Promise<AgentSidecarInfo> {
+    const source = this.coldStartSource;
+    if (
+      !source ||
+      !app.hasSingleInstanceLock() ||
+      !app.isPackaged ||
+      !NativeDesktopProfile.selected() ||
+      this.agentEnabled ||
+      this.ownedLegacy ||
+      this.legacyLaunchStarted ||
+      this.sandboxReady ||
+      this.isShuttingDown
+    )
+      throw new Error("retained_media_profile_unavailable");
+    this.retainedMedia ??= source.then(async (sealed) => {
+      if (sealed.userDataPath !== sealed.providerHome)
+        throw new Error("retained_media_profile_unavailable");
+      const settings = await RetainedMediaLaunch.prepareSettings(
+        sealed.userDataPath
+      );
+      const temporary = path.join(app.getPath("temp"), "retained-media");
+      for (const directory of [
+        path.join(sealed.providerHome, "providers"),
+        temporary,
+      ]) {
+        await fs.promises
+          .mkdir(directory, { mode: 0o700 })
+          .catch((error: NodeJS.ErrnoException) => {
+            if (error.code !== "EEXIST") throw error;
+          });
+      }
+      return Object.freeze({
+        executable: process.execPath,
+        settings,
+        providerHome: sealed.providerHome,
+        media: sealed.mediaRoot,
+        temporary,
+        editorBaseUrl: EDITOR_BASE_URL,
+      });
+    });
+    if (this.retiringMedia) await this.retiringMedia;
+    if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
+    return await this.spawn();
+  }
+
+  closeRetainedMedia(): Promise<void> {
+    if (!this.retainedMedia) return Promise.resolve();
+    if (this.info) return this.drain();
+    return (this.verifiedDrain ??= this.closeStartingMedia());
+  }
+
+  private async closeStartingMedia(): Promise<void> {
+    this.isShuttingDown = true;
+    this.stop();
+    const retired = this.retiringMedia;
+    if (!retired) return;
+    let timeout: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        retired,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error("agent_sidecar_drain_unverified")),
+            DRAIN_EXIT_TIMEOUT_MS
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   /** Start one legacy generation for a Main-owned isolated profile. */
@@ -652,6 +728,7 @@ export class AgentSidecarSupervisor {
 
   private async spawnOne(): Promise<AgentSidecarInfo> {
     const generation = ++this.nextGeneration;
+    const retained = this.retainedMedia && (await this.retainedMedia);
     const scriptPath = this.sidecarScriptPath();
     const password = crypto.randomBytes(32).toString("base64url");
 
@@ -659,7 +736,7 @@ export class AgentSidecarSupervisor {
     // unsupported platforms, avoid shell quoting entirely and spawn
     // Electron-as-node with an argv array so Windows paths with spaces
     // work under cmd.exe.
-    const supportedSandbox = isSupportedPlatform();
+    const supportedSandbox = !retained && isSupportedPlatform();
 
     const mode = this.agentEnabled
       ? "enabled"
@@ -735,6 +812,7 @@ export class AgentSidecarSupervisor {
     return await new Promise<AgentSidecarInfo>((resolve, reject) => {
       let resolved = false;
       let child: ChildProcess;
+      const retainedLaunch = retained && RetainedMediaLaunch.start(retained);
       // Per-spawn ownership: an old child's delayed `exit` must never close or
       // clear the network host belonging to a newer generation.
       let spawnNetworkHost: AgentNetworkHost | null = null;
@@ -793,22 +871,24 @@ export class AgentSidecarSupervisor {
         ...cleanedEnv,
         ELECTRON_RUN_AS_NODE: "1",
       };
-      child = supportedSandbox
-        ? spawn(wrappedCmd!, {
-            shell: true,
-            env: childEnv,
-            stdio: ["pipe", "pipe", "pipe", "ipc"],
-          })
-        : spawn(process.execPath, args, {
-            shell: false,
-            env: childEnv,
-            stdio: ["pipe", "pipe", "pipe", "ipc"],
-          });
+      child =
+        retainedLaunch?.child ??
+        (supportedSandbox
+          ? spawn(wrappedCmd!, {
+              shell: true,
+              env: childEnv,
+              stdio: ["pipe", "pipe", "pipe", "ipc"],
+            })
+          : spawn(process.execPath, args, {
+              shell: false,
+              env: childEnv,
+              stdio: ["pipe", "pipe", "pipe", "ipc"],
+            }));
       this.child = child;
       this.activeGeneration = generation;
       this.note(
         "sup",
-        `spawned pid=${child.pid ?? "?"} sandbox=${supportedSandbox ? "srt" : "none"}`
+        `spawned pid=${child.pid ?? "?"} sandbox=${retained ? "retained-media" : supportedSandbox ? "srt" : "none"}`
       );
       if (!child.stdin || !child.stdout || !child.send || !child.connected) {
         resolved = true;
@@ -843,7 +923,10 @@ export class AgentSidecarSupervisor {
           output: child.stdin!,
           authority: this.networkAuthority,
           onFatal: (error) => failSpawnChannel("capability channel", error),
-          commandExecutor: this.commandHost?.shellExecutor,
+          commandExecutor: retained
+            ? undefined
+            : this.commandHost?.shellExecutor,
+          prepareProviderCustody: retainedLaunch?.prepareProviderCustody,
         });
         spawnNetworkHost = host;
         if (!this.isCurrentGeneration(child, generation) || resolved) {
@@ -881,7 +964,7 @@ export class AgentSidecarSupervisor {
         }
       });
 
-      child.on("exit", (code, signal) => {
+      child.on(retained ? "close" : "exit", (code, signal) => {
         this.note(
           "sup",
           `exited code=${code}${signal ? ` signal=${signal}` : ""}`,
@@ -890,6 +973,9 @@ export class AgentSidecarSupervisor {
         // Node may emit exit with a cleanup acknowledgment still buffered in
         // stdout. The verified drain owns these hosts until pipe close.
         if (this.drainingChild === child) return;
+        if (retained && this.isCurrentGeneration(child, generation)) {
+          this.joinRetiringMedia(child, true, true);
+        }
         spawnDaemonSocketHost?.close();
         if (this.daemonSocketHost === spawnDaemonSocketHost) {
           this.daemonSocketHost = null;
@@ -955,6 +1041,7 @@ export class AgentSidecarSupervisor {
     restart: boolean
   ): void {
     if (!this.isCurrentGeneration(child, generation)) return;
+    if (this.retainedMedia) this.joinRetiringMedia(child, false, restart);
     this.closeCurrentHosts();
     this.info = null;
     // Clear ownership before kill: a synchronous/mock exit and a delayed real
@@ -967,6 +1054,24 @@ export class AgentSidecarSupervisor {
       // already dead
     }
     if (restart && !this.isShuttingDown) this.scheduleRestart();
+  }
+
+  private joinRetiringMedia(
+    child: ChildProcess,
+    closed: boolean,
+    restart: boolean
+  ): void {
+    const exited = closed
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => child.once("close", () => resolve()));
+    const custody = this.networkHost?.joinCustody();
+    const retiring = Promise.all([exited, custody]).then(() => undefined);
+    this.retiringMedia = retiring;
+    void retiring.then(() => {
+      if (this.retiringMedia !== retiring) return;
+      this.retiringMedia = undefined;
+      if (restart) this.scheduleRestart();
+    });
   }
 
   private handleRestartFailure(err: unknown): void {
@@ -985,7 +1090,13 @@ export class AgentSidecarSupervisor {
    * exit can converge on the same recovery edge.
    */
   private scheduleRestart(): void {
-    if (this.isShuttingDown || this.restartTimer || this.ownedLegacy) return;
+    if (
+      this.isShuttingDown ||
+      this.restartTimer ||
+      this.ownedLegacy ||
+      this.retiringMedia
+    )
+      return;
     const wait = this.restartBackoffMs;
     this.restartBackoffMs = Math.min(this.restartBackoffMs * 2, BACKOFF_MAX_MS);
     this.note("sup", `restart in ${wait}ms`, "warn");
@@ -1025,6 +1136,14 @@ export function startAgentSidecar(
   workspaceCatalog?: string
 ): Promise<AgentSidecarInfo> {
   return sidecar().start(workspaceCatalog);
+}
+
+export function startRetainedMediaSidecar(): Promise<AgentSidecarInfo> {
+  return sidecar().startRetainedMedia();
+}
+
+export function closeRetainedMediaSidecar(): Promise<void> {
+  return supervisor?.closeRetainedMedia() ?? Promise.resolve();
 }
 
 export function startOwnedLegacyWriter(): Promise<OwnedLegacyWriter> {

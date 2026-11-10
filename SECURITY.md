@@ -1364,9 +1364,14 @@ Today:
   through the original owner. Drain waits for admitted custody work and
   suppresses a result after retirement.
   The [media composition](desktop/src/sidecar/daemon.ts) withholds unrelated
-  routes under that launch scope. Packaged fixtures verify provider mediation,
-  accepted-socket transfer, scope denials, and clean drain. Desktop's existing
-  compatibility launch retains its SRT boundary.
+  routes under that launch scope. Main selects it after admitting a packaged
+  macOS arm64 native chat profile. The [child-held writer lock](desktop/src/retained-media-owner.ts)
+  refuses a second owner before providers or custody start and survives Main
+  loss until the exact child exits. The [supervisor](desktop/src/main/agent-sidecar-supervisor.ts)
+  joins that exit and admitted custody work before a replacement. Packaged
+  fixtures verify provider mediation, accepted-socket transfer, scope denials,
+  Main crash refusal, and clean drain. Compatibility launches retain their
+  SRT boundary.
 - The isolated native Desktop profile gives Main sole ownership of
   `recent.json` in its private browser directory. Its recents IPC uses the
   current authenticated top-level frame. Paths are remembered metadata and

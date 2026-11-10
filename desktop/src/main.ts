@@ -17,6 +17,8 @@ import {
 } from "./branding";
 import {
   startAgentSidecar,
+  startRetainedMediaSidecar,
+  closeRetainedMediaSidecar,
   startOwnedLegacyWriter,
   getAgentSidecarInfo,
   getAgentSidecarMode,
@@ -505,6 +507,7 @@ app.on("open-url", (event, url) => {
 // menu actions, and the file-handle path. The supervisor maintains
 // the live reference internally for restart-on-crash continuity.
 let agentSidecarInfo: AgentSidecarInfo | null = null;
+let strictRetainedMedia = false;
 let providerApprovalStarted = false;
 
 function approveConfiguredProviderEndpointsWhenReady(): void {
@@ -603,6 +606,11 @@ app.on("ready", async () => {
 
   // Keep a disposable profile on the build it was launched to exercise.
   const nativeProfile = NativeDesktopProfile.selected();
+  strictRetainedMedia =
+    nativeProfile &&
+    app.isPackaged &&
+    process.platform === "darwin" &&
+    process.arch === "arm64";
   if (!nativeProfile || NativeDesktopProfile.firstSelected())
     updateElectronApp({ notifyUser: true });
 
@@ -803,6 +811,8 @@ app.on("ready", async () => {
       if (NativeDesktopProfile.managedPredecessor()) {
         managedLegacyStart = startOwnedLegacyWriter();
         agentSidecarInfo = (await managedLegacyStart).connection;
+      } else if (strictRetainedMedia) {
+        agentSidecarInfo = await startRetainedMediaSidecar();
       } else {
         agentSidecarInfo = await startAgentSidecar(workspaceCatalog?.directory);
       }
@@ -926,7 +936,7 @@ app.once("will-quit", () => {
   // A dirty window can cancel quit. Keep shared services available until
   // Electron confirms that all windows have closed.
   closeChatGptOAuth();
-  if (!managedLegacyStart) stopAgentSidecar();
+  if (!managedLegacyStart && !strictRetainedMedia) stopAgentSidecar();
   disposeAllTerminals();
   void disposeAllWorkspaceWatches();
 });
@@ -938,7 +948,10 @@ app.on("will-quit", (event) => {
   }
   entryWindow?.beginShutdown();
   if (
-    (!nativeDesktopAgent && !nativeEditorMcp && !managedLegacyStart) ||
+    (!nativeDesktopAgent &&
+      !nativeEditorMcp &&
+      !managedLegacyStart &&
+      !strictRetainedMedia) ||
     nativeQuitReady
   )
     return;
@@ -947,6 +960,7 @@ app.on("will-quit", (event) => {
     nativeDesktopAgent?.close(),
     nativeEditorMcp?.close(),
     managedLegacyStart?.then((writer) => writer.drain()),
+    strictRetainedMedia ? closeRetainedMediaSidecar() : undefined,
   ])
     .then((outcomes) => {
       if (outcomes.some((outcome) => outcome.status === "rejected"))

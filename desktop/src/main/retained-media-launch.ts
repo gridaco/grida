@@ -2,6 +2,7 @@
 import { execFile, spawn } from "node:child_process";
 import fs, { type BigIntStats } from "node:fs";
 import files from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { promisify } from "node:util";
 import { AuthStore, SecretsStore } from "@grida/daemon/server";
@@ -265,7 +266,12 @@ export namespace RetainedMediaLaunch {
         throw new Error("retained_media_package_invalid");
       }
     }
-    const asar = regular(path.join(resources, "app.asar"));
+    // Electron Main presents an ASAR as a virtual directory through node:fs.
+    // The kernel profile must bind the actual, regular archive on disk.
+    const physicalFs = process.versions.electron
+      ? (createRequire(process.execPath)("original-fs") as typeof fs)
+      : fs;
+    const asar = regular(path.join(resources, "app.asar"), false, physicalFs);
     regular(SANDBOX, true);
     regular(ACL_READER, true);
     const settings = privateDirectory(input.settings);
@@ -369,10 +375,10 @@ export namespace RetainedMediaLaunch {
     return [...definitions, "-p", rules.join("\n")];
   }
 
-  function canonical(file: string) {
+  function canonical(file: string, disk = fs) {
     if (path.isAbsolute(file)) {
       try {
-        if (fs.realpathSync(file) === file) return file;
+        if (disk.realpathSync(file) === file) return file;
       } catch {
         // The launcher requires a present, canonical owner-selected root.
       }
@@ -380,9 +386,9 @@ export namespace RetainedMediaLaunch {
     throw new Error("retained_media_path_invalid");
   }
 
-  function regular(file: string, executable = false) {
-    canonical(file);
-    const stat = fs.lstatSync(file);
+  function regular(file: string, executable = false, disk = fs) {
+    canonical(file, disk);
+    const stat = disk.lstatSync(file);
     if (
       !stat.isFile() ||
       (stat.mode & 0o022) !== 0 ||

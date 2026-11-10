@@ -393,20 +393,28 @@ separate deployment boundary for unreviewed legacy writers.
 
 ## Retained media process
 
-The packaged retained-media launcher on macOS arm64 uses a deny-by-default
-Seatbelt policy. Trusted Main supplies the packaged Electron executable, an
+The admitted native chat profile in a packaged macOS arm64 app starts
+retained media under a deny-by-default Seatbelt policy. Trusted Main first
+seals the old writer through fresh-profile or managed archive admission.
+It supplies the packaged Electron executable, an
 isolated settings directory, the shared provider custody directory, the
 app-managed media directory, and a private temporary directory. The runtime
 and system libraries are read-only. Only Electron and the fixed macOS ACL
-reader can execute under the profile. Clean shutdown evidence covers the
-owned media process. Descendant closure requires separate verification.
+reader can execute under the profile.
 
 The child inherits the existing framed provider pipes and one Node IPC
 channel for already-accepted sockets. Main still owns the daemon listener.
 The kernel denies direct listening and connections. The retained composition
 serves media and provider settings. It withholds file, workspace, recents,
-chat, and command routes. Settings use the supplied directory and any
-replacement of legacy settings custody requires separate admission.
+chat, and command routes. Main copies the admitted endpoint settings into
+the retained partition. The child asks Main to prepare the original provider
+custody on first credential access over its fixed private channel.
+
+The child acquires a kernel-backed writer lock in its private settings
+directory before loading providers or announcing readiness. A child that
+outlives Main keeps that lock until exit. Main joins the exact child and any
+admitted custody work before same-process replacement. Failure leaves the
+retained role unavailable for that launch.
 
 Desktop keeps its existing SRT launch for the remaining compatibility
 services. Compatibility profiles use the sidecar for standalone document

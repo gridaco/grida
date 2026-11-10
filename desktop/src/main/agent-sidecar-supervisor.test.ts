@@ -313,6 +313,42 @@ describe("AgentSidecarSupervisor recovery", () => {
     expect(spawn).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps a retired strict launch selected and joins exact close and custody before replacement", async () => {
+    const supervisor = new AgentSidecarSupervisor();
+    const child = fakeChild();
+    const joined = Promise.withResolvers<void>();
+    const spawn = vi.fn<() => Promise<unknown>>(async () => undefined);
+    Object.assign(supervisor, {
+      retainedMedia: Promise.resolve({}),
+      child: child.value,
+      activeGeneration: 7,
+      networkHost: {
+        updateGrants: vi.fn<() => Promise<void>>(async () => {
+          throw new Error("grant acknowledgement timed out");
+        }),
+        joinCustody: vi.fn<() => Promise<void>>(() => joined.promise),
+        close: vi.fn<() => void>(),
+      },
+      daemonSocketHost: { close: vi.fn<() => void>() },
+      spawn,
+    });
+    await expect(
+      supervisor.approveProviderEndpoint("ollama", "http://localhost:11434/v1")
+    ).rejects.toThrow(/acknowledgement timed out/);
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
+    await expect(supervisor.start()).rejects.toThrow(
+      "retained_media_already_selected"
+    );
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(spawn).not.toHaveBeenCalled();
+    child.value.emit("close", 0, null);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(spawn).not.toHaveBeenCalled();
+    joined.resolve();
+    await vi.advanceTimersByTimeAsync(250);
+    expect(spawn).toHaveBeenCalledTimes(1);
+  });
+
   it("does not let a stale generation retire or restart its replacement", () => {
     const supervisor = new AgentSidecarSupervisor();
     const stale = fakeChild();

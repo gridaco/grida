@@ -321,6 +321,10 @@ export class AgentNetworkHost {
       : drain;
   }
 
+  joinCustody(): Promise<void> {
+    return this.custodyWork ?? Promise.resolve();
+  }
+
   private static electronAdapter(networkSession: Session): NetworkAdapter {
     return {
       // `Session.fetch({ redirect: "manual" })` rejects when Chromium sees a
