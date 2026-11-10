@@ -13,6 +13,8 @@ import type {
   NativeChatGoalControl,
   NativeChatGoalObservation,
   NativeChatGoalRequest,
+  NativeChatLibrarySelection,
+  NativeChatLibrarySelectionAnswer,
   NativeChatMessage,
   NativeChatObservation,
   NativeChatRevisionInput,
@@ -145,6 +147,9 @@ export type NativeChatView = Readonly<{
   questions: readonly NativeChatQuestion[];
   questionReady: boolean;
   questionError: string | null;
+  librarySelection: NativeChatLibrarySelection | null;
+  librarySelectionError: string | null;
+  librarySelectionRetry: boolean;
   queue: NativeChatQueuePage | null;
   queueLoading: boolean;
   queueDraft: Readonly<{ inputId: string; text: string }> | null;
@@ -190,6 +195,13 @@ type Scope = {
   summaryRequest?: { turnId: string; failed?: boolean };
   approvalBasis?: string;
   questionBasis?: string;
+  librarySelectionAvailable?: boolean;
+  librarySelectionBasis?: string;
+  pendingLibraryAnswer?: {
+    selectionId: string;
+    reviewId: string;
+    answer: NativeChatLibrarySelectionAnswer;
+  };
   queueBasis?: { revision: number; offset: number; observationId: string };
   queueListing?: Promise<void>;
   pendingQueueChange?: { key: string; change: NativeChatQueueChange };
@@ -212,6 +224,7 @@ type Scope = {
     attachment?: SelectedAttachment;
     reviewConfiguration: boolean;
     allowWakeup: boolean;
+    allowLibrarySelection: boolean;
     editorSvgTargetId?: string;
   };
   awaitingTurn?: string;
@@ -268,6 +281,9 @@ const EMPTY: NativeChatView = Object.freeze({
   questions: [],
   questionReady: false,
   questionError: null,
+  librarySelection: null,
+  librarySelectionError: null,
+  librarySelectionRetry: false,
   queue: null,
   queueLoading: false,
   queueDraft: null,
@@ -303,7 +319,8 @@ export class NativeChatController {
     private readonly bridge: DesktopNativeChat,
     private readonly memory?: Pick<Storage, "getItem" | "setItem">,
     private readonly memoryKey?: string,
-    private readonly editorSurfaces?: NativeChatEditorSurfaces
+    private readonly editorSurfaces?: NativeChatEditorSurfaces,
+    private readonly libraryPicker = false
   ) {}
 
   static watchReadiness(
@@ -580,6 +597,9 @@ export class NativeChatController {
       questions: [],
       questionReady: false,
       questionError: null,
+      librarySelection: null,
+      librarySelectionError: null,
+      librarySelectionRetry: false,
       queue: null,
       queueLoading: false,
       queueDraft: null,
@@ -637,6 +657,7 @@ export class NativeChatController {
             this.view.observation?.snapshot.current?.turnId
         : !this.needsQueue ||
           !!this.bridge.enqueue ||
+          !!this.scope.pending?.allowLibrarySelection ||
           (this.view.allowWakeup && !!this.scope.pending?.allowWakeup))
     );
   }
@@ -820,9 +841,14 @@ export class NativeChatController {
     const attachment = scope.attachment;
     const read = {};
     scope.attachmentCapabilityRead = read;
-    const [png, file] = await Promise.all([
+    const [png, file, library] = await Promise.all([
       this.bridge.submitImage && this.bridge.acceptsPng?.().catch(() => false),
       this.bridge.submitFile && this.bridge.acceptsFile?.().catch(() => false),
+      this.libraryPicker &&
+        this.bridge.submitWithLibrarySelection &&
+        this.bridge.librarySelections &&
+        this.bridge.answerLibrarySelection &&
+        this.bridge.acceptsLibrarySelection?.().catch(() => false),
     ]);
     if (
       !this.owns(scope) ||
@@ -830,6 +856,7 @@ export class NativeChatController {
       scope.attachmentCapabilityRead !== read
     )
       return null;
+    scope.librarySelectionAvailable = library === true;
     this.update({ imageInput: png === true, fileInput: file === true });
     return { png: png === true, file: file === true };
   }
@@ -1562,6 +1589,16 @@ export class NativeChatController {
         throw new Error("native_chat_pending_effort_changed");
       if (retained && retained.reviewConfiguration !== reviewConfiguration)
         throw new Error("native_context_limit_pending_review_changed");
+      if (
+        !retained &&
+        this.libraryPicker &&
+        scope.librarySelectionAvailable === undefined &&
+        mode === "submit" &&
+        !allowWakeup &&
+        !reviewConfiguration &&
+        !selectedAttachment
+      )
+        await this.readInputCapabilities(scope);
       const pending: NonNullable<Scope["pending"]> = retained ?? {
         text,
         inputId: crypto.randomUUID(),
@@ -1571,6 +1608,13 @@ export class NativeChatController {
         attachment: selectedAttachment,
         reviewConfiguration,
         allowWakeup,
+        allowLibrarySelection:
+          mode === "submit" &&
+          scope.librarySelectionAvailable === true &&
+          !allowWakeup &&
+          !reviewConfiguration &&
+          !selectedAttachment &&
+          !(scope.stopEditorSvgText && svgTarget),
         editorSvgTargetId: scope.stopEditorSvgText ? svgTarget : undefined,
       };
       let accepted;
@@ -1630,6 +1674,16 @@ export class NativeChatController {
             operatingRegime: pending.operatingRegime,
             ...(pending.effort && { effort: pending.effort }),
           });
+        } else if (pending.allowLibrarySelection) {
+          if (!this.bridge.submitWithLibrarySelection)
+            throw new Error("native_chat_library_selection_unavailable");
+          accepted = await this.bridge.submitWithLibrarySelection(
+            attachment.attachmentId,
+            pending.inputId,
+            pending.text,
+            pending.operatingRegime,
+            pending.effort
+          );
         } else if (pending.operatingRegime) {
           if (!this.bridge.submitInRegime)
             throw new Error("native_chat_operating_regime_unavailable");
@@ -2397,6 +2451,99 @@ export class NativeChatController {
     }
   }
 
+  async answerLibrarySelection(
+    selectionId: string,
+    choice:
+      | "skip"
+      | "retry"
+      | { id: string; readPng: (maxBytes: number) => Promise<ArrayBuffer> }
+  ): Promise<boolean> {
+    const scope = this.scope;
+    const selection = this.view.librarySelection;
+    const attachment = scope?.attachment;
+    const send = this.bridge.answerLibrarySelection;
+    if (
+      !scope ||
+      !attachment ||
+      !send ||
+      selection?.selectionId !== selectionId ||
+      this.view.acting ||
+      (choice === "retry") !== !!scope.pendingLibraryAnswer ||
+      (choice !== "retry" &&
+        scope.librarySelectionBasis !== scope.observation?.observationId)
+    )
+      return false;
+    const owns = () => this.owns(scope) && scope.attachment === attachment;
+    this.update({ acting: true, librarySelectionError: null });
+    try {
+      let pending = scope.pendingLibraryAnswer;
+      if (!pending && choice !== "retry") {
+        let answer: NativeChatLibrarySelectionAnswer = { kind: "skipped" };
+        if (choice !== "skip") {
+          const bytes = await choice.readPng(MAX_ATTACHMENT_BYTES);
+          if (bytes.byteLength <= 0 || bytes.byteLength > MAX_ATTACHMENT_BYTES)
+            throw new Error("image_size_limit");
+          answer = {
+            kind: "selected",
+            id: choice.id,
+            png: new Uint8Array(bytes.slice(0)),
+          };
+        }
+        if (!owns()) return false;
+        if (
+          this.view.librarySelection?.reviewId !== selection.reviewId ||
+          scope.librarySelectionBasis !== scope.observation?.observationId
+        ) {
+          this.update({
+            librarySelectionError:
+              "The Library request changed. Review it and try again.",
+          });
+          return false;
+        }
+        pending = { selectionId, reviewId: selection.reviewId, answer };
+        scope.pendingLibraryAnswer = pending;
+      }
+      if (!pending || pending.selectionId !== selectionId) return false;
+      await send.call(
+        this.bridge,
+        attachment.attachmentId,
+        pending.reviewId,
+        pending.answer
+      );
+      if (owns()) {
+        scope.pendingLibraryAnswer = undefined;
+        scope.librarySelectionBasis = undefined;
+        this.update({ librarySelection: null, librarySelectionRetry: false });
+      }
+      return true;
+    } catch (error) {
+      if (owns()) {
+        if (
+          error instanceof Error &&
+          /library_selection_(no_longer_answerable|unavailable|answer_invalid)|invalid_png_image|image_size_limit|stale_(session|control)_revision|request_identity_reused/.test(
+            error.message
+          )
+        ) {
+          scope.pendingLibraryAnswer = undefined;
+          scope.librarySelectionBasis = undefined;
+        }
+        const retry = !!scope.pendingLibraryAnswer;
+        this.update({
+          librarySelectionRetry: retry,
+          librarySelectionError: retry
+            ? "Couldn't confirm the Library answer. Retry the same answer."
+            : "Couldn't use this Library choice. Review the request and try again.",
+        });
+      }
+      return false;
+    } finally {
+      if (owns()) {
+        await this.refresh(scope);
+        if (owns()) this.update({ acting: false });
+      }
+    }
+  }
+
   private open(scope: Scope): Promise<void> {
     if (scope.attachment) return Promise.resolve();
     if (scope.opening) return scope.opening;
@@ -2614,6 +2761,10 @@ export class NativeChatController {
         const turnChanged =
           scope.observation?.snapshot.current?.turnId !==
           next.snapshot.current?.turnId;
+        if (turnChanged) {
+          scope.librarySelectionBasis = undefined;
+          scope.pendingLibraryAnswer = undefined;
+        }
         const replay =
           scope.replay ||
           lifecycleBasis(scope.observation) !== lifecycleBasis(next) ||
@@ -2646,6 +2797,9 @@ export class NativeChatController {
             questions: [],
             questionReady: false,
             questionError: null,
+            librarySelection: null,
+            librarySelectionError: null,
+            librarySelectionRetry: false,
           }),
         });
         this.refreshTurnSummary(scope, attachment, next);
@@ -2654,6 +2808,7 @@ export class NativeChatController {
         await Promise.all([
           this.refreshApprovals(scope, attachment, next),
           this.refreshQuestions(scope, attachment, next),
+          this.refreshLibrarySelection(scope, attachment, next),
           this.refreshGoal(scope, attachment, next),
         ]);
         if (!this.owns(scope)) return;
@@ -3011,6 +3166,48 @@ export class NativeChatController {
         )
       )
         this.update({ questionError: "Couldn't load the pending question." });
+    }
+  }
+
+  private async refreshLibrarySelection(
+    scope: Scope,
+    attachment: NativeChatAttachment,
+    observation: NativeChatObservation
+  ): Promise<void> {
+    const read = this.bridge.librarySelections;
+    if (!read || !scope.librarySelectionAvailable) return;
+    const turn = observation.snapshot.current;
+    if (turn?.disposition !== "suspended" || turn.cancelled) {
+      scope.librarySelectionBasis = undefined;
+      scope.pendingLibraryAnswer = undefined;
+      if (this.view.librarySelection || this.view.librarySelectionError)
+        this.update({
+          librarySelection: null,
+          librarySelectionError: null,
+          librarySelectionRetry: false,
+        });
+      return;
+    }
+    if (scope.librarySelectionBasis === observation.observationId) return;
+    try {
+      const [selection] = await read.call(
+        this.bridge,
+        attachment.attachmentId,
+        observation.observationId
+      );
+      if (!this.owns(scope)) return;
+      scope.librarySelectionBasis = observation.observationId;
+      const changed =
+        this.view.librarySelection?.selectionId !== selection?.selectionId;
+      if (scope.pendingLibraryAnswer?.selectionId !== selection?.selectionId)
+        scope.pendingLibraryAnswer = undefined;
+      this.update({
+        librarySelection: selection ?? null,
+        librarySelectionRetry: !!scope.pendingLibraryAnswer,
+        ...(changed && { librarySelectionError: null }),
+      });
+    } catch {
+      // A new observation can replace a stale selection review.
     }
   }
 

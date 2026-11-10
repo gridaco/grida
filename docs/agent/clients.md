@@ -557,6 +557,19 @@ In a native workbench with image input, choose **Add from Library**, select
 one image, and write a message. Grida prepares a PNG for the chat. If an image
 cannot be added, your draft and any existing attachment stay in place.
 
+## Choose a reference the agent asks for
+
+In a native workbench on the supported OpenRouter image connection, the agent
+can pause a text turn to request a Library image. Open **Choose reference**
+to see the suggested search. Refine the search if needed, select one image,
+and choose **Use reference**. The model receives the image in the waiting turn.
+Your composer draft stays separate.
+
+Choose **Skip** to continue without an image. Closing the picker leaves the
+request open. If Grida cannot confirm your answer, reopen it and choose
+**Retry answer**. If you paused the turn yourself, use **Resume** after
+answering.
+
 ## Attach a file for inspection
 
 In a native workspace chat, choose **Attach file** or drop or paste one file

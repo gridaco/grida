@@ -900,6 +900,169 @@ it("keeps ordinary turns quiet when question inspection is absent or fails", asy
   controller.disconnect();
 });
 
+it("keeps a Library-enabled send's identity and submission path after a lost reply", async () => {
+  const { bridge, waiting } = fixture();
+  const controller = new NativeChatController(
+    bridge,
+    undefined,
+    undefined,
+    undefined,
+    true
+  );
+  const plain = vi.spyOn(bridge, "submit");
+  let supported = true;
+  bridge.acceptsLibrarySelection = async () => supported;
+  bridge.librarySelections = async () => [];
+  bridge.answerLibrarySelection = async () => {
+    throw new Error("unexpected Library answer");
+  };
+  const send = vi.fn<
+    NonNullable<DesktopNativeChat["submitWithLibrarySelection"]>
+  >(async (sessionId, inputId) => ({
+    sessionId,
+    inputId,
+    disposition: "claimed",
+    inputPosition: 1,
+    turnId: `turn-${sessionId}`,
+  }));
+  send.mockRejectedValueOnce(new Error("fixture lost send"));
+  bridge.submitWithLibrarySelection = send;
+  await controller.select("chat-a");
+  await expect(controller.submit("Find a reference.")).rejects.toThrow(
+    "fixture lost send"
+  );
+  supported = false;
+  waiting.add("chat-a");
+  await controller.repair();
+  await controller.submit("Find a reference.");
+  expect(send.mock.calls[0]).toEqual([
+    "chat-a",
+    expect.any(String),
+    "Find a reference.",
+    undefined,
+    undefined,
+  ]);
+  expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
+  expect(plain).not.toHaveBeenCalled();
+  controller.disconnect();
+});
+
+it("retries a Library answer with its original review and exact selected PNG", async () => {
+  const { bridge, waiting } = fixture();
+  const controller = new NativeChatController(
+    bridge,
+    undefined,
+    undefined,
+    undefined,
+    true
+  );
+  waiting.add("chat-a");
+  const selectionId = "reference-request";
+  let reviewId = "review-first";
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => ({
+    ...(await observe(id)),
+    observationId: `${id}/${reviewId}`,
+  });
+  bridge.acceptsLibrarySelection = async () => true;
+  bridge.submitWithLibrarySelection = bridge.submit;
+  bridge.librarySelections = async (id) =>
+    waiting.has(id)
+      ? [{ selectionId, reviewId, initialSearchQuery: "Printmaking" }]
+      : [];
+  const answer = vi.fn<
+    NonNullable<DesktopNativeChat["answerLibrarySelection"]>
+  >(async (sessionId) => {
+    waiting.clear();
+    return {
+      sessionId,
+      turnId: `turn-${sessionId}`,
+      requestId: "answer",
+      sessionRevision: 3,
+      journalPosition: 2,
+    };
+  });
+  answer.mockImplementationOnce(async () => {
+    reviewId = "review-refreshed";
+    throw new Error("fixture lost answer");
+  });
+  bridge.answerLibrarySelection = answer;
+  const bytes = new Uint8Array([5, 17, 29]);
+  const readPng = vi.fn<() => Promise<ArrayBuffer>>(async () => bytes.buffer);
+  await controller.select("chat-a");
+  expect(controller.read().librarySelection).toMatchObject({
+    selectionId,
+    reviewId,
+  });
+  expect(
+    await controller.answerLibrarySelection(selectionId, {
+      id: "pin",
+      readPng,
+    })
+  ).toBe(false);
+  expect(controller.read()).toMatchObject({
+    librarySelection: { selectionId, reviewId: "review-refreshed" },
+    librarySelectionRetry: true,
+  });
+  bytes.fill(0);
+  expect(await controller.answerLibrarySelection(selectionId, "retry")).toBe(
+    true
+  );
+  expect(readPng).toHaveBeenCalledTimes(1);
+  expect(answer.mock.calls).toEqual(
+    Array.from({ length: 2 }, () => [
+      "chat-a",
+      "review-first",
+      { kind: "selected", id: "pin", png: new Uint8Array([5, 17, 29]) },
+    ])
+  );
+  expect(controller.read().librarySelection).toBeNull();
+  controller.disconnect();
+});
+
+it("does not send a Library image materialized after changing chats", async () => {
+  const { bridge, waiting } = fixture();
+  const controller = new NativeChatController(
+    bridge,
+    undefined,
+    undefined,
+    undefined,
+    true
+  );
+  waiting.add("chat-a");
+  bridge.acceptsLibrarySelection = async () => true;
+  bridge.submitWithLibrarySelection = bridge.submit;
+  bridge.librarySelections = async (id) =>
+    waiting.has(id)
+      ? [
+          {
+            selectionId: "library-a",
+            reviewId: "review-a",
+            initialSearchQuery: "Printmaking",
+          },
+        ]
+      : [];
+  const answer =
+    vi.fn<NonNullable<DesktopNativeChat["answerLibrarySelection"]>>();
+  bridge.answerLibrarySelection = answer;
+  await controller.select("chat-a");
+  const bytes = Promise.withResolvers<ArrayBuffer>();
+  const reading = controller.answerLibrarySelection("library-a", {
+    id: "pin",
+    readPng: () => bytes.promise,
+  });
+  await controller.select("chat-b");
+  bytes.resolve(new Uint8Array([5, 17, 29]).buffer);
+  expect(await reading).toBe(false);
+  expect(answer).not.toHaveBeenCalled();
+  expect(controller.read()).toMatchObject({
+    selected: "chat-b",
+    librarySelection: null,
+    librarySelectionRetry: false,
+  });
+  controller.disconnect();
+});
+
 it("keeps a queued edit draft across a stale revision and requires an explicit retry", async () => {
   const { bridge, controller, running } = fixture();
   running.add("chat-a");

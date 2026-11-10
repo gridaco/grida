@@ -173,9 +173,10 @@ export function NativeAgentPane({
         bridge,
         selectionMemory,
         selectionKey && `grida.nativeChat.${selectionKey}`,
-        editorSurfaces
+        editorSurfaces,
+        !!workspaceId
       ),
-    [bridge, selectionKey, editorSurfaces]
+    [bridge, selectionKey, editorSurfaces, workspaceId]
   );
   const state = useSyncExternalStore(
     controller.subscribe,
@@ -194,6 +195,10 @@ export function NativeAgentPane({
   const pngPicker = useRef<HTMLInputElement>(null);
   const filePicker = useRef<HTMLInputElement>(null);
   const [libraryScope, setLibraryScope] = useState<number | null>(null);
+  const [libraryRequest, setLibraryRequest] = useState<{
+    scope: number;
+    selectionId: string;
+  } | null>(null);
   const side = state.sideChat;
   useEffect(() => {
     controller.connect(initialSession);
@@ -224,6 +229,7 @@ export function NativeAgentPane({
       ? state.approvals[0]
       : undefined;
   const question = turn && !turn.cancelled ? state.questions[0] : undefined;
+  const librarySelection = state.librarySelection;
   const retrying =
     running && !question && snapshot?.retryNotBeforeMs !== undefined;
   const queued = snapshot?.queuedInputs ?? 0;
@@ -868,6 +874,25 @@ export function NativeAgentPane({
           />
         </div>
       )}
+      {librarySelection && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-t px-3 py-2 text-xs">
+          <p>The agent is asking for a Library reference.</p>
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            disabled={state.acting}
+            onClick={() =>
+              setLibraryRequest({
+                scope: state.scope,
+                selectionId: librarySelection.selectionId,
+              })
+            }
+          >
+            {state.librarySelectionRetry ? "Review answer" : "Choose reference"}
+          </Button>
+        </div>
+      )}
       {(wakeup || state.wakeupError) && (
         <div className="shrink-0 space-y-1 border-t px-3 py-2 text-xs">
           {wakeup && (
@@ -1230,18 +1255,64 @@ export function NativeAgentPane({
               void controller.pickLibraryImage(
                 state.scope,
                 `Library: ${pin.title}`,
-                async (maxBytes) => {
-                  const source = await readLibraryAttachment(pin.id);
-                  if (!source) throw new Error("library_image_unavailable");
-                  return await encodeLibraryPng(source, maxBytes);
-                }
+                (maxBytes) => readLibraryPng(pin.id, maxBytes)
               );
             }}
           />
         )}
+        {librarySelection &&
+          libraryRequest?.scope === state.scope &&
+          libraryRequest.selectionId === librarySelection.selectionId && (
+            <AgentLibraryAttachmentPicker
+              key={librarySelection.selectionId}
+              open
+              single
+              onOpenChange={(open) => {
+                if (!open) setLibraryRequest(null);
+              }}
+              onAttach={([pin]) => {
+                if (pin)
+                  void controller.answerLibrarySelection(
+                    librarySelection.selectionId,
+                    {
+                      id: pin.id,
+                      readPng: (maxBytes) => readLibraryPng(pin.id, maxBytes),
+                    }
+                  );
+              }}
+              request={{
+                initialQuery: librarySelection.initialSearchQuery,
+                busy: state.acting,
+                error: state.librarySelectionError,
+                skip: () => {
+                  void controller.answerLibrarySelection(
+                    librarySelection.selectionId,
+                    "skip"
+                  );
+                },
+                retry: state.librarySelectionRetry
+                  ? () => {
+                      void controller.answerLibrarySelection(
+                        librarySelection.selectionId,
+                        "retry"
+                      );
+                    }
+                  : undefined,
+              }}
+            />
+          )}
       </div>
     </div>
   );
+}
+
+async function readLibraryPng(
+  id: string,
+  maxBytes: number
+): Promise<ArrayBuffer> {
+  const source = await readLibraryAttachment(id);
+  if (!source) throw new Error("library_image_unavailable");
+  return encodeLibraryPng(source, maxBytes);
 }
 
 function reviewText(value: string): string {
