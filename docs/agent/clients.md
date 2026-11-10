@@ -828,12 +828,12 @@ use Recover to reconsider eligible work under the original allowance and
 authorization.
 Work with an interrupted dispatch remains recorded against its existing turn.
 
-A private ACP client can allow one check-in when starting a **Standard Act**
-goal. The check-in waits within the first reserved turn and uses its remaining
-inference allowance. After reopening, restore the schedule and resume the
-goal if it is paused. Cancelled check-ins require explicit continuation.
-Later automatic Goal turns receive no check-in permission from the original
-input.
+Desktop and private ACP clients can allow one check-in when starting a
+**Standard Act** goal. The check-in waits within the first reserved turn and
+uses its remaining inference allowance. After reopening, restore the schedule
+and resume the goal if it is paused. Cancelled check-ins require explicit
+continuation. Later automatic Goal turns receive their own permissions.
+[Schedule a follow-up](./scheduled-work.md)
 
 Negotiate the version-1 capabilities `co.grida/goal/start`, `co.grida/goal/inspect`,
 `co.grida/goal/control`, and `co.grida/goal/recover` for these operations.

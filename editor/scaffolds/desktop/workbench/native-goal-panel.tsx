@@ -40,6 +40,7 @@ export function NativeGoalPanel({
   const canManageWork = goalTurn || goal?.automatic;
   const fundedTurn = goalTurn && !!goal?.reservation?.reviewInferenceSteps;
   const canStart = controller.canStartGoal;
+  const canAllowWakeup = view.wakeupsAvailable && effort === "standard";
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const fields = new FormData(event.currentTarget);
@@ -56,6 +57,8 @@ export function NativeGoalPanel({
         },
         automatic: fields.has("automatic"),
         ...(effort === "ultra" && { effort }),
+        ...(canAllowWakeup &&
+          fields.has("allowWakeup") && { allowWakeup: true }),
       })
       .then((accepted) => {
         if (accepted) setAdding(false);
@@ -274,6 +277,16 @@ export function NativeGoalPanel({
             <input name="automatic" type="checkbox" disabled={view.acting} />
             Continue automatically within these limits
           </label>
+          {canAllowWakeup && (
+            <label className="flex items-center gap-2">
+              <input
+                name="allowWakeup"
+                type="checkbox"
+                disabled={view.acting}
+              />
+              Allow one check-in during the first goal turn
+            </label>
+          )}
           <div className="flex justify-end gap-2">
             <Button
               size="xs"

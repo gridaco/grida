@@ -1355,10 +1355,7 @@ export class NativeChatController {
   async startGoal(request: NativeChatGoalRequest): Promise<boolean> {
     const scope = this.scope;
     if (!scope || !this.canStartGoal || !this.bridge.startGoal) return false;
-    const problem =
-      request.effort === "ultra" && !this.view.goalEffortAvailable
-        ? "Ultra is unavailable for goals on this connection."
-        : goalRequestProblem(request);
+    const problem = goalRequestProblem(request, this.view);
     if (problem) {
       this.update({ error: problem });
       return false;
@@ -3394,7 +3391,16 @@ function revisionChanged(error: unknown): boolean {
   );
 }
 
-function goalRequestProblem(request: NativeChatGoalRequest): string | null {
+function goalRequestProblem(
+  request: NativeChatGoalRequest,
+  view: Pick<NativeChatView, "goalEffortAvailable" | "wakeupsAvailable">
+): string | null {
+  if (request.allowWakeup && request.effort === "ultra")
+    return "Choose Standard effort to allow a scheduled goal check-in.";
+  if (request.allowWakeup && !view.wakeupsAvailable)
+    return "Scheduled goal check-ins are unavailable on this connection.";
+  if (request.effort === "ultra" && !view.goalEffortAvailable)
+    return "Ultra is unavailable for goals on this connection.";
   if (!request.objective.trim() || utf8.encode(request.objective).length > 8192)
     return "Enter a goal objective of at most 8 KiB.";
   if (

@@ -1005,7 +1005,7 @@ it("retries steering exactly after a lost reply and never falls through to the q
   controller.disconnect();
 });
 
-it.each(["standard", "ultra"] as const)(
+it.each(["standard", "ultra", "scheduled standard"] as const)(
   "starts a %s goal only on explicit acceptance and reuses its exact input on retry",
   async (effort) => {
     const { bridge, controller } = fixture();
@@ -1015,6 +1015,7 @@ it.each(["standard", "ultra"] as const)(
       allowance: { workTurns: 3, inferenceSteps: 32 },
       automatic: false,
       ...(effort === "ultra" && { effort }),
+      ...(effort === "scheduled standard" && { allowWakeup: true as const }),
     };
     let goalId: string | null = null;
     const observe = bridge.observe.bind(bridge);
@@ -1057,6 +1058,14 @@ it.each(["standard", "ultra"] as const)(
     start.mockRejectedValueOnce(new Error("fixture lost reply"));
     bridge.startGoal = start;
     bridge.acceptsGoalEffort = async () => effort === "ultra";
+    if (effort === "scheduled standard") {
+      bridge.acceptsWakeups = async () => true;
+      bridge.submitWithWakeup =
+        vi.fn<NonNullable<DesktopNativeChat["submitWithWakeup"]>>();
+      bridge.scheduledWakeup = async () => null;
+      bridge.controlWakeup =
+        vi.fn<NonNullable<DesktopNativeChat["controlWakeup"]>>();
+    }
     await controller.select("chat-a");
     expect(controller.read().goalEffortAvailable).toBe(effort === "ultra");
     expect(start).not.toHaveBeenCalled();
@@ -1064,6 +1073,7 @@ it.each(["standard", "ultra"] as const)(
     expect(controller.read().error).toContain("Your draft is still here");
     expect(await controller.startGoal(request)).toBe(true);
     expect(start.mock.calls[1]).toEqual(start.mock.calls[0]);
+    expect(start.mock.calls[0][2]).toEqual(request);
     expect(controller.read().goal?.goal?.state).toEqual({ status: "active" });
     expect(
       controller.read().observation?.snapshot.pendingGoalId
@@ -1073,27 +1083,38 @@ it.each(["standard", "ultra"] as const)(
   }
 );
 
-it("refuses Ultra Goal start when the connection has no negotiated Goal effort", async () => {
-  const { bridge, controller } = fixture();
-  bridge.goal = async () => ({ observationId: null, goal: null });
-  const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
-  bridge.startGoal = start;
-  try {
-    await controller.select("chat-a");
-    expect(
-      await controller.startGoal({
-        objective: "Check the export",
-        criteria: ["The export opens"],
-        allowance: { workTurns: 1, inferenceSteps: 7 },
-        automatic: false,
-        effort: "ultra",
-      })
-    ).toBe(false);
-    expect(start).not.toHaveBeenCalled();
-  } finally {
-    controller.disconnect();
+it.each([
+  [{ effort: "ultra" as const }, "Ultra is unavailable"],
+  [{ allowWakeup: true as const }, "check-ins are unavailable"],
+  [
+    { effort: "ultra" as const, allowWakeup: true as const },
+    "Choose Standard effort",
+  ],
+])(
+  "refuses unsupported Goal options %j before sending",
+  async (options, error) => {
+    const { bridge, controller } = fixture();
+    bridge.goal = async () => ({ observationId: null, goal: null });
+    const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
+    bridge.startGoal = start;
+    try {
+      await controller.select("chat-a");
+      expect(
+        await controller.startGoal({
+          objective: "Check the export",
+          criteria: ["The export opens"],
+          allowance: { workTurns: 1, inferenceSteps: 7 },
+          automatic: false,
+          ...options,
+        })
+      ).toBe(false);
+      expect(start).not.toHaveBeenCalled();
+      expect(controller.read().error).toContain(error);
+    } finally {
+      controller.disconnect();
+    }
   }
-});
+);
 
 it.each(["blocked", "cleared"] as const)(
   "uses task controls for funded Goal work and accounts for its exact held review when %s",

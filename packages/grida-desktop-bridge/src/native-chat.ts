@@ -331,6 +331,7 @@ export type NativeChatGoalRequest = Readonly<{
   allowance: NativeChatGoalUsage;
   automatic: boolean;
   effort?: NativeChatEffort;
+  allowWakeup?: true;
 }>;
 
 export type NativeChatGoalStatus =
@@ -346,7 +347,7 @@ export type NativeChatGoalStatus =
     };
 
 export type NativeChatGoal = Readonly<
-  NativeChatGoalRequest & {
+  Omit<NativeChatGoalRequest, "allowWakeup"> & {
     goalId: string;
     state: NativeChatGoalStatus;
     paused: boolean;

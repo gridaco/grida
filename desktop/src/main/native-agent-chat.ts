@@ -1288,7 +1288,7 @@ export class NativeAgentChat {
       sessionId,
       identity(inputId),
       request,
-      this.acceptsGoalEffort
+      { fundedReview: this.acceptsGoalEffort, wakeups: this.acceptsWakeups }
     );
     return acceptance(accepted, sessionId, inputId);
   }

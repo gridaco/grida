@@ -81,7 +81,7 @@ async function provider() {
 }
 
 it.runIf(Boolean(resourcesPath))(
-  "keeps scheduled check-in permission, cancellation, and restart recovery attached to the exact task",
+  "cancels a message check-in and restores the same reserved Goal turn after restart",
   async () => {
     const root = fs.mkdtempSync(
       path.join(fs.realpathSync(os.tmpdir()), "grida-wakeups-")
@@ -212,27 +212,59 @@ it.runIf(Boolean(resourcesPath))(
       ).resolves.toMatchObject({ status: "cancelled", armed: false });
 
       const second = await ipc.create(event);
-      const secondInput = await ipc.submitWithWakeup(
+      const goalRequest = {
+        objective: "Schedule another check-in.",
+        criteria: ["Inspect the export"],
+        allowance: { workTurns: 2, inferenceSteps: 4 },
+        automatic: false,
+      };
+      await expect(
+        ipc.startGoal(event, second.attachmentId, "ultra", {
+          ...goalRequest,
+          effort: "ultra",
+          allowWakeup: true,
+        })
+      ).rejects.toThrow("native_chat_goal_wakeup_unavailable");
+      const goalInput = await ipc.startGoal(
         event,
         second.attachmentId,
         "restore-task",
-        "Schedule another check-in."
+        { ...goalRequest, allowWakeup: true }
       );
       const secondWaiting = await suspended(ipc, second.attachmentId);
+      const goalTurnId = secondWaiting.snapshot.current!.turnId;
+      await expect(
+        ipc.startGoal(event, second.attachmentId, "restore-task", goalRequest)
+      ).rejects.toThrow("input_identity_reused");
+      await expect(
+        ipc.startGoal(event, second.attachmentId, "restore-task", {
+          ...goalRequest,
+          allowWakeup: true,
+        })
+      ).resolves.toMatchObject({ inputPosition: goalInput.inputPosition });
+      const waitingGoal = await ipc.goal(
+        event,
+        second.attachmentId,
+        secondWaiting.observationId
+      );
+      expect(waitingGoal.goal?.reservation).toMatchObject({
+        turnId: goalTurnId,
+        inferenceSteps: 4,
+      });
       const retained = await ipc.scheduledWakeup(
         event,
         second.attachmentId,
         secondWaiting.observationId
       );
       expect(retained).toMatchObject({
-        turnId: secondInput.turnId,
+        turnId: goalTurnId,
         status: "waiting",
         armed: true,
       });
-      await ipc.control(event, second.attachmentId, {
+      await ipc.controlGoal(event, second.attachmentId, {
         action: "pause",
         requestId: "hold-task",
-        observationId: secondWaiting.observationId,
+        observationId: waitingGoal.observationId,
       });
       await chat!.close();
       ipc = await start();
@@ -265,18 +297,29 @@ it.runIf(Boolean(resourcesPath))(
       ).resolves.toMatchObject({ status: "paused", armed: true });
       expect(endpoint.requests).toHaveLength(3);
       const held = await suspended(ipc, reopened.attachmentId);
-      await ipc.control(event, reopened.attachmentId, {
+      const heldGoal = await ipc.goal(
+        event,
+        reopened.attachmentId,
+        held.observationId
+      );
+      expect(heldGoal.goal?.reservation?.turnId).toBe(goalTurnId);
+      await ipc.controlGoal(event, reopened.attachmentId, {
         action: "resume",
         requestId: "resume-task",
-        observationId: held.observationId,
+        observationId: heldGoal.observationId,
       });
-      const secondDone = await finished(
-        ipc,
-        reopened.attachmentId,
-        secondInput.turnId!
-      );
+      const secondDone = await finished(ipc, reopened.attachmentId, goalTurnId);
       expect(endpoint.requests).toHaveLength(4);
       expect(toolResults(endpoint.requests[3])).toContain(scheduledPrompt);
+      const settledGoal = await ipc.goal(
+        event,
+        reopened.attachmentId,
+        secondDone.observationId
+      );
+      expect(settledGoal.goal).toMatchObject({
+        spent: { workTurns: 1, inferenceSteps: 2 },
+        reservation: null,
+      });
       await expect(
         ipc.scheduledWakeup(
           event,

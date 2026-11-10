@@ -51,6 +51,8 @@ turn. If work finishes before the review can be accounted for, the goal keeps
 its held steps. Choose **Refresh held allowance** to account for any settled
 review. That control reads the recorded work and starts no new work.
 
-Private native clients can also use reviewed automatic verification or an
-explicit check-in under the supported goal policies.
+Standard goals on supported connections can schedule a check-in during their
+first turn. [Schedule a follow-up](./scheduled-work.md)
+
+Private native clients can also use reviewed automatic verification.
 [Use goals from a native client](./clients.md#work-toward-a-persistent-goal)

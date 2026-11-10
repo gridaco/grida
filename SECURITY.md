@@ -1100,7 +1100,9 @@ lazy reads, read-only mutation, and symlink escape refusal.
   The [Desktop goal adapter](desktop/src/main/native-agent-goals.ts) retains
   the exact goal, driver, and session revisions behind a frame-scoped token.
   Goal inspection is read-only. Desktop starts work through explicit user
-  acceptance of the objective and allowance.
+  acceptance of the objective and allowance. An explicitly selected
+  check-in requires the negotiated scheduling controls and a Standard Act
+  goal. It uses the first turn's captured allowance and authority.
   Completion confirmation requires a negotiated, attached user control. The
   inspected work turn and objective revision are retained behind the same
   scoped token. The owner commits the exact confirmation only while idle

@@ -50,8 +50,10 @@ export class NativeAgentGoals {
       input.effort === undefined
         ? undefined
         : member(input.effort, ["standard", "ultra"] as const);
+    const allowWakeup = input.allowWakeup === true;
     if (
-      Object.keys(input).length !== (effort === undefined ? 4 : 5) ||
+      Object.keys(input).length !==
+        4 + Number(effort !== undefined) + Number(allowWakeup) ||
       Object.keys(allowance).length !== 2
     )
       throw invalid();
@@ -64,6 +66,7 @@ export class NativeAgentGoals {
       },
       automatic: flag(input.automatic),
       ...(effort && { effort }),
+      ...(allowWakeup && { allowWakeup: true }),
     };
   }
 
@@ -85,17 +88,20 @@ export class NativeAgentGoals {
     sessionId: string,
     inputId: string,
     request: unknown,
-    fundedReviewAvailable = false
+    capabilities: { fundedReview: boolean; wakeups: boolean }
   ): Promise<unknown> {
-    const { objective, criteria, allowance, automatic, effort } =
+    const { objective, criteria, allowance, automatic, effort, allowWakeup } =
       NativeAgentGoals.readRequest(request);
-    if (effort === "ultra" && !fundedReviewAvailable)
+    if (allowWakeup && (!capabilities.wakeups || effort === "ultra"))
+      throw new Error("native_chat_goal_wakeup_unavailable");
+    if (effort === "ultra" && !capabilities.fundedReview)
       throw new Error("native_chat_goal_effort_unavailable");
     return this.request("_co.grida/goal/start", {
       sessionId,
       inputId,
       prompt: [{ type: "text", text: objective }],
       ...(effort === "ultra" && { effort }),
+      ...(allowWakeup && { operatingRegime: "act", allowWakeups: true }),
       goal: {
         objective: { description: objective, criteria },
         allowance: {
