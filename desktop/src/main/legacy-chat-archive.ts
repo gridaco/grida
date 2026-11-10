@@ -116,6 +116,8 @@ export class LegacyChatArchive {
   private async snapshot(seal?: Seal): Promise<Receipt | null> {
     const userData = await canonicalDirectory(this.source.userDataPath);
     if (!userData) return null;
+    const directoryStat = await fs.lstat(userData);
+    checkSourceDirectory(directoryStat);
     const sourceDb = path.join(userData, DB_NAME);
     const databaseStat = await statIfPresent(sourceDb);
     const sidecars = await Promise.all(
@@ -142,12 +144,32 @@ export class LegacyChatArchive {
       const current = await fs.lstat(sourceDb);
       if (!sameIdentity(databaseStat, current))
         throw new ArchiveFailure("source_changed");
+      // SQLite locks the opened inode. Check that the configured directory and
+      // its database still name the same objects after archive I/O.
+      const confirmLocation = async () => {
+        const directory = await statIfPresent(this.source.userDataPath);
+        if (
+          !directory ||
+          !sameIdentity(directoryStat, directory) ||
+          (await fs.realpath(this.source.userDataPath)) !== userData
+        )
+          throw new ArchiveFailure("source_changed");
+        checkSourceDirectory(directory);
+        const database = await statIfPresent(sourceDb);
+        if (!database || !sameIdentity(current, database))
+          throw new ArchiveFailure("source_changed");
+        checkSourceFile(database);
+        return database;
+      };
       const parent = path.join(userData, ARCHIVE_NAME);
       if (seal) {
         const retained = readSourceSeal(guard, seal);
         if (retained) {
           await checkArchiveRoot(parent);
-          return await verifyArchive(parent, retained);
+          const verified = await verifyArchive(parent, retained);
+          if (!sameSnapshot(current, await confirmLocation()))
+            throw new ArchiveFailure("source_changed");
+          return verified;
         }
       }
       await makePrivateDirectory(parent);
@@ -228,11 +250,12 @@ export class LegacyChatArchive {
       await syncDirectory(userData);
       if (seal) {
         const verified = await verifyArchive(parent, receipt.id);
-        if (!sameSnapshot(current, await fs.lstat(sourceDb)))
+        if (!sameSnapshot(current, await confirmLocation()))
           throw new ArchiveFailure("source_changed");
         commitSourceSeal(guard, seal.requestId, verified.id);
         readSourceSeal(guard, { ...seal, expectedArchiveId: verified.id });
         await syncDirectory(userData);
+        await confirmLocation();
         return verified;
       }
       return receipt;

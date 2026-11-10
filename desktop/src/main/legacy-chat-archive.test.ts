@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { setTimeout } from "node:timers/promises";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LegacyChatArchive } from "./legacy-chat-archive";
 
 const roots: string[] = [];
@@ -160,6 +160,40 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
     await expect(
       archive.sealQuiesced({ requestId: "another-cutoff" })
     ).rejects.toThrow("Legacy chat archive: invalid_source_seal");
+  });
+
+  it("refuses a source replaced while verifying its retained archive", async () => {
+    const { archive, db } = await fixture();
+    createDatabase(db);
+    const receipt = await archive.sealQuiesced({ requestId: "retire" });
+    const manifest = path.join(receipt.directory, "manifest.json");
+    const open = fs.open;
+    const replace = vi.spyOn(fs, "open").mockImplementation(async (...args) => {
+      if (args[0] === manifest) {
+        await fs.rename(db, `${db}.detached`);
+        createDatabase(db);
+      }
+      return open(...args);
+    });
+    try {
+      await expect(
+        archive.sealQuiesced({
+          requestId: "retire",
+          expectedArchiveId: receipt.id,
+        })
+      ).rejects.toThrow("Legacy chat archive: source_changed");
+      expect(replace).toHaveBeenCalledWith(manifest, expect.any(Number));
+    } finally {
+      replace.mockRestore();
+    }
+    const replacement = new DatabaseSync(db, { readOnly: true });
+    try {
+      expect(
+        replacement.prepare("PRAGMA user_version").get()?.user_version
+      ).toBe(3);
+    } finally {
+      replacement.close();
+    }
   });
 
   it("refuses to seal an absent or unknown legacy source", async () => {
