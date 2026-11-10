@@ -470,8 +470,7 @@ export namespace providers {
   /**
    * Reveal `endpoints.json` (the hand-editable config — `overrides` for
    * power users live there) in the OS file manager. Returns `false` when
-   * the surface isn't available (old binary, or the web daemon bridge
-   * which has no native shell) — callers hide the affordance.
+   * the host lacks the capability. Callers hide the affordance.
    */
   export async function revealConfigFile(): Promise<boolean> {
     if (!canRevealConfigFile()) return false;
@@ -1171,8 +1170,7 @@ export namespace workspaces {
    * Auto-create a fresh project — mint an EMPTY managed-root folder and
    * register it. No document is seeded: the agent creates whatever the task
    * needs on its first turn. Powers the home's "auto-create, ask nothing" flow:
-   * no OS folder dialog. Rejects when the host wired no managed root (e.g. the
-   * web-daemon dev bridge).
+   * no OS folder dialog. Rejects when the host has no managed root.
    */
   export async function createProject(
     input: WorkspaceCreateInput
@@ -1184,8 +1182,7 @@ export namespace workspaces {
    * surfaced by {@link list} with `is_default`. The home roots a fresh session
    * HERE instead of minting a per-session folder (the old auto-create flow
    * littered the managed root and pre-picked where to work). Null on a host with
-   * no managed root (the web-daemon dev bridge), where the caller must fall back
-   * to opening a folder.
+   * no managed root, where the caller falls back to opening a folder.
    */
   export async function getDefault(): Promise<Workspace | null> {
     return (await list()).find((w) => w.is_default) ?? null;
@@ -1236,8 +1233,8 @@ export namespace workspaces {
   }
   /**
    * Streamable media `src` for the read-only image/video viewer (#924), or
-   * `undefined` when the host can't serve a streaming scheme (web-daemon dev
-   * bridge) — the viewer then falls back to {@link readFileBytes}. Synchronous
+   * `undefined` when the host lacks the streaming capability. The viewer falls
+   * back to {@link readFileBytes}. Synchronous
    * passthrough; see the bridge contract for the URL shape. Returns `undefined`
    * (rather than throwing) when no desktop bridge is present, so the viewer can
    * branch on it directly.

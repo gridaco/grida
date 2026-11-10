@@ -80,6 +80,9 @@ Hosted browser assistants are unavailable under the desktop-first scope.
 | Web SVG assistant    | Hosted chat and tool execution for the browser SVG editor.           | Hosted execution, chat panel and assistant controls removed. SVG editing and storage retained. |
 | Web canvas assistant | Hosted chat and design-tool execution for the browser canvas editor. | Hosted execution and the Agent tab removed. Canvas editing and inspector retained.             |
 
+The development browser bridge for Desktop pages was also removed. Open those
+pages in Desktop or use the native host for [headless development](./clients.md).
+
 ## Checking coverage
 
 Review each capability from accepted input through authority, execution,

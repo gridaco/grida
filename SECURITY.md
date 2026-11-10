@@ -336,6 +336,8 @@ single control is insufficient.
    `window.grida` only when `location.pathname` is `/desktop` or starts
    with `/desktop/` at preload-run time. The preload fails closed when
    the current document is not a desktop route.
+   Electron preload is the sole bridge installer. Desktop renderer code
+   reads the bridge through its typed client.
    A fresh document load that doesn't match the prefix gets no bridge,
    so XSS on `/blog/foo` cannot see it. SPA navigation within an
    already-loaded document is constrained by preload's history guard and

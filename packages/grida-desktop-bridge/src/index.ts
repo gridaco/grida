@@ -358,10 +358,8 @@ export type DesktopBridge = {
      * the viewer is size-independent (no 1 MiB base64 cap) and video seeking
      * works.
      *
-     * OPTIONAL: a host that can't serve a streaming scheme (e.g. the
-     * web-daemon dev bridge running in a plain browser) omits this; the viewer
-     * falls back to {@link read_file_bytes}. Gate on its presence, not on
-     * `caps`.
+     * OPTIONAL: when the host omits this capability, the viewer uses
+     * {@link read_file_bytes}.
      */
     media_url?: (workspaceId: string, relPath: string) => string;
     /**
