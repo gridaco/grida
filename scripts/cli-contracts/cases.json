@@ -42,6 +42,22 @@
     }
   },
   {
+    "id": "cli.help.agent-run-external",
+    "argv": ["agent", "run-external", "--help"],
+    "expected": {
+      "exit": 0,
+      "stdout": {
+        "includes": [
+          "Usage: grida agent run-external --profile FILE --state-dir DIRECTORY",
+          "one reviewed ACP v1 stdio peer",
+          "Results are JSON Lines",
+          "Documentation: https://grida.co/docs/cli/agent"
+        ]
+      },
+      "stderr": ""
+    }
+  },
+  {
     "id": "cli.help.agent-serve",
     "argv": ["agent", "serve", "--help"],
     "expected": {

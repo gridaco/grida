@@ -2,7 +2,7 @@
 // GRIDA-GG: provider — invocation-owned chat authority with scoped renewal.
 
 use crate::error::{Error, Result};
-use crate::{AgentAction, AgentCommand, account, host, http};
+use crate::{AgentAction, AgentCommand, ExternalAgentCommand, account, host, http};
 use agent_kit_core::inference::RequestControl;
 use agent_kit_core::{BoxFuture, Error as CoreError, ErrorKind, Result as CoreResult};
 use agent_kit_providers::{
@@ -168,11 +168,39 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
     }
 }
 
+pub async fn dispatch_external(command: ExternalAgentCommand) -> Result<u8> {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    {
+        process::external::run(
+            process::external::RunOptions {
+                state_directory: command.state_dir,
+                profile: command.profile,
+                prompt: command.prompt,
+                timeout: Duration::from_millis(command.deadline_ms),
+            },
+            process::shutdown_signal(),
+        )
+        .await
+        .map_err(failure)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = command;
+        Err(Error::new(
+            "external_acp_platform_unsupported",
+            "Confined external ACP peers are available on macOS and Linux.",
+        ))
+    }
+}
+
 fn failure(error: agent_kit_core::Error) -> Error {
     let message = match error.code.as_str() {
         "empty_prompt" => "Provide a nonempty prompt with --prompt or stdin.",
         "prompt_too_large" => "The prompt is larger than the supported limit.",
         "gg_scope_changed" => "Use the Grida account and organization that opened this host.",
+        "external_acp_profile_invalid" | "permission_profile_invalid" => {
+            "Use a private profile with the exact reviewed peer and sandbox paths."
+        }
         "session_execution_configuration_changed" => {
             "Select the same provider, model, account, and organization as the saved chat."
         }

@@ -56,6 +56,7 @@ topics! {
     AccountCredits => ("account credits", "account-credits", "/account"),
     Agent => ("agent", "agent", "/agent"),
     AgentRun => ("agent run", "agent-run", "/agent"),
+    AgentRunExternal => ("agent run-external", "agent-run-external", "/agent"),
     AgentServe => ("agent serve", "agent-serve", "/agent"),
     Ai => ("ai", "ai", ""),
     Models => ("ai models", "models", "/models"),

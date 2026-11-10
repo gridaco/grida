@@ -71,6 +71,14 @@ pub enum AgentAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExternalAgentCommand {
+    pub state_dir: PathBuf,
+    pub profile: PathBuf,
+    pub prompt: Option<String>,
+    pub deadline_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModelSelection {
     pub provider: Provider,
     pub model: String,
@@ -133,6 +141,7 @@ pub enum Command {
     /// this executable runs; its arguments belong to FX and are not read here.
     Fx,
     Agent(AgentCommand),
+    AgentExternal(ExternalAgentCommand),
     AuthLogin {
         storage: Option<Storage>,
         no_browser: bool,
@@ -226,6 +235,7 @@ const STRINGS: &[&str] = &[
     "voice",
     "out",
     "state-dir",
+    "profile",
     "cwd",
     "session",
     "deadline-ms",
@@ -399,6 +409,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Failure> {
     }
     let command = match topic.as_str() {
         "agent run" | "agent serve" => Command::Agent(parse_agent(&tokens, topic == "agent run")?),
+        "agent run-external" => Command::AgentExternal(parse_external_agent(&tokens)?),
         "ai rigging list" => {
             tokens.allowed(true, &["provider", "feature"])?;
             Command::RiggingList {
@@ -614,6 +625,29 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
         } else {
             AgentAction::ServeStdio
         },
+    })
+}
+
+fn parse_external_agent(tokens: &Tokens) -> Result<ExternalAgentCommand, Failure> {
+    tokens.allowed(
+        false,
+        &["state-dir", "profile", "prompt", "deadline-ms", "no-input"],
+    )?;
+    let state_dir = PathBuf::from(tokens.required("state-dir")?);
+    let profile = PathBuf::from(tokens.required("profile")?);
+    let deadline_ms = tokens
+        .value("deadline-ms")
+        .unwrap_or("120000")
+        .parse::<u64>()
+        .map_err(|_| Failure::usage())?;
+    if !state_dir.is_absolute() || !profile.is_absolute() || !(1..=600_000).contains(&deadline_ms) {
+        return Err(Failure::usage());
+    }
+    Ok(ExternalAgentCommand {
+        state_dir,
+        profile,
+        prompt: tokens.value("prompt").map(str::to_owned),
+        deadline_ms,
     })
 }
 
@@ -924,6 +958,32 @@ mod tests {
             .unwrap_err(),
             Failure::usage()
         );
+    }
+
+    #[test]
+    fn external_agent_uses_an_explicit_private_profile_instead_of_gateway_options() {
+        let root = std::env::temp_dir();
+        let state = root.join("external-state");
+        let profile = root.join("external-acp.json");
+        let state_flag = format!("--state-dir={}", state.display());
+        let profile_flag = format!("--profile={}", profile.display());
+        let base = ["agent", "run-external", &state_flag, &profile_flag];
+        assert_eq!(
+            parsed(&base).command,
+            Command::AgentExternal(ExternalAgentCommand {
+                state_dir: state,
+                profile,
+                prompt: None,
+                deadline_ms: 120_000,
+            })
+        );
+        for unsupported in ["--provider=gg", "--org-id=5", "--json", "--deadline-ms=0"] {
+            let mut rejected = base.to_vec();
+            rejected.push(unsupported);
+            assert_eq!(parse(&args(&rejected)).unwrap_err(), Failure::usage());
+        }
+        let relative = ["agent", "run-external", &state_flag, "--profile=peer.json"];
+        assert_eq!(parse(&args(&relative)).unwrap_err(), Failure::usage());
     }
 
     #[test]

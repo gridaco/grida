@@ -340,6 +340,9 @@ peer's scope, Stop behavior, and retained receipt. Use the accepted session
 ID with `inspect` to recover the outcome. Each new run starts its own peer
 process. [Native launch profile](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-a-confined-external-acp-peer)
 
+The `grida agent run-external` command uses the same reviewed profile and
+local receipt. [Run a local ACP peer from the CLI](../cli/agent.md#run-a-local-acp-peer)
+
 ## Run a confined command
 
 Source-built native hosts can run finite commands on macOS and Linux when

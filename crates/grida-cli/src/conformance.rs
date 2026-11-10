@@ -110,6 +110,13 @@ pub fn project(invocation: &Invocation) -> Value {
                 }
             }
         }
+        Command::AgentExternal(command) => {
+            put(&mut object, "stateDir", json!(command.state_dir));
+            put(&mut object, "profile", json!(command.profile));
+            optional(&mut object, "prompt", command.prompt.as_deref());
+            put(&mut object, "deadlineMs", command.deadline_ms);
+            "agent run-external"
+        }
         Command::Docs(topic) => {
             put(&mut object, "topic", topic.name());
             "docs"
