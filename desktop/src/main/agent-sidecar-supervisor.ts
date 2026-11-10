@@ -76,6 +76,8 @@ export type AgentSidecarInfo = {
   password: string;
 };
 
+type AgentSidecarMode = "enabled" | "disabled" | "native-chat";
+
 const STARTUP_TIMEOUT_MS = 15_000; // bumped from 8s — srt init adds proxy startup time
 const DRAIN_EXIT_TIMEOUT_MS = 10_000;
 const BACKOFF_INITIAL_MS = 250;
@@ -99,7 +101,10 @@ export class AgentSidecarSupervisor {
   private spawning: Promise<AgentSidecarInfo> | null = null;
   private networkHost: AgentNetworkHost | null = null;
   private daemonSocketHost: AgentDaemonSocketHost | null = null;
-  private info: AgentSidecarInfo | null = null;
+  private info: {
+    connection: AgentSidecarInfo;
+    mode: AgentSidecarMode;
+  } | null = null;
   private restartBackoffMs = BACKOFF_INITIAL_MS;
   private isShuttingDown = false;
   private verifiedDrain: Promise<void> | undefined;
@@ -165,7 +170,7 @@ export class AgentSidecarSupervisor {
   async start(): Promise<AgentSidecarInfo> {
     if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
     if (this.agentEnabled) this.legacyLaunchStarted = true;
-    if (this.info) return this.info;
+    if (this.info) return this.info.connection;
     if (this.restartTimer) {
       clearTimeout(this.restartTimer);
       this.restartTimer = null;
@@ -204,7 +209,11 @@ export class AgentSidecarSupervisor {
   }
 
   getInfo(): AgentSidecarInfo | null {
-    return this.info;
+    return this.info?.connection ?? null;
+  }
+
+  getMode(): AgentSidecarMode | null {
+    return this.info?.mode ?? null;
   }
 
   /** Permanently retire this ready generation and verify its exact cleanup. */
@@ -512,7 +521,7 @@ export class AgentSidecarSupervisor {
   }
 
   private spawn(): Promise<AgentSidecarInfo> {
-    if (this.info) return Promise.resolve(this.info);
+    if (this.info) return Promise.resolve(this.info.connection);
     if (this.spawning) return this.spawning;
     const pending = this.spawnOne();
     this.spawning = pending;
@@ -534,7 +543,12 @@ export class AgentSidecarSupervisor {
     // work under cmd.exe.
     const supportedSandbox = isSupportedPlatform();
 
-    const agentEnabled = this.agentEnabled;
+    const mode = this.agentEnabled
+      ? "enabled"
+      : this.coldStartSource
+        ? "native-chat"
+        : "disabled";
+    const agentEnabled = mode === "enabled";
     const skillsRoot = agentEnabled ? this.skillsRootPath() : undefined;
     if (agentEnabled && !this.scratchBase) {
       throw new Error("agent scratch authority was not initialized");
@@ -544,7 +558,7 @@ export class AgentSidecarSupervisor {
       `--user-data=${this.user_data_path}`,
       `--provider-home=${this.provider_home}`,
       `--media-root=${this.media_root}`,
-      `--agent=${agentEnabled ? "enabled" : this.coldStartSource ? "native-chat" : "disabled"}`,
+      `--agent=${mode}`,
       ...(this.scratchBase ? [`--scratch-base=${this.scratchBase}`] : []),
       // Host-bundled skills dir (repo-root `skills/`) — the built-in skills the
       // agent advertises + loads on demand. Read-only; omitted if unresolved.
@@ -703,12 +717,13 @@ export class AgentSidecarSupervisor {
         await capabilityReady;
         if (!this.isCurrentGeneration(child, generation) || resolved) return;
         daemonSocketHost.markReady(readyPort);
-        this.info = { port: daemonPort, password };
+        const connection = { port: daemonPort, password };
+        this.info = { connection, mode };
         this.restartBackoffMs = BACKOFF_INITIAL_MS;
         this.note("sup", `ready main-owned port=${daemonPort}`);
         resolved = true;
         clearTimeout(timeout);
-        resolve(this.info);
+        resolve(connection);
       })().catch((error) => {
         failSpawnChannel(
           "capability channel startup",
@@ -870,6 +885,10 @@ export function sealLegacyChatForColdStart() {
 
 export function getAgentSidecarInfo(): AgentSidecarInfo | null {
   return supervisor.getInfo();
+}
+
+export function getAgentSidecarMode(): AgentSidecarMode | null {
+  return supervisor.getMode();
 }
 
 export function nativeAgentEndpointNetwork(id: string, baseUrl: string) {

@@ -59,13 +59,19 @@ describe("AgentSidecarSupervisor recovery", () => {
     Object.assign(supervisor, {
       child: child.value,
       activeGeneration: 3,
-      info: { port: 43123, password: "fixture" },
+      info: {
+        connection: { port: 43123, password: "fixture" },
+        mode: "native-chat",
+      },
       networkHost: { requestDrain, close: vi.fn<() => void>() },
       daemonSocketHost: { close },
     });
+    expect(supervisor.getMode()).toBe("native-chat");
+    expect(supervisor.getInfo()).toEqual({ port: 43123, password: "fixture" });
     const shutdown = supervisor.drain();
     expect(supervisor.drain()).toBe(shutdown);
     expect(supervisor.getInfo()).toBeNull();
+    expect(supervisor.getMode()).toBeNull();
     expect(close).toHaveBeenCalledTimes(1);
     expect(requestDrain).toHaveBeenCalledTimes(1);
     let settled = false;
@@ -89,7 +95,10 @@ describe("AgentSidecarSupervisor recovery", () => {
     Object.assign(supervisor, {
       child: child.value,
       activeGeneration: 3,
-      info: { port: 43123, password: "fixture" },
+      info: {
+        connection: { port: 43123, password: "fixture" },
+        mode: "enabled",
+      },
       networkHost: { requestDrain: async () => {}, close: vi.fn<() => void>() },
       daemonSocketHost: { close: vi.fn<() => void>() },
     });

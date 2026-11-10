@@ -17,6 +17,7 @@ import {
 import {
   startAgentSidecar,
   getAgentSidecarInfo,
+  getAgentSidecarMode,
   stopAgentSidecar,
   approveAgentProviderEndpoint,
   describeAgentProviderEndpoint,
@@ -465,7 +466,13 @@ let agentSidecarInfo: AgentSidecarInfo | null = null;
 let providerApprovalStarted = false;
 
 function approveConfiguredProviderEndpointsWhenReady(): void {
-  if (providerApprovalStarted || !agentSidecarInfo || !entryWindow?.isMain) {
+  const mode = getAgentSidecarMode();
+  if (
+    providerApprovalStarted ||
+    mode === null ||
+    mode === "disabled" ||
+    !entryWindow?.isMain
+  ) {
     return;
   }
   providerApprovalStarted = true;
@@ -691,7 +698,9 @@ app.on("ready", async () => {
       // Desktop notifications on turn-finish / pending-approval (RFC
       // `events.md` §the first consumer). Main-owned so a turn with no
       // renderer attached (queue drain, closed window) still notifies.
-      if (!nativeDesktopAgent) startAgentNotifications(windowAdmission);
+      if (!nativeDesktopAgent && getAgentSidecarMode() === "enabled") {
+        startAgentNotifications(windowAdmission);
+      }
       // Now that the sidecar is up, serve `grida-workspace://` media requests
       // by proxying to its streamed `/workspaces/file` route (#924).
       handleWorkspaceMediaProtocol();
