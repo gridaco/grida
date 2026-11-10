@@ -2777,6 +2777,59 @@ describe("Native workspace chat controller", () => {
     }
   });
 
+  it.each(["remains open", "disconnects"] as const)(
+    "handles the latest notification target when a switching pane %s",
+    async (pane) => {
+      const { bridge, controller } = fixture();
+      const id = "b".repeat(64);
+      const switching = Promise.withResolvers<void>();
+      let active: string | null = null;
+      bridge.selectProfile = vi.fn<
+        NonNullable<DesktopNativeChat["selectProfile"]>
+      >(async (selection) => {
+        if (selection.kind === "new") await switching.promise;
+        active = selection.kind === "default" ? null : selection.id;
+      });
+      const load = bridge.load.bind(bridge);
+      const loaded = vi
+        .spyOn(bridge, "load")
+        .mockImplementation(async (sessionId) => {
+          if (active && sessionId.startsWith("background-"))
+            throw new Error("wrong_owner");
+          return await load(sessionId);
+        });
+      const submit = vi.spyOn(bridge, "submit");
+      const closes = pane === "disconnects";
+      try {
+        controller.connect("current");
+        await vi.waitFor(() => expect(controller.read().loading).toBe(false));
+        const selected = controller.selectProfile({ kind: "new", id });
+        expect(controller.read().profileBusy).toBe(true);
+        await controller.focusDefaultChat("background-first");
+        await controller.focusDefaultChat("background-latest");
+        expect(loaded.mock.calls).toEqual([["current"]]);
+        if (closes) controller.disconnect();
+        switching.resolve();
+        await selected;
+        await vi.waitFor(() => {
+          expect(controller.read()).toMatchObject({
+            selected: closes ? "current" : "background-latest",
+            loading: false,
+          });
+          expect(loaded.mock.calls).toEqual(
+            closes ? [["current"]] : [["current"], ["background-latest"]]
+          );
+        });
+        expect(bridge.selectProfile).toHaveBeenCalledTimes(closes ? 1 : 2);
+        expect(active).toBe(closes ? id : null);
+        expect(submit).not.toHaveBeenCalled();
+      } finally {
+        switching.resolve();
+        controller.disconnect();
+      }
+    }
+  );
+
   it("projects UTF-8 offsets, duplicate chunks, and a final replacement without repeating text", async () => {
     const { controller, running, updates } = fixture();
     running.add("a");

@@ -321,6 +321,7 @@ export class NativeChatController {
   private recents: readonly string[] = [];
   private profileId: string | null = null;
   private profileRead?: object;
+  private pendingDefaultFocus?: { sessionId: string };
 
   constructor(
     private readonly bridge: DesktopNativeChat,
@@ -391,6 +392,7 @@ export class NativeChatController {
 
   connect(initial: string | null): void {
     const saved = this.restore();
+    this.pendingDefaultFocus = undefined;
     this.catalogConnection = {};
     this.catalog = null;
     this.recents = saved.sessions;
@@ -414,6 +416,7 @@ export class NativeChatController {
     this.scope = undefined;
     this.catalogConnection = undefined;
     this.profileRead = undefined;
+    this.pendingDefaultFocus = undefined;
     this.queueRelease(previous);
   }
 
@@ -477,13 +480,32 @@ export class NativeChatController {
   }
 
   async focusDefaultChat(sessionId: string): Promise<void> {
-    if (!this.catalogConnection || this.view.profileBusy || this.view.acting)
+    if (!this.catalogConnection) return;
+    const request = { sessionId };
+    this.pendingDefaultFocus = request;
+    await this.applyDefaultFocus(request);
+  }
+
+  private defaultFocusBlocked(): boolean {
+    return (
+      this.view.profileBusy ||
+      this.view.acting ||
+      !!this.view.attachmentDraft ||
+      this.view.attachmentReading
+    );
+  }
+
+  private async applyDefaultFocus(request: {
+    sessionId: string;
+  }): Promise<void> {
+    if (this.pendingDefaultFocus !== request || this.defaultFocusBlocked())
       return;
+    this.pendingDefaultFocus = undefined;
     if (this.profileId || this.view.profiles?.active) {
-      await this.selectProfile({ kind: "default" }, sessionId);
+      await this.selectProfile({ kind: "default" }, request.sessionId);
       return;
     }
-    await this.select(sessionId);
+    await this.select(request.sessionId);
   }
 
   async selectProfile(
@@ -3381,8 +3403,12 @@ export class NativeChatController {
   }
 
   private update(change: Partial<NativeChatView>): void {
+    const focus = this.pendingDefaultFocus;
+    const wasBlocked = focus && this.defaultFocusBlocked();
     this.view = { ...this.view, ...change };
     for (const listener of this.listeners) listener();
+    if (focus && wasBlocked && !this.defaultFocusBlocked())
+      queueMicrotask(() => void this.applyDefaultFocus(focus));
   }
 
   private sessionChoices(entry = this.view.catalogEntry): readonly string[] {
