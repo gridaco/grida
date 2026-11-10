@@ -131,11 +131,24 @@ export class LegacyChatSourceLease {
     });
   }
 
-  async retire(request: Retirement): Promise<LegacyChatRetirement> {
+  retire(request: Retirement): Promise<LegacyChatRetirement> {
+    return this.retirement(request, false);
+  }
+
+  verifyRetired(request: Retirement): Promise<LegacyChatRetirement> {
+    return this.retirement(request, true);
+  }
+
+  private async retirement(
+    request: Retirement,
+    readOnly: boolean
+  ): Promise<LegacyChatRetirement> {
     const { requestId, verifyWriterAdmission, verifyArchive } = request;
     if (!validId(requestId)) throw failure("invalid_request");
     return await this.transaction(async (db, current, identity) => {
       if (current.kind === "active") throw failure("dirty");
+      if (readOnly && current.kind !== "retired")
+        throw failure("retirement_missing");
       if (current.kind === "retired" && current.requestId !== requestId)
         throw failure("retirement_changed");
       const drainedClaimId =
@@ -163,7 +176,7 @@ export class LegacyChatSourceLease {
       if (retained) return retained;
       writeState(db, { kind: "retired", requestId, archiveId, drainedClaimId });
       return Object.freeze({ ...identity, requestId, archiveId });
-    });
+    }, readOnly);
   }
 
   private async transaction<T>(
@@ -171,7 +184,8 @@ export class LegacyChatSourceLease {
       db: DatabaseSync,
       state: State,
       identity: Identity
-    ) => T | Promise<T>
+    ) => T | Promise<T>,
+    readOnly = false
   ): Promise<T> {
     if (
       (process.platform !== "darwin" && process.platform !== "linux") ||
@@ -192,32 +206,40 @@ export class LegacyChatSourceLease {
     let db: DatabaseSync | undefined;
     try {
       const folder = path.join(source.directory, DIRECTORY);
-      await ensurePrivateDirectory(folder);
+      if (!readOnly) await ensurePrivateDirectory(folder);
+      await checkControlDirectory(folder);
       const filename = path.join(folder, FILE);
       await checkSidecars(filename);
-      const initial = await openControlFile(filename);
-      db = new DatabaseSync(filename, { timeout: 0, allowExtension: false });
+      const initial = await openControlFile(filename, readOnly);
+      db = new DatabaseSync(filename, {
+        readOnly,
+        timeout: 0,
+        allowExtension: false,
+      });
       await checkControlIdentity(filename, initial);
-      db.exec("PRAGMA trusted_schema=OFF; PRAGMA synchronous=FULL");
+      db.exec("PRAGMA trusted_schema=OFF");
+      if (!readOnly) db.exec("PRAGMA synchronous=FULL");
       if (db.prepare("PRAGMA journal_mode").get()?.journal_mode !== "delete")
         throw failure("unsafe_state");
       try {
-        db.exec("BEGIN IMMEDIATE");
+        db.exec(readOnly ? "BEGIN" : "BEGIN IMMEDIATE");
       } catch (error) {
         const code = (error as { errcode?: number }).errcode;
         if (typeof code === "number" && (code & 0xff) === 5)
           throw failure("busy");
         throw error;
       }
-      const state = readState(db, source.identity);
+      const state = readState(db, source.identity, readOnly);
       const result = await operation(db, state, source.identity);
       await checkControlIdentity(filename, initial);
       const current = await canonicalSource(this.source);
       if (!sameIdentity(source.identity, current.identity))
         throw failure("source_changed");
       db.exec("COMMIT");
-      await syncDirectory(folder);
-      await syncDirectory(source.directory);
+      if (!readOnly) {
+        await syncDirectory(folder);
+        await syncDirectory(source.directory);
+      }
       return result;
     } finally {
       try {
@@ -230,10 +252,15 @@ export class LegacyChatSourceLease {
   }
 }
 
-function readState(db: DatabaseSync, identity: Identity): State {
+function readState(
+  db: DatabaseSync,
+  identity: Identity,
+  readOnly: boolean
+): State {
   const version = db.prepare("PRAGMA user_version").get()?.user_version;
   const application = db.prepare("PRAGMA application_id").get()?.application_id;
   if (
+    !readOnly &&
     version === 0 &&
     application === 0 &&
     db.prepare("SELECT COUNT(*) AS count FROM sqlite_schema").get()?.count === 0
@@ -347,6 +374,9 @@ async function ensurePrivateDirectory(directory: string) {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
   }
+}
+
+async function checkControlDirectory(directory: string) {
   const stat = await fs.lstat(directory);
   if (
     !stat.isDirectory() ||
@@ -358,10 +388,11 @@ async function ensurePrivateDirectory(directory: string) {
   await rejectAcl(directory);
 }
 
-async function openControlFile(filename: string) {
+async function openControlFile(filename: string, readOnly: boolean) {
   const handle = await fs.open(
     filename,
-    constants.O_RDWR | constants.O_CREAT | OPEN,
+    (readOnly ? constants.O_RDONLY : constants.O_RDWR | constants.O_CREAT) |
+      OPEN,
     0o600
   );
   try {

@@ -68,9 +68,14 @@ export namespace NativeDesktopProfile {
       }
     );
     if (!scope || !protectedLegacy) return;
-    // The media-only role can reuse an admitted native profile. A legacy
-    // record still requires the chat writer handoff in a normal launch.
-    if (mediaOnly && scope.mode !== "native") throw invalidProfile();
+    // A promotion can select its storage paths. The media launcher separately
+    // verifies completion before granting the sidecar access to those paths.
+    if (
+      mediaOnly &&
+      scope.mode !== "native" &&
+      (scope.mode !== "cutover" || !NativeFirstProfile.hasPromotion(scope))
+    )
+      throw invalidProfile();
     app.setPath("userData", scope.browser);
     app.setPath("sessionData", scope.browser);
     app.setPath("temp", scope.temp);
@@ -101,6 +106,13 @@ export namespace NativeDesktopProfile {
   ): void {
     if (!first) throw invalidProfile();
     NativeFirstProfile.beginPromotion(first, promotion);
+  }
+
+  export function verifyPromotion(
+    promotion: NativeFirstProfile.Promotion
+  ): void {
+    if (!first) throw invalidProfile();
+    NativeFirstProfile.verifyPromotion(first, promotion);
   }
 
   export function managedCutoverControls(): readonly string[] {

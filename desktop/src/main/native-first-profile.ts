@@ -32,6 +32,10 @@ export namespace NativeFirstProfile {
     return [path.join(paths.root, RECORD), path.join(paths.root, PROMOTION)];
   }
 
+  export function hasPromotion(paths: Paths): boolean {
+    return statIfPresent(path.join(paths.root, PROMOTION)) !== undefined;
+  }
+
   /** Birth requires launch admission. Subsequent selection follows the record. */
   export function open(
     appData: string,
@@ -120,20 +124,7 @@ export namespace NativeFirstProfile {
 
   /** Called while the exact drained writer claim remains locked for retirement. */
   export function beginPromotion(paths: Paths, promotion: Promotion): void {
-    if (paths.mode !== "cutover" || !validPromotion(promotion)) throw invalid();
-    const uid = BigInt(process.geteuid!());
-    const { mode: _mode, ...directories } = paths;
-    const record = readRecord(path.join(paths.root, RECORD), uid);
-    if (
-      !record.equals(
-        profileReceipt(directoryIdentities(directories, uid), true)
-      )
-    )
-      throw invalid();
-    const target = path.join(paths.root, PROMOTION);
-    const bytes = Buffer.from(
-      `${JSON.stringify({ version: 1, ...promotion })}\n`
-    );
+    const { target, bytes, uid } = expectedPromotion(paths, promotion);
     if (statIfPresent(target)) {
       if (!readRecord(target, uid).equals(bytes)) throw invalid();
       return;
@@ -161,6 +152,29 @@ export namespace NativeFirstProfile {
     } finally {
       if (statIfPresent(temporary)) fs.unlinkSync(temporary);
     }
+  }
+
+  export function verifyPromotion(paths: Paths, promotion: Promotion): void {
+    const { target, bytes, uid } = expectedPromotion(paths, promotion);
+    if (!readRecord(target, uid).equals(bytes)) throw invalid();
+  }
+
+  function expectedPromotion(paths: Paths, promotion: Promotion) {
+    if (paths.mode !== "cutover" || !validPromotion(promotion)) throw invalid();
+    const uid = BigInt(process.geteuid!());
+    const { mode: _mode, ...directories } = paths;
+    const record = readRecord(path.join(paths.root, RECORD), uid);
+    if (
+      !record.equals(
+        profileReceipt(directoryIdentities(directories, uid), true)
+      )
+    )
+      throw invalid();
+    return {
+      uid,
+      target: path.join(paths.root, PROMOTION),
+      bytes: Buffer.from(`${JSON.stringify({ version: 1, ...promotion })}\n`),
+    };
   }
 
   function validPromotion({

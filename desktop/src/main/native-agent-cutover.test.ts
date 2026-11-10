@@ -181,6 +181,99 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     expect(fs.existsSync(test.nativeState)).toBe(false);
   });
 
+  it.runIf(process.platform === "darwin")(
+    "revalidates a completed managed handoff for media-only without repairing storage",
+    async () => {
+      const test = await fixture();
+      const source = {
+        userDataPath: test.legacy,
+        scratchBase: test.scratchBase,
+        desktopUserDataPath: electron.userData,
+        providerHome: test.legacy,
+        mediaRoot: electron.media,
+      };
+      const lease = new LegacyChatSourceLease(source);
+      const writer = await lease.claimManagedWriter();
+      writeLegacy(test.database, test.scratchBase);
+      const verifyWriterAdmission: LegacyChatWriterAdmission = async (
+        identity,
+        claimId
+      ) =>
+        identity.sourceId === writer.sourceId &&
+        identity.scratchId === writer.scratchId &&
+        claimId === writer.claimId;
+      const verify = () =>
+        test.NativeAgentCutover.verifyCompletedMediaOnly(
+          source,
+          verifyWriterAdmission
+        );
+      await expect(verify()).rejects.toThrow(
+        "native_chat_cutover_not_completed"
+      );
+      await writer.completeDrain(async () => true);
+      const cutover = await test.NativeAgentCutover.prepare({
+        requireDrainedClaim: true,
+        verifyWriterAdmission,
+      });
+      await expect(verify()).rejects.toThrow(
+        "native_chat_cutover_not_completed"
+      );
+
+      const { NativeAgentChat } = await import("./native-agent-chat");
+      const start = vi
+        .spyOn(NativeAgentChat, "start")
+        .mockResolvedValue({ close: async () => {} } as Awaited<
+          ReturnType<typeof NativeAgentChat.start>
+        >);
+      try {
+        await cutover.startWorkspace("work", test.launch);
+      } finally {
+        start.mockRestore();
+      }
+      const checkpoint = fs.readFileSync(test.checkpoint);
+      const database = fs.readFileSync(test.database);
+      const control = path.join(
+        LegacyChatSourceLease.controlRoot(test.legacy),
+        "control.sqlite"
+      );
+      const controlBytes = fs.readFileSync(control);
+      await expect(verify()).resolves.toBeUndefined();
+      await expect(
+        test.NativeAgentCutover.verifyCompletedMediaOnly(
+          source,
+          async () => false
+        )
+      ).rejects.toThrow("writer_admission_unverified");
+
+      const pending = path.join(test.nativeState, ".cutover.pending");
+      fs.writeFileSync(pending, checkpoint, { mode: 0o600 });
+      await expect(verify()).rejects.toThrow(
+        "native_chat_cutover_not_completed"
+      );
+      expect(fs.readFileSync(pending)).toEqual(checkpoint);
+      fs.unlinkSync(pending);
+
+      fs.chmodSync(test.database, 0o600);
+      await expect(verify()).rejects.toThrow("source_fence_incomplete");
+      expect(fs.statSync(test.database).mode & 0o777).toBe(0o600);
+      fs.chmodSync(test.database, 0o400);
+      const archivedInput = path.join(
+        cutover.archive!.directory,
+        "scratch",
+        "ses_fixture",
+        "note.txt"
+      );
+      fs.writeFileSync(archivedInput, "five");
+      await expect(verify()).rejects.toThrow("invalid_receipt");
+      expect(fs.readFileSync(test.database)).toEqual(database);
+      expect(fs.readFileSync(test.checkpoint)).toEqual(checkpoint);
+      expect(fs.readFileSync(control)).toEqual(controlBytes);
+      fs.unlinkSync(control);
+      await expect(verify()).rejects.toMatchObject({ code: "ENOENT" });
+      expect(fs.existsSync(control)).toBe(false);
+    }
+  );
+
   it("refuses existing legacy history when native chat is selected for a fresh profile", async () => {
     const test = await fixture();
     writeLegacy(test.database, test.scratchBase);

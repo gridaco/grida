@@ -86,6 +86,10 @@ type LegacyChatSource = Readonly<{
   providerHome: string;
   mediaRoot: string;
 }>;
+type RetainedMediaScope = Readonly<{
+  mediaOnly: boolean;
+  source?: Promise<LegacyChatSource>;
+}>;
 type OwnedLegacyWriter = Readonly<{
   connection: AgentSidecarInfo;
   drain(): Promise<
@@ -98,7 +102,7 @@ type OwnedLegacyGeneration = {
   claim?: LegacyChatWriter;
 };
 
-class LegacyChatHandoffRequired extends Error {
+export class LegacyChatHandoffRequired extends Error {
   constructor(cause?: unknown) {
     super("legacy_chat_handoff_required", { cause });
   }
@@ -109,7 +113,7 @@ export class AgentSidecarSupervisor {
   private legacyLaunchStarted = false;
   private ownedLegacy?: OwnedLegacyGeneration;
   private coldStartSource?: Promise<LegacyChatSource>;
-  private retainedMedia?: Promise<RetainedMediaLaunch.Options>;
+  private retainedMedia?: RetainedMediaScope;
   private retiringMedia?: Promise<void>;
   private child: ChildProcess | null = null;
   private activeGeneration = 0;
@@ -247,29 +251,50 @@ export class AgentSidecarSupervisor {
       this.isShuttingDown
     )
       throw new Error("retained_media_profile_unavailable");
-    this.retainedMedia ??= (async () => {
-      await source;
-      await RetainedMediaLaunch.prepareSettings(this.user_data_path);
-      await RetainedMediaLaunch.prepareProviderHome(this.provider_home);
-      const temporary = path.join(app.getPath("temp"), "retained-media");
-      await fs.promises
-        .mkdir(temporary, { mode: 0o700 })
-        .catch((error: NodeJS.ErrnoException) => {
-          if (error.code !== "EEXIST") throw error;
-        });
-      return Object.freeze({
-        executable: process.execPath,
-        agentData: this.user_data_path,
-        providerHome: this.provider_home,
-        media: this.media_root,
-        temporary,
-        editorBaseUrl: EDITOR_BASE_URL,
-        mediaOnly,
-      });
-    })();
+    this.retainedMedia ??= Object.freeze({ mediaOnly, source });
     if (this.retiringMedia) await this.retiringMedia;
     if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
     return await this.spawn();
+  }
+
+  private async prepareRetainedMedia({
+    mediaOnly,
+    source,
+  }: RetainedMediaScope): Promise<RetainedMediaLaunch.Options> {
+    await source;
+    if (mediaOnly && NativeDesktopProfile.managedCutover()) {
+      try {
+        const { NativeAgentCutover } = await import("./native-agent-cutover");
+        await NativeAgentCutover.verifyCompletedMediaOnly(
+          await this.captureCutoverSource(),
+          async (identity, claimId) => {
+            if (!claimId) return false;
+            NativeDesktopProfile.verifyPromotion({ ...identity, claimId });
+            return true;
+          }
+        );
+      } catch (error) {
+        throw new LegacyChatHandoffRequired(error);
+      }
+    }
+    if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
+    await RetainedMediaLaunch.prepareSettings(this.user_data_path);
+    await RetainedMediaLaunch.prepareProviderHome(this.provider_home);
+    const temporary = path.join(app.getPath("temp"), "retained-media");
+    await fs.promises
+      .mkdir(temporary, { mode: 0o700 })
+      .catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "EEXIST") throw error;
+      });
+    return Object.freeze({
+      executable: process.execPath,
+      agentData: this.user_data_path,
+      providerHome: this.provider_home,
+      media: this.media_root,
+      temporary,
+      editorBaseUrl: EDITOR_BASE_URL,
+      mediaOnly,
+    });
   }
 
   closeRetainedMedia(): Promise<void> {
@@ -363,21 +388,20 @@ export class AgentSidecarSupervisor {
       throw new Error("legacy_chat_cold_start_required");
     }
     this.agentEnabled = false;
-    if (!this.coldStartSource) {
-      const temp = app.getPath("temp");
-      const desktopUserDataPath = app.getPath("userData");
-      this.coldStartSource = import("@grida/agent/sandbox").then(
-        ({ defaultScratchBase }) =>
-          Object.freeze({
-            userDataPath: this.user_data_path,
-            scratchBase: defaultScratchBase(this.user_data_path, temp),
-            desktopUserDataPath,
-            providerHome: this.provider_home,
-            mediaRoot: this.media_root,
-          })
-      );
-    }
-    return this.coldStartSource;
+    return (this.coldStartSource ??= this.captureCutoverSource());
+  }
+
+  private async captureCutoverSource(): Promise<LegacyChatSource> {
+    const temp = app.getPath("temp");
+    const desktopUserDataPath = app.getPath("userData");
+    const { defaultScratchBase } = await import("@grida/agent/sandbox");
+    return Object.freeze({
+      userDataPath: this.user_data_path,
+      scratchBase: defaultScratchBase(this.user_data_path, temp),
+      desktopUserDataPath,
+      providerHome: this.provider_home,
+      mediaRoot: this.media_root,
+    });
   }
 
   getInfo(): AgentSidecarInfo | null {
@@ -803,7 +827,9 @@ export class AgentSidecarSupervisor {
 
   private async spawnOne(): Promise<AgentSidecarInfo> {
     const generation = ++this.nextGeneration;
-    const retained = this.retainedMedia && (await this.retainedMedia);
+    const retained =
+      this.retainedMedia &&
+      (await this.prepareRetainedMedia(this.retainedMedia));
     const scriptPath = this.sidecarScriptPath();
     const password = crypto.randomBytes(32).toString("base64url");
 

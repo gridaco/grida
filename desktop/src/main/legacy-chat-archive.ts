@@ -82,6 +82,7 @@ type Seal = Readonly<{
   requestId: string;
   expectedArchiveId?: string;
   requireReadOnlySource?: boolean;
+  verifyFrozenOnly?: true;
 }>;
 
 /** Main-owned cutover evidence. The caller must close old chat admission, stop
@@ -171,6 +172,15 @@ export class LegacyChatArchive {
     }
   }
 
+  verifyFrozen(requestId: string, archiveId: string): Promise<Receipt> {
+    return this.sealQuiesced({
+      requestId,
+      expectedArchiveId: archiveId,
+      requireReadOnlySource: true,
+      verifyFrozenOnly: true,
+    });
+  }
+
   /** Verify a published cutoff. This does not check for later source changes. */
   async verify(id: string): Promise<Receipt> {
     try {
@@ -254,6 +264,8 @@ export class LegacyChatArchive {
       await confirmReadOnlySource(sourceDb, databaseStat, confirmLocation);
       return verified;
     }
+    if (seal?.verifyFrozenOnly)
+      throw new ArchiveFailure("source_fence_incomplete");
     if (seal?.requireReadOnlySource) await checkSourceFenceAcl(sourceDb);
     const guard = seal
       ? acquireSourceSealFence(sourceDb, seal)

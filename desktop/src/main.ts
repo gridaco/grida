@@ -17,6 +17,7 @@ import {
 } from "./branding";
 import {
   assertCompatibilityChatSourceAvailable,
+  LegacyChatHandoffRequired,
   startAgentSidecar,
   startRetainedMediaSidecar,
   closeRetainedMediaSidecar,
@@ -1012,10 +1013,18 @@ app.on("ready", async () => {
       markAuthenticatedEntryReady();
       return true;
     } catch (err) {
-      console.error("[grida] agent sidecar failed to start:", err);
+      const handoff =
+        err instanceof LegacyChatHandoffRequired &&
+        NativeDesktopProfile.mediaOnly();
+      console.error(
+        "[grida] agent sidecar failed to start:",
+        handoff ? err.message : err
+      );
       dialog.showErrorBox(
         "Grida couldn't start",
-        "The Grida agent sidecar failed to start. Please relaunch the app or report this issue."
+        handoff
+          ? "Open the managed profile normally to finish or verify its chat handoff."
+          : "The Grida agent sidecar failed to start. Please relaunch the app or report this issue."
       );
       app.quit();
       return false;

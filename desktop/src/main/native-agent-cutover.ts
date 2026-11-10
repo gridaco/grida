@@ -84,6 +84,37 @@ export class NativeAgentCutover {
     return this.claim();
   }
 
+  static async verifyCompletedMediaOnly(
+    source: Awaited<ReturnType<typeof sealLegacyChatForColdStart>>,
+    verifyWriterAdmission: LegacyChatWriterAdmission
+  ): Promise<void> {
+    if (process.platform !== "darwin")
+      throw new Error("native_chat_cutover_platform_unsupported");
+    const stateDirectory = path.join(
+      await fs.realpath(source.desktopUserDataPath),
+      STATE_DIRECTORY
+    );
+    const sourceKey = cutoffSourceKey([
+      source.userDataPath,
+      source.scratchBase,
+    ]);
+    const checkpoint = await readCheckpoint(stateDirectory, true);
+    if (
+      !checkpoint?.nativeReady ||
+      !checkpoint.archiveId ||
+      checkpoint.source !== sourceKey
+    )
+      throw new Error("native_chat_cutover_not_completed");
+    await retireLegacy(
+      source,
+      sourceKey,
+      checkpoint,
+      { requireDrainedClaim: true, verifyWriterAdmission },
+      new LegacyChatArchive(source),
+      true
+    );
+  }
+
   private static async claim(
     existing?: ExistingCutoff
   ): Promise<NativeAgentCutover> {
@@ -146,9 +177,7 @@ export class NativeAgentCutover {
     }
     if (!existing)
       await requireFreshSource(source.userDataPath, source.scratchBase);
-    const sourceKey = createHash("sha256")
-      .update(JSON.stringify(basis))
-      .digest("hex");
+    const sourceKey = cutoffSourceKey(basis);
     const previous = await readCheckpoint(stateDirectory);
     if (previous && previous.source !== sourceKey)
       throw new Error("native_chat_cutover_source_changed");
@@ -325,12 +354,14 @@ async function retireLegacy(
   sourceKey: string,
   previous: Checkpoint | null,
   existing: ExistingCutoff,
-  archive: LegacyChatArchive
+  archive: LegacyChatArchive,
+  verifyOnly = false
 ): Promise<Ready["archive"]> {
   const historical = existing.historicalScratch;
   const requestId = `desktop-native-chat-${sourceKey}`;
   let cutoff: Ready["archive"] = null;
-  await new LegacyChatSourceLease(source).retire({
+  const lease = new LegacyChatSourceLease(source);
+  const request: Parameters<LegacyChatSourceLease["retire"]>[0] = {
     requestId,
     requireDrainedClaim: existing.requireDrainedClaim,
     verifyWriterAdmission: async (identity, drainedClaimId) => {
@@ -351,15 +382,27 @@ async function retireLegacy(
       await requireDrainedCommands(source.scratchBase);
       if (!retained && archive.historicalScratchBase)
         await requireDrainedCommands(archive.historicalScratchBase, true);
-      cutoff = await archive.sealQuiesced({
-        requestId,
-        expectedArchiveId: retained?.archiveId ?? undefined,
-        requireReadOnlySource: process.platform === "darwin",
-      });
+      if (verifyOnly) {
+        if (!retained?.archiveId)
+          throw new Error("native_chat_cutover_archive_changed");
+        cutoff = await archive.verifyFrozen(requestId, retained.archiveId);
+      } else {
+        cutoff = await archive.sealQuiesced({
+          requestId,
+          expectedArchiveId: retained?.archiveId ?? undefined,
+          requireReadOnlySource: process.platform === "darwin",
+        });
+      }
       return cutoff.id;
     },
-  });
+  };
+  if (verifyOnly) await lease.verifyRetired(request);
+  else await lease.retire(request);
   return cutoff;
+}
+
+function cutoffSourceKey(basis: readonly string[]): string {
+  return createHash("sha256").update(JSON.stringify(basis)).digest("hex");
 }
 
 async function requireFreshSource(userDataPath: string, scratchBase: string) {
@@ -407,7 +450,10 @@ async function requireDrainedCommands(
     throw new Error("legacy_chat_command_drain_unverified");
 }
 
-async function readCheckpoint(directory: string): Promise<Checkpoint | null> {
+async function readCheckpoint(
+  directory: string,
+  verifyOnly = false
+): Promise<Checkpoint | null> {
   const state = await statIfPresent(directory);
   if (!state) return null;
   checkDirectory(state, true);
@@ -416,6 +462,7 @@ async function readCheckpoint(directory: string): Promise<Checkpoint | null> {
   const staged = await statIfPresent(pending);
   if (staged) {
     checkCheckpointFile(staged);
+    if (verifyOnly) throw new Error("native_chat_cutover_not_completed");
     await fs.unlink(pending);
   }
   const filename = path.join(directory, CHECKPOINT);

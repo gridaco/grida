@@ -334,7 +334,29 @@ it.runIf(process.platform === "darwin" && process.arch === "arm64")(
       );
       expect(setPath).not.toHaveBeenCalled();
       expect(await fs.readdir(v2.agent)).toEqual([]);
+      const promoted = NativeFirstProfile.open(appData, legacyRoots, {
+        supported: true,
+        allowBirth: false,
+      })!;
+      const promotion = {
+        sourceId: "a".repeat(64),
+        scratchId: "b".repeat(64),
+        claimId: "eac20941-e6a4-40aa-a2a2-0015ab53e80e",
+      };
+      NativeFirstProfile.beginPromotion(promoted, promotion);
+      profile.prepareFirst(app, false);
+      expect(profile.mediaOnly()).toBe(true);
+      expect(profile.managedCutover()).toBe(true);
+      expect(paths.get("userData")).toBe(promoted.browser);
+      expect(() => profile.verifyPromotion(promotion)).not.toThrow();
+      expect(() =>
+        profile.verifyPromotion({ ...promotion, sourceId: "c".repeat(64) })
+      ).toThrow("native_first_profile_invalid");
       await fs.rm(v2.root, { recursive: true, force: true });
+      paths.set("temp", fixture);
+      vi.resetModules();
+      const { NativeDesktopProfile: freshProfile } =
+        await import("./native-desktop-profile");
 
       const native = NativeFirstProfile.open(appData, legacyRoots, {
         supported: true,
@@ -343,15 +365,15 @@ it.runIf(process.platform === "darwin" && process.arch === "arm64")(
       const browserChat = path.join(native.browser, "native-chat");
       await fs.mkdir(browserChat, { mode: 0o700 });
       await fs.writeFile(path.join(browserChat, "retained"), "native chat");
-      profile.prepareFirst(app, false);
-      await expect(profile.configure(app)).resolves.toBe("gateway");
-      expect(profile.selected()).toBe(true);
-      expect(profile.mediaOnly()).toBe(true);
-      expect(profile.agentData()).toBe(native.agent);
-      expect(profile.mediaRoot()).toBe(native.media);
+      freshProfile.prepareFirst(app, false);
+      await expect(freshProfile.configure(app)).resolves.toBe("gateway");
+      expect(freshProfile.selected()).toBe(true);
+      expect(freshProfile.mediaOnly()).toBe(true);
+      expect(freshProfile.agentData()).toBe(native.agent);
+      expect(freshProfile.mediaRoot()).toBe(native.media);
       expect(paths.get("userData")).toBe(native.browser);
       expect(paths.get("sessionData")).toBe(native.browser);
-      expect(profile.legacyRoots(app).overlaps(oldChat)).toBe(true);
+      expect(freshProfile.legacyRoots(app).overlaps(oldChat)).toBe(true);
       expect(await fs.readFile(oldChat, "utf8")).toBe("retained legacy chat");
       expect(
         await fs.readFile(path.join(browserChat, "retained"), "utf8")

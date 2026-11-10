@@ -221,29 +221,104 @@ describe("AgentSidecarSupervisor recovery", () => {
         .mockResolvedValue(undefined);
       await fs.mkdir(LegacyChatSourceLease.controlRoot(agent), { mode: 0o700 });
       const supervisor = new AgentSidecarSupervisor({ agent: false });
-      const spawn = vi
-        .fn<() => ReturnType<typeof supervisor.startRetainedMedia>>()
-        .mockResolvedValue({ port: 43123, password: "fixture" });
-      Object.assign(supervisor, { spawn });
+      const observed = new Error("fixture reached the retained launcher");
+      const launch = vi
+        .spyOn(RetainedMediaLaunch, "start")
+        .mockImplementation(() => {
+          throw observed;
+        });
       await expect(supervisor.sealLegacyChatForColdStart()).rejects.toThrow(
         "legacy_chat_cold_start_required"
       );
-      expect(await supervisor.startRetainedMedia()).toEqual({
-        port: 43123,
-        password: "fixture",
-      });
+      await expect(supervisor.startRetainedMedia()).rejects.toBe(observed);
       expect(prepare).toHaveBeenCalledExactlyOnceWith(agent);
       expect(prepareProviderHome).toHaveBeenCalledExactlyOnceWith(agent);
-      expect(spawn).toHaveBeenCalledOnce();
       expect(Reflect.get(supervisor, "coldStartSource")).toBeUndefined();
-      expect(await Reflect.get(supervisor, "retainedMedia")).toMatchObject({
-        agentData: agent,
-        providerHome: agent,
-        temporary: path.join(temporary, "retained-media"),
-        mediaOnly: true,
-      });
+      expect(launch).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          agentData: agent,
+          providerHome: agent,
+          temporary: path.join(temporary, "retained-media"),
+          mediaOnly: true,
+        })
+      );
       expect(await fs.readdir(agent)).toEqual(["legacy-chat-ownership"]);
     } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("checks completed cutover before every media-only launch attempt", async () => {
+    const root = await fs.mkdtemp(
+      path.join(os.tmpdir(), "grida-promoted-media-")
+    );
+    const agent = path.join(root, "agent");
+    const browser = path.join(root, "browser");
+    const temporary = path.join(root, "temp");
+    const getPath = vi.mocked(app.getPath);
+    const originalGetPath = getPath.getMockImplementation()!;
+    try {
+      await fs.mkdir(temporary);
+      vi.spyOn(NativeDesktopProfile, "mediaOnly").mockReturnValue(true);
+      vi.spyOn(NativeDesktopProfile, "selected").mockReturnValue(true);
+      vi.spyOn(NativeDesktopProfile, "managedCutover").mockReturnValue(true);
+      vi.spyOn(NativeDesktopProfile, "agentData").mockReturnValue(agent);
+      const { NativeAgentCutover } = await import("./native-agent-cutover");
+      const verify = vi
+        .spyOn(NativeAgentCutover, "verifyCompletedMediaOnly")
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("archive changed"));
+      const prepare = vi
+        .spyOn(RetainedMediaLaunch, "prepareSettings")
+        .mockResolvedValue(path.join(agent, "retained-settings"));
+      vi.spyOn(RetainedMediaLaunch, "prepareProviderHome").mockResolvedValue(
+        undefined
+      );
+      const observed = new Error("fixture reached the retained launcher");
+      const launch = vi
+        .spyOn(RetainedMediaLaunch, "start")
+        .mockImplementation(() => {
+          throw observed;
+        });
+      getPath.mockImplementation((name) =>
+        name === "temp"
+          ? temporary
+          : name === "userData"
+            ? browser
+            : path.join(root, name)
+      );
+      const supervisor = new AgentSidecarSupervisor({ agent: false });
+      await expect(supervisor.startRetainedMedia()).rejects.toBe(observed);
+      await expect(supervisor.startRetainedMedia()).rejects.toThrow(
+        "legacy_chat_handoff_required"
+      );
+      expect(verify).toHaveBeenCalledTimes(2);
+      expect(verify).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          userDataPath: agent,
+          desktopUserDataPath: browser,
+        }),
+        expect.any(Function)
+      );
+      expect(prepare).toHaveBeenCalledExactlyOnceWith(agent);
+      expect(launch).toHaveBeenCalledTimes(1);
+      expect(Reflect.get(supervisor, "coldStartSource")).toBeUndefined();
+
+      const checking = Promise.withResolvers<void>();
+      const finish = Promise.withResolvers<void>();
+      verify.mockImplementationOnce(() => {
+        checking.resolve();
+        return finish.promise;
+      });
+      const restarting = supervisor.startRetainedMedia();
+      await checking.promise;
+      await supervisor.closeRetainedMedia();
+      finish.resolve();
+      await expect(restarting).rejects.toThrow("agent_sidecar_shutting_down");
+      expect(prepare).toHaveBeenCalledOnce();
+      expect(launch).toHaveBeenCalledOnce();
+    } finally {
+      getPath.mockImplementation(originalGetPath);
       await fs.rm(root, { recursive: true, force: true });
     }
   });

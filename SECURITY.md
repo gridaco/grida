@@ -300,7 +300,10 @@ subsequent reads never use that retired source.
 Packaged macOS arm64 can reuse an existing verified native profile for
 media-only startup. Main retains its native file, workspace, and recent-file
 owners and confines the media sidecar to its settings, custody, media, and
-temporary roots. This role opens neither chat store and cannot admit an
+temporary roots. A managed legacy handoff can select this role only after
+the native-ready checkpoint, retired writer claim, promotion, frozen source
+and archive have been verified. The supervisor repeats these checks before
+each launch. This role opens neither chat store and cannot admit an
 unfinished legacy profile.
 The [supervisor](desktop/src/main/agent-sidecar-supervisor.ts) selects the
 native retained-media launcher without loading the compatibility sandbox.
