@@ -125,6 +125,8 @@ export type ServerOptions = {
   projects_root?: string;
   /** Host-owned scope source for the guarded file routes only. */
   workspace_catalog?: string;
+  /** Host-owned file and workspace exclusions for the retained native profile. */
+  protected_file_roots?: readonly string[];
   /**
    * Host-provided dedicated root for durable binary media. Omitted on hosts
    * that do not offer this capability; never derived from a client request.
@@ -203,7 +205,10 @@ export function buildServer(opts: ServerOptions): BuiltServer {
   const secrets = new SecretsStore(auth, opts.provider_home);
   const services: DaemonServices = {
     user_data_path: opts.user_data_path,
-    files: new FileRegistry([secrets.directory]),
+    files: new FileRegistry(
+      [secrets.directory, ...(opts.protected_file_roots ?? [])],
+      { refuseHardlinks: Boolean(opts.protected_file_roots?.length) }
+    ),
     recent: new RecentStore(opts.user_data_path),
     media: createMediaPersistence(opts.media_root),
     workspaces: new WorkspaceRegistry(opts.user_data_path, opts.projects_root, [
@@ -225,6 +230,7 @@ export function buildServer(opts: ServerOptions): BuiltServer {
         opts.user_data_path,
         secrets.directory,
         ...(opts.media_root ? [opts.media_root] : []),
+        ...(opts.protected_file_roots ?? []),
       ])
     );
   } else if (opts.capabilities.workspaces) {

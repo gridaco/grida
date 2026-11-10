@@ -37,6 +37,8 @@ import {
   nativeAgentEndpointNetwork,
   type AgentSidecarInfo,
 } from "./agent-sidecar-supervisor";
+import { app } from "electron";
+import { NativeDesktopProfile } from "./native-desktop-profile";
 import { NativeProviderSelection } from "./native-provider-selection";
 import type { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import { NativeWorkspaceReads } from "./native-workspace-reads";
@@ -79,6 +81,12 @@ export namespace agentSidecarClient {
    * focus it instead of opening a new one.
    */
   export async function registerPath(filePath: string): Promise<string> {
+    if (
+      NativeDesktopProfile.selected() &&
+      catalog &&
+      NativeDesktopProfile.legacyRoots(app).overlaps(filePath)
+    )
+      throw new Error("file-overlaps-protected-root");
     const data = await client().files.register(filePath);
     return data.doc_id;
   }

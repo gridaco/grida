@@ -34,6 +34,8 @@
  *                          Private packaged launcher selection with native-chat.
  *                        --owned-legacy-writer=1
  *                          Confined legacy writer with no command executor.
+ *                        --legacy-state-root=<absolute path>
+ *                          Private native preview denials, one per root.
  *                        --user-data=<absolute path>
  *                          The host-owned agent data or retained settings root.
  *                        --scratch-base=<absolute path>
@@ -152,6 +154,22 @@ if (
   console.error("[agent-sidecar] fatal: invalid workspace catalog scope");
   process.exit(1);
 }
+const legacyRootFlag = "--legacy-state-root=";
+const legacyStateRoots = process.argv
+  .slice(2)
+  .filter((argument) => argument.startsWith(legacyRootFlag))
+  .map((argument) => argument.slice(legacyRootFlag.length));
+if (
+  legacyStateRoots.length > 0 &&
+  (legacyStateRoots.length > 24 ||
+    !workspaceCatalog ||
+    legacyStateRoots.some(
+      (root) => !root.startsWith("/") || Buffer.byteLength(root) > 4096
+    ))
+) {
+  console.error("[agent-sidecar] fatal: invalid legacy state protection");
+  process.exit(1);
+}
 if (
   retainedMediaScope !== undefined &&
   (retainedMediaScope !== "1" || agentMode !== "native-chat" || sandboxEnforced)
@@ -217,6 +235,9 @@ async function main() {
     media_root: requiredMediaRoot,
     retained_media_scope: retainedMediaScope === "1",
     workspace_catalog: workspaceCatalog,
+    protected_file_roots: legacyStateRoots.length
+      ? legacyStateRoots
+      : undefined,
     projects_root: projectsRoot,
     editor_base_url: runtimeEditorBaseUrl,
     agent:

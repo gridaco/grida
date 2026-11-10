@@ -2,9 +2,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { App } from "electron";
+import { ProtectedRoots } from "@grida/daemon/server";
+import { home } from "@grida/home";
 
 export namespace NativeDesktopProfile {
   export type Provider = "gateway" | "chatgpt";
+  const admitted = new WeakMap<Pick<App, "getPath">, ProtectedRoots>();
 
   export function selected(): boolean {
     return (
@@ -20,6 +23,13 @@ export namespace NativeDesktopProfile {
     return selected() && agentData && path.isAbsolute(agentData)
       ? path.join(path.dirname(agentData), "media")
       : undefined;
+  }
+
+  /** Shared live path denials for this admitted preview profile. */
+  export function legacyRoots(app: Pick<App, "getPath">): ProtectedRoots {
+    const roots = admitted.get(app);
+    if (!selected() || !roots) throw invalidProfile();
+    return roots;
   }
 
   export async function configure(
@@ -71,6 +81,8 @@ export namespace NativeDesktopProfile {
       reserved.has(path.basename(browserData).toLowerCase())
     )
       throw invalidProfile();
+    const protectedLegacy = await captureLegacyRoots(app, systemTemp);
+    if (protectedLegacy.overlaps(root)) throw invalidProfile();
     await checkDirectory(root);
     const browser = await checkDirectory(browserData);
     const occupied = new Set([`${browser.dev}:${browser.ino}`]);
@@ -94,7 +106,39 @@ export namespace NativeDesktopProfile {
     }
     app.setPath("temp", temp);
     app.setPath("documents", projects);
+    admitted.set(app, protectedLegacy);
     return provider;
+  }
+
+  async function captureLegacyRoots(
+    app: Pick<App, "getPath">,
+    systemTemp: string
+  ): Promise<ProtectedRoots> {
+    const userHome = app.getPath("home");
+    const appData = app.getPath("appData");
+    const gridaHomes = [
+      path.join(userHome, ".grida"),
+      home.dir({ home: userHome }),
+    ];
+    const { defaultScratchBase } = await import("@grida/agent/sandbox");
+    const roots = [
+      ...gridaHomes,
+      ...gridaHomes.map((directory) =>
+        defaultScratchBase(path.join(directory, "agent"), systemTemp)
+      ),
+      ...["Grida", "Grida Insiders", "Grida (Insiders)", "desktop"].map(
+        (name) => path.join(appData, name)
+      ),
+    ];
+    if (process.platform === "linux") {
+      const xdg = process.env.XDG_DATA_HOME?.trim();
+      const data =
+        xdg && path.isAbsolute(xdg)
+          ? xdg
+          : path.join(userHome, ".local", "share");
+      roots.push(path.join(data, "grida"), path.join(data, "grida-insiders"));
+    }
+    return new ProtectedRoots(roots);
   }
 
   async function checkDirectory(directory: string) {

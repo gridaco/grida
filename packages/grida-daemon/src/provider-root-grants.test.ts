@@ -163,4 +163,53 @@ describe("native provider-root grants", () => {
       server.cleanup();
     }
   });
+
+  it("keeps retained documents outside additional host-owned roots", async () => {
+    const legacy = path.join(root, "legacy-state");
+    const original = path.join(legacy, "private.grida");
+    const selected = path.join(root, "selected.grida");
+    await fs.mkdir(legacy);
+    await fs.writeFile(original, "retained legacy bytes");
+    let services: DaemonServices | undefined;
+    const server = buildServer({
+      password: "synthetic-daemon-password",
+      protocol: DAEMON_PROTOCOL,
+      capabilities: DAEMON_DEFAULT_CAPABILITIES,
+      user_data_path: path.join(root, "state"),
+      protected_file_roots: [legacy],
+      http_access: { allowed_origins: [], allowed_referer_paths: [] },
+      tenants: [
+        {
+          register: (_app, current) => {
+            services = current;
+            return {};
+          },
+        },
+      ],
+    });
+    try {
+      const registry = services!.files;
+      expect(() => registry.registerPath(original)).toThrow(
+        "file-overlaps-protected-root"
+      );
+      const id = registry.registerPath(selected);
+      await filesIo.writeFile(registry, id, "ordinary document");
+      expect((await filesIo.readFile(registry, id)).content).toBe(
+        "ordinary document"
+      );
+      await fs.unlink(selected);
+      await fs.symlink(original, selected);
+      expect(registry.getEntry(id)).toBeUndefined();
+      await fs.unlink(selected);
+      await fs.link(original, selected);
+      expect(registry.getEntry(id)).toBeUndefined();
+      expect(new FileRegistry().registerPath(selected)).toEqual(
+        expect.any(String)
+      );
+      expect(await fs.readFile(original, "utf8")).toBe("retained legacy bytes");
+    } finally {
+      server.drain();
+      server.cleanup();
+    }
+  });
 });

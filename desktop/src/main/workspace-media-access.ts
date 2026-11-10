@@ -39,6 +39,7 @@ export function nativeWorkspaceCatalog() {
     projectsRoot: path.join(app.getPath("documents"), "Grida Projects"),
     protectedPaths: [
       ...filesystem.deny_read,
+      ...NativeDesktopProfile.legacyRoots(app).metadataPaths(),
       agentData,
       app.getPath("temp"),
       DesktopMediaRoot.current,

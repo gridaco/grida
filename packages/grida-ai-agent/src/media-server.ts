@@ -76,6 +76,7 @@ export type MediaDaemonOptions = Omit<MediaTenantOptions, "capabilities"> & {
   provider_home?: string;
   projects_root?: string;
   workspace_catalog?: string;
+  protected_file_roots?: readonly string[];
   media_root?: string;
   http_access: DaemonHttpAccess;
   hostname?: string;
@@ -98,6 +99,7 @@ export function createMediaDaemon(opts: MediaDaemonOptions): DaemonServer {
     provider_home: opts.provider_home,
     projects_root: opts.projects_root,
     workspace_catalog: opts.workspace_catalog,
+    protected_file_roots: opts.protected_file_roots,
     media_root: opts.media_root,
     http_access: opts.http_access,
     hostname: opts.hostname,

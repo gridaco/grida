@@ -69,7 +69,10 @@ function normalize(filePath: string): string {
 export class FileRegistry {
   private readonly protectedRoots: ProtectedRoots;
 
-  constructor(protectedRoots: readonly string[] = []) {
+  constructor(
+    protectedRoots: readonly string[] = [],
+    private readonly options: Readonly<{ refuseHardlinks?: boolean }> = {}
+  ) {
     this.protectedRoots = new ProtectedRoots(protectedRoots);
   }
 
@@ -85,7 +88,7 @@ export class FileRegistry {
    */
   registerPath(filePath: string): string {
     const normalized = normalize(filePath);
-    if (this.protectedRoots.overlaps(normalized))
+    if (this.denied(normalized))
       throw new Error("file-overlaps-protected-root");
     const existing = this.state.by_path.get(normalized);
     if (existing) return existing;
@@ -100,11 +103,23 @@ export class FileRegistry {
     if (!entry) return undefined;
     // Saved docIds do not preserve authority after a directory or target changes.
     try {
-      if (this.protectedRoots.overlaps(entry.path)) return undefined;
+      if (this.denied(entry.path)) return undefined;
     } catch {
       return undefined;
     }
     return { ...entry };
+  }
+
+  private denied(filePath: string): boolean {
+    if (this.protectedRoots.overlaps(filePath)) return true;
+    if (!this.options.refuseHardlinks) return false;
+    try {
+      const current = fs.statSync(filePath);
+      return current.isFile() && current.nlink > 1;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
   }
 
   removeEntry(docId: string): void {

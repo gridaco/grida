@@ -17,6 +17,7 @@ export namespace DesktopDaemon {
     media_root: string;
     retained_media_scope?: boolean;
     workspace_catalog?: string;
+    protected_file_roots?: readonly string[];
     projects_root?: string;
     editor_base_url: string;
     provider_http: ProviderHttpTransport;
@@ -36,7 +37,7 @@ export namespace DesktopDaemon {
       throw new Error("retained_media_scope_invalid");
     }
     if (
-      opts.workspace_catalog &&
+      (opts.workspace_catalog || opts.protected_file_roots) &&
       (opts.agent !== "native-chat" || opts.retained_media_scope)
     )
       throw new Error("workspace_catalog_scope_invalid");
@@ -47,6 +48,7 @@ export namespace DesktopDaemon {
       media_root: opts.media_root,
       projects_root: opts.projects_root,
       workspace_catalog: opts.workspace_catalog,
+      protected_file_roots: opts.protected_file_roots,
       http_access: {
         allowed_origins: [new URL(opts.editor_base_url).origin],
         allowed_referer_paths: ["/desktop"],

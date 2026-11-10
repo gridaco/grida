@@ -39,4 +39,29 @@ describe("DesktopAgentSandboxPolicy", () => {
     expect(policy.filesystem.deny_write).toContain(desktopStateRoot);
     expect(policy.filesystem.allow_write).not.toContain(desktopStateRoot);
   });
+
+  it("adds literal legacy-state read and write denials only when supplied", () => {
+    const launch = {
+      userData: "/isolated/agent",
+      mediaRoot: "/isolated/media",
+      home: "/Users/test",
+      ggHost: "grida.co",
+    };
+    const root = "/Users/test/.grida";
+    const ordinary = DesktopAgentSandboxPolicy.build(launch);
+    const preview = DesktopAgentSandboxPolicy.build({
+      ...launch,
+      legacyStateRoots: [root],
+    });
+    expect(ordinary.filesystem.deny_read).not.toContain(root);
+    expect(ordinary.filesystem.deny_write).not.toContain(root);
+    expect(preview.filesystem.deny_read).toContain(root);
+    expect(preview.filesystem.deny_write).toContain(root);
+    expect(() =>
+      DesktopAgentSandboxPolicy.build({
+        ...launch,
+        legacyStateRoots: [root + "[old]"],
+      })
+    ).toThrow("native_desktop_legacy_state_path_not_literal");
+  });
 });

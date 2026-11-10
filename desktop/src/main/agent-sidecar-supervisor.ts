@@ -125,6 +125,7 @@ export class AgentSidecarSupervisor {
   private restartTimer: NodeJS.Timeout | null = null;
   private sandboxReady = false;
   private workspaceCatalog?: string;
+  private legacyStateRoots: readonly string[] = [];
   private scratchBase: string | null = null;
   private commandHost: AgentCommandHost | null = null;
   private readonly networkAuthority = new AgentNetworkAuthority(
@@ -523,13 +524,25 @@ export class AgentSidecarSupervisor {
       // (e.g. "bwrap not found in PATH"). Letting it throw means
       // one error path, not two.
     }
+    const coldSource = await this.coldStartSource;
+    let legacyPolicyRoots: readonly string[] = [];
+    if (coldSource && NativeDesktopProfile.selected()) {
+      const legacy = NativeDesktopProfile.legacyRoots(app);
+      if (legacy.overlaps(path.dirname(coldSource.desktopUserDataPath)))
+        throw new Error("native_desktop_profile_invalid");
+      // The sidecar cannot stat the denied lexical symlink. Main resolves it
+      // before confinement, while the file registry rechecks target aliases.
+      this.legacyStateRoots = legacy.canonicalPaths();
+      legacyPolicyRoots = [...legacy.metadataPaths(), ...this.legacyStateRoots];
+    }
     const policy = DesktopAgentSandboxPolicy.build({
       userData: this.user_data_path,
       providerRoot: path.join(this.provider_home, "providers"),
       mediaRoot: this.media_root,
       desktopStateRoot:
         this.ownedLegacy?.desktopUserDataPath ??
-        (await this.coldStartSource)?.desktopUserDataPath,
+        coldSource?.desktopUserDataPath,
+      legacyStateRoots: legacyPolicyRoots,
       workspaceCatalogRoot: this.workspaceCatalog
         ? path.dirname(this.workspaceCatalog)
         : undefined,
@@ -631,6 +644,7 @@ export class AgentSidecarSupervisor {
       ...(this.workspaceCatalog
         ? [`--workspace-catalog=${this.workspaceCatalog}`]
         : []),
+      ...this.legacyStateRoots.map((root) => `--legacy-state-root=${root}`),
       ...(this.scratchBase ? [`--scratch-base=${this.scratchBase}`] : []),
       // Host-bundled skills dir (repo-root `skills/`) — the built-in skills the
       // agent advertises + loads on demand. Read-only; omitted if unresolved.

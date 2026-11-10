@@ -37,6 +37,11 @@ export class ProtectedRoots {
     ];
   }
 
+  /** Resolve aliases before giving physical paths to a confined reader. */
+  canonicalPaths(): string[] {
+    return [...new Set(this.roots.map((root) => this.canonical(root)))];
+  }
+
   private canonical(value: string): string {
     let current = path.resolve(value);
     const suffix: string[] = [];

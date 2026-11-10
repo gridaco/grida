@@ -13,6 +13,7 @@ export namespace DesktopAgentSandboxPolicy {
     mediaRoot: string;
     desktopStateRoot?: string;
     workspaceCatalogRoot?: string;
+    legacyStateRoots?: readonly string[];
     home: string;
     ggHost: string;
   }) {
@@ -34,7 +35,12 @@ export namespace DesktopAgentSandboxPolicy {
     const providerRoot = path.resolve(
       input.providerRoot ?? path.join(input.userData, "providers")
     );
-    const mainOnly = input.desktopStateRoot ? [input.desktopStateRoot] : [];
+    if (input.legacyStateRoots?.some((root) => /[*?[\]]/u.test(root)))
+      throw new Error("native_desktop_legacy_state_path_not_literal");
+    const mainOnly = [
+      ...(input.desktopStateRoot ? [input.desktopStateRoot] : []),
+      ...(input.legacyStateRoots ?? []),
+    ];
     return {
       ...policy,
       filesystem: {
