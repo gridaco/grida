@@ -34,6 +34,7 @@ import { AgentSidecarSupervisor } from "./agent-sidecar-supervisor";
 import { app } from "electron";
 import { AgentNetworkHost } from "./agent-network-host";
 import { AgentNetworkPolicy } from "../agent-network-policy";
+import { NativeDesktopProfile } from "./native-desktop-profile";
 import { ensureInitialized, wrap } from "./sandbox/manager";
 
 describe("AgentSidecarSupervisor recovery", () => {
@@ -132,6 +133,40 @@ describe("AgentSidecarSupervisor recovery", () => {
       })
     );
     supervisor.stop();
+  });
+
+  it("prepares an owned writer without admitting scratch or commands before wrapping", async () => {
+    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/owned/agent");
+    vi.spyOn(NativeDesktopProfile, "configure").mockResolvedValueOnce(
+      "gateway"
+    );
+    const supervisor = new AgentSidecarSupervisor();
+    vi.spyOn(
+      supervisor as unknown as { skillsRootPath(): string | undefined },
+      "skillsRootPath"
+    ).mockReturnValue(undefined);
+    vi.mocked(wrap).mockRejectedValueOnce(
+      new Error("fixture wrapper unavailable")
+    );
+    await expect(supervisor.startOwnedLegacyWriter()).rejects.toThrow(
+      "fixture wrapper unavailable"
+    );
+    expect(vi.mocked(wrap).mock.calls.at(-1)?.[0]).toContain(
+      "--owned-legacy-writer=1"
+    );
+    expect(
+      (supervisor as unknown as { commandHost: unknown }).commandHost
+    ).toBeNull();
+    expect(
+      (supervisor as unknown as { ownedLegacy: { claim?: unknown } })
+        .ownedLegacy.claim
+    ).toBeUndefined();
+    await expect(supervisor.start()).rejects.toThrow(
+      "owned_legacy_writer_already_selected"
+    );
+    await expect(supervisor.sealLegacyChatForColdStart()).rejects.toThrow(
+      "legacy_chat_cold_start_required"
+    );
   });
 
   it("forwards disabled agent startup without scratch or skill arguments", async () => {

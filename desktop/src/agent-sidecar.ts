@@ -32,6 +32,8 @@
  *                          compositions do not load scratch or skills.
  *                        --retained-media-scope=1
  *                          Private packaged launcher selection with native-chat.
+ *                        --owned-legacy-writer=1
+ *                          Confined legacy writer with no command executor.
  *                        --user-data=<absolute path>
  *                          The host-owned agent data or retained settings root.
  *                        --scratch-base=<absolute path>
@@ -133,6 +135,14 @@ const runtimeEditorBaseUrl = getCliArg("editor-base-url") ?? EDITOR_BASE_URL;
 // disabled, so a future supervisor bug that drops the flag can't silently
 // expose an unsandboxed shell.
 const sandboxEnforced = getCliArg("sandbox-enforced") === "1";
+const ownedLegacyWriter = getCliArg("owned-legacy-writer");
+if (
+  ownedLegacyWriter !== undefined &&
+  (ownedLegacyWriter !== "1" || agentMode !== "enabled" || !sandboxEnforced)
+) {
+  console.error("[agent-sidecar] fatal: invalid owned legacy writer scope");
+  process.exit(1);
+}
 const retainedMediaScope = getCliArg("retained-media-scope");
 const workspaceCatalog = getCliArg("workspace-catalog");
 if (
@@ -216,7 +226,10 @@ async function main() {
             scratch_base: requiredScratchBase!,
             skills_root: skillsRoot,
             sandbox_enforced: sandboxEnforced,
-            shell_executor: sandboxEnforced ? network.shellExecutor : undefined,
+            shell_executor:
+              sandboxEnforced && ownedLegacyWriter === undefined
+                ? network.shellExecutor
+                : undefined,
           }
         : agentMode === "native-chat"
           ? "native-chat"

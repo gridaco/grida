@@ -33,11 +33,13 @@ export type LegacyChatRetirement = Readonly<
   Identity & { requestId: string; archiveId: string | null }
 >;
 
-export type LegacyChatWriter = Readonly<{
-  claimId: string;
-  /** The owning supervisor verifies this exact generation and its workers. */
-  completeDrain(verify: (claimId: string) => Promise<boolean>): Promise<void>;
-}>;
+export type LegacyChatWriter = Readonly<
+  Identity & {
+    claimId: string;
+    /** The owning supervisor verifies this exact generation and its workers. */
+    completeDrain(verify: (claimId: string) => Promise<boolean>): Promise<void>;
+  }
+>;
 
 type Retirement = Readonly<{
   requestId: string;
@@ -58,16 +60,30 @@ export class LegacyChatSourceLease {
     this.source = Object.freeze({ ...source });
   }
 
-  async claimWriter(): Promise<LegacyChatWriter> {
+  claimWriter(): Promise<LegacyChatWriter> {
+    return this.claim(false);
+  }
+
+  /** Admit the first writer of a controlled source before any scratch sweep. */
+  claimFreshWriter(): Promise<LegacyChatWriter> {
+    return this.claim(true);
+  }
+
+  private async claim(fresh: boolean): Promise<LegacyChatWriter> {
     const claimId = randomUUID();
-    const identity = await this.transaction((db, current, identity) => {
+    const identity = await this.transaction(async (db, current, identity) => {
       if (current.kind === "retired") throw failure("retired");
       if (current.kind === "active") throw failure("dirty");
+      if (fresh) {
+        if (current.claimId !== null) throw failure("not_fresh");
+        await requireUnusedSource(this.source);
+      }
       writeState(db, { kind: "active", claimId });
       return identity;
     });
     let completion: Promise<void> | undefined;
     return Object.freeze({
+      ...identity,
       claimId,
       completeDrain: (verify: (claimId: string) => Promise<boolean>) =>
         (completion ??= this.completeDrain(identity, claimId, verify).catch(
@@ -392,6 +408,26 @@ function sameIdentity(a: Identity, b: Identity) {
 
 function digest(value: readonly string[]) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+async function requireUnusedSource(source: Source): Promise<void> {
+  for (const target of [
+    ...[
+      "sessions.db",
+      "sessions.db-journal",
+      "sessions.db-wal",
+      "sessions.db-shm",
+      "chat-archive",
+    ].map((name) => path.join(source.userDataPath, name)),
+    source.scratchBase,
+  ]) {
+    try {
+      await fs.lstat(target);
+      throw failure("not_fresh");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
 }
 
 function validId(value: unknown): value is string {

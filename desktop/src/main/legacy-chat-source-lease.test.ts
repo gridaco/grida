@@ -84,6 +84,29 @@ async function childAt(source: { userDataPath: string; scratchBase: string }) {
 }
 
 describe.skipIf(!supported)("cooperative legacy chat source lease", () => {
+  it("refuses mutable legacy state before claiming a fresh owned writer", async () => {
+    const { source, lease } = await fixture();
+    const command = path.join(source.scratchBase, "commands", "unknown-owner");
+    await fs.mkdir(command, { recursive: true, mode: 0o700 });
+    await expect(lease.claimFreshWriter()).rejects.toThrow(
+      "legacy_chat_source_not_fresh"
+    );
+    expect(await fs.readdir(path.dirname(command))).toEqual(["unknown-owner"]);
+    await fs.rmdir(command);
+    await fs.rmdir(path.dirname(command));
+    await fs.rmdir(source.scratchBase);
+    const writer = await lease.claimFreshWriter();
+    expect(writer.sourceId).toMatch(/^[a-f0-9]{64}$/);
+    expect(writer.scratchId).toMatch(/^[a-f0-9]{64}$/);
+    await expect(lease.claimWriter()).rejects.toThrow(
+      "legacy_chat_source_dirty"
+    );
+    await writer.completeDrain(async (id) => id === writer.claimId);
+    await expect(lease.claimFreshWriter()).rejects.toThrow(
+      "legacy_chat_source_not_fresh"
+    );
+  });
+
   it("allows only the exact verified drain to release a generation", async () => {
     const { source, lease } = await fixture();
     const writer = await lease.claimWriter();

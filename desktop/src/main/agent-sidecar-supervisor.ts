@@ -68,6 +68,8 @@ import type { NativeProviderNetwork } from "./native-provider-egress";
 import type { DesktopAccountSession } from "./account-session";
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import { AgentNetworkPolicy } from "../agent-network-policy";
+import { NativeDesktopProfile } from "./native-desktop-profile";
+import type { LegacyChatWriter } from "./legacy-chat-source-lease";
 
 export type AgentSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
@@ -90,10 +92,21 @@ type LegacyChatSource = Readonly<{
   providerHome: string;
   mediaRoot: string;
 }>;
+type OwnedLegacyWriter = Readonly<{
+  connection: AgentSidecarInfo;
+  drain(): Promise<
+    Readonly<Pick<LegacyChatWriter, "sourceId" | "scratchId" | "claimId">>
+  >;
+}>;
+type OwnedLegacyGeneration = {
+  desktopUserDataPath: string;
+  claim?: LegacyChatWriter;
+};
 
 export class AgentSidecarSupervisor {
   private agentEnabled: boolean;
   private legacyLaunchStarted = false;
+  private ownedLegacy?: OwnedLegacyGeneration;
   private coldStartSource?: Promise<LegacyChatSource>;
   private child: ChildProcess | null = null;
   private activeGeneration = 0;
@@ -170,6 +183,8 @@ export class AgentSidecarSupervisor {
 
   async start(workspaceCatalog?: string): Promise<AgentSidecarInfo> {
     if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
+    if (this.ownedLegacy)
+      throw new Error("owned_legacy_writer_already_selected");
     if (
       (workspaceCatalog && (!this.coldStartSource || !isSupportedPlatform())) ||
       (this.sandboxReady && workspaceCatalog !== this.workspaceCatalog)
@@ -186,6 +201,44 @@ export class AgentSidecarSupervisor {
       await this.initSandbox();
     }
     return await this.spawn();
+  }
+
+  /** Start one legacy generation for a Main-owned isolated profile. */
+  async startOwnedLegacyWriter(): Promise<OwnedLegacyWriter> {
+    const data = process.env.GRIDA_AGENT_USER_DATA;
+    if (
+      !app.hasSingleInstanceLock() ||
+      !isSupportedPlatform() ||
+      !this.agentEnabled ||
+      this.legacyLaunchStarted ||
+      this.isShuttingDown ||
+      !data ||
+      data !== this.user_data_path
+    ) {
+      throw new Error("owned_legacy_writer_profile_unavailable");
+    }
+    this.legacyLaunchStarted = true;
+    const owned: OwnedLegacyGeneration = {
+      desktopUserDataPath: app.getPath("userData"),
+    };
+    this.ownedLegacy = owned;
+    await NativeDesktopProfile.configure(app);
+    const { defaultScratchBase } = await import("@grida/agent/sandbox");
+    this.scratchBase = defaultScratchBase(data, app.getPath("temp"));
+    await this.initSandbox();
+    const connection = await this.spawn();
+    const claim = owned.claim;
+    if (!claim) throw new Error("owned_legacy_writer_claim_missing");
+    const { sourceId, scratchId, claimId } = claim;
+    const receipt = Object.freeze({ sourceId, scratchId, claimId });
+    return Object.freeze({
+      connection,
+      drain: async () => {
+        await this.drain();
+        await claim.completeDrain(async (id) => id === claimId);
+        return receipt;
+      },
+    });
   }
 
   /** Select the media-only composition before the old writer can be started. */
@@ -429,7 +482,7 @@ export class AgentSidecarSupervisor {
     // TMPDIR to its shared compatibility directory. Session scratch must live
     // outside those unconditional write defaults so a per-command deny of the
     // shared base can carve back exactly one session.
-    if (this.agentEnabled) {
+    if (this.agentEnabled && !this.ownedLegacy) {
       const { defaultScratchBase, prepareScratchAuthority } =
         await import("@grida/agent/sandbox");
       this.scratchBase = defaultScratchBase(
@@ -442,7 +495,7 @@ export class AgentSidecarSupervisor {
       await sweepAgentCommandTemps(this.scratchBase);
     }
     if (!isSupportedPlatform()) {
-      if (this.coldStartSource)
+      if (this.coldStartSource || this.ownedLegacy)
         throw new Error("native_retained_sidecar_sandbox_unavailable");
       // Windows or another unsupported platform. Log loudly and let
       // the spawn proceed unwrapped — the alternative is refusing
@@ -474,7 +527,9 @@ export class AgentSidecarSupervisor {
       userData: this.user_data_path,
       providerRoot: path.join(this.provider_home, "providers"),
       mediaRoot: this.media_root,
-      desktopStateRoot: (await this.coldStartSource)?.desktopUserDataPath,
+      desktopStateRoot:
+        this.ownedLegacy?.desktopUserDataPath ??
+        (await this.coldStartSource)?.desktopUserDataPath,
       workspaceCatalogRoot: this.workspaceCatalog
         ? path.dirname(this.workspaceCatalog)
         : undefined,
@@ -494,7 +549,7 @@ export class AgentSidecarSupervisor {
         denyWrite: policy.filesystem.deny_write,
       },
     });
-    if (this.scratchBase) {
+    if (this.scratchBase && !this.ownedLegacy) {
       this.commandHost = new AgentCommandHost({
         scratchBase: this.scratchBase,
         userData: this.user_data_path,
@@ -572,6 +627,7 @@ export class AgentSidecarSupervisor {
       `--provider-home=${this.provider_home}`,
       `--media-root=${this.media_root}`,
       `--agent=${mode}`,
+      ...(this.ownedLegacy ? ["--owned-legacy-writer=1"] : []),
       ...(this.workspaceCatalog
         ? [`--workspace-catalog=${this.workspaceCatalog}`]
         : []),
@@ -604,6 +660,22 @@ export class AgentSidecarSupervisor {
     }
     if (generation !== this.nextGeneration || this.isShuttingDown) {
       throw new Error("agent sidecar startup was cancelled");
+    }
+    if (this.ownedLegacy) {
+      if (!wrappedCmd || !this.scratchBase || this.ownedLegacy.claim)
+        throw new Error("owned_legacy_writer_admission_unavailable");
+      const { LegacyChatSourceLease } =
+        await import("./legacy-chat-source-lease");
+      if (generation !== this.nextGeneration || this.isShuttingDown)
+        throw new Error("agent sidecar startup was cancelled");
+      this.ownedLegacy.claim = await new LegacyChatSourceLease({
+        userDataPath: this.user_data_path,
+        scratchBase: this.scratchBase,
+      }).claimFreshWriter();
+      // From this admission barrier on, only verified child drain can
+      // clear the claim. The child owns initial database and scratch work.
+      if (generation !== this.nextGeneration || this.isShuttingDown)
+        throw new Error("agent sidecar startup was cancelled");
     }
 
     return await new Promise<AgentSidecarInfo>((resolve, reject) => {
@@ -859,7 +931,7 @@ export class AgentSidecarSupervisor {
    * exit can converge on the same recovery edge.
    */
   private scheduleRestart(): void {
-    if (this.isShuttingDown || this.restartTimer) return;
+    if (this.isShuttingDown || this.restartTimer || this.ownedLegacy) return;
     const wait = this.restartBackoffMs;
     this.restartBackoffMs = Math.min(this.restartBackoffMs * 2, BACKOFF_MAX_MS);
     this.note("sup", `restart in ${wait}ms`, "warn");
@@ -895,6 +967,10 @@ export function startAgentSidecar(
   workspaceCatalog?: string
 ): Promise<AgentSidecarInfo> {
   return supervisor.start(workspaceCatalog);
+}
+
+export function startOwnedLegacyWriter(): Promise<OwnedLegacyWriter> {
+  return supervisor.startOwnedLegacyWriter();
 }
 
 export function sealLegacyChatForColdStart() {
