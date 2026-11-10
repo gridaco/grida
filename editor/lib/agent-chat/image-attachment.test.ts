@@ -43,6 +43,7 @@ function stubImage(): () => StubImage {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe("encodeLibraryImageUrl", () => {
@@ -100,8 +101,10 @@ describe("encodeLibraryImageUrl", () => {
   );
 });
 
+// GRIDA-SEC-004: Reject unrelated origins and non-Library paths before image loading.
 describe("trustedLibraryImageUrl", () => {
   const base = "https://project.supabase.co";
+  const sha = "a".repeat(64);
 
   it("accepts only public-storage objects on the configured Library origin", () => {
     expect(
@@ -124,6 +127,56 @@ describe("trustedLibraryImageUrl", () => {
         "http://project.supabase.co/storage/v1/object/public/library/x.png",
         base
       )
+    ).toBeNull();
+  });
+
+  it("does not admit Tigris images before the explicit provider switch", () => {
+    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_STORAGE_PROVIDER", "supabase");
+    expect(
+      trustedLibraryImageUrl(`https://library.grida.co/${sha}.png`, base)
+    ).toBeNull();
+  });
+
+  it("admits hash-key images while retaining saved Supabase references", () => {
+    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_STORAGE_PROVIDER", "tigris");
+    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_ASSET_ORIGIN", undefined);
+    const url = `https://library.grida.co/${sha}.png`;
+    expect(trustedLibraryImageUrl(url, base)?.href).toBe(url);
+    expect(trustedLibraryImageUrl(url, "")?.href).toBe(url);
+    expect(
+      trustedLibraryImageUrl(
+        `${base}/storage/v1/object/public/library/legacy.png`,
+        base
+      )?.href
+    ).toBe(`${base}/storage/v1/object/public/library/legacy.png`);
+  });
+
+  it.each([
+    `https://library.grida.co.attacker.test/${sha}.png`,
+    `https://other.t3.tigrisbucket.io/${sha}.png`,
+    `http://library.grida.co/${sha}.png`,
+    `https://user:secret@library.grida.co/${sha}.png`,
+    "https://library.grida.co/legacy/image.png",
+    `https://library.grida.co/_qualification/${sha}.png`,
+    `https://library.grida.co/${sha.toUpperCase()}.png`,
+    `https://library.grida.co/${sha}.png?download=`,
+    `https://library.grida.co/${sha}.png#fragment`,
+  ])("rejects a noncanonical or foreign Tigris image URL: %s", (url) => {
+    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_STORAGE_PROVIDER", "tigris");
+    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_ASSET_ORIGIN", undefined);
+    expect(trustedLibraryImageUrl(url, base)).toBeNull();
+  });
+
+  it("supports an explicitly configured local object-store origin", () => {
+    vi.stubEnv("NEXT_PUBLIC_GRIDA_LIBRARY_STORAGE_PROVIDER", "tigris");
+    vi.stubEnv(
+      "NEXT_PUBLIC_GRIDA_LIBRARY_ASSET_ORIGIN",
+      "http://127.0.0.1:9000"
+    );
+    const local = `http://127.0.0.1:9000/${sha}.webp`;
+    expect(trustedLibraryImageUrl(local, base)?.href).toBe(local);
+    expect(
+      trustedLibraryImageUrl(`https://library.grida.co/${sha}.png`, base)
     ).toBeNull();
   });
 });

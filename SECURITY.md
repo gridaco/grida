@@ -764,14 +764,17 @@ host (`workspace`) carries no data so standard-URL host canonicalization can't
 corrupt the id; both ids live in the path.
 
 **First-party library images (reference-first artwork).** The artwork-station
-gather step (`design_search`) shows the user images from the Grida **Library** —
-the app's OWN Supabase storage bucket — and the picked references are kept as
-URLs and rendered directly (never downloaded). So the desktop CSP allowlists the
-**one first-party library origin** (`NEXT_PUBLIC_SUPABASE_URL`) in `img-src`,
-image-only. This is distinct from the generated-media rule above: generation
+gather step (`design_search`) shows the user images from the Grida **Library**,
+and the picked references are kept as URLs and rendered directly (never
+downloaded). The desktop CSP allows the selected first-party Library origin in
+`img-src` only. Supabase (`NEXT_PUBLIC_SUPABASE_URL`) remains the default;
+`NEXT_PUBLIC_GRIDA_LIBRARY_STORAGE_PROVIDER=tigris` explicitly selects the
+Tigris asset origin and retains the configured Supabase image origin for saved
+references. This is distinct from the generated-media rule above: generation
 provider CDNs (fal/openrouter/…) stay excluded — generated media is sidecar
-bytes via `data:`/`blob:`/`grida-workspace:`. The origin is derived from env at
-module load and omitted when unset (a malformed value cannot widen the policy);
+bytes via `data:`/`blob:`/`grida-workspace:`. Origins are fixed from the explicit
+provider configuration at module load; an unset Supabase origin is omitted,
+and malformed values cannot widen the policy.
 `proxy.test.ts` pins both the allow (library origin in `img-src` only) and the
 deny (provider CDNs still excluded). The alternative — proxying library images
 through `grida-workspace:` like generated media — was rejected: the library is
@@ -989,6 +992,8 @@ Today:
 - [Agent sandbox entry](packages/grida-ai-agent/src/sandbox/index.ts) — exports the existing scratch authority helpers for explicit agent host setup without importing the full server. Its containment import uses the existing [daemon sandbox entry](packages/grida-daemon/src/sandbox/index.ts); built-entry tests reject a dependency on the daemon server. Exporting the helper does not prepare scratch or grant a command executor.
 - [editor/proxy.ts](editor/proxy.ts) — Next.js 16 proxy that sets the CSP + `X-Robots-Tag` + `Referrer-Policy` + `X-Content-Type-Options` headers on every `/desktop/*` response.
 - [editor/lib/desktop/csp.ts](editor/lib/desktop/csp.ts) — the desktop CSP template (`buildDesktopCsp`), kept out of `proxy.ts` per Next.js 16 route-export rules. Owns the directive set, the `grida-workspace:` img/media scope (#924), and the first-party library `img-src` carve-out. Pinned by `proxy.test.ts`.
+- [Library byte locations](editor/lib/library/storage.ts) and [their tests](editor/lib/library/storage.test.ts) — explicit provider selection and validated first-party image origin shared by the CSP and image attachment allowlist. They add no connection or provider authority.
+- [Image attachments](editor/lib/agent-chat/image-attachment.ts) and [their tests](editor/lib/agent-chat/image-attachment.test.ts) — admit only configured Library image URLs and legacy configured Supabase public-Storage paths before bounded browser image decoding.
 - [editor/app/desktop/layout.tsx](editor/app/desktop/layout.tsx) — root layout for the desktop route group; gates all children through `DesktopBridgeGate`.
 - [editor/scaffolds/desktop/desktop-bridge-gate.tsx](editor/scaffolds/desktop/desktop-bridge-gate.tsx) — server-rendering-safe gate that renders children only when `window.grida` is present.
 - [editor/scaffolds/desktop/open-in-desktop-cta.tsx](editor/scaffolds/desktop/open-in-desktop-cta.tsx) — fallback shown to web visitors (capability boundary visible per doctrine rule 3).

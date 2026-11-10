@@ -14,6 +14,7 @@
  */
 
 import type { FileUIPart } from "ai";
+import { LibraryStorage } from "@/lib/library/storage";
 
 export type ImageAttachmentPolicy = {
   /** Accepted source mime types. Raster only — SVG is text and is excluded. */
@@ -262,15 +263,27 @@ export async function encodeLibraryImageUrl(
   }
 }
 
-/** The semantic companion to Desktop's CSP `img-src` carve-out. */
+/** GRIDA-SEC-004: Semantic companion to Desktop's image-only Library CSP carve-out. */
 export function trustedLibraryImageUrl(
   value: string,
   libraryBaseUrl: string
 ): URL | null {
-  if (!libraryBaseUrl) return null;
   try {
-    const base = new URL(libraryBaseUrl);
     const candidate = new URL(value);
+    if (
+      LibraryStorage.provider() === "tigris" &&
+      candidate.origin === LibraryStorage.origin() &&
+      !candidate.username &&
+      !candidate.password &&
+      !candidate.search &&
+      !candidate.hash &&
+      /^\/[a-f0-9]{64}\.(?:jpg|png|webp|gif|svg|avif)$/.test(candidate.pathname)
+    ) {
+      return candidate;
+    }
+    // Keep saved Supabase references and the existing local Storage path valid.
+    if (!libraryBaseUrl) return null;
+    const base = new URL(libraryBaseUrl);
     return (candidate.protocol === "https:" ||
       candidate.protocol === "http:") &&
       candidate.protocol === base.protocol &&

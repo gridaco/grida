@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import mime from "mime-types";
+import { LibraryStorage } from "./storage";
 
 /**
  * Library content addressing — #929.
@@ -16,25 +17,11 @@ export namespace LibraryCAS {
     return createHash("sha256").update(bytes).digest("hex");
   }
 
-  /**
-   * Pinned mimetype → extension map. Pinned (rather than delegated to a
-   * library) so every producer, in every language, derives the same CAS path
-   * for the same media type — e.g. `mime-types` (npm) says "jpeg" while
-   * Python's `mimetypes` says ".jpg". The sibling-repo producer mirrors this
-   * table verbatim.
-   */
-  const EXT: Record<string, string> = {
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-    "image/gif": "gif",
-    "image/svg+xml": "svg",
-    "image/avif": "avif",
-  };
-
   /** Informative extension for a media type; pinned map first, `mime-types` fallback. */
   export function ext(mimetype: string): string | null {
-    return EXT[mimetype] ?? mime.extension(mimetype) ?? null;
+    return (
+      LibraryStorage.extension(mimetype) || mime.extension(mimetype) || null
+    );
   }
 
   /** Flat CAS storage path: `<sha256>.<ext>` (bare `<sha256>` when the type has no extension). */

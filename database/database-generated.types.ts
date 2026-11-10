@@ -2477,7 +2477,7 @@ export type Database = {
           gravity_x?: number | null
           gravity_y?: number | null
           height: number
-          id: string
+          id?: string
           keywords?: string[]
           lang?: string | null
           license?: string
