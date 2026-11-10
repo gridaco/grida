@@ -34,6 +34,8 @@ import type {
   NativeChatTurnSummary,
   NativeChatWakeup,
   NativeChatWakeupAction,
+  NativeSubagentAssignmentInput,
+  NativeSubagentCreate,
 } from "@grida/desktop-bridge";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
@@ -45,6 +47,7 @@ import {
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeAgentRevisions } from "./native-agent-revisions";
+import { NativeAgentSubagents } from "./native-agent-subagents";
 import {
   NativeAgentGoals,
   type NativeGoalInspection,
@@ -182,6 +185,10 @@ export class NativeAgentChat {
   );
   private readonly revisions = new NativeAgentRevisions((method, params) =>
     this.process.request(method, params)
+  );
+  private readonly subagents = new NativeAgentSubagents(
+    (method, params) => this.process.request(method, params),
+    turn
   );
   private readonly configuration = new NativeAgentConfiguration(
     (method, params) => this.process.request(method, params, 10_000)
@@ -368,6 +375,85 @@ export class NativeAgentChat {
         this.requireAttached(session);
         check(revision);
       }
+    );
+  }
+
+  listSubagents(
+    parent: NativeChatSession,
+    afterChildId: string | undefined,
+    check: () => void
+  ) {
+    return this.subagents.list(
+      parent,
+      afterChildId,
+      this.subagentScope(parent, check)
+    );
+  }
+
+  inspectSubagent(
+    attachment: object,
+    parent: NativeChatSession,
+    childId: string,
+    inputId: string | undefined,
+    check: () => void
+  ) {
+    return this.subagents.inspect(
+      attachment,
+      parent,
+      childId,
+      inputId,
+      this.subagentScope(parent, check)
+    );
+  }
+
+  createSubagent(
+    parent: NativeChatSession,
+    input: NativeSubagentCreate,
+    check: () => void
+  ) {
+    return this.subagents.create(
+      parent,
+      input,
+      this.subagentScope(parent, check)
+    );
+  }
+
+  assignSubagent(
+    attachment: object,
+    parent: NativeChatSession,
+    input: NativeSubagentAssignmentInput,
+    observe: () => NativeChatSnapshot,
+    check: () => void
+  ) {
+    return this.subagents.assign(
+      attachment,
+      parent,
+      input,
+      () => {
+        const snapshot = observe();
+        this.requireObservation(parent, snapshot);
+        const sponsor = snapshot.latest;
+        if (sponsor?.disposition !== "settled")
+          throw new Error("native_chat_subagent_sponsor_unavailable");
+        return sponsor.turnId;
+      },
+      this.subagentScope(parent, check)
+    );
+  }
+
+  stopSubagent(
+    attachment: object,
+    parent: NativeChatSession,
+    observationId: string,
+    requestId: string,
+    check: () => void
+  ) {
+    return this.subagents.stop(
+      attachment,
+      parent,
+      observationId,
+      requestId,
+      this.subagentScope(parent, check)
     );
   }
 
@@ -719,6 +805,9 @@ export class NativeAgentChat {
       ...(pending[0] && { pendingGoalId: pending[0].inputId }),
       ...(this.process.acceptsHistoryRevision && {
         historyRevisionAvailable: true as const,
+      }),
+      ...(this.process.acceptsSubagents && {
+        subagentsAvailable: true as const,
       }),
       ...(current?.disposition === "running" &&
         !current.paused &&
@@ -1394,6 +1483,18 @@ export class NativeAgentChat {
     if (!this.ownsSession(session))
       throw new Error("native_chat_attachment_required");
     return session.id;
+  }
+
+  private subagentScope(
+    parent: NativeChatSession,
+    check: () => void
+  ): () => void {
+    return () => {
+      this.requireAttached(parent);
+      if (!this.process.acceptsSubagents)
+        throw new Error("native_chat_subagent_unavailable");
+      check();
+    };
   }
 
   private requireOpen(): void {

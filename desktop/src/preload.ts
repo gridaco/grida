@@ -405,6 +405,38 @@ const bridge: DesktopBridge = {
       ),
     revise: (attachmentId, input) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_REVISE, attachmentId, input),
+    listSubagents: (attachmentId, afterChildId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_LIST_SUBAGENTS,
+        attachmentId,
+        afterChildId
+      ),
+    inspectSubagent: (attachmentId, childId, inputId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_INSPECT_SUBAGENT,
+        attachmentId,
+        childId,
+        inputId
+      ),
+    createSubagent: (attachmentId, input) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_CREATE_SUBAGENT,
+        attachmentId,
+        input
+      ),
+    assignSubagent: (attachmentId, input) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_ASSIGN_SUBAGENT,
+        attachmentId,
+        input
+      ),
+    stopSubagent: (attachmentId, stopObservationId, requestId) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_STOP_SUBAGENT,
+        attachmentId,
+        stopObservationId,
+        requestId
+      ),
     create: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CREATE),
     load: (sessionId) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LOAD, sessionId),

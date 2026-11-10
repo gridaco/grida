@@ -64,6 +64,7 @@ import type {
 
 import type { DesktopNativeChat } from "./native-chat";
 export type * from "./native-chat";
+export type * from "./native-subagents";
 
 export const DESKTOP_BRIDGE_PROTOCOL = 1 as const;
 

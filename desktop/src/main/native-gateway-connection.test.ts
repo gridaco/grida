@@ -1,7 +1,10 @@
 // GRIDA-SEC-006 — the account-scoped bearer stays in the main connector.
+import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { expect, it, vi } from "vitest";
 import type {
   DesktopAccountSession,
@@ -10,6 +13,8 @@ import type {
 import { NativeGatewayConnection } from "./native-gateway-connection";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 import { NativeAgentProcess } from "./native-agent-process";
+import { NativeAgentChat } from "./native-agent-chat";
+import { NativeChatIpc } from "./native-chat-ipc";
 
 const origin = "https://grida.test";
 const target = `${origin}/api/v1/ai/chat/completions`;
@@ -424,6 +429,172 @@ it.skipIf(!resourcesPath)(
         await agent?.close();
       } finally {
         connections.forEach((connection) => connection.close());
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  },
+  30_000
+);
+
+it.skipIf(!resourcesPath)(
+  "lists, assigns, and stops exact named work through the guarded Desktop bridge",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-desktop-subagent-")
+    );
+    const cwd = path.join(root, "workspace");
+    await fs.mkdir(cwd, { mode: 0o700 });
+    const owner = fixture();
+    const connection = await NativeGatewayConnection.open(owner.options);
+    let cancelled = false;
+    owner.dispatch.mockImplementation(async (body) => {
+      const input = JSON.parse(body.toString()).messages.at(-1).content;
+      const hold = input === "Hold this review.";
+      const text =
+        input === "Review the first draft."
+          ? "First review."
+          : "Fixture answer.";
+      const chunk = `data: ${JSON.stringify({ id: "fixture", choices: [{ index: 0, delta: { role: "assistant", content: text }, finish_reason: null }] })}\n\n`;
+      const response = hold
+        ? new ReadableStream<Uint8Array>({
+            start: (stream) => stream.enqueue(new TextEncoder().encode(chunk)),
+            cancel: () => {
+              cancelled = true;
+            },
+          })
+        : chunk +
+          'data: {"id":"fixture","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n' +
+          "data: [DONE]\n\n";
+      return new Response(response, {
+        headers: { "content-type": "text/event-stream" },
+      });
+    });
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...connection.launch("fixture"),
+        subagents: true,
+        resourcesPath: resourcesPath!,
+        stateDirectory: path.join(root, "state"),
+        cwd,
+      });
+      const editor = "https://editor.fixture.invalid";
+      const window = () => {
+        const frame = { url: `${editor}/desktop/workspace?id=workspace` };
+        const sender = Object.assign(new EventEmitter(), {
+          mainFrame: frame,
+          isDestroyed: () => false,
+          isLoadingMainFrame: () => false,
+        }) as unknown as WebContents;
+        return { sender, senderFrame: frame } as unknown as IpcMainInvokeEvent;
+      };
+      const first = window();
+      const second = window();
+      const active = { workspaceId: "workspace", chat };
+      const ipc = new NativeChatIpc(editor, (sender) =>
+        sender === first.sender || sender === second.sender ? active : null
+      );
+      const parent = await ipc.create(first);
+      const aid = parent.attachmentId;
+      const submitted = await ipc.submit(
+        first,
+        aid,
+        "sponsor",
+        "Review the project."
+      );
+      const sponsor = await vi.waitFor(async () => {
+        const observed = await ipc.observe(first, aid);
+        expect(observed.snapshot.subagentsAvailable).toBe(true);
+        expect(observed.snapshot.current).toBeNull();
+        expect(observed.snapshot.latest?.turnId).toBe(submitted.turnId);
+        return observed;
+      });
+      const create = {
+        requestId: randomUUID(),
+        name: "Reviewer",
+        workTurns: 2,
+      };
+      const child = await ipc.createSubagent(first, aid, create);
+      await expect(ipc.createSubagent(first, aid, create)).resolves.toEqual(
+        child
+      );
+      await expect(ipc.listSubagents(first, aid, undefined)).resolves.toEqual({
+        children: [child],
+        nextAfterChildId: null,
+      });
+      const assign = (instructions: string) => ({
+        childId: child.childId,
+        parentObservationId: sponsor.observationId,
+        inputId: randomUUID(),
+        instructions,
+      });
+      const completed = assign("Review the first draft.");
+      await ipc.assignSubagent(first, aid, completed);
+      await vi.waitFor(async () => {
+        const observed = await ipc.inspectSubagent(
+          first,
+          aid,
+          child.childId,
+          undefined
+        );
+        expect(observed.child.assignment).toMatchObject({
+          inputId: completed.inputId,
+          parentTurnId: submitted.turnId,
+          instructionPreview: completed.instructions,
+          result: { text: "First review." },
+        });
+      });
+      const held = assign("Hold this review.");
+      await ipc.assignSubagent(first, aid, held);
+      const running = await vi.waitFor(async () => {
+        expect(owner.dispatch).toHaveBeenCalledTimes(3);
+        const observed = await ipc.inspectSubagent(
+          first,
+          aid,
+          child.childId,
+          held.inputId
+        );
+        expect(observed.stopObservationId).toEqual(expect.any(String));
+        return observed;
+      });
+      const old = await ipc.inspectSubagent(
+        first,
+        aid,
+        child.childId,
+        completed.inputId
+      );
+      expect(old.stopObservationId).toBeNull();
+      expect(old.child.assignment?.result?.text).toBe("First review.");
+      const attached = await ipc.load(second, parent.sessionId);
+      const stopId = randomUUID();
+      await expect(
+        ipc.stopSubagent(
+          second,
+          attached.attachmentId,
+          running.stopObservationId!,
+          stopId
+        )
+      ).rejects.toThrow("native_chat_subagent_observation_unavailable");
+      await ipc.stopSubagent(first, aid, running.stopObservationId!, stopId);
+      await ipc.stopSubagent(first, aid, running.stopObservationId!, stopId);
+      await vi.waitFor(async () => {
+        const ended = await ipc.inspectSubagent(
+          first,
+          aid,
+          child.childId,
+          held.inputId
+        );
+        expect(ended.child.admissionPaused).toBe(true);
+        expect(ended.child.assignment?.disposition).toBe("completed");
+        expect(ended.stopObservationId).toBeNull();
+        expect(cancelled).toBe(true);
+      });
+      expect(owner.dispatch).toHaveBeenCalledTimes(3);
+    } finally {
+      try {
+        await chat?.close();
+      } finally {
+        connection.close();
         await fs.rm(root, { recursive: true, force: true });
       }
     }

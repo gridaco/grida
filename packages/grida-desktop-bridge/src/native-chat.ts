@@ -1,4 +1,6 @@
 // GRIDA-SEC-004 — renderer-safe native chat projection.
+import type { NativeSubagentClient } from "./native-subagents";
+
 export type NativeChatAttachment = Readonly<{
   attachmentId: string;
   sessionId: string;
@@ -107,6 +109,7 @@ export type NativeChatSnapshot = Readonly<{
   queuedInputs: number;
   pendingGoalId?: string;
   historyRevisionAvailable?: true;
+  subagentsAvailable?: true;
   /** Earliest provider retry time in UTC milliseconds for the current turn. */
   retryNotBeforeMs?: number;
   admissionPaused: boolean;
@@ -368,7 +371,7 @@ export type NativeChatUpdate =
     }>;
 
 /** Available only for a main-selected native chat in the current workspace. */
-export type DesktopNativeChat = {
+export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   available(): Promise<boolean>;
   /** Starts the admitted workspace when requested and native mode is selected. */
   status?(start?: boolean): Promise<NativeChatReadiness>;

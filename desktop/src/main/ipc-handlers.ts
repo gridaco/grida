@@ -261,6 +261,31 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     (event, id: string, input: unknown) => nativeChat.revise(event, id, input)
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_CREATE, (event) => nativeChat.create(event));
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_LIST_SUBAGENTS,
+    (event, id: string, afterChildId: unknown) =>
+      nativeChat.listSubagents(event, id, afterChildId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_INSPECT_SUBAGENT,
+    (event, id: string, childId: unknown, inputId: unknown) =>
+      nativeChat.inspectSubagent(event, id, childId, inputId)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_CREATE_SUBAGENT,
+    (event, id: string, input: unknown) =>
+      nativeChat.createSubagent(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_ASSIGN_SUBAGENT,
+    (event, id: string, input: unknown) =>
+      nativeChat.assignSubagent(event, id, input)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_STOP_SUBAGENT,
+    (event, id: string, stopObservationId: unknown, requestId: unknown) =>
+      nativeChat.stopSubagent(event, id, stopObservationId, requestId)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_LOAD, (event, id: string) =>
     nativeChat.load(event, id)
   );

@@ -1080,6 +1080,16 @@ lazy reads, read-only mutation, and symlink escape refusal.
   workspace, tool, or delegation grants. The
   [process fixtures](crates/grida-agent/tests/process/subagents.rs) check
   attachment scope, restart, exact result attribution, and allowance reuse.
+- Native Desktop opts into named children through the trusted Gateway launch.
+  Main derives the sponsor from the exact attached parent observation and
+  retains that sponsor for an exact assignment retry. It checks child, input,
+  and turn identities before returning bounded assignment
+  and result text. A frame receives a Stop token only for the displayed
+  assignment's current turn. Another frame or an older result carries no
+  authority to stop newer work. [Launch](desktop/src/main/native-desktop-agent.ts),
+  [Main adapter](desktop/src/main/native-agent-subagents.ts),
+  [IPC](desktop/src/main/native-chat-ipc.ts),
+  [bridge projection](packages/grida-desktop-bridge/src/native-subagents.ts).
 
 - Portable Rust provider contracts: [crates/grida-ai/src/catalogue.rs](crates/grida-ai/src/catalogue.rs),
   [crates/grida-ai/src/discovery.rs](crates/grida-ai/src/discovery.rs),

@@ -112,6 +112,11 @@ export type ActiveNativeChat = Readonly<{
         | "runCommand"
         | "prepareRevision"
         | "revise"
+        | "listSubagents"
+        | "inspectSubagent"
+        | "createSubagent"
+        | "assignSubagent"
+        | "stopSubagent"
         | "readArtifact"
         | "acceptsWakeups"
         | "submitWithWakeup"
@@ -385,6 +390,126 @@ export class NativeChatIpc {
         operatingRegime: input.operatingRegime,
       },
       (expected) => this.revalidateRevision(owner, attachment, expected)
+    );
+  }
+
+  listSubagents(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    afterChildId: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (
+      !chat.listSubagents ||
+      (afterChildId !== undefined && typeof afterChildId !== "string")
+    )
+      throw new Error("native_chat_subagent_unavailable");
+    return chat.listSubagents(attachment.session, afterChildId, () =>
+      this.revalidate(owner, attachment)
+    );
+  }
+
+  inspectSubagent(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    childId: unknown,
+    inputId: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (
+      !chat.inspectSubagent ||
+      typeof childId !== "string" ||
+      (inputId !== undefined && typeof inputId !== "string")
+    )
+      throw new Error("native_chat_subagent_unavailable");
+    return chat.inspectSubagent(
+      attachment,
+      attachment.session,
+      childId,
+      inputId,
+      () => this.revalidate(owner, attachment)
+    );
+  }
+
+  createSubagent(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    value: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    const input = record(value);
+    if (
+      !chat.createSubagent ||
+      !input ||
+      Object.keys(input).length !== 3 ||
+      !token(input.requestId) ||
+      typeof input.name !== "string" ||
+      typeof input.workTurns !== "number"
+    )
+      throw new Error("native_chat_subagent_invalid_input");
+    return chat.createSubagent(
+      attachment.session,
+      {
+        requestId: input.requestId,
+        name: input.name,
+        workTurns: input.workTurns,
+      },
+      () => this.revalidate(owner, attachment)
+    );
+  }
+
+  assignSubagent(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    value: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    const input = record(value);
+    if (
+      !chat.assignSubagent ||
+      !input ||
+      Object.keys(input).length !== 4 ||
+      typeof input.childId !== "string" ||
+      !token(input.parentObservationId) ||
+      !token(input.inputId) ||
+      typeof input.instructions !== "string"
+    )
+      throw new Error("native_chat_subagent_invalid_input");
+    const assignment = {
+      childId: input.childId,
+      parentObservationId: input.parentObservationId,
+      inputId: input.inputId,
+      instructions: input.instructions,
+    };
+    return chat.assignSubagent(
+      attachment,
+      attachment.session,
+      assignment,
+      () => requireObservation(attachment, assignment.parentObservationId),
+      () => this.revalidate(owner, attachment)
+    );
+  }
+
+  stopSubagent(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    stopObservationId: unknown,
+    requestId: unknown
+  ) {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const chat = owner.active.chat;
+    if (!chat.stopSubagent || !token(stopObservationId) || !token(requestId))
+      throw new Error("native_chat_subagent_invalid_input");
+    return chat.stopSubagent(
+      attachment,
+      attachment.session,
+      stopObservationId,
+      requestId,
+      () => this.revalidate(owner, attachment)
     );
   }
 

@@ -218,7 +218,10 @@ export class NativeDesktopAgent {
       signal
     );
     return {
-      provider: gateway.launch(TIER_MODEL_IDS[AGENT_DEFAULT_TIER]),
+      provider: {
+        ...gateway.launch(TIER_MODEL_IDS[AGENT_DEFAULT_TIER]),
+        subagents: true as const,
+      },
       release: () => gateway.close(),
     };
   }
