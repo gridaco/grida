@@ -2,6 +2,8 @@ Usage: grida agent run --provider gg --model ID --state-dir DIRECTORY --cwd DIRE
 
 Options:
   --prompt TEXT             Use this prompt. Omit to read bounded UTF-8 from stdin.
+  --input-png FILE          Attach one PNG on a supported Gateway model.
+  --input-file FILE         Attach one file for inspection.
   --skill NAME              Select a skill for this prompt. Repeat to add more.
   --session ID              Continue a settled chat with its original project and model.
   --org SLUG | --org-id ID  Select a funding organization.

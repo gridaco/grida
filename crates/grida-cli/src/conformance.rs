@@ -82,6 +82,8 @@ pub fn project(invocation: &Invocation) -> Value {
                     cwd,
                     session,
                     prompt,
+                    input_png,
+                    input_file,
                     skills,
                     questions,
                     deadline_ms,
@@ -93,6 +95,12 @@ pub fn project(invocation: &Invocation) -> Value {
                         session.as_ref().map(|id| id.as_str()),
                     );
                     optional(&mut object, "prompt", prompt.as_deref());
+                    if let Some(path) = input_png {
+                        put(&mut object, "inputPng", json!(path));
+                    }
+                    if let Some(path) = input_file {
+                        put(&mut object, "inputFile", json!(path));
+                    }
                     if !skills.is_empty() {
                         put(
                             &mut object,

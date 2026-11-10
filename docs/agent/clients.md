@@ -202,6 +202,12 @@ printf '%s' 'Explain this concept briefly.' | target/debug/grida agent run \
   --no-input
 ```
 
+On macOS and Linux, add `--input-png FILE` to attach one PNG up to 256 KiB to a
+run using the default Gateway model. The selected image is retained with the
+chat. Continuing the chat can send that retained image to the same connection
+again. Use `--input-file FILE` to attach a file up to 256 KiB for inspection.
+Each run accepts one of these attachments.
+
 The final JSON event can include `gateway_billing` with the recorded charge for
 each model request. A settled charge is a decimal string in mills, including
 `"0"` for a confirmed zero charge. Pending or unavailable evidence means the

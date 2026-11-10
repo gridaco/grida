@@ -82,6 +82,8 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
             cwd,
             session,
             prompt,
+            input_png,
+            input_file,
             skills,
             questions,
             deadline_ms,
@@ -110,15 +112,18 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
                 },
             };
             process::validate_prompt(&prompt).map_err(failure)?;
-            Some(RunOptions {
-                cwd,
-                session,
-                prompt: Some(prompt),
-                input_png: None,
-                skills,
-                questions,
-                timeout: Duration::from_millis(deadline_ms),
-            })
+            Some((
+                RunOptions {
+                    cwd,
+                    session,
+                    prompt: Some(prompt),
+                    input_png,
+                    skills,
+                    questions,
+                    timeout: Duration::from_millis(deadline_ms),
+                },
+                input_file,
+            ))
         }
         AgentAction::ServeStdio => None,
     };
@@ -166,8 +171,10 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
         )
         .map_err(failure)?,
     );
-    if let Some(run) = run {
-        process::run(&host, run, signal).await.map_err(failure)
+    if let Some((run, input_file)) = run {
+        process::run_with_file(&host, run, input_file, signal)
+            .await
+            .map_err(failure)
     } else {
         process::serve(host, None, signal).await.map_err(failure)
     }

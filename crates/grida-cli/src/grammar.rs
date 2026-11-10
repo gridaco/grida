@@ -63,6 +63,8 @@ pub enum AgentAction {
         cwd: PathBuf,
         session: Option<SessionId>,
         prompt: Option<String>,
+        input_png: Option<PathBuf>,
+        input_file: Option<PathBuf>,
         skills: Vec<grida_agent::skills::SkillReference>,
         questions: bool,
         deadline_ms: u64,
@@ -229,6 +231,8 @@ const STRINGS: &[&str] = &[
     "input",
     "prompt",
     "prompt-file",
+    "input-png",
+    "input-file",
     "text",
     "text-file",
     "image",
@@ -570,6 +574,8 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
             "cwd",
             "session",
             "prompt",
+            "input-png",
+            "input-file",
             "skill",
             "questions",
             "deadline-ms",
@@ -579,6 +585,9 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
     }
     tokens.allowed(false, &allowed)?;
     if tokens.required("provider")? != "gg" || (!run && !tokens.flag("stdio")) {
+        return Err(Failure::usage());
+    }
+    if tokens.seen("input-png") && tokens.seen("input-file") {
         return Err(Failure::usage());
     }
     let absolute = |name| {
@@ -612,6 +621,8 @@ fn parse_agent(tokens: &Tokens, run: bool) -> Result<AgentCommand, Failure> {
                     .transpose()
                     .map_err(|_| Failure::usage())?,
                 prompt: tokens.value("prompt").map(str::to_owned),
+                input_png: tokens.value("input-png").map(PathBuf::from),
+                input_file: tokens.value("input-file").map(PathBuf::from),
                 skills: tokens
                     .values("skill")
                     .unwrap_or_default()
@@ -919,6 +930,56 @@ mod tests {
         assert_eq!(
             parsed(&["help", "ai", "providers", "configure", "tripo"]).command,
             Command::Help(Topic::ProvidersConfigure)
+        );
+    }
+
+    #[test]
+    fn agent_run_accepts_one_headless_attachment() {
+        let arguments = [
+            "agent",
+            "run",
+            "--provider=gg",
+            "--model=openai/gpt-5.6-sol",
+            "--state-dir=/state",
+            "--cwd=/workspace",
+            "--input-png=example.png",
+        ];
+        let Command::Agent(AgentCommand {
+            action: AgentAction::Run { input_png, .. },
+            ..
+        }) = parsed(&arguments).command
+        else {
+            panic!("expected agent run");
+        };
+        assert_eq!(input_png, Some(PathBuf::from("example.png")));
+        let mut file_arguments = arguments.to_vec();
+        file_arguments.pop();
+        file_arguments.push("--input-file=document.pdf");
+        let Command::Agent(AgentCommand {
+            action: AgentAction::Run { input_file, .. },
+            ..
+        }) = parsed(&file_arguments).command
+        else {
+            panic!("expected agent run");
+        };
+        assert_eq!(input_file, Some(PathBuf::from("document.pdf")));
+        let mut duplicate = arguments.to_vec();
+        duplicate.push("--input-png=other.png");
+        assert!(parse(&args(&duplicate)).is_err());
+        let mut conflicting = arguments.to_vec();
+        conflicting.push("--input-file=document.pdf");
+        assert!(parse(&args(&conflicting)).is_err());
+        assert!(
+            parse(&args(&[
+                "agent",
+                "serve",
+                "--provider=gg",
+                "--model=openai/gpt-5.6-sol",
+                "--state-dir=/state",
+                "--stdio",
+                "--input-png=example.png",
+            ]))
+            .is_err()
         );
     }
 
