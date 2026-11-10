@@ -66,11 +66,8 @@ impl SummaryResponse {
     }
 }
 
-pub(super) fn handlers(
-    host: Arc<Host>,
-    sessions: Arc<Mutex<ConnectionSessions>>,
-) -> Builder<Agent, impl HandleDispatchFrom<Client>> {
-    Agent.v1().on_receive_request(
+pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>) -> RequestRoutes {
+    RequestRoutes::default().on_receive_request(
         async move |request: SummaryRequest, responder, _| {
             let result = async {
                 require(&sessions, SUMMARY, Some(&request.session_id))?;

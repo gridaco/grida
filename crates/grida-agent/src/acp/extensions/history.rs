@@ -67,14 +67,10 @@ struct ReviseResponse {
     input_position: u64,
 }
 
-pub(super) fn handlers(
-    host: Arc<Host>,
-    sessions: Arc<Mutex<ConnectionSessions>>,
-) -> Builder<Agent, impl HandleDispatchFrom<Client>> {
+pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>) -> RequestRoutes {
     let history = (host.clone(), sessions.clone());
     let fork = (host.clone(), sessions.clone());
-    Agent
-        .v1()
+    RequestRoutes::default()
         .on_receive_request(
             async move |request: History, responder, _| {
                 let result = async {

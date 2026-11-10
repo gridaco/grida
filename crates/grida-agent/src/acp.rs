@@ -153,7 +153,7 @@ async fn serve_connection(
     Agent
         .v1()
         .name("grida-agent")
-        .with_connection_builder(extensions::handlers(
+        .with_handler(extensions::handlers(
             host.clone(),
             sessions.clone(),
             reviewer,

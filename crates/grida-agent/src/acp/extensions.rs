@@ -6,6 +6,7 @@ mod goals;
 mod history;
 mod lifecycle;
 mod questions;
+mod routes;
 mod side_chats;
 mod skills;
 mod summaries;
@@ -13,11 +14,9 @@ mod wakeups;
 
 use super::{ConnectionSessions, host_error, prompt_part, prompt_parts, unavailable};
 use crate::host::{DurableSubmission, Host, InputSettings, PromptRequest};
-use agent_client_protocol::v1::Builder;
 use agent_client_protocol::v1::schema::{ContentBlock, Meta};
 use agent_client_protocol::{
-    Agent, Client, Error, HandleDispatchFrom, JsonRpcRequest, JsonRpcResponse, Result,
-    on_receive_request,
+    Client, Error, HandleDispatchFrom, JsonRpcRequest, JsonRpcResponse, Result, on_receive_request,
 };
 use agent_kit_core::history::HistoryPosition;
 use agent_kit_core::messages::OutcomeStatus;
@@ -27,6 +26,7 @@ use agent_kit_sessions::{
     ControlReceipt, InputDisposition, InputView, SessionRevision, TurnDisposition, TurnView,
 };
 use grida_agent_master::configuration::SettingChange;
+use routes::RequestRoutes;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -295,12 +295,7 @@ pub(super) fn handlers(
     sessions: Arc<Mutex<ConnectionSessions>>,
     reviewer: bool,
     side_chats: Option<Arc<crate::host::side_chats::SideChats>>,
-) -> Builder<
-    Agent,
-    impl HandleDispatchFrom<Client>,
-    impl agent_client_protocol::RunWithConnectionTo<Client>,
-    impl agent_client_protocol::HandleConnectionClose<Client>,
-> {
+) -> impl HandleDispatchFrom<Client> {
     let submit_host = host.clone();
     let submit_sessions = sessions.clone();
     let snapshot_host = host.clone();
@@ -313,30 +308,29 @@ pub(super) fn handlers(
     let update_sessions = sessions.clone();
     let image_intake = reviewer && host.accepts_images();
 
-    Agent
-        .v1()
-        .with_connection_builder(lifecycle::handlers(
+    RequestRoutes::default()
+        .extend(lifecycle::handlers(
             host.clone(),
             sessions.clone(),
             image_intake,
         ))
-        .with_connection_builder(questions::handlers(host.clone(), sessions.clone()))
-        .with_connection_builder(approvals::handlers(
+        .extend(questions::handlers(host.clone(), sessions.clone()))
+        .extend(approvals::handlers(
             host.clone(),
             sessions.clone(),
             reviewer,
         ))
-        .with_connection_builder(history::handlers(host.clone(), sessions.clone()))
-        .with_connection_builder(compaction::handlers(host.clone(), sessions.clone()))
-        .with_connection_builder(skills::handlers(host.clone(), sessions.clone()))
-        .with_connection_builder(summaries::handlers(host.clone(), sessions.clone()))
-        .with_connection_builder(goals::handlers(
+        .extend(history::handlers(host.clone(), sessions.clone()))
+        .extend(compaction::handlers(host.clone(), sessions.clone()))
+        .extend(skills::handlers(host.clone(), sessions.clone()))
+        .extend(summaries::handlers(host.clone(), sessions.clone()))
+        .extend(goals::handlers(
             host.clone(),
             sessions.clone(),
             image_intake,
         ))
-        .with_connection_builder(wakeups::handlers(host.clone(), sessions.clone()))
-        .with_connection_builder(side_chats::handlers(
+        .extend(wakeups::handlers(host.clone(), sessions.clone()))
+        .extend(side_chats::handlers(
             host.clone(),
             sessions.clone(),
             side_chats,

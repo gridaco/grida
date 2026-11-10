@@ -168,7 +168,7 @@ pub(super) fn handlers(
     host: Arc<Host>,
     sessions: Arc<Mutex<ConnectionSessions>>,
     image_intake: bool,
-) -> Builder<Agent, impl HandleDispatchFrom<Client>> {
+) -> RequestRoutes {
     let enqueue = (host.clone(), sessions.clone());
     let input = (host.clone(), sessions.clone());
     let replace = (host.clone(), sessions.clone());
@@ -177,8 +177,7 @@ pub(super) fn handlers(
     let resume_queue = (host.clone(), sessions.clone());
     let steer = (host.clone(), sessions.clone());
     let pause = (host.clone(), sessions.clone());
-    Agent
-        .v1()
+    RequestRoutes::default()
         .on_receive_request(
             async move |request: Enqueue, responder, _| {
                 let result = async {

@@ -42,19 +42,10 @@ struct AnswerQuestion {
     answer: QuestionAnswer,
 }
 
-pub(super) fn handlers(
-    host: Arc<Host>,
-    sessions: Arc<Mutex<ConnectionSessions>>,
-) -> Builder<
-    Agent,
-    impl HandleDispatchFrom<Client>,
-    impl agent_client_protocol::RunWithConnectionTo<Client>,
-    impl agent_client_protocol::HandleConnectionClose<Client>,
-> {
+pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>) -> RequestRoutes {
     let list_host = host.clone();
     let list_sessions = sessions.clone();
-    Agent
-        .v1()
+    RequestRoutes::default()
         .on_receive_request(
             async move |request: ListQuestions, responder, _| {
                 let result = async {

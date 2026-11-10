@@ -43,16 +43,10 @@ pub(super) fn handlers(
     host: Arc<Host>,
     sessions: Arc<Mutex<ConnectionSessions>>,
     reviewer: bool,
-) -> Builder<
-    Agent,
-    impl HandleDispatchFrom<Client>,
-    impl agent_client_protocol::RunWithConnectionTo<Client>,
-    impl agent_client_protocol::HandleConnectionClose<Client>,
-> {
+) -> RequestRoutes {
     let list_host = host.clone();
     let list_sessions = sessions.clone();
-    Agent
-        .v1()
+    RequestRoutes::default()
         .on_receive_request(
             async move |request: ListApprovals, responder, _| {
                 let result = async {

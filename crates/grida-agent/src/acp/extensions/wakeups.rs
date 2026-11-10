@@ -50,14 +50,10 @@ struct RecoverWakeup(WakeupTarget);
 #[serde(transparent)]
 struct WakeupsResponse(Wakeups);
 
-pub(super) fn handlers(
-    host: Arc<Host>,
-    sessions: Arc<Mutex<ConnectionSessions>>,
-) -> Builder<Agent, impl HandleDispatchFrom<Client>> {
+pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>) -> RequestRoutes {
     let list = (host.clone(), sessions.clone());
     let cancel = (host.clone(), sessions.clone());
-    Agent
-        .v1()
+    RequestRoutes::default()
         .on_receive_request(
             async move |request: ListWakeups, responder, _| {
                 let result = async {

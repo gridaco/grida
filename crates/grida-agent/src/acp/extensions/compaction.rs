@@ -27,11 +27,8 @@ struct Compact {
 #[serde(transparent)]
 struct CompactResponse(CompactionReport);
 
-pub(super) fn handlers(
-    host: Arc<Host>,
-    sessions: Arc<Mutex<ConnectionSessions>>,
-) -> Builder<Agent, impl HandleDispatchFrom<Client>> {
-    Agent.v1().on_receive_request(
+pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>) -> RequestRoutes {
+    RequestRoutes::default().on_receive_request(
         async move |request: Compact, responder, connection| {
             let host = host.clone();
             let sessions = sessions.clone();

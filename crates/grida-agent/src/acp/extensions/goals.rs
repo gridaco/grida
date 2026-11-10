@@ -74,12 +74,11 @@ pub(super) fn handlers(
     host: Arc<Host>,
     sessions: Arc<Mutex<ConnectionSessions>>,
     image_intake: bool,
-) -> Builder<Agent, impl HandleDispatchFrom<Client>> {
+) -> RequestRoutes {
     let start = (host.clone(), sessions.clone());
     let inspect = (host.clone(), sessions.clone());
     let control = (host.clone(), sessions.clone());
-    Agent
-        .v1()
+    RequestRoutes::default()
         .on_receive_request(
             async move |request: Start, responder, _| {
                 let result = async {

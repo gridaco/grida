@@ -51,11 +51,10 @@ pub(super) fn handlers(
     host: Arc<Host>,
     sessions: Arc<Mutex<ConnectionSessions>>,
     scope: Option<Arc<SideChats>>,
-) -> Builder<Agent, impl HandleDispatchFrom<Client>> {
+) -> RequestRoutes {
     let open = (sessions.clone(), scope.clone());
     let ask = (sessions.clone(), scope.clone());
-    Agent
-        .v1()
+    RequestRoutes::default()
         .on_receive_request(
             async move |request: Open, responder, _| {
                 let result = async {
