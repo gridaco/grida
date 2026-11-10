@@ -1326,17 +1326,17 @@ Today:
 - The [native Plan regime](crates/grida-agent/src/host.rs) selects investigation tools under the existing read grants and keeps command, working-copy mutation, settings changes and timer tools out of the turn inventory. The durable input captures the regime. Queue edits and restart cannot widen Plan to Act. A Plan launch can observe or stop retained Act work and refuses to resume it. [Process tests](crates/grida-agent/tests/process/operating_regime.rs) cover captured authority through queue edit, restart and separate Act submission.
 - The native [turn summary](crates/grida-agent/src/acp/extensions/summaries.rs) requires a negotiated capability and an attached chat. It reads the exact settled turn and projects bounded plain text, tool disposition counts, unresolved counts, check statuses, whether independent review findings were collected, and provider-reported token subtotals in a fixed set of categories. Raw operations, arguments, child identities, provider state, and attempt-level usage attribution stay in the host.
 - [Native goal host](crates/grida-agent/src/host/goals.rs) binds goal tools to the exact session, reserved turn, and goal revision. The tools read captured goal metadata or record a proposal. Their grant cannot authorize workspace, command, or provider operations. Explicit goal acceptance retains the selected permissions and uses the ordinary queue and turn owner.
-- The native [wake-up ACP extension](crates/grida-agent/src/acp/extensions/wakeups.rs) requires private stdio, a negotiated capability, and an attached session. The [timer host](crates/grida-agent/src/host/wakeups.rs) binds an explicit opt-in to its admitted turn, resolves the exact wait, and uses ordinary continuation authority. Restart recovery requires a separate identified request. [Process tests](crates/grida-agent/tests/process/wakeups.rs) cover private scope, ownership, cancellation, and restart.
-- Native [completion checks](crates/grida-agent/src/host/completion_checks.rs)
-  require trusted launch selection and an exact turn-bound grant. The built-in
-  text check uses only the bounded recorded answer. An optional command in the
-  [launch profile](crates/grida-agent/src/launch_permissions.rs) runs in Act under
 - The optional [Goal file verifier](crates/grida-agent/src/goal_verification.rs)
   matches one criterion from the trusted launch profile to a complete native
   read under the exact recorded turn grant. The [Master](crates/grida-agent-master/src/goals/settlement.rs)
   gives the model a bounded reference to the verified operation and independently
   checks that same evidence at settlement. [Built fixtures](crates/grida-agent/tests/process/goals/verification.rs)
   cover mismatched criteria, paths and bytes, and a retained observation after restart.
+- The native [wake-up ACP extension](crates/grida-agent/src/acp/extensions/wakeups.rs) requires private stdio, a negotiated capability, and an attached session. The [timer host](crates/grida-agent/src/host/wakeups.rs) binds an explicit opt-in to its admitted turn, resolves the exact wait, and uses ordinary continuation authority. Restart recovery requires a separate identified request. [Process tests](crates/grida-agent/tests/process/wakeups.rs) cover private scope, ownership, cancellation, and restart.
+- Native [completion checks](crates/grida-agent/src/host/completion_checks.rs)
+  require trusted launch selection and an exact turn-bound grant. The built-in
+  text check uses only the bounded recorded answer. An optional command in the
+  [launch profile](crates/grida-agent/src/launch_permissions.rs) runs in Act under
   the existing read-only primary scope and no-network [command supervisor](crates/grida-agent/src/command.rs).
   It receives literal arguments and bounded event input without inherited
   credentials. [Native preparation](crates/agent-kit-sandbox/src/native.rs)
