@@ -19,8 +19,8 @@ use agent_kit_core::tools::{
 };
 use agent_kit_core::turn::{
     CommitReceipt, ControlDirective, ControlReader, ControlRevision, ControlSnapshot,
-    JournalAction, JournalChange, ResponseContract, TurnBinding, TurnJournal, TurnLease,
-    TurnOutcome, TurnState, WaitRecord, bind_lease,
+    JournalAction, JournalChange, OperationOutcome, ResponseContract, TurnBinding, TurnJournal,
+    TurnLease, TurnOutcome, TurnState, WaitRecord, bind_lease,
 };
 use agent_kit_core::{
     BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, GrantId, MessageId, ModelId,
@@ -134,6 +134,8 @@ struct ScriptProvider {
     measured_requests: Mutex<Vec<InferenceRequest>>,
     hold_next_count: Mutex<Option<Arc<tokio::sync::Notify>>>,
     authority: Mutex<AuthorityBinding>,
+    capabilities: Mutex<ModelCapabilities>,
+    prepare_failure: Mutex<Option<Error>>,
 }
 
 impl Provider for ScriptProvider {
@@ -172,15 +174,12 @@ impl Provider for ScriptProvider {
     }
 
     fn capabilities(&self, _: &ModelId) -> Result<ModelCapabilities> {
-        Ok(ModelCapabilities {
-            revision: BindingId::new("script-v1")?,
-            input_modalities: BTreeSet::from([Modality::Text]),
-            json_tools: true,
-            text_tools: true,
-            max_output_tokens: Some(4096),
-        })
+        Ok(self.capabilities.lock().unwrap().clone())
     }
     fn prepare(&self, request: InferenceRequest) -> Result<PreparedRequest> {
+        if let Some(error) = self.prepare_failure.lock().unwrap().clone() {
+            return Err(error);
+        }
         let capabilities = self.capabilities(&request.model)?;
         PreparedRequest::from_validated(
             request,
@@ -192,6 +191,12 @@ impl Provider for ScriptProvider {
         )
     }
     fn start(&self, request: PreparedRequest, control: InferenceControl) -> Result<InferenceRun> {
+        if request.capabilities() != &self.capabilities(&request.request().model)? {
+            return Err(Error::new(
+                ErrorKind::Conflict,
+                "prepared_provider_binding_changed",
+            ));
+        }
         let index = self.calls.fetch_add(1, Ordering::SeqCst);
         self.requests
             .lock()
@@ -523,6 +528,14 @@ impl Fixture {
             measured_requests: Mutex::new(vec![]),
             hold_next_count: Mutex::new(None),
             authority: Mutex::new(authority()),
+            capabilities: Mutex::new(ModelCapabilities {
+                revision: BindingId::new("script-v1").unwrap(),
+                input_modalities: BTreeSet::from([Modality::Text]),
+                json_tools: true,
+                text_tools: true,
+                max_output_tokens: Some(4096),
+            }),
+            prepare_failure: Mutex::new(None),
         });
         let tool = Arc::new(EchoTool::new());
         let mut inventory = Inventory::new();
@@ -1946,6 +1959,92 @@ async fn fresh_authority_replaces_only_a_request_that_never_dispatched() {
         assert!(account.unresolved.is_empty());
         assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
         store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn reopening_an_unstarted_request_under_a_new_profile() {
+    for failure in [
+        None,
+        Some(Error::new(
+            ErrorKind::Unsupported,
+            "missing_tool_thought_signature",
+        )),
+    ] {
+        let fixture = Fixture::new(Script::Answer);
+        let store = fixture.store();
+        let claim = fixture.claim(&store).await;
+        let lease = intercept_publication(claim.lease, PublicationInterruption::BeforeDispatch);
+        let opened = fixture.runtime().open(lease).await.unwrap();
+        let result = fixture
+            .master(1, "Be concise")
+            .run(opened.turn, input())
+            .await;
+        assert!(matches!(result, Err(error) if error.code == "commit_outcome_unknown"));
+        assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
+        drop(store);
+
+        let store = fixture.reopen().await;
+        fixture.provider.authority.lock().unwrap().binding = BindingId::new("fresh-host").unwrap();
+        {
+            let mut capabilities = fixture.provider.capabilities.lock().unwrap();
+            capabilities.revision = BindingId::new("script-png-v1").unwrap();
+            capabilities.input_modalities.insert(Modality::Image);
+        }
+        *fixture.provider.prepare_failure.lock().unwrap() = failure.clone();
+        let claim = fixture.recover(&store).await;
+        let state = claim.lease.journal().load().await.unwrap();
+        let [original] = state.operations().values().collect::<Vec<_>>()[..] else {
+            panic!("expected one prepared operation");
+        };
+        assert!(original.attempts.is_empty());
+        assert!(original.outcome().is_none());
+        let opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let operations = opened.turn.operations();
+        let MasterOutcome::Settled(receipt) = fixture
+            .master(1, "Be concise")
+            .run(opened.turn, input())
+            .await
+            .unwrap()
+        else {
+            panic!("expected a durable settlement");
+        };
+        let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+        let (status, steps) = if failure.is_some() {
+            (OutcomeStatus::Failed, 0)
+        } else {
+            (OutcomeStatus::Succeeded, 1)
+        };
+        assert_eq!(receipt.outcome.status, status);
+        assert_eq!(account.steps, steps);
+        assert_eq!(account.failure, failure);
+        assert!(account.unresolved.is_empty());
+        let view = operations.view();
+        let retired = &view.state.operations()[&original.record.id];
+        assert!(retired.attempts.is_empty());
+        assert!(
+            matches!(retired.outcome(), Some(OperationOutcome::Inference(outcome))
+            if outcome.failure.as_ref().is_some_and(|failure| failure.kind == FailureKind::Cancelled))
+        );
+        assert_eq!(view.state.operations().len(), 1 + steps as usize);
+        assert_eq!(
+            fixture.provider.calls.load(Ordering::SeqCst),
+            steps as usize
+        );
+        let retained = receipt.outcome.clone();
+        store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+        drop(operations);
+        drop(store);
+
+        let reopened = fixture.reopen().await;
+        assert_eq!(
+            reopened
+                .inspect_turn(session_id(), turn_id())
+                .await
+                .unwrap()
+                .outcome,
+            Some(retained)
+        );
     }
 }
 

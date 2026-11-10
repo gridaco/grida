@@ -168,6 +168,12 @@ struct CompletionChecksExecution {
     grants: BTreeMap<agent_kit_core::BindingId, GrantSelection>,
 }
 
+enum RequestRefresh {
+    Unchanged,
+    Retired,
+    Rejected(Error),
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Continuation {
     configuration: Fingerprint,
@@ -423,17 +429,22 @@ impl Master {
                     &self.provider.capabilities(&self.config.model)?,
                 )?;
             }
-            if self
+            let rebind_failure = match self
                 .retire_unstarted_request(&mut turn, &mut continuation)
                 .await?
             {
-                continue;
-            }
+                RequestRefresh::Unchanged => None,
+                RequestRefresh::Retired => continue,
+                RequestRefresh::Rejected(error) => Some(error),
+            };
             let step_key = continuation.step_key();
             let retry = continuation.pending_retry();
-            let delay = retry
-                .map(|retry| retry.delay(&self.authority.inference))
-                .transpose();
+            let delay = match rebind_failure {
+                Some(error) => Err(error),
+                None => retry
+                    .map(|retry| retry.delay(&self.authority.inference))
+                    .transpose(),
+            };
             if let Ok(Some(delay)) = &delay
                 && !delay.is_zero()
                 && !turn
@@ -827,9 +838,9 @@ impl Master {
         &self,
         turn: &mut Turn,
         continuation: &mut Continuation,
-    ) -> Result<bool> {
+    ) -> Result<RequestRefresh> {
         let Some(request) = &continuation.request else {
-            return Ok(false);
+            return Ok(RequestRefresh::Unchanged);
         };
         let key = continuation.step_key();
         let operation = turn.operation(&OperationKey::new(key.clone())?)?;
@@ -837,7 +848,7 @@ impl Master {
             .as_ref()
             .is_some_and(|operation| !operation.attempts.is_empty())
         {
-            return Ok(false);
+            return Ok(RequestRefresh::Unchanged);
         }
         let new_input = turn
             .view()
@@ -862,7 +873,7 @@ impl Master {
             && !operation.as_ref().is_some_and(paused_before_generation)
             && request.binding().authority == self.authority.inference.authority
         {
-            return Ok(false);
+            return Ok(RequestRefresh::Unchanged);
         }
         let previous = &request.binding().authority;
         let current = &self.authority.inference.authority;
@@ -872,8 +883,11 @@ impl Master {
                 "continuation_authority_changed",
             ));
         }
-        let refreshed = self.provider.prepare(request.request().clone())?;
-        if refreshed.binding().provider != request.binding().provider {
+        let refreshed = self.provider.prepare(request.request().clone());
+        if refreshed
+            .as_ref()
+            .is_ok_and(|refreshed| refreshed.binding().provider != request.binding().provider)
+        {
             return Err(Error::new(
                 ErrorKind::Conflict,
                 "continuation_provider_changed",
@@ -886,6 +900,9 @@ impl Master {
                 .cancel_prepared(operation.record.id)
                 .await?;
         }
+        if let Err(error) = refreshed {
+            return Ok(RequestRefresh::Rejected(error));
+        }
         continuation.request = None;
         continuation.request_generation = continuation
             .request_generation
@@ -896,7 +913,7 @@ impl Master {
             encode(CONTINUATION_SCHEMA, continuation)?,
         )
         .await?;
-        Ok(true)
+        Ok(RequestRefresh::Retired)
     }
 
     fn prepare(&self, view: &TurnView) -> Result<PreparedRequest> {
