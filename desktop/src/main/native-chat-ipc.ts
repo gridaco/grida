@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 — native chat attachments and delivery belong to the admitted frame.
 import { randomUUID } from "node:crypto";
 import type { IpcMainInvokeEvent, WebContents, WebFrameMain } from "electron";
+import { NativeEditorSurfaces } from "@grida/desktop-bridge";
 import type {
   NativeChatAcceptance,
   NativeChatAttachment,
@@ -45,6 +46,7 @@ import type {
 import type { NativeApprovalReview } from "./native-agent-permissions";
 import type { NativeGoalInspection } from "./native-agent-goals";
 import type { NativeSideChat } from "./native-agent-side-chats";
+import type { NativeEditorSurfaceLease } from "./native-editor-surfaces";
 import {
   contextLimitValue,
   type ContextLimitBasis,
@@ -122,6 +124,7 @@ export type ActiveNativeChat = Readonly<{
         | "submitWithWakeup"
         | "scheduledWakeup"
         | "controlWakeup"
+        | "registerEditorSurfaces"
       >
     >;
 }>;
@@ -137,6 +140,7 @@ type Attachment = {
   artifacts?: { turnId: string; items: readonly NativeChatImageArtifact[] };
   readingArtifact?: boolean;
   deletion?: ReviewedDeletion;
+  editorSurfaces?: NativeEditorSurfaceLease;
   side?: SideAttachment;
   reviewedConfiguration?: {
     input: NativeChatConfigurationInput;
@@ -681,10 +685,30 @@ export class NativeChatIpc {
   detach(event: IpcMainInvokeEvent, attachmentId: string): void {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
     owner.attachments.delete(attachment.id);
+    attachment.editorSurfaces?.close();
     void this.releaseSide(owner, attachment).catch(() => {});
     for (const [id, subscription] of owner.subscriptions) {
       if (subscription.attachment === attachment)
         this.unsubscribeOwned(owner, id);
+    }
+  }
+
+  publishEditorSurfaces(
+    event: IpcMainInvokeEvent,
+    attachmentId: string,
+    value: unknown
+  ): void {
+    const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const snapshot = NativeEditorSurfaces.parse(value);
+    if (!snapshot) throw new Error("native_chat_editor_surfaces_invalid");
+    if (attachment.editorSurfaces) {
+      attachment.editorSurfaces.update(snapshot);
+    } else {
+      attachment.editorSurfaces = owner.active.chat.registerEditorSurfaces?.(
+        attachment.session,
+        snapshot,
+        () => this.revalidate(owner, attachment)
+      );
     }
   }
 
@@ -696,11 +720,15 @@ export class NativeChatIpc {
     regime?: unknown
   ) {
     const { owner, attachment } = this.requireAttachment(event, attachmentId);
+    const mode = operatingRegime(regime);
     const result = await owner.active.chat.submit(
       attachment.session,
       inputId,
       text,
-      operatingRegime(regime)
+      mode,
+      ...(mode === "act" && attachment.editorSurfaces
+        ? ([attachment.editorSurfaces.id] as const)
+        : [])
     );
     this.revalidate(owner, attachment);
     return result;
@@ -741,7 +769,10 @@ export class NativeChatIpc {
     const result = await chat.submitWithWakeup(
       attachment.session,
       inputId,
-      text
+      text,
+      ...(attachment.editorSurfaces
+        ? ([attachment.editorSurfaces.id] as const)
+        : [])
     );
     this.revalidate(owner, attachment);
     return result;
@@ -1569,8 +1600,10 @@ export class NativeChatIpc {
         stopWatching();
         for (const id of owner.subscriptions.keys())
           this.unsubscribeOwned(owner, id);
-        for (const attachment of owner.attachments.values())
+        for (const attachment of owner.attachments.values()) {
+          attachment.editorSurfaces?.close();
           void this.releaseSide(owner, attachment).catch(() => {});
+        }
         owner.attachments.clear();
       },
     };
@@ -1650,6 +1683,7 @@ export class NativeChatIpc {
       for (const attachment of owner.attachments.values()) {
         if (attachment.session !== session) continue;
         owner.attachments.delete(attachment.id);
+        attachment.editorSurfaces?.close();
         owner.retired.add(attachment.id);
         if (owner.retired.size > MAX_ATTACHMENTS) {
           const oldest = owner.retired.values().next().value;

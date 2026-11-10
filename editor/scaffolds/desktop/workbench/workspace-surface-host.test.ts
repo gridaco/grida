@@ -113,6 +113,26 @@ describe("WorkspaceSurfaceHost.listOpen", () => {
       open: ["/a.svg"],
     });
   });
+
+  it("updates the native projection on editor group changes", () => {
+    const { host, group } = createHost([]);
+    const observe = vi.fn<() => void>();
+    const unsubscribe = host.subscribeToEditorSurfaces(observe);
+    group.open("a.svg");
+    group.open("b.canvas");
+    group.open("virtual://design-search");
+    expect(host.readEditorSurfaces()).toEqual({
+      active: null,
+      open: ["/a.svg", "/b.canvas"],
+      truncated: false,
+    });
+    group.activate("a.svg");
+    expect(observe).toHaveBeenCalledTimes(4);
+    expect(host.readEditorSurfaces().active).toBe("/a.svg");
+    unsubscribe();
+    group.activate("b.canvas");
+    expect(observe).toHaveBeenCalledTimes(4);
+  });
 });
 
 describe("WorkspaceSurfaceHost.restoreRelative", () => {

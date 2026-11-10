@@ -13,6 +13,7 @@ import type {
   NativeChatTurnSummary,
   NativeChatUpdate,
   NativeChatWakeup,
+  NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "./native-chat-controller";
 
@@ -109,6 +110,47 @@ function fixture() {
     controller: new NativeChatController(bridge),
   };
 }
+
+it("publishes editor updates only while the selected chat attachment is owned", async () => {
+  const { bridge } = fixture();
+  const publish = vi.fn<
+    NonNullable<DesktopNativeChat["publishEditorSurfaces"]>
+  >(async () => {});
+  bridge.publishEditorSurfaces = publish;
+  const open = ["/a.svg", "/b.canvas"];
+  let snapshot: NativeEditorSurfaceSnapshot = {
+    active: open[0],
+    open,
+    truncated: false,
+  };
+  const listeners = new Set<() => void>();
+  const controller = new NativeChatController(bridge, undefined, undefined, {
+    readEditorSurfaces: () => snapshot,
+    subscribeToEditorSurfaces: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  });
+  try {
+    controller.connect("first");
+    await vi.waitFor(() =>
+      expect(publish).toHaveBeenCalledExactlyOnceWith("first", snapshot)
+    );
+    const original = [...listeners][0];
+    snapshot = { ...snapshot, active: open[1] };
+    original();
+    expect(publish).toHaveBeenLastCalledWith("first", snapshot);
+    await controller.select("second");
+    expect(publish).toHaveBeenLastCalledWith("second", snapshot);
+    expect(listeners.size).toBe(1);
+    expect(listeners.has(original)).toBe(false);
+    original();
+    expect(publish).toHaveBeenCalledTimes(3);
+  } finally {
+    controller.disconnect();
+  }
+  expect(listeners.size).toBe(0);
+});
 
 it("replaces a retry wait when the same turn's new observation clears it", async () => {
   const { bridge, controller, running } = fixture();

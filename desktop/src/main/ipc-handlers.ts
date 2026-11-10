@@ -308,6 +308,11 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     nativeChat.detach(event, id)
   );
   guarded(
+    IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
+    (event, attachmentId: string, snapshot: unknown) =>
+      nativeChat.publishEditorSurfaces(event, attachmentId, snapshot)
+  );
+  guarded(
     IPC_CHANNELS.NATIVE_CHAT_SUBMIT,
     (event, id: string, input: string, text: string, regime?: unknown) =>
       nativeChat.submit(event, id, input, text, regime)

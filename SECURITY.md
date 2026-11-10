@@ -954,6 +954,14 @@ lazy reads, read-only mutation, and symlink escape refusal.
   the admitted route and rechecks that scope before returning readiness.
   Navigation invalidates an outstanding reply. A failed native startup reports
   unavailability and cannot select the legacy owner.
+- [Live editor observations](crates/grida-agent/src/editor_surfaces.rs)
+  require the negotiated private Desktop stdio capability. Main issues the
+  binding for an exact authorized [chat attachment](desktop/src/main/native-editor-surfaces.ts).
+  Each observation revalidates the current frame and chat. Navigation or
+  replacement revokes the binding. Rust retains it with the accepted input,
+  checks the reply's chat and endpoint identity, and bounds the projected
+  workspace-relative paths. The read supplies editor context only and confers
+  no file, network, or document-edit authority.
 - The [native text observer](crates/grida-agent/src/acp/live.rs) projects
   assistant text from owned turns on negotiated private stdio. It checks
   attachment before serialization and uses the existing bounded ACP delivery

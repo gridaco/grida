@@ -73,8 +73,10 @@ async fn serve(
     let delivery = Arc::new(Delivery::new());
     let (sdk, wire) = Channel::duplex();
     let (incoming, outgoing) = wire.into_parts();
+    let editor_surfaces = host.editor_surfaces.clone();
     let read = async {
         let result = transport::read(input, outgoing, delivery.clone()).await;
+        editor_surfaces.detach();
         if let Some(provider) = &provider {
             provider.detach();
         }
@@ -92,6 +94,7 @@ async fn serve(
         read,
         transport::write(output, incoming, delivery.clone()),
     );
+    editor_surfaces.detach();
     if let Some(provider) = &provider {
         provider.detach();
     }
@@ -183,6 +186,7 @@ async fn serve_connection(
                 let subagents = initialized_host.subagents_available();
                 let deletion = reviewer && initialized_host.deletion_available();
                 let mut advertised = extensions::advertised(reviewer, subagents, deletion);
+                let mut editor_surfaces = false;
                 if reviewer {
                     advertised.insert(live::CAPABILITY.into(), 1.into());
                 }
@@ -203,6 +207,20 @@ async fn serve_connection(
                         return responder.respond_with_error(host_error(error));
                     }
                     advertised.insert(capability.into(), 1.into());
+                    let capability = crate::editor_surfaces::CAPABILITY;
+                    if reviewer
+                        && request
+                            .client_capabilities
+                            .meta
+                            .as_ref()
+                            .and_then(|meta| meta.get(capability))
+                            .and_then(serde_json::Value::as_u64)
+                            == Some(1)
+                    {
+                        initialized_host.editor_surfaces.attach(connection.clone());
+                        advertised.insert(capability.into(), 1.into());
+                        editor_surfaces = true;
+                    }
                 }
                 let updates = {
                     let mut sessions = initialized_sessions.lock().unwrap();
@@ -210,6 +228,11 @@ async fn serve_connection(
                     let meta = request.client_capabilities.meta.as_ref();
                     sessions.negotiated =
                         extensions::negotiated(meta, reviewer, subagents, deletion);
+                    if editor_surfaces {
+                        sessions
+                            .negotiated
+                            .insert(crate::editor_surfaces::CAPABILITY);
+                    }
                     if reviewer
                         && !sessions.live_started
                         && meta

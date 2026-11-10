@@ -467,6 +467,12 @@ const bridge: DesktopBridge = {
       }
       await ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_DETACH, attachmentId);
     },
+    publishEditorSurfaces: (attachmentId, snapshot) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.NATIVE_CHAT_PUBLISH_EDITOR_SURFACES,
+        attachmentId,
+        snapshot
+      ),
     submit: (attachmentId, inputId, text) =>
       ipcRenderer.invoke(
         IPC_CHANNELS.NATIVE_CHAT_SUBMIT,

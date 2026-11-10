@@ -35,6 +35,7 @@ import type {
   NativeChatTurnSummary,
   NativeChatWakeup,
   NativeChatWakeupAction,
+  NativeEditorSurfaceSnapshot,
   NativeSubagentAssignmentInput,
   NativeSubagentCreate,
 } from "@grida/desktop-bridge";
@@ -605,13 +606,28 @@ export class NativeAgentChat {
     return this.sideChats.close(side);
   }
 
+  registerEditorSurfaces(
+    session: NativeChatSession,
+    snapshot: NativeEditorSurfaceSnapshot,
+    requireCurrent: () => void
+  ) {
+    return this.process.registerEditorSurfaces(
+      this.requireAttached(session),
+      snapshot,
+      requireCurrent
+    );
+  }
+
   submit(
     session: NativeChatSession,
     inputId: string,
     text: string,
-    operatingRegime?: NativeChatOperatingRegime
+    operatingRegime?: NativeChatOperatingRegime,
+    editorEndpointId?: string
   ): Promise<NativeChatAcceptance> {
-    return this.send("submit", session, inputId, text, operatingRegime);
+    return this.send("submit", session, inputId, text, operatingRegime, {
+      editorEndpointId,
+    });
   }
 
   enqueue(
@@ -626,12 +642,14 @@ export class NativeAgentChat {
   submitWithWakeup(
     session: NativeChatSession,
     inputId: string,
-    text: string
+    text: string,
+    editorEndpointId?: string
   ): Promise<NativeChatAcceptance> {
     if (!this.acceptsWakeups)
       return Promise.reject(new Error("native_chat_wakeup_unavailable"));
     return this.send("submit", session, inputId, text, "act", {
       allowWakeups: true,
+      editorEndpointId,
     });
   }
 
@@ -702,11 +720,13 @@ export class NativeAgentChat {
       image?: ReturnType<typeof pngPrompt>;
       allowConfigurationChanges?: true;
       allowWakeups?: true;
+      editorEndpointId?: string;
     } = {}
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     identity(inputId);
-    const { image, allowConfigurationChanges, allowWakeups } = options;
+    const { image, allowConfigurationChanges, allowWakeups, editorEndpointId } =
+      options;
     return acceptance(
       await this.process.request(`_co.grida/session/${mode}`, {
         sessionId,
@@ -715,6 +735,11 @@ export class NativeAgentChat {
         ...(operatingRegime && { operatingRegime }),
         ...(allowConfigurationChanges && { allowConfigurationChanges }),
         ...(allowWakeups && { allowWakeups }),
+        ...(mode === "submit" &&
+          operatingRegime === "act" &&
+          !image &&
+          !allowConfigurationChanges &&
+          editorEndpointId && { editorEndpointId }),
       }),
       sessionId,
       inputId

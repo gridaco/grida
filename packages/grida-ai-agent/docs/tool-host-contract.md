@@ -83,6 +83,15 @@ An invocation addressed to one endpoint cannot silently move to its replacement
 or to whichever tab is now active. Late replies retain their original call and
 endpoint identity.
 
+For workspace chat, `surface_list_open` reads the captured workbench's active
+file and open files when invoked. The workbench owns the observations. Main
+authorizes the attached frame and publishes a bounded view of workspace-relative
+paths over private stdio. Rust retains the binding with the accepted Act input
+and validates each reply before projecting it as a tool result. An empty
+workbench returns an empty view. A detached or replaced workbench is unavailable.
+An unverified reply supplies no editor data. The binding grants no filesystem
+access or document mutation.
+
 The document tool defines the meaning of its document, selection, and content
 arguments. It returns its own domain result or error. A tool that requires a
 version or other precondition validates it inside the document implementation.

@@ -24,7 +24,7 @@ use agent_client_protocol::{
 use agent_kit_core::history::HistoryPosition;
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{ControlRevision, JournalPosition};
-use agent_kit_core::{ChangeId, Fingerprint, SessionId, TurnId};
+use agent_kit_core::{BindingId, ChangeId, Fingerprint, SessionId, TurnId};
 use agent_kit_sessions::{
     ControlReceipt, InputDisposition, InputView, SessionRevision, TurnDisposition, TurnView,
 };
@@ -137,6 +137,7 @@ struct Submit {
     #[serde(default)]
     allow_wakeups: bool,
     operating_regime: Option<crate::OperatingRegime>,
+    editor_endpoint_id: Option<BindingId>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -367,9 +368,15 @@ pub(super) fn handlers(
                     if request.allow_wakeups && !wakeups::available(&submit_sessions) {
                         return Err(unavailable("wakeup_capability_required"));
                     }
+                    if let Some(endpoint) = &request.editor_endpoint_id {
+                        require(&submit_sessions, crate::editor_surfaces::CAPABILITY, None)?;
+                        if uuid::Uuid::parse_str(endpoint.as_str()).is_err() {
+                            return Err(Error::invalid_params());
+                        }
+                    }
                     let parts = prompt_parts(request.prompt, image_intake)?;
                     let accepted = submit_host
-                        .submit_prompt_with_wakeups(
+                        .submit_prompt_with_context(
                             PromptRequest {
                                 id: request.input_id,
                                 session: request.session_id,
@@ -385,6 +392,7 @@ pub(super) fn handlers(
                                 )?,
                             },
                             request.allow_wakeups,
+                            request.editor_endpoint_id,
                         )
                         .await
                         .map_err(host_error)?;

@@ -136,6 +136,164 @@ it("does not dispatch after a scope change, a cancelled request, or close during
 
 const resourcesPath = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 it.skipIf(!resourcesPath)(
+  "reads the current tabs through one exact workbench attachment and refuses replacement state",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(
+        await fs.realpath(os.tmpdir()),
+        "grida-desktop-editor-surfaces-"
+      )
+    );
+    const cwd = path.join(root, "workspace");
+    await fs.mkdir(cwd, { mode: 0o700 });
+    const owner = fixture();
+    const connection = await NativeGatewayConnection.open(owner.options);
+    const editor = "https://editor.fixture.invalid";
+    const window = () => {
+      const frame = { url: `${editor}/desktop/workspace?id=workspace` };
+      const contents = Object.assign(new EventEmitter(), {
+        mainFrame: frame,
+        isDestroyed: () => false,
+        isLoadingMainFrame: () => false,
+      });
+      return {
+        contents,
+        event: {
+          sender: contents,
+          senderFrame: frame,
+        } as unknown as IpcMainInvokeEvent,
+      };
+    };
+    const first = window();
+    const other = window();
+    const accepted = Promise.withResolvers<void>();
+    const providerInputs: {
+      messages: { role: string; content: string }[];
+      tools: { function: { name: string } }[];
+    }[] = [];
+    let chat: NativeAgentChat | undefined;
+    try {
+      chat = await NativeAgentChat.start({
+        ...connection.launch("fixture"),
+        resourcesPath: resourcesPath!,
+        stateDirectory: path.join(root, "state"),
+        cwd,
+      });
+      const active = { workspaceId: "workspace", chat };
+      const ipc = new NativeChatIpc(editor, (sender) =>
+        sender === first.event.sender || sender === other.event.sender
+          ? active
+          : null
+      );
+      const parent = await ipc.create(first.event);
+      const alternative = await ipc.load(other.event, parent.sessionId);
+      const open = ["/first.svg", "/second.canvas"];
+      const snapshot = (active: string) => ({ active, open, truncated: false });
+      ipc.publishEditorSurfaces(
+        first.event,
+        parent.attachmentId,
+        snapshot(open[0])
+      );
+      ipc.publishEditorSurfaces(other.event, alternative.attachmentId, {
+        active: "/unrelated.svg",
+        open: ["/unrelated.svg"],
+        truncated: false,
+      });
+      owner.dispatch.mockImplementation(async (body) => {
+        providerInputs.push(JSON.parse(body.toString()));
+        const step = providerInputs.length;
+        if (step === 2)
+          ipc.publishEditorSurfaces(
+            first.event,
+            parent.attachmentId,
+            snapshot(open[1])
+          );
+        if (step === 3) {
+          await accepted.promise;
+          first.contents.emit("did-start-navigation", { isMainFrame: true });
+        }
+        const event = (delta: unknown, reason: string | null) =>
+          `data: ${JSON.stringify({ id: `step-${step}`, choices: [{ index: 0, delta, finish_reason: reason }] })}\n\n`;
+        const reply =
+          step <= 3
+            ? event(
+                {
+                  role: "assistant",
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: `read-${step}`,
+                      type: "function",
+                      function: { name: "surface_list_open", arguments: "{}" },
+                    },
+                  ],
+                },
+                null
+              ) + event({}, "tool_calls")
+            : event({ content: "Finished reading editor tabs." }, null) +
+              event({}, "stop");
+        return new Response(reply + "data: [DONE]\n\n", {
+          headers: { "content-type": "text/event-stream" },
+        });
+      });
+      const submitted = await ipc.submitWithWakeup(
+        first.event,
+        parent.attachmentId,
+        "surface-fixture",
+        "Tell me what is open."
+      );
+      accepted.resolve();
+      await vi.waitFor(
+        async () => {
+          const { snapshot } = await ipc.observe(
+            other.event,
+            alternative.attachmentId
+          );
+          expect(snapshot.current).toBeNull();
+          expect(snapshot.latest).toMatchObject({
+            turnId: submitted.turnId,
+            status: "succeeded",
+          });
+        },
+        { timeout: 5000 }
+      );
+      expect(providerInputs).toHaveLength(4);
+      expect(
+        providerInputs[0].tools.map((tool) => tool.function.name)
+      ).toContain("surface_list_open");
+      const results = providerInputs[3].messages
+        .filter((message) => message.role === "tool")
+        .map((message) => JSON.parse(message.content));
+      expect(results).toEqual([
+        expect.objectContaining({
+          status: "succeeded",
+          structured: { interactive: true, ...snapshot(open[0]) },
+        }),
+        expect.objectContaining({
+          status: "succeeded",
+          structured: { interactive: true, ...snapshot(open[1]) },
+        }),
+        expect.objectContaining({
+          status: "failed",
+          content: ["editor_surface_endpoint_unavailable"],
+          structured: null,
+        }),
+      ]);
+      expect(JSON.stringify(providerInputs)).not.toContain("/unrelated.svg");
+    } finally {
+      accepted.resolve();
+      try {
+        await chat?.close();
+      } finally {
+        connection.close();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  },
+  20_000
+);
+
+it.skipIf(!resourcesPath)(
   "restarts a native Gateway chat under its captured scope only",
   async () => {
     const root = await fs.mkdtemp(

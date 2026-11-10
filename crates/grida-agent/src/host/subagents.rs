@@ -238,6 +238,7 @@ impl Host {
                     configuration_permission: crate::ConfigurationPermission::Disabled,
                     allow_wakeups: false,
                     allow_host_tools: false,
+                    editor_endpoint: None,
                     operating_regime: OperatingRegime::Act,
                     subagent: Some(Assignment {
                         parent_turn: parent_turn.clone(),

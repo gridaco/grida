@@ -34,7 +34,7 @@ import { useGGModels } from "@/lib/desktop/gg-models";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Chat, useChat } from "@ai-sdk/react";
-import type { AgentSurface } from "@grida/agent/surface";
+import type { WorkspaceSurfaceHost } from "./workspace-surface-host";
 import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type UIMessage,
@@ -133,7 +133,7 @@ import styles from "./agent-pane.module.css";
 export type AgentPaneProps = {
   workspace: Workspace;
   /** Host-owned artifact presentation for this workbench's editor group. */
-  surfaceHost: AgentSurface.Host;
+  surfaceHost: WorkspaceSurfaceHost;
   /** The file currently in focus in the editor pane. */
   activeRelPath?: string | null;
   className?: string;
@@ -248,6 +248,7 @@ function NativeAgentPaneGate({
       bridge={bridge}
       workspaceId={legacy.workspace.id}
       initialSession={params.get("session")}
+      editorSurfaces={legacy.surfaceHost}
     />
   );
 }

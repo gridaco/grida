@@ -3,11 +3,13 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
+import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
 import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeAgentRevisions } from "./native-agent-revisions";
+import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
 import {
   NativeAgentPermissions,
   type NativeWorkspaceSelection,
@@ -76,6 +78,7 @@ export class NativeAgentProcess {
   readonly permissions?: NativeAgentPermissions;
   private readonly pending = new Map<number, Pending>();
   private readonly providerRequests = new Set<number | string>();
+  private readonly editorEndpoints = new NativeEditorSurfaceEndpoints();
   private readonly buffer = Buffer.allocUnsafe(FRAME_LIMIT);
   private readonly decoder = new TextDecoder("utf-8", { fatal: true });
   private readonly exited: Promise<{
@@ -91,6 +94,7 @@ export class NativeAgentProcess {
   private namedChildren = false;
   private artifacts = false;
   private savedChatDeletion = false;
+  private editorSurfaces = false;
   private readonly commandCapabilities = new Set<string>();
   private observedExit = false;
   private shutdown: Promise<void> | undefined;
@@ -290,6 +294,7 @@ export class NativeAgentProcess {
                 ...NativeAgentRevisions.capabilities,
                 ...(options.subagents && SUBAGENT_CAPABILITIES),
                 ...NativeAgentWakeups.capabilities,
+                [NativeEditorSurfaceEndpoints.capability]: 1,
                 [NativeAgentArtifacts.capability]: 1,
                 ...(requestDeletion && { [NativeAgentDeletion.capability]: 1 }),
               },
@@ -330,6 +335,9 @@ export class NativeAgentProcess {
         advertised?.[NativeAgentArtifacts.capability] === 1;
       processOwner.savedChatDeletion =
         requestDeletion && advertised?.[NativeAgentDeletion.capability] === 1;
+      processOwner.editorSurfaces =
+        providerEgress !== undefined &&
+        advertised?.[NativeEditorSurfaceEndpoints.capability] === 1;
       processOwner.ready = true;
       return processOwner;
     } catch (error) {
@@ -346,6 +354,15 @@ export class NativeAgentProcess {
     if (method === NativeAgentPermissions.answerMethod)
       return Promise.reject(new Error("native_agent_approval_requires_review"));
     return this.call(method, params, timeoutMs);
+  }
+
+  registerEditorSurfaces(
+    sessionId: string,
+    snapshot: NativeEditorSurfaceSnapshot,
+    requireCurrent: () => void
+  ) {
+    if (this.connected && this.editorSurfaces)
+      return this.editorEndpoints.register(sessionId, snapshot, requireCurrent);
   }
 
   private call(
@@ -396,6 +413,7 @@ export class NativeAgentProcess {
 
   private async stop(): Promise<void> {
     this.providerEgress?.close();
+    this.editorEndpoints.close();
     this.child.stdin.end();
     const exit = await bounded(this.exited, SHUTDOWN_TIMEOUT_MS);
     if (exit && !this.ready) return;
@@ -467,6 +485,21 @@ export class NativeAgentProcess {
           this.providerRequest(message.id, message.params);
           return;
         }
+        if (
+          message.method === NativeEditorSurfaceEndpoints.readMethod &&
+          this.connected &&
+          this.editorSurfaces
+        ) {
+          const result = this.editorEndpoints.read(message.params);
+          this.write({
+            jsonrpc: "2.0",
+            id: message.id,
+            ...(result
+              ? { result }
+              : { error: { code: -32602, message: "Invalid params" } }),
+          });
+          return;
+        }
         this.write({
           jsonrpc: "2.0",
           id: message.id,
@@ -513,6 +546,7 @@ export class NativeAgentProcess {
   private fail(error: Error): void {
     this.failure ??= error;
     this.providerEgress?.close();
+    this.editorEndpoints.close();
     this.providerRequests.clear();
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer);

@@ -37,6 +37,7 @@ import { NativeTurnSummary } from "./native-turn-summary";
 import { NativeContextLimitPanel } from "./native-context-limit-panel";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
 import { NativeSubagentsPanel } from "./native-subagents-panel";
+import type { WorkspaceSurfaceHost } from "./workspace-surface-host";
 
 const TEXT_CATALOG = { commands: [], mentions: [] };
 const COMMAND_DESCRIPTIONS = {
@@ -59,19 +60,22 @@ export function NativeAgentPane({
   bridge,
   workspaceId,
   initialSession,
+  editorSurfaces,
 }: {
   bridge: DesktopNativeChat;
   workspaceId: string;
   initialSession: string | null;
+  editorSurfaces?: WorkspaceSurfaceHost;
 }) {
   const controller = useMemo(
     () =>
       new NativeChatController(
         bridge,
         selectionMemory,
-        `grida.nativeChat.${workspaceId}`
+        `grida.nativeChat.${workspaceId}`,
+        editorSurfaces
       ),
-    [bridge, workspaceId]
+    [bridge, workspaceId, editorSurfaces]
   );
   const state = useSyncExternalStore(
     controller.subscribe,

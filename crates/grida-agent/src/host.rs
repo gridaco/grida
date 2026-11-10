@@ -110,6 +110,7 @@ pub struct Host {
     configuration: Option<Arc<Configuration>>,
     permissions: Option<Arc<crate::permissions::PermissionProfile>>,
     host_tools: Option<Arc<host_tools::HostTools>>,
+    pub(crate) editor_surfaces: crate::editor_surfaces::EditorSurfaces,
     subagents_enabled: bool,
     operating_regime: OperatingRegime,
     require_completion_text: bool,
@@ -280,6 +281,8 @@ struct StoredPrompt {
     )]
     host_tools_capture: Option<host_tools::Capture>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    editor_endpoint: Option<BindingId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     guidance: Option<crate::skills::CapturedGuidance>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     goal: Option<goals::GoalInput>,
@@ -300,6 +303,7 @@ struct SubmissionPolicy {
     configuration_permission: crate::ConfigurationPermission,
     allow_wakeups: bool,
     allow_host_tools: bool,
+    editor_endpoint: Option<BindingId>,
     operating_regime: OperatingRegime,
     subagent: Option<grida_agent_master::subagents::Assignment>,
 }
@@ -546,6 +550,7 @@ impl Host {
             configuration,
             permissions: None,
             host_tools: None,
+            editor_surfaces: Default::default(),
             subagents_enabled: false,
             operating_regime: OperatingRegime::default(),
             require_completion_text: false,
@@ -668,17 +673,17 @@ impl Host {
     }
 
     pub async fn start_prompt(&self, request: PromptRequest) -> Result<AcceptedRun> {
-        self.launch_prompt(request, false, false).await
+        let policy = self.submission_policy(&request, false)?;
+        self.launch_prompt(request, false, policy).await
     }
 
     async fn launch_prompt(
         &self,
         request: PromptRequest,
         publish_text: bool,
-        allow_wakeups: bool,
+        policy: SubmissionPolicy,
     ) -> Result<AcceptedRun> {
         self.execution()?;
-        let policy = self.submission_policy(&request, allow_wakeups)?;
         let PromptRequest {
             id, session, parts, ..
         } = request;
@@ -992,7 +997,9 @@ impl Host {
         };
         let prepared = input
             .as_ref()
-            .map(|input| self.prepare_input(execution, input, InputAuthority::RequireCaptured))
+            .map(|input| {
+                self.prepare_input(execution, session, input, InputAuthority::RequireCaptured)
+            })
             .transpose()?;
         if prepared
             .as_ref()
@@ -1067,7 +1074,7 @@ impl Host {
                     .map_err(|_| {
                         problem(ErrorKind::Uncertain, "retained_input_selection_invalid")
                     })?;
-                self.prepare_input(execution, input, InputAuthority::CancellationOnly)
+                self.prepare_input(execution, session, input, InputAuthority::CancellationOnly)
                     .map_err(|_| problem(ErrorKind::Uncertain, "retained_input_unavailable"))?
             }
         };
@@ -1350,6 +1357,7 @@ impl Host {
             configuration_permission: request.configuration_permission,
             allow_wakeups,
             allow_host_tools: true,
+            editor_endpoint: None,
             operating_regime,
             subagent: None,
         })
@@ -1367,6 +1375,7 @@ impl Host {
             configuration_permission,
             allow_wakeups,
             allow_host_tools,
+            editor_endpoint,
             operating_regime,
             subagent,
         } = policy;
@@ -1458,6 +1467,7 @@ impl Host {
                     configuration_permission,
                     permission_capture,
                     host_tools_capture,
+                    editor_endpoint,
                     guidance,
                     goal: None,
                     subagent,
@@ -1474,6 +1484,7 @@ impl Host {
     fn prepare_input(
         &self,
         execution: &Execution,
+        session: &SessionId,
         input: &Submission,
         authority: InputAuthority,
     ) -> Result<PreparedInput> {
@@ -1564,6 +1575,24 @@ impl Host {
                     && let Some(capture) = &stored.host_tools_capture
                 {
                     host_tools = Some(self.retained_host_tools(capture)?);
+                }
+                if !cancellation_only && let Some(endpoint) = &stored.editor_endpoint {
+                    if !stored.operating_regime.is_act()
+                        || stored.goal.is_some()
+                        || subagent
+                        || self.side_context.is_some()
+                        || host_tools.is_some()
+                    {
+                        return Err(problem(
+                            ErrorKind::InvalidState,
+                            "invalid_editor_surface_scope",
+                        ));
+                    }
+                    host_tools = Some(Arc::new(host_tools::HostTools::editor(
+                        self.editor_surfaces
+                            .tool_host(session.clone(), endpoint.clone())?,
+                        endpoint.clone(),
+                    )?));
                 }
                 authority.validate(
                     stored.authority.as_ref(),
@@ -1766,22 +1795,37 @@ impl Host {
     }
 
     pub async fn submit_prompt(&self, request: PromptRequest) -> Result<DurableSubmission> {
-        self.submit_prompt_with_wakeups(request, false).await
+        self.submit_prompt_with_context(request, false, None).await
     }
 
-    pub(crate) async fn submit_prompt_with_wakeups(
+    pub(crate) async fn submit_prompt_with_context(
         &self,
         request: PromptRequest,
         allow_wakeups: bool,
+        editor_endpoint: Option<BindingId>,
     ) -> Result<DurableSubmission> {
         validate_prompt_parts(&request.parts)?;
         if let Some(accepted) = self.existing_submission(&request, allow_wakeups).await? {
             return Ok(accepted);
         }
-        match self
-            .launch_prompt(request.clone(), true, allow_wakeups)
-            .await
+        let mut policy = self.submission_policy(&request, allow_wakeups)?;
+        if editor_endpoint.is_some()
+            && (!policy.operating_regime.is_act()
+                || self.side_context.is_some()
+                || self.host_tools.is_some()
+                || policy.configuration_permission == crate::ConfigurationPermission::Change
+                || !request
+                    .parts
+                    .iter()
+                    .all(|part| matches!(part, PromptPart::Text { .. })))
         {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "editor_surface_requires_workspace_act_text",
+            ));
+        }
+        policy.editor_endpoint = editor_endpoint;
+        match self.launch_prompt(request.clone(), true, policy).await {
             Ok(run) => Ok(DurableSubmission {
                 session: run.session,
                 input: run.input,

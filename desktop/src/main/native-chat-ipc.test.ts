@@ -16,6 +16,7 @@ import {
   type ConfigurationReview,
 } from "./native-chat-ipc";
 import type { NativeChatSession } from "./native-agent-chat";
+import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
 
 const ORIGIN = "https://fixture.invalid";
 const WORKSPACE = "workspace";
@@ -29,6 +30,41 @@ const UPDATE = {
   offsetBytes: 0,
   replace: true,
 } as const;
+
+it("binds editor observations only to an exact Act text attachment", async () => {
+  const { ipc, chat, first, second } = setup();
+  const endpoints = new NativeEditorSurfaceEndpoints();
+  chat.registerEditorSurfaces = (session, snapshot, current) =>
+    endpoints.register(session.id, snapshot, current);
+  const submit = vi.spyOn(chat, "submit");
+  const enqueue = vi.spyOn(chat, "enqueue");
+  const attachment = await ipc.create(first.event);
+  const id = attachment.attachmentId;
+  const empty = { active: null, open: [], truncated: false };
+  expect(() => ipc.publishEditorSurfaces(second.event, id, empty)).toThrow(
+    "native_chat_attachment_unavailable"
+  );
+  expect(() =>
+    ipc.publishEditorSurfaces(first.event, id, { ...empty, open: ["/../x"] })
+  ).toThrow("native_chat_editor_surfaces_invalid");
+  await ipc.submit(first.event, id, "without-snapshot", "Text", "act");
+  expect(submit.mock.calls.at(-1)).toHaveLength(4);
+  ipc.publishEditorSurfaces(first.event, id, empty);
+  await ipc.submit(first.event, id, "act", "Text", "act");
+  const endpointId = submit.mock.calls.at(-1)?.[4];
+  expect(endpointId).toMatch(/^[a-f0-9-]{36}$/);
+  const read = { sessionId: attachment.sessionId, endpointId };
+  expect(endpoints.read(read)).toEqual({ ...read, available: true, ...empty });
+  expect(endpoints.read({ ...read, sessionId: "other" })).toMatchObject({
+    available: false,
+  });
+  await ipc.submit(first.event, id, "plan", "Text", "plan");
+  expect(submit.mock.calls.at(-1)).toHaveLength(4);
+  await ipc.enqueue(first.event, id, "queue", "Text", "act");
+  expect(enqueue.mock.calls.at(-1)).toHaveLength(4);
+  ipc.detach(first.event, id);
+  expect(endpoints.read(read)).toEqual({ ...read, available: false, ...empty });
+});
 
 it("keeps an edit review on the current frame and latest observed revision", async () => {
   const { ipc, chat, first, second } = setup();

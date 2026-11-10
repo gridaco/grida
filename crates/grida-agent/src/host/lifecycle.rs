@@ -319,6 +319,7 @@ impl Host {
                             configuration_permission,
                             allow_wakeups: false,
                             allow_host_tools: capture.is_some(),
+                            editor_endpoint: None,
                             operating_regime,
                             subagent: None,
                         },

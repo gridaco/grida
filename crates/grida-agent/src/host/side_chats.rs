@@ -67,6 +67,7 @@ impl Host {
             configuration: self.configuration.clone(),
             permissions: None,
             host_tools: None,
+            editor_surfaces: Default::default(),
             subagents_enabled: false,
             operating_regime: OperatingRegime::Act,
             require_completion_text: false,

@@ -32,6 +32,7 @@ import type {
   NativeChatWakeup,
   NativeChatWakeupAction,
   NativeContextLimit,
+  NativeEditorSurfaceSnapshot,
   NativeSubagentClient,
 } from "@grida/desktop-bridge";
 import { NativeSideChatController } from "./native-side-chat-controller";
@@ -106,6 +107,7 @@ type Scope = {
   id: number;
   requested: string | null;
   attachment?: NativeChatAttachment;
+  stopEditorSurfaceUpdates?: () => void;
   sideChat?: NativeSideChatController;
   subagents?: NativeSubagentController;
   image?: ArrayBuffer;
@@ -219,7 +221,11 @@ export class NativeChatController {
   constructor(
     private readonly bridge: DesktopNativeChat,
     private readonly memory?: Pick<Storage, "getItem" | "setItem">,
-    private readonly memoryKey?: string
+    private readonly memoryKey?: string,
+    private readonly editorSurfaces?: {
+      readEditorSurfaces(): NativeEditorSurfaceSnapshot;
+      subscribeToEditorSurfaces(listener: () => void): () => void;
+    }
   ) {}
 
   static watchReadiness(
@@ -1875,6 +1881,13 @@ export class NativeChatController {
         : await this.bridge.create();
       scope.attachment = attachment;
       if (!this.owns(scope)) return;
+      if (this.editorSurfaces && this.bridge.publishEditorSurfaces) {
+        const publish = () => this.publishEditorSurfaces(scope, attachment);
+        scope.stopEditorSurfaceUpdates =
+          this.editorSurfaces.subscribeToEditorSurfaces(() => void publish());
+        await publish();
+        if (!this.owns(scope)) return;
+      }
       this.recents = [
         attachment.sessionId,
         ...this.recents.filter((id) => id !== attachment.sessionId),
@@ -1898,6 +1911,7 @@ export class NativeChatController {
   private queueRelease(scope: Scope | undefined): void {
     if (!scope) return;
     clearTimeout(scope.timer);
+    scope.stopEditorSurfaceUpdates?.();
     void scope.sideChat?.close().catch(() => {});
     scope.subagents?.dispose();
     this.attachments = this.attachments.then(async () => {
@@ -1905,6 +1919,19 @@ export class NativeChatController {
       if (scope.attachment)
         await this.bridge.detach(scope.attachment.attachmentId).catch(() => {});
     });
+  }
+
+  private async publishEditorSurfaces(
+    scope: Scope,
+    attachment: NativeChatAttachment
+  ): Promise<void> {
+    if (!this.owns(scope) || !this.editorSurfaces) return;
+    await this.bridge
+      .publishEditorSurfaces?.(
+        attachment.attachmentId,
+        this.editorSurfaces.readEditorSurfaces()
+      )
+      .catch(() => {});
   }
 
   private async readCatalogEntry(

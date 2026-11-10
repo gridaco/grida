@@ -1,4 +1,5 @@
 import type { AgentSurface } from "@grida/agent/surface";
+import { NativeEditorSurfaces } from "@grida/desktop-bridge";
 import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
 import type { WorkspaceViewState } from "@/lib/desktop/workspace-view-state";
 import type { EditorGroup } from "./editor-group";
@@ -17,7 +18,7 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
     private readonly readdir: WorkspaceArtifact.Readdir,
     private readonly group: Pick<
       EditorGroup,
-      "getSnapshot" | "open" | "restore"
+      "getSnapshot" | "open" | "restore" | "subscribe"
     >,
     private readonly isVirtual: (id: string) => boolean = (id) =>
       id.startsWith("virtual://")
@@ -100,6 +101,14 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
         ? null
         : WorkspaceArtifact.toAgentPath(active);
     return { active: activePath, open };
+  }
+
+  readEditorSurfaces() {
+    return NativeEditorSurfaces.capture(this.listOpen());
+  }
+
+  subscribeToEditorSurfaces(listener: () => void): () => void {
+    return this.group.subscribe(listener);
   }
 
   /**

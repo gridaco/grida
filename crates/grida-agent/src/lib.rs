@@ -6,6 +6,7 @@ pub mod command;
 pub mod configuration;
 mod configuration_tools;
 mod custody;
+mod editor_surfaces;
 pub mod file_tools;
 pub mod gg;
 pub mod host;

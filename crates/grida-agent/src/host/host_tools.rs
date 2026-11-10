@@ -1,6 +1,7 @@
 //! GRIDA-SEC-004 — tool-host authority belongs to the captured endpoints and turn.
 
 use super::{Host, problem};
+use crate::editor_surfaces::LIST_OPEN;
 use crate::mcp_client::McpClient;
 use crate::surface_tools::{OPEN_SURFACE, headless_surface};
 use crate::tool_host::{CapabilityGrant, ToolHost};
@@ -30,6 +31,7 @@ pub(super) struct HostTools {
     surface: Option<ToolHost>,
     capture: Capture,
     grants: BTreeMap<ToolId, CapabilityGrant>,
+    principal: &'static str,
 }
 
 impl Host {
@@ -102,6 +104,29 @@ impl Host {
 
 impl HostTools {
     fn new(mcp: Option<McpClient>, surface: Option<ToolHost>) -> Result<Self> {
+        let lease = mcp
+            .as_ref()
+            .map(|client| Ok(client.lease().clone()))
+            .unwrap_or_else(|| BindingId::new(HEADLESS_BINDING))?;
+        let principal = if mcp.is_some() {
+            "local-mcp"
+        } else {
+            "local-headless"
+        };
+        Self::with_local(mcp, surface, OPEN_SURFACE, lease, principal)
+    }
+
+    pub(super) fn editor(surface: ToolHost, lease: BindingId) -> Result<Self> {
+        Self::with_local(None, Some(surface), LIST_OPEN, lease, "live-editor")
+    }
+
+    fn with_local(
+        mcp: Option<McpClient>,
+        surface: Option<ToolHost>,
+        local_id: &str,
+        lease: BindingId,
+        principal: &'static str,
+    ) -> Result<Self> {
         let mut grants = BTreeMap::new();
         let mut definitions = BTreeMap::new();
         let selected = mcp
@@ -111,7 +136,7 @@ impl HostTools {
             .unwrap_or_default();
         let local = surface
             .as_ref()
-            .map(|host| host.grant(&ToolId::new(OPEN_SURFACE)?))
+            .map(|host| host.grant(&ToolId::new(local_id)?))
             .transpose()?;
         for grant in selected.into_iter().chain(local) {
             let definition = grant.describe()?;
@@ -125,12 +150,7 @@ impl HostTools {
             grants.insert(id, grant);
         }
         let capture = Capture {
-            // The local implementation is stateless and does not present
-            // anything. Its exact definition can be rebound after restart.
-            lease: mcp
-                .as_ref()
-                .map(|client| Ok(client.lease().clone()))
-                .unwrap_or_else(|| BindingId::new(HEADLESS_BINDING))?,
+            lease,
             catalog: Fingerprint::of(&definitions)?,
         };
         Ok(Self {
@@ -138,6 +158,7 @@ impl HostTools {
             surface,
             capture,
             grants,
+            principal,
         })
     }
 
@@ -161,11 +182,7 @@ impl HostTools {
 
     pub(super) fn bind(self: Arc<Self>, turn: &TurnBinding) -> Result<Arc<TurnTools>> {
         let authority = AuthorityBinding {
-            principal: PrincipalId::new(if self.mcp.is_some() {
-                "local-mcp"
-            } else {
-                "local-headless"
-            })?,
+            principal: PrincipalId::new(self.principal)?,
             binding: self.capture.lease.clone(),
             // A resumed turn can still use the exact same live owner.
             scope: ScopeId::new(turn.turn.as_str())?,
