@@ -299,7 +299,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
   });
 
   it.skipIf(process.platform !== "darwin" || !process.geteuid?.())(
-    "withholds native readiness when the sealed source is still writable",
+    "recovers a writable seal before lease retirement and refuses to rebase an accepted archive",
     async () => {
       const test = await fixture();
       writeLegacy(test.database, test.scratchBase);
@@ -314,13 +314,31 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
       const original = await archive.sealQuiesced({
         requestId: `desktop-native-chat-${key}`,
       });
+      const legacy = new DatabaseSync(test.database);
+      try {
+        legacy.exec("INSERT INTO chat_sessions VALUES ('ses_post_seal')");
+      } finally {
+        legacy.close();
+      }
+      const prepared = await test.prepare();
+      expect(prepared.archive?.id).not.toBe(original.id);
+      expect(prepared.archive?.sessionCount).toBe(2);
+      expect(
+        JSON.parse(fs.readFileSync(test.checkpoint, "utf8"))
+      ).toMatchObject({
+        archiveId: prepared.archive?.id,
+        nativeReady: false,
+      });
+      fs.chmodSync(test.database, 0o600);
       const bytes = fs.readFileSync(test.database);
       await expect(test.prepare()).rejects.toThrow(
         "Legacy chat archive: source_fence_incomplete"
       );
-      expect(fs.existsSync(test.nativeState)).toBe(false);
       expect(fs.readFileSync(test.database)).toEqual(bytes);
       await expect(archive.verify(original.id)).resolves.toEqual(original);
+      expect(fs.readdirSync(test.archiveRoot).sort()).toEqual(
+        [original.id, prepared.archive?.id].sort()
+      );
     }
   );
 

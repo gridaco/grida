@@ -13,6 +13,7 @@ const DB_NAME = "sessions.db";
 const WAL_SIDECARS = ["-wal", "-shm"] as const;
 const DB_SIDECARS = [...WAL_SIDECARS, "-journal"] as const;
 const READ_ONLY_MODE = 0o400;
+const ROLLBACK_HEADER_BYTES = 28;
 const ARCHIVE_NAME = "chat-archive";
 const MANIFEST_NAME = "manifest.json";
 const PENDING_NAME = ".pending";
@@ -23,6 +24,11 @@ const MAX_MANIFEST_BYTES = 32 * 1024 * 1024;
 const MAX_DESCRIPTOR_BYTES = 64 * 1024;
 const RETIRED_VERSION = 2_147_483_647;
 const SEAL_TABLE = "grida_legacy_chat_retirement";
+const SEAL_SCHEMA = `CREATE TABLE ${SEAL_TABLE} (
+      id INTEGER PRIMARY KEY CHECK(id = 1),
+      request_id TEXT NOT NULL,
+      archive_id TEXT NOT NULL
+    ) STRICT`;
 const DIGEST = /^[a-f0-9]{64}$/;
 const REQUEST_ID = /^[a-zA-Z0-9_.:@/-]{1,128}$/;
 const READ_FLAGS =
@@ -52,6 +58,7 @@ type Manifest = {
 type Receipt = {
   id: string;
   directory: string;
+  sqliteVersion: number;
   sessionCount: number;
   inputCaveats: readonly InputCaveat[];
 };
@@ -187,16 +194,23 @@ export class LegacyChatArchive {
         (await sourceSidecars(sourceDb, WAL_SIDECARS)).some(Boolean)
       )
         throw new ArchiveFailure("source_fence_incomplete");
+      let interruptedArchive: Receipt | undefined;
       if (seal) {
         const retained = readSourceSeal(guard, seal);
         if (retained) {
-          if (seal.requireReadOnlySource)
+          if (
+            seal.requireReadOnlySource &&
+            seal.expectedArchiveId !== undefined
+          )
             throw new ArchiveFailure("source_fence_incomplete");
           await checkArchiveRoot(parent);
           const verified = await verifyArchive(parent, retained);
           if (!sameSnapshot(current, await confirmLocation()))
             throw new ArchiveFailure("source_changed");
-          return verified;
+          if (!seal.requireReadOnlySource) return verified;
+          // The lease never accepted this writable seal. Older writers may
+          // have changed the source after it was backed up.
+          interruptedArchive = verified;
         }
       }
       await makePrivateDirectory(parent);
@@ -227,6 +241,8 @@ export class LegacyChatArchive {
         const mode = destination.prepare("PRAGMA journal_mode = DELETE").get();
         if (mode?.journal_mode !== "delete")
           throw new ArchiveFailure("invalid_database");
+        if (seal && interruptedArchive)
+          normalizeRecoveryCopy(destination, seal, interruptedArchive);
       } finally {
         destination.close();
       }
@@ -268,6 +284,8 @@ export class LegacyChatArchive {
       let receipt: Receipt;
       if (await statIfPresent(published)) {
         receipt = await verifyArchive(parent, id);
+        await fs.rm(stage, { recursive: true });
+        stage = undefined;
       } else {
         await fs.rename(stage, published);
         stage = undefined;
@@ -285,7 +303,12 @@ export class LegacyChatArchive {
       }
       if (!sameSnapshot(current, await confirmLocation()))
         throw new ArchiveFailure("source_changed");
-      commitSourceSeal(guard, seal.requestId, verified.id);
+      commitSourceSeal(
+        guard,
+        seal.requestId,
+        verified.id,
+        interruptedArchive?.id
+      );
       readSourceSeal(guard, { ...seal, expectedArchiveId: verified.id });
       await syncDirectory(userData);
       await confirmLocation();
@@ -368,7 +391,11 @@ function acquireSourceSealFence(source: string, seal: Seal): DatabaseSync {
     : source;
   const probe = new DatabaseSync(probePath, { readOnly: true, timeout: 0 });
   try {
-    if (readSourceSeal(probe, seal) && seal.requireReadOnlySource)
+    if (
+      readSourceSeal(probe, seal) &&
+      seal.requireReadOnlySource &&
+      seal.expectedArchiveId !== undefined
+    )
       throw new ArchiveFailure("source_fence_incomplete");
   } catch (error) {
     if (sqliteBusy(error)) throw new ArchiveFailure("source_busy");
@@ -396,6 +423,34 @@ function acquireSourceSealFence(source: string, seal: Seal): DatabaseSync {
     if (sqliteBusy(error)) throw new ArchiveFailure("source_busy");
     throw error;
   }
+}
+
+function normalizeRecoveryCopy(
+  db: DatabaseSync,
+  seal: Seal,
+  original: Receipt
+) {
+  if (
+    readSourceSeal(db, { ...seal, expectedArchiveId: original.id }) !==
+    original.id
+  )
+    throw new ArchiveFailure("invalid_source_seal");
+  const ownedObjects = db
+    .prepare(
+      "SELECT type, sql FROM sqlite_schema WHERE tbl_name=? OR instr(lower(sql), ?) > 0 LIMIT 2"
+    )
+    .all(SEAL_TABLE, SEAL_TABLE);
+  if (
+    ownedObjects.length !== 1 ||
+    ownedObjects[0]?.type !== "table" ||
+    ownedObjects[0]?.sql !== SEAL_SCHEMA
+  )
+    throw new ArchiveFailure("invalid_source_seal");
+  // Remove only our retirement metadata from the backup. Erasing its freed
+  // bytes keeps an unchanged retry independent of the previous archive ID.
+  db.exec(`PRAGMA foreign_keys=OFF; PRAGMA secure_delete=ON;
+    BEGIN IMMEDIATE; DROP TABLE ${SEAL_TABLE};
+    PRAGMA user_version=${original.sqliteVersion}; COMMIT;`);
 }
 
 function readFrozenSeal(sourceDb: string, seal: Seal): string {
@@ -427,15 +482,18 @@ async function sourceSidecars(
 }
 
 async function checkSourceFenceAcl(sourceDb: string): Promise<void> {
-  for (const target of [sourceDb, path.dirname(sourceDb)]) {
-    const { stdout } = await promisify(execFile)("/bin/ls", ["-ldeb", target], {
-      env: { LC_ALL: "C", LANG: "C" },
-      timeout: 2_000,
-      maxBuffer: 65_536,
-    });
-    if (!/^[d-][rwxstST-]{9}[@ ]/.test(stdout) || /^\s*\d+:/m.test(stdout))
-      throw new ArchiveFailure("unsafe_source");
-  }
+  await checkSourcePathAcl(sourceDb);
+  await checkSourcePathAcl(path.dirname(sourceDb));
+}
+
+async function checkSourcePathAcl(target: string): Promise<void> {
+  const { stdout } = await promisify(execFile)("/bin/ls", ["-ldeb", target], {
+    env: { LC_ALL: "C", LANG: "C" },
+    timeout: 2_000,
+    maxBuffer: 65_536,
+  });
+  if (!/^[d-][rwxstST-]{9}[@ ]/.test(stdout) || /^\s*\d+:/m.test(stdout))
+    throw new ArchiveFailure("unsafe_source");
 }
 
 async function confirmReadOnlySource(
@@ -446,13 +504,41 @@ async function confirmReadOnlySource(
   if ((source.mode & 0o7777) !== READ_ONLY_MODE)
     throw new ArchiveFailure("source_fence_incomplete");
   await checkSourceFenceAcl(sourceDb);
-  if ((await sourceSidecars(sourceDb)).some(Boolean))
-    throw new ArchiveFailure("source_fence_incomplete");
+  const [wal, shared, rollback] = await sourceSidecars(sourceDb);
+  if (wal || shared) throw new ArchiveFailure("source_fence_incomplete");
+  if (rollback) await verifyInactiveRollback(`${sourceDb}-journal`, rollback);
   const current = await confirmLocation();
   if ((current.mode & 0o7777) !== READ_ONLY_MODE)
     throw new ArchiveFailure("source_fence_incomplete");
   if (!sameSnapshot(source, current))
     throw new ArchiveFailure("source_changed");
+}
+
+async function verifyInactiveRollback(filename: string, original: Stats) {
+  checkSourceFile(original);
+  await checkSourcePathAcl(filename);
+  const journal = await fs.open(filename, READ_FLAGS);
+  try {
+    const opened = await journal.stat();
+    if (!sameSnapshot(original, opened))
+      throw new ArchiveFailure("source_changed");
+    // SQLite can leave a committed rollback journal after an exclusive
+    // connection exits abruptly. An empty journal or zeroed header is inert.
+    const header = Buffer.alloc(ROLLBACK_HEADER_BYTES);
+    const { bytesRead } = await journal.read(header, 0, header.length, 0);
+    if (
+      opened.size !== 0 &&
+      (bytesRead !== header.length || header.some((byte) => byte !== 0))
+    )
+      throw new ArchiveFailure("source_fence_incomplete");
+    if (
+      !sameSnapshot(opened, await journal.stat()) ||
+      !sameSnapshot(opened, await fs.lstat(filename))
+    )
+      throw new ArchiveFailure("source_changed");
+  } finally {
+    await journal.close();
+  }
 }
 
 function readSourceSeal(db: DatabaseSync, seal: Seal): string | null {
@@ -492,14 +578,22 @@ function readSourceSeal(db: DatabaseSync, seal: Seal): string | null {
 function commitSourceSeal(
   db: DatabaseSync,
   requestId: string,
-  archiveId: string
+  archiveId: string,
+  previousArchiveId: string | undefined
 ) {
-  db.exec(`BEGIN IMMEDIATE;
-    CREATE TABLE ${SEAL_TABLE} (
-      id INTEGER PRIMARY KEY CHECK(id = 1),
-      request_id TEXT NOT NULL,
-      archive_id TEXT NOT NULL
-    ) STRICT;`);
+  if (previousArchiveId === archiveId) return;
+  db.exec("BEGIN IMMEDIATE");
+  if (previousArchiveId !== undefined) {
+    const replaced = db
+      .prepare(
+        `UPDATE ${SEAL_TABLE} SET archive_id=? WHERE id=1 AND request_id=? AND archive_id=?`
+      )
+      .run(archiveId, requestId, previousArchiveId);
+    if (replaced.changes !== 1) throw new ArchiveFailure("invalid_source_seal");
+    db.exec("COMMIT");
+    return;
+  }
+  db.exec(`${SEAL_SCHEMA};`);
   db.prepare(`INSERT INTO ${SEAL_TABLE} VALUES (1, ?, ?)`).run(
     requestId,
     archiveId
@@ -765,6 +859,7 @@ function archiveReceipt(
   return {
     id,
     directory,
+    sqliteVersion: manifest.sqliteVersion,
     sessionCount: manifest.sessionCount,
     inputCaveats: manifest.inputCaveats,
   };

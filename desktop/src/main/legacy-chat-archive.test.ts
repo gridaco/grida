@@ -133,7 +133,7 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
   });
 
   it.skipIf(process.platform !== "darwin" || !process.geteuid?.())(
-    "reuses the archive from the same read-only source and refuses leftover SQLite state",
+    "reuses a read-only source with an inert journal and refuses other SQLite state",
     async () => {
       const { archive, db } = await fixture();
       createDatabase(db);
@@ -157,12 +157,60 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
         archive.sealQuiesced({ ...options, expectedArchiveId: receipt.id })
       ).resolves.toEqual(receipt);
       expect(await fs.readFile(db)).toEqual(before);
-      await fs.writeFile(`${db}-journal`, "incomplete", { mode: 0o600 });
+      const journal = `${db}-journal`;
+      const inactive = Buffer.concat([Buffer.alloc(28), Buffer.alloc(640, 1)]);
+      await fs.writeFile(journal, inactive, { mode: 0o600 });
+      await expect(archive.sealQuiesced(options)).resolves.toEqual(receipt);
+      await expect(fs.readFile(journal)).resolves.toEqual(inactive);
+      const incomplete = Buffer.alloc(768, 1);
+      await fs.writeFile(journal, incomplete);
       await expect(archive.sealQuiesced(options)).rejects.toThrow(
         "Legacy chat archive: source_fence_incomplete"
       );
-      expect(await fs.readFile(`${db}-journal`, "utf8")).toBe("incomplete");
+      await expect(fs.readFile(journal)).resolves.toEqual(incomplete);
+      await fs.truncate(journal, 0);
+      await expect(archive.sealQuiesced(options)).resolves.toEqual(receipt);
+      await fs.writeFile(`${db}-shm`, "ambiguous", { mode: 0o600 });
+      await expect(archive.sealQuiesced(options)).rejects.toThrow(
+        "Legacy chat archive: source_fence_incomplete"
+      );
       expect(await fs.readFile(db)).toEqual(before);
+      await expect(archive.verify(receipt.id)).resolves.toEqual(receipt);
+    }
+  );
+
+  it.skipIf(process.platform !== "darwin" || !process.geteuid?.())(
+    "refuses a rollback journal that changes during verification",
+    async () => {
+      const { archive, db } = await fixture();
+      createDatabase(db);
+      const options = { requestId: "journal", requireReadOnlySource: true };
+      const receipt = await archive.sealQuiesced(options);
+      const canonical = await fs.realpath(db);
+      const journal = `${canonical}-journal`;
+      await fs.writeFile(journal, Buffer.alloc(0), { mode: 0o600 });
+      const open = fs.open;
+      const replace = vi
+        .spyOn(fs, "open")
+        .mockImplementation(async (...args) => {
+          if (args[0] === journal) {
+            await fs.rename(journal, `${journal}.displaced`);
+            await fs.writeFile(journal, Buffer.alloc(0), { mode: 0o600 });
+          }
+          return open(...args);
+        });
+      try {
+        await expect(archive.sealQuiesced(options)).rejects.toThrow(
+          "Legacy chat archive: source_changed"
+        );
+      } finally {
+        replace.mockRestore();
+      }
+      await fs.unlink(journal);
+      await fs.symlink(db, journal);
+      await expect(archive.sealQuiesced(options)).rejects.toThrow(
+        "Legacy chat archive: unsafe_source"
+      );
       await expect(archive.verify(receipt.id)).resolves.toEqual(receipt);
     }
   );
@@ -186,40 +234,51 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
   );
 
   it.skipIf(process.platform !== "darwin" || !process.geteuid?.())(
-    "preserves both copies when the source seal committed before the mode change failed",
+    "recaptures newer history after a writable seal and reuses unchanged recovery on retry",
     async () => {
-      const { archive, db, archiveRoot } = await fixture();
+      const { archive, db, archiveRoot, scratch } = await fixture();
       createDatabase(db);
+      await fs.mkdir(scratch, { recursive: true, mode: 0o700 });
+      await fs.writeFile(path.join(scratch, "upload.png"), "past", {
+        mode: 0o600,
+      });
       const canonical = await fs.realpath(db);
       const open = fs.open;
-      const changeMode = vi
-        .spyOn(fs, "open")
-        .mockImplementation(async (...args) => {
-          const handle = await open(...args);
-          if (args[0] === canonical)
-            vi.spyOn(handle, "chmod").mockRejectedValueOnce(
-              new Error("injected mode failure")
-            );
-          return handle;
-        });
       const options = { requestId: "incomplete", requireReadOnlySource: true };
-      try {
-        await expect(archive.sealQuiesced(options)).rejects.toThrow(
-          "Legacy chat archive: source_fence_incomplete"
-        );
-      } finally {
-        changeMode.mockRestore();
-      }
+      const interrupt = async () => {
+        const changeMode = vi
+          .spyOn(fs, "open")
+          .mockImplementation(async (...args) => {
+            const handle = await open(...args);
+            if (args[0] === canonical)
+              vi.spyOn(handle, "chmod").mockRejectedValueOnce(
+                new Error("injected mode failure")
+              );
+            return handle;
+          });
+        try {
+          await expect(archive.sealQuiesced(options)).rejects.toThrow(
+            "Legacy chat archive: source_fence_incomplete"
+          );
+        } finally {
+          changeMode.mockRestore();
+        }
+      };
+      await interrupt();
       const [archiveId] = await fs.readdir(archiveRoot);
       const source = new DatabaseSync(db);
       try {
         expect(source.prepare("PRAGMA user_version").get()?.user_version).toBe(
           2_147_483_647
         );
-        source.exec("INSERT INTO chat_sessions VALUES ('ses_unarchived')");
+        source.exec(`INSERT INTO chat_sessions VALUES ('ses_unarchived');
+          INSERT INTO chat_messages VALUES ('msg_unarchived', 'ses_unarchived', 'assistant');
+          CREATE TABLE additional_history(payload BLOB);
+          INSERT INTO additional_history VALUES (x'001200ff');`);
       } finally {
         source.close();
       }
+      await fs.writeFile(path.join(scratch, "upload.png"), "next");
       const before = await fs.readFile(db);
       const mode = (await fs.lstat(db)).mode;
       await expect(
@@ -229,6 +288,81 @@ describe.skipIf(!unix)("legacy chat preservation", () => {
       expect((await fs.lstat(db)).mode).toBe(mode);
       expect(await fs.readdir(archiveRoot)).toEqual([archiveId]);
       expect((await archive.verify(archiveId)).sessionCount).toBe(2);
+
+      await interrupt();
+      const recovered = await archive.sealQuiesced(options);
+      expect(recovered.id).not.toBe(archiveId);
+      expect(recovered.sessionCount).toBe(3);
+      expect(recovered.sqliteVersion).toBe(3);
+      expect((await fs.readdir(archiveRoot)).sort()).toEqual(
+        [archiveId, recovered.id].sort()
+      );
+      await expect(
+        archive.sealQuiesced({ ...options, expectedArchiveId: recovered.id })
+      ).resolves.toEqual(recovered);
+      await expect(
+        fs.readFile(
+          path.join(archiveRoot, archiveId, "scratch/ses_fixture/upload.png"),
+          "utf8"
+        )
+      ).resolves.toBe("past");
+      await expect(
+        fs.readFile(
+          path.join(recovered.directory, "scratch/ses_fixture/upload.png"),
+          "utf8"
+        )
+      ).resolves.toBe("next");
+      const copied = new DatabaseSync(
+        path.join(recovered.directory, "sessions.db"),
+        { readOnly: true }
+      );
+      try {
+        expect(
+          copied
+            .prepare("SELECT role FROM chat_messages WHERE id='msg_unarchived'")
+            .get()?.role
+        ).toBe("assistant");
+        expect(
+          copied
+            .prepare("SELECT hex(payload) AS bytes FROM additional_history")
+            .get()?.bytes
+        ).toBe("001200FF");
+        expect(
+          copied
+            .prepare(
+              "SELECT name FROM sqlite_schema WHERE name='grida_legacy_chat_retirement'"
+            )
+            .get()
+        ).toBeUndefined();
+      } finally {
+        copied.close();
+      }
+    }
+  );
+
+  it.skipIf(process.platform !== "darwin" || !process.geteuid?.())(
+    "refuses to strip a retirement table with an unknown dependency",
+    async () => {
+      const { archive, db, archiveRoot } = await fixture();
+      createDatabase(db);
+      const prior = await archive.sealQuiesced({ requestId: "dependency" });
+      const source = new DatabaseSync(db);
+      try {
+        source.exec(
+          "CREATE VIEW additional_view AS SELECT request_id FROM grida_legacy_chat_retirement"
+        );
+      } finally {
+        source.close();
+      }
+      const bytes = await fs.readFile(db);
+      await expect(
+        archive.sealQuiesced({
+          requestId: "dependency",
+          requireReadOnlySource: true,
+        })
+      ).rejects.toThrow("Legacy chat archive: invalid_source_seal");
+      expect(await fs.readFile(db)).toEqual(bytes);
+      expect(await fs.readdir(archiveRoot)).toEqual([prior.id]);
     }
   );
 
