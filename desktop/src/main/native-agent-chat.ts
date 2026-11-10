@@ -542,7 +542,8 @@ export class NativeAgentChat {
     session: NativeChatSession,
     snapshot: NativeChatSnapshot,
     catalogRevision: number,
-    requestId: string
+    requestId: string,
+    expectedOwnedChildren?: readonly number[]
   ): Promise<void> {
     const sessionId = this.requireObservation(session, snapshot);
     if (!this.acceptsSavedChatDeletion)
@@ -553,6 +554,7 @@ export class NativeAgentChat {
       requestId: identity(requestId),
       expectedSessionRevision: snapshot.sessionRevision,
       expectedCatalogRevision: revision(catalogRevision),
+      ...(expectedOwnedChildren && { expectedOwnedChildren }),
     });
     if (!this.ownsSession(session)) return;
     this.attached.delete(sessionId);
@@ -560,6 +562,14 @@ export class NativeAgentChat {
     this.transcripts.delete(sessionId);
     this.unverifiedTranscripts.delete(sessionId);
     this.listeners.delete(sessionId);
+  }
+
+  async previewSavedChatDeletion(session: NativeChatSession) {
+    const sessionId = this.requireAttached(session);
+    if (!this.process.acceptsSavedChatDeletionPreview) return undefined;
+    const preview = await this.deletion.preview({ sessionId, cwd: this.cwd });
+    this.requireAttached(session);
+    return preview;
   }
 
   async organize(

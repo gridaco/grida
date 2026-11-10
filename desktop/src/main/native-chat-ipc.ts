@@ -113,6 +113,7 @@ export type ActiveNativeChat = Readonly<{
         NativeAgentChat,
         | "acceptsSavedChatDeletion"
         | "deleteSavedChat"
+        | "previewSavedChatDeletion"
         | "ownsSession"
         | "commands"
         | "runCommand"
@@ -162,6 +163,7 @@ type ReviewedDeletion = {
   requestId: string;
   snapshot: NativeChatSnapshot;
   catalogRevision: number;
+  expectedOwnedChildren?: readonly number[];
 };
 
 type SideAttachment = {
@@ -225,7 +227,8 @@ export class NativeChatIpc {
     ) => Promise<boolean>,
     private readonly confirmDeletion?: (
       sender: WebContents,
-      title: string | null
+      title: string | null,
+      ownedChildren?: number
     ) => Promise<boolean>,
     private readonly selectArtifactDestination?: (
       sender: WebContents
@@ -629,10 +632,33 @@ export class NativeChatIpc {
           entry.revision !== catalogRevision
         )
           throw new Error("session_catalog_revision_changed");
-        const confirmed = await confirm(owner.sender, entry.title);
-        this.revalidate(owner, attachment);
-        if (!confirmed) return false;
-        reviewed = { requestId: randomUUID(), snapshot, catalogRevision };
+        const preview = await chat.previewSavedChatDeletion?.(session);
+        const checkReview = () => {
+          this.revalidate(owner, attachment);
+          if (
+            preview &&
+            attachment.latestObservation?.sessionRevision !==
+              snapshot.sessionRevision
+          )
+            throw new Error("stale_session_revision");
+        };
+        checkReview();
+        const confirmed = await confirm(
+          owner.sender,
+          entry.title,
+          ...(preview?.ownedChildren ? [preview.ownedChildren] : [])
+        );
+        if (!confirmed) {
+          this.revalidate(owner, attachment);
+          return false;
+        }
+        checkReview();
+        reviewed = {
+          requestId: randomUUID(),
+          snapshot,
+          catalogRevision,
+          ...(preview && { expectedOwnedChildren: preview.ownedChildrenBasis }),
+        };
         attachment.deletion = reviewed;
       }
       try {
@@ -640,7 +666,10 @@ export class NativeChatIpc {
           session,
           reviewed.snapshot,
           reviewed.catalogRevision,
-          reviewed.requestId
+          reviewed.requestId,
+          ...(reviewed.expectedOwnedChildren
+            ? [reviewed.expectedOwnedChildren]
+            : [])
         );
       } catch (error) {
         const pending =

@@ -6,6 +6,14 @@ export type NativeSavedChatDeletion = Readonly<{
   requestId: string;
   expectedSessionRevision: number;
   expectedCatalogRevision: number;
+  expectedOwnedChildren?: readonly number[];
+}>;
+
+type Target = Pick<NativeSavedChatDeletion, "sessionId" | "cwd">;
+
+export type NativeSavedChatDeletionPreview = Readonly<{
+  ownedChildren: number;
+  ownedChildrenBasis: readonly number[];
 }>;
 
 const UNVERIFIED = "native_chat_deletion_unverified";
@@ -28,11 +36,12 @@ const UNVERIFIED_RECEIPT = new Set([
 
 export class NativeAgentDeletion {
   static readonly capability = "co.grida/session/delete";
+  static readonly previewCapability = "co.grida/session/delete-preview";
 
   constructor(
     private readonly request: (
       method: string,
-      params: NativeSavedChatDeletion
+      params: Target
     ) => Promise<unknown>
   ) {}
 
@@ -40,8 +49,49 @@ export class NativeAgentDeletion {
     return error instanceof Error && UNVERIFIED_RECEIPT.has(error.message);
   }
 
+  async preview({
+    sessionId: expectedSession,
+    cwd,
+  }: Target): Promise<NativeSavedChatDeletionPreview> {
+    const invalid = () => new Error("native_chat_deletion_preview_invalid");
+    const response = await this.request(
+      `_${NativeAgentDeletion.previewCapability}`,
+      { sessionId: expectedSession, cwd }
+    );
+    if (!response || typeof response !== "object" || Array.isArray(response))
+      throw invalid();
+    const { sessionId, ownedChildren, ownedChildrenBasis } = response as Record<
+      string,
+      unknown
+    >;
+    if (
+      Object.keys(response).length !== 3 ||
+      sessionId !== expectedSession ||
+      typeof ownedChildren !== "number" ||
+      !Number.isInteger(ownedChildren) ||
+      ownedChildren < 0 ||
+      ownedChildren > 128 ||
+      !Array.isArray(ownedChildrenBasis) ||
+      ownedChildrenBasis.length !== 32
+    )
+      throw invalid();
+    const basis = [...ownedChildrenBasis];
+    if (basis.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255))
+      throw invalid();
+    return Object.freeze({
+      ownedChildren,
+      ownedChildrenBasis: Object.freeze(basis),
+    });
+  }
+
   async retire(deletion: NativeSavedChatDeletion): Promise<void> {
-    const request = Object.freeze({ ...deletion });
+    const { expectedOwnedChildren } = deletion;
+    const request = Object.freeze({
+      ...deletion,
+      ...(expectedOwnedChildren && {
+        expectedOwnedChildren: Object.freeze([...expectedOwnedChildren]),
+      }),
+    });
     try {
       await this.verifyReceipt(request);
     } catch (error) {

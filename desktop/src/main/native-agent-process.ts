@@ -111,6 +111,7 @@ export class NativeAgentProcess {
   private childQueueControls = false;
   private artifacts = false;
   private savedChatDeletion = false;
+  private savedChatDeletionPreview = false;
   private goalCompletionReview = false;
   private editorSurfaces = false;
   private editorSurfaceOpen = false;
@@ -210,6 +211,10 @@ export class NativeAgentProcess {
 
   get acceptsSavedChatDeletion(): boolean {
     return this.connected && this.savedChatDeletion;
+  }
+
+  get acceptsSavedChatDeletionPreview(): boolean {
+    return this.acceptsSavedChatDeletion && this.savedChatDeletionPreview;
   }
 
   get availableCommands() {
@@ -357,7 +362,10 @@ export class NativeAgentProcess {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
                 }),
                 [NativeAgentArtifacts.capability]: 1,
-                ...(requestDeletion && { [NativeAgentDeletion.capability]: 1 }),
+                ...(requestDeletion && {
+                  [NativeAgentDeletion.capability]: 1,
+                  [NativeAgentDeletion.previewCapability]: 1,
+                }),
               },
             },
           },
@@ -405,6 +413,9 @@ export class NativeAgentProcess {
         advertised?.[NativeAgentArtifacts.capability] === 1;
       processOwner.savedChatDeletion =
         requestDeletion && advertised?.[NativeAgentDeletion.capability] === 1;
+      processOwner.savedChatDeletionPreview =
+        requestDeletion &&
+        advertised?.[NativeAgentDeletion.previewCapability] === 1;
       processOwner.editorSurfaces =
         providerEgress !== undefined &&
         advertised?.[NativeEditorSurfaceEndpoints.capability] === 1;

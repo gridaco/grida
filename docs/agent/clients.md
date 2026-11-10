@@ -262,8 +262,10 @@ On macOS and Linux, select an eligible idle chat and choose **Delete chat**.
 Confirm in the Desktop dialog to remove the conversation and its private
 attachments and working copies. Desktop closes the deleted chat in any open
 workspace window. Project files, saved exports, and independent forks stay
-available. You can archive chats that still have outstanding work or named
-subagents.
+available. On supported connections, the dialog shows how many owned named
+subagents will be deleted with the chat.
+Running, paused, queued, or unresolved work blocks deletion. You can archive
+a chat while its work continues.
 
 With the native **Ask me** profile, a read outside the current grants pauses
 for review when its folder is eligible for additional access. The pane shows

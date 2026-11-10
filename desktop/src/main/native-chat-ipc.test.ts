@@ -16,6 +16,7 @@ import {
   type ConfigurationReview,
 } from "./native-chat-ipc";
 import type { NativeChatSession } from "./native-agent-chat";
+import type { NativeSavedChatDeletionPreview } from "./native-agent-deletion";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
 
 const ORIGIN = "https://fixture.invalid";
@@ -273,7 +274,8 @@ function setup(
   ) => Promise<boolean>,
   confirmDeletion?: (
     sender: WebContents,
-    title: string | null
+    title: string | null,
+    ownedChildren?: number
   ) => Promise<boolean>,
   selectArtifactDestination?: (sender: WebContents) => Promise<string | null>
 ) {
@@ -523,6 +525,94 @@ function setup(
 }
 
 describe("native chat IPC", () => {
+  it("reviews an exact child count and reuses its basis only for an unverified delete", async () => {
+    const confirm = vi.fn<
+      (
+        sender: WebContents,
+        title: string | null,
+        count?: number
+      ) => Promise<boolean>
+    >(async () => true);
+    const { first, chat, ipc } = setup(undefined, confirm);
+    const observe = chat.observe.bind(chat);
+    let sessionRevision = 1;
+    chat.observe = async (session) => ({
+      ...(await observe(session)),
+      current: null,
+      sessionRevision,
+    });
+    Object.defineProperty(chat, "acceptsSavedChatDeletion", { value: true });
+    const prior = {
+      ownedChildren: 1,
+      ownedChildrenBasis: Object.freeze(Array<number>(32).fill(1)),
+    };
+    const replacement = {
+      ownedChildren: 2,
+      ownedChildrenBasis: Object.freeze(Array<number>(32).fill(2)),
+    };
+    const delayed = Promise.withResolvers<NativeSavedChatDeletionPreview>();
+    const preview =
+      vi.fn<
+        (
+          session: NativeChatSession
+        ) => Promise<NativeSavedChatDeletionPreview | undefined>
+      >();
+    preview
+      .mockReturnValueOnce(delayed.promise)
+      .mockResolvedValueOnce(prior)
+      .mockResolvedValueOnce(replacement);
+    chat.previewSavedChatDeletion = preview;
+    const remove =
+      vi.fn<
+        (
+          session: NativeChatSession,
+          snapshot: NativeChatSnapshot,
+          catalogRevision: number,
+          requestId: string,
+          expectedOwnedChildren?: readonly number[]
+        ) => Promise<void>
+      >();
+    remove
+      .mockRejectedValueOnce(new Error("session_deletion_dependencies_changed"))
+      .mockRejectedValueOnce(new Error("native_chat_deletion_unverified"))
+      .mockResolvedValueOnce(undefined);
+    chat.deleteSavedChat = remove;
+    const opened = await ipc.create(first.event);
+    const read = () => ipc.observe(first.event, opened.attachmentId);
+    const removeAt = (id: string) =>
+      ipc.deleteSavedChat(first.event, opened.attachmentId, id, 0);
+    const initial = await read();
+    const stale = removeAt(initial.observationId).catch(
+      (error: unknown) => error
+    );
+    await vi.waitFor(() => expect(preview).toHaveBeenCalledOnce());
+    sessionRevision++;
+    const current = await read();
+    delayed.resolve(prior);
+    expect(await stale).toEqual(
+      expect.objectContaining({ message: "stale_session_revision" })
+    );
+    expect(confirm).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+
+    await expect(removeAt(current.observationId)).rejects.toThrow(
+      "session_deletion_dependencies_changed"
+    );
+    await expect(removeAt(current.observationId)).rejects.toThrow(
+      "native_chat_deletion_unverified"
+    );
+    await expect(removeAt((await read()).observationId)).resolves.toBe(true);
+    expect(preview).toHaveBeenCalledTimes(3);
+    expect(confirm.mock.calls).toEqual([
+      [first.sender, null, 1],
+      [first.sender, null, 2],
+    ]);
+    expect(remove.mock.calls[0]?.[4]).toBe(prior.ownedChildrenBasis);
+    expect(remove.mock.calls[1]?.[4]).toBe(replacement.ownedChildrenBasis);
+    expect(remove.mock.calls[0]?.[3]).not.toBe(remove.mock.calls[1]?.[3]);
+    expect(remove.mock.calls[2]).toEqual(remove.mock.calls[1]);
+  });
+
   it("keeps a confirmed request through reply loss and retires only exact owner attachments", async () => {
     const confirm = vi.fn<
       (sender: WebContents, title: string | null) => Promise<boolean>

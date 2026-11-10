@@ -156,15 +156,17 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       });
       return confirmed.response === 1;
     },
-    async (sender, title) => {
+    async (sender, title, ownedChildren) => {
       const window = admittedWindow(sender);
       if (!window) return false;
+      const chat = title ? `“${title}”` : "This chat";
+      const children = ownedChildren
+        ? ` This also deletes ${ownedChildren} named ${ownedChildren === 1 ? "subagent" : "subagents"} and their private data.`
+        : "";
       const result = await dialog.showMessageBox(window, {
         type: "warning",
         message: "Delete this saved chat?",
-        detail: title
-          ? `“${title}” and its private attachments and working copies will be permanently removed. Project files and independent forks stay available.`
-          : "This chat and its private attachments and working copies will be permanently removed. Project files and independent forks stay available.",
+        detail: `${chat} and its private attachments and working copies will be permanently removed.${children} Project files and independent forks stay available.`,
         buttons: ["Cancel", "Delete chat"],
         defaultId: 0,
         cancelId: 0,

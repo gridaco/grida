@@ -7,11 +7,9 @@ import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { describe, expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "../bridge/contract";
 import { NativeAgentChat } from "./native-agent-chat";
-import {
-  NativeAgentDeletion,
-  type NativeSavedChatDeletion,
-} from "./native-agent-deletion";
+import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeChatIpc } from "./native-chat-ipc";
+import { NativeGatewayConnection } from "./native-gateway-connection";
 
 const deletion = {
   sessionId: "chat",
@@ -20,34 +18,82 @@ const deletion = {
   expectedSessionRevision: 12,
   expectedCatalogRevision: 3,
 } as const;
+type DeletionRequest = ConstructorParameters<typeof NativeAgentDeletion>[0];
 
 describe("NativeAgentDeletion", () => {
+  it("requests a scoped preview and retains an immutable reviewed membership basis", async () => {
+    const basis = Array.from({ length: 32 }, (_, index) => index);
+    const request = vi.fn<DeletionRequest>().mockResolvedValue({
+      sessionId: deletion.sessionId,
+      ownedChildren: 2,
+      ownedChildrenBasis: basis,
+    });
+    const preview = await new NativeAgentDeletion(request).preview({
+      sessionId: deletion.sessionId,
+      cwd: deletion.cwd,
+    });
+    expect(request).toHaveBeenCalledExactlyOnceWith(
+      "_co.grida/session/delete-preview",
+      { sessionId: deletion.sessionId, cwd: deletion.cwd }
+    );
+    expect(preview.ownedChildren).toBe(2);
+    expect(preview.ownedChildrenBasis).toEqual(basis);
+    expect(Object.isFrozen(preview.ownedChildrenBasis)).toBe(true);
+    basis[0] = 255;
+    expect(preview.ownedChildrenBasis[0]).toBe(0);
+  });
+
+  it.each([
+    { sessionId: "other-chat" },
+    { ownedChildren: 129 },
+    { ownedChildren: -1 },
+    { ownedChildren: 0.5 },
+    { ownedChildrenBasis: [0] },
+    { ownedChildrenBasis: Array(32).fill(256) },
+    { ownedChildrenBasis: Array(32) },
+  ])("refuses a stale or malformed review reply %j", async (change) => {
+    const request = vi.fn<DeletionRequest>().mockResolvedValue({
+      sessionId: deletion.sessionId,
+      ownedChildren: 0,
+      ownedChildrenBasis: Array(32).fill(0),
+      ...change,
+    });
+    await expect(
+      new NativeAgentDeletion(request).preview({
+        sessionId: deletion.sessionId,
+        cwd: deletion.cwd,
+      })
+    ).rejects.toThrow("native_chat_deletion_preview_invalid");
+  });
+
   it("retries a lost reply with the exact immutable request", async () => {
-    const request =
-      vi.fn<
-        (method: string, params: NativeSavedChatDeletion) => Promise<unknown>
-      >();
+    const request = vi.fn<DeletionRequest>();
+    const basis = Array<number>(32).fill(7);
+    const reviewed = {
+      ...deletion,
+      expectedOwnedChildren: basis,
+    };
     request
-      .mockRejectedValueOnce(new Error("native_agent_request_timeout"))
+      .mockImplementationOnce(async () => {
+        basis[0] = 255;
+        throw new Error("native_agent_request_timeout");
+      })
       .mockResolvedValueOnce({
         sessionId: "chat",
         requestId: "confirmed-delete",
       });
-    await new NativeAgentDeletion(request).retire(deletion);
+    await new NativeAgentDeletion(request).retire(reviewed);
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls[0]).toEqual([
       "_co.grida/session/delete",
-      deletion,
+      { ...deletion, expectedOwnedChildren: Array(32).fill(7) },
     ]);
     expect(request.mock.calls[1]?.[1]).toBe(request.mock.calls[0]?.[1]);
     expect(Object.isFrozen(request.mock.calls[0]?.[1])).toBe(true);
   });
 
   it("retains uncertainty when a previous deletion response was lost", async () => {
-    const request =
-      vi.fn<
-        (method: string, params: NativeSavedChatDeletion) => Promise<unknown>
-      >();
+    const request = vi.fn<DeletionRequest>();
     request
       .mockRejectedValueOnce(new Error("sqlite_commit_unconfirmed"))
       .mockRejectedValueOnce(new Error("session_deletion_in_progress"));
@@ -59,11 +105,7 @@ describe("NativeAgentDeletion", () => {
 
   it("leaves explicit dependency refusals intact", async () => {
     const blocker = new Error("session_deletion_has_subagents");
-    const request = vi
-      .fn<
-        (method: string, params: NativeSavedChatDeletion) => Promise<unknown>
-      >()
-      .mockRejectedValue(blocker);
+    const request = vi.fn<DeletionRequest>().mockRejectedValue(blocker);
     await expect(
       new NativeAgentDeletion(request).retire(deletion)
     ).rejects.toBe(blocker);
@@ -72,14 +114,10 @@ describe("NativeAgentDeletion", () => {
   });
 
   it("requires a receipt for both the confirmed request and exact chat", async () => {
-    const request = vi
-      .fn<
-        (method: string, params: NativeSavedChatDeletion) => Promise<unknown>
-      >()
-      .mockResolvedValue({
-        sessionId: "another-chat",
-        requestId: "confirmed-delete",
-      });
+    const request = vi.fn<DeletionRequest>().mockResolvedValue({
+      sessionId: "another-chat",
+      requestId: "confirmed-delete",
+    });
     await expect(
       new NativeAgentDeletion(request).retire(deletion)
     ).rejects.toThrow("native_chat_deletion_unverified");
@@ -89,9 +127,9 @@ describe("NativeAgentDeletion", () => {
 
 const packaged = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 
-it.runIf(Boolean(packaged) && process.platform !== "win32")(
-  "confirms exact saved chat deletion through Main and a disposable built native host",
-  async () => {
+it.runIf(Boolean(packaged) && process.platform !== "win32").each([false, true])(
+  "confirms exact saved chat deletion through a built native host with named child %s",
+  async (withChild) => {
     const root = fs.mkdtempSync(
       path.join(fs.realpathSync(os.tmpdir()), "grida-chat-deletion-")
     );
@@ -99,13 +137,37 @@ it.runIf(Boolean(packaged) && process.platform !== "win32")(
     fs.mkdirSync(cwd, { mode: 0o700 });
     const authored = path.join(cwd, "authored.txt");
     fs.writeFileSync(authored, "Keep the project file.");
+    const gateway = withChild
+      ? await NativeGatewayConnection.open({
+          origin: "https://gateway.fixture.invalid",
+          account: {
+            withGatewayGrant: async (_, accept) =>
+              accept({
+                token: "synthetic.deletion.fixture",
+                expiresAt: Date.now() + 120_000,
+                subject: "deletion-fixture",
+                organizationId: 1,
+                isCurrent: () => true,
+              }),
+          },
+          network: {
+            prepare: () => {
+              throw new Error("deletion must not dispatch inference");
+            },
+          },
+        })
+      : undefined;
     const launch = {
       resourcesPath: packaged!,
       stateDirectory: path.join(root, "state"),
       cwd,
-      provider: "openai-compatible",
-      endpoint: "http://127.0.0.1:1/v1",
-      model: "fixture",
+      ...(gateway
+        ? { ...gateway.launch("fixture"), subagents: true as const }
+        : {
+            provider: "openai-compatible" as const,
+            endpoint: "http://127.0.0.1:1/v1",
+            model: "fixture",
+          }),
     } as const;
     const origin = "https://editor.fixture.invalid";
     const windowAt = () => {
@@ -132,7 +194,11 @@ it.runIf(Boolean(packaged) && process.platform !== "win32")(
       const active = { workspaceId: "workspace", chat };
       const confirm =
         vi.fn<
-          (sender: WebContents, title: string | null) => Promise<boolean>
+          (
+            sender: WebContents,
+            title: string | null,
+            count?: number
+          ) => Promise<boolean>
         >();
       confirm.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
       const ipc = new NativeChatIpc(
@@ -145,6 +211,14 @@ it.runIf(Boolean(packaged) && process.platform !== "win32")(
       );
       const opened = await ipc.create(first.event);
       const peer = await ipc.load(second.event, opened.sessionId);
+      const child = withChild
+        ? await ipc.createSubagent(first.event, opened.attachmentId, {
+            requestId: randomUUID(),
+            name: "Reviewer",
+            workTurns: 1,
+          })
+        : undefined;
+      expect(Boolean(child)).toBe(withChild);
       const entry = await ipc.organize(first.event, opened.attachmentId, {
         revision: 0,
         archived: true,
@@ -174,7 +248,11 @@ it.runIf(Boolean(packaged) && process.platform !== "win32")(
         )
       ).resolves.toBe(true);
       expect(confirm).toHaveBeenCalledTimes(2);
-      expect(confirm).toHaveBeenLastCalledWith(first.sender, "Disposable chat");
+      expect(confirm).toHaveBeenLastCalledWith(
+        first.sender,
+        "Disposable chat",
+        ...(withChild ? [1] : [])
+      );
       expect(second.frame.send).toHaveBeenCalledWith(
         IPC_CHANNELS.NATIVE_CHAT_UPDATE,
         {
@@ -199,8 +277,12 @@ it.runIf(Boolean(packaged) && process.platform !== "win32")(
       );
       expect(fs.readFileSync(authored, "utf8")).toBe("Keep the project file.");
     } finally {
-      await chat?.close();
-      fs.rmSync(root, { recursive: true, force: true });
+      try {
+        await chat?.close();
+      } finally {
+        gateway?.close();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
     }
   },
   30_000

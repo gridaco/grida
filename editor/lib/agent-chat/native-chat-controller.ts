@@ -809,6 +809,7 @@ export class NativeChatController {
       const reason = error instanceof Error ? error.message : "";
       if (
         reason.includes("session_catalog_revision_changed") ||
+        reason.includes("session_deletion_dependencies_changed") ||
         reason.includes("stale_session_revision")
       ) {
         await Promise.all([this.readCatalogEntry(scope), this.refresh(scope)]);
@@ -2732,18 +2733,22 @@ function deletionError(reason: string): string {
   if (reason.includes("has_side_chat"))
     return "Close the side chat before deleting this chat.";
   if (reason.includes("has_subagents"))
-    return "This chat has named subagents and can't be deleted.";
+    return "This connection can't delete a chat with named subagents.";
+  if (reason.includes("deletion_dependencies_changed"))
+    return "This chat or its named subagents changed. Review it before deleting.";
+  if (reason.includes("deletion_dependency_limit"))
+    return "This chat has too many named subagents to delete together.";
   if (reason.includes("has_retained_inputs"))
-    return "This chat has retained inputs and can't be deleted.";
+    return "Couldn't verify the private files for this chat or its named subagents.";
   if (reason.includes("session_goal_exists"))
     return "Finish or clear the Goal before deleting this chat.";
   if (reason.includes("work_unresolved"))
-    return "This chat has unresolved work and can't be deleted.";
+    return "This chat or a named subagent still has unresolved work.";
   if (
     reason.includes("requires_idle") ||
     reason.includes("requires_empty_queue")
   )
-    return "This chat still has running, paused, or queued work.";
+    return "This chat or a named subagent still has running, paused, or queued work.";
   if (
     reason.includes("revision_changed") ||
     reason.includes("stale_session_revision")
