@@ -1,5 +1,6 @@
 use agent_kit_core::{Error, ErrorKind, ModelId, Result, SessionId};
 use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command, value_parser};
+use grida_agent::configuration::WorkspaceConfiguration;
 use grida_agent::host::{GgOptions, Host};
 use grida_agent::mcp_client::McpClient;
 use grida_agent::process::{self, RunOptions};
@@ -118,6 +119,23 @@ fn command() -> Command {
                         .requires("stdio")
                         .conflicts_with("headless-surface")
                         .action(ArgAction::SetTrue),
+                )
+                .arg(
+                    Arg::new("workspace-configuration")
+                        .long("workspace-configuration")
+                        .value_name("DIRECTORY")
+                        .value_parser(value_parser!(PathBuf))
+                        .requires_all(["supervised-provider", "workspace-configuration-epoch"])
+                        .conflicts_with("listen")
+                        .hide(true),
+                )
+                .arg(
+                    Arg::new("workspace-configuration-epoch")
+                        .long("workspace-configuration-epoch")
+                        .value_name("UUID")
+                        .value_parser(value_parser!(uuid::Uuid))
+                        .requires("workspace-configuration")
+                        .hide(true),
                 )
                 .arg(
                     Arg::new("supervised-configured-endpoint-key")
@@ -521,6 +539,13 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         ));
     }
     let provider_env = provider.credential_env.clone();
+    let workspace_configuration = if name == "serve" {
+        args.get_one::<PathBuf>("workspace-configuration")
+            .zip(args.get_one::<uuid::Uuid>("workspace-configuration-epoch"))
+            .map(|(directory, epoch)| WorkspaceConfiguration::new(directory.clone(), *epoch))
+    } else {
+        None
+    };
     let host = match (&supervisor, gateway_scope, chatgpt_scope) {
         (Some(supervisor), _, Some(scope)) => {
             if provider.protocol != ProviderProtocol::Responses {
@@ -535,6 +560,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 provider.model,
                 scope,
                 supervisor.clone(),
+                workspace_configuration.as_ref(),
             )?
         }
         (Some(supervisor), Some(scope), None) => {
@@ -550,11 +576,15 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 &provider.endpoint,
                 scope,
                 supervisor.clone(),
+                workspace_configuration.as_ref(),
             )?
         }
-        (Some(supervisor), None, None) => {
-            Host::open_supervised(state_dir, provider, supervisor.clone())?
-        }
+        (Some(supervisor), None, None) => Host::open_supervised(
+            state_dir,
+            provider,
+            supervisor.clone(),
+            workspace_configuration.as_ref(),
+        )?,
         (None, _, _) => Host::open(state_dir, Some(provider))?,
     };
     let mcp_client = outbound_mcp(args, regime, provider_env.as_deref()).await?;

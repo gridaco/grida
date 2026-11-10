@@ -37,7 +37,9 @@ pub use subagents::{
 pub use wakeups::{ScheduledWakeup, WakeupStatus, Wakeups};
 
 use crate::EffortPreset;
-use crate::configuration::{Configuration, ConfigurationInspection, ConfigurationSnapshot};
+use crate::configuration::{
+    Configuration, ConfigurationInspection, ConfigurationSnapshot, WorkspaceConfiguration,
+};
 use crate::configuration_tools::ConfigurationAccess;
 use crate::gg::GgConnection;
 use crate::http::{CompatibleOutputLimitField, HttpTransport, ProviderOptions, ProviderProtocol};
@@ -482,6 +484,7 @@ impl Host {
         Self::open_with(
             state_dir,
             provider.map(|options| || Execution::new(state_dir, options, None)),
+            None,
         )
     }
 
@@ -489,10 +492,12 @@ impl Host {
         state_dir: &Path,
         provider: ProviderOptions,
         supervisor: crate::SupervisedProvider,
+        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         Self::open_with(
             state_dir,
             Some(|| Execution::new(state_dir, provider, Some(supervisor))),
+            workspace_configuration,
         )
     }
 
@@ -503,6 +508,7 @@ impl Host {
         endpoint: &str,
         scope: &str,
         supervisor: crate::SupervisedProvider,
+        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         options.validate()?;
         let connection = Arc::new(crate::gg::SupervisedGg::new(endpoint, scope, supervisor)?);
@@ -517,6 +523,7 @@ impl Host {
                     Credential::SupervisedGg(connection),
                 )
             }),
+            workspace_configuration,
         )
     }
 
@@ -527,6 +534,7 @@ impl Host {
         model: ModelId,
         scope: &str,
         supervisor: crate::SupervisedProvider,
+        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         let connection = Arc::new(crate::chatgpt_subscription::SupervisedChatGpt::new(
             endpoint, &model, scope, supervisor,
@@ -534,6 +542,7 @@ impl Host {
         Self::open_with(
             state_dir,
             Some(|| Execution::new_chatgpt(model, connection)),
+            workspace_configuration,
         )
     }
 
@@ -559,6 +568,7 @@ impl Host {
                     Credential::Gg(connection.clone()),
                 )
             }),
+            None,
         )?;
         host.gg_connection = Some(connection);
         Ok(host)
@@ -567,6 +577,7 @@ impl Host {
     fn open_with(
         state_dir: &Path,
         execution: Option<impl FnOnce() -> Result<Execution>>,
+        workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
         let database = state_dir.join("runtime.sqlite");
         if execution.is_some() {
@@ -580,7 +591,10 @@ impl Host {
         )?);
         let configuration = execution
             .as_ref()
-            .map(|_| Configuration::open(state_dir))
+            .map(|_| match workspace_configuration {
+                Some(workspace) => workspace.open(state_dir),
+                None => Configuration::open(state_dir),
+            })
             .transpose()?
             .map(Arc::new);
         let execution = execution.map(|open| open()).transpose()?.map(Arc::new);

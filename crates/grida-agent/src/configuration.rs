@@ -11,8 +11,11 @@ use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use toml_edit::{DocumentMut, Item, Table, value};
+use uuid::Uuid;
 
 const MAX_FILE_BYTES: u64 = 64 * 1024;
+const SOURCE_FILE: &str = "config.toml";
+const WORKSPACE_ACTIVE_FILE: &str = "config.active-v1.json";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfigurationSnapshot {
@@ -35,6 +38,53 @@ pub struct Configuration {
     directory_metadata: Metadata,
     writer: File,
     active: Mutex<ConfigurationSnapshot>,
+    workspace_epoch: Option<Uuid>,
+}
+
+/// Private supervising launch selection for workers serving one workspace.
+pub struct WorkspaceConfiguration {
+    directory: PathBuf,
+    epoch: Uuid,
+}
+
+impl WorkspaceConfiguration {
+    pub fn new(directory: PathBuf, epoch: Uuid) -> Self {
+        Self { directory, epoch }
+    }
+
+    pub(crate) fn open(&self, state: &Path) -> Result<Configuration> {
+        let directory = self
+            .directory
+            .canonicalize()
+            .map_err(|_| unavailable("config_directory_unavailable"))?;
+        let canonical_state = state
+            .canonicalize()
+            .map_err(|_| unavailable("config_directory_unavailable"))?;
+        let profiles = directory.join("profiles");
+        let profile = state.file_name().and_then(|name| name.to_str());
+        if self.directory != directory
+            || canonical_state != state
+            || self.epoch.is_nil()
+            || (state != directory
+                && (state.parent() != Some(profiles.as_path())
+                    || !profile.is_some_and(|id| {
+                        id.len() == 64
+                            && id
+                                .bytes()
+                                .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+                    })))
+        {
+            return Err(invalid("workspace_configuration_scope_invalid"));
+        }
+        Configuration::open_in(&directory, Some(self.epoch))
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct WorkspaceActive {
+    epoch: [u8; 16],
+    snapshot: ConfigurationSnapshot,
 }
 
 struct Source {
@@ -47,18 +97,38 @@ impl Configuration {
     /// The host supplies its private state directory. Invalid startup content
     /// prevents activation instead of silently selecting automatic defaults.
     pub fn open(directory: &Path) -> Result<Self> {
+        Self::open_in(directory, None)
+    }
+
+    fn open_in(directory: &Path, workspace_epoch: Option<Uuid>) -> Result<Self> {
         let directory_metadata = validate_directory(directory)?;
         let directory = directory
             .canonicalize()
             .map_err(|_| unavailable("config_directory_unavailable"))?;
         let writer = open_writer(&directory.join("config.lock"))?;
-        let source = read_source(&directory)?;
-        let active = snapshot(&source)?;
+        let active = if let Some(epoch) = workspace_epoch {
+            let _guard = WriterGuard::acquire(&writer)?;
+            match read_workspace_active(&directory)? {
+                Some(active) if &active.epoch == epoch.as_bytes() => active.snapshot,
+                _ => {
+                    let source = read_source(&directory)?;
+                    let active = snapshot(&source)?;
+                    write_workspace_active(&directory, epoch, &active, || {
+                        check_directory_identity(&directory, &directory_metadata)?;
+                        check_source_revision(&directory, source.revision)
+                    })?;
+                    active
+                }
+            }
+        } else {
+            snapshot(&read_source(&directory)?)?
+        };
         Ok(Self {
             directory,
             directory_metadata,
             writer,
             active: Mutex::new(active),
+            workspace_epoch,
         })
     }
 
@@ -69,23 +139,26 @@ impl Configuration {
             .lock()
             .map_err(|_| unavailable("config_lock_failed"))?;
         self.validate_directory()?;
-        let bytes = read_bytes(&self.directory.join("config.toml"))?;
+        let _writer = self.workspace_writer()?;
+        let active = self.current(&active)?;
+        let bytes = read_bytes(&self.directory.join(SOURCE_FILE))?;
         let file_revision = revision(bytes.as_deref())?;
         let file_diagnostic = parse(bytes.as_deref()).err();
         Ok(ConfigurationInspection {
             field: CONTEXT_MAX_INPUT_TOKENS,
             file_revision,
             file_diagnostic,
-            active: active.clone(),
+            active,
             exact_input_counting: false,
         })
     }
 
     pub fn snapshot(&self) -> Result<ConfigurationSnapshot> {
-        self.active
+        let active = self
+            .active
             .lock()
-            .map(|active| active.clone())
-            .map_err(|_| unavailable("config_lock_failed"))
+            .map_err(|_| unavailable("config_lock_failed"))?;
+        self.current(&active)
     }
 
     /// Activate an explicit manual edit after validating its exact revision.
@@ -103,10 +176,12 @@ impl Configuration {
             .lock()
             .map_err(|_| unavailable("config_lock_failed"))?;
         self.validate_directory()?;
+        let _writer = self.workspace_writer()?;
+        self.require_workspace_epoch()?;
         let source = read_source(&self.directory)?;
         check_revision(source.revision, expected)?;
         admission()?;
-        *active = snapshot(&source)?;
+        *active = self.activate(&source, admission)?;
         Ok(active.clone())
     }
 
@@ -132,6 +207,7 @@ impl Configuration {
             .map_err(|_| unavailable("config_lock_failed"))?;
         self.validate_directory()?;
         let _writer = WriterGuard::acquire(&self.writer)?;
+        self.require_workspace_epoch()?;
         let mut source = read_source(&self.directory)?;
         check_revision(source.revision, expected)?;
         let requested = match change {
@@ -145,7 +221,7 @@ impl Configuration {
         };
         if source.defaults.context.max_input_tokens == requested {
             admission()?;
-            *active = snapshot(&source)?;
+            *active = self.activate(&source, admission)?;
             return Ok(active.clone());
         }
         if source.revision.is_none() {
@@ -166,34 +242,71 @@ impl Configuration {
         let bytes = source.document.to_string().into_bytes();
         let defaults = parse(Some(&bytes))?;
         self.validate_directory()?;
-        write_atomic(&self.directory, &bytes, || {
+        write_atomic(&self.directory, SOURCE_FILE, &bytes, || {
             admission()?;
             self.validate_directory()?;
             // Detect manual edits through staging before replacing the file.
-            let current = read_bytes(&self.directory.join("config.toml"))?;
-            check_revision(revision(current.as_deref())?, expected)?;
+            check_source_revision(&self.directory, expected)?;
             admission()
         })?;
         source.revision = revision(Some(&bytes))?;
         source.defaults = defaults;
-        *active = snapshot(&source)?;
+        *active = self.activate(&source, admission).map_err(|error| {
+            if self.workspace_epoch.is_some() {
+                Error::new(ErrorKind::Uncertain, "config_activation_uncertain")
+            } else {
+                error
+            }
+        })?;
         Ok(active.clone())
     }
 
-    fn validate_directory(&self) -> Result<()> {
-        let current = validate_directory(&self.directory)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::MetadataExt;
-            if current.dev() != self.directory_metadata.dev()
-                || current.ino() != self.directory_metadata.ino()
-            {
-                return Err(unavailable("config_directory_changed"));
-            }
+    fn workspace_writer(&self) -> Result<Option<WriterGuard<'_>>> {
+        self.workspace_epoch
+            .map(|_| WriterGuard::acquire(&self.writer))
+            .transpose()
+    }
+
+    fn current(&self, local: &ConfigurationSnapshot) -> Result<ConfigurationSnapshot> {
+        if let Some(epoch) = self.workspace_epoch {
+            self.validate_directory()?;
+            return self.workspace_snapshot(epoch);
         }
-        #[cfg(not(unix))]
-        let _ = (&current, &self.directory_metadata);
+        Ok(local.clone())
+    }
+
+    fn require_workspace_epoch(&self) -> Result<()> {
+        if let Some(epoch) = self.workspace_epoch {
+            self.workspace_snapshot(epoch)?;
+        }
         Ok(())
+    }
+
+    fn workspace_snapshot(&self, epoch: Uuid) -> Result<ConfigurationSnapshot> {
+        read_workspace_active(&self.directory)?
+            .filter(|active| &active.epoch == epoch.as_bytes())
+            .map(|active| active.snapshot)
+            .ok_or_else(|| unavailable("workspace_configuration_epoch_changed"))
+    }
+
+    fn activate(
+        &self,
+        source: &Source,
+        admission: impl Fn() -> Result<()>,
+    ) -> Result<ConfigurationSnapshot> {
+        let active = snapshot(source)?;
+        if let Some(epoch) = self.workspace_epoch {
+            write_workspace_active(&self.directory, epoch, &active, || {
+                self.validate_directory()?;
+                check_source_revision(&self.directory, source.revision)?;
+                admission()
+            })?;
+        }
+        Ok(active)
+    }
+
+    fn validate_directory(&self) -> Result<()> {
+        check_directory_identity(&self.directory, &self.directory_metadata)
     }
 }
 
@@ -205,6 +318,42 @@ fn snapshot(source: &Source) -> Result<ConfigurationSnapshot> {
     })
 }
 
+fn read_workspace_active(directory: &Path) -> Result<Option<WorkspaceActive>> {
+    read_bytes(&directory.join(WORKSPACE_ACTIVE_FILE))?
+        .map(|bytes| {
+            let active: WorkspaceActive = serde_json::from_slice(&bytes)
+                .map_err(|_| invalid("workspace_configuration_receipt_invalid"))?;
+            let snapshot = &active.snapshot;
+            if active.epoch == [0; 16]
+                || snapshot.identity
+                    != Fingerprint::of(&(snapshot.source_revision, &snapshot.defaults))?
+                || snapshot
+                    .defaults
+                    .context
+                    .max_input_tokens
+                    .is_some_and(|limit| limit.get() > CONTEXT_MAX_INPUT_TOKENS.maximum)
+            {
+                return Err(invalid("workspace_configuration_receipt_invalid"));
+            }
+            Ok(active)
+        })
+        .transpose()
+}
+
+fn write_workspace_active(
+    directory: &Path,
+    epoch: Uuid,
+    active: &ConfigurationSnapshot,
+    admission: impl Fn() -> Result<()>,
+) -> Result<()> {
+    let bytes = serde_json::to_vec(&WorkspaceActive {
+        epoch: *epoch.as_bytes(),
+        snapshot: active.clone(),
+    })
+    .map_err(|_| invalid("workspace_configuration_receipt_invalid"))?;
+    write_atomic(directory, WORKSPACE_ACTIVE_FILE, &bytes, admission)
+}
+
 fn check_revision(actual: Option<Fingerprint>, expected: Option<Fingerprint>) -> Result<()> {
     if actual != expected {
         return Err(Error::new(ErrorKind::Conflict, "config_revision_changed"));
@@ -212,12 +361,17 @@ fn check_revision(actual: Option<Fingerprint>, expected: Option<Fingerprint>) ->
     Ok(())
 }
 
+fn check_source_revision(directory: &Path, expected: Option<Fingerprint>) -> Result<()> {
+    let current = read_bytes(&directory.join(SOURCE_FILE))?;
+    check_revision(revision(current.as_deref())?, expected)
+}
+
 fn revision(bytes: Option<&[u8]>) -> Result<Option<Fingerprint>> {
     bytes.map(|bytes| Fingerprint::of(&bytes)).transpose()
 }
 
 fn read_source(directory: &Path) -> Result<Source> {
-    let bytes = read_bytes(&directory.join("config.toml"))?;
+    let bytes = read_bytes(&directory.join(SOURCE_FILE))?;
     let defaults = parse(bytes.as_deref())?;
     let document = match &bytes {
         Some(bytes) => std::str::from_utf8(bytes)
@@ -286,6 +440,20 @@ fn validate_directory(directory: &Path) -> Result<Metadata> {
         }
     }
     Ok(metadata)
+}
+
+fn check_directory_identity(directory: &Path, expected: &Metadata) -> Result<()> {
+    let current = validate_directory(directory)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if current.dev() != expected.dev() || current.ino() != expected.ino() {
+            return Err(unavailable("config_directory_changed"));
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = (&current, expected);
+    Ok(())
 }
 
 fn read_bytes(path: &Path) -> Result<Option<Vec<u8>>> {
@@ -384,7 +552,12 @@ impl Drop for WriterGuard<'_> {
     }
 }
 
-fn write_atomic(directory: &Path, bytes: &[u8], admission: impl Fn() -> Result<()>) -> Result<()> {
+fn write_atomic(
+    directory: &Path,
+    filename: &str,
+    bytes: &[u8],
+    admission: impl Fn() -> Result<()>,
+) -> Result<()> {
     if bytes.len() as u64 > MAX_FILE_BYTES {
         return Err(Error::new(
             ErrorKind::LimitExceeded,
@@ -401,7 +574,7 @@ fn write_atomic(directory: &Path, bytes: &[u8], admission: impl Fn() -> Result<(
         .sync_all()
         .map_err(|_| unavailable("config_write_failed"))?;
     admission()?;
-    file.persist(directory.join("config.toml"))
+    file.persist(directory.join(filename))
         .map_err(|_| unavailable("config_write_failed"))?;
     #[cfg(unix)]
     File::open(directory)
@@ -416,4 +589,105 @@ fn invalid(code: &str) -> Error {
 
 fn unavailable(code: &str) -> Error {
     Error::new(ErrorKind::Unavailable, code)
+}
+
+#[cfg(unix)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::{PermissionsExt, symlink};
+
+    fn private_workspace() -> tempfile::TempDir {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        root
+    }
+
+    #[test]
+    fn an_interrupted_workspace_update_keeps_the_previous_active_snapshot() {
+        let root = private_workspace();
+        let directory = root.path().canonicalize().unwrap();
+        let epoch = Uuid::new_v4();
+        let first = Configuration::open_in(&directory, Some(epoch)).unwrap();
+        let second = Configuration::open_in(&directory, Some(epoch)).unwrap();
+        let previous = first.snapshot().unwrap();
+
+        let error = first
+            .update_guarded(
+                None,
+                SettingChange::SetContextMaxInputTokens {
+                    value: NonZeroU64::new(8000).unwrap(),
+                },
+                || {
+                    if directory.join(SOURCE_FILE).exists() {
+                        return Err(Error::new(ErrorKind::Unavailable, "config_cancelled"));
+                    }
+                    Ok(())
+                },
+            )
+            .unwrap_err();
+        assert_eq!(error.kind, ErrorKind::Uncertain);
+        assert_eq!(error.code, "config_activation_uncertain");
+
+        let pending = second.inspect().unwrap();
+        assert!(pending.file_revision.is_some());
+        assert_eq!(pending.active, previous);
+        assert_eq!(first.snapshot().unwrap(), previous);
+        let reloaded = second.reload(pending.file_revision).unwrap();
+        assert_eq!(
+            reloaded.defaults.context.max_input_tokens.unwrap().get(),
+            8000
+        );
+        assert_eq!(first.snapshot().unwrap(), reloaded);
+    }
+
+    #[test]
+    fn a_new_workspace_epoch_activates_pending_manual_settings_once() {
+        let root = private_workspace();
+        let directory = root.path().canonicalize().unwrap();
+        let epoch = Uuid::new_v4();
+        let first = Configuration::open_in(&directory, Some(epoch)).unwrap();
+        let source = b"schema_version = 1\n[context]\nmax_input_tokens = 9000\n";
+        write_atomic(&directory, SOURCE_FILE, source, || Ok(())).unwrap();
+        let second = Configuration::open_in(&directory, Some(epoch)).unwrap();
+        assert_eq!(second.snapshot().unwrap(), first.snapshot().unwrap());
+        assert!(
+            second
+                .snapshot()
+                .unwrap()
+                .defaults
+                .context
+                .max_input_tokens
+                .is_none()
+        );
+
+        let next = Configuration::open_in(&directory, Some(Uuid::new_v4())).unwrap();
+        assert_eq!(
+            next.snapshot()
+                .unwrap()
+                .defaults
+                .context
+                .max_input_tokens
+                .unwrap()
+                .get(),
+            9000
+        );
+        let error = first.snapshot().unwrap_err();
+        assert_eq!(error.code, "workspace_configuration_epoch_changed");
+    }
+
+    #[test]
+    fn a_workspace_config_refuses_an_unrelated_or_aliased_state_directory() {
+        let root = private_workspace();
+        let other = private_workspace();
+        let directory = root.path().canonicalize().unwrap();
+        let alias = other.path().canonicalize().unwrap().join("alias");
+        symlink(&directory, &alias).unwrap();
+        let workspace = WorkspaceConfiguration::new(directory.clone(), Uuid::new_v4());
+        for refused in [other.path().canonicalize().unwrap(), alias] {
+            let error = workspace.open(&refused).err().unwrap();
+            assert_eq!(error.code, "workspace_configuration_scope_invalid");
+        }
+        assert!(!directory.join(WORKSPACE_ACTIVE_FILE).exists());
+    }
 }

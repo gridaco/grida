@@ -343,6 +343,14 @@ immutable defaults snapshot with each accepted input. A setting change applies
 to later inputs. The current compatible adapter rejects an explicit input-token
 cap before generation when it cannot establish a hard bound.
 
+A private stdio supervisor can give workers with separate chat stores one
+workspace configuration. They share the workspace's existing `config.toml`
+and writer lock. Later input captures the same activated defaults from either
+worker. Manual edits stay pending until an explicit reload or the supervisor
+starts a new workspace generation. An interrupted activation can leave a
+newer source revision with the previous defaults still active. Inspect and
+reload that revision before relying on the change.
+
 Use repeatable `--skill NAME` options with `run` to select guidance for that
 input. ACP clients can select a versioned reference from the skill catalog.
 Bundled skills are available without project access. On Unix, project skills

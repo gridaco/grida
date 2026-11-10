@@ -966,6 +966,11 @@ lazy reads, read-only mutation, and symlink escape refusal.
   separate native confirmation bound to the exact Act input and chat attachment.
   Navigation retires both reviews. The renderer receives the active value and
   support status through the guarded bridge.
+  The [workspace configuration owner](crates/grida-agent/src/configuration.rs)
+  admits shared defaults only for a private supervising launch bound to the
+  exact workspace state root and generation. It serializes source and active
+  revisions through the existing writer lock. Each worker captures the active
+  revision for new input. A pending file edit does not change accepted work.
   Native startup accepts only a start flag. Main resolves the workspace from
   the admitted route and rechecks that scope before returning readiness.
   Navigation invalidates an outstanding reply. A failed native startup reports
