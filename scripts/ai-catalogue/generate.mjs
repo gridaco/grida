@@ -171,6 +171,29 @@ if (bundle) {
   }
   for (const [name, value] of Object.entries(values))
     write(path.join(root, "crates/grida-ai/data", name + ".json"), json(value));
+  const responseWindows = new Map();
+  for (const model of Object.values(publicModels["text.catalog"])) {
+    const binding = model.providers?.openai;
+    const window = model.context_window;
+    if (
+      model.reference_provider !== "openai" ||
+      binding?.provider !== "openai" ||
+      !binding.id ||
+      !Number.isSafeInteger(window) ||
+      window <= 0
+    )
+      continue;
+    if (responseWindows.has(binding.id))
+      throw Error(`Duplicate OpenAI context binding: ${binding.id}`);
+    responseWindows.set(binding.id, window);
+  }
+  write(
+    path.join(root, "crates/grida-agent/data/responses-context-windows.json"),
+    json({
+      models_release: release,
+      windows: Object.fromEntries([...responseWindows].sort()),
+    })
+  );
   write(
     path.join(root, "packages/grida-ai/schemas/operations.generated.json"),
     json(values.operations)

@@ -3,9 +3,12 @@
 
 use super::*;
 use agent_kit_core::history::HistoryRecord;
-use agent_kit_core::inference::{FailureKind, InferenceFailure, InferenceOutcome, PreparedRequest};
+use agent_kit_core::inference::{
+    FailureKind, InferenceFailure, InferenceOutcome, InferenceStatus, MeasurementKind,
+    PreparedRequest,
+};
 use agent_kit_core::messages::OutcomeStatus;
-use agent_kit_core::turn::{OperationOutcome, TurnState};
+use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnState};
 use agent_kit_runtime::{
     CompletionDraft, FinishOutcome, OpenedTurn, OperationKey, SuspendOutcome, SuspensionDraft,
 };
@@ -79,6 +82,11 @@ pub(super) struct AutomaticCompaction {
     head: ChangeId,
     expected_revision: SessionRevision,
     plan: CompactionPlan,
+}
+
+enum CompactionTrigger {
+    Manual,
+    Automatic { verified_pressure: bool },
 }
 
 impl Host {
@@ -258,7 +266,7 @@ impl Host {
             &execution.config,
             defaults.defaults.context.max_input_tokens,
             context,
-            false,
+            CompactionTrigger::Manual,
         )?
         .ok_or_else(|| problem(ErrorKind::InvalidInput, "compaction_nothing_to_do"))?;
         let claim = self
@@ -373,7 +381,22 @@ impl Host {
         if context.session_revision != view.revision {
             return Ok(None);
         }
-        let Some(plan) = compaction_plan_for(execution, &input.config, input.limit, context, true)?
+        let verified_pressure = self
+            .verified_compaction_pressure(
+                view,
+                execution,
+                &input,
+                context.records.last().map(|entry| &entry.turn),
+            )
+            .await
+            .unwrap_or(false);
+        let Some(plan) = compaction_plan_for(
+            execution,
+            &input.config,
+            input.limit,
+            context,
+            CompactionTrigger::Automatic { verified_pressure },
+        )?
         else {
             return Ok(None);
         };
@@ -385,6 +408,46 @@ impl Host {
                 plan,
             },
         )))
+    }
+
+    async fn verified_compaction_pressure(
+        &self,
+        view: &SessionView,
+        execution: &Execution,
+        input: &PreparedInput,
+        retained_tail: Option<&TurnId>,
+    ) -> Result<bool> {
+        let Credential::Http(transport) = &execution.authorization.credential else {
+            return Ok(false);
+        };
+        let model = input.config.model.clone();
+        let Some(window) = transport.verified_context_window(&model) else {
+            return Ok(false);
+        };
+        let Some(output) = input.config.max_output_tokens else {
+            return Ok(false);
+        };
+        let Some(usable) = window.get().checked_sub(output).and_then(NonZeroU64::new) else {
+            return Ok(false);
+        };
+        let threshold = input.limit.map_or(usable, |limit| usable.min(limit));
+        let Some(latest) = view.latest.as_ref().filter(|turn| {
+            retained_tail == Some(&turn.binding.turn)
+                && turn
+                    .outcome
+                    .as_ref()
+                    .is_some_and(|outcome| outcome.status == OutcomeStatus::Succeeded)
+        }) else {
+            return Ok(false);
+        };
+        let binding = transport.binding().clone();
+        self.store
+            .inspect_turn_with(
+                view.session.clone(),
+                latest.binding.turn.clone(),
+                move |state| Ok(previous_input_reached(state, &binding, &model, threshold)),
+            )
+            .await
     }
 
     pub(super) async fn admit_automatic_compaction(
@@ -727,7 +790,7 @@ fn compaction_plan_for(
     configuration: &MasterConfig,
     limit: Option<NonZeroU64>,
     mut context: RetainedHistory,
-    automatic: bool,
+    trigger: CompactionTrigger,
 ) -> Result<Option<CompactionPlan>> {
     let source = context.basis.clone();
     let records = std::mem::take(&mut context.records);
@@ -743,7 +806,7 @@ fn compaction_plan_for(
             _ => turns.push((entry.turn, vec![message])),
         }
     }
-    let prefix_end = if automatic {
+    let prefix_end = if matches!(&trigger, CompactionTrigger::Automatic { .. }) {
         // Keep the most recent complete conversational turn unchanged.
         turns.pop();
         let Some((last, _)) = turns.last() else {
@@ -767,8 +830,8 @@ fn compaction_plan_for(
     else {
         return Ok(None);
     };
-    if automatic
-        && (coverage.input_bytes < AUTOMATIC_SOURCE_BYTES
+    if let CompactionTrigger::Automatic { verified_pressure } = trigger
+        && ((!verified_pressure && coverage.input_bytes < AUTOMATIC_SOURCE_BYTES)
             || coverage.omissions.media != 0
             || coverage.omissions.tool_results_with_media != 0)
     {
@@ -784,6 +847,58 @@ fn compaction_plan_for(
         coverage,
         covered_through: covered_through.or(prefix_end),
     }))
+}
+
+fn previous_input_reached(
+    state: &TurnState,
+    binding: &ProviderBinding,
+    model: &ModelId,
+    threshold: NonZeroU64,
+) -> bool {
+    // Helper requests can quote conversation text, but only an ordinary
+    // request carries this turn's exact user message in its prepared input.
+    let Some(user) = state.history().records().iter().rev().find_map(|record| {
+        let HistoryRecord::Message(message) = record;
+        (message.role == Role::User).then_some(message)
+    }) else {
+        return false;
+    };
+    state.operations().values().any(|operation| {
+        let OperationInput::Inference(request) = &operation.record.input else {
+            return false;
+        };
+        let previous = request.binding();
+        if previous.provider != binding.provider
+            || previous.authority.principal != binding.authority.principal
+            || previous.authority.scope != binding.authority.scope
+            || &request.request().model != model
+            || !request.request().messages.contains(user)
+        {
+            return false;
+        }
+        let Some(attempt) = operation.attempts.last() else {
+            return false;
+        };
+        let Some(OperationOutcome::Inference(outcome)) = &attempt.outcome else {
+            return false;
+        };
+        outcome.status == InferenceStatus::Completed
+            && outcome
+                .usage
+                .iter()
+                .filter(|usage| {
+                    usage.attempt == attempt.id
+                        && usage.source == binding.provider.as_str()
+                        && usage.category == "input_tokens"
+                        && usage.unit == "tokens"
+                })
+                .max_by_key(|usage| usage.revision)
+                .is_some_and(|usage| {
+                    usage.final_value
+                        && usage.certainty == MeasurementKind::Exact
+                        && usage.quantity >= threshold.get()
+                })
+    })
 }
 
 fn attempted_summary(state: &TurnState) -> Result<Option<&InferenceOutcome>> {

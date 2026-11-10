@@ -18,8 +18,11 @@ use reqwest::header::{
 };
 use reqwest::{Client, Url};
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::net::{IpAddr, SocketAddr};
+use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
@@ -209,6 +212,13 @@ impl HttpTransport {
         self.protocol == ProviderProtocol::Responses
     }
 
+    pub(crate) fn verified_context_window(&self, model: &ModelId) -> Option<NonZeroU64> {
+        if !self.supports_exact_input_counting() {
+            return None;
+        }
+        responses_context_window(&self.target, model)
+    }
+
     pub async fn validate_credential(&self) -> Result<()> {
         if let Some(credential) = &self.credential {
             credential.validate().await?;
@@ -235,6 +245,22 @@ impl HttpTransport {
         }
         Err(TransportFailure::Unavailable)
     }
+}
+
+fn responses_context_window(target: &Url, model: &ModelId) -> Option<NonZeroU64> {
+    if target.as_str() != "https://api.openai.com/v1/responses" {
+        return None;
+    }
+    #[derive(serde::Deserialize)]
+    struct Facts {
+        windows: BTreeMap<String, NonZeroU64>,
+    }
+    static FACTS: OnceLock<Facts> = OnceLock::new();
+    let facts = FACTS.get_or_init(|| {
+        serde_json::from_str(include_str!("../data/responses-context-windows.json"))
+            .expect("generated model context facts")
+    });
+    facts.windows.get(model.as_str()).copied()
 }
 
 impl StreamingTransport for HttpTransport {
@@ -559,6 +585,26 @@ mod tests {
             credential_home: None,
             compatible_output_limit_field: None,
         }
+    }
+
+    #[test]
+    fn verified_context_window_requires_the_canonical_route_and_exact_model() {
+        let canonical = Url::parse("https://api.openai.com/v1/responses").unwrap();
+        let model = ModelId::new("gpt-6.1-sol").unwrap();
+        assert_eq!(
+            responses_context_window(&canonical, &model).unwrap().get(),
+            1_050_000
+        );
+        for target in [
+            "https://api.openai.com/v1/other/responses",
+            "https://api.openai.com:444/v1/responses",
+            "https://openai.example.test/v1/responses",
+            "http://127.0.0.1:1/v1/responses",
+        ] {
+            assert!(responses_context_window(&Url::parse(target).unwrap(), &model).is_none());
+        }
+        let unregistered = ModelId::new("openai/gpt-6.1-sol").unwrap();
+        assert!(responses_context_window(&canonical, &unregistered).is_none());
     }
 
     #[test]
