@@ -52,6 +52,16 @@ deferral. Responses can be a suggested choice, free text, or a skip. Their
 schema and reply validation live with the tools. The host chooses which styles
 to offer and how to deliver questions to its clients.
 
+Effort policy selects a turn's parent generation allowance within a
+host-supplied total. Standard uses the direct allowance. Ultra requires an
+already funded independent assignment and a matching offered tool. It reserves
+that assignment's generation steps from the same total and instructs the model
+to delegate useful work and integrate the findings. Tool permissions, Plan or
+Act, model choice and per-request output limits remain independent. A retained
+Ultra continuation requires the original policy and a matching live offer to
+continue. Stop can preserve the recorded results without the offer. Goal work
+with a parent-only reservation cannot draw on a separate child allowance.
+
 Completion accounts expose typed output-limit, refusal, and step-limit reasons
 for client adapters. Provider failure classifications remain available in the
 account, with context exhaustion separate from output-limit exhaustion.

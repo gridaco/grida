@@ -1,7 +1,7 @@
 use agent_kit_core::authority::{
     AuthorityBinding, AuthorityRequest, AuthorityValidator, GrantSelection,
 };
-use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision};
+use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision, DriverStateSnapshot};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
     DispatchEvidence, FailureKind, InferenceControl, InferenceFailure, InferenceOutcome,
@@ -37,12 +37,14 @@ use agent_kit_sessions::{
 };
 use agent_kit_store_sqlite::SqliteStore;
 use futures_util::stream;
+use grida_agent_master::effort::{Policy as EffortPolicy, Preset};
 use grida_agent_master::goals::{Allowance, Blocker, Goal, Objective, Status, Usage, WorkOutcome};
 use grida_agent_master::hooks::{
     CheckInvocation, CheckMode, CheckStatus, CompletionCheck, CompletionChecks,
 };
 use grida_agent_master::{
-    Master, MasterAuthority, MasterConfig, MasterOutcome, StopReason, read_account,
+    Master, MasterAuthority, MasterConfig, MasterOutcome, OperatingRegime, StopReason,
+    read_account, subagents,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU32;
@@ -65,6 +67,9 @@ fn provider_id() -> ProviderId {
 }
 fn tool_id() -> ToolId {
     ToolId::new("echo").unwrap()
+}
+fn review_tool_id() -> ToolId {
+    ToolId::new("review_independently").unwrap()
 }
 fn envelope(value: &str) -> Envelope {
     Envelope::new(
@@ -117,6 +122,7 @@ enum Script {
     ToolThenAnswer,
     ToolAndDeferred,
     Tools,
+    EffortReview,
     GoalReport { call: &'static str },
 }
 
@@ -241,6 +247,51 @@ impl Provider for ScriptProvider {
             } else {
                 content
             };
+        }
+        if matches!(self.script, Script::EffortReview) {
+            let parts = || {
+                request
+                    .request()
+                    .messages
+                    .iter()
+                    .flat_map(|message| &message.content)
+            };
+            let prompted = request.request().messages.first().is_some_and(|system| {
+                system.role == Role::System && system.content.iter().any(|part| {
+                    matches!(part, Content::Text(text) if text.contains("Ultra effort is active."))
+                })
+            });
+            if prompted {
+                content = if index == 0 {
+                    assert!(
+                        request
+                            .request()
+                            .tools
+                            .iter()
+                            .any(|offer| offer.id == review_tool_id())
+                    );
+                    vec![Content::ToolCall(ToolCall {
+                        id: ToolCallId::new("review-first")?,
+                        tool: review_tool_id(),
+                        arguments: ToolArguments::Json(serde_json::json!({"expected":3})),
+                    })]
+                } else {
+                    let finding = parts()
+                        .find_map(|part| match part {
+                            Content::ToolResult(result)
+                                if result.call.as_str() == "review-first" =>
+                            {
+                                match result.content.as_slice() {
+                                    [ResultContent::Text(finding)] => Some(finding),
+                                    _ => None,
+                                }
+                            }
+                            _ => None,
+                        })
+                        .expect("the recorded independent finding");
+                    vec![Content::Text(format!("Independent review: {finding}"))]
+                };
+            }
         }
         if matches!(self.script, Script::ToolAndDeferred) {
             content.push(Content::ToolCall(ToolCall {
@@ -377,6 +428,56 @@ impl Tool for EchoTool {
     }
 }
 
+struct IndependentReview {
+    definition: ToolDefinition,
+    child: subagents::Profile,
+    allocation: Mutex<DriverStateSnapshot>,
+    invocations: AtomicUsize,
+}
+
+impl Tool for IndependentReview {
+    fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+
+    fn validate(&self, arguments: &ToolArguments) -> Result<()> {
+        if matches!(arguments, ToolArguments::Json(input) if input["expected"].as_u64().is_some()) {
+            Ok(())
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidInput,
+                "expected_count_missing",
+            ))
+        }
+    }
+
+    fn invoke(&self, invocation: Invocation, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async move {
+            self.invocations.fetch_add(1, Ordering::SeqCst);
+            let mut state = self.allocation.lock().unwrap();
+            let reservation = match self.child.reserve(&state) {
+                Ok(reservation) => reservation,
+                Err(error) => return ToolOutcome::failed(&error.code),
+            };
+            state.apply(reservation).unwrap();
+            let ToolArguments::Json(input) = invocation.arguments() else {
+                unreachable!()
+            };
+            let actual = ["title", "body"].len();
+            let expected = input["expected"].as_u64().unwrap();
+            ToolOutcome {
+                status: OutcomeStatus::Succeeded,
+                content: vec![ResultContent::Text(format!(
+                    "The inspected layout has {actual} items. The assignment expected {expected}."
+                ))],
+                structured: None,
+                receipt: None,
+                truncated: false,
+            }
+        })
+    }
+}
+
 struct Granted(GrantSelection);
 impl AuthorityValidator for Granted {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
@@ -435,6 +536,45 @@ impl Fixture {
     fn store(&self) -> SqliteStore {
         SqliteStore::open(self.directory.path().join("sessions.sqlite")).unwrap()
     }
+    fn install_review(&mut self) -> Arc<IndependentReview> {
+        let review = Arc::new(IndependentReview {
+            definition: ToolDefinition {
+                id: review_tool_id(),
+                version: 1,
+                description: "Run one independent read-only layout review.".into(),
+                input: InputFormat::Json(serde_json::json!({"type":"object"})),
+                max_input_bytes: 4096,
+                max_output_bytes: 4096,
+                recovery: RecoveryKind::Unavailable,
+            },
+            child: subagents::Profile::new(session_id(), "Reviewer".into(), 1, &authority())
+                .unwrap(),
+            allocation: Mutex::new(DriverStateSnapshot::default()),
+            invocations: AtomicUsize::new(0),
+        });
+        let mut inventory = Inventory::new();
+        inventory.insert(self.tool.clone()).unwrap();
+        inventory.insert(review.clone()).unwrap();
+        self.inventory = inventory.snapshot(&[tool_id(), review_tool_id()]).unwrap();
+        review
+    }
+
+    fn effort(&self, preset: Preset) -> EffortPolicy {
+        let offer = self
+            .inventory
+            .offers()
+            .unwrap()
+            .into_iter()
+            .find(|offer| offer.id == review_tool_id())
+            .unwrap();
+        EffortPolicy::capture(
+            preset,
+            NonZeroU32::new(2).unwrap(),
+            NonZeroU32::new(6).unwrap(),
+            Some((&offer, &self.grants())),
+        )
+        .unwrap()
+    }
     async fn reopen(&self) -> SqliteStore {
         let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
         loop {
@@ -472,20 +612,25 @@ impl Fixture {
         .unwrap()
     }
     fn master(&self, steps: u32, instructions: &str) -> Master {
+        self.master_in(steps, instructions, OperatingRegime::Act)
+    }
+    fn master_in(&self, steps: u32, instructions: &str, regime: OperatingRegime) -> Master {
+        let mut config = MasterConfig {
+            model: ModelId::new("model").unwrap(),
+            instructions: instructions.into(),
+            max_steps: steps,
+            max_output_tokens: Some(1024),
+        };
+        regime.apply(&mut config);
         Master::new(
-            MasterConfig {
-                model: ModelId::new("model").unwrap(),
-                instructions: instructions.into(),
-                max_steps: steps,
-                max_output_tokens: Some(1024),
-            },
+            config,
             self.provider.clone(),
             self.inventory.clone(),
             MasterAuthority {
                 inference: self.grants(),
                 tools: match self.provider.script {
                     Script::Answer => BTreeMap::new(),
-                    Script::GoalReport { .. } => self
+                    Script::GoalReport { .. } | Script::EffortReview | Script::Tools => self
                         .inventory
                         .offers()
                         .unwrap()
@@ -1012,6 +1157,206 @@ async fn committed_tool_results_are_reused_and_reach_the_next_model_request() {
     assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
     let requests = fixture.provider.requests.lock().unwrap();
     assert!(requests[1].messages.iter().flat_map(|message| &message.content).any(|part| matches!(part, Content::ToolResult(result) if result.status == OutcomeStatus::Succeeded && result.content == vec![ResultContent::Text("echoed".into())])));
+}
+
+#[tokio::test]
+async fn ultra_requests_and_integrates_independent_review_in_plan_and_act() {
+    for regime in [OperatingRegime::Plan, OperatingRegime::Act] {
+        for preset in [Preset::Standard, Preset::Ultra] {
+            let mut fixture = Fixture::new(Script::EffortReview);
+            let review = fixture.install_review();
+            let policy = fixture.effort(preset);
+            let ultra = preset == Preset::Ultra;
+            assert_eq!(policy.preset(), preset);
+            assert_eq!(policy.parent_generation_steps(), if ultra { 4 } else { 2 });
+            assert_eq!(
+                policy.reserved_child_generation_steps(),
+                if ultra { 2 } else { 0 }
+            );
+            let store = fixture.store();
+            let claim = fixture.claim(&store).await;
+            let opened = fixture.runtime().open(claim.lease).await.unwrap();
+            let MasterOutcome::Settled(receipt) = fixture
+                .master_in(2, "Inspect the fixture layout.", regime)
+                .with_effort(policy)
+                .unwrap()
+                .run(opened.turn, input())
+                .await
+                .unwrap()
+            else {
+                panic!("expected a settled review")
+            };
+            let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+            assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+            assert_eq!(account.steps, if ultra { 2 } else { 1 });
+            assert_eq!(
+                account.text,
+                if ultra {
+                    "Independent review: The inspected layout has 2 items. The assignment expected 3."
+                } else {
+                    "Finished"
+                }
+            );
+            assert_eq!(
+                review.invocations.load(Ordering::SeqCst),
+                usize::from(ultra)
+            );
+            let allocation = review
+                .child
+                .allocation(&review.allocation.lock().unwrap())
+                .unwrap();
+            assert_eq!(allocation.reserved, u8::from(ultra));
+            for request in fixture.provider.requests.lock().unwrap().iter() {
+                assert_eq!(request.tools, fixture.inventory.offers().unwrap());
+                assert_eq!(request.max_output_tokens, Some(1024));
+                let [Content::Text(instructions)] = request.messages[0].content.as_slice() else {
+                    panic!("expected selected product instructions")
+                };
+                assert_eq!(instructions.contains("Plan is active."), !regime.is_act());
+                assert_eq!(instructions.contains("Ultra effort is active."), ultra);
+            }
+        }
+    }
+}
+
+#[test]
+fn ultra_requires_room_for_independent_work_and_a_selected_offer() {
+    let standard = NonZeroU32::new(2).unwrap();
+    assert_eq!(
+        EffortPolicy::capture(Preset::Ultra, standard, NonZeroU32::new(6).unwrap(), None)
+            .unwrap_err()
+            .code,
+        "ultra_delegation_unavailable"
+    );
+    let mut fixture = Fixture::new(Script::EffortReview);
+    let review = fixture.install_review();
+    let offer = review.definition.offer().unwrap();
+    assert_eq!(
+        EffortPolicy::capture(
+            Preset::Ultra,
+            standard,
+            NonZeroU32::new(4).unwrap(),
+            Some((&offer, &fixture.grants())),
+        )
+        .unwrap_err()
+        .code,
+        "effort_allowance_unavailable"
+    );
+}
+
+#[tokio::test]
+async fn effort_keeps_parent_generation_inside_its_selected_allowance() {
+    for (preset, steps) in [(Preset::Standard, 2), (Preset::Ultra, 4)] {
+        let mut fixture = Fixture::new(Script::Tools);
+        let review = fixture.install_review();
+        let store = fixture.store();
+        let claim = fixture.claim(&store).await;
+        let opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let MasterOutcome::Settled(receipt) = fixture
+            .master(2, "Use permitted tools.")
+            .with_effort(fixture.effort(preset))
+            .unwrap()
+            .run(opened.turn, input())
+            .await
+            .unwrap()
+        else {
+            panic!("expected a step-limited result")
+        };
+        assert_eq!(receipt.outcome.status, OutcomeStatus::Failed);
+        let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+        assert_eq!(account.stop_reason, Some(StopReason::StepLimit));
+        assert_eq!(account.steps, steps);
+        assert_eq!(
+            fixture.provider.calls.load(Ordering::SeqCst),
+            steps as usize
+        );
+        assert_eq!(review.invocations.load(Ordering::SeqCst), 0);
+    }
+}
+
+#[tokio::test]
+async fn retained_ultra_replays_exact_policy_or_can_stop_without_the_delegate() {
+    for recovery in ["same", "different", "unavailable", "stop"] {
+        let mut fixture = Fixture::new(Script::EffortReview);
+        let review = fixture.install_review();
+        let policy = fixture.effort(Preset::Ultra);
+        let standard = fixture.effort(Preset::Standard);
+        let store = fixture.store();
+        let claim = fixture.claim(&store).await;
+        let opened = fixture
+            .runtime()
+            .open(interrupted(claim.lease))
+            .await
+            .unwrap();
+        assert!(
+            fixture
+                .master(2, "Inspect the layout.")
+                .with_effort(policy.clone())
+                .unwrap()
+                .run(opened.turn, input())
+                .await
+                .is_err()
+        );
+        assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(review.invocations.load(Ordering::SeqCst), 1);
+        drop(store);
+
+        let reopened = fixture.reopen().await;
+        let claim = fixture.recover(&reopened).await;
+        let state = claim.lease.journal().load().await.unwrap();
+        let encoded: serde_json::Value =
+            serde_json::from_slice(state.checkpoint().unwrap().bytes()).unwrap();
+        let retained: EffortPolicy = serde_json::from_value(encoded["effort"].clone()).unwrap();
+        assert_eq!(retained, policy);
+        if matches!(recovery, "unavailable" | "stop") {
+            fixture.inventory = Inventory::new().snapshot(&[]).unwrap();
+        }
+        if recovery == "stop" {
+            let view = reopened.inspect(session_id()).await.unwrap();
+            reopened
+                .control(ControlRequest {
+                    id: change_id("stop-without-review"),
+                    session: session_id(),
+                    expected_revision: view.revision,
+                    action: SessionControl::Turn {
+                        turn: turn_id(),
+                        expected: view.current.unwrap().controls.revision,
+                        directive: ControlDirective::Cancel,
+                    },
+                })
+                .await
+                .unwrap();
+        }
+        let opened = fixture.runtime().open(claim.lease).await.unwrap();
+        let outcome = fixture
+            .master(2, "Inspect the layout.")
+            .with_effort(if recovery == "different" {
+                standard
+            } else {
+                retained
+            })
+            .unwrap()
+            .run(opened.turn, input())
+            .await;
+        match (recovery, outcome) {
+            ("same", Ok(MasterOutcome::Settled(receipt))) => {
+                assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+                assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
+            }
+            ("stop", Ok(MasterOutcome::Settled(receipt))) => {
+                assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
+                let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+                assert_eq!(account.tool_activity.unwrap().succeeded, 1);
+            }
+            ("different", Err(error)) => assert_eq!(error.code, "master_effort_changed"),
+            ("unavailable", Err(error)) => assert_eq!(error.code, "ultra_delegation_unavailable"),
+            _ => panic!("unexpected retained effort outcome for {recovery}"),
+        }
+        assert_eq!(review.invocations.load(Ordering::SeqCst), 1);
+        if recovery != "same" {
+            assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+        }
+    }
 }
 
 #[tokio::test]
@@ -2884,6 +3229,28 @@ async fn claim_goal_work(store: &SqliteStore, goal: &Goal) -> ClaimedTurn {
         panic!("expected goal work ownership");
     };
     claim
+}
+
+#[tokio::test]
+async fn ultra_cannot_spend_child_capacity_from_a_parent_only_goal_reservation() {
+    let mut fixture = Fixture::new(Script::EffortReview);
+    let review = fixture.install_review();
+    let store = fixture.store();
+    let goal = goal_for_work(8);
+    let claim = claim_goal_work(&store, &goal).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let Err(error) = fixture
+        .master(2, "Inspect the fixture layout.")
+        .with_effort(fixture.effort(Preset::Ultra))
+        .unwrap()
+        .run(opened.turn, input())
+        .await
+    else {
+        panic!("expected goal work to refuse a separate child allowance")
+    };
+    assert_eq!(error.code, "goal_child_allowance_unavailable");
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
+    assert_eq!(review.invocations.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]

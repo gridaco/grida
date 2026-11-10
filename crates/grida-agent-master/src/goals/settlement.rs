@@ -10,8 +10,15 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) type Verifier = dyn Fn(&str, &OperationState) -> bool + Send + Sync;
 
-pub(crate) fn step_limit(state: &TurnState, configured: u32) -> Result<u32> {
-    Ok(work_goal(state)?.map_or(configured, |goal| {
+pub(crate) fn step_limit(state: &TurnState, configured: u32, reserves_child: bool) -> Result<u32> {
+    let goal = work_goal(state)?;
+    if goal.is_some() && reserves_child {
+        return Err(problem(
+            ErrorKind::Unsupported,
+            "goal_child_allowance_unavailable",
+        ));
+    }
+    Ok(goal.map_or(configured, |goal| {
         configured.min(
             goal.reservation()
                 .expect("reserved work")

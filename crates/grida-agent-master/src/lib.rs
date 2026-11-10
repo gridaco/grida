@@ -3,6 +3,7 @@
 pub mod compaction;
 pub mod configuration;
 pub mod conversation_seed;
+pub mod effort;
 pub mod goals;
 pub mod history;
 pub mod hooks;
@@ -148,6 +149,7 @@ pub struct Master {
     authority: MasterAuthority,
     history: Vec<Message>,
     input_limit: Option<NonZeroU64>,
+    effort: Option<effort::Policy>,
     goal_verifier: Option<Box<goals::settlement::Verifier>>,
     completion_checks: Option<CompletionChecksExecution>,
 }
@@ -171,6 +173,8 @@ struct Continuation {
     request_generation: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     retry: Option<retry::AdmissionRetry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    effort: Option<effort::Policy>,
 }
 
 impl Continuation {
@@ -229,6 +233,7 @@ impl Master {
             authority,
             history: Vec::new(),
             input_limit: None,
+            effort: None,
             goal_verifier: None,
             completion_checks: None,
         })
@@ -244,6 +249,22 @@ impl Master {
     pub fn with_input_limit(mut self, limit: Option<NonZeroU64>) -> Self {
         self.input_limit = limit;
         self
+    }
+
+    /// Apply a captured effort policy. The exact delegation offer is checked
+    /// before further work, while Stop can settle without the live tool.
+    pub fn with_effort(mut self, policy: effort::Policy) -> Result<Self> {
+        if self.effort.is_some() {
+            return Err(Error::new(
+                ErrorKind::Conflict,
+                "master_effort_already_bound",
+            ));
+        }
+        policy.apply(&mut self.config)?;
+        if policy.preset() == effort::Preset::Ultra {
+            self.effort = Some(policy);
+        }
+        Ok(self)
     }
 
     /// Install the accepted completion policy and its private handler inventory.
@@ -274,7 +295,14 @@ impl Master {
     }
 
     pub async fn run(&self, mut turn: Turn, input: Vec<Message>) -> Result<MasterOutcome> {
-        let max_steps = goals::settlement::step_limit(&turn.view().state, self.config.max_steps)?;
+        let max_steps = {
+            let view = turn.view();
+            goals::settlement::step_limit(
+                &view.state,
+                self.config.max_steps,
+                self.effort.is_some() && !view.state.controls().cancelled,
+            )?
+        };
         let mut continuation = self.continuation(&turn)?;
         self.accept_input(&mut turn, input).await?;
         let view = turn.view();
@@ -288,6 +316,7 @@ impl Master {
         for operation in orphaned {
             turn.operations().record_interruption(operation).await?;
         }
+        let mut effort_to_verify = self.effort.as_ref();
         loop {
             let view = turn.view();
             if view.state.controls().cancelled {
@@ -347,6 +376,13 @@ impl Master {
                     Some(outcome) => return Ok(outcome),
                     None => continue,
                 }
+            }
+            if let Some(effort) = effort_to_verify.take() {
+                effort.verify_offer(
+                    &self.tools,
+                    &self.authority.tools,
+                    &self.provider.capabilities(&self.config.model)?,
+                )?;
             }
             if self
                 .retire_unstarted_request(&mut turn, &mut continuation)
@@ -690,11 +726,16 @@ impl Master {
                 request_history: None,
                 request_generation: 0,
                 retry: None,
+                effort: self.effort.clone(),
             }),
             Some(envelope) => {
                 let value: Continuation = decode(CONTINUATION_SCHEMA, envelope)?;
+                if value.effort != self.effort {
+                    return Err(Error::new(ErrorKind::Conflict, "master_effort_changed"));
+                }
                 let legacy = self.completion_checks.is_none()
                     && self.input_limit.is_none()
+                    && self.effort.is_none()
                     && self.history.is_empty()
                     && value.configuration == Fingerprint::of(&self.config)?;
                 if value.configuration != fingerprint && !legacy {
