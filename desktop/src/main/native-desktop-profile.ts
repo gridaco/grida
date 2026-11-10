@@ -5,6 +5,7 @@ import path from "node:path";
 import type { App } from "electron";
 import { ProtectedRoots } from "@grida/daemon/server";
 import { home } from "@grida/home";
+import { isValidEndpointProviderId } from "@grida/agent";
 import { defaultScratchBase } from "@grida/agent/sandbox";
 import { NativeFirstProfile } from "./native-first-profile";
 
@@ -155,7 +156,7 @@ export namespace NativeDesktopProfile {
       browserData !== app.getPath("userData")
     )
       throw invalidProfile();
-    const provider = await selectedProvider(process.argv);
+    const provider = selectedProvider(process.argv);
     const root = path.dirname(agentData);
     const systemTemp = await fs.realpath(app.getPath("temp"));
     const relative = path.relative(systemTemp, root);
@@ -205,7 +206,7 @@ export namespace NativeDesktopProfile {
     return provider;
   }
 
-  async function selectedProvider(argv: readonly string[]): Promise<Provider> {
+  function selectedProvider(argv: readonly string[]): Provider {
     const separator = argv.indexOf("--");
     const options = separator < 0 ? argv : argv.slice(0, separator);
     const provider = option(options, "--native-chat-provider") ?? "gateway";
@@ -218,7 +219,6 @@ export namespace NativeDesktopProfile {
       return { kind: "byok", id: provider, model };
     if (provider.startsWith("endpoint:")) {
       const id = provider.slice("endpoint:".length);
-      const { isValidEndpointProviderId } = await import("@grida/agent");
       if (isValidEndpointProviderId(id)) return { kind: "endpoint", id, model };
     }
     throw invalidProfile();
