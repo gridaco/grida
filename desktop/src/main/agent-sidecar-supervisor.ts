@@ -676,6 +676,7 @@ export class AgentSidecarSupervisor {
       ggHost: new URL(EDITOR_BASE_URL).hostname,
     });
     await sandbox.ensureInitialized({
+      seccomp: this.packagedSeccomp(),
       network: {
         allowedDomains: policy.network.allowed_domains,
         deniedDomains: policy.network.denied_domains,
@@ -699,6 +700,35 @@ export class AgentSidecarSupervisor {
       });
     }
     this.sandboxReady = true;
+  }
+
+  private packagedSeccomp(): { applyPath: string } | undefined {
+    if (
+      !app.isPackaged ||
+      process.platform !== "linux" ||
+      (process.arch !== "arm64" && process.arch !== "x64")
+    )
+      return;
+    // SRT runs this in a shell outside Electron's virtual ASAR filesystem.
+    // Use the physical package file and refuse a missing or redirected helper.
+    const applyPath = path.join(
+      fs.realpathSync(process.resourcesPath),
+      "app.asar.unpacked",
+      "node_modules",
+      "@anthropic-ai",
+      "sandbox-runtime",
+      "vendor",
+      "seccomp",
+      process.arch,
+      "apply-seccomp"
+    );
+    if (
+      !fs.lstatSync(applyPath).isFile() ||
+      fs.realpathSync(applyPath) !== applyPath
+    )
+      throw new Error("agent_sidecar_packaged_seccomp_invalid");
+    fs.accessSync(applyPath, fs.constants.X_OK);
+    return { applyPath };
   }
 
   private async loadCompatibilitySandbox() {

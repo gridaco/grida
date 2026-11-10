@@ -24,6 +24,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { verifyNativeAgentRuntime } from "./native-agent-package.mjs";
 
+const { binaryHeader } = await import(
+  new URL("../../scripts/cli-release/native.mjs", import.meta.url).href
+);
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
@@ -104,16 +108,39 @@ if (!asar || !fs.existsSync(asar)) {
 }
 
 if (process.argv[3] === "--native-agent") {
-  const ran = await verifyNativeAgentRuntime(
-    path.dirname(asar),
-    process.argv[4],
-    process.argv[5]
-  );
+  const [platform, arch] = process.argv.slice(4);
+  const resources = path.dirname(asar);
+  if (platform === "linux") verifyLinuxSeccomp(resources, arch);
+  const ran = await verifyNativeAgentRuntime(resources, platform, arch);
   console.log("✔ packaged native agent executables verified.");
   if (ran)
     console.log(
       "✔ packaged native agent ACP startup, reopen and EOF verified."
     );
+}
+
+function verifyLinuxSeccomp(resources, arch) {
+  if (arch !== "arm64" && arch !== "x64")
+    throw new Error("Unsupported packaged Linux seccomp architecture");
+  const applyPath = path.join(
+    fs.realpathSync(resources),
+    "app.asar.unpacked",
+    "node_modules",
+    "@anthropic-ai",
+    "sandbox-runtime",
+    "vendor",
+    "seccomp",
+    arch,
+    "apply-seccomp"
+  );
+  if (
+    !fs.lstatSync(applyPath).isFile() ||
+    fs.realpathSync(applyPath) !== applyPath
+  )
+    throw new Error("Packaged Linux seccomp helper is not a regular file");
+  fs.accessSync(applyPath, fs.constants.X_OK);
+  binaryHeader(fs.readFileSync(applyPath), { os: "linux", cpu: arch });
+  console.log("✔ packaged Linux seccomp helper verified outside app.asar.");
 }
 
 // Extract the asar so we can resolve modules against the packaged tree

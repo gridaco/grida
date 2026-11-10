@@ -101,8 +101,8 @@ describe("Desktop native agent package", () => {
   }
 
   it("allows installers only after staging and verifying this package", async () => {
-    const platform = process.platform === "darwin" ? "linux" : "darwin";
-    const arch = "x64";
+    const platform = "linux";
+    const arch = process.arch === "x64" ? "arm64" : "x64";
     const fixture = stage(platform, arch);
     const { prePackage, packageAfterCopy, postPackage, preMake } =
       config.hooks ?? {};
@@ -149,7 +149,24 @@ describe("Desktop native agent package", () => {
       await expect(preMake(forge)).rejects.toThrow(
         "Desktop installers require a fresh verified package"
       );
-      await postPackage(forge, { platform, arch, outputPaths: [outputPath] });
+      const packaged = { platform, arch, outputPaths: [outputPath] };
+      await expect(postPackage(forge, packaged)).rejects.toThrow(
+        /verify-packaged-bundle/
+      );
+      await expect(preMake(forge)).rejects.toThrow(
+        "Desktop installers require a fresh verified package"
+      );
+      const applyPath = path.join(
+        resources,
+        "app.asar.unpacked/node_modules/@anthropic-ai/sandbox-runtime/vendor/seccomp",
+        arch,
+        "apply-seccomp"
+      );
+      fs.mkdirSync(path.dirname(applyPath), { recursive: true });
+      fs.writeFileSync(applyPath, fixtureBinary({ os: platform, cpu: arch }), {
+        mode: 0o755,
+      });
+      await postPackage(forge, packaged);
       await expect(preMake(forge)).resolves.toBeUndefined();
       await expect(preMake(forge)).rejects.toThrow(
         "Desktop installers require a fresh verified package"

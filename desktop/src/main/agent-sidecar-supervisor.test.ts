@@ -17,7 +17,9 @@ vi.mock("electron", () => ({
     ),
     getAppPath: vi.fn<() => string>(() => "/app/desktop"),
     hasSingleInstanceLock: vi.fn<() => boolean>(() => true),
-    isPackaged: true,
+    get isPackaged() {
+      return true;
+    },
   },
 }));
 vi.mock("../env", () => ({ EDITOR_BASE_URL: "https://grida.co" }));
@@ -121,6 +123,7 @@ describe("AgentSidecarSupervisor recovery", () => {
       scratchBase: string | null;
       commandHost: unknown;
     };
+    vi.spyOn(app, "isPackaged", "get").mockReturnValue(false);
     vi.mocked(app.getPath).mockClear();
     vi.mocked(ensureInitialized).mockClear();
 
@@ -131,6 +134,7 @@ describe("AgentSidecarSupervisor recovery", () => {
     expect(app.getPath).not.toHaveBeenCalledWith("temp");
     expect(ensureInitialized).toHaveBeenCalledWith(
       expect.objectContaining({
+        seccomp: undefined,
         network: expect.objectContaining({
           allowedDomains: [],
           allowLocalBinding: false,
@@ -138,6 +142,56 @@ describe("AgentSidecarSupervisor recovery", () => {
       })
     );
     supervisor.stop();
+  });
+
+  it("requires the physical packaged Linux seccomp helper before starting SRT", async () => {
+    const resources = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-srt-resources-")
+    );
+    const descriptors = Object.getOwnPropertyDescriptors(process);
+    const applyPath = path.join(
+      resources,
+      "app.asar.unpacked/node_modules/@anthropic-ai/sandbox-runtime/vendor/seccomp/arm64/apply-seccomp"
+    );
+    const initSandbox = () =>
+      (
+        new AgentSidecarSupervisor({ agent: false }) as unknown as {
+          initSandbox(): Promise<void>;
+        }
+      ).initSandbox();
+    try {
+      Object.defineProperty(process, "platform", {
+        ...descriptors.platform,
+        value: "linux",
+      });
+      Object.defineProperty(process, "arch", {
+        ...descriptors.arch,
+        value: "arm64",
+      });
+      Object.defineProperty(process, "resourcesPath", {
+        value: resources,
+        configurable: true,
+      });
+      await fs.mkdir(path.dirname(applyPath), { recursive: true });
+      await fs.writeFile(applyPath, "fixture", { mode: 0o700 });
+      vi.mocked(ensureInitialized).mockClear();
+      await initSandbox();
+      expect(ensureInitialized).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ seccomp: { applyPath } })
+      );
+
+      await fs.unlink(applyPath);
+      vi.mocked(ensureInitialized).mockClear();
+      await expect(initSandbox()).rejects.toMatchObject({ code: "ENOENT" });
+      expect(ensureInitialized).not.toHaveBeenCalled();
+    } finally {
+      for (const key of ["platform", "arch", "resourcesPath"] as const) {
+        if (descriptors[key])
+          Object.defineProperty(process, key, descriptors[key]);
+        else Reflect.deleteProperty(process, key);
+      }
+      await fs.rm(resources, { recursive: true, force: true });
+    }
   });
 
   it("starts strict media on the disabled native profile without sealing chat", async () => {
