@@ -1,8 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { NativeExternalRunIpc } from "./native-external-run-ipc";
 import { NativeExternalRuns } from "./native-external-runs";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
@@ -232,13 +235,49 @@ describe.skipIf(process.platform === "win32")(
         await expect(catalog.openSelected(alias)).rejects.toThrow(
           "workspace_media_root_denied"
         );
-        const id = randomUUID();
-        await owner.start(id, "hold", current);
+        const origin = "https://editor.fixture.invalid";
+        const frame = { url: `${origin}/desktop/workspace?id=${workspace.id}` };
+        const sender = Object.assign(new EventEmitter(), {
+          mainFrame: frame,
+          isDestroyed: () => false,
+          isLoadingMainFrame: () => false,
+        }) as unknown as WebContents;
+        const event = {
+          sender,
+          senderFrame: frame,
+        } as unknown as IpcMainInvokeEvent;
+        const ipc = new NativeExternalRunIpc(
+          origin,
+          (caller) => caller === sender,
+          () => (owner?.accepting ? owner : undefined)
+        );
+        expect(await ipc.status(event)).toEqual({
+          name: test.profile.name,
+          run: null,
+        });
+        const stopped = randomUUID();
+        await ipc.start(event, stopped, "hold");
         await vi.waitFor(async () =>
-          expect((await owner!.observe(id)).disposition).toBe("running")
+          expect((await ipc.status(event))?.run).toMatchObject({
+            runId: stopped,
+            disposition: "running",
+          })
+        );
+        expect(await ipc.stop(event, stopped)).toMatchObject({
+          disposition: "cancelled",
+          cleanupVerified: true,
+        });
+        const id = randomUUID();
+        await ipc.start(event, id, "hold");
+        await vi.waitFor(async () =>
+          expect((await ipc.status(event))?.run).toMatchObject({
+            runId: id,
+            disposition: "running",
+          })
         );
         await catalog.forget(workspace.id);
         expect(await catalog.find(workspace.id)).toBeNull();
+        expect(await ipc.status(event)).toBeNull();
         expect(await owner.observe(id)).toMatchObject({
           disposition: "cancelled",
           cleanupVerified: true,

@@ -63,6 +63,8 @@ import { DesktopMediaHost } from "./media-host";
 import { DesktopMediaRoot } from "./media-root";
 import { NativeChatIpc, type ActiveNativeChat } from "./native-chat-ipc";
 import type { NativeDocumentFiles } from "./native-document-files";
+import { NativeExternalRunIpc } from "./native-external-run-ipc";
+import type { NativeExternalRuns } from "./native-external-runs";
 
 // `new URL(EDITOR_BASE_URL).origin` is needed per IPC invoke; parse the
 // build-time constant once at module init rather than per call.
@@ -95,6 +97,7 @@ type RegisterIpcHandlersOptions = {
   ) => ActiveNativeChat | null;
   /** Present when this main process has selected native chat mode. */
   ensure_native_chat?: (workspaceId: string) => Promise<void>;
+  native_external_agent?: NativeExternalRuns;
   native_chat_profiles?: import("./native-chat-ipc").NativeChatProfileOwner;
   publish_workspace_surfaces?: (
     event: IpcMainInvokeEvent,
@@ -196,6 +199,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     },
     options.native_chat_profiles
   );
+  const externalAgent = new NativeExternalRunIpc(
+    EDITOR_ORIGIN,
+    (sender) => admittedWindow(sender) !== null,
+    () => {
+      const owner = options.native_external_agent;
+      return owner?.accepting ? owner : undefined;
+    }
+  );
   /**
    * GRIDA-SEC-004 / GRIDA-SEC-005 — every native IPC invoke must pass both
    * structural URL admission and the controller-owned window/role capability
@@ -266,6 +277,16 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     );
   }
 
+  guarded(IPC_CHANNELS.NATIVE_EXTERNAL_STATUS, (event) =>
+    externalAgent.status(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_EXTERNAL_START,
+    (event, id: unknown, text: unknown) => externalAgent.start(event, id, text)
+  );
+  guarded(IPC_CHANNELS.NATIVE_EXTERNAL_STOP, (event, id: unknown) =>
+    externalAgent.stop(event, id)
+  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE, (event) =>
     nativeChat.available(event)
   );

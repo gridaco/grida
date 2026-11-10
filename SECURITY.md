@@ -1559,6 +1559,11 @@ Today:
   reserves dedicated peer scratch against ordinary workspace grants. It checks
   the exact scratch identity and keeps existing custody denials for the peer.
   Forget waits for the selected owner to drain before withdrawing the workspace.
+  The optional [Desktop bridge](packages/grida-desktop-bridge/src/native-external-agent.ts)
+  exposes status, identified text submission, and Stop.
+  [Main IPC](desktop/src/main/native-external-run-ipc.ts) restricts the capability
+  to the selected authenticated workspace frame and its exact observed run.
+  Navigation withdraws the observation and closes pending admission.
 - The native [permission owner](crates/grida-agent/src/permissions.rs) resolves an explicit host profile, binds a durable decision to one action and its captured scope, and fences revocation at command spawn. [Sandbox preparation](crates/agent-kit-sandbox/src/native.rs) checks the exact opened directory and captures executable and scope identity. [Native permission tests](crates/grida-agent/tests/permissions.rs) cover decline, restart, identity changes and revocation.
 - The native [approval extension](crates/grida-agent/src/acp/extensions/approvals.rs) requires the private supervising stdio client for answers. Attached shared clients can read pending approvals. The [host](crates/grida-agent/src/host/permissions.rs) checks the retained action and revisions and holds the execution slot while command cleanup is pending. Unverified cleanup stops automatic queue advancement. [Process tests](crates/grida-agent/tests/process/approvals.rs) cover private review, restart, exact retries, cancellation, and confined command dispatch.
 - Trusted launch configuration can select [automatic review](crates/grida-agent/src/host/approval_review.rs) for one exact file read already governed by `ask`. The [review policy](crates/grida-agent-master/src/approval_review.rs) bounds the evidence and gives the selected provider no tools, absolute root, or file content. Only a valid retained result on the same action, scope, control, and history basis can answer the ordinary pending approval. Manual decisions and current file grants still govern. The host filters reviewer output before the public stream. [Built tests](crates/grida-agent/tests/process/approvals/reviewer.rs) cover exact scope, manual precedence, restart, and interruption.

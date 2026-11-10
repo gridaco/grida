@@ -7,6 +7,9 @@ const allChannels = Object.values(IPC_CHANNELS) as IpcChannel[];
 const nativeChat = allChannels.filter((channel) =>
   channel.startsWith("grida:native-chat:")
 );
+const nativeExternal = allChannels.filter((channel) =>
+  channel.startsWith("grida:native-external:")
+);
 const workspacePublish = IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES;
 const documentFiles = [IPC_CHANNELS.DOCUMENT_READ, IPC_CHANNELS.DOCUMENT_WRITE];
 
@@ -51,6 +54,7 @@ describe("ipc_admission", () => {
       allChannels.filter(
         (channel) =>
           !nativeChat.includes(channel) &&
+          !nativeExternal.includes(channel) &&
           channel !== workspacePublish &&
           !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
@@ -89,6 +93,24 @@ describe("ipc_admission", () => {
           nativeChat.includes(channel)
         )
       ).toBe(false);
+    }
+  });
+
+  it("admits external agents only on the exact main workspace route", () => {
+    expect(nativeExternal).toEqual([
+      IPC_CHANNELS.NATIVE_EXTERNAL_STATUS,
+      IPC_CHANNELS.NATIVE_EXTERNAL_START,
+      IPC_CHANNELS.NATIVE_EXTERNAL_STOP,
+    ]);
+    for (const channel of nativeExternal) {
+      expect(allowedFor("main", "/desktop/workspace")).toContain(channel);
+      expect(allowedFor("main", "/desktop/workspace/extra")).not.toContain(
+        channel
+      );
+      expect(allowedFor("main", "/desktop/settings")).not.toContain(channel);
+      expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+        channel
+      );
     }
   });
 

@@ -792,6 +792,7 @@ app.on("ready", async () => {
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
     recent_files: recentFiles,
     document_files: nativeDocuments,
+    native_external_agent: nativeExternalRuns,
     resolve_document_window: (id) => documentWindows.get(id),
     publish_workspace_surfaces: (event, snapshot) =>
       nativeEditorMcp?.publish(event, snapshot) ?? Promise.resolve(false),

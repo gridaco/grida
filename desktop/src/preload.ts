@@ -489,6 +489,13 @@ const bridge: DesktopBridge = {
 
   handshake,
 
+  nativeExternalAgent: {
+    status: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_STATUS),
+    start: (id, text) =>
+      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_START, id, text),
+    stop: (id) => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_STOP, id),
+  },
+
   nativeChat: {
     available: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE),
     status: (start) =>

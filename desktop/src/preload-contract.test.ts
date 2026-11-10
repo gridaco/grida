@@ -103,13 +103,28 @@ describe("Desktop preload agent seam", () => {
     );
   });
 
-  it("forwards effort through the optional native chat submission argument", () => {
+  it("preserves the optional effort slot when forwarding an SVG target", () => {
     const submission = preloadSource.match(
       /submitInRegime:\s*\(([^)]*)\)\s*=>\s*ipcRenderer\.invoke\(([\s\S]*?)\),/
     );
-    expect(submission?.[1]).toMatch(/\beffort\s*$/);
-    expect(submission?.[2]).toContain(
-      "...(effort === undefined ? [] : [effort])"
+    expect(submission?.[1]).toMatch(/\beffort,\s*editorSvgTargetId\s*$/);
+    expect(submission?.[2]).toMatch(
+      /editorSvgTargetId !== undefined\s*\?\s*\[effort, editorSvgTargetId\]\s*:\s*effort === undefined\s*\?\s*\[\]\s*:\s*\[effort\]/
+    );
+  });
+
+  it("forwards only the reviewed external run identity and text", () => {
+    const external = preloadSource.match(
+      /nativeExternalAgent:\s*\{([\s\S]*?)\},/
+    );
+    expect(external?.[1]).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_STATUS)"
+    );
+    expect(external?.[1]).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_START, id, text)"
+    );
+    expect(external?.[1]).toContain(
+      "ipcRenderer.invoke(IPC_CHANNELS.NATIVE_EXTERNAL_STOP, id)"
     );
   });
 });

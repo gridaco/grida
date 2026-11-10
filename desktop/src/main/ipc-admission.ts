@@ -74,6 +74,7 @@ export namespace ipc_admission {
         }
         if (
           channel.startsWith("grida:native-chat:") ||
+          channel.startsWith("grida:native-external:") ||
           channel === IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES
         ) {
           return pathname === "/desktop/workspace";

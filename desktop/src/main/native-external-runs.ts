@@ -5,6 +5,7 @@ import { constants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
+import type { NativeExternalRun } from "@grida/desktop-bridge";
 import { NativeAgentProcess } from "./native-agent-process";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 
@@ -38,18 +39,7 @@ type Profile = Readonly<{
   runtimePaths: readonly string[];
   deadlineMs: number;
 }>;
-type Disposition =
-  | "starting"
-  | "running"
-  | "not_dispatched"
-  | keyof typeof EXIT;
-export type NativeExternalRun = Readonly<{
-  runId: string;
-  disposition: Disposition;
-  text: string | null;
-  responseTruncated: boolean;
-  cleanupVerified: boolean;
-}>;
+type Disposition = NativeExternalRun["disposition"];
 type Options = Readonly<{
   resourcesPath: string;
   privateDirectory: string;
@@ -152,6 +142,10 @@ export class NativeExternalRuns {
 
   get selection() {
     return { workspaceId: this.profile.workspaceId, name: this.profile.name };
+  }
+
+  get accepting(): boolean {
+    return !this.closed;
   }
 
   async start(

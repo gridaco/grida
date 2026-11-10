@@ -63,8 +63,10 @@ import type {
 } from "@grida/daemon";
 
 import type { DesktopNativeChat } from "./native-chat";
+import type { DesktopNativeExternalAgent } from "./native-external-agent";
 import type { NativeEditorSurfaceSnapshot } from "./native-editor-surfaces";
 export type * from "./native-chat";
+export type * from "./native-external-agent";
 export type * from "./native-subagents";
 export { NativeEditorSurfaces } from "./native-editor-surfaces";
 export { NativeEditorSvgText } from "./native-editor-svg-text";
@@ -251,6 +253,7 @@ export type DesktopBridge = {
   caps: DesktopCapabilities;
   handshake: () => Promise<HandshakeResponse>;
   nativeChat?: DesktopNativeChat;
+  nativeExternalAgent?: DesktopNativeExternalAgent;
   /**
    * Grida account lifecycle owned by the native entry controller. Optional
    * because older protocol-1 hosts let individual renderer windows sign out
