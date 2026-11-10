@@ -37,7 +37,7 @@ async fn verified_responses_admission_rejection_retries_once_after_the_advised_d
         vec![
             Reply::RateLimited {
                 code: "rate_limit_exceeded",
-                retry_after: 1,
+                retry_after: &["1"],
             },
             Reply::Finished("Recovered reply."),
         ],
@@ -86,11 +86,11 @@ async fn responses_rate_limit_budget_stops_after_the_second_rejection() {
         vec![
             Reply::RateLimited {
                 code: "rate_limit_exceeded",
-                retry_after: 0,
+                retry_after: &["0"],
             },
             Reply::RateLimited {
                 code: "rate_limit_exceeded",
-                retry_after: 0,
+                retry_after: &["0"],
             },
         ],
         Some(TEST_CREDENTIAL),
@@ -124,10 +124,17 @@ async fn responses_rate_limit_budget_stops_after_the_second_rejection() {
 }
 
 #[tokio::test]
-async fn responses_leaves_quota_and_long_advice_for_the_client() {
+async fn responses_leaves_quota_or_unusable_retry_advice_for_the_client() {
     for (code, advice, kind) in [
-        ("insufficient_quota", 0, "quota"),
-        ("rate_limit_exceeded", 6, "rate_limit"),
+        ("insufficient_quota", &["0"][..], "quota"),
+        ("rate_limit_exceeded", &["6"][..], "rate_limit"),
+        (
+            "rate_limit_exceeded",
+            &["Sun, 06 Nov 2094 08:49:37 GMT"][..],
+            "rate_limit",
+        ),
+        ("rate_limit_exceeded", &[][..], "rate_limit"),
+        ("rate_limit_exceeded", &["0", "60"][..], "rate_limit"),
     ] {
         let directory = TempDir::new().unwrap();
         let state = directory.path().join("state");
@@ -177,7 +184,7 @@ async fn private_client_sees_the_retry_deadline_and_can_stop_before_dispatch() {
         ProviderProtocol::Responses,
         vec![Reply::RateLimited {
             code: "rate_limit_exceeded",
-            retry_after: 5,
+            retry_after: &["5"],
         }],
         Some(TEST_CREDENTIAL),
     )

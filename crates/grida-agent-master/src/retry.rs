@@ -27,10 +27,7 @@ impl AdmissionRetry {
         inference: &InferenceOutcome,
     ) -> Option<Self> {
         let failure = admission_rejection(inference)?;
-        let delay = failure
-            .retry_after_ms
-            .unwrap_or(MIN_DELAY_MS)
-            .max(MIN_DELAY_MS);
+        let delay = failure.retry_after_ms?.max(MIN_DELAY_MS);
         if delay > MAX_DELAY_MS {
             return None;
         }

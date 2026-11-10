@@ -92,7 +92,7 @@ enum Reply {
     InputCount(u64),
     RateLimited {
         code: &'static str,
-        retry_after: u64,
+        retry_after: &'static [&'static str],
     },
     Hold(&'static str),
     Stop(&'static str),
@@ -242,8 +242,14 @@ async fn fixture_request(
     }
     if let Reply::RateLimited { code, retry_after } = reply {
         let body = json!({"error":{"code":code,"message":"fixture rejection"}}).to_string();
+        let mut advice = String::new();
+        for value in retry_after {
+            advice.push_str("Retry-After: ");
+            advice.push_str(value);
+            advice.push_str("\r\n");
+        }
         let response = format!(
-            "HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nContent-Length: {}\r\nRetry-After: {retry_after}\r\nConnection: close\r\n\r\n{body}",
+            "HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nContent-Length: {}\r\n{advice}Connection: close\r\n\r\n{body}",
             body.len()
         );
         stream

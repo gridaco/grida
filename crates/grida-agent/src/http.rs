@@ -336,10 +336,13 @@ impl StreamingTransport for HttpTransport {
                         })
                 })
                 .map(str::to_owned);
-            let retry_after_ms = response
-                .headers()
-                .get(RETRY_AFTER)
+            let retry_after = response.headers().get_all(RETRY_AFTER);
+            let mut advice = retry_after.iter();
+            let retry_after_ms = advice
+                .next()
+                .filter(|_| advice.next().is_none())
                 .and_then(|value| value.to_str().ok())
+                .filter(|value| value.bytes().all(|byte| byte.is_ascii_digit()))
                 .and_then(|value| value.parse::<u64>().ok())
                 .and_then(|seconds| seconds.checked_mul(1000));
             let maximum = request.max_response_bytes;

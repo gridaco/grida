@@ -439,9 +439,10 @@ Opening a preview leaves the project and the conversation unchanged.
 ## Follow a provider retry
 
 The native Desktop workspace pane can show **Retrying after rate limit…**
-when a supported provider rejected a request before starting it. Grida can
-make one more attempt using the same provider and credentials. Use **Pause**
-or **Stop** to control the current turn while the retry is pending.
+when the Responses API rejected a request before starting it and supplied a
+usable retry delay. Grida can make one more attempt using the same provider
+and credentials. Use **Pause** or **Stop** to control the current turn while
+the retry is pending.
 
 ## Use durable client operations
 
