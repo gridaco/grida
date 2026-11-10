@@ -1351,6 +1351,12 @@ Today:
   supplies canonical disjoint settings, credential, media, and temporary
   roots to a macOS arm64 Seatbelt profile. The profile keeps the installed
   runtime read-only and preserves the fixed private pipes and Node IPC socket.
+  After the previous settings writer retires, preparation binds the exact
+  source directory and copies only its bounded endpoint configuration into an
+  owner-only sibling of the provider store. The original file and credential
+  custody stay with their existing owners. Later endpoint deletions survive
+  preparation retries. [Settings fixtures](desktop/src/main/retained-media-settings.test.ts)
+  cover exact bytes, aliases, interruption, and source identity.
   The [media composition](desktop/src/sidecar/daemon.ts) withholds unrelated
   routes under that launch scope. Packaged fixtures verify provider mediation,
   accepted-socket transfer, scope denials, and clean drain. Desktop's existing

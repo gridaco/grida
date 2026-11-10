@@ -1,10 +1,18 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — trusted packaged media launch with private inherited handles.
-import { spawn } from "node:child_process";
-import fs from "node:fs";
+import { execFile, spawn } from "node:child_process";
+import fs, { type BigIntStats } from "node:fs";
+import files from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 
 const SANDBOX = "/usr/bin/sandbox-exec";
 const ACL_READER = "/bin/ls";
+const SETTINGS_DIRECTORY = "retained-settings";
+const ENDPOINTS = "endpoints.json";
+const SETTINGS_OWNER = ".source";
+const MAX_ENDPOINTS_BYTES = 16 * 1024 * 1024;
+const PRIVATE_READ = fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW;
+const execute = promisify(execFile);
 const SYSTEM_RUNTIME = ["/System/Library", "/usr/lib"];
 // Node's bootstrap calls uname as well as querying its CPU and page limits.
 const SYSTEM_METADATA = [
@@ -33,6 +41,163 @@ export namespace RetainedMediaLaunch {
     editorBaseUrl: string;
   }>;
 
+  /** The caller has retired the original settings writer before preparing this partition. */
+  export async function prepareSettings(source: string): Promise<string> {
+    requireQualifiedPlatform();
+    const agent = privateDirectory(source);
+    await refuseAdditionalAccess(agent);
+    const identity = await files.lstat(agent, { bigint: true });
+    const receipt = Buffer.from(
+      `${JSON.stringify({ version: 1, source: fileIdentity(identity) })}\n`
+    );
+    const settings = path.join(agent, SETTINGS_DIRECTORY);
+    if (await statIfPresent(settings)) return verifySettings(settings, receipt);
+
+    const original = path.join(agent, ENDPOINTS);
+    const endpoint = await readSettingsFile(original, MAX_ENDPOINTS_BYTES);
+    const stage = await files.mkdtemp(path.join(agent, ".retained-settings-"));
+    try {
+      if (endpoint)
+        await writeSettingsFile(path.join(stage, ENDPOINTS), endpoint.bytes);
+      await writeSettingsFile(path.join(stage, SETTINGS_OWNER), receipt);
+      await syncSettingsDirectory(stage);
+      if (
+        fileIdentity(
+          await files.lstat(privateDirectory(agent), { bigint: true })
+        ) !== fileIdentity(identity) ||
+        !sameSnapshot(endpoint?.stat, await statIfPresent(original))
+      )
+        throw new Error("retained_media_settings_source_changed");
+      if (await statIfPresent(settings))
+        return await verifySettings(settings, receipt);
+      try {
+        await files.rename(stage, settings);
+      } catch (error) {
+        // A competing publisher leaves a nonempty directory. Never replace
+        // its accepted settings, including an explicit endpoint deletion.
+        if (
+          !["EEXIST", "ENOTEMPTY"].includes(
+            (error as NodeJS.ErrnoException).code ?? ""
+          )
+        )
+          throw error;
+        return await verifySettings(settings, receipt);
+      }
+      await syncSettingsDirectory(agent);
+      return settings;
+    } finally {
+      await files.rm(stage, { recursive: true, force: true });
+    }
+  }
+
+  async function verifySettings(
+    settings: string,
+    receipt: Buffer
+  ): Promise<string> {
+    privateDirectory(settings);
+    await refuseAdditionalAccess(settings);
+    const owner = await readSettingsFile(
+      path.join(settings, SETTINGS_OWNER),
+      receipt.length
+    );
+    if (!owner?.bytes.equals(receipt))
+      throw new Error("retained_media_settings_unverified");
+    const endpoint = await statIfPresent(path.join(settings, ENDPOINTS));
+    if (endpoint) checkSettingsFile(endpoint, MAX_ENDPOINTS_BYTES);
+    await syncSettingsDirectory(path.dirname(settings));
+    return settings;
+  }
+
+  async function refuseAdditionalAccess(directory: string) {
+    const { stdout } = await execute(ACL_READER, ["-lde", directory], {
+      env: { LC_ALL: "C", LANG: "C" },
+      maxBuffer: 65_536,
+      timeout: 2_000,
+    });
+    if (/^\s*\d+:.*\ballow\b/m.test(stdout))
+      throw new Error("retained_media_directory_invalid");
+  }
+
+  async function readSettingsFile(filename: string, limit: number) {
+    const handle = await files
+      .open(filename, PRIVATE_READ | fs.constants.O_NONBLOCK)
+      .catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error;
+      });
+    if (!handle) return undefined;
+    try {
+      const stat = await handle.stat({ bigint: true });
+      checkSettingsFile(stat, limit);
+      const bytes = Buffer.alloc(Number(stat.size) + 1);
+      const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
+      if (
+        bytesRead !== Number(stat.size) ||
+        !sameSnapshot(stat, await statIfPresent(filename))
+      )
+        throw new Error("retained_media_settings_source_changed");
+      return { bytes: bytes.subarray(0, bytesRead), stat };
+    } finally {
+      await handle.close();
+    }
+  }
+
+  function checkSettingsFile(stat: BigIntStats, limit: number) {
+    if (
+      !stat.isFile() ||
+      stat.uid !== BigInt(process.geteuid!()) ||
+      stat.nlink !== 1n ||
+      (stat.mode & 0o7022n) !== 0n ||
+      stat.size > BigInt(limit)
+    )
+      throw new Error("retained_media_settings_file_invalid");
+  }
+
+  async function writeSettingsFile(filename: string, bytes: Buffer) {
+    const handle = await files.open(filename, "wx", 0o600);
+    try {
+      await handle.writeFile(bytes);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  }
+
+  async function syncSettingsDirectory(directory: string) {
+    const handle = await files.open(
+      directory,
+      PRIVATE_READ | fs.constants.O_DIRECTORY
+    );
+    try {
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  }
+
+  async function statIfPresent(
+    filename: string
+  ): Promise<BigIntStats | undefined> {
+    try {
+      return await files.lstat(filename, { bigint: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+
+  function sameSnapshot(before?: BigIntStats, after?: BigIntStats): boolean {
+    if (!before || !after) return before === after;
+    return (
+      fileIdentity(before) === fileIdentity(after) &&
+      before.size === after.size &&
+      before.mtimeNs === after.mtimeNs &&
+      before.ctimeNs === after.ctimeNs
+    );
+  }
+
+  function fileIdentity(stat: BigIntStats): string {
+    return `${stat.dev}:${stat.ino}:${stat.birthtimeNs}`;
+  }
+
   /**
    * Launch the packaged retained-media service. The host still owns the
    * provider pipes, the IPC socket and every listener. Platform qualification
@@ -53,9 +218,7 @@ export namespace RetainedMediaLaunch {
   }
 
   export function prepare(input: Options) {
-    if (process.platform !== "darwin" || process.arch !== "arm64") {
-      throw new Error("retained_media_platform_unqualified");
-    }
+    requireQualifiedPlatform();
     const executable = regular(input.executable, true);
     const macos = path.dirname(executable);
     const contents = path.dirname(macos);
@@ -132,6 +295,11 @@ export namespace RetainedMediaLaunch {
         LC_ALL: "C",
       },
     };
+  }
+
+  function requireQualifiedPlatform() {
+    if (process.platform !== "darwin" || process.arch !== "arm64")
+      throw new Error("retained_media_platform_unqualified");
   }
 
   function profile(

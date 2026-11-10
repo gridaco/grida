@@ -10,6 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
+import { AuthStore, SecretsStore } from "@grida/daemon/server";
 
 // Only the Electron fetch adapter is replaced. The real host validates grants
 // and carries requests/responses over the same bounded channel as Desktop.
@@ -155,6 +156,86 @@ describe.skipIf(
           )
         )
       ).toEqual([config]);
+    } finally {
+      await active?.stop(false);
+      await fs.rm(scope.root, { recursive: true, force: true });
+    }
+  });
+
+  it("uses adopted settings with the existing canonical provider custody", async () => {
+    const scope = await packagedScope();
+    let active: Sidecar | undefined;
+    try {
+      const { providerHome } = scope.options;
+      const config = {
+        id: "local_fixture",
+        base_url: "http://127.0.0.1:11434/v1",
+        models: [{ id: "fixture-model" }],
+      };
+      const legacySettings = path.join(providerHome, "endpoints.json");
+      const original = Buffer.from(`${JSON.stringify([config], null, 4)}\n`);
+      await fs.writeFile(legacySettings, original, { mode: 0o600 });
+      const auth = new AuthStore(providerHome);
+      await new SecretsStore(auth, providerHome).set("elevenlabs", key);
+      const credentials = path.join(
+        providerHome,
+        "providers",
+        "credentials.toml"
+      );
+      const canonical = await fs.readFile(credentials);
+      const options = {
+        ...scope.options,
+        settings: await RetainedMediaLaunch.prepareSettings(providerHome),
+      };
+      expect(
+        await fs.readFile(path.join(options.settings, "endpoints.json"))
+      ).toEqual(original);
+      const discovery = ggContractFixture([]);
+      const providerTransport = vi.fn<StartOptions["fetchProvider"]>(
+        async (url) => {
+          const response = discovery.response(url);
+          if (!response) throw new Error("unexpected provider request");
+          return response;
+        }
+      );
+      active = await Sidecar.startRetained(options, providerTransport);
+      expect(
+        await (await active.post("/providers/endpoints/list")).json()
+      ).toEqual([config]);
+      expect(
+        await (
+          await active.post("/secrets/has", { provider_id: "elevenlabs" })
+        ).json()
+      ).toEqual({ has: true });
+      expect(
+        (await active.post("/providers/endpoints/delete", { id: config.id }))
+          .status
+      ).toBe(200);
+      await active.stop();
+      active = undefined;
+
+      expect(await RetainedMediaLaunch.prepareSettings(providerHome)).toBe(
+        options.settings
+      );
+      active = await Sidecar.startRetained(options, providerTransport);
+      expect(
+        await (await active.post("/providers/endpoints/list")).json()
+      ).toEqual([]);
+      expect(
+        await (
+          await active.post("/secrets/has", { provider_id: "elevenlabs" })
+        ).json()
+      ).toEqual({ has: true });
+      expect(await fs.readFile(legacySettings)).toEqual(original);
+      expect(await fs.readFile(credentials)).toEqual(canonical);
+      expect(providerTransport.mock.calls.map(([url]) => url).sort()).toEqual([
+        "https://gateway.grida.ai/schemas/operations.json",
+        "https://gateway.grida.ai/schemas/operations.json",
+        "https://gateway.grida.ai/v1/endpoints",
+        "https://gateway.grida.ai/v1/endpoints",
+        "https://gateway.grida.ai/v1/models",
+        "https://gateway.grida.ai/v1/models",
+      ]);
     } finally {
       await active?.stop(false);
       await fs.rm(scope.root, { recursive: true, force: true });
