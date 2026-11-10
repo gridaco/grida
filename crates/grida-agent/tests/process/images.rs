@@ -127,6 +127,7 @@ async fn deleting_a_crop_chat_reclaims_its_private_files_and_recovers_after_inte
                         expected_catalog_revision: request["expectedCatalogRevision"]
                             .as_u64()
                             .unwrap(),
+                        dependents: None,
                     },
                     Some(identity),
                     |_, _| Ok(()),

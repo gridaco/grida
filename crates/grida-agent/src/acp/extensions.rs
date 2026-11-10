@@ -109,6 +109,7 @@ fn capability_keys(
         .chain(summaries::artifact_capability(reviewer))
         .chain([catalog::ORGANIZE])
         .chain(delete_chat.then_some(deletion::DELETE))
+        .chain(delete_chat.then_some(deletion::PREVIEW))
         .chain(goals::CAPABILITIES)
         .chain(side_chats::capabilities(reviewer))
         .chain(wakeups::capabilities(reviewer))

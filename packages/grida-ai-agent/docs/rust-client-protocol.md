@@ -64,8 +64,16 @@ for future attachment or execution.
 
 Deletion requires idle, resolved work and an empty queue. A concurrent
 transcript replay or catalog read can require a retry. An open side chat, a
-pending wake-up, an unfinished Goal, named children, or unresolved execution
-evidence blocks deletion. The host removes verified chat-owned attachment and
+pending wake-up, an unfinished Goal, or unresolved execution evidence blocks
+deletion. To include owned named subagents, negotiate
+`co.grida/session/delete-preview` version 1 and call
+`_co.grida/session/delete-preview` with the attached `sessionId` and `cwd`.
+The response contains `sessionId`, `ownedChildren`, and `ownedChildrenBasis`.
+Show the count for review, then pass the unchanged basis as `expectedOwnedChildren`
+when deleting. The host requires the reviewed membership and revisions, and
+all owned work must be idle, resolved, and free of queued input. An older client
+without the basis can delete eligible chats that have no named subagents.
+The host removes verified chat-owned attachment and
 working data before returning success. If the database commit outlives removal,
 restarting the private host or retrying the exact request can complete removal.
 Independent forks retain their own copied prefix. Workspace files, exported

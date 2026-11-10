@@ -3,7 +3,7 @@
 use super::*;
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::TurnState;
-use agent_kit_store_sqlite::deletion::{DeleteSession, SessionDeleted};
+use agent_kit_store_sqlite::deletion::{DeleteDependents, DeleteSession, SessionDeleted};
 
 pub(crate) struct SavedChatDeletion {
     pub session: SessionId,
@@ -11,18 +11,27 @@ pub(crate) struct SavedChatDeletion {
     pub request: ChangeId,
     pub expected_revision: SessionRevision,
     pub expected_catalog_revision: u64,
+    pub expected_owned_children: Option<Fingerprint>,
 }
 
 impl SavedChatDeletion {
     async fn scoped(self) -> Result<(DeleteSession, PathBuf)> {
         tokio::task::spawn_blocking(move || {
             let cwd = canonical_workspace(&self.cwd)?;
+            let dependents = match self.expected_owned_children {
+                Some(basis) => Some(DeleteDependents {
+                    scope: catalog::child_scope(&self.session)?,
+                    basis,
+                }),
+                None => None,
+            };
             let request = DeleteSession {
                 session: self.session,
                 scope: catalog::workspace_scope(&cwd)?,
                 request: self.request,
                 expected_revision: self.expected_revision,
                 expected_catalog_revision: self.expected_catalog_revision,
+                dependents,
             };
             Ok((request, cwd))
         })
@@ -34,6 +43,23 @@ impl SavedChatDeletion {
 impl Host {
     pub(crate) fn deletion_available(&self) -> bool {
         cfg!(any(target_os = "macos", target_os = "linux")) && self.state_dir.is_some()
+    }
+
+    pub(crate) async fn preview_saved_chat_deletion(
+        &self,
+        session: SessionId,
+        cwd: PathBuf,
+    ) -> Result<(usize, Fingerprint)> {
+        let cwd = tokio::task::spawn_blocking(move || canonical_workspace(&cwd))
+            .await
+            .map_err(|_| problem(ErrorKind::Unavailable, "workspace_unavailable"))??;
+        let view = self.store.inspect(session.clone()).await?;
+        require_saved_workspace(&view.configuration, &cwd)?;
+        let children = self
+            .store
+            .retirement_dependencies(catalog::child_scope(&session)?)
+            .await?;
+        Ok((children.sessions.len(), children.basis))
     }
 
     pub(crate) async fn saved_chat_deletion_receipt(
@@ -69,24 +95,48 @@ impl Host {
             let session = request.session.clone();
             let view = host.store.inspect(session.clone()).await?;
             require_saved_workspace(&view.configuration, &cwd)?;
+            let child_scope = catalog::child_scope(&session)?;
+            let children = host.store.retirement_dependencies(child_scope).await?;
+            if let Some(expected) = &request.dependents {
+                if expected.basis != children.basis {
+                    return Err(problem(
+                        ErrorKind::Conflict,
+                        "session_deletion_dependencies_changed",
+                    ));
+                }
+            } else if !children.sessions.is_empty() {
+                return Err(problem(
+                    ErrorKind::Conflict,
+                    "session_deletion_has_subagents",
+                ));
+            }
+            let mut family = Vec::with_capacity(1 + children.sessions.len());
+            family.push(session);
+            family.extend(children.sessions);
             {
                 let mut work = host.work.lock().await;
                 if work.closed {
                     return Err(problem(ErrorKind::Unavailable, "host_shutting_down"));
                 }
-                if work.active.contains_key(&session)
-                    || work.ready.iter().any(|ready| ready.session() == &session)
-                    || work.timers.keys().any(|(owner, _)| owner == &session)
-                {
+                if family.iter().any(|id| {
+                    work.active.contains_key(id)
+                        || work.ready.iter().any(|ready| ready.session() == id)
+                        || work.timers.keys().any(|(owner, _)| owner == id)
+                }) {
                     return Err(problem(
                         ErrorKind::Conflict,
                         "session_deletion_requires_idle",
                     ));
                 }
-                work.retiring.insert(session.clone());
+                work.retiring.extend(family.iter().cloned());
             }
-            let result = host.delete_owned_chat(state_dir, cwd, request).await;
-            host.work.lock().await.retiring.remove(&session);
+            let result = host
+                .delete_owned_chat(state_dir, cwd, request, family[1..].to_vec())
+                .await;
+            let mut work = host.work.lock().await;
+            for id in &family {
+                work.retiring.remove(id);
+            }
             result
         })
         .await
@@ -97,19 +147,22 @@ impl Host {
         state_dir: Arc<Path>,
         cwd: PathBuf,
         request: DeleteSession,
+        children: Vec<SessionId>,
     ) -> Result<SessionDeleted> {
-        if self
-            .store
-            .has_catalog_entries(catalog::child_scope(&request.session)?)
-            .await?
-        {
-            return Err(problem(
-                ErrorKind::Conflict,
-                "session_deletion_has_subagents",
-            ));
-        }
         let owner = request.session.clone();
+        let parent = owner.clone();
+        let child_cwd = cwd.clone();
         let cleanup = tokio::task::spawn_blocking(move || {
+            // Named children only accept text. Unexpected retained storage
+            // needs its own ownership proof before the family can retire.
+            for child in children {
+                if images::Images::retirement_identity(&state_dir, &child)?.is_some() {
+                    return Err(problem(
+                        ErrorKind::Conflict,
+                        "session_deletion_has_retained_inputs",
+                    ));
+                }
+            }
             images::Images::retirement_identity(&state_dir, &owner)
         })
         .await
@@ -117,12 +170,28 @@ impl Host {
         .map_err(|_| problem(ErrorKind::Conflict, "session_deletion_has_retained_inputs"))?;
         let receipt = self
             .store
-            .delete_idle_with_cleanup(
+            .delete_idle_with_dependents(
                 request,
                 cleanup,
                 move |configuration, driver| {
                     require_saved_workspace(configuration, &cwd)?;
                     goals::require_resolved_goal(driver)
+                },
+                move |configuration, driver| {
+                    let configuration = decode_session_configuration(configuration)?;
+                    if configuration.cwd != child_cwd {
+                        return Err(problem(
+                            ErrorKind::Conflict,
+                            "session_deletion_dependencies_changed",
+                        ));
+                    }
+                    let profile = configuration
+                        .subagent
+                        .filter(|profile| profile.parent() == &parent)
+                        .ok_or_else(|| {
+                            problem(ErrorKind::Conflict, "session_deletion_dependencies_changed")
+                        })?;
+                    profile.allocation(driver).map(|_| ())
                 },
                 require_resolved_work,
             )

@@ -8,7 +8,7 @@ use agent_kit_core::{Envelope, Error, ErrorKind, Fingerprint, MessageId, Session
 use agent_kit_sessions::{CreateSession, SessionStore};
 use agent_kit_store_sqlite::SqliteStore;
 use agent_kit_store_sqlite::context::ContextInstall;
-use agent_kit_store_sqlite::deletion::{DeleteSession, SessionDeleted};
+use agent_kit_store_sqlite::deletion::{DeleteDependents, DeleteSession, SessionDeleted};
 use agent_kit_store_sqlite::history::{
     HistorySeed, HistorySelection, RetainedHistory, SeededSession,
 };
@@ -33,6 +33,7 @@ async fn deletion(store: &SqliteStore) -> DeleteSession {
         request: change("delete"),
         expected_revision: store.inspect(session()).await.unwrap().revision,
         expected_catalog_revision: store.catalog_entry(session()).await.unwrap().revision,
+        dependents: None,
     }
 }
 
@@ -406,4 +407,44 @@ async fn upgrades_a_retired_chat_without_reopening_its_identity() {
         store.create(original).await.unwrap_err().code,
         "session_identity_retired"
     );
+}
+
+#[tokio::test]
+async fn a_queued_dependent_rolls_back_the_entire_reviewed_retirement() {
+    let directory = private_directory();
+    let store =
+        SqliteStore::open_cataloged(directory.path().join("sessions.sqlite"), project).unwrap();
+    let first = SessionId::new("first").unwrap();
+    let second = SessionId::new("second").unwrap();
+    store.create(create(session(), "workspace")).await.unwrap();
+    store.create(create(first.clone(), "owned")).await.unwrap();
+    store.create(create(second.clone(), "owned")).await.unwrap();
+    store
+        .submit(second.clone(), submission("pending", "Leave this queued"))
+        .await
+        .unwrap();
+
+    let scope = project(&payload("owned")).unwrap();
+    let preview = store.retirement_dependencies(scope).await.unwrap();
+    assert_eq!(preview.sessions, vec![first.clone(), second.clone()]);
+    let mut request = deletion(&store).await;
+    request.dependents = Some(DeleteDependents {
+        scope,
+        basis: preview.basis,
+    });
+    let error = store
+        .delete_idle_with_dependents(
+            request.clone(),
+            None,
+            |_, _| Ok(()),
+            |_, _| Ok(()),
+            |_| Ok(()),
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, "session_deletion_requires_empty_queue");
+    assert!(store.deletion_receipt(request).await.unwrap().is_none());
+    assert!(store.inspect(session()).await.is_ok());
+    assert!(store.inspect(first).await.is_ok());
+    assert_eq!(store.inspect(second).await.unwrap().queued.len(), 1);
 }

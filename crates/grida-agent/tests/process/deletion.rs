@@ -7,6 +7,7 @@ use agent_kit_core::{Fingerprint, SessionId};
 use std::os::unix::fs::DirBuilderExt;
 
 const DELETE: &str = "_co.grida/session/delete";
+const PREVIEW: &str = "_co.grida/session/delete-preview";
 const CATALOG: &str = "_co.grida/session/catalog-entry";
 const SNAPSHOT: &str = "_co.grida/session/snapshot";
 
@@ -14,12 +15,15 @@ pub(super) fn capabilities() -> Value {
     let mut request = extension_initialize();
     for key in [
         "co.grida/session/delete",
+        "co.grida/session/delete-preview",
         "co.grida/session/organize",
         "co.grida/session/updates",
         "co.grida/side-chat/open",
         "co.grida/side-chat/ask",
         "co.grida/side-chat/close",
         "co.grida/subagent/create",
+        "co.grida/subagent/assign",
+        "co.grida/subagent/inspect",
         "co.grida/goal/start",
     ] {
         request["clientCapabilities"]["_meta"][key] = 1.into();
@@ -82,6 +86,171 @@ async fn prompt(client: &mut Client, session: &str, text: &str) {
 
 fn refused(reply: &Value, reason: &str) {
     assert_eq!(reply["error"]["data"], reason, "{reply}");
+}
+
+#[tokio::test]
+async fn reviewed_deletion_removes_only_idle_owned_children() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let cwd = workspace.path();
+    let (release, wait) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("Parent has work to review."),
+        Reply::Release("Child work is resolved.", wait),
+    ])
+    .await;
+    let mut client = start(&state, &endpoint.url).await;
+    let parent = created(&mut client, cwd).await;
+    let foreign_parent = created(&mut client, cwd).await;
+    prompt(&mut client, &parent, "Keep a reviewed parent result").await;
+    endpoint.request().await;
+    let snapshot = client.request(SNAPSHOT, json!({"sessionId":parent})).await;
+    let parent_turn = snapshot["result"]["latest"]["turnId"].as_str().unwrap();
+
+    let foreign = create_child(&mut client, &foreign_parent, "foreign").await;
+    let first = create_child(&mut client, &parent, "first").await;
+    let before = preview(&mut client, &parent, cwd, 1).await;
+    let second = create_child(&mut client, &parent, "second").await;
+    let mut request = deletion(&mut client, &parent, cwd).await;
+    request["expectedOwnedChildren"] = before;
+    refused(
+        &client.request(DELETE, request.clone()).await,
+        "session_deletion_dependencies_changed",
+    );
+
+    let assigned = client
+        .request(
+            "_co.grida/subagent/assign",
+            json!({
+                "parentSessionId":parent,"childId":second,"parentTurnId":parent_turn,
+                "inputId":"second-work","instructions":"Check the evidence.",
+            }),
+        )
+        .await;
+    assert!(assigned["result"].is_object(), "{assigned}");
+    endpoint.request().await;
+    request["expectedOwnedChildren"] = preview(&mut client, &parent, cwd, 2).await;
+    refused(
+        &client.request(DELETE, request.clone()).await,
+        "session_deletion_requires_idle",
+    );
+    assert_eq!(
+        inspect_child(&mut client, &parent, &first).await["result"]["childId"],
+        first
+    );
+    assert_eq!(
+        inspect_child(&mut client, &foreign_parent, &foreign).await["result"]["childId"],
+        foreign
+    );
+
+    release.send(()).unwrap();
+    timeout(WAIT, async {
+        loop {
+            let child = inspect_child(&mut client, &parent, &second).await;
+            if child["result"]["current"].is_null() && child["result"]["latest"].is_object() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    refused(
+        &client.request(DELETE, request.clone()).await,
+        "session_deletion_dependencies_changed",
+    );
+    request["expectedOwnedChildren"] = preview(&mut client, &parent, cwd, 2).await;
+    let result = timeout(WAIT, async {
+        loop {
+            let deleted = client.request(DELETE, request.clone()).await;
+            if deleted["error"]["data"] != "session_deletion_requires_idle" {
+                break deleted;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        result["result"],
+        json!({"sessionId":parent,"requestId":"confirmed-delete"}),
+        "{result}"
+    );
+    client.close().await;
+
+    let store = agent_kit_store_sqlite::SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    use agent_kit_sessions::SessionStore;
+    for removed in [&parent, &first, &second] {
+        assert_eq!(
+            store
+                .inspect(SessionId::new(removed).unwrap())
+                .await
+                .unwrap_err()
+                .code,
+            "session_missing"
+        );
+    }
+    assert!(
+        store
+            .inspect(SessionId::new(&foreign).unwrap())
+            .await
+            .is_ok()
+    );
+    drop(store);
+
+    let mut client = start(&state, &endpoint.url).await;
+    assert_eq!(
+        client.request(DELETE, request).await["result"],
+        result["result"]
+    );
+    assert!(
+        client
+            .request("session/load", setup(&foreign_parent, cwd))
+            .await["result"]
+            .is_object()
+    );
+    assert_eq!(
+        inspect_child(&mut client, &foreign_parent, &foreign).await["result"]["childId"],
+        foreign
+    );
+    client.close().await;
+    endpoint.done().await;
+}
+
+async fn create_child(client: &mut Client, parent: &str, name: &str) -> String {
+    let child = client
+        .request(
+            "_co.grida/subagent/create",
+            json!({
+                "parentSessionId":parent,"requestId":name,"name":name,"workTurns":1,
+            }),
+        )
+        .await;
+    child["result"]["childId"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{child}"))
+        .to_owned()
+}
+
+async fn preview(client: &mut Client, session: &str, cwd: &Path, count: usize) -> Value {
+    let reply = client
+        .request(PREVIEW, json!({"sessionId":session,"cwd":cwd}))
+        .await;
+    assert_eq!(reply["result"]["sessionId"], session);
+    assert_eq!(reply["result"]["ownedChildren"], count, "{reply}");
+    let basis = reply["result"]["ownedChildrenBasis"].clone();
+    assert_eq!(basis.as_array().unwrap().len(), 32);
+    basis
+}
+
+async fn inspect_child(client: &mut Client, parent: &str, child: &str) -> Value {
+    client
+        .request(
+            "_co.grida/subagent/inspect",
+            json!({"parentSessionId":parent,"childId":child}),
+        )
+        .await
 }
 
 #[tokio::test]
@@ -379,9 +548,18 @@ async fn shared_connection_cannot_negotiate_deletion() {
         .unwrap();
     let init = ws_rpc(&mut socket, 1, "initialize", capabilities()).await;
     assert!(init["result"]["agentCapabilities"]["_meta"][&DELETE[1..]].is_null());
-    let denied = ws_rpc(
+    assert!(init["result"]["agentCapabilities"]["_meta"][&PREVIEW[1..]].is_null());
+    let unreviewable = ws_rpc(
         &mut socket,
         2,
+        PREVIEW,
+        json!({"sessionId":"missing","cwd":temp.path()}),
+    )
+    .await;
+    assert_eq!(unreviewable["error"]["code"], -32601);
+    let denied = ws_rpc(
+        &mut socket,
+        3,
         DELETE,
         json!({
             "sessionId":"missing","cwd":temp.path(),"requestId":"delete",

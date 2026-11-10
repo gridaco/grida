@@ -991,8 +991,11 @@ lazy reads, read-only mutation, and symlink escape refusal.
 - [Saved-chat deletion](crates/grida-agent/src/acp/extensions/deletion.rs)
   requires negotiated private stdio and an attached chat at both observed
   revisions. An exact scope-bound retry can recover the retirement receipt.
-  The [host](crates/grida-agent/src/host/deletion.rs) excludes outstanding work
-  and owned children under the existing admission owner. Chat-owned retained
+  A separate negotiated preview captures the exact owned child membership and
+  revisions. The [host](crates/grida-agent/src/host/deletion.rs) fences the reviewed
+  family under the admission owner, verifies every child belongs to that parent
+  and workspace, and rejects outstanding work. SQLite retires the family in one
+  transaction. Chat-owned retained
   attachments and working copies are removed from the exact verified private
   directory. Its identity commits with retirement so recovery never selects a
   replacement at the same path. Removal verifies the known directory layout

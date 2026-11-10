@@ -3,6 +3,8 @@
 use super::*;
 use rusqlite::types::ValueRef;
 
+const MAX_DEPENDENTS: usize = 128;
+
 pub(super) const SCHEMA: &str = "
 CREATE TABLE session_retirements (
     session TEXT PRIMARY KEY,
@@ -23,6 +25,19 @@ pub struct DeleteSession {
     pub request: ChangeId,
     pub expected_revision: SessionRevision,
     pub expected_catalog_revision: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dependents: Option<DeleteDependents>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct DeleteDependents {
+    pub scope: Fingerprint,
+    pub basis: Fingerprint,
+}
+
+pub struct RetirementDependencies {
+    pub sessions: Vec<SessionId>,
+    pub basis: Fingerprint,
 }
 
 /// Receipt for removal of SQLite-owned records and retirement of their identity.
@@ -67,6 +82,41 @@ impl SqliteStore {
         check_session: impl FnOnce(&Envelope, &DriverStateSnapshot) -> Result<()> + Send + 'static,
         check_turn: impl FnMut(&TurnState) -> Result<()> + Send + 'static,
     ) -> Result<SessionDeleted> {
+        self.delete_idle_with_dependents(
+            request,
+            cleanup,
+            check_session,
+            |_, _| {
+                Err(error(
+                    ErrorKind::Unsupported,
+                    "session_deletion_dependencies_unavailable",
+                ))
+            },
+            check_turn,
+        )
+        .await
+    }
+
+    /// Capture the exact membership and revisions of one owner-defined scope.
+    pub async fn retirement_dependencies(
+        &self,
+        scope: Fingerprint,
+    ) -> Result<RetirementDependencies> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            retirement_dependencies(connection, scope)
+        })
+        .await
+    }
+
+    /// Retire the reviewed family atomically, under the same idle and history bounds.
+    pub async fn delete_idle_with_dependents(
+        &self,
+        request: DeleteSession,
+        cleanup: Option<[u8; 32]>,
+        check_session: impl FnOnce(&Envelope, &DriverStateSnapshot) -> Result<()> + Send + 'static,
+        mut check_dependent: impl FnMut(&Envelope, &DriverStateSnapshot) -> Result<()> + Send + 'static,
+        mut check_turn: impl FnMut(&TurnState) -> Result<()> + Send + 'static,
+    ) -> Result<SessionDeleted> {
         execute(Arc::clone(&self.inner), move |inner, connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -87,42 +137,43 @@ impl SqliteStore {
                 .map_err(database_error)?
                 .ok_or_else(|| error(ErrorKind::InvalidInput, "session_missing"))?;
             if unsigned(catalog_revision)? != request.expected_catalog_revision {
-                return Err(error(ErrorKind::Conflict, "session_catalog_revision_changed"));
+                return Err(error(
+                    ErrorKind::Conflict,
+                    "session_catalog_revision_changed",
+                ));
             }
             let session = load_session(&transaction, id)?;
             require_revision(&session, request.expected_revision)?;
-            if session.active_turn.is_some() || has_live_session_owner(inner, id)? {
-                return Err(error(ErrorKind::Conflict, "session_deletion_requires_idle"));
-            }
-            let queued: bool = transaction
-                .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM submissions WHERE session=?1 AND queue_order IS NOT NULL)",
-                    [id.as_str()],
-                    |row| row.get(0),
-                )
-                .map_err(database_error)?;
-            if queued {
-                return Err(error(ErrorKind::Conflict, "session_deletion_requires_empty_queue"));
-            }
+            require_idle(inner, &transaction, id, session.active_turn.is_some())?;
             check_session(&session.configuration, &session.driver_state)?;
-            check_turns(&transaction, id, check_turn)?;
+            let mut scan = RetirementScan::default();
+            scan.check_turns(&transaction, id, &mut check_turn)?;
 
-            transaction
-                .execute(
-                    "INSERT INTO session_retirements(session,scope,fingerprint,cleanup) VALUES(?1,?2,?3,?4)",
-                    params![id.as_str(), request.scope.bytes().as_slice(), fingerprint.bytes().as_slice(), cleanup.as_ref().map(|value| value.as_slice())],
-                )
-                .map_err(database_error)?;
-            for sql in [
-                "DELETE FROM session_context_replacements WHERE session=?1",
-                "DELETE FROM session_history_views WHERE session=?1",
-                "DELETE FROM submissions WHERE session=?1",
-                "DELETE FROM requests WHERE session=?1",
-                "DELETE FROM turns WHERE session=?1",
-                "DELETE FROM sessions WHERE id=?1",
-            ] {
-                transaction.execute(sql, [id.as_str()]).map_err(database_error)?;
+            if let Some(expected) = &request.dependents {
+                let actual = retirement_dependencies(&transaction, expected.scope)?;
+                if actual.basis != expected.basis || actual.sessions.contains(id) {
+                    return Err(error(
+                        ErrorKind::Conflict,
+                        "session_deletion_dependencies_changed",
+                    ));
+                }
+                for child in actual.sessions {
+                    let saved = load_session(&transaction, &child)?;
+                    require_idle(inner, &transaction, &child, saved.active_turn.is_some())?;
+                    check_dependent(&saved.configuration, &saved.driver_state)?;
+                    scan.check_turns(&transaction, &child, &mut check_turn)?;
+                    let child_fingerprint =
+                        Fingerprint::of(&("delete-dependent-session-v1", fingerprint, &child))?;
+                    delete_rows(
+                        &transaction,
+                        &child,
+                        expected.scope,
+                        child_fingerprint,
+                        None,
+                    )?;
+                }
             }
+            delete_rows(&transaction, id, request.scope, fingerprint, cleanup)?;
             transaction.commit().map_err(commit_error)?;
             inner.changed.notify_waiters();
             Ok(receipt(&request, cleanup))
@@ -172,6 +223,93 @@ impl SqliteStore {
     }
 }
 
+fn retirement_dependencies(
+    connection: &Connection,
+    scope: Fingerprint,
+) -> Result<RetirementDependencies> {
+    let mut statement = connection
+        .prepare(
+            "SELECT catalog.session, session.revision, catalog.revision
+         FROM session_catalog catalog JOIN sessions session ON session.id=catalog.session
+         WHERE catalog.scope=?1 ORDER BY catalog.session LIMIT ?2",
+        )
+        .map_err(database_error)?;
+    let mut rows = statement
+        .query(params![
+            scope.bytes().as_slice(),
+            (MAX_DEPENDENTS + 1) as i64
+        ])
+        .map_err(database_error)?;
+    let mut revisions = Vec::new();
+    while let Some(row) = rows.next().map_err(database_error)? {
+        if revisions.len() == MAX_DEPENDENTS {
+            return Err(error(
+                ErrorKind::LimitExceeded,
+                "session_deletion_dependency_limit",
+            ));
+        }
+        let id = SessionId::new(row.get::<_, String>(0).map_err(database_error)?)?;
+        let revision = unsigned(row.get(1).map_err(database_error)?)?;
+        let catalog_revision = unsigned(row.get(2).map_err(database_error)?)?;
+        revisions.push((id, revision, catalog_revision));
+    }
+    Ok(RetirementDependencies {
+        basis: Fingerprint::of(&(scope, &revisions))?,
+        sessions: revisions.into_iter().map(|(id, _, _)| id).collect(),
+    })
+}
+
+fn require_idle(
+    inner: &Inner,
+    connection: &Connection,
+    id: &SessionId,
+    active: bool,
+) -> Result<()> {
+    if active || has_live_session_owner(inner, id)? {
+        return Err(error(ErrorKind::Conflict, "session_deletion_requires_idle"));
+    }
+    let queued: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM submissions WHERE session=?1 AND queue_order IS NOT NULL)",
+            [id.as_str()],
+            |row| row.get(0),
+        )
+        .map_err(database_error)?;
+    if queued {
+        return Err(error(
+            ErrorKind::Conflict,
+            "session_deletion_requires_empty_queue",
+        ));
+    }
+    Ok(())
+}
+
+fn delete_rows(
+    connection: &Connection,
+    id: &SessionId,
+    scope: Fingerprint,
+    fingerprint: Fingerprint,
+    cleanup: Option<[u8; 32]>,
+) -> Result<()> {
+    connection.execute(
+        "INSERT INTO session_retirements(session,scope,fingerprint,cleanup) VALUES(?1,?2,?3,?4)",
+        params![id.as_str(), scope.bytes().as_slice(), fingerprint.bytes().as_slice(), cleanup.as_ref().map(|value| value.as_slice())],
+    ).map_err(database_error)?;
+    for sql in [
+        "DELETE FROM session_context_replacements WHERE session=?1",
+        "DELETE FROM session_history_views WHERE session=?1",
+        "DELETE FROM submissions WHERE session=?1",
+        "DELETE FROM requests WHERE session=?1",
+        "DELETE FROM turns WHERE session=?1",
+        "DELETE FROM sessions WHERE id=?1",
+    ] {
+        connection
+            .execute(sql, [id.as_str()])
+            .map_err(database_error)?;
+    }
+    Ok(())
+}
+
 pub(super) fn require_unretired(connection: &Connection, id: &SessionId) -> Result<()> {
     let retired: bool = connection
         .query_row(
@@ -186,39 +324,46 @@ pub(super) fn require_unretired(connection: &Connection, id: &SessionId) -> Resu
     Ok(())
 }
 
-fn check_turns(
-    connection: &Connection,
-    session: &SessionId,
-    mut check: impl FnMut(&TurnState) -> Result<()>,
-) -> Result<()> {
-    let mut statement = connection
-        .prepare("SELECT id,snapshot FROM turns WHERE session=?1 ORDER BY ordinal LIMIT ?2")
-        .map_err(database_error)?;
-    let mut rows = statement
-        .query(params![session.as_str(), MAX_HISTORY_TURNS + 1])
-        .map_err(database_error)?;
-    let mut turns = 0;
-    let mut bytes = 0;
-    while let Some(row) = rows.next().map_err(database_error)? {
-        let ValueRef::Blob(snapshot) = row.get_ref(1).map_err(database_error)? else {
-            return Err(error(ErrorKind::InvalidState, "stored_data_invalid"));
-        };
-        turns += 1;
-        bytes += snapshot.len();
-        if turns > MAX_HISTORY_TURNS || bytes > MAX_HISTORY_SCAN_BYTES {
-            return Err(error(
-                ErrorKind::LimitExceeded,
-                "session_deletion_scan_limit",
-            ));
+#[derive(Default)]
+struct RetirementScan {
+    turns: i64,
+    bytes: usize,
+}
+
+impl RetirementScan {
+    fn check_turns(
+        &mut self,
+        connection: &Connection,
+        session: &SessionId,
+        mut check: impl FnMut(&TurnState) -> Result<()>,
+    ) -> Result<()> {
+        let mut statement = connection
+            .prepare("SELECT id,snapshot FROM turns WHERE session=?1 ORDER BY ordinal LIMIT ?2")
+            .map_err(database_error)?;
+        let mut rows = statement
+            .query(params![session.as_str(), MAX_HISTORY_TURNS + 1])
+            .map_err(database_error)?;
+        while let Some(row) = rows.next().map_err(database_error)? {
+            let ValueRef::Blob(snapshot) = row.get_ref(1).map_err(database_error)? else {
+                return Err(error(ErrorKind::InvalidState, "stored_data_invalid"));
+            };
+            self.turns += 1;
+            self.bytes += snapshot.len();
+            if self.turns > MAX_HISTORY_TURNS || self.bytes > MAX_HISTORY_SCAN_BYTES {
+                return Err(error(
+                    ErrorKind::LimitExceeded,
+                    "session_deletion_scan_limit",
+                ));
+            }
+            let turn = TurnId::new(row.get::<_, String>(0).map_err(database_error)?)?;
+            let state = decode_turn(snapshot, session, &turn)?;
+            if state.outcome().is_none() {
+                return Err(error(ErrorKind::Conflict, "session_deletion_requires_idle"));
+            }
+            check(&state)?;
         }
-        let turn = TurnId::new(row.get::<_, String>(0).map_err(database_error)?)?;
-        let state = decode_turn(snapshot, session, &turn)?;
-        if state.outcome().is_none() {
-            return Err(error(ErrorKind::Conflict, "session_deletion_requires_idle"));
-        }
-        check(&state)?;
+        Ok(())
     }
-    Ok(())
 }
 
 fn deletion_fingerprint(request: &DeleteSession) -> Result<Fingerprint> {
