@@ -25,9 +25,11 @@ type FileRequest = {
   includeModified?: true;
   listDirectory?: true;
   write?: { length: number; expectedMtime?: string };
+  publish?: { length: number; sha256: string; parentIdentity: NativeIdentity };
 };
 type DirectoryEntry = Pick<WorkspaceFsEntry, "name" | "kind">;
 type NativeIdentity = WorkspaceMediaGrant["identity"];
+type PublicationReceipt = { status: "published" | "already_present" };
 export type DocumentFileGrant = Readonly<{
   path: string;
   identity: NativeIdentity;
@@ -206,6 +208,29 @@ export class WorkspaceFileWorkers {
       signal,
       check,
       savedWorkspace
+    );
+  }
+
+  async publish(
+    grant: WorkspaceMediaGrant,
+    relative: string,
+    content: Buffer,
+    parentIdentity: NativeIdentity,
+    sha256: string,
+    signal: AbortSignal,
+    check: () => void
+  ): Promise<PublicationReceipt> {
+    const request = frame(grant, {
+      path: relative,
+      publish: { length: content.length, sha256, parentIdentity },
+    });
+    return await this.save(
+      { workspace: grant },
+      request,
+      content,
+      signal,
+      check,
+      publishedWorkspace
     );
   }
 
@@ -443,6 +468,18 @@ function savedWorkspace(response: unknown) {
   return { mtime: savedMtime(response, 1) };
 }
 
+function publishedWorkspace(response: unknown): PublicationReceipt {
+  if (
+    !response ||
+    typeof response !== "object" ||
+    Object.keys(response).length !== 1 ||
+    !("status" in response) ||
+    (response.status !== "published" && response.status !== "already_present")
+  )
+    throw unavailable();
+  return { status: response.status };
+}
+
 function savedDocument(response: unknown) {
   const mtime = savedMtime(response, 2);
   const { identity } = response as { identity?: unknown };
@@ -610,6 +647,8 @@ const definitiveWriteErrors = new Set([
   "workspace_write_failed",
   "workspace_write_limit",
   "workspace_write_utf8",
+  "workspace_publish_conflict",
+  "workspace_publish_digest_mismatch",
   "workspace_file_frame_invalid",
   "workspace_directory_changed",
   "workspace_path_outside_root",
@@ -629,6 +668,7 @@ function workerError(diagnostic: string, error: unknown) {
   const code = workerCode(diagnostic);
   switch (code) {
     case "document_file_changed":
+    case "workspace_publish_conflict":
       return new WorkspaceMediaError(409, code);
     case "workspace_directory_limit":
       return new WorkspaceMediaError(413, code);

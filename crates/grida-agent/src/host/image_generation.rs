@@ -14,8 +14,10 @@ use agent_client_protocol::{Client, JsonRpcRequest, JsonRpcResponse};
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ResultContent};
 use agent_kit_core::tools::{RecoveryKind, ToolDefinition, ToolOutcome};
-use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnBinding, TurnState};
-use agent_kit_core::{BindingId, BoxFuture, ErrorKind, Result, SessionId, ToolId};
+use agent_kit_core::turn::{
+    OperationInput, OperationOutcome, OperationState, TurnBinding, TurnState,
+};
+use agent_kit_core::{BindingId, BoxFuture, ErrorKind, Result, SessionId, ToolId, TurnId};
 use agent_kit_store_sqlite::SqliteStore;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Serialize};
@@ -23,6 +25,10 @@ use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use uuid::Uuid;
+
+mod placement;
+pub(crate) use placement::CAPABILITY as PLACE_CAPABILITY;
+pub(super) use placement::TOOL as PLACE_TOOL;
 
 pub(crate) const CAPABILITY: &str = "co.grida/media/generate-image";
 pub(crate) const REFERENCE_CAPABILITY: &str = "co.grida/media/image-reference";
@@ -32,25 +38,32 @@ const MAX_PROMPT_BYTES: usize = 8 * 1024;
 const MAX_MEDIA_BYTES: u64 = 64 * 1024 * 1024;
 const TEXT_VERSION: u32 = 1;
 const REFERENCE_VERSION: u32 = 2;
+const PLACEABLE_TEXT_VERSION: u32 = 3;
+const PLACEABLE_REFERENCE_VERSION: u32 = 4;
+
+fn generation_operation(state: &TurnState, operation: &OperationState) -> Option<u32> {
+    let OperationInput::Tool(invocation) = &operation.record.input else {
+        return None;
+    };
+    let grants = &operation.record.grants;
+    let version = invocation.definition().version;
+    (invocation.definition().id.as_str() == TOOL
+        && matches!(
+            version,
+            TEXT_VERSION | REFERENCE_VERSION | PLACEABLE_TEXT_VERSION | PLACEABLE_REFERENCE_VERSION
+        )
+        && grants.authority.principal.as_str() == PRINCIPAL
+        && grants.authority.scope.as_str() == state.binding().turn.as_str()
+        && matches!(grants.grants.as_slice(), [grant] if grant.as_str() == TOOL)
+        && !operation.attempts.is_empty())
+    .then_some(version)
+}
 
 pub(super) fn summary_note(state: &TurnState) -> Option<&'static str> {
     let mut retained = false;
     let mut unretained = false;
     for operation in state.operations().values() {
-        let OperationInput::Tool(invocation) = &operation.record.input else {
-            continue;
-        };
-        let grants = &operation.record.grants;
-        if invocation.definition().id.as_str() != TOOL
-            || !matches!(
-                invocation.definition().version,
-                TEXT_VERSION | REFERENCE_VERSION
-            )
-            || grants.authority.principal.as_str() != PRINCIPAL
-            || grants.authority.scope.as_str() != state.binding().turn.as_str()
-            || !matches!(grants.grants.as_slice(), [grant] if grant.as_str() == TOOL)
-            || operation.attempts.is_empty()
-        {
+        if generation_operation(state, operation).is_none() {
             continue;
         }
         let outcomes = operation.outcome().into_iter().chain(
@@ -97,11 +110,13 @@ pub(crate) struct DesktopImageGeneration {
 struct DesktopConnection {
     client: ConnectionTo<Client>,
     references: bool,
+    placement: bool,
 }
 
 pub(super) struct Prepared {
     owner: DesktopImageGeneration,
     references: bool,
+    placement: bool,
 }
 
 impl Prepared {
@@ -113,7 +128,7 @@ impl Prepared {
     ) -> Result<Arc<HostTools>> {
         let reference = if self.references {
             Some(ReferenceScope {
-                store,
+                store: store.clone(),
                 turn: turn.clone(),
                 storage: execution
                     .retained_inputs
@@ -124,10 +139,13 @@ impl Prepared {
         } else {
             None
         };
-        let tool = self.owner.tool_host(turn.session.clone(), reference)?;
+        let tool = self
+            .owner
+            .tool_host(turn, reference, self.placement.then_some(store))?;
         Ok(Arc::new(HostTools::image_generation(
             tool,
             self.owner.binding,
+            self.placement,
         )?))
     }
 }
@@ -162,8 +180,12 @@ impl Host {
 }
 
 impl DesktopImageGeneration {
-    pub(crate) fn attach(&self, client: ConnectionTo<Client>, references: bool) {
-        *self.connection.lock().unwrap() = Some(DesktopConnection { client, references });
+    pub(crate) fn attach(&self, client: ConnectionTo<Client>, references: bool, placement: bool) {
+        *self.connection.lock().unwrap() = Some(DesktopConnection {
+            client,
+            references,
+            placement,
+        });
     }
 
     pub(crate) fn detach(&self) {
@@ -183,17 +205,37 @@ impl DesktopImageGeneration {
             .is_some_and(|connection| connection.references)
     }
 
-    pub(super) fn prepare(&self, references: bool) -> Result<Prepared> {
+    pub(super) fn placement(&self) -> bool {
+        self.connection
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|connection| connection.placement)
+    }
+
+    pub(super) fn prepare(&self, references: bool, placement: bool) -> Result<Prepared> {
         if references && !self.references() {
             return Err(reference_unavailable());
+        }
+        if placement && !self.placement() {
+            return Err(problem(
+                ErrorKind::Unavailable,
+                "retained_image_placement_unavailable",
+            ));
         }
         Ok(Prepared {
             owner: self.clone(),
             references,
+            placement,
         })
     }
 
-    fn tool_host(&self, session: SessionId, reference: Option<ReferenceScope>) -> Result<ToolHost> {
+    fn tool_host(
+        &self,
+        turn: &TurnBinding,
+        reference: Option<ReferenceScope>,
+        placement_store: Option<Arc<SqliteStore>>,
+    ) -> Result<ToolHost> {
         let mut properties = json!({
             "prompt": {"type": "string", "minLength": 1, "maxLength": MAX_PROMPT_BYTES},
             "background": {"enum": ["auto", "opaque", "transparent"]}
@@ -205,13 +247,18 @@ impl DesktopImageGeneration {
             properties["library_reference_id"] = json!({"type":"string", "format":"uuid", "description":"The catalog ID of one Library image the user selected earlier in this turn."});
             description.push_str(" Use library_reference_id only for a Library image the user selected in this turn.");
         }
+        let placement = placement_store.is_some();
+        if placement {
+            description.push_str(" To place a retained image in the workspace, use place_generated_image with its media ID and source turn.");
+        }
         let definition = CapabilityDefinition {
             tool: ToolDefinition {
                 id: ToolId::new(TOOL)?,
-                version: if reference.is_some() {
-                    REFERENCE_VERSION
-                } else {
-                    TEXT_VERSION
+                version: match (reference.is_some(), placement) {
+                    (false, false) => TEXT_VERSION,
+                    (true, false) => REFERENCE_VERSION,
+                    (false, true) => PLACEABLE_TEXT_VERSION,
+                    (true, true) => PLACEABLE_REFERENCE_VERSION,
                 },
                 description,
                 input: InputFormat::Json(json!({
@@ -221,7 +268,7 @@ impl DesktopImageGeneration {
                     "additionalProperties": false
                 })),
                 max_input_bytes: MAX_PROMPT_BYTES * 6 + 128,
-                max_output_bytes: 1024,
+                max_output_bytes: if placement { 4096 } else { 1024 },
                 recovery: RecoveryKind::Unavailable,
             },
             output_schema: json!({
@@ -238,11 +285,16 @@ impl DesktopImageGeneration {
             effect: CapabilityEffect::Mutation,
         };
         let executor = Arc::new(GenerateImage {
-            session,
+            session: turn.session.clone(),
             owner: self.clone(),
             reference,
+            placement_turn: placement.then(|| turn.turn.clone()),
         }) as Arc<dyn CapabilityExecutor>;
-        ToolHost::new([(definition, executor)])
+        let mut tools = vec![(definition, executor)];
+        if let Some(store) = placement_store {
+            tools.push(placement::tool(self.clone(), store, turn.clone())?);
+        }
+        ToolHost::new(tools)
     }
 }
 
@@ -324,6 +376,8 @@ enum Reply {
         id: String,
         media_type: String,
         bytes: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sha256: Option<String>,
     },
     Unavailable,
     GeneratedUnretained,
@@ -331,12 +385,13 @@ enum Reply {
 }
 
 impl Reply {
-    fn outcome(self) -> ToolOutcome {
+    fn outcome(self, placement_turn: Option<&TurnId>) -> ToolOutcome {
         match self {
             Self::Retained {
                 id,
                 media_type,
                 bytes,
+                sha256,
             } if Uuid::parse_str(&id).is_ok_and(|parsed| parsed.to_string() == id)
                 && matches!(
                     media_type.as_str(),
@@ -344,15 +399,23 @@ impl Reply {
                 )
                 && (1..=MAX_MEDIA_BYTES).contains(&bytes) =>
             {
+                let mut structured = json!({"status":"retained", "id":id, "media_type":media_type, "bytes":bytes});
+                let receipt = if let Some(turn) = placement_turn {
+                    let Some(receipt) = sha256.and_then(|sha256| placement::Artifact::new(id.clone(), media_type.clone(), bytes, sha256).and_then(|artifact| artifact.receipt()).ok()) else {
+                        return ToolOutcome::uncertain();
+                    };
+                    structured["source_turn_id"] = json!(turn);
+                    Some(receipt)
+                } else {
+                    None
+                };
                 ToolOutcome {
                     status: OutcomeStatus::Succeeded,
                     content: vec![ResultContent::Text(format!(
                         "Generated an image and retained it in Desktop Recents (media item {id})."
                     ))],
-                    structured: Some(
-                        json!({"status":"retained", "id":id, "media_type":media_type, "bytes":bytes}),
-                    ),
-                    receipt: None,
+                    structured: Some(structured),
+                    receipt,
                     truncated: false,
                 }
             }
@@ -373,6 +436,7 @@ struct GenerateImage {
     session: SessionId,
     owner: DesktopImageGeneration,
     reference: Option<ReferenceScope>,
+    placement_turn: Option<TurnId>,
 }
 
 struct ReferenceScope {
@@ -473,7 +537,10 @@ impl GenerateImage {
             .lock()
             .unwrap()
             .as_ref()
-            .filter(|connection| reference_png.is_none() || connection.references)
+            .filter(|connection| {
+                (reference_png.is_none() || connection.references)
+                    && (self.placement_turn.is_none() || connection.placement)
+            })
             .map(|connection| connection.client.clone());
         let Some(connection) = client else {
             return ToolOutcome::failed("desktop_image_generation_unavailable");
@@ -490,7 +557,7 @@ impl GenerateImage {
             biased;
             () = call.cancellation.cancelled() => ToolOutcome::uncertain(),
             reply = connection.send_request(request).block_task() => {
-                reply.map_or_else(|_| ToolOutcome::uncertain(), Reply::outcome)
+                reply.map_or_else(|_| ToolOutcome::uncertain(), |reply| reply.outcome(self.placement_turn.as_ref()))
             }
         }
     }
@@ -563,7 +630,7 @@ mod tests {
             json!({"kind":"retained", "id":id, "mediaType":"image/png", "bytes":128}),
         )
         .unwrap()
-        .outcome();
+        .outcome(None);
         assert_eq!(accepted.status, OutcomeStatus::Succeeded);
         assert_eq!(
             accepted.structured,
@@ -571,7 +638,7 @@ mod tests {
         );
         let unretained = serde_json::from_value::<Reply>(json!({"kind":"generated_unretained"}))
             .unwrap()
-            .outcome();
+            .outcome(None);
         assert_eq!(unretained.status, OutcomeStatus::Uncertain);
         assert_eq!(
             unretained.structured,
@@ -586,7 +653,7 @@ mod tests {
             assert_eq!(
                 serde_json::from_value::<Reply>(reply)
                     .unwrap()
-                    .outcome()
+                    .outcome(None)
                     .status,
                 OutcomeStatus::Uncertain
             );

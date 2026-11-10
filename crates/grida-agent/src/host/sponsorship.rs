@@ -588,6 +588,7 @@ impl Host {
         captured.host_tools_capture = None;
         captured.desktop_image_generation = None;
         captured.allow_image_reference = false;
+        captured.allow_image_placement = false;
         captured.editor_endpoint = None;
         captured.editor_presentation = false;
         captured.editor_svg_target = None;
@@ -1069,6 +1070,7 @@ mod tests {
                     allow_library_selection: false,
                     allow_host_tools: false,
                     desktop_image_generation: None,
+                    allow_image_placement: false,
                     editor_endpoint: None,
                     editor_presentation: false,
                     editor_svg_target: None,

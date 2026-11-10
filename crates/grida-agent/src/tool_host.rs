@@ -8,7 +8,7 @@ use agent_kit_core::tools::{
 use agent_kit_core::{
     BindingId, BoxFuture, CancellationToken, Envelope, Error, ErrorKind, Result, SchemaId, ToolId,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -18,6 +18,7 @@ use uuid::Uuid;
 const MAX_CONCURRENT_CALLS: usize = 8;
 const MAX_CALL_DURATION: Duration = Duration::from_secs(120);
 const MAX_CAPABILITY_BYTES: usize = 512 * 1024;
+const CALL_EVIDENCE_SCHEMA: &str = "grida.agent.tool-host.call";
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct CapabilityDefinition {
@@ -34,7 +35,8 @@ pub enum CapabilityEffect {
     Mutation,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct CallBinding {
     pub id: BindingId,
     pub endpoint: BindingId,
@@ -55,11 +57,24 @@ pub struct CapabilityReply {
     pub outcome: ToolOutcome,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct CallEvidence {
     binding: CallBinding,
     reply_verified: bool,
     owner_receipt: Option<Envelope>,
+}
+
+pub(crate) fn verified_owner_receipt(outcome: &ToolOutcome) -> Option<Envelope> {
+    let receipt = outcome.receipt.as_ref()?;
+    if receipt.schema().as_str() != CALL_EVIDENCE_SCHEMA
+        || receipt.version() != 1
+        || receipt.bytes().len() > 4096
+    {
+        return None;
+    }
+    let evidence: CallEvidence = serde_json::from_slice(receipt.bytes()).ok()?;
+    evidence.owner_receipt.filter(|_| evidence.reply_verified)
 }
 
 /// The owning implementation validates its domain schema and supplies outcome
@@ -248,7 +263,7 @@ impl CapabilityGrant {
             owner_receipt: outcome.receipt.take(),
         };
         outcome.receipt = Some(Envelope::new(
-            SchemaId::new("grida.agent.tool-host.call")?,
+            SchemaId::new(CALL_EVIDENCE_SCHEMA)?,
             1,
             serde_json::to_vec(&evidence)
                 .map_err(|_| Error::new(ErrorKind::Uncertain, "host_call_evidence_unavailable"))?,

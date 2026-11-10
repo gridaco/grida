@@ -51,6 +51,7 @@ const RETAINED_IMAGE_FIELDS = new Set([
   "credential",
   "n",
   "reference_png",
+  "receipt_sha256",
 ]);
 const MAX_REFERENCE_BYTES = 256 * 1024;
 const MAX_REFERENCE_PIXELS = 4 * 1024 * 1024;
@@ -110,14 +111,17 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
     let imageKeys: Pick<SecretsStore, "_getKey"> = secrets;
     let requiredBinding: string | undefined;
     let reference: string | undefined;
+    let digestReceipt = false;
     if (retainedOnly) {
       const request = await c.req.json<Record<string, unknown>>();
       const credential = retainedCredential(request.credential);
       reference = retainedReference(request.reference_png);
+      digestReceipt = request.receipt_sha256 === true;
       if (
         (provider !== "openrouter" && provider !== "vercel") ||
         !credential ||
         (request.reference_png !== undefined && !reference) ||
+        (request.receipt_sha256 !== undefined && !digestReceipt) ||
         typeof request.binding_id !== "string" ||
         !request.binding_id ||
         request.binding_id.length > 256 ||
@@ -225,12 +229,15 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
         image.media_type
       );
       let stored;
+      let sha256: string | undefined;
       if (
         fileName &&
         deps.media &&
         RETAINED_IMAGE_MIME_TYPES.has(image.media_type)
       ) {
         try {
+          if (digestReceipt)
+            sha256 = createHash("sha256").update(image.data).digest("hex");
           stored = await deps.media.save({
             file_name: fileName,
             media_type: image.media_type,
@@ -244,6 +251,7 @@ export function registerImagesRoutes(app: Hono, deps: ImagesRoutesDeps) {
         model_id: resolved.model_id,
         provider_id: resolved.provider_id,
         stored_media: stored ?? null,
+        ...(stored && sha256 && { sha256 }),
       });
     }
 

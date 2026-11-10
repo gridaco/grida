@@ -3,6 +3,7 @@
 #![cfg(any(target_os = "macos", target_os = "linux"))]
 
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
@@ -15,17 +16,21 @@ const EXE: &str = env!("CARGO_BIN_EXE_grida-agent");
 const WAIT: Duration = Duration::from_secs(8);
 
 fn request(root: &Path, path: &str) -> Value {
-    let stat = fs::metadata(root).unwrap();
     json!({
         "workspaceId":"registered-editor-workspace",
         "root":root,
-        "identity":{
-            "device":stat.dev().to_string(),
-            "inode":stat.ino().to_string(),
-            "birthTimeNs":stat.created().unwrap().duration_since(UNIX_EPOCH).unwrap().as_nanos().to_string(),
-        },
+        "identity":directory_identity(root),
         "protected":[],
         "path":path,
+    })
+}
+
+fn directory_identity(directory: &Path) -> Value {
+    let stat = fs::metadata(directory).unwrap();
+    json!({
+        "device":stat.dev().to_string(),
+        "inode":stat.ino().to_string(),
+        "birthTimeNs":stat.created().unwrap().duration_since(UNIX_EPOCH).unwrap().as_nanos().to_string(),
     })
 }
 
@@ -108,6 +113,142 @@ async fn save(
     input.write_all(bytes).await.unwrap();
     drop(input);
     complete(child).await
+}
+
+fn publication(root: &Path, path: &str, parent: &Path, bytes: &[u8]) -> Value {
+    let mut request = request(root, path);
+    let sha256: String = Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    request["publish"] = json!({
+        "length": bytes.len(),
+        "sha256": sha256,
+        "parentIdentity": directory_identity(parent),
+    });
+    request
+}
+
+async fn publish(request: Value, bytes: &[u8]) -> std::process::Output {
+    let mut child = launch(worker());
+    let mut input = child.stdin.take().unwrap();
+    send(&mut input, request).await;
+    input.write_all(bytes).await.unwrap();
+    drop(input);
+    complete(child).await
+}
+
+fn publication_status(output: &std::process::Output) -> Value {
+    assert!(output.status.success(), "{:?}", output.stderr);
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+fn publication_error(output: &std::process::Output, code: &str) {
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains(code), "{stderr}");
+}
+
+#[tokio::test]
+async fn binary_publication_preserves_bytes_and_leaves_exact_retries_in_place() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    let parent = root.join("images");
+    fs::create_dir(&parent).unwrap();
+    let bytes = b"\x89PNG\0\xff";
+    let other = b"\x89PNG\0\xfe";
+    let request = publication(&root, "images/render.png", &parent, bytes);
+    let first = publish(request.clone(), bytes).await;
+    assert_eq!(publication_status(&first), json!({"status":"published"}));
+    let file = parent.join("render.png");
+    let before = fs::metadata(&file).unwrap();
+    let retry = publish(request, bytes).await;
+    assert_eq!(
+        publication_status(&retry),
+        json!({"status":"already_present"})
+    );
+    let conflict = publish(
+        publication(&root, "images/render.png", &parent, other),
+        other,
+    )
+    .await;
+    publication_error(&conflict, "workspace_publish_conflict");
+    let after = fs::metadata(&file).unwrap();
+    assert_eq!(fs::read(&file).unwrap(), bytes);
+    assert_eq!(before.ino(), after.ino());
+    assert_eq!(before.modified().unwrap(), after.modified().unwrap());
+    assert_eq!(fs::read_dir(&parent).unwrap().count(), 1);
+}
+
+#[tokio::test]
+async fn concurrent_publications_have_one_winner_and_do_not_replace_it() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    let first = vec![0x23; 256 * 1024];
+    let second = vec![0xc0; first.len()];
+    let relative = "render.png";
+    let (a, b) = tokio::join!(
+        publish(publication(&root, relative, &root, &first), &first),
+        publish(publication(&root, relative, &root, &second), &second),
+    );
+    let (winner, bytes, loser) = if a.status.success() {
+        (a, first, b)
+    } else {
+        (b, second, a)
+    };
+    assert_eq!(publication_status(&winner), json!({"status":"published"}));
+    publication_error(&loser, "workspace_publish_conflict");
+    assert_eq!(fs::read(root.join(relative)).unwrap(), bytes);
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+}
+
+#[tokio::test]
+async fn binary_publication_refuses_a_changed_parent_aliases_and_invalid_bytes() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().canonicalize().unwrap();
+    let parent = root.join("images");
+    let previous = root.join("previous");
+    let bytes = b"\x89PNG\0\xff";
+    fs::create_dir(&parent).unwrap();
+    let stale = publication(&root, "images/render.png", &parent, bytes);
+    fs::rename(&parent, &previous).unwrap();
+    fs::create_dir(&parent).unwrap();
+    publication_error(&publish(stale, bytes).await, "workspace_directory_changed");
+    assert_eq!(fs::read_dir(&previous).unwrap().count(), 0);
+
+    std::os::unix::fs::symlink(&parent, root.join("alias")).unwrap();
+    let alias = publication(&root, "alias/render.png", &parent, bytes);
+    publication_error(&publish(alias, bytes).await, "workspace_directory_changed");
+    let missing_parent = publication(&root, "missing/render.png", &parent, bytes);
+    publication_error(&publish(missing_parent, bytes).await, "file_unavailable");
+    assert!(!root.join("missing").exists());
+
+    let path = "images/render.png";
+    let mut protected = publication(&root, path, &parent, bytes);
+    protected["protected"] = json!([parent.join("render.png")]);
+    publication_error(&publish(protected, bytes).await, "protected_root_overlap");
+    let wrong_body = publication(&root, path, &parent, b"\x89PNG\0\xfe");
+    publication_error(
+        &publish(wrong_body, bytes).await,
+        "workspace_publish_digest_mismatch",
+    );
+    assert_eq!(fs::read_dir(&parent).unwrap().count(), 0);
+
+    let existing = root.join("original.png");
+    fs::write(&existing, bytes).unwrap();
+    let final_name = root.join(path);
+    std::os::unix::fs::symlink(&existing, &final_name).unwrap();
+    let request = publication(&root, path, &parent, bytes);
+    publication_error(
+        &publish(request.clone(), bytes).await,
+        "workspace_publish_conflict",
+    );
+    assert!(fs::symlink_metadata(&final_name).unwrap().is_symlink());
+    fs::remove_file(&final_name).unwrap();
+    fs::hard_link(&existing, &final_name).unwrap();
+    publication_error(&publish(request, bytes).await, "workspace_publish_conflict");
+    assert_eq!(fs::metadata(&existing).unwrap().nlink(), 2);
 }
 
 #[tokio::test]

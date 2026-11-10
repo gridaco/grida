@@ -12,6 +12,7 @@ import { NativeAgentRevisions } from "./native-agent-revisions";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeAgentGoals } from "./native-agent-goals";
 import { NativeImageGeneration } from "./native-image-generation";
+import { NativeImagePlacement } from "./native-image-placement";
 import {
   NativeEditorSurfaceEndpoints,
   type NativeEditorSurfaceDelivery,
@@ -73,6 +74,7 @@ export type NativeAgentLaunch = {
   mcp?: NativeMcpLaunch;
   workspace?: NativeWorkspaceSelection;
   imageGeneration?: NativeImageGeneration;
+  imagePlacement?: NativeImagePlacement;
   capabilities?: Readonly<Record<string, 1>>;
   onSessionUpdate?: (params: unknown) => void;
 };
@@ -116,6 +118,7 @@ export class NativeAgentProcess {
   private ready = false;
   private imageInput = false;
   private imageReference = false;
+  private imagePlacementEnabled = false;
   private librarySelection = false;
   private fileInput = false;
   private agentEffort = false;
@@ -144,7 +147,8 @@ export class NativeAgentProcess {
     private readonly onSessionUpdate?: (params: unknown) => void,
     askRoots?: ReadonlyMap<string, string>,
     private readonly providerEgress?: NativeProviderEgress,
-    private readonly imageGeneration?: NativeImageGeneration
+    private readonly imageGeneration?: NativeImageGeneration,
+    private readonly imagePlacement?: NativeImagePlacement
   ) {
     if (askRoots) {
       this.permissions = new NativeAgentPermissions(
@@ -288,6 +292,7 @@ export class NativeAgentProcess {
     const imageGeneration = options.workspace
       ? options.imageGeneration
       : undefined;
+    const imagePlacement = imageGeneration ? options.imagePlacement : undefined;
     if (
       imageGeneration &&
       (options.provider !== "openai-compatible" ||
@@ -446,7 +451,8 @@ export class NativeAgentProcess {
       options.onSessionUpdate,
       permissionProfile?.askRoots,
       providerEgress,
-      imageGeneration
+      imageGeneration,
+      imagePlacement
     );
     try {
       const response = object(
@@ -460,6 +466,7 @@ export class NativeAgentProcess {
                 ...(imageGeneration?.supportsReference && {
                   [NativeImageGeneration.referenceCapability]: 1,
                 }),
+                ...(imagePlacement && { [NativeImagePlacement.capability]: 1 }),
                 ...NativeAgentCommands.capabilities,
                 ...NativeAgentRevisions.capabilities,
                 [NativeAgentGoals.completionCapability]: 1,
@@ -511,6 +518,9 @@ export class NativeAgentProcess {
         imageGeneration?.supportsReference === true &&
         processOwner.imageInput &&
         advertised?.[NativeImageGeneration.referenceCapability] === 1;
+      processOwner.imagePlacementEnabled =
+        imagePlacement !== undefined &&
+        advertised?.[NativeImagePlacement.capability] === 1;
       processOwner.librarySelection =
         options.workspace !== undefined &&
         processOwner.imageInput &&
@@ -647,6 +657,7 @@ export class NativeAgentProcess {
   private async stop(): Promise<void> {
     this.providerEgress?.close();
     this.imageGeneration?.close();
+    this.imagePlacement?.close();
     this.editorEndpoints.close();
     this.child.stdin.end();
     const exit = await bounded(this.exited, SHUTDOWN_TIMEOUT_MS);
@@ -726,12 +737,34 @@ export class NativeAgentProcess {
         ) {
           const id = message.id;
           void this.imageGeneration
-            .generate(id, message.params, this.imageReference)
+            .generate(
+              id,
+              message.params,
+              this.imageReference,
+              this.imagePlacementEnabled
+            )
             .then((result) => {
               if (this.connected) this.write({ jsonrpc: "2.0", id, result });
             })
             .catch(() =>
               this.disconnect("native_agent_image_generation_reply_failed")
+            );
+          return;
+        }
+        if (
+          this.connected &&
+          this.imagePlacementEnabled &&
+          this.imagePlacement &&
+          message.method === NativeImagePlacement.method
+        ) {
+          const id = message.id;
+          void this.imagePlacement
+            .place(id, message.params)
+            .then((result) => {
+              if (this.connected) this.write({ jsonrpc: "2.0", id, result });
+            })
+            .catch(() =>
+              this.disconnect("native_agent_image_placement_reply_failed")
             );
           return;
         }
@@ -792,7 +825,9 @@ export class NativeAgentProcess {
       } else if (message.method === NativeProviderEgress.cancelMethod) {
         this.providerEgress?.cancel(message.params);
       } else if (message.method === "$/cancel_request") {
-        this.imageGeneration?.cancel(object(message.params)?.requestId);
+        const id = object(message.params)?.requestId;
+        this.imageGeneration?.cancel(id);
+        this.imagePlacement?.cancel(id);
       } else if (message.method === "session/update") {
         try {
           this.onSessionUpdate?.(message.params);
@@ -833,6 +868,7 @@ export class NativeAgentProcess {
     this.failure ??= error;
     this.providerEgress?.close();
     this.imageGeneration?.close();
+    this.imagePlacement?.close();
     this.editorEndpoints.close();
     this.providerRequests.clear();
     for (const pending of this.pending.values()) {

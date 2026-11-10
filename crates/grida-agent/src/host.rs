@@ -328,6 +328,8 @@ struct StoredPrompt {
     desktop_image_generation: Option<BindingId>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_image_reference: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    allow_image_placement: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     editor_endpoint: Option<BindingId>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -357,6 +359,7 @@ struct SubmissionPolicy {
     allow_library_selection: bool,
     allow_host_tools: bool,
     desktop_image_generation: Option<BindingId>,
+    allow_image_placement: bool,
     editor_endpoint: Option<BindingId>,
     editor_presentation: bool,
     editor_svg_target: Option<BindingId>,
@@ -1673,19 +1676,20 @@ impl Host {
                 "act_unavailable_on_plan_host",
             ));
         }
+        let image_owner = self
+            .desktop_image_generation
+            .as_ref()
+            .filter(|_| operating_regime.is_act() && !allow_wakeups && self.side_context.is_none());
         Ok(SubmissionPolicy {
             questions: request.questions,
             configuration_permission: request.configuration_permission,
             allow_wakeups,
             allow_library_selection: false,
             allow_host_tools: true,
-            desktop_image_generation: self
-                .desktop_image_generation
-                .as_ref()
-                .filter(|_| {
-                    operating_regime.is_act() && !allow_wakeups && self.side_context.is_none()
-                })
+            desktop_image_generation: image_owner
                 .and_then(image_generation::DesktopImageGeneration::capture),
+            allow_image_placement: image_owner
+                .is_some_and(image_generation::DesktopImageGeneration::placement),
             editor_endpoint: None,
             editor_presentation: false,
             editor_svg_target: None,
@@ -1709,6 +1713,7 @@ impl Host {
             allow_library_selection,
             allow_host_tools,
             desktop_image_generation,
+            allow_image_placement,
             editor_endpoint,
             editor_presentation,
             editor_svg_target,
@@ -1744,6 +1749,7 @@ impl Host {
         };
         let host_tools_capture =
             self.capture_host_tools(!child_work && allow_host_tools && operating_regime.is_act())?;
+        let allow_image_placement = allow_image_placement && desktop_image_generation.is_some();
         let allow_image_reference = allow_library_selection
             && desktop_image_generation.is_some()
             && self
@@ -1832,6 +1838,7 @@ impl Host {
                     host_tools_capture,
                     desktop_image_generation,
                     allow_image_reference,
+                    allow_image_placement,
                     editor_endpoint,
                     editor_presentation,
                     editor_svg_target,
@@ -1947,6 +1954,7 @@ impl Host {
                         || stored.host_tools_capture.is_some()
                         || stored.desktop_image_generation.is_some()
                         || stored.allow_image_reference
+                        || stored.allow_image_placement
                         || stored.editor_endpoint.is_some()
                         || stored.editor_presentation
                         || stored.editor_svg_target.is_some()
@@ -2051,8 +2059,13 @@ impl Host {
                                 "retained_image_generation_binding_unavailable",
                             )
                         })?;
-                    image_generation = Some(owner.prepare(stored.allow_image_reference)?);
-                } else if !cancellation_only && stored.allow_image_reference {
+                    image_generation = Some(
+                        owner
+                            .prepare(stored.allow_image_reference, stored.allow_image_placement)?,
+                    );
+                } else if !cancellation_only
+                    && (stored.allow_image_reference || stored.allow_image_placement)
+                {
                     return Err(problem(
                         ErrorKind::InvalidState,
                         "invalid_image_generation_scope",

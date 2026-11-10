@@ -7,7 +7,13 @@ type Provider = "openrouter" | "vercel";
 type Request = (init: RequestInit) => Promise<Response>;
 type CredentialProof = { nonce: string; proof: string };
 type Reply =
-  | { kind: "retained"; id: string; mediaType: string; bytes: number }
+  | {
+      kind: "retained";
+      id: string;
+      mediaType: string;
+      bytes: number;
+      sha256?: string;
+    }
   | { kind: "unavailable" | "generated_unretained" | "uncertain" };
 
 const ID = /^[A-Za-z0-9_.:@/-]{1,256}$/;
@@ -92,7 +98,8 @@ export class NativeImageGeneration {
   async generate(
     id: number | string,
     value: unknown,
-    referenceNegotiated = false
+    referenceNegotiated = false,
+    placementNegotiated = false
   ): Promise<Reply> {
     const params = record(value);
     if (!params) return { kind: "unavailable" };
@@ -141,6 +148,7 @@ export class NativeImageGeneration {
       binding_id: string;
       credential: CredentialProof;
       reference_png?: string;
+      receipt_sha256?: true;
     } = {
       model_id: this.model,
       binding_id: this.mediaBinding,
@@ -150,6 +158,7 @@ export class NativeImageGeneration {
       credential,
       ...(background && { background }),
       ...(typeof referencePng === "string" && { reference_png: referencePng }),
+      ...(placementNegotiated && { receipt_sha256: true }),
     };
     try {
       const response = await this.request({
@@ -171,12 +180,26 @@ export class NativeImageGeneration {
       signal.throwIfAborted();
       if (
         result?.model_id !== this.model ||
-        result.provider_id !== this.provider ||
-        Object.keys(result).length !== 3
+        result.provider_id !== this.provider
       )
         return { kind: "uncertain" };
-      if (result.stored_media === null) return { kind: "generated_unretained" };
-      return retained(result.stored_media) ?? { kind: "uncertain" };
+      if (result.stored_media === null && Object.keys(result).length === 3)
+        return { kind: "generated_unretained" };
+      if (Object.keys(result).length !== (placementNegotiated ? 4 : 3))
+        return { kind: "uncertain" };
+      const item = retained(result.stored_media);
+      if (
+        !item ||
+        (placementNegotiated &&
+          (typeof result.sha256 !== "string" ||
+            !/^[a-f0-9]{64}$/.test(result.sha256)))
+      )
+        return { kind: "uncertain" };
+      return {
+        ...item,
+        ...(placementNegotiated &&
+          typeof result.sha256 === "string" && { sha256: result.sha256 }),
+      };
     } catch {
       return { kind: "uncertain" };
     } finally {
@@ -245,7 +268,9 @@ async function readReceipt(response: Response) {
   return record(JSON.parse(json));
 }
 
-function retained(value: unknown): Reply | undefined {
+function retained(
+  value: unknown
+): Extract<Reply, { kind: "retained" }> | undefined {
   const item = record(value);
   if (!item) return undefined;
   const { id, file_name, media_type, byte_size, created_at } = item;

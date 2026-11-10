@@ -1,12 +1,14 @@
-//! GRIDA-SEC-004 / GRIDA-SEC-014 — atomic UTF-8 saves relative to a pinned parent.
+//! GRIDA-SEC-004 / GRIDA-SEC-014 — atomic saves and publication relative to a pinned parent.
 
+use super::stdio::NativeIdentity;
 use super::*;
 use crate::file_tools::{FileAuthority, open_root_directory};
 use rustix::fs::{
-    AtFlags, FileType, Mode, OFlags, Stat, fstat, fsync, mkdirat, openat, renameat, statat,
-    unlinkat,
+    AtFlags, FileType, Mode, OFlags, RenameFlags, Stat, fstat, fsync, mkdirat, openat, renameat,
+    renameat_with, statat, unlinkat,
 };
 use rustix::io::Errno;
+use serde::Serialize;
 use std::ffi::OsStr;
 use std::io::Write;
 use std::path::Component;
@@ -81,6 +83,192 @@ pub(super) fn save(
         return Err(unverified());
     }
     Ok(written_mtime)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum PublishStatus {
+    Published,
+    AlreadyPresent,
+}
+
+pub(super) fn publish(
+    authority: &FileAuthority,
+    directory: &BindingId,
+    relative: &Path,
+    bytes: &[u8],
+    parent_identity: &NativeIdentity,
+) -> Result<PublishStatus> {
+    validate_path(relative)?;
+    if relative
+        .as_os_str()
+        .as_encoded_bytes()
+        .split(|byte| *byte == b'/')
+        .any(|part| part.is_empty() || part == b".")
+    {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "file_relative_path_invalid",
+        ));
+    }
+    let name = relative.file_name().ok_or_else(not_a_file)?;
+    let relative_parent = relative.parent().ok_or_else(not_a_file)?;
+    let FileAuthority {
+        workspace,
+        grants,
+        protected,
+    } = authority;
+    let scope = workspace.select(
+        Some(directory),
+        Path::new(""),
+        FileAccess::Read,
+        grants,
+        protected,
+    )?;
+    let root = scope.read_root(workspace, grants, protected)?;
+    let target = workspace.select(
+        Some(directory),
+        relative_parent,
+        FileAccess::Write,
+        grants,
+        protected,
+    )?;
+    if target.path() != scope.root().join(relative_parent) {
+        return Err(changed());
+    }
+    let parent = open_root_directory(root, scope.root(), relative_parent)?;
+    let check_parent = || {
+        target.revalidate(workspace, grants, protected)?;
+        if !parent_identity.matches(&parent.metadata().map_err(|_| failed())?) {
+            return Err(changed());
+        }
+        verify_open_path(&parent, scope.root())?;
+        let latest = open_root_directory(root, scope.root(), relative_parent)?;
+        if !same_file(&parent, &latest)? {
+            return Err(changed());
+        }
+        Ok(())
+    };
+    let destination = scope.root().join(relative);
+    let check_path = || {
+        if statat(&parent, name, AtFlags::SYMLINK_NOFOLLOW)
+            .is_ok_and(|stat| FileType::from_raw_mode(stat.st_mode) == FileType::Symlink)
+        {
+            return Err(publish_conflict());
+        }
+        let current = workspace.select(
+            Some(directory),
+            relative,
+            FileAccess::Write,
+            grants,
+            protected,
+        )?;
+        if current.path().as_os_str() != destination.as_os_str() {
+            return Err(publish_conflict());
+        }
+        Ok(())
+    };
+    let already_present = || {
+        check_path()?;
+        if let Some(matched) = match_existing(&parent, scope.root(), name, bytes)? {
+            check_parent()?;
+            check_path()?;
+            check_snapshot(&parent, name, &matched)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    };
+    check_parent()?;
+    if already_present()? {
+        return Ok(PublishStatus::AlreadyPresent);
+    }
+    let stage = Staged::create(&parent)?;
+    (&stage.file).write_all(bytes).map_err(|_| failed())?;
+    stage.file.sync_all().map_err(|_| failed())?;
+    check_parent()?;
+    check_path()?;
+    if !stage.owns_name() {
+        return Err(changed());
+    }
+    match renameat_with(
+        &parent,
+        stage.name.as_str(),
+        &parent,
+        name,
+        RenameFlags::NOREPLACE,
+    ) {
+        Ok(()) => {}
+        Err(Errno::EXIST) => {
+            return if already_present()? {
+                Ok(PublishStatus::AlreadyPresent)
+            } else {
+                Err(publish_conflict())
+            };
+        }
+        Err(_) => return Err(unverified()),
+    }
+    fsync(&parent).map_err(|_| unverified())?;
+    let matched = match_existing(&parent, scope.root(), name, bytes)
+        .map_err(|_| unverified())?
+        .ok_or_else(unverified)?;
+    if !stage.matches(&matched) {
+        return Err(unverified());
+    }
+    check_parent().map_err(|_| unverified())?;
+    check_path().map_err(|_| unverified())?;
+    check_snapshot(&parent, name, &matched).map_err(|_| unverified())?;
+    Ok(PublishStatus::Published)
+}
+
+fn match_existing(parent: &File, root: &Path, name: &OsStr, bytes: &[u8]) -> Result<Option<Stat>> {
+    let before = match statat(parent, name, AtFlags::SYMLINK_NOFOLLOW) {
+        Ok(stat) => stat,
+        Err(Errno::NOENT) => return Ok(None),
+        Err(_) => return Err(failed()),
+    };
+    if FileType::from_raw_mode(before.st_mode) != FileType::RegularFile
+        || before.st_nlink != 1
+        || before.st_size as u64 != bytes.len() as u64
+    {
+        return Err(publish_conflict());
+    }
+    let mut opened =
+        open_root_file(parent, root, Path::new(name)).map_err(|_| publish_conflict())?;
+    if !same_snapshot(&before, &fstat(&opened).map_err(|_| failed())?) {
+        return Err(publish_conflict());
+    }
+    let mut buffer = [0; CHUNK_BYTES];
+    for chunk in bytes.chunks(buffer.len()) {
+        let read = &mut buffer[..chunk.len()];
+        opened.read_exact(read).map_err(|_| publish_conflict())?;
+        if read != chunk {
+            return Err(publish_conflict());
+        }
+    }
+    check_snapshot(parent, name, &before)?;
+    Ok(Some(before))
+}
+
+fn check_snapshot(parent: &File, name: &OsStr, before: &Stat) -> Result<()> {
+    let current =
+        statat(parent, name, AtFlags::SYMLINK_NOFOLLOW).map_err(|_| publish_conflict())?;
+    if !same_snapshot(before, &current) {
+        return Err(publish_conflict());
+    }
+    Ok(())
+}
+
+fn same_snapshot(before: &Stat, current: &Stat) -> bool {
+    before.st_dev == current.st_dev
+        && before.st_ino == current.st_ino
+        && before.st_mode == current.st_mode
+        && before.st_nlink == current.st_nlink
+        && before.st_size == current.st_size
+        && before.st_mtime == current.st_mtime
+        && before.st_mtime_nsec == current.st_mtime_nsec
+        && before.st_ctime == current.st_ctime
+        && before.st_ctime_nsec == current.st_ctime_nsec
 }
 
 fn create_parent(
@@ -192,6 +380,10 @@ impl Drop for Staged<'_> {
 
 fn modified_since() -> Error {
     Error::new(ErrorKind::Conflict, "workspace_write_modified_since")
+}
+
+fn publish_conflict() -> Error {
+    Error::new(ErrorKind::Conflict, "workspace_publish_conflict")
 }
 
 fn not_a_file() -> Error {

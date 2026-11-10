@@ -25,6 +25,7 @@ import {
 import type { NativeChatGptHost } from "./native-chatgpt-host";
 import { NativeChatProfiles } from "./native-chat-profiles";
 import type { NativeDesktopProfile } from "./native-desktop-profile";
+import type { NativeImagePlacement } from "./native-image-placement";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeProviderSelection } from "./native-provider-selection";
 import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
@@ -52,6 +53,9 @@ type LaunchOptions = Readonly<{
   openExternal: (url: string) => Promise<void>;
   workspaceCatalogRoot?: string;
   workspaceGrant?: (id: string) => Promise<WorkspaceMediaGrant>;
+  imagePlacement?: (
+    workspace: Pick<WorkspaceMediaGrant, "workspaceId" | "root" | "identity">
+  ) => NativeImagePlacement;
   mcp?: NativeMcpLaunch;
   selectableProfiles?: boolean;
   onLifecycle?: (
@@ -89,7 +93,8 @@ export class NativeDesktopAgent {
     private readonly mcp?: NativeMcpLaunch,
     private readonly provider: NativeDesktopProfile.Provider = "gateway",
     readonly selectableProfiles = false,
-    private readonly onLifecycle?: LaunchOptions["onLifecycle"]
+    private readonly onLifecycle?: LaunchOptions["onLifecycle"],
+    private readonly imagePlacement?: LaunchOptions["imagePlacement"]
   ) {
     if (subscription) {
       const { oauth } = subscription;
@@ -188,7 +193,8 @@ export class NativeDesktopAgent {
       options?.mcp,
       options?.provider,
       options?.selectableProfiles,
-      options?.onLifecycle
+      options?.onLifecycle,
+      options?.imagePlacement
     );
   }
 
@@ -698,6 +704,13 @@ export class NativeDesktopAgent {
         : undefined;
     return {
       ...provider,
+      imagePlacement:
+        "imageGeneration" in provider &&
+        provider.imageGeneration &&
+        identity &&
+        !nestedProtectedPaths
+          ? this.imagePlacement?.({ workspaceId: id, root, identity })
+          : undefined,
       workspaceConfiguration,
       resourcesPath: this.resourcesPath,
       workspace: {

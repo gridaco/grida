@@ -4,6 +4,7 @@ use super::*;
 use crate::file_tools::FileAuthority;
 use crate::workspace::{DirectoryGrant, DirectorySpec, ProtectedRoots};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
@@ -31,6 +32,7 @@ struct OpenRequest {
     #[serde(default)]
     list_directory: bool,
     write: Option<SaveRequest>,
+    publish: Option<PublishRequest>,
 }
 
 #[derive(Deserialize)]
@@ -40,9 +42,22 @@ struct SaveRequest {
     expected_mtime: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PublishRequest {
+    length: usize,
+    sha256: String,
+    parent_identity: NativeIdentity,
+}
+
 #[derive(Serialize)]
 struct Saved {
     mtime: f64,
+}
+
+#[derive(Serialize)]
+struct Published {
+    status: super::write::PublishStatus,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -107,8 +122,10 @@ pub fn serve_stdio() -> Result<()> {
         }
         Request::Workspace(request) => request,
     };
+    let writes = request.write.is_some() || request.publish.is_some();
     if (request.list_directory && request.include_modified)
-        || (request.write.is_some() && (request.list_directory || request.include_modified))
+        || (writes && (request.list_directory || request.include_modified))
+        || (request.write.is_some() && request.publish.is_some())
     {
         return Err(invalid_frame());
     }
@@ -141,13 +158,7 @@ pub fn serve_stdio() -> Result<()> {
         ));
     }
     let authority = FileAuthority {
-        grants: [DirectoryGrant::bind(
-            &snapshot,
-            &directory,
-            true,
-            request.write.is_some(),
-        )?]
-        .into(),
+        grants: [DirectoryGrant::bind(&snapshot, &directory, true, writes)?].into(),
         workspace: snapshot.clone(),
         protected,
     };
@@ -171,13 +182,7 @@ pub fn serve_stdio() -> Result<()> {
                     .ok_or_else(invalid_frame)
             })
             .transpose()?;
-        let mut content = vec![0; write.length];
-        input
-            .read_exact(&mut content)
-            .map_err(|_| invalid_frame())?;
-        if !input.fill_buf().map_err(|_| invalid_frame())?.is_empty() {
-            return Err(invalid_frame());
-        }
+        let content = read_body(&mut input, write.length)?;
         std::str::from_utf8(&content)
             .map_err(|_| Error::new(ErrorKind::InvalidInput, "workspace_write_utf8"))?;
         let mtime = super::write::save(
@@ -187,14 +192,34 @@ pub fn serve_stdio() -> Result<()> {
             &content,
             expected_mtime,
         )?;
-        return serde_json::to_writer(&mut output, &Saved { mtime })
-            .map_err(|_| output_failed())
-            .and_then(|()| {
-                output
-                    .write_all(b"\n")
-                    .and_then(|()| output.flush())
-                    .map_err(|_| output_failed())
-            });
+        return write_receipt(&mut output, &Saved { mtime });
+    }
+    if let Some(publish) = request.publish {
+        if publish.length > super::write::MAX_WRITE_BYTES {
+            return Err(Error::new(
+                ErrorKind::LimitExceeded,
+                "workspace_write_limit",
+            ));
+        }
+        let content = read_body(&mut input, publish.length)?;
+        let digest: String = Sha256::digest(&content)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        if digest != publish.sha256 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "workspace_publish_digest_mismatch",
+            ));
+        }
+        let status = super::write::publish(
+            &authority,
+            &directory,
+            &request.path,
+            &content,
+            &publish.parent_identity,
+        )?;
+        return write_receipt(&mut output, &Published { status });
     }
     if request.list_directory {
         let listing = super::directory::list(&authority, &directory, &request.path)?;
@@ -238,6 +263,25 @@ pub fn serve_stdio() -> Result<()> {
     .and_then(|_| output.flush())
     .map_err(|_| Error::new(ErrorKind::Unavailable, "workspace_file_stream_failed"))?;
     Ok(())
+}
+
+fn read_body(input: &mut impl BufRead, length: usize) -> Result<Vec<u8>> {
+    let mut content = vec![0; length];
+    input
+        .read_exact(&mut content)
+        .map_err(|_| invalid_frame())?;
+    if !input.fill_buf().map_err(|_| invalid_frame())?.is_empty() {
+        return Err(invalid_frame());
+    }
+    Ok(content)
+}
+
+fn write_receipt(output: &mut impl Write, value: &impl Serialize) -> Result<()> {
+    serde_json::to_writer(&mut *output, value).map_err(|_| output_failed())?;
+    output
+        .write_all(b"\n")
+        .and_then(|()| output.flush())
+        .map_err(|_| output_failed())
 }
 
 pub(super) fn milliseconds(time: SystemTime) -> f64 {

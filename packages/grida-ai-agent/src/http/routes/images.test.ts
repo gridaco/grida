@@ -97,6 +97,7 @@ describe("POST /images/generate", () => {
       { n: 2 },
       { provider: "gg" },
       { binding_id: "changed" },
+      { receipt_sha256: false },
     ]) {
       expect(
         (await post(app, { ...payload, ...change }, RETAINED_IMAGE_TYPE)).status
@@ -116,6 +117,19 @@ describe("POST /images/generate", () => {
       media_type: "image/png",
       bytes: Uint8Array.from(Buffer.from(PNG, "base64")),
     });
+    const withDigest = await post(
+      app,
+      { ...payload, receipt_sha256: true },
+      RETAINED_IMAGE_TYPE
+    );
+    expect(await withDigest.json()).toEqual({
+      model_id: LISTED,
+      provider_id: "openrouter",
+      stored_media: stored,
+      sha256: createHash("sha256")
+        .update(Buffer.from(PNG, "base64"))
+        .digest("hex"),
+    });
     expect(await (await post(app, payload)).json()).toMatchObject({
       images: [{ base64: PNG, media_type: "image/png", stored_media: stored }],
     });
@@ -124,10 +138,18 @@ describe("POST /images/generate", () => {
     request.mockResolvedValueOnce(
       Response.json({ data: [{ b64_json: "Qk0AAAAAAAAAAAAA" }] })
     );
-    const unsupported = await post(app, payload, RETAINED_IMAGE_TYPE);
+    const unsupported = await post(
+      app,
+      { ...payload, receipt_sha256: true },
+      RETAINED_IMAGE_TYPE
+    );
     expect(unsupported.status).toBe(200);
-    expect(await unsupported.json()).toMatchObject({ stored_media: null });
-    expect(save).toHaveBeenCalledTimes(2);
+    expect(await unsupported.json()).toEqual({
+      model_id: LISTED,
+      provider_id: "openrouter",
+      stored_media: null,
+    });
+    expect(save).toHaveBeenCalledTimes(3);
   });
 
   it("refuses a changed provider key during resolution or immediately before dispatch", async () => {

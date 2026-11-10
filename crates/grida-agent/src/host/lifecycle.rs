@@ -347,6 +347,9 @@ impl Host {
                     let desktop_image_generation = stored
                         .as_ref()
                         .and_then(|input| input.desktop_image_generation.clone());
+                    let allow_image_placement = stored
+                        .as_ref()
+                        .is_some_and(|input| input.allow_image_placement);
                     let effort = stored.and_then(|input| input.effort);
                     self.capture_input(
                         &view,
@@ -359,6 +362,7 @@ impl Host {
                             allow_library_selection: false,
                             allow_host_tools,
                             desktop_image_generation,
+                            allow_image_placement,
                             editor_endpoint: None,
                             editor_presentation: false,
                             editor_svg_target: None,

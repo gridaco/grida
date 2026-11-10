@@ -240,6 +240,7 @@ impl Host {
                     allow_library_selection: false,
                     allow_host_tools: false,
                     desktop_image_generation: None,
+                    allow_image_placement: false,
                     editor_endpoint: None,
                     editor_presentation: false,
                     editor_svg_target: None,

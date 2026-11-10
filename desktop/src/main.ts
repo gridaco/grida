@@ -3,7 +3,7 @@ import { app, shell, BrowserWindow, Menu, dialog, session } from "electron";
 import path from "node:path";
 import { updateElectronApp } from "update-electron-app";
 import started from "electron-squirrel-startup";
-import { RecentStore } from "@grida/daemon/server";
+import { MediaStore, RecentStore } from "@grida/daemon/server";
 import create_menu, {
   focus_or_open_canvas_window,
   rebuild_application_menu,
@@ -60,6 +60,11 @@ import {
 import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 import { NativeDocumentFiles } from "./main/native-document-files";
 import { ipc_sender } from "./main/ipc-sender";
+import { DesktopMediaRoot } from "./main/media-root";
+import {
+  NativeImagePlacement,
+  type ImagePlacementReview,
+} from "./main/native-image-placement";
 
 // GRIDA-SEC-004 — single-instance enforcement is acquired in the `ready`
 // handler, NOT here at module top. It must run AFTER `open-file` has fired:
@@ -145,6 +150,69 @@ registerWorkspaceMediaScheme();
 // main. Auxiliary document/settings/workspace windows are admitted and
 // registered through this controller only after it reaches `main`.
 let entryWindow: DesktopEntryWindow | null = null;
+let reviewingWorkspaceImage = false;
+
+const approveWorkspaceImage: ImagePlacementReview = async ({
+  workspace,
+  relative,
+  signal: requestSignal,
+}) => {
+  const window = BrowserWindow.getFocusedWindow();
+  if (!window || window.isDestroyed() || reviewingWorkspaceImage)
+    return { kind: "unavailable" };
+  const sender = window.webContents;
+  if (sender.isDestroyed()) return { kind: "unavailable" };
+  const frame = sender.mainFrame;
+  const href = frame.url;
+  const url = URL.parse(href);
+  if (
+    !url ||
+    url.origin !== new URL(EDITOR_BASE_URL).origin ||
+    url.pathname !== "/desktop/workspace" ||
+    url.searchParams.getAll("id").length !== 1 ||
+    url.searchParams.get("id") !== workspace.workspaceId
+  )
+    return { kind: "unavailable" };
+
+  const navigation = new AbortController();
+  const signal = AbortSignal.any([requestSignal, navigation.signal]);
+  const check = () => {
+    signal.throwIfAborted();
+    if (
+      window.isDestroyed() ||
+      sender.isDestroyed() ||
+      sender.isLoadingMainFrame() ||
+      entryWindow?.ipcRoleFor(window) !== "main" ||
+      sender.mainFrame !== frame ||
+      frame.url !== href
+    )
+      throw new Error("workspace_image_review_unavailable");
+  };
+  const close = ipc_sender.watchNavigation(sender, () => navigation.abort());
+  let approved = false;
+  reviewingWorkspaceImage = true;
+  try {
+    check();
+    const { response } = await dialog.showMessageBox(window, {
+      type: "question",
+      message: "Place this generated image in the workspace?",
+      detail: path.join(workspace.root, relative),
+      buttons: ["Cancel", "Place image"],
+      defaultId: 0,
+      cancelId: 0,
+      signal,
+    });
+    check();
+    if (response !== 1) return { kind: "declined" };
+    approved = true;
+    return { kind: "approved", check, signal, close };
+  } catch {
+    return { kind: "unavailable" };
+  } finally {
+    reviewingWorkspaceImage = false;
+    if (!approved) close();
+  }
+};
 let nativeDesktopAgent: NativeDesktopAgent | undefined;
 let nativeDocuments: NativeDocumentFiles | undefined;
 let nativeFileWorkspaces: NativeWorkspaceCatalog | undefined;
@@ -679,6 +747,10 @@ app.on("ready", async () => {
           )
         : undefined;
       workspaceCatalog = nativeWorkspaceCatalog();
+      const catalog = workspaceCatalog;
+      const documentWorkers = nativeWorkspaceMedia();
+      const media =
+        documentWorkers && new MediaStore(DesktopMediaRoot.current());
       if (nativeChatProfile) {
         const options = {
           provider,
@@ -689,8 +761,22 @@ app.on("ready", async () => {
             current: () => boolean
           ) => notifyNativeChat(workspaceId, event, windowAdmission, current),
           openExternal: (url: string) => shell.openExternal(url),
-          workspaceCatalogRoot: path.dirname(workspaceCatalog.directory),
-          workspaceGrant: workspaceCatalog.fileGrant.bind(workspaceCatalog),
+          workspaceCatalogRoot: path.dirname(catalog.directory),
+          workspaceGrant: catalog.fileGrant.bind(catalog),
+          imagePlacement:
+            documentWorkers && media
+              ? (
+                  workspace: ConstructorParameters<
+                    typeof NativeImagePlacement
+                  >[0]
+                ) =>
+                  new NativeImagePlacement(workspace, {
+                    catalog,
+                    workers: documentWorkers,
+                    media,
+                    review: approveWorkspaceImage,
+                  })
+              : undefined,
           selectableProfiles: strictRetainedMedia,
         };
         nativeDesktopAgent = NativeDesktopProfile.managedCutover()
@@ -724,7 +810,6 @@ app.on("ready", async () => {
           })
         );
       }
-      const documentWorkers = nativeWorkspaceMedia();
       if (documentWorkers) {
         nativeFileWorkspaces = workspaceCatalog;
         nativeDocuments = new NativeDocumentFiles(

@@ -145,14 +145,18 @@ impl HostTools {
         )
     }
 
-    pub(super) fn image_generation(host: ToolHost, lease: BindingId) -> Result<Self> {
-        Self::with_local(
-            None,
-            Some(host),
-            &[super::image_generation::TOOL],
-            lease,
-            super::image_generation::PRINCIPAL,
-        )
+    pub(super) fn image_generation(
+        host: ToolHost,
+        lease: BindingId,
+        placement: bool,
+    ) -> Result<Self> {
+        use super::image_generation::{PLACE_TOOL, PRINCIPAL, TOOL};
+        let capabilities: &[&str] = if placement {
+            &[TOOL, PLACE_TOOL]
+        } else {
+            &[TOOL]
+        };
+        Self::with_local(None, Some(host), capabilities, lease, PRINCIPAL)
     }
 
     fn with_local(

@@ -495,6 +495,22 @@ chat-owned bytes and sends one bounded `referencePng` to Main. The media
 service verifies the same provider variant and constructs its inline image
 input. A missing or stale selection fails before generation.
 
+The private Desktop supervisor can negotiate `co.grida/media/place-image`
+version 1 alongside generation for an admitted workbench. The host captures
+the binding for ordinary Act work. A retained generation on that binding
+journals a verified owner receipt containing the media identity, MIME type,
+length, and SHA-256. Provider history receives the opaque media and source
+turn identities. It never receives the receipt digest.
+
+`place_generated_image` takes a retained `media_id`, a relative `path`,
+and the exact `source_turn_id` when reusing an image from an earlier turn in
+the same chat. The reverse request carries the active session, turn and call,
+the path, and the verified artifact receipt. Main owns destination review,
+workspace and parent identity, retained byte verification, and scoped
+publication. It distinguishes a new file, an exact file already at the
+destination, a declined review, a conflicting file, and unavailable or
+unverified work. Reconnect does not repeat a dispatched placement.
+
 ### Persistent goal operations
 
 Negotiate each `co.grida/goal/` capability at version `1`. The methods apply

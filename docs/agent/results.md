@@ -35,6 +35,18 @@ Check **Turn summary** for the result. Desktop keeps a retained image in
 not retain it, the summary explains what happened and the turn ends without
 another generation.
 
+### Place a generated image in the workspace
+
+On supported macOS Apple silicon Desktop builds, keep the workbench open
+and in focus. Ask in **Act** to place a retained generated image at a path
+such as `assets/banner.png`. Choose an existing folder and a filename
+extension that matches the image. Desktop asks you to confirm the full
+destination before it writes.
+
+If a different file is already there, Desktop leaves it intact. You can ask
+the same chat to retry placement or choose another destination. The retry
+uses the retained image, including after you reopen the chat.
+
 ## See an artifact while work continues
 
 In a native workspace chat with live presentation, ask the agent to open
