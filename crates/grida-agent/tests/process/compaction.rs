@@ -91,6 +91,81 @@ fn compact(session: &str, id: &str) -> Value {
     json!({"sessionId":session,"requestId":id})
 }
 
+#[tokio::test]
+async fn oversized_history_compacts_complete_early_turns_and_keeps_the_exact_suffix() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("First original answer."),
+        Reply::Finished("Second original answer."),
+        Reply::Finished("Third original answer."),
+        Reply::Finished("Earlier requirements and decisions."),
+        Reply::Finished("Continued with recent context."),
+        Reply::Finished("Updated concise context."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+    let first = format!("First large source {}", "a".repeat(115_000));
+    let second = format!("Second large source {}", "b".repeat(115_000));
+    let recent = format!("Recent large source {}", "c".repeat(115_000));
+    for (index, text) in [&first, &second, &recent].into_iter().enumerate() {
+        let reply = prompt(&mut socket, 3 + index as u64, &session, text).await;
+        assert_eq!(reply["result"]["stopReason"], "end_turn", "{reply}");
+        endpoint.request().await;
+    }
+
+    let request = compact(&session, "compact-prefix");
+    let result = ws_rpc(&mut socket, 6, "_co.grida/session/compact", request.clone()).await;
+    assert_eq!(result["result"]["status"], "installed", "{result}");
+    assert_eq!(result["result"]["coveredRecords"], 4);
+    let summary_request = endpoint.request().await["messages"].to_string();
+    assert!(summary_request.contains(&first));
+    assert!(summary_request.contains(&second));
+    assert!(summary_request.contains("Second original answer."));
+    assert!(!summary_request.contains("Recent large source"));
+    drop(socket);
+    terminate_shared_server(host).await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let transcript = load(&mut socket, &session, workspace.path()).await.join("");
+    for source in [&first, &second, &recent] {
+        assert!(transcript.contains(source));
+    }
+    assert!(!transcript.contains("Earlier requirements and decisions."));
+    let retried = ws_rpc(&mut socket, 7, "_co.grida/session/compact", request).await;
+    assert_eq!(retried["result"], result["result"]);
+    assert!(endpoint.requests.try_recv().is_err());
+
+    let reply = prompt(&mut socket, 8, &session, "Continue from here.").await;
+    assert_eq!(reply["result"]["stopReason"], "end_turn", "{reply}");
+    let next = endpoint.request().await["messages"].to_string();
+    assert!(next.contains("Earlier requirements and decisions."));
+    assert!(next.contains(&recent));
+    assert!(next.contains("Third original answer."));
+    assert!(!next.contains("First large source"));
+    assert!(!next.contains("Second large source"));
+    let compacted = ws_rpc(
+        &mut socket,
+        9,
+        "_co.grida/session/compact",
+        compact(&session, "compact-tail"),
+    )
+    .await;
+    assert_eq!(compacted["result"]["status"], "installed", "{compacted}");
+    let summary_request = endpoint.request().await["messages"].to_string();
+    assert!(summary_request.contains("Earlier requirements and decisions."));
+    assert!(summary_request.contains(&recent));
+    assert!(summary_request.contains("Continued with recent context."));
+    assert!(!summary_request.contains("First large source"));
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
+}
+
 async fn compact_on_peer(
     url: &str,
     session: &str,

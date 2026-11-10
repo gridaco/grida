@@ -683,11 +683,13 @@ prompt or call the identified compaction operation. Start from an idle chat
 with an open, empty queue. The summary uses the selected model. New prompts
 can enter the queue while it runs.
 
-After a successful compaction, future model requests use the summary and
-subsequent conversation. The original transcript remains available. If
-compaction fails or its result is uncertain, the host keeps the previous
-context. Pause and Stop apply while the summary runs. An identified request
-can inspect the retained attempt after reconnecting.
+After a successful compaction, future model requests use the summary and any
+turns it did not cover. If the history is too large for one summary request,
+the host summarizes complete early turns and keeps the later turns verbatim.
+You can compact again to cover more of the conversation. The original
+transcript remains available. If compaction fails or its result is uncertain,
+the host keeps the previous context. Pause and Stop apply while the summary
+runs. An identified request can inspect the retained attempt after reconnecting.
 
 ### Work toward a persistent goal
 

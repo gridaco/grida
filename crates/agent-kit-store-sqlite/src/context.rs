@@ -1,7 +1,7 @@
 //! Retained model context replacements backed by owned turn outcomes.
 
 use super::history::{
-    HistoryBasis, HistorySeed, HistorySelection, RetainedHistory, read_view, require_basis,
+    HistoryBasis, HistorySeed, HistorySelection, RetainedHistory, View, read_view, require_basis,
     seed_bytes, select_view,
 };
 use super::{
@@ -38,6 +38,17 @@ pub struct ContextInstall {
     pub expected_context: HistoryBasis,
     pub expected_outcome: Fingerprint,
     pub replacement: HistorySeed,
+    /// Last source turn covered by the replacement. Later source turns stay
+    /// in context. With no boundary, the replacement covers the full source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub covered_through: Option<TurnId>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum StoredContextReplacement {
+    Prefix { seed: HistorySeed, through: i64 },
+    Full(HistorySeed),
 }
 
 impl SqliteStore {
@@ -137,7 +148,6 @@ impl SqliteStore {
             )?;
             let ordinal = ordinal.expect("before turn has ordinal");
             let view = sql_number(source_view.id.0)?;
-            let bytes = seed_bytes(&request.replacement)?;
             let identity = encode(&Fingerprint::of(&request)?)?;
             let existing: Option<Vec<u8>> = transaction.query_row(
                 "SELECT identity FROM session_context_replacements WHERE session=?1 AND view=?2 AND turn_ordinal=?3",
@@ -161,8 +171,24 @@ impl SqliteStore {
             if outcome.status != OutcomeStatus::Succeeded || Fingerprint::of(outcome)? != request.expected_outcome {
                 return Err(error(ErrorKind::Conflict, "context_outcome_changed"));
             }
-            let history = read_context(&transaction, id, session.revision, Some(request.turn), &|_| Vec::new())?;
+            let (context, before) = context_view(&transaction, id, Some(request.turn))?;
+            let previous_through = context.after;
+            let history = read_view(&transaction, id, session.revision, context, before, &|_| Vec::new())?;
             require_basis(&history.basis, &request.expected_context)?;
+            let mut bytes = seed_bytes(&request.replacement)?;
+            if let Some(turn) = request.covered_through {
+                let through = transaction.query_row(
+                    "SELECT ordinal FROM turns WHERE session=?1 AND id=?2 AND ordinal>?3 AND ordinal<?4",
+                    params![id.as_str(), turn.as_str(), previous_through, ordinal],
+                    |row| row.get(0),
+                ).optional().map_err(database_error)?.ok_or_else(|| {
+                    error(ErrorKind::Conflict, "context_coverage_boundary_changed")
+                })?;
+                bytes = encode(&StoredContextReplacement::Prefix { seed: request.replacement, through })?;
+                if bytes.len() > MAX_HISTORY_BYTES {
+                    return Err(error(ErrorKind::LimitExceeded, "history_projection_limit"));
+                }
+            }
             transaction.execute(
                 "INSERT INTO session_context_replacements(session,view,turn_ordinal,replacement,identity)
                  VALUES(?1,?2,?3,?4,?5)",
@@ -181,6 +207,15 @@ fn read_context(
     before_turn: Option<TurnId>,
     project: &dyn Fn(&TurnState) -> Vec<HistoryRecord>,
 ) -> Result<RetainedHistory> {
+    let (view, before) = context_view(connection, session, before_turn)?;
+    read_view(connection, session, revision, view, before, project)
+}
+
+fn context_view(
+    connection: &Connection,
+    session: &SessionId,
+    before_turn: Option<TurnId>,
+) -> Result<(View, Option<i64>)> {
     let selection = before_turn.map_or(HistorySelection::Current, HistorySelection::BeforeTurn);
     let (mut view, before) = select_view(connection, session, selection)?;
     let replacement = connection
@@ -206,9 +241,19 @@ fn read_context(
                 "stored_context_replacement_invalid",
             ));
         }
-        view.after = ordinal;
-        view.seed = Some(decode(&bytes)?);
+        let (seed, through) = match decode(&bytes)? {
+            StoredContextReplacement::Prefix { seed, through } => (seed, through),
+            StoredContextReplacement::Full(seed) => (seed, ordinal),
+        };
+        if through <= view.after || through > ordinal {
+            return Err(error(
+                ErrorKind::InvalidState,
+                "stored_context_replacement_invalid",
+            ));
+        }
+        view.after = through;
+        view.seed = Some(seed);
         view.seed_identity = Some(decode(&identity)?);
     }
-    read_view(connection, session, revision, view, before, project)
+    Ok((view, before))
 }

@@ -2,6 +2,7 @@
 //! GRIDA-SEC-006 preserves the captured provider principal and scope on recovery.
 
 use super::*;
+use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{FailureKind, InferenceFailure, InferenceOutcome, PreparedRequest};
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{OperationOutcome, TurnState};
@@ -11,7 +12,7 @@ use agent_kit_runtime::{
 use agent_kit_store_sqlite::context::{ContextInstall, UnpromptedClaim};
 use agent_kit_store_sqlite::history::{HistoryBasis, HistorySeed};
 use grida_agent_master::compaction::{
-    CompactionAccount, CompactionFailure, Coverage, summary_request,
+    CompactionAccount, CompactionFailure, Coverage, SummaryRequest, summary_request,
 };
 use grida_agent_master::usage::InferenceUsage;
 
@@ -68,6 +69,8 @@ pub(super) struct CompactionPlan {
     source: HistoryBasis,
     request: PreparedRequest,
     coverage: Coverage,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    covered_through: Option<TurnId>,
 }
 
 impl Host {
@@ -236,21 +239,34 @@ impl Host {
         if !view.queued.is_empty() {
             return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
         }
-        let context = self
+        let mut context = self
             .store
             .context_history_with(session.clone(), None, grida_agent_master::history::project)
             .await?;
         let expected_revision = context.session_revision;
         let source = context.basis.clone();
-        let has_local_records = !context.records.is_empty();
-        let (messages, omissions, compacted) = super::history::context_material(context)?;
-        if compacted && !has_local_records {
+        let records = std::mem::take(&mut context.records);
+        let (seed, omissions, compacted) = super::history::context_material(context)?;
+        if compacted && records.is_empty() {
             return Err(problem(ErrorKind::InvalidInput, "compaction_nothing_to_do"));
         }
-        let Some((inference, coverage)) = summary_request(
+        let mut turns: Vec<(TurnId, Vec<Message>)> = Vec::new();
+        for entry in records {
+            let HistoryRecord::Message(message) = entry.record;
+            match turns.last_mut() {
+                Some((turn, messages)) if *turn == entry.turn => messages.push(message),
+                _ => turns.push((entry.turn, vec![message])),
+            }
+        }
+        let Some(SummaryRequest {
+            inference,
+            coverage,
+            covered_through,
+        }) = summary_request(
             execution.config.model.clone(),
             execution.config.max_output_tokens,
-            messages,
+            seed,
+            turns,
             omissions,
         )?
         else {
@@ -265,6 +281,7 @@ impl Host {
             source: source.clone(),
             request: prepared,
             coverage,
+            covered_through,
         };
         let claim = self
             .store
@@ -510,6 +527,7 @@ impl Host {
                             records,
                             provenance,
                         },
+                        covered_through: plan.covered_through.clone(),
                     })
                     .await
                 {
@@ -517,7 +535,9 @@ impl Host {
                     Err(error)
                         if matches!(
                             error.code.as_str(),
-                            "context_install_basis_changed" | "history_basis_changed"
+                            "context_install_basis_changed"
+                                | "history_basis_changed"
+                                | "context_coverage_boundary_changed"
                         ) =>
                     {
                         CompactionStatus::Stale

@@ -113,6 +113,7 @@ async fn removes_only_owned_rows_and_replays_exact_receipt_after_reopen() {
                 records: vec![message.clone()],
                 provenance: payload("context"),
             },
+            covered_through: None,
         })
         .await
         .unwrap();

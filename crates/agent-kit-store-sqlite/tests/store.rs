@@ -2176,13 +2176,15 @@ async fn malformed_seed_creates_neither_a_session_nor_a_receipt() {
 }
 
 #[tokio::test]
-async fn context_replacement_retains_transcript_queued_input_and_old_context() {
+async fn context_prefix_replacement_retains_suffix_transcript_and_queued_input() {
     use agent_kit_store_sqlite::context::{ContextInstall, UnpromptedClaim};
 
     let (directory, store) = store().await;
     let original = history_message("original", "Original transcript");
     let original_turn =
         finish_history_turn(&store, session(), "original", vec![original.clone()]).await;
+    let tail = history_message("tail", "Unchanged suffix");
+    finish_history_turn(&store, session(), "tail", vec![tail.clone()]).await;
     let source = store
         .context_history_with(session(), None, |state| state.history().records().to_vec())
         .await
@@ -2236,6 +2238,7 @@ async fn context_replacement_retains_transcript_queued_input_and_old_context() {
             records: vec![summary.clone()],
             provenance: payload("covered original"),
         },
+        covered_through: Some(original_turn.clone()),
     };
     let mut mismatch = install.clone();
     mismatch.expected_outcome = Fingerprint::of(&"wrong").unwrap();
@@ -2244,18 +2247,25 @@ async fn context_replacement_retains_transcript_queued_input_and_old_context() {
         ErrorKind::Conflict,
         "context_outcome_changed",
     );
+    let mut invalid_cut = install.clone();
+    invalid_cut.covered_through = Some(install.turn.clone());
+    assert_error(
+        store.install_context(invalid_cut).await,
+        ErrorKind::Conflict,
+        "context_coverage_boundary_changed",
+    );
     assert_eq!(
         store
             .context_history_with(session(), None, |state| state.history().records().to_vec())
             .await
             .unwrap()
             .into_records(),
-        std::slice::from_ref(&original)
+        [original.clone(), tail.clone()]
     );
     store.install_context(install.clone()).await.unwrap();
     assert_eq!(
         store.history(session(), None).await.unwrap(),
-        std::slice::from_ref(&original)
+        [original, tail.clone()]
     );
     let observed = store.inspect(session()).await.unwrap();
     assert_eq!(observed.queued[0].input, queued);
@@ -2288,7 +2298,7 @@ async fn context_replacement_retains_transcript_queued_input_and_old_context() {
             .await
             .unwrap()
             .into_records(),
-        [summary]
+        [summary, tail]
     );
     assert!(
         store
@@ -2356,6 +2366,7 @@ async fn context_candidate_cannot_install_after_a_new_turn_claim() {
                     records: vec![history_message("summary", "Stale")],
                     provenance: payload("old"),
                 },
+                covered_through: None,
             })
             .await,
         ErrorKind::Conflict,
