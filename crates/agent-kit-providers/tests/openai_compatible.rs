@@ -579,6 +579,59 @@ async fn terminal_usage_replaces_cumulative_values_and_keeps_attempt_identity() 
 }
 
 #[tokio::test]
+async fn first_party_usage_frames_preserve_missing_counts_and_reported_zero() {
+    // The first-party codec omits its usage frame when no category is known.
+    let no_usage = response(
+        vec![choice(json!({"content":"finished"}), Some("stop")), done()],
+        false,
+    );
+    let partial_usage = response(
+        vec![
+            choice(json!({"content":"finished"}), Some("stop")),
+            frame(json!({
+                "choices": [],
+                "usage": {
+                    "completion_tokens": 7,
+                    "prompt_tokens_details": { "cached_tokens": 0 }
+                }
+            })),
+            done(),
+        ],
+        false,
+    );
+    let provider = adapter(FixtureTransport::new([Ok(no_usage), Ok(partial_usage)]));
+    let prepared = provider.prepare(request()).unwrap();
+    let first = provider
+        .start(prepared.clone(), control("unknown-usage"))
+        .unwrap()
+        .finish()
+        .await;
+    assert_eq!(first.status, InferenceStatus::Completed);
+    assert!(first.usage.is_empty());
+
+    let second = provider
+        .start(prepared, control("partial-usage"))
+        .unwrap()
+        .finish()
+        .await;
+    assert_eq!(second.status, InferenceStatus::Completed);
+    assert!(
+        second
+            .usage
+            .iter()
+            .all(|entry| { entry.attempt.as_str() == "partial-usage" && entry.final_value })
+    );
+    assert_eq!(
+        second
+            .usage
+            .iter()
+            .map(|entry| (entry.category.as_str(), entry.quantity))
+            .collect::<Vec<_>>(),
+        [("cached_input_tokens", 0), ("output_tokens", 7)]
+    );
+}
+
+#[tokio::test]
 async fn eof_after_finish_reason_keeps_known_usage_and_reports_interruption() {
     let script = vec![
         choice(json!({ "content": "partial" }), Some("stop")),

@@ -129,11 +129,11 @@ export type WireMessage = z.infer<typeof messageSchema>;
 // ---------------------------------------------------------------------------
 
 export type WireUsage = {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-  prompt_tokens_details: { cached_tokens: number };
-  completion_tokens_details: { reasoning_tokens: number };
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  prompt_tokens_details?: { cached_tokens: number };
+  completion_tokens_details?: { reasoning_tokens: number };
 };
 
 export type WireResponseToolCall = {
@@ -157,7 +157,7 @@ export type ChatCompletionResponse = {
     };
     finish_reason: WireFinishReason;
   }>;
-  usage: WireUsage;
+  usage?: WireUsage;
 };
 
 export type WireFinishReason =
@@ -189,7 +189,7 @@ export type ChatCompletionChunk = {
   usage?: WireUsage;
 };
 
-/** Trailing usage-only chunk (only when `stream_options.include_usage`). */
+/** Trailing usage-only chunk for reported counts when `include_usage` is set. */
 export type ChatCompletionUsageChunk = {
   id: string;
   object: "chat.completion.chunk";

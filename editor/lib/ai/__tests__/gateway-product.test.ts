@@ -10,6 +10,8 @@ import {
   gatewayCostMills,
   GatewayProductError,
 } from "../gateway-product";
+import { streamEncoder } from "../openai-compat/codec";
+import type { WireUsage } from "../openai-compat/wire";
 const context = { organizationId: 7, feature: "canvas/generate" };
 const opts = { grida: context };
 const imageDefaults = {
@@ -23,6 +25,7 @@ let submitted: RequestInit[] = [];
 let text = "hello";
 let status = 200;
 let statusUnavailable = false;
+let streamUsage: WireUsage | undefined;
 const requestId = "req_fixture";
 const png =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=";
@@ -31,6 +34,7 @@ beforeEach(() => {
   text = "hello";
   status = 200;
   statusUnavailable = false;
+  streamUsage = undefined;
   vi.stubEnv("GRIDA_AI_GATEWAY_ORIGIN", "http://127.0.0.1:8080");
   vi.stubEnv("GRIDA_AI_GATEWAY_ALLOW_LOCAL", "1");
   vi.stubEnv("GRIDA_AI_GATEWAY_KEY_ID", "product-test");
@@ -82,6 +86,26 @@ beforeEach(() => {
           { headers: { "X-Request-ID": requestId } }
         );
       }
+      if (JSON.parse(init.body as string).stream === true) {
+        const payloads: unknown[] = [
+          { choices: [{ index: 0, delta: { content: text } }] },
+          { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
+        ];
+        if (streamUsage !== undefined) {
+          payloads.push({ choices: [], usage: streamUsage });
+        }
+        return new Response(
+          payloads
+            .map((value) => `data: ${JSON.stringify(value)}\n\n`)
+            .join("") + "data: [DONE]\n\n",
+          {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "X-Request-ID": requestId,
+            },
+          }
+        );
+      }
       return Response.json(
         {
           id: "completion_fixture",
@@ -120,6 +144,47 @@ describe("trusted GG product adapter", () => {
       new Headers(submitted[0].headers).get("Idempotency-Key")
     ).toBeTruthy();
   });
+  it.each([
+    { usage: undefined, expected: [] },
+    { usage: {}, expected: [] },
+    {
+      usage: {
+        completion_tokens: 7,
+        prompt_tokens_details: { cached_tokens: 0 },
+      },
+      expected: [
+        { completion_tokens: 7, prompt_tokens_details: { cached_tokens: 0 } },
+      ],
+    },
+  ])(
+    "forwards only reported upstream usage: $usage",
+    async ({ usage, expected }) => {
+      streamUsage = usage;
+      const result = await gatewayLanguageModel("openai/gpt-5.6-luna").doStream(
+        {
+          prompt: [
+            { role: "user", content: [{ type: "text", text: "hello" }] },
+          ],
+          providerOptions: opts,
+        }
+      );
+      const encoded = await new Response(
+        result.stream.pipeThrough(
+          streamEncoder("openai/gpt-5.6-luna", { includeUsage: true })
+        )
+      ).text();
+      expect(encoded.endsWith("data: [DONE]\n\n")).toBe(true);
+      const frames = encoded
+        .split("\n\n")
+        .filter((line) => line.startsWith("data: {"));
+      expect(
+        frames
+          .map((frame) => JSON.parse(frame.slice(6)).usage)
+          .filter((value) => value !== undefined)
+      ).toStrictEqual(expected);
+      expect(submitted).toHaveLength(1);
+    }
+  );
   it("preserves JSON-schema output and function-tool definitions", async () => {
     text = '{"name":"cube"}';
     const r = await generateText({

@@ -1,7 +1,11 @@
 // GRIDA-GG: gateway — trusted, organization-scoped server execution.
 import "server-only";
 import { randomUUID } from "node:crypto";
-import type { ImageModelV3, LanguageModelV3 } from "@ai-sdk/provider";
+import type {
+  ImageModelV3,
+  LanguageModelV3,
+  LanguageModelV3Usage,
+} from "@ai-sdk/provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { ProductBillingError } from "@/lib/platform/product-billing";
 
@@ -252,6 +256,41 @@ export function gatewayLanguageModel(modelId: string): LanguageModelV3 {
       name: "gg",
       baseURL: "https://gateway.grida.ai/v1",
       apiKey: "server-authority",
+      convertUsage: (usage) => {
+        // The SDK default fills omitted counts with zero when a usage object
+        // exists. Keep absent categories unknown on the Gateway connection.
+        const input = usage?.prompt_tokens ?? undefined;
+        const output = usage?.completion_tokens ?? undefined;
+        const cacheRead =
+          usage?.prompt_tokens_details?.cached_tokens ?? undefined;
+        const reasoning =
+          usage?.completion_tokens_details?.reasoning_tokens ?? undefined;
+        return {
+          inputTokens: {
+            total: input,
+            noCache:
+              input !== undefined &&
+              cacheRead !== undefined &&
+              cacheRead <= input
+                ? input - cacheRead
+                : undefined,
+            cacheRead,
+            cacheWrite: undefined,
+          },
+          outputTokens: {
+            total: output,
+            text:
+              output !== undefined &&
+              reasoning !== undefined &&
+              reasoning <= output
+                ? output - reasoning
+                : undefined,
+            reasoning,
+          },
+          // The SDK validates known fields on an already decoded JSON object.
+          raw: (usage ?? undefined) as LanguageModelV3Usage["raw"],
+        };
+      },
       fetch: async (_url, init) => {
         const response = await gatewayFetch(
           ctx,
