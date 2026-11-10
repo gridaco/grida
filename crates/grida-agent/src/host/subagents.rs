@@ -17,6 +17,7 @@ pub struct SubagentInspection {
 pub struct SubagentWork {
     pub input: ChangeId,
     pub parent_turn: TurnId,
+    pub max_generation_steps: u32,
     pub disposition: InputDisposition,
     pub turn: Option<TurnView>,
 }
@@ -122,7 +123,7 @@ impl Host {
             if previous.disposition == InputDisposition::Queued {
                 self.kick_queue(child.clone()).await;
             }
-            return self.subagent_work(&child, previous, parent_turn).await;
+            return self.subagent_work(&child, previous, stored).await;
         }
 
         self.check_execution(&view)?;
@@ -164,6 +165,7 @@ impl Host {
         Ok(SubagentWork {
             input,
             parent_turn,
+            max_generation_steps: subagents::INFERENCE_STEPS_PER_ASSIGNMENT,
             disposition: InputDisposition::Queued,
             turn: None,
         })
@@ -214,13 +216,7 @@ impl Host {
                         problem(ErrorKind::Unavailable, "subagent_assignment_unavailable")
                     })?;
                 let stored: StoredPrompt = decode_input(&accepted.input)?;
-                let assignment = stored.subagent.ok_or_else(|| {
-                    problem(ErrorKind::InvalidState, "subagent_assignment_missing")
-                })?;
-                Some(
-                    self.subagent_work(&child, accepted, assignment.parent_turn)
-                        .await?,
-                )
+                Some(self.subagent_work(&child, accepted, stored).await?)
             }
             None => None,
         };
@@ -240,8 +236,14 @@ impl Host {
         &self,
         child: &SessionId,
         accepted: agent_kit_sessions::InputView,
-        parent_turn: TurnId,
+        stored: StoredPrompt,
     ) -> Result<SubagentWork> {
+        let assignment = stored
+            .subagent
+            .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_missing"))?;
+        let max_generation_steps = stored
+            .max_steps
+            .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_limit_missing"))?;
         let turn = match &accepted.disposition {
             InputDisposition::Claimed { turn } | InputDisposition::Completed { turn } => {
                 Some(self.store.inspect_turn(child.clone(), turn.clone()).await?)
@@ -250,10 +252,52 @@ impl Host {
         };
         Ok(SubagentWork {
             input: accepted.input.id,
-            parent_turn,
+            parent_turn: assignment.parent_turn,
+            max_generation_steps,
             disposition: accepted.disposition,
             turn,
         })
+    }
+
+    pub async fn pause_subagent(
+        &self,
+        parent: SessionId,
+        control: TurnControl,
+    ) -> Result<ControlReceipt> {
+        self.child_for_control(&parent, &control.session).await?;
+        self.pause(control).await
+    }
+
+    pub async fn resume_subagent(
+        &self,
+        parent: SessionId,
+        control: TurnControl,
+        epoch: u64,
+        position: JournalPosition,
+    ) -> Result<TurnView> {
+        self.child_for_control(&parent, &control.session)
+            .await?
+            .require_authority(&self.execution()?.authority.inference.authority)?;
+        self.resume(control, epoch, position).await
+    }
+
+    pub async fn steer_subagent(
+        &self,
+        parent: SessionId,
+        control: TurnControl,
+        expected_history: HistoryPosition,
+        instructions: String,
+    ) -> Result<ControlReceipt> {
+        subagents::validate_assignment(&instructions)?;
+        self.child_for_control(&parent, &control.session)
+            .await?
+            .require_authority(&self.execution()?.authority.inference.authority)?;
+        self.steer(
+            control,
+            expected_history,
+            vec![PromptPart::Text { text: instructions }],
+        )
+        .await
     }
 
     /// Cancel the exact child turn. No other assignment can be queued while
@@ -264,8 +308,7 @@ impl Host {
         control: TurnControl,
     ) -> Result<ControlReceipt> {
         self.owned_control(move |host| async move {
-            host.require_subagents()?;
-            host.subagent_view(&parent, control.session.clone()).await?;
+            host.child_for_control(&parent, &control.session).await?;
             let receipt = host
                 .store
                 .control(ControlRequest {
@@ -283,6 +326,13 @@ impl Host {
             Ok(receipt)
         })
         .await
+    }
+
+    async fn child_for_control(&self, parent: &SessionId, child: &SessionId) -> Result<Profile> {
+        self.require_subagents()?;
+        self.subagent_view(parent, child.clone())
+            .await
+            .map(|(_, profile)| profile)
     }
 
     fn require_subagents(&self) -> Result<()> {

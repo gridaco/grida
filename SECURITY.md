@@ -1026,7 +1026,9 @@ lazy reads, read-only mutation, and symlink escape refusal.
   require an attached parent and a trusted opt-in launch. The
   [host](crates/grida-agent/src/host/subagents.rs) rechecks the child's
   retained parent link, verified provider scope, and exact settled sponsoring
-  turn. The [allocation policy](crates/grida-agent-master/src/subagents.rs)
+  turn. Pause, Resume, Steer, and Stop target an exact child turn and use the
+  ordinary revision checks. Resume and Steer revalidate provider continuity.
+  The [allocation policy](crates/grida-agent-master/src/subagents.rs)
   binds a work reservation to the ordinary durable claim. Child work receives no
   workspace, tool, or delegation grants. The
   [process fixtures](crates/grida-agent/tests/process/subagents.rs) check

@@ -12,7 +12,8 @@ const ALLOCATION_SCHEMA: &str = "grida.agent.subagent.allocation";
 const MAX_WORK_TURNS: u8 = 8;
 const MAX_NAME_BYTES: usize = 128;
 pub const MAX_ASSIGNMENT_BYTES: usize = 64 * 1024;
-pub const INFERENCE_STEPS_PER_ASSIGNMENT: u32 = 1;
+/// A new assignment can continue once after a dispatched generation is interrupted.
+pub const INFERENCE_STEPS_PER_ASSIGNMENT: u32 = 2;
 pub const INSTRUCTIONS: &str = "You are a subagent. Work on the current assignment using the retained context of this child conversation. Return your findings in text.";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

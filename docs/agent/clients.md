@@ -306,8 +306,8 @@ target/debug/grida-agent serve --stdio --subagents \
 ```
 
 During initialization, negotiate version 1 for `co.grida/subagent/create`,
-`assign`, `inspect`, and `stop` separately. Attach to the parent and finish
-an Act turn.
+`assign`, `inspect`, `pause`, `resume`, `steer`, and `stop` separately.
+Attach to the parent and finish an Act turn.
 
 1. Create the child with a display name, a creation request ID, and an
    allowance of one to eight work turns. Retain the returned child ID.
@@ -316,13 +316,15 @@ an Act turn.
    workspace tools. When it is idle, assign a follow-up using the same child
    ID and a new input ID.
 3. Inspect a particular input to read the result from its original child
-   turn. After restart, attach to the same parent and use the retained
-   child and input IDs. If an assignment was interrupted, stop it before
-   giving the child new work. Its reserved work turn still counts against the allowance.
+   turn. Use Pause to suspend that turn, Steer to add a correction, and
+   Resume to continue it. After restart, attach to the same parent and use
+   the retained child and input IDs. Use Stop to end the assignment.
 
 Retry creation or assignment with the same ID and fields to recover its
-receipt. Follow-up work after restart requires the same verified provider
-authority. The launcher owns this text-only profile and its allowance.
+receipt. New assignments allow up to two generation steps. A continuation
+uses the same assignment and its remaining steps. Reserved work still counts
+after interruption. Resuming, steering, and assigning new work require the
+same verified provider authority.
 See the [native host request fields](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md).
 
 ## Ask in a temporary side chat

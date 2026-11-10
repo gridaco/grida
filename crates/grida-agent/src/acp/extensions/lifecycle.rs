@@ -159,9 +159,9 @@ struct Resume {
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
 #[serde(rename_all = "camelCase")]
-struct ResumeResponse {
-    request_id: ChangeId,
-    turn: TurnSummary,
+pub(super) struct ResumeResponse {
+    pub(super) request_id: ChangeId,
+    pub(super) turn: TurnSummary,
 }
 
 pub(super) fn handlers(

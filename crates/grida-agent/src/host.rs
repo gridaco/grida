@@ -1465,8 +1465,10 @@ impl Host {
                         || stored.guidance.is_some()
                         || stored.goal.is_some()
                         || stored.completion_checks.is_some()
-                        || stored.max_steps
-                            != Some(grida_agent_master::subagents::INFERENCE_STEPS_PER_ASSIGNMENT)
+                        || !matches!(
+                            stored.max_steps,
+                            Some(1..=grida_agent_master::subagents::INFERENCE_STEPS_PER_ASSIGNMENT)
+                        )
                         || !matches!(stored.parts.as_slice(), [PromptPart::Text { .. }])
                     {
                         return Err(problem(
