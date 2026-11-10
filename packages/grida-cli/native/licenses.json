@@ -1,7 +1,7 @@
 {
   "format": 1,
   "generator": "cargo-about 0.8.2",
-  "cargo_lock_sha256": "47f38146ce52a6218263b72622e917d776b4c751008310df9207427da4e1f4f2",
+  "cargo_lock_sha256": "a8934349b20b46319d63bab4b045d74bb3227309dc627701e0d58dfc903726d8",
   "targets": [
     "x86_64-apple-darwin",
     "aarch64-apple-darwin",
@@ -13,6 +13,12 @@
     "aarch64-pc-windows-msvc"
   ],
   "crates": [
+    {
+      "name": "adler2",
+      "version": "2.0.1",
+      "license": "0BSD OR MIT OR Apache-2.0",
+      "repository": "https://github.com/oyvindln/adler2"
+    },
     {
       "name": "aes",
       "version": "0.9.3",
@@ -308,6 +314,12 @@
       "repository": "https://github.com/RustCrypto/utils"
     },
     {
+      "name": "crc32fast",
+      "version": "1.5.2",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/srijs/rust-crc32fast"
+    },
+    {
       "name": "crossbeam-utils",
       "version": "0.8.23",
       "license": "MIT OR Apache-2.0",
@@ -416,6 +428,12 @@
       "repository": "https://gitlab.com/kornelski/dunce"
     },
     {
+      "name": "dyn-clone",
+      "version": "1.0.20",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/dtolnay/dyn-clone"
+    },
+    {
       "name": "endi",
       "version": "1.1.1",
       "license": "MIT",
@@ -476,6 +494,12 @@
       "repository": "https://github.com/smol-rs/fastrand"
     },
     {
+      "name": "fdeflate",
+      "version": "0.3.7",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/image-rs/fdeflate"
+    },
+    {
       "name": "find-msvc-tools",
       "version": "0.1.14",
       "license": "MIT OR Apache-2.0",
@@ -486,6 +510,12 @@
       "version": "0.5.9",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/petgraph/fixedbitset"
+    },
+    {
+      "name": "flate2",
+      "version": "1.1.10",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/rust-lang/flate2-rs"
     },
     {
       "name": "foldhash",
@@ -519,6 +549,12 @@
     },
     {
       "name": "futures-core",
+      "version": "0.3.34",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/rust-lang/futures-rs"
+    },
+    {
+      "name": "futures-executor",
       "version": "0.3.34",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/rust-lang/futures-rs"
@@ -642,6 +678,12 @@
       "version": "1.10.1",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/seanmonstar/httparse"
+    },
+    {
+      "name": "httpdate",
+      "version": "1.0.3",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/pyfisch/httpdate"
     },
     {
       "name": "hybrid-array",
@@ -818,6 +860,18 @@
       "repository": "https://github.com/Gilnaa/memoffset"
     },
     {
+      "name": "miniz_oxide",
+      "version": "0.8.9",
+      "license": "MIT OR Zlib OR Apache-2.0",
+      "repository": "https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide"
+    },
+    {
+      "name": "miniz_oxide",
+      "version": "0.9.1",
+      "license": "MIT OR Zlib OR Apache-2.0",
+      "repository": "https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide"
+    },
+    {
       "name": "mio",
       "version": "1.2.3",
       "license": "MIT",
@@ -914,6 +968,12 @@
       "repository": "https://github.com/smol-rs/parking"
     },
     {
+      "name": "pastey",
+      "version": "0.2.3",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/as1100k/pastey"
+    },
+    {
       "name": "percent-encoding",
       "version": "2.3.2",
       "license": "MIT OR Apache-2.0",
@@ -948,6 +1008,12 @@
       "version": "0.3.34",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/rust-lang/pkg-config-rs"
+    },
+    {
+      "name": "png",
+      "version": "0.18.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/image-rs/image-png"
     },
     {
       "name": "polling",
@@ -1022,6 +1088,18 @@
       "repository": "https://github.com/rust-random/rand"
     },
     {
+      "name": "ref-cast-impl",
+      "version": "1.0.27",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/dtolnay/ref-cast"
+    },
+    {
+      "name": "ref-cast",
+      "version": "1.0.27",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/dtolnay/ref-cast"
+    },
+    {
       "name": "regex-automata",
       "version": "0.4.18",
       "license": "MIT OR Apache-2.0",
@@ -1044,6 +1122,12 @@
       "version": "0.13.5",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/seanmonstar/reqwest"
+    },
+    {
+      "name": "rmcp",
+      "version": "3.9.0",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/modelcontextprotocol/rust-sdk/"
     },
     {
       "name": "rusqlite",
@@ -1106,6 +1190,18 @@
       "repository": "https://github.com/steffengy/schannel-rs"
     },
     {
+      "name": "schemars_derive",
+      "version": "1.2.3",
+      "license": "MIT",
+      "repository": "https://github.com/GREsau/schemars"
+    },
+    {
+      "name": "schemars",
+      "version": "1.2.3",
+      "license": "MIT",
+      "repository": "https://github.com/GREsau/schemars"
+    },
+    {
       "name": "scopeguard",
       "version": "1.2.0",
       "license": "MIT OR Apache-2.0",
@@ -1138,6 +1234,12 @@
     {
       "name": "serde_core",
       "version": "1.0.229",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/serde-rs/serde"
+    },
+    {
+      "name": "serde_derive_internals",
+      "version": "0.30.0",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/serde-rs/serde"
     },
@@ -1232,6 +1334,12 @@
       "repository": "https://github.com/vorner/signal-hook"
     },
     {
+      "name": "simd-adler32",
+      "version": "0.3.10",
+      "license": "MIT",
+      "repository": "https://github.com/mcountryman/simd-adler32"
+    },
+    {
       "name": "slab",
       "version": "0.4.12",
       "license": "MIT",
@@ -1248,6 +1356,12 @@
       "version": "0.6.5",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/rust-lang/socket2"
+    },
+    {
+      "name": "sse-stream",
+      "version": "0.2.6",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/4t145/sse-stream/"
     },
     {
       "name": "stable_deref_trait",
@@ -1374,6 +1488,12 @@
       "version": "0.26.6",
       "license": "MIT OR Apache-2.0",
       "repository": "https://github.com/rustls/tokio-rustls"
+    },
+    {
+      "name": "tokio-stream",
+      "version": "0.1.19",
+      "license": "MIT",
+      "repository": "https://github.com/tokio-rs/tokio"
     },
     {
       "name": "tokio-tungstenite",
