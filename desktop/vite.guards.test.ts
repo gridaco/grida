@@ -26,7 +26,6 @@ describe("externalizedWorkspaceImports", () => {
         "electron",
         "hono",
         "hono/jsx",
-        "undici",
       ])
     ).toEqual([]);
   });

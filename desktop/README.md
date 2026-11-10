@@ -38,8 +38,8 @@ Desktop sidecar composition
   -> @grida/agent/media-server serves media through @grida/ai without chat startup
   -> full @grida/agent/server also enables sessions and desktop agent execution
   -> serves authenticated daemon HTTP only on main-transferred sockets
-  -> sends only provider requests and credential-free provider-asset downloads
-     over bounded framed stdin/stdout
+  -> requires a host transport over bounded framed stdin/stdout for provider
+     requests and credential-free provider-asset downloads
 
 editor /desktop/*
   -> owns UX only, through typed bridge clients

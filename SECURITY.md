@@ -439,8 +439,10 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    construction-time HTTP operations: authenticated provider requests and
    credential-free provider-asset downloads. Desktop implements them over the
    sidecar's inherited stdin/stdout using a strict length-prefixed protocol;
-   stdout is protocol-only and stderr is logs. Electron main executes requests
-   through a dedicated, non-persistent Chromium `Session` in system-proxy mode.
+   stdout is protocol-only and stderr is logs. Desktop's sidecar requires both
+   operations before it selects any daemon composition. Electron main
+   executes requests through a dedicated, non-persistent Chromium `Session`
+   in system-proxy mode.
    It revalidates the host-issued grant, method, exact/suffix origin, headers,
    body bounds, and every redirect; response bytes move only against explicit
    credit and aborts propagate both ways. The download lane contains only

@@ -36,6 +36,12 @@ export namespace DesktopDaemon {
 
   export async function create(opts: Options): Promise<DaemonServer> {
     const { agent } = opts;
+    if (
+      typeof opts.provider_http?.request !== "function" ||
+      typeof opts.provider_http?.download !== "function"
+    ) {
+      throw new Error("desktop_provider_transport_required");
+    }
     const ownedLegacy = typeof agent === "object" && agent.owned_legacy_writer;
     if (ownedLegacy && (!agent.sandbox_enforced || agent.shell_executor)) {
       throw new Error("owned_legacy_writer_scope_invalid");

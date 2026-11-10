@@ -20,26 +20,32 @@ const reportPath = process.env.GRIDA_MEDIA_STARTUP_REPORT;
 assert.ok(reportPath);
 const root = fs.realpathSync(process.env.GRIDA_MEDIA_STARTUP_ROOT);
 const state = fs.realpathSync(process.env.GRIDA_MEDIA_STARTUP_STATE);
+const legacyChat = process.env.GRIDA_MEDIA_STARTUP_LEGACY_CHAT === "1";
 const custody = { locks: 0, acl: 0 };
-const enabled = () => fs.existsSync(path.join(root, "allow-custody"));
+const enabled = () =>
+  legacyChat || fs.existsSync(path.join(root, "allow-custody"));
 const lockFiles = new Set([
   path.join(state, ".auth-lock", "profile.lock.sqlite"),
   path.join(state, "providers", "profile.lock.sqlite"),
 ]);
-sqlite.DatabaseSync = class extends NativeDatabase {
-  constructor(filename, options) {
-    if (!enabled() || !lockFiles.has(filename)) forbidden("imports");
-    super(filename, options);
-    custody.locks++;
-  }
-  exec(sql) {
-    if (
-      !["PRAGMA busy_timeout = 0", "BEGIN IMMEDIATE", "ROLLBACK"].includes(sql)
-    )
-      forbidden("imports");
-    return super.exec(sql);
-  }
-};
+if (!legacyChat) {
+  sqlite.DatabaseSync = class extends NativeDatabase {
+    constructor(filename, options) {
+      if (!enabled() || !lockFiles.has(filename)) forbidden("imports");
+      super(filename, options);
+      custody.locks++;
+    }
+    exec(sql) {
+      if (
+        !["PRAGMA busy_timeout = 0", "BEGIN IMMEDIATE", "ROLLBACK"].includes(
+          sql
+        )
+      )
+        forbidden("imports");
+      return super.exec(sql);
+    }
+  };
+}
 const counts = { imports: 0, network: 0, processes: 0 };
 function forbidden(kind) {
   counts[kind] += 1;
@@ -47,6 +53,7 @@ function forbidden(kind) {
 }
 moduleApi.registerHooks({
   resolve(specifier, context, next) {
+    if (specifier === "undici") forbidden("imports");
     if (/^(?:node:)?sqlite$/.test(specifier) && !enabled()) {
       counts.imports += 1;
       throw new Error(
@@ -113,7 +120,9 @@ globalThis.fetch = denyNetwork;
 moduleApi.syncBuiltinESMExports();
 
 // Prove the import/network tripwires are active before resetting observation.
-assert.throws(() => require("node:sqlite"), /forbidden imports/);
+assert.throws(() => require("undici"), /forbidden imports/);
+if (!legacyChat)
+  assert.throws(() => require("node:sqlite"), /forbidden imports/);
 assert.throws(() => childProcess.spawn("unused"), /forbidden processes/);
 assert.throws(() => childProcess.fork("unused"), /forbidden processes/);
 assert.throws(() => net.connect(1, "127.0.0.1"), /forbidden network/);
@@ -122,7 +131,11 @@ assert.throws(
   () => globalThis.fetch("https://example.invalid"),
   /forbidden network/
 );
-assert.deepEqual(counts, { imports: 1, network: 3, processes: 2 });
+assert.deepEqual(counts, {
+  imports: legacyChat ? 1 : 2,
+  network: 3,
+  processes: 2,
+});
 counts.imports = counts.network = counts.processes = 0;
 process.on("exit", () => {
   fs.writeFileSync(

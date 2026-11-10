@@ -64,6 +64,20 @@ describe("Desktop daemon composition", () => {
     });
   });
 
+  it("refuses startup without both host provider operations", async () => {
+    for (const provider_http of [undefined, { request: transport.request }]) {
+      await expect(
+        DesktopDaemon.create({
+          ...common,
+          agent: false,
+          provider_http: provider_http as typeof transport,
+        })
+      ).rejects.toThrow("desktop_provider_transport_required");
+    }
+    expect(mocks.media).not.toHaveBeenCalled();
+    expect(mocks.agent).not.toHaveBeenCalled();
+  });
+
   it("forwards full agent authorities and existing Desktop capabilities", async () => {
     const shell = vi.fn<ShellExecutor>();
     await DesktopDaemon.create({

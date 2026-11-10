@@ -25,14 +25,6 @@ export default defineConfig({
         "hono",
         /^hono\//,
         "@hono/node-server",
-        // `undici` is Node's actual fetch implementation. We import
-        // `EnvHttpProxyAgent` + `setGlobalDispatcher` from it at the
-        // top of agent-sidecar.ts so outbound HTTP routes
-        // through srt's proxy (Node fetch ignores HTTP_PROXY env by
-        // default in v6+). Externalise so the resolver does the work
-        // at runtime — bundling it would pull in a large native-ish
-        // surface and risk duplicating the AI SDK's own copy.
-        "undici",
       ],
     },
   },

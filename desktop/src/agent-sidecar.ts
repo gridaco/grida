@@ -55,29 +55,9 @@
  * This process creates no listener; it serves only sockets main already
  * accepted on exact loopback.
  */
-import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 import { AgentSidecarNetwork } from "./agent-sidecar-network";
 import { AgentSidecarDaemonSockets } from "./agent-sidecar-daemon-sockets";
 import { RetainedMediaOwner } from "./retained-media-owner";
-
-// Route Node's built-in `fetch` (undici) through whatever proxy is in
-// `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`. Without this, undici v6+
-// ignores those env vars and dials direct — which is wrong for us
-// because srt (the outer sandbox wrap in
-// `main/agent-sidecar-supervisor.ts`) sets those env vars to point at its
-// own in-process HTTP/SOCKS proxies on `localhost`, and the
-// allowlist in `@grida/agent/server` lives at that proxy. Bypass
-// the proxy and Seatbelt's outbound-DNS deny surfaces as a
-// misleading `getaddrinfo ENOTFOUND <host>` from inside the AI SDK's
-// retry loop, with no obvious connection to the sandbox. Trusted in-process
-// provider operations now use the explicit host transport below. This ambient
-// dispatcher remains for separately-authorized non-provider sidecar traffic;
-// Desktop supplies no direct external destinations to that policy.
-//
-// `EnvHttpProxyAgent` reads the env at construction time, so this
-// must run before any top-level fetch — i.e. before any other
-// import that might do work. Keep it directly under the imports.
-setGlobalDispatcher(new EnvHttpProxyAgent());
 
 // Stdout is the private framed channel. Package/runtime diagnostics use
 // console.log in several places, so redirect every stdout-backed console method
@@ -263,8 +243,7 @@ async function main() {
         : agentMode === "native-chat"
           ? "native-chat"
           : false,
-    // issue #974 — provider traffic follows Electron/Chromium's system network
-    // route while the sidecar and its raw children remain under the SRT wrap.
+    // Provider and asset traffic uses the private channel to Electron Main.
     provider_http: network.providerHttp,
   });
 

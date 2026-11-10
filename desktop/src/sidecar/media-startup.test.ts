@@ -620,7 +620,7 @@ describe("built Desktop media startup", () => {
         TEMP: temporary,
       };
       await runBuild(root, output, env);
-      // Vite intentionally leaves the existing Hono/undici runtime dependencies
+      // Vite intentionally leaves the existing Hono runtime dependencies
       // external. This is a startup proof, not an independent distribution proof.
       await fs.symlink(
         path.join(desktop, "node_modules"),
@@ -1017,6 +1017,7 @@ describe("built Desktop media startup", () => {
         const lease = new LegacyChatSourceLease(source);
         const writer = await lease.claimWriter();
         const metadata = ggContractFixture([]);
+        let inference = 0;
         active = await Sidecar.start({
           root,
           output,
@@ -1025,8 +1026,23 @@ describe("built Desktop media startup", () => {
           env,
           runtime: await sidecarRuntime(),
           generation: 1,
-          fetchProvider: async (url) =>
-            metadata.response(url) ?? new Response(null, { status: 403 }),
+          fetchProvider: async (url, init) => {
+            const discovery = metadata.response(url);
+            if (discovery) return discovery;
+            expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
+            expect(init.method).toBe("POST");
+            expect(new Headers(init.headers).get("authorization")).toBe(
+              `Bearer ${key}`
+            );
+            expect(await new Response(init.body).text()).toContain(
+              "Legacy provider transport check"
+            );
+            inference++;
+            return new Response(
+              'data: {"id":"fixture","choices":[{"index":0,"delta":{"content":"Legacy provider reply"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
+              { headers: { "content-type": "text/event-stream" } }
+            );
+          },
           legacyScratch: scratchBase,
         });
         const handshake = await active.post("/handshake");
@@ -1036,10 +1052,36 @@ describe("built Desktop media startup", () => {
           shell: false,
         });
         const created = await active.post("/sessions", {
-          agent: "fixture",
+          agent: "grida",
           title: "Saved legacy chat",
         });
         expect(created.status).toBe(200);
+        const { id } = await created.json();
+        expect(
+          (
+            await active.post("/secrets/set", {
+              provider_id: "openrouter",
+              key,
+            })
+          ).status
+        ).toBe(200);
+        const reply = await active.post("/agent/run", {
+          session_id: id,
+          provider_id: "openrouter",
+          tier: "nano",
+          messages: [
+            {
+              id: "legacy-user",
+              role: "user",
+              parts: [
+                { type: "text", text: "Legacy provider transport check" },
+              ],
+            },
+          ],
+        });
+        expect(reply.status).toBe(200);
+        expect(await reply.text()).toContain("Legacy provider reply");
+        expect(inference).toBe(1);
         await expect(lease.claimWriter()).rejects.toThrow(
           "legacy_chat_source_dirty"
         );
@@ -1050,6 +1092,10 @@ describe("built Desktop media startup", () => {
           return true;
         });
         active = undefined;
+        const report = JSON.parse(
+          await fs.readFile(path.join(root, "guard-1.json"), "utf8")
+        );
+        expect(report.counts).toEqual({ imports: 0, network: 0, processes: 0 });
         const archive = new LegacyChatArchive(source);
         const retired = await lease.retire({
           requestId: "fixture-retirement",
@@ -1142,9 +1188,8 @@ class Sidecar {
   static async start(options: StartOptions): Promise<Sidecar> {
     await fs.rm(path.join(options.root, "allow-custody"), { force: true });
     const argv = [
-      ...(options.legacyScratch
-        ? []
-        : ["--require", path.join(fixture, "media-startup-guard.cjs")]),
+      "--require",
+      path.join(fixture, "media-startup-guard.cjs"),
       path.join(options.output, "sidecar.cjs"),
       ...(options.legacyScratch
         ? [
@@ -1177,6 +1222,7 @@ class Sidecar {
         ELECTRON_RUN_AS_NODE: "1",
         GRIDA_MEDIA_STARTUP_ROOT: options.root,
         GRIDA_MEDIA_STARTUP_STATE: options.userData,
+        ...(options.legacyScratch && { GRIDA_MEDIA_STARTUP_LEGACY_CHAT: "1" }),
         GRIDA_MEDIA_STARTUP_REPORT: path.join(
           options.root,
           `guard-${options.generation}.json`

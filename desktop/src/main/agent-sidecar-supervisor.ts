@@ -825,30 +825,9 @@ export class AgentSidecarSupervisor {
         reject(new Error("agent sidecar startup timed out"));
       }, STARTUP_TIMEOUT_MS);
 
-      // Strip proxy env vars from the spawn environment. Two reasons,
-      // in order of importance:
-      //
-      // 1. srt's outer wrap re-injects HTTP_PROXY / HTTPS_PROXY /
-      //    ALL_PROXY pointing at its own in-process proxies (where
-      //    `main/sandbox/policy.ts`'s allowlist actually lives). If
-      //    we let the launching shell's proxy env leak through, it
-      //    races with srt's values — and on some macOS shells the
-      //    inherited value wins. Trusted provider calls now use the private
-      //    host transport, but non-provider sidecar traffic still relies on
-      //    srt's proxy and must not inherit a competing outer proxy. Launching Grida
-      //    from a sandbox shell (Claude Code, mitmproxy session,
-      //    corporate VPN client) ends up with the sidecar talking to
-      //    that outer sandbox's proxy instead of Grida's own.
-      //
-      // 2. With the strip in place, srt is the only source of truth
-      //    for the remaining sidecar proxy env. `agent-sidecar.ts` then sets an
-      //    `EnvHttpProxyAgent` as undici's global dispatcher so
-      //    Node's fetch actually routes through that proxy — without
-      //    the dispatcher, the env vars do nothing because undici v6+
-      //    no longer reads them on its own.
-      //
-      // This block is small but load-bearing; both halves of the fix
-      // (this strip + the dispatcher in agent-sidecar.ts) are required.
+      // The compatibility wrapper supplies its own sandbox environment.
+      // Strip inherited proxy settings so the launching shell cannot
+      // compete with it. Main owns the provider HTTP transport.
       const cleanedEnv: NodeJS.ProcessEnv = { ...process.env };
       for (const key of [
         "HTTP_PROXY",
