@@ -10,6 +10,7 @@ use grida_agent_master::subagents::Allocation;
 const CREATE: &str = "co.grida/subagent/create";
 const ASSIGN: &str = "co.grida/subagent/assign";
 const SEND_MESSAGE: &str = "co.grida/subagent/send-message";
+const LIST: &str = "co.grida/subagent/list";
 const INSPECT: &str = "co.grida/subagent/inspect";
 const STOP: &str = "co.grida/subagent/stop";
 const PAUSE: &str = "co.grida/subagent/pause";
@@ -23,6 +24,7 @@ pub(super) fn capabilities(available: bool) -> impl Iterator<Item = &'static str
         CREATE,
         ASSIGN,
         SEND_MESSAGE,
+        LIST,
         INSPECT,
         STOP,
         PAUSE,
@@ -94,6 +96,29 @@ impl From<SubagentMessageReceipt> for MessageReceipt {
             text: receipt.text,
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
+#[request(method = "_co.grida/subagent/list", response = ChildPage)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct List {
+    parent_session_id: SessionId,
+    after_child_id: Option<SessionId>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
+#[serde(rename_all = "camelCase")]
+struct ChildPage {
+    parent_session_id: SessionId,
+    children: Vec<NamedChild>,
+    next_after_child_id: Option<SessionId>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NamedChild {
+    child_id: SessionId,
+    name: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -195,6 +220,8 @@ struct Inspection {
     current: Option<TurnSummary>,
     latest: Option<TurnSummary>,
     assignment: Option<Assignment>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    observed_assignment: Option<Assignment>,
     message: Option<MessageReceipt>,
 }
 
@@ -214,6 +241,9 @@ impl From<SubagentInspection> for Inspection {
             latest: view.latest.map(TurnSummary::from),
             assignment: view
                 .assignment
+                .map(|work| Assignment::from_work(child_id.clone(), work)),
+            observed_assignment: view
+                .observed_assignment
                 .map(|work| Assignment::from_work(child_id, work)),
             message: view.message.map(MessageReceipt::from),
         }
@@ -228,6 +258,8 @@ struct Assignment {
     input_id: ChangeId,
     max_generation_steps: u32,
     message_input_ids: Vec<ChangeId>,
+    instruction_preview: String,
+    instruction_truncated: bool,
     disposition: InputDisposition,
     turn: Option<TurnSummary>,
     result: Option<summaries::SummaryResponse>,
@@ -246,6 +278,8 @@ impl Assignment {
             input_id: work.input,
             max_generation_steps: work.max_generation_steps,
             message_input_ids: work.message_inputs,
+            instruction_preview: work.instruction_preview,
+            instruction_truncated: work.instruction_truncated,
             disposition: work.disposition,
             turn: work.turn.map(TurnSummary::from),
             result,
@@ -257,6 +291,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
     let create = (host.clone(), sessions.clone());
     let assign = (host.clone(), sessions.clone());
     let inspect = (host.clone(), sessions.clone());
+    let list = (host.clone(), sessions.clone());
     let message = (host.clone(), sessions.clone());
     let stop = (host.clone(), sessions.clone());
     let pause = (host.clone(), sessions.clone());
@@ -324,6 +359,32 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                         .map_err(host_error)?;
                     require(&message.1, SEND_MESSAGE, Some(&request.parent_session_id))?;
                     Ok(MessageReceipt::from(receipt))
+                }
+                .await;
+                responder.respond_with_result(result)
+            },
+            on_receive_request!(),
+        )
+        .on_receive_request(
+            async move |request: List, responder, _| {
+                let result = async {
+                    let parent = request.parent_session_id;
+                    require(&list.1, LIST, Some(&parent))?;
+                    let page = list
+                        .0
+                        .list_subagents(&parent, request.after_child_id)
+                        .await
+                        .map_err(host_error)?;
+                    require(&list.1, LIST, Some(&parent))?;
+                    Ok(ChildPage {
+                        parent_session_id: parent,
+                        children: page
+                            .entries
+                            .into_iter()
+                            .map(|(child_id, name)| NamedChild { child_id, name })
+                            .collect(),
+                        next_after_child_id: page.next_after,
+                    })
                 }
                 .await;
                 responder.respond_with_result(result)

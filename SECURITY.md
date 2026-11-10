@@ -1064,7 +1064,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
 - [Private subagent controls](crates/grida-agent/src/acp/extensions/subagents.rs)
   require an attached parent and a trusted opt-in launch. The
   [host](crates/grida-agent/src/host/subagents.rs) rechecks the child's
-  retained parent link and verified provider scope before new delivery. Work
+  retained parent link and verified provider scope before new delivery.
+  Discovery reads only the attached parent's bounded catalog and validates
+  each retained parent link before returning names and IDs. Inspection binds
+  the selected input and result to the same observed child turn. Work
   assignments also require the exact settled sponsoring turn. Informational
   messages retain their own receipts and wait for an approved assignment to
   claim them as attributed user data. Message delivery and exact receipt retry

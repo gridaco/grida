@@ -359,7 +359,7 @@ target/debug/grida-agent serve --stdio --subagents \
 ```
 
 During initialization, negotiate version 1 for `co.grida/subagent/create`,
-`assign`, `inspect`, `pause`, `resume`, `steer`, `stop`, `resume-queue`,
+`list`, `assign`, `send-message`, `inspect`, `pause`, `resume`, `steer`, `stop`, `resume-queue`,
 and `withdraw` separately. Attach to the parent and finish an Act turn.
 
 1. Create the child with a display name, a creation request ID, and an
@@ -368,12 +368,14 @@ and `withdraw` separately. Attach to the parent and finish an Act turn.
    input ID. The child uses its own conversation history and receives no
    workspace tools. Assign follow-ups with the same child ID and new input
    IDs. They wait in order within the child's remaining allowance.
-3. Inspect a particular input to read the result from its original child
-   turn. Use Pause to suspend that turn, Steer to add a correction, and
-   Resume to continue it. After restart, attach to the same parent and use
-   the retained child and input IDs. Stop ends the assignment and holds its
-   queue. Use Resume Queue to start the next assignment, or withdraw a queued
-   assignment to free its place.
+3. Inspect the child to see its current or latest assignment and its result
+   if one is available. Supply a retained input ID to inspect an earlier
+   assignment. After restart, attach to the same parent and list its named
+   children to recover their IDs.
+4. Use Pause to suspend a child turn, Steer to add a correction, and Resume
+   to continue it. Stop ends the assignment and holds its queue. Use Resume
+   Queue to start the next assignment, or withdraw a queued assignment to
+   free its place.
 
 Retry creation or assignment with the same ID and fields to recover its
 receipt. New assignments allow up to two generation steps. A continuation

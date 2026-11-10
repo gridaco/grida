@@ -461,9 +461,10 @@ with `mcp_client::McpClient::connect` and `Host::with_mcp_client`.
 
 ## Run named child work from a private launcher
 
-Use `serve --stdio --subagents` with a direct provider and an Act launch.
+Use `serve --stdio --subagents` with an Act launch. The trusted launcher can
+use a direct provider or a bounded supervised Grida Gateway scope.
 During ACP initialization, negotiate version 1 separately for
-`co.grida/subagent/create`, `assign`, `send-message`, `inspect`, `pause`, `resume`,
+`co.grida/subagent/create`, `list`, `assign`, `send-message`, `inspect`, `pause`, `resume`,
 `steer`, `stop`, `resume-queue`, and `withdraw`. Callers attach to the
 parent through the ordinary session API. Children have their own stable IDs
 and history and are absent from ordinary chat listing and load.
@@ -471,6 +472,10 @@ and history and are absent from ordinary chat listing and load.
 - Create supplies `parentSessionId`, `requestId`, `name`, and
   `workTurns` from 1 through 8. Repeating the creation returns its original
   `childId`. Names are display labels.
+- List supplies the attached `parentSessionId` and an optional
+  `afterChildId` from that parent's previous page. It returns up to 32
+  `children` with `childId` and `name`, newest first, and
+  `nextAfterChildId` when more remain.
 - Assign supplies `parentSessionId`, `childId`, `parentTurnId`,
   `inputId`, and text `instructions`. The parent turn must have settled
   in Act. Assignments wait in acceptance order within the remaining work-turn
@@ -481,12 +486,15 @@ and history and are absent from ordinary chat listing and load.
   child's execution and allowance unchanged. An exact retry returns the
   original input position and its current disposition.
 - Inspect supplies the parent and child IDs and an optional `inputId`.
-  For an assignment it returns the original turn, retained result, and
-  `messageInputIds` selected for that turn. For a message it returns the exact
-  text and delivery disposition. A claimed or completed disposition identifies
-  the assigned turn. Evidence of model input comes from that turn's inference
-  record. Inspect also reports `queuedInputIds`, `pendingMessageIds`, and
-  `admissionPaused`. Inspection leaves execution unchanged.
+  An assignment includes the original turn, retained result, and
+  `messageInputIds` selected for that turn. Its `instructionPreview` is
+  capped at 1024 UTF-8 bytes and `instructionTruncated` reports omissions.
+  Without an input ID, `observedAssignment` identifies the current or latest
+  child turn and its exact assignment. A message inspection returns its
+  retained text and delivery disposition. Evidence of model input comes
+  from the selected turn's inference record. Inspect also reports
+  `queuedInputIds`, `pendingMessageIds`, and `admissionPaused`.
+  Listing and inspection leave execution unchanged.
 - Pause and Stop supply the parent and child IDs, child `turnId`, a fresh
   `requestId`, and the observed `expectedSessionRevision` and
   `expectedControlRevision`. Stop ends the active assignment and holds

@@ -3,11 +3,13 @@
 use super::*;
 use agent_kit_sessions::InputView;
 use agent_kit_store_sqlite::InputObservation;
+use agent_kit_store_sqlite::catalog::CatalogPage;
 use grida_agent_master::subagents::{self, Allocation, Assignment, Profile};
 
 const MESSAGE_SCHEMA: &str = "grida.agent.subagent.message";
 const MAX_PENDING_MESSAGES: usize = 16;
 const MAX_MESSAGE_BYTES: usize = 4 * 1024;
+const MAX_INSTRUCTION_PREVIEW_BYTES: usize = 1024;
 
 pub struct SubagentInspection {
     pub parent: SessionId,
@@ -21,6 +23,7 @@ pub struct SubagentInspection {
     pub current: Option<TurnView>,
     pub latest: Option<TurnView>,
     pub assignment: Option<SubagentWork>,
+    pub observed_assignment: Option<SubagentWork>,
     pub message: Option<SubagentMessageReceipt>,
 }
 
@@ -31,6 +34,8 @@ pub struct SubagentWork {
     pub disposition: InputDisposition,
     pub turn: Option<TurnView>,
     pub message_inputs: Vec<ChangeId>,
+    pub instruction_preview: String,
+    pub instruction_truncated: bool,
 }
 
 pub struct SubagentAssignment {
@@ -80,6 +85,30 @@ impl Host {
                 .execution
                 .as_ref()
                 .is_some_and(|execution| execution.config.max_output_tokens.is_some())
+    }
+
+    pub(crate) async fn list_subagents(
+        &self,
+        parent: &SessionId,
+        after: Option<SessionId>,
+    ) -> Result<CatalogPage<(SessionId, String)>> {
+        self.require_subagents()?;
+        let page = self
+            .store
+            .list_catalog_configurations(catalog::child_scope(parent)?, 0, after)
+            .await?;
+        let entries = page
+            .entries
+            .into_iter()
+            .map(|(child, configuration)| {
+                let profile = child_profile(parent, &configuration)?;
+                Ok((child, profile.name().to_owned()))
+            })
+            .collect::<Result<_>>()?;
+        Ok(CatalogPage {
+            entries,
+            next_after: page.next_after,
+        })
     }
 
     pub async fn create_subagent(
@@ -144,7 +173,8 @@ impl Host {
             .inspect_with_input(child.clone(), input.clone())
             .await
             .map_err(child_observation_error)?;
-        let profile = child_profile(&parent, &view)?;
+        let profile = child_profile(&parent, &view.configuration)?;
+        let (instruction_preview, instruction_truncated) = assignment_preview(&instructions);
         let parts = vec![PromptPart::Text { text: instructions }];
         if let Some(previous) = previous {
             if is_message(&previous.input.input) {
@@ -226,6 +256,8 @@ impl Host {
             disposition: InputDisposition::Queued,
             turn: None,
             message_inputs: Vec::new(),
+            instruction_preview,
+            instruction_truncated,
         })
     }
 
@@ -264,7 +296,7 @@ impl Host {
             .inspect_with_input(child.clone(), input.clone())
             .await
             .map_err(child_observation_error)?;
-        let profile = child_profile(&parent, &view)?;
+        let profile = child_profile(&parent, &view.configuration)?;
         if let Some(previous) = previous {
             if previous.input.input != submission {
                 return Err(problem(
@@ -308,12 +340,6 @@ impl Host {
         accepted: InputObservation,
         stored: StoredPrompt,
     ) -> Result<SubagentWork> {
-        let assignment = stored
-            .subagent
-            .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_missing"))?;
-        let max_generation_steps = stored
-            .max_steps
-            .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_limit_missing"))?;
         let message_inputs = if let Some(turn) = &accepted.turn {
             self.store
                 .turn_submissions(child, turn.binding.turn.clone())
@@ -325,14 +351,42 @@ impl Host {
         } else {
             Vec::new()
         };
-        Ok(SubagentWork {
-            input: accepted.input.input.id,
-            parent_turn: assignment.parent_turn,
-            max_generation_steps,
-            disposition: accepted.input.disposition,
-            turn: accepted.turn,
+        describe_assignment(
+            accepted.input.input.id,
+            accepted.input.disposition,
+            accepted.turn,
+            stored,
             message_inputs,
-        })
+        )
+    }
+
+    async fn observed_subagent_work(&self, view: &SessionView) -> Result<Option<SubagentWork>> {
+        let Some(turn) = view.current.as_ref().or(view.latest.as_ref()) else {
+            return Ok(None);
+        };
+        let selected = self
+            .store
+            .turn_submissions(view.session.clone(), turn.binding.turn.clone())
+            .await?;
+        let input = assignment_input(&selected, true)?;
+        let turn_id = turn.binding.turn.clone();
+        let disposition = if turn.disposition == TurnDisposition::Settled {
+            InputDisposition::Completed { turn: turn_id }
+        } else {
+            InputDisposition::Claimed { turn: turn_id }
+        };
+        describe_assignment(
+            input.id.clone(),
+            disposition,
+            Some(turn.clone()),
+            decode_input(input)?,
+            selected
+                .iter()
+                .filter(|item| is_message(item))
+                .map(|item| item.id.clone())
+                .collect(),
+        )
+        .map(Some)
     }
 
     async fn validate_subagent_sponsor(&self, parent: &SessionId, turn: &TurnId) -> Result<()> {
@@ -369,6 +423,7 @@ impl Host {
         input: Option<ChangeId>,
     ) -> Result<SubagentInspection> {
         self.require_subagents()?;
+        let observe_assignment = input.is_none();
         let (view, profile, assignment, message) = match input {
             Some(input) => {
                 let (view, accepted) = self
@@ -376,7 +431,7 @@ impl Host {
                     .inspect_with_input(child.clone(), input)
                     .await
                     .map_err(child_observation_error)?;
-                let profile = child_profile(&parent, &view)?;
+                let profile = child_profile(&parent, &view.configuration)?;
                 let accepted = accepted.ok_or_else(|| {
                     problem(ErrorKind::Unavailable, "subagent_assignment_unavailable")
                 })?;
@@ -398,6 +453,11 @@ impl Host {
                 let (view, profile) = self.subagent_view(&parent, child.clone()).await?;
                 (view, profile, None, None)
             }
+        };
+        let observed_assignment = if observe_assignment {
+            self.observed_subagent_work(&view).await?
+        } else {
+            None
         };
         Ok(SubagentInspection {
             parent,
@@ -421,6 +481,7 @@ impl Host {
             current: view.current,
             latest: view.latest,
             assignment,
+            observed_assignment,
             message,
         })
     }
@@ -557,7 +618,7 @@ impl Host {
             .inspect(child)
             .await
             .map_err(child_observation_error)?;
-        let profile = child_profile(parent, &view)?;
+        let profile = child_profile(parent, &view.configuration)?;
         Ok((view, profile))
     }
 }
@@ -570,11 +631,48 @@ fn child_observation_error(error: Error) -> Error {
     }
 }
 
-fn child_profile(parent: &SessionId, view: &SessionView) -> Result<Profile> {
-    session_configuration(view)?
+fn child_profile(parent: &SessionId, configuration: &Envelope) -> Result<Profile> {
+    decode_session_configuration(configuration)?
         .subagent
         .filter(|profile| profile.parent() == parent)
         .ok_or_else(|| problem(ErrorKind::Unavailable, "subagent_unavailable"))
+}
+
+fn assignment_preview(text: &str) -> (String, bool) {
+    let end = text.floor_char_boundary(MAX_INSTRUCTION_PREVIEW_BYTES);
+    (text[..end].to_owned(), end < text.len())
+}
+
+fn describe_assignment(
+    input: ChangeId,
+    disposition: InputDisposition,
+    turn: Option<TurnView>,
+    stored: StoredPrompt,
+    message_inputs: Vec<ChangeId>,
+) -> Result<SubagentWork> {
+    let assignment = stored
+        .subagent
+        .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_missing"))?;
+    let max_generation_steps = stored
+        .max_steps
+        .ok_or_else(|| problem(ErrorKind::InvalidState, "subagent_assignment_limit_missing"))?;
+    let [PromptPart::Text { text }] = stored.parts.as_slice() else {
+        return Err(problem(
+            ErrorKind::InvalidState,
+            "subagent_assignment_text_missing",
+        ));
+    };
+    let (instruction_preview, instruction_truncated) = assignment_preview(text);
+    Ok(SubagentWork {
+        input,
+        parent_turn: assignment.parent_turn,
+        max_generation_steps,
+        disposition,
+        turn,
+        message_inputs,
+        instruction_preview,
+        instruction_truncated,
+    })
 }
 
 pub(super) fn is_message(input: &Submission) -> bool {

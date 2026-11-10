@@ -6,6 +6,7 @@ use super::*;
 const CREATE: &str = "_co.grida/subagent/create";
 const ASSIGN: &str = "_co.grida/subagent/assign";
 const SEND_MESSAGE: &str = "_co.grida/subagent/send-message";
+const LIST: &str = "_co.grida/subagent/list";
 const INSPECT: &str = "_co.grida/subagent/inspect";
 const STOP: &str = "_co.grida/subagent/stop";
 const PAUSE: &str = "_co.grida/subagent/pause";
@@ -13,10 +14,11 @@ const RESUME: &str = "_co.grida/subagent/resume";
 const STEER: &str = "_co.grida/subagent/steer";
 const RESUME_QUEUE: &str = "_co.grida/subagent/resume-queue";
 const WITHDRAW: &str = "_co.grida/subagent/withdraw";
-const CAPABILITIES: [&str; 10] = [
+const CAPABILITIES: [&str; 11] = [
     CREATE,
     ASSIGN,
     SEND_MESSAGE,
+    LIST,
     INSPECT,
     STOP,
     PAUSE,
@@ -117,6 +119,15 @@ async fn inspect(client: &mut PrivateStdio, parent: &str, child: &str, input: &s
     response["result"].clone()
 }
 
+async fn observed_assignment(client: &mut PrivateStdio, parent: &str, child: &str) -> Value {
+    let reply = client
+        .request(INSPECT, json!({"parentSessionId":parent,"childId":child}))
+        .await;
+    assert!(reply.get("error").is_none(), "{reply}");
+    assert!(reply["result"]["assignment"].is_null(), "{reply}");
+    reply["result"]["observedAssignment"].clone()
+}
+
 async fn wait_for(
     client: &mut PrivateStdio,
     parent: &str,
@@ -168,6 +179,79 @@ fn queue_basis(view: &Value, parent: &str, child: &str, request: &str) -> Value 
         "parentSessionId":parent,"childId":child,"requestId":request,
         "expectedSessionRevision":view["sessionRevision"],
     })
+}
+
+#[tokio::test]
+async fn an_attached_parent_reopens_only_its_named_children_in_bounded_pages() {
+    let temporary = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let provider = Endpoint::start(Vec::new()).await;
+    let mut first = serve(&state, &provider.url).await;
+    let parent = new_session(&mut first, workspace.path()).await;
+    let other = new_session(&mut first, workspace.path()).await;
+    let foreign = first.request(CREATE, create(&other)).await;
+    let mut expected = Vec::new();
+    for index in 0..33 {
+        let name = format!("Researcher {index}");
+        let reply = first
+            .request(
+                CREATE,
+                json!({
+                    "parentSessionId":parent,
+                    "requestId":format!("researcher-{index}"),
+                    "name":name,
+                    "workTurns":1,
+                }),
+            )
+            .await;
+        assert!(reply["result"]["childId"].is_string(), "{reply}");
+        expected.push(json!({"childId":reply["result"]["childId"],"name":name}));
+    }
+    expected.reverse();
+    first.close().await;
+
+    let mut reopened = serve(&state, &provider.url).await;
+    let first_page = json!({"parentSessionId":parent});
+    assert!(
+        reopened
+            .request(LIST, first_page.clone())
+            .await
+            .get("error")
+            .is_some()
+    );
+    load_parent(&mut reopened, &parent, workspace.path()).await;
+    let page = reopened.request(LIST, first_page).await;
+    assert_eq!(page["result"]["parentSessionId"], parent, "{page}");
+    assert_eq!(page["result"]["children"], json!(&expected[..32]), "{page}");
+    let cursor = &page["result"]["nextAfterChildId"];
+    assert_eq!(*cursor, expected[31]["childId"]);
+    let remainder = reopened
+        .request(
+            LIST,
+            json!({"parentSessionId":parent,"afterChildId":cursor}),
+        )
+        .await;
+    assert_eq!(remainder["result"]["children"], json!(&expected[32..]));
+    assert!(remainder["result"]["nextAfterChildId"].is_null());
+    let out_of_scope = reopened
+        .request(
+            LIST,
+            json!({
+                "parentSessionId":parent,
+                "afterChildId":foreign["result"]["childId"],
+            }),
+        )
+        .await;
+    assert_eq!(out_of_scope["error"]["data"], "invalid_session_cursor");
+    let newest = expected[0]["childId"].as_str().unwrap();
+    assert!(
+        observed_assignment(&mut reopened, &parent, newest)
+            .await
+            .is_null()
+    );
+    reopened.close().await;
+    provider.done().await;
 }
 
 #[tokio::test]
@@ -248,12 +332,18 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
     assert_eq!(before["allocation"], json!({"workTurns":2,"reserved":1}));
     assert_eq!(first_result["parentTurnId"], parent_turn);
     assert_eq!(first_result["result"]["text"], "First child finding.");
+    assert_eq!(first_result["instructionPreview"], "Check the first point.");
+    assert_eq!(first_result["instructionTruncated"], false);
     first.close().await;
 
     let mut second = serve(&state, &provider.url).await;
     load_parent(&mut second, &parent, workspace.path()).await;
     let retained = inspect(&mut second, &parent, &child, "research-one").await;
     assert_eq!(retained["assignment"], *first_result);
+    assert_eq!(
+        observed_assignment(&mut second, &parent, &child).await,
+        *first_result
+    );
     assert_eq!(
         second.request(ASSIGN, first_input.clone()).await["result"],
         *first_result
@@ -266,13 +356,8 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
         "subagent_assignment_identity_reused"
     );
 
-    let follow_up = assign(
-        &parent,
-        &child,
-        &parent_turn,
-        "research-two",
-        "Check the second point.",
-    );
+    let instructions = format!("Check the second point. {}", "🧩".repeat(300));
+    let follow_up = assign(&parent, &child, &parent_turn, "research-two", &instructions);
     let accepted = second.request(ASSIGN, follow_up).await;
     assert_eq!(
         accepted["result"]["disposition"]["kind"], "queued",
@@ -295,6 +380,15 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
     assert_eq!(
         after["assignment"]["result"]["text"],
         "Second child finding."
+    );
+    assert_eq!(
+        after["assignment"]["instructionPreview"],
+        &instructions[..instructions.floor_char_boundary(1024)]
+    );
+    assert_eq!(after["assignment"]["instructionTruncated"], true);
+    assert_eq!(
+        observed_assignment(&mut second, &parent, &child).await,
+        after["assignment"]
     );
     assert_eq!(
         inspect(&mut second, &parent, &child, "research-one").await["assignment"],
@@ -524,7 +618,7 @@ async fn child_messages_wait_for_an_assignment_and_keep_the_exact_delivery_after
 }
 
 #[tokio::test]
-async fn shared_connections_cannot_negotiate_child_message_delivery() {
+async fn shared_connections_cannot_negotiate_child_discovery_or_message_delivery() {
     let temporary = TempDir::new().unwrap();
     let mut provider = Endpoint::start(vec![]).await;
     let mut command = executable();
@@ -545,8 +639,10 @@ async fn shared_connections_cannot_negotiate_child_message_delivery() {
         .unwrap();
     let mut request = extension_initialize();
     request["clientCapabilities"]["_meta"][&SEND_MESSAGE[1..]] = 1.into();
+    request["clientCapabilities"]["_meta"][&LIST[1..]] = 1.into();
     let ready = ws_rpc(&mut socket, 1, "initialize", request).await;
     assert!(ready["result"]["agentCapabilities"]["_meta"][&SEND_MESSAGE[1..]].is_null());
+    assert!(ready["result"]["agentCapabilities"]["_meta"][&LIST[1..]].is_null());
     let denied = ws_rpc(
         &mut socket,
         2,
@@ -555,6 +651,8 @@ async fn shared_connections_cannot_negotiate_child_message_delivery() {
     )
     .await;
     assert_eq!(denied["error"]["code"], -32601, "{denied}");
+    let list = ws_rpc(&mut socket, 3, LIST, json!({"parentSessionId":"parent"})).await;
+    assert_eq!(list["error"]["code"], -32601, "{list}");
     assert!(provider.requests.try_recv().is_err());
     drop(socket);
     super::lifecycle::terminate_shared_server(child).await;
@@ -606,6 +704,10 @@ async fn paused_child_accepts_exact_steering_and_resumes_the_same_assignment_aft
     assert_eq!(accepted["result"]["maxGenerationSteps"], 2, "{accepted}");
     provider.request().await;
     let running = inspect(&mut first, &parent, &child, "initial").await;
+    assert_eq!(
+        observed_assignment(&mut first, &parent, &child).await,
+        running["assignment"]
+    );
     let turn = running["current"]["turnId"].as_str().unwrap().to_owned();
     let other = new_session(&mut first, workspace.path()).await;
     let unrelated = first
