@@ -1098,6 +1098,11 @@ lazy reads, read-only mutation, and symlink escape refusal.
   or authorize replay. Loss of a correlated result leaves the call
   uncertain. The [native launch](crates/grida-agent/src/main.rs) selects the
   peer and a separate environment credential before admitting work.
+  When an Act turn also has a live editor attachment, the
+  [host](crates/grida-agent/src/host.rs) binds each source independently.
+  [Tool admission](crates/grida-agent/src/host/permissions.rs) routes by the
+  exact captured grant selection, and the inventory rejects duplicate tool
+  identities before exposing the tools to the model.
   [Desktop Main](desktop/src/main/native-mcp-launch.ts) enables this path only
   in an explicit disposable Gateway launch. It pins the selected canonical
   workspace identity and the first exact account, organization and origin

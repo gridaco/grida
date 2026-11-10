@@ -104,6 +104,10 @@ impl Host {
 }
 
 impl HostTools {
+    pub(super) fn has_local_surface(&self) -> bool {
+        self.surface.is_some()
+    }
+
     fn new(mcp: Option<McpClient>, surface: Option<ToolHost>) -> Result<Self> {
         let lease = mcp
             .as_ref()

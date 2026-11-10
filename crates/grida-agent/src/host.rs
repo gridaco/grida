@@ -398,7 +398,7 @@ struct PreparedInput {
     configuration_permission: crate::ConfigurationPermission,
     captured: Option<ConfigurationSnapshot>,
     permission_capture: Option<crate::permissions::PermissionCapture>,
-    host_tools: Option<Arc<host_tools::HostTools>>,
+    host_tools: Vec<Arc<host_tools::HostTools>>,
     guidance: Option<Message>,
     goal: Option<goals::GoalInput>,
     completion_checks: Option<CompletionChecks>,
@@ -597,7 +597,12 @@ impl Host {
     }
 
     pub(crate) fn supports_editor_tools(&self) -> bool {
-        self.operating_regime.is_act() && self.host_tools.is_none() && self.side_context.is_none()
+        self.operating_regime.is_act()
+            && self.side_context.is_none()
+            && self
+                .host_tools
+                .as_ref()
+                .is_none_or(|tools| !tools.has_local_surface())
     }
 
     pub async fn new_session(&self, cwd: PathBuf) -> Result<SessionId> {
@@ -1216,9 +1221,9 @@ impl Host {
             .transpose()?;
         let host_tools = prepared
             .host_tools
-            .take()
+            .into_iter()
             .map(|owner| owner.bind(claim.lease.binding()))
-            .transpose()?;
+            .collect::<Result<Vec<_>>>()?;
         let delegation = (!cancellation_only && prepared.effort.is_some())
             .then(|| sponsorship::DelegationAccess::bind(self, claim.lease.binding()))
             .transpose()?;
@@ -1305,7 +1310,7 @@ impl Host {
                 &mut authority.tools,
             )?;
         }
-        if let Some(host_tools) = host_tools {
+        for host_tools in host_tools {
             host_tools.insert(&mut inventory, &mut authority.tools)?;
         }
         if let Some(goal) = goal_authority {
@@ -1597,7 +1602,7 @@ impl Host {
                 .push_str(grida_agent_master::side_context::INSTRUCTIONS);
         }
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
-        let mut host_tools = None;
+        let mut host_tools = Vec::new();
         let mut subagent = false;
         let mut effort = None;
         let (
@@ -1703,21 +1708,21 @@ impl Host {
                     && stored.operating_regime.is_act()
                     && let Some(capture) = &stored.host_tools_capture
                 {
-                    host_tools = Some(self.retained_host_tools(capture)?);
+                    host_tools.push(self.retained_host_tools(capture)?);
                 }
                 if !cancellation_only && let Some(endpoint) = &stored.editor_endpoint {
                     if !stored.operating_regime.is_act()
                         || stored.goal.is_some()
                         || subagent
                         || self.side_context.is_some()
-                        || host_tools.is_some()
+                        || host_tools.iter().any(|tools| tools.has_local_surface())
                     {
                         return Err(problem(
                             ErrorKind::InvalidState,
                             "invalid_editor_surface_scope",
                         ));
                     }
-                    host_tools = Some(Arc::new(host_tools::HostTools::editor(
+                    host_tools.push(Arc::new(host_tools::HostTools::editor(
                         self.editor_surfaces.tool_host(
                             session.clone(),
                             endpoint.clone(),

@@ -31,7 +31,7 @@ pub(super) struct ToolAuthority {
     image: Option<Arc<image_tools::TurnImage>>,
     wakeups: Option<Arc<wakeups::WakeupAccess>>,
     completion: Option<Arc<completion_checks::CompletionAccess>>,
-    host_tools: Option<Arc<host_tools::TurnTools>>,
+    host_tools: Vec<Arc<host_tools::TurnTools>>,
     delegation: Option<Arc<sponsorship::DelegationAccess>>,
 }
 
@@ -42,14 +42,14 @@ impl ToolAuthority {
         image: Option<Arc<image_tools::TurnImage>>,
         wakeups: Option<Arc<wakeups::WakeupAccess>>,
         completion: Option<Arc<completion_checks::CompletionAccess>>,
-        host_tools: Option<Arc<host_tools::TurnTools>>,
+        host_tools: Vec<Arc<host_tools::TurnTools>>,
         delegation: Option<Arc<sponsorship::DelegationAccess>>,
     ) -> Option<Arc<Self>> {
         if permissions.is_none()
             && image.is_none()
             && wakeups.is_none()
             && completion.is_none()
-            && host_tools.is_none()
+            && host_tools.is_empty()
             && delegation.is_none()
         {
             return None;
@@ -105,8 +105,8 @@ impl AuthorityValidator for ToolAuthority {
         }
         if let Some(host_tools) = self
             .host_tools
-            .as_ref()
-            .filter(|scope| scope.handles(&request.selection))
+            .iter()
+            .find(|scope| scope.handles(&request.selection))
         {
             return host_tools.validate(request);
         }
@@ -157,8 +157,8 @@ impl ToolGate for ToolAuthority {
         }
         if let Some(host_tools) = self
             .host_tools
-            .as_ref()
-            .filter(|scope| scope.handles(&admission.grants))
+            .iter()
+            .find(|scope| scope.handles(&admission.grants))
         {
             return host_tools.decide(admission, context);
         }

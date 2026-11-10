@@ -32,9 +32,10 @@ vi.mock("./agent-sidecar-client", () => ({ agentSidecarClient: sidecar }));
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const token = "fixture.local.peer.bearer";
 const toolName = "mcp_local_lookup";
+const editorTool = "surface_list_open";
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
-  "gives only the selected Gateway workspace its allowlisted MCP tool, and only for Act",
+  "uses separate editor and allowlisted MCP tools in the same selected Act turn",
   async () => {
     const base = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-native-desktop-mcp-")
@@ -171,22 +172,26 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
                   (item: { function: { name: string } }) => item.function.name
                 );
                 offers.push(names);
-                if (
-                  names.includes(toolName) &&
-                  !request.messages.some(
-                    (item: { role: string }) => item.role === "tool"
-                  )
-                ) {
+                const results = request.messages.filter(
+                  (item: { role: string }) => item.role === "tool"
+                );
+                if (names.includes(toolName) && results.length < 2) {
+                  const readingEditor = results.length === 0;
+                  expect(names).toContain(editorTool);
                   return stream(
                     {
                       tool_calls: [
                         {
                           index: 0,
-                          id: "fixture-mcp-call",
+                          id: readingEditor
+                            ? "fixture-editor-call"
+                            : "fixture-mcp-call",
                           type: "function",
                           function: {
-                            name: toolName,
-                            arguments: '{"label":"sample"}',
+                            name: readingEditor ? editorTool : toolName,
+                            arguments: readingEditor
+                              ? "{}"
+                              : '{"label":"sample"}',
                           },
                         },
                       ],
@@ -265,14 +270,27 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(faults).toEqual([]);
       expect(
         offers.map((names) => names.filter((name) => name.startsWith("mcp_")))
-      ).toEqual([[], [], [toolName], [toolName]]);
+      ).toEqual([[], [], [toolName], [toolName], [toolName]]);
       expect(
         offers.map((names) =>
           names.filter(
             (name) => name.startsWith("surface_") || name.startsWith("svg_")
           )
         )
-      ).toEqual([["surface_list_open", "surface_open"], [], [], []]);
+      ).toEqual([
+        [editorTool, "surface_open"],
+        [],
+        [editorTool, "surface_open"],
+        [editorTool, "surface_open"],
+        [editorTool, "surface_open"],
+      ]);
+      const firstResult = JSON.parse(bodies[3]).messages.find(
+        (item: { role: string }) => item.role === "tool"
+      );
+      expect(JSON.parse(firstResult.content)).toMatchObject({
+        status: "succeeded",
+        structured: { active: "/poster.svg", open: ["/poster.svg"] },
+      });
       expect(bodies.at(-1)).toContain("Exact local result");
       expect(bodies.join("")).not.toContain(token);
       await desktop.clearAccount();

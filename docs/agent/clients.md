@@ -402,8 +402,9 @@ The disposable Desktop Gateway profile can also enable one local peer for a
 selected workspace through [trusted launch options](https://github.com/gridaco/grida/blob/main/desktop/README.md).
 Workspace startup can discover the peer before you select Plan. Only Act can
 invoke the allowlisted tools.
-The selected MCP workspace uses the peer's tool inventory. Live workbench
-and SVG tools remain available in other eligible Desktop workspaces.
+An attached workbench in the selected workspace can use its live editor tools
+and the allowlisted MCP tools in the same Act turn. The peer receives the
+arguments supplied to its own calls.
 
 Retained work keeps its original tool connection. If that connection closes,
 Stop is still available for a suspended turn. A lost reply after a tool call
