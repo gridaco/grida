@@ -690,6 +690,8 @@ export class NativeChatIpc {
                 return "native-provider-key-required";
               case "native_provider_model_unavailable":
                 return "native-provider-model-unavailable";
+              case "native_provider_endpoint_https_required":
+                return "native-provider-endpoint-https-required";
               case "native_provider_endpoint_not_approved":
                 return "native-provider-endpoint-approval-required";
               default:

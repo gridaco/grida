@@ -16,7 +16,8 @@ the endpoint can use a key saved under its own ID.
 
 Native chat accepts plain HTTP on `localhost` and numeric loopback addresses.
 Use HTTPS for an endpoint on another device, even if you approved its HTTP
-address in an earlier Desktop version.
+address in an earlier Desktop version. The saved HTTP setting stays in Desktop
+settings, but the endpoint is unavailable for new native chats.
 
 ## Start a chat with a saved model
 
@@ -48,6 +49,8 @@ its chats.
   Desktop settings, then choose **Retry** in chat.
 - If an endpoint needs approval, save it in Desktop settings and approve
   its address in the native dialog, then choose **Retry**.
+- If chat requires HTTPS for an endpoint on another device, update its saved
+  address to an HTTPS endpoint and approve the new address before retrying.
 - If the selected model is unavailable, check the model configured for
   the profile. A saved endpoint uses its default or first registered
   model when no model is specified.

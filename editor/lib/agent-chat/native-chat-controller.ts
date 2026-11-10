@@ -351,6 +351,7 @@ export class NativeChatController {
           case "native-ready":
           case "native-provider-key-required":
           case "native-provider-model-unavailable":
+          case "native-provider-endpoint-https-required":
           case "native-provider-endpoint-approval-required":
             publish(result);
             break;

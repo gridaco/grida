@@ -2323,6 +2323,10 @@ it.each([
   ["native-provider-key-required", "native-provider-key-required"],
   ["native-provider-model-unavailable", "native-provider-model-unavailable"],
   [
+    "native-provider-endpoint-https-required",
+    "native-provider-endpoint-https-required",
+  ],
+  [
     "native-provider-endpoint-approval-required",
     "native-provider-endpoint-approval-required",
   ],

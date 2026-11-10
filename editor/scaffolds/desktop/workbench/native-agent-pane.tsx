@@ -150,6 +150,8 @@ const nativeChatUnavailableMessage = {
     "Add an API key for the selected provider in Desktop settings, then retry.",
   "native-provider-model-unavailable":
     "The selected model is unavailable. Check the model configured for this Desktop profile.",
+  "native-provider-endpoint-https-required":
+    "Native chat requires HTTPS for an endpoint on another device. Update the saved endpoint in Desktop settings, approve its new address, then retry.",
   "native-provider-endpoint-approval-required":
     "Save the selected endpoint in Desktop settings and approve its address, then retry.",
 } as const;

@@ -126,6 +126,7 @@ export type NativeChatReadiness =
   | "native-unavailable"
   | "native-provider-key-required"
   | "native-provider-model-unavailable"
+  | "native-provider-endpoint-https-required"
   | "native-provider-endpoint-approval-required";
 
 export type NativeChatTurn = Readonly<{

@@ -1027,6 +1027,8 @@ lazy reads, read-only mutation, and symlink escape refusal.
   field. An existing profile reopens under its original field, and a new
   profile keeps the same endpoint and custody checks when it uses
   `max_tokens`.
+  Main rejects invalid endpoint URLs and plain HTTP outside loopback before
+  looking up a key or requesting endpoint approval.
   The private profile record contains display labels and semantic IDs. It
   retains no endpoint URL or credential bytes. A changed connection cannot
   reopen history under a different owner. Switching models invalidates the

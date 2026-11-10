@@ -2131,6 +2131,10 @@ describe("native chat IPC", () => {
     ["native_provider_byok_key_missing", "native-provider-key-required"],
     ["native_provider_model_unavailable", "native-provider-model-unavailable"],
     [
+      "native_provider_endpoint_https_required",
+      "native-provider-endpoint-https-required",
+    ],
+    [
       "native_provider_endpoint_not_approved",
       "native-provider-endpoint-approval-required",
     ],

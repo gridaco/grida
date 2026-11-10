@@ -103,6 +103,65 @@ it("refuses missing selections, models and approval", async () => {
   );
 });
 
+it.each([
+  "http://192.168.0.8:11434/v1",
+  "http://127.0.0.1.example.test/v1",
+  "http://[::ffff:192.168.0.8]/v1",
+  "http://[::127.0.0.1]/v1",
+])(
+  "withholds a saved plain HTTP endpoint outside loopback at %s",
+  async (endpoint) => {
+    const owner = settings();
+    const saved = { ...config, base_url: endpoint };
+    owner.list.mockResolvedValue([saved]);
+    const select = (id: string) =>
+      NativeProviderSelection.configuredEndpoint(id, undefined, owner);
+
+    await expect(select(saved.id)).rejects.toThrow(
+      "native_provider_endpoint_https_required"
+    );
+    await expect(
+      NativeChatProfiles.configuredChoices([saved], select)
+    ).resolves.toEqual({
+      choices: [],
+      previousIds: [],
+    });
+    expect(owner.hasKey).not.toHaveBeenCalled();
+    expect(owner.network).not.toHaveBeenCalled();
+    expect(await owner.list()).toEqual([saved]);
+  }
+);
+
+it.each([
+  "http://LOCALHOST:11434/v1",
+  "http://127.8.12.24:11434/v1",
+  "http://[::1]:11434/v1",
+  "http://[::ffff:127.8.12.24]:11434/v1",
+  "https://192.168.0.8:11434/v1",
+])("preserves approved native endpoint selection at %s", async (endpoint) => {
+  const owner = settings();
+  owner.list.mockResolvedValue([{ ...config, base_url: endpoint }]);
+  await expect(
+    NativeProviderSelection.configuredEndpoint("local", undefined, owner)
+  ).resolves.toMatchObject({ endpoint, model: "beta" });
+  expect(owner.network).toHaveBeenCalledExactlyOnceWith("local", endpoint);
+});
+
+it.each([
+  "ftp://localhost/v1",
+  "https://user:password@example.test/v1",
+  "https://example.test/v1?",
+  "https://example.test/v1#",
+])("refuses an invalid saved native endpoint at %s", async (endpoint) => {
+  const owner = settings();
+  owner.list.mockResolvedValue([{ ...config, base_url: endpoint }]);
+  await expect(
+    NativeProviderSelection.configuredEndpoint("local", undefined, owner)
+  ).rejects.toThrow("native_provider_endpoint_invalid");
+  expect(owner.hasKey).not.toHaveBeenCalled();
+  expect(owner.network).not.toHaveBeenCalled();
+});
+
 it.runIf(sharedCustody)(
   "binds a custom key to its exact route and never selects a reserved vendor key",
   async () => {

@@ -5,6 +5,7 @@ import {
 } from "@grida/agent";
 import { catalog } from "@grida/ai/catalogue";
 import fs from "node:fs/promises";
+import { isIPv4 } from "node:net";
 import path from "node:path";
 import type { NativeAgentLaunch } from "./native-agent-process";
 import type { NativeProviderNetwork } from "./native-provider-egress";
@@ -95,15 +96,27 @@ export namespace NativeProviderSelection {
       !config.models.some((entry) => entry.id === model)
     )
       throw new Error("native_provider_model_unavailable");
+    const endpoint = config.base_url;
+    const target = URL.parse(endpoint);
+    if (
+      !target ||
+      (target.protocol !== "http:" && target.protocol !== "https:") ||
+      target.username ||
+      target.password ||
+      target.href.includes("?") ||
+      target.href.includes("#")
+    )
+      throw new Error("native_provider_endpoint_invalid");
+    if (target.protocol === "http:" && !isLoopbackHost(target.hostname))
+      throw new Error("native_provider_endpoint_https_required");
+
     const hasKey = await settings.hasKey(config.id);
     if (hasKey && nativeVendorKeys.has(config.id))
       throw new Error("native_provider_endpoint_credential_id_reserved");
     const credentialHome = hasKey
       ? await checkedCredentialHome(settings.credentialHome)
       : undefined;
-    const endpoint = config.base_url;
     const network = await settings.network(config.id, endpoint);
-    const target = new URL(endpoint);
     target.pathname = `${target.pathname.replace(/\/$/, "")}/chat/completions`;
     return {
       provider: "openai-compatible",
@@ -123,6 +136,17 @@ export namespace NativeProviderSelection {
             : null,
       },
     };
+  }
+
+  // Match the native HTTP boundary before looking up credentials or approval.
+  // WHATWG URL hostnames serialize IPv4-mapped IPv6 with hexadecimal words.
+  function isLoopbackHost(host: string): boolean {
+    return (
+      host === "localhost" ||
+      host === "[::1]" ||
+      (host.startsWith("127.") && isIPv4(host)) ||
+      /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/.test(host)
+    );
   }
 
   async function checkedCredentialHome(home?: string): Promise<string> {
