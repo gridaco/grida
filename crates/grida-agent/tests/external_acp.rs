@@ -25,12 +25,13 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Write as _;
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use uuid::Uuid;
 
 const PEER: &str = r#"
 BEGIN {
@@ -235,6 +236,19 @@ impl Fixture {
         path
     }
 
+    fn identified_profile(&self, mode: &str) -> PathBuf {
+        let path = self.write_profile(mode);
+        let mut profile: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        let metadata = fs::metadata(&self.workspace).unwrap();
+        profile["workspaceIdentity"] = json!({
+            "device": metadata.dev().to_string(),
+            "inode": metadata.ino().to_string(),
+            "birthTimeNs": metadata.created().unwrap().duration_since(UNIX_EPOCH).unwrap().as_nanos().to_string(),
+        });
+        fs::write(&path, serde_json::to_vec(&profile).unwrap()).unwrap();
+        path
+    }
+
     fn command(&self, profile: &Path) -> tokio::process::Command {
         let mut command = tokio::process::Command::new(env!("CARGO_BIN_EXE_grida-agent"));
         command
@@ -251,6 +265,24 @@ impl Fixture {
             .env("HTTP_PROXY", "fixture-ambient")
             .kill_on_drop(true);
         command
+    }
+
+    fn identified_command(&self, profile: &Path, id: Uuid) -> tokio::process::Command {
+        let mut command = self.command(profile);
+        command.arg("--run-id").arg(id.to_string());
+        command
+    }
+
+    async fn inspect_run(&self, id: Uuid) -> std::process::Output {
+        tokio::process::Command::new(env!("CARGO_BIN_EXE_grida-agent"))
+            .arg("inspect-external")
+            .arg("--state-dir")
+            .arg(self.state())
+            .arg("--run-id")
+            .arg(id.to_string())
+            .output()
+            .await
+            .unwrap()
     }
 
     async fn admit(&self, store: &SqliteStore, driver: &ExternalAcpDriver) -> ClaimRequest {
@@ -608,6 +640,120 @@ fn records(stdout: &[u8]) -> Vec<Value> {
         .lines()
         .map(|line| serde_json::from_str(line).unwrap())
         .collect()
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and a built helper"]
+async fn identified_external_reopens_exact_receipt_without_a_second_peer() {
+    let fixture = Fixture::new(false);
+    let profile = fixture.identified_profile("complete");
+    let id = Uuid::new_v4();
+    let launched = fixture
+        .identified_command(&profile, id)
+        .args(["--prompt", "reviewed prompt"])
+        .output()
+        .await
+        .unwrap();
+    assert!(launched.status.success(), "{launched:?}");
+    let outputs = records(&launched.stdout);
+    let [accepted, finished] = outputs.as_slice() else {
+        panic!("expected the first accepted and finished records: {outputs:?}");
+    };
+    for key in ["run_id", "session_id", "turn_id", "input_id"] {
+        assert_eq!(accepted[key], id.to_string(), "{key}");
+        assert_eq!(finished[key], accepted[key], "{key}");
+    }
+    assert_eq!(finished["account"]["text"], "partial and completed");
+    assert_eq!(finished["account"]["cleanup_verified"], true);
+    // The peer's execution is now impossible under the same captured workspace
+    // identity, but the exact result can still be reopened without dispatch.
+    fs::rename(&fixture.workspace, fixture.workspace.with_extension("old")).unwrap();
+    fs::DirBuilder::new()
+        .mode(0o700)
+        .create(&fixture.workspace)
+        .unwrap();
+    let replay = fixture
+        .identified_command(&profile, id)
+        .args(["--prompt", "reviewed prompt"])
+        .output()
+        .await
+        .unwrap();
+    assert!(replay.status.success(), "{replay:?}");
+    let receipt: Value = serde_json::from_slice(&replay.stdout).unwrap();
+    assert_eq!(receipt["kind"], "external_run");
+    for key in [
+        "run_id",
+        "session_id",
+        "turn_id",
+        "input_id",
+        "disposition",
+        "account",
+    ] {
+        assert_eq!(receipt[key], finished[key], "{key}");
+    }
+    let conflict = fixture
+        .identified_command(&profile, id)
+        .args(["--prompt", "reviewed prompt changed"])
+        .output()
+        .await
+        .unwrap();
+    assert_eq!(conflict.status.code(), Some(1), "{conflict:?}");
+    assert!(conflict.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&conflict.stderr).contains("external_acp_run_conflict"));
+    let wrong_root = fixture
+        .identified_command(&profile, Uuid::new_v4())
+        .args(["--prompt", "reviewed prompt"])
+        .output()
+        .await
+        .unwrap();
+    assert_eq!(wrong_root.status.code(), Some(1), "{wrong_root:?}");
+    assert!(wrong_root.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&wrong_root.stderr).contains("external_acp_workspace_changed"));
+    fs::remove_file(profile).unwrap();
+    let observed = fixture.inspect_run(id).await;
+    assert!(observed.status.success(), "{observed:?}");
+    assert_eq!(observed.stdout, replay.stdout);
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and a built helper"]
+async fn identified_external_crash_does_not_repeat_an_unconfirmed_handoff() {
+    let fixture = Fixture::new(false);
+    let profile = fixture.identified_profile("cancel");
+    let id = Uuid::new_v4();
+    let mut child = fixture
+        .identified_command(&profile, id)
+        .args(["--prompt", "reviewed prompt"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .unwrap();
+    wait_for_prompt(&fixture).await;
+    let concurrent = fixture
+        .identified_command(&profile, id)
+        .args(["--prompt", "reviewed prompt"])
+        .output()
+        .await
+        .unwrap();
+    assert_eq!(concurrent.status.code(), Some(1), "{concurrent:?}");
+    assert!(concurrent.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&concurrent.stderr).contains("store_already_owned"));
+    child.kill().await.unwrap();
+    let observed = fixture.inspect_run(id).await;
+    assert!(observed.status.success(), "{observed:?}");
+    let receipt: Value = serde_json::from_slice(&observed.stdout).unwrap();
+    assert_eq!(receipt["disposition"], "uncertain");
+    assert_eq!(receipt["account"], Value::Null);
+    let repeated = fixture
+        .identified_command(&profile, id)
+        .args(["--prompt", "reviewed prompt"])
+        .output()
+        .await
+        .unwrap();
+    assert!(repeated.status.success(), "{repeated:?}");
+    assert_eq!(repeated.stdout, observed.stdout);
 }
 
 #[tokio::test]

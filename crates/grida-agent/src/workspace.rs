@@ -294,6 +294,22 @@ impl DirectoryBinding {
         &self._pin
     }
 
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub(crate) fn matches_native_identity(
+        &self,
+        device: &str,
+        inode: &str,
+        birth_time_ns: &str,
+    ) -> bool {
+        self.identity.device.to_string() == device
+            && self.identity.inode.to_string() == inode
+            && self
+                .identity
+                .created
+                .duration_since(std::time::UNIX_EPOCH)
+                .is_ok_and(|created| created.as_nanos().to_string() == birth_time_ns)
+    }
+
     pub(crate) fn permission_identity(&self) -> Result<Fingerprint> {
         Fingerprint::of(&(
             &self.spec.id,

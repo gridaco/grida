@@ -11,10 +11,10 @@ use agent_kit_core::authority::{
 };
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::messages::{Content, Role};
-use agent_kit_core::turn::{CommitReceipt, ControlDirective, TurnBinding};
+use agent_kit_core::turn::{CommitReceipt, ControlDirective, TurnBinding, TurnState};
 use agent_kit_core::{
-    BindingId, BoxFuture, Error, ErrorKind, GrantId, PrincipalId, Result, ScopeId, SessionId,
-    TurnId,
+    BindingId, BoxFuture, ChangeId, Error, ErrorKind, Fingerprint, GrantId, PrincipalId, Result,
+    ScopeId, SessionId, TurnId,
 };
 use agent_kit_sandbox::{
     DeniedAccess, ExecutionScope, Installation, ProtectedPath, Sandbox, Termination,
@@ -56,6 +56,32 @@ struct ProfileFile {
     temporary_parent: PathBuf,
     #[serde(default)]
     protected_paths: Vec<PathBuf>,
+    workspace_identity: Option<WorkspaceIdentity>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct WorkspaceIdentity {
+    device: String,
+    inode: String,
+    birth_time_ns: String,
+}
+
+struct RunIdentity {
+    session: SessionId,
+    turn: TurnId,
+    input: ChangeId,
+}
+
+impl RunIdentity {
+    fn new(id: Uuid) -> Result<Self> {
+        let value = id.to_string();
+        Ok(Self {
+            session: SessionId::new(&value)?,
+            turn: TurnId::new(&value)?,
+            input: ChangeId::new(&value)?,
+        })
+    }
 }
 
 #[derive(Default)]
@@ -82,25 +108,55 @@ struct Ready {
     claim: ClaimedTurn,
 }
 
+enum Admission {
+    Acquired(Box<Ready>),
+    Observed(Value),
+}
+
 /// Run one selected peer without opening the ordinary model host.
 pub async fn run(options: RunOptions, signal: impl Future<Output = Result<()>>) -> Result<u8> {
+    run_selected(options, None, signal).await
+}
+
+/// Launch once with a caller-reserved identity. A retained run only gets observed.
+pub async fn run_identified(
+    options: RunOptions,
+    id: Uuid,
+    signal: impl Future<Output = Result<()>>,
+) -> Result<u8> {
+    run_selected(options, Some(RunIdentity::new(id)?), signal).await
+}
+
+async fn run_selected(
+    options: RunOptions,
+    identity: Option<RunIdentity>,
+    signal: impl Future<Output = Result<()>>,
+) -> Result<u8> {
     if options.timeout.is_zero() || options.timeout > MAX_RUN_TIMEOUT {
         return Err(problem(ErrorKind::InvalidInput, "invalid_run_deadline"));
     }
     let deadline = Instant::now() + options.timeout;
     tokio::pin!(signal);
-    let Ready {
-        store,
-        driver,
-        claim,
-    } = tokio::select! {
-        result = tokio::time::timeout_at(deadline.into(), admit(options, deadline)) => result
+    let admission = tokio::select! {
+        result = tokio::time::timeout_at(deadline.into(), admit(options, deadline, identity.as_ref())) => result
             .map_err(|_| problem(ErrorKind::Unavailable, "run_deadline_reached"))??,
         result = &mut signal => {
             result?;
             return Ok(130);
         }
     };
+    let ready = match admission {
+        Admission::Acquired(ready) => ready,
+        Admission::Observed(record) => {
+            write_record(&record).await?;
+            return Ok(0);
+        }
+    };
+    let Ready {
+        store,
+        driver,
+        claim,
+    } = *ready;
     let binding = claim.lease.binding().clone();
     let input = claim.inputs[0].id.clone();
     let mut record = json!({
@@ -111,6 +167,9 @@ pub async fn run(options: RunOptions, signal: impl Future<Output = Result<()>>) 
         "input_id": input,
         "driver": driver.capabilities(),
     });
+    if let Some(identity) = &identity {
+        record["run_id"] = json!(identity.session);
+    }
     let accepted = write_record(&record).await;
     let mut completion = driver.run(claim);
     if let Err(error) = accepted {
@@ -139,24 +198,61 @@ pub async fn run(options: RunOptions, signal: impl Future<Output = Result<()>>) 
     Ok(code)
 }
 
-async fn admit(options: RunOptions, deadline: Instant) -> Result<Ready> {
+async fn admit(
+    options: RunOptions,
+    deadline: Instant,
+    identity: Option<&RunIdentity>,
+) -> Result<Admission> {
     let prompt = match options.prompt {
         Some(prompt) => prompt,
         None => read_prompt().await?,
     };
-    let input = ExternalAcpDriver::submission(change_id()?, &prompt)?;
+    let input = ExternalAcpDriver::submission(
+        match identity {
+            Some(identity) => identity.input.clone(),
+            None => change_id()?,
+        },
+        &prompt,
+    )?;
     check_private_directory(&options.state_directory)?;
+    let bytes = read_profile(&options.profile)?;
+    let profile: ProfileFile = serde_json::from_slice(&bytes).map_err(|_| invalid_profile())?;
+    if identity.is_some() != profile.workspace_identity.is_some() {
+        return Err(invalid_profile());
+    }
+    let database = options.state_directory.join("runtime.sqlite");
+    let (intent, owned_store) = if let Some(identity) = identity {
+        let intent = Fingerprint::of(&(&options.profile, &bytes, &input, options.timeout))?;
+        // The store lock serializes the first admission with every retry.
+        let store = SqliteStore::open(&database)?;
+        if let Some(record) = observation(&store, identity, Some(intent)).await? {
+            return Ok(Admission::Observed(record));
+        }
+        (Some(intent), Some(store))
+    } else {
+        (None, None)
+    };
     let authority = Arc::new(SelectedAuthority::default());
     let driver = load_driver(
         &options.profile,
+        profile,
+        Sha256::digest(&bytes).into(),
         &options.state_directory,
         authority.clone(),
-        options.timeout,
-        deadline,
+        (options.timeout, deadline),
+        intent,
     )?;
-    let store = SqliteStore::open(options.state_directory.join("runtime.sqlite"))?;
-    let session = SessionId::new(Uuid::new_v4().to_string())?;
-    let turn = TurnId::new(Uuid::new_v4().to_string())?;
+    let store = match owned_store {
+        Some(store) => store,
+        None => SqliteStore::open(&database)?,
+    };
+    let (session, turn) = match identity {
+        Some(identity) => (identity.session.clone(), identity.turn.clone()),
+        None => (
+            SessionId::new(Uuid::new_v4().to_string())?,
+            TurnId::new(Uuid::new_v4().to_string())?,
+        ),
+    };
     authority
         .0
         .set(driver.authority_request(&session, &turn, &input)?)
@@ -193,22 +289,22 @@ async fn admit(options: RunOptions, deadline: Instant) -> Result<Ready> {
             "external_acp_claim_already_exists",
         ));
     };
-    Ok(Ready {
+    Ok(Admission::Acquired(Box::new(Ready {
         store,
         driver,
         claim,
-    })
+    })))
 }
 
 fn load_driver(
     path: &Path,
+    profile: ProfileFile,
+    profile_digest: [u8; 32],
     state: &Path,
     authority: Arc<SelectedAuthority>,
-    timeout: Duration,
-    deadline: Instant,
+    (timeout, deadline): (Duration, Instant),
+    intent: Option<Fingerprint>,
 ) -> Result<ExternalAcpDriver> {
-    let bytes = read_profile(path)?;
-    let profile: ProfileFile = serde_json::from_slice(&bytes).map_err(|_| invalid_profile())?;
     if profile.version != 1
         || profile.arguments.len() > 64
         || profile.arguments.iter().map(String::len).sum::<usize>() > 8 * 1024
@@ -232,10 +328,7 @@ fn load_driver(
         protected.push(home.join(".grida"));
     }
     let roots = ProtectedRoots::new(protected.clone())?;
-    let selected = format!(
-        "external-acp:{}",
-        URL_SAFE_NO_PAD.encode(Sha256::digest(&bytes))
-    );
+    let selected = format!("external-acp:{}", URL_SAFE_NO_PAD.encode(profile_digest));
     let revision = BindingId::new(&selected)?;
     let id = BindingId::new("primary")?;
     let workspace = WorkspaceSnapshot::capture(
@@ -253,6 +346,18 @@ fn load_driver(
     let directory = workspace.permission_directory(None, &roots)?;
     if directory.root() != profile.cwd {
         return Err(invalid_profile());
+    }
+    if let Some(identity) = &profile.workspace_identity
+        && !directory.matches_native_identity(
+            &identity.device,
+            &identity.inode,
+            &identity.birth_time_ns,
+        )
+    {
+        return Err(problem(
+            ErrorKind::Conflict,
+            "external_acp_workspace_changed",
+        ));
     }
     let sandbox = Sandbox::new(Installation {
         helper: profile.helper.into(),
@@ -296,7 +401,78 @@ fn load_driver(
         },
         authority,
         directory.pinned_directory(),
+        intent,
     )
+}
+
+/// Read a reserved run after its owner releases the store. No profile or peer
+/// process is needed to reopen its receipt.
+pub async fn inspect(state: &Path, id: Uuid) -> Result<u8> {
+    let identity = RunIdentity::new(id)?;
+    check_private_directory(state)?;
+    let database = state.join("runtime.sqlite");
+    let missing = || problem(ErrorKind::InvalidInput, "external_acp_run_missing");
+    match std::fs::symlink_metadata(&database) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Err(missing()),
+        Err(_) => {
+            return Err(problem(
+                ErrorKind::Unavailable,
+                "external_acp_store_unavailable",
+            ));
+        }
+        Ok(_) => {}
+    }
+    let store = SqliteStore::open(database)?;
+    let record = observation(&store, &identity, None)
+        .await?
+        .ok_or_else(missing)?;
+    write_record(&record).await?;
+    Ok(0)
+}
+
+async fn observation(
+    store: &SqliteStore,
+    identity: &RunIdentity,
+    expected: Option<Fingerprint>,
+) -> Result<Option<Value>> {
+    let view = match store.inspect(identity.session.clone()).await {
+        Ok(view) => view,
+        Err(error) if error.code == "session_missing" => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let conflict = || problem(ErrorKind::Conflict, "external_acp_run_conflict");
+    let intent = ExternalAcpDriver::captured_intent(&view.configuration).map_err(|_| conflict())?;
+    if expected.is_some_and(|expected| intent != expected) {
+        return Err(conflict());
+    }
+    let (disposition, account) = match view.current.or(view.latest) {
+        Some(turn) if turn.binding.turn == identity.turn => {
+            store
+                .inspect_turn_with(identity.session.clone(), identity.turn.clone(), |state| {
+                    match state.outcome() {
+                        Some(outcome) => {
+                            Ok((settled_status(outcome.status).0, recorded_account(state)?))
+                        }
+                        None if state.checkpoint().is_some() => Ok(("uncertain", Value::Null)),
+                        None => Ok(("not_dispatched", Value::Null)),
+                    }
+                })
+                .await?
+        }
+        Some(_) => return Err(conflict()),
+        None => ("not_dispatched", Value::Null),
+    };
+    Ok(Some(json!({
+        "schema_version": 1,
+        "kind": "external_run",
+        "run_id": identity.session,
+        "session_id": identity.session,
+        "turn_id": identity.turn,
+        "input_id": identity.input,
+        "driver": ExternalAcpDriver::declared_capabilities(),
+        "disposition": disposition,
+        "account": account,
+    })))
 }
 
 async fn stop_and_wait(
@@ -345,26 +521,13 @@ async fn finish(
             let outcome = receipt.outcome.clone();
             verify(store, binding, CommitReceipt::Settled(receipt)).await?;
             let (disposition, code) = settled_status(outcome.status);
-            let mut account = outcome
-                .account
-                .as_ref()
-                .map(read_account)
-                .transpose()?
-                .unwrap_or(Value::Null);
-            if let Some(object) = account.as_object_mut() {
-                let text = store
-                    .inspect_turn_with(binding.session.clone(), binding.turn.clone(), |state| {
-                        Ok(state.history().records().iter().rev().find_map(|record| {
-                            let HistoryRecord::Message(message) = record;
-                            match (message.role, message.content.as_slice()) {
-                                (Role::Assistant, [Content::Text(text)]) => Some(text.clone()),
-                                _ => None,
-                            }
-                        }))
-                    })
-                    .await?;
-                object.insert("text".into(), json!(text));
-            }
+            let account = store
+                .inspect_turn_with(
+                    binding.session.clone(),
+                    binding.turn.clone(),
+                    recorded_account,
+                )
+                .await?;
             Ok((disposition, code, account, None))
         }
         Ok(DriverOutcome::Suspended(receipt)) => {
@@ -376,6 +539,26 @@ async fn finish(
         }
         Err(error) => Err(error),
     }
+}
+
+fn recorded_account(state: &TurnState) -> Result<Value> {
+    let mut account = state
+        .outcome()
+        .and_then(|outcome| outcome.account.as_ref())
+        .map(read_account)
+        .transpose()?
+        .unwrap_or(Value::Null);
+    if let Some(object) = account.as_object_mut() {
+        let text = state.history().records().iter().rev().find_map(|record| {
+            let HistoryRecord::Message(message) = record;
+            match (message.role, message.content.as_slice()) {
+                (Role::Assistant, [Content::Text(text)]) => Some(text),
+                _ => None,
+            }
+        });
+        object.insert("text".into(), json!(text));
+    }
+    Ok(account)
 }
 
 async fn verify(store: &SqliteStore, binding: &TurnBinding, receipt: CommitReceipt) -> Result<()> {

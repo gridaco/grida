@@ -242,9 +242,16 @@ fn command() -> Command {
     let command = command
         .subcommand(Command::new("workspace-file").hide(true))
         .subcommand(
+            Command::new("inspect-external")
+                .hide(true)
+                .arg(state_dir())
+                .arg(external_run_id().required(true)),
+        )
+        .subcommand(
             Command::new("run-external")
                 .about("Run one text turn through a reviewed, confined ACP peer")
                 .arg(state_dir())
+                .arg(external_run_id())
                 .arg(
                     Arg::new("profile")
                         .long("profile")
@@ -274,6 +281,15 @@ fn state_dir() -> Arg {
         .value_name("DIRECTORY")
         .value_parser(value_parser!(PathBuf))
         .required(true)
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn external_run_id() -> Arg {
+    Arg::new("run-id")
+        .long("run-id")
+        .value_name("UUID")
+        .value_parser(value_parser!(uuid::Uuid))
+        .hide(true)
 }
 
 fn launch(command: Command) -> Command {
@@ -408,21 +424,32 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         .expect("required state dir");
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     if name == "run-external" {
-        return process::external::run(
-            process::external::RunOptions {
-                state_directory: state_dir.clone(),
-                profile: args
-                    .get_one::<PathBuf>("profile")
-                    .expect("required external ACP profile")
-                    .clone(),
-                prompt: args.get_one::<String>("prompt").cloned(),
-                timeout: Duration::from_millis(
-                    *args
-                        .get_one::<u64>("deadline-ms")
-                        .expect("deadline default"),
-                ),
-            },
-            process::shutdown_signal(),
+        let options = process::external::RunOptions {
+            state_directory: state_dir.clone(),
+            profile: args
+                .get_one::<PathBuf>("profile")
+                .expect("required external ACP profile")
+                .clone(),
+            prompt: args.get_one::<String>("prompt").cloned(),
+            timeout: Duration::from_millis(
+                *args
+                    .get_one::<u64>("deadline-ms")
+                    .expect("deadline default"),
+            ),
+        };
+        let shutdown = process::shutdown_signal();
+        return match args.get_one::<uuid::Uuid>("run-id") {
+            Some(id) => process::external::run_identified(options, *id, shutdown).await,
+            None => process::external::run(options, shutdown).await,
+        };
+    }
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    if name == "inspect-external" {
+        return process::external::inspect(
+            state_dir,
+            *args
+                .get_one::<uuid::Uuid>("run-id")
+                .expect("required run id"),
         )
         .await;
     }

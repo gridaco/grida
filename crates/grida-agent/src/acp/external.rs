@@ -36,6 +36,7 @@ use tokio::io::{AsyncWriteExt, DuplexStream};
 use uuid::Uuid;
 
 const PROFILE: &str = "grida.external-acp.profile";
+const IDENTIFIED_PROFILE: &str = "grida.external-acp.identified-profile";
 const INPUT: &str = "grida.external-acp.input";
 const DISPATCH: &str = "grida.external-acp.dispatch";
 const ACCOUNT: &str = "grida.external-acp.account";
@@ -76,6 +77,13 @@ struct Driver {
     launch: ExternalAcpLaunch,
     authority: Arc<dyn AuthorityValidator>,
     configuration: Envelope,
+    intent: Option<Fingerprint>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct IdentifiedProfile {
+    launch: Fingerprint,
+    intent: Fingerprint,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -95,6 +103,10 @@ struct Account<'a> {
 
 impl ExternalAcpDriver {
     pub fn capabilities(&self) -> ExternalAcpCapabilities {
+        Self::declared_capabilities()
+    }
+
+    pub(crate) fn declared_capabilities() -> ExternalAcpCapabilities {
         ExternalAcpCapabilities {
             kind: "external_acp",
             transport: "acp_v1_stdio",
@@ -113,7 +125,7 @@ impl ExternalAcpDriver {
         launch: ExternalAcpLaunch,
         authority: Arc<dyn AuthorityValidator>,
     ) -> Result<Self> {
-        Self::compose(sandbox, launch, authority, None)
+        Self::compose(sandbox, launch, authority, None, None)
     }
 
     pub(crate) fn for_directory(
@@ -121,8 +133,9 @@ impl ExternalAcpDriver {
         launch: ExternalAcpLaunch,
         authority: Arc<dyn AuthorityValidator>,
         directory: &std::fs::File,
+        intent: Option<Fingerprint>,
     ) -> Result<Self> {
-        Self::compose(sandbox, launch, authority, Some(directory))
+        Self::compose(sandbox, launch, authority, Some(directory), intent)
     }
 
     fn compose(
@@ -130,6 +143,7 @@ impl ExternalAcpDriver {
         launch: ExternalAcpLaunch,
         authority: Arc<dyn AuthorityValidator>,
         directory: Option<&std::fs::File>,
+        intent: Option<Fingerprint>,
     ) -> Result<Self> {
         if !launch.scope.write.is_empty() {
             return Err(problem(
@@ -141,18 +155,23 @@ impl ExternalAcpDriver {
         if let Some(directory) = directory {
             prepared.validate_working_root(directory)?;
         }
-        let configuration = profile(&prepared, &launch)?;
+        let configuration = profile(&prepared, &launch, intent)?;
         Ok(Self(Arc::new(Driver {
             sandbox,
             launch,
             authority,
             configuration,
+            intent,
         })))
     }
 
     /// Bind a new local session to this exact selected profile.
     pub fn configuration(&self) -> Envelope {
         self.0.configuration.clone()
+    }
+
+    pub(crate) fn captured_intent(configuration: &Envelope) -> Result<Fingerprint> {
+        Ok(decode::<IdentifiedProfile>(IDENTIFIED_PROFILE, configuration)?.intent)
     }
 
     pub fn submission(id: ChangeId, prompt: &str) -> Result<Submission> {
@@ -240,7 +259,7 @@ impl Driver {
             return Err(problem(ErrorKind::Conflict, "external_acp_profile_changed"));
         }
         let prepared = prepare(&self.sandbox, &self.launch)?;
-        if profile(&prepared, &self.launch)? != self.configuration {
+        if profile(&prepared, &self.launch, self.intent)? != self.configuration {
             return Err(problem(ErrorKind::Conflict, "external_acp_profile_changed"));
         }
         let request = self.request(&binding.turn, action)?;
@@ -361,6 +380,10 @@ fn action(
     turn: &TurnId,
     input: &Submission,
 ) -> Result<Fingerprint> {
+    if configuration.schema().as_str() == IDENTIFIED_PROFILE {
+        let configuration: IdentifiedProfile = decode(IDENTIFIED_PROFILE, configuration)?;
+        return Fingerprint::of(&(configuration, session, turn, &input.id, &input.payload));
+    }
     let configuration: Fingerprint = decode(PROFILE, configuration)?;
     Fingerprint::of(&(configuration, session, turn, &input.id, &input.payload))
 }
@@ -678,16 +701,21 @@ fn prepare(sandbox: &Sandbox, launch: &ExternalAcpLaunch) -> Result<PreparedProc
     )
 }
 
-fn profile(prepared: &PreparedProcess, launch: &ExternalAcpLaunch) -> Result<Envelope> {
+fn profile(
+    prepared: &PreparedProcess,
+    launch: &ExternalAcpLaunch,
+    intent: Option<Fingerprint>,
+) -> Result<Envelope> {
     prepared.verify_executable(&launch.executable)?;
-    encode(
-        PROFILE,
-        &Fingerprint::of(&(
-            prepared.capture_fingerprint()?,
-            launch.executable.sha256,
-            launch.timeout,
-        ))?,
-    )
+    let launch = Fingerprint::of(&(
+        prepared.capture_fingerprint()?,
+        launch.executable.sha256,
+        launch.timeout,
+    ))?;
+    match intent {
+        Some(intent) => encode(IDENTIFIED_PROFILE, &IdentifiedProfile { launch, intent }),
+        None => encode(PROFILE, &launch),
+    }
 }
 
 fn message(
