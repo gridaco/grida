@@ -559,9 +559,10 @@ Four pressure cases constrain the reusable-session design.
    input identity while joining its existing turn. The result identifies which
    inputs were incorporated, and steering preserves the current allowance.
 
-These cases use the existing Sessions service and controls. The current Grida
-native implementation still lacks general child execution, as recorded in the
-[feature catalog](../../../docs/agent/features.md).
+Native private ACP supports bounded named text assignments and one
+parent-funded reviewer. Named work can reuse a child from a later settled
+parent turn and retains separate usage and results. A parent Resume preserves
+the reviewer's independent Pause after reopening. [Built child lifecycle cases](../../../crates/grida-agent/tests/process/subagents.rs)
 
 ## Side conversation study
 

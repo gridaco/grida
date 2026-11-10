@@ -1,6 +1,7 @@
 //! GRIDA-SEC-004 — the built private host retains child scope and assignment evidence.
 
 use super::approvals::Stdio as PrivateStdio;
+use super::lifecycle::task_basis;
 use super::summaries::reported_usage_answer;
 use super::*;
 
@@ -16,6 +17,7 @@ const STEER: &str = "_co.grida/subagent/steer";
 const RESUME_QUEUE: &str = "_co.grida/subagent/resume-queue";
 const WITHDRAW: &str = "_co.grida/subagent/withdraw";
 const SUMMARY: &str = "_co.grida/session/turn-summary";
+const EFFORT: &str = "_co.grida/session/effort";
 const CAPABILITIES: [&str; 11] = [
     CREATE,
     ASSIGN,
@@ -53,11 +55,11 @@ async fn serve_with_key(state: &Path, endpoint: &str, key: &str) -> PrivateStdio
         .unwrap();
     let mut client = PrivateStdio::from_child(child);
     let mut request = extension_initialize();
-    for key in CAPABILITIES.into_iter().chain([SUMMARY]) {
+    for key in CAPABILITIES.into_iter().chain([SUMMARY, EFFORT]) {
         request["clientCapabilities"]["_meta"][&key[1..]] = 1.into();
     }
     let response = client.request("initialize", request).await;
-    for key in CAPABILITIES.into_iter().chain([SUMMARY]) {
+    for key in CAPABILITIES.into_iter().chain([SUMMARY, EFFORT]) {
         assert_eq!(
             response["result"]["agentCapabilities"]["_meta"][&key[1..]],
             1
@@ -264,6 +266,7 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
     let mut provider = Endpoint::start(vec![
         reported_usage_answer("Parent completed.", 13, 5),
         reported_usage_answer("First child finding.", 3, 1),
+        reported_usage_answer("Later parent work completed.", 11, 4),
         reported_usage_answer("Second child finding.", 7, 2),
     ])
     .await;
@@ -380,8 +383,22 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
         "subagent_assignment_identity_reused"
     );
 
+    let later_parent = settle_parent(&mut second, &parent).await;
+    assert_ne!(later_parent, parent_turn);
+    let request = provider.request().await;
+    assert!(
+        !request["messages"]
+            .to_string()
+            .contains("First child finding.")
+    );
     let instructions = format!("Check the second point. {}", "🧩".repeat(300));
-    let follow_up = assign(&parent, &child, &parent_turn, "research-two", &instructions);
+    let follow_up = assign(
+        &parent,
+        &child,
+        &later_parent,
+        "research-two",
+        &instructions,
+    );
     let accepted = second.request(ASSIGN, follow_up).await;
     assert_eq!(
         accepted["result"]["disposition"]["kind"], "queued",
@@ -397,6 +414,7 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
     })
     .await;
     assert_eq!(after["allocation"], json!({"workTurns":2,"reserved":2}));
+    assert_eq!(after["assignment"]["parentTurnId"], later_parent);
     assert_ne!(
         after["assignment"]["turn"]["turnId"],
         first_result["turn"]["turnId"]
@@ -406,6 +424,10 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
         "Second child finding."
     );
     assert_eq!(after["assignment"]["result"]["tokenUsage"], usage("7", "2"));
+    let later_result = second
+        .request(SUMMARY, json!({"sessionId":parent,"turnId":later_parent}))
+        .await;
+    assert_eq!(later_result["result"]["tokenUsage"], usage("11", "4"));
     assert_eq!(
         after["assignment"]["instructionPreview"],
         &instructions[..instructions.floor_char_boundary(1024)]
@@ -425,7 +447,7 @@ async fn named_child_reuses_its_own_context_and_retains_exact_assignment_results
             assign(
                 &parent,
                 &child,
-                &parent_turn,
+                &later_parent,
                 "research-three",
                 "Outside the allowance.",
             ),
@@ -816,6 +838,204 @@ async fn paused_child_accepts_exact_steering_and_resumes_the_same_assignment_aft
     assert!(provider.requests.try_recv().is_err());
 
     provider.done().await;
+}
+
+#[tokio::test]
+async fn a_parent_resume_preserves_the_reviewers_independent_pause_after_restart() {
+    const SNAPSHOT: &str = "_co.grida/session/snapshot";
+    const TASK_PAUSE: &str = "_co.grida/session/pause";
+    const TASK_RESUME: &str = "_co.grida/session/resume";
+    const ASSIGNMENT: &str = "Verify the candidate independently.";
+
+    async fn parent_snapshot(client: &mut PrivateStdio, session: &str) -> Value {
+        let response = client.request(SNAPSHOT, json!({"sessionId":session})).await;
+        response
+            .get("result")
+            .unwrap_or_else(|| panic!("{response}"))
+            .clone()
+    }
+
+    for child_first in [true, false] {
+        let temporary = TempDir::new().unwrap();
+        let workspace = TempDir::new().unwrap();
+        let state = temporary.path().join("state");
+        let (release, parent_pending) = tokio::sync::oneshot::channel();
+        let mut provider = Endpoint::start(vec![
+            Reply::Tool(
+                "delegate_review",
+                r#"{"instructions":"Verify the candidate independently."}"#,
+            ),
+            Reply::Hold("Partial task or review work."),
+            Reply::Hold("Partial review or task work."),
+            Reply::Release("Parent work resumed.", parent_pending),
+            Reply::Finished("Review work resumed separately."),
+        ])
+        .await;
+        let mut first = serve(&state, &provider.url).await;
+        let parent = new_session(&mut first, workspace.path()).await;
+        let accepted = first
+            .request(
+                "_co.grida/session/submit",
+                json!({
+                    "sessionId":parent,"inputId":"review-task","effort":"ultra",
+                    "prompt":[{"type":"text","text":"Private parent task."}],
+                }),
+            )
+            .await;
+        let parent_turn = accepted["result"]["turnId"].as_str().unwrap();
+        for _ in 0..3 {
+            provider.request().await;
+        }
+        let children = first.request(LIST, json!({"parentSessionId":parent})).await;
+        let [reviewer] = children["result"]["children"]
+            .as_array()
+            .unwrap()
+            .as_slice()
+        else {
+            panic!("expected one funded reviewer: {children}");
+        };
+        let child = reviewer["childId"].as_str().unwrap();
+        let assignment = observed_assignment(&mut first, &parent, child).await;
+        let input = assignment["inputId"].as_str().unwrap();
+        let child_turn = assignment["turn"]["turnId"].as_str().unwrap();
+        assert_eq!(assignment["parentTurnId"], parent_turn);
+        assert_eq!(assignment["maxGenerationSteps"], 2);
+
+        let mut child_pause = None;
+        if child_first {
+            let active = inspect(&mut first, &parent, child, input).await;
+            let pause = child_basis(&active, &parent, child, "independent-child-pause");
+            let receipt = first.request(PAUSE, pause.clone()).await;
+            assert_eq!(receipt["result"]["turnId"], child_turn, "{receipt}");
+            child_pause = Some((pause, receipt["result"].clone()));
+        }
+        let active = parent_snapshot(&mut first, &parent).await;
+        let parent_pause = task_basis(&active, &parent, "ancestor-pause");
+        let parent_receipt = first.request(TASK_PAUSE, parent_pause.clone()).await;
+        assert_eq!(
+            parent_receipt["result"]["turnId"], parent_turn,
+            "{parent_receipt}"
+        );
+        let parent_held = timeout(WAIT, async {
+            loop {
+                let view = parent_snapshot(&mut first, &parent).await;
+                if view["current"]["disposition"] == "suspended" {
+                    break view;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        let ancestor_held = wait_for(&mut first, &parent, child, input, |view| {
+            view["current"]["disposition"] == "suspended"
+        })
+        .await;
+        if !child_first {
+            let pause = child_basis(&ancestor_held, &parent, child, "independent-child-pause");
+            let receipt = first.request(PAUSE, pause.clone()).await;
+            assert_eq!(receipt["result"]["turnId"], child_turn, "{receipt}");
+            child_pause = Some((pause, receipt["result"].clone()));
+        }
+        let both_held = inspect(&mut first, &parent, child, input).await;
+        let denied = first
+            .request(
+                RESUME,
+                resume_basis(&both_held, &parent, child, "child-under-ancestor"),
+            )
+            .await;
+        assert_eq!(
+            denied["error"]["data"], "sponsored_subagent_held_by_ancestor",
+            "{denied}"
+        );
+        assert_eq!(inspect(&mut first, &parent, child, input).await, both_held);
+        first.close().await;
+
+        let mut second = serve(&state, &provider.url).await;
+        load_parent(&mut second, &parent, workspace.path()).await;
+        assert_eq!(parent_snapshot(&mut second, &parent).await, parent_held);
+        assert_eq!(inspect(&mut second, &parent, child, input).await, both_held);
+        assert_eq!(
+            second.request(TASK_PAUSE, parent_pause).await["result"],
+            parent_receipt["result"]
+        );
+        let (child_pause, receipt) = child_pause.unwrap();
+        assert_eq!(second.request(PAUSE, child_pause).await["result"], receipt);
+        assert!(provider.requests.try_recv().is_err());
+
+        let parent_resume = json!({
+            "task":task_basis(&parent_held,&parent,"resume-ancestor"),
+            "expectedEpoch":parent_held["current"]["epoch"],
+            "expectedJournalPosition":parent_held["current"]["journalPosition"],
+        });
+        let resumed = second.request(TASK_RESUME, parent_resume.clone()).await;
+        assert_eq!(
+            resumed["result"]["turn"]["turnId"], parent_turn,
+            "{resumed}"
+        );
+        assert_eq!(resumed["result"]["turn"]["epoch"], 2);
+        let parent_request = provider.request().await;
+        assert!(
+            parent_request["messages"]
+                .to_string()
+                .contains("Private parent task.")
+        );
+        let independent = inspect(&mut second, &parent, child, input).await;
+        assert_eq!(independent["current"]["turnId"], child_turn);
+        assert_eq!(independent["current"]["epoch"], 1);
+        assert_eq!(independent["current"]["paused"], true);
+        assert_eq!(independent["current"]["disposition"], "suspended");
+        assert_eq!(
+            second.request(TASK_RESUME, parent_resume).await["result"]["turn"]["epoch"],
+            2
+        );
+        assert!(provider.requests.try_recv().is_err());
+
+        let child_resume = resume_basis(&independent, &parent, child, "resume-independent-child");
+        let resumed = second.request(RESUME, child_resume.clone()).await;
+        assert_eq!(resumed["result"]["turn"]["turnId"], child_turn, "{resumed}");
+        assert_eq!(resumed["result"]["turn"]["epoch"], 2);
+        let child_request = provider.request().await;
+        let messages = child_request["messages"].to_string();
+        assert!(messages.contains(ASSIGNMENT));
+        assert!(!messages.contains("Private parent task."));
+        assert!(child_request.get("tools").is_none());
+        let completed = wait_for(&mut second, &parent, child, input, |view| {
+            view["assignment"]["disposition"]["kind"] == "completed"
+        })
+        .await;
+        assert_eq!(completed["allocation"], json!({"workTurns":1,"reserved":1}));
+        assert_eq!(completed["assignment"]["parentTurnId"], parent_turn);
+        assert_eq!(
+            completed["assignment"]["result"]["text"],
+            "Review work resumed separately."
+        );
+        assert_eq!(
+            second.request(RESUME, child_resume).await["result"]["turn"]["epoch"],
+            2
+        );
+        assert_eq!(
+            parent_snapshot(&mut second, &parent).await["current"]["disposition"],
+            "running"
+        );
+        assert!(provider.requests.try_recv().is_err());
+        release.send(()).unwrap();
+        timeout(WAIT, async {
+            loop {
+                let view = parent_snapshot(&mut second, &parent).await;
+                if view["current"].is_null() {
+                    assert_eq!(view["latest"]["turnId"], parent_turn);
+                    assert_eq!(view["latest"]["status"], "succeeded");
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        second.close().await;
+        provider.done().await;
+    }
 }
 
 #[tokio::test]
