@@ -573,10 +573,17 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         None
     };
     let subagents = name == "serve" && args.get_flag("subagents");
-    if subagents && supervisor.is_some() && (gateway_scope.is_none() || chatgpt_scope.is_some()) {
+    let stored_subagents = provider.permits_stored_subagents()
+        && args
+            .get_one::<String>("supervised-configured-endpoint-key")
+            .is_none();
+    if subagents
+        && supervisor.is_some()
+        && (chatgpt_scope.is_some() || (gateway_scope.is_none() && !stored_subagents))
+    {
         return Err(problem(
             ErrorKind::Unsupported,
-            "subagent_supervised_gateway_required",
+            "subagent_supervised_provider_unsupported",
         ));
     }
     let regime = if args
@@ -674,6 +681,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             .is_some_and(|value| value == "ultra");
     let host = if subagents || ultra {
         host.with_subagents()
+    } else {
+        host
+    };
+    let host = if subagents && supervisor.is_some() && gateway_scope.is_none() && stored_subagents {
+        host.without_sponsorship()
     } else {
         host
     };

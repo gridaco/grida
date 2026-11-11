@@ -933,7 +933,9 @@ lazy reads, read-only mutation, and symlink escape refusal.
   change on the same origin. Retained launch profiles cannot use the new grant.
   Built-in OpenRouter and Vercel profiles require a selected catalogue model and
   a stored key from the supervisor's credential home. Their broker authorizes
-  only that provider's exact Chat Completions route. This launch path is limited
+  only that provider's exact Chat Completions route. These profiles permit
+  manual subagents under the same captured authority; they do not enable
+  Ultra or funded Goal review. This launch path is limited
   to shared custody on macOS and Linux. [Process fixtures](desktop/src/main/native-provider-selection.test.ts)
   exercise built-in and configured keys and refusal after credential replacement.
   The isolated [Desktop profile](desktop/src/main/native-desktop-profile.ts)

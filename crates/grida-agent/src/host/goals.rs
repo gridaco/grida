@@ -225,7 +225,7 @@ impl Host {
 
     async fn require_goal_named_child(&self, parent: &SessionId, child: &SessionId) -> Result<()> {
         let unavailable = || problem(ErrorKind::Unavailable, "goal_named_child_unavailable");
-        if !self.subagents_available() {
+        if !self.subagents_available() || !self.sponsorship_available() {
             return Err(unavailable());
         }
         let child_view = self
@@ -424,6 +424,9 @@ impl Host {
         let (mut captured, automatic) =
             self.goal_origin(&view.session, &continuation.basis).await?;
         if !automatic && !goal.explicit_continuation() {
+            return Ok(None);
+        }
+        if captured.effort.is_some() && !self.sponsorship_enabled {
             return Ok(None);
         }
         if captured.effort.as_ref().is_some_and(|effort| {

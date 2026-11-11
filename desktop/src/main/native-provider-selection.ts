@@ -32,6 +32,7 @@ export namespace NativeProviderSelection {
       | "configuredEndpointKey"
       | "imageGeneration"
       | "llamaCppInputCount"
+      | "subagents"
     > & {
       providerNetwork: NativeProviderNetwork;
     }
@@ -85,6 +86,7 @@ export namespace NativeProviderSelection {
       endpoint,
       model,
       credentialHome: home,
+      subagents: true,
       ...(imageGeneration && { imageGeneration }),
       providerNetwork: {
         prepare: (url, headers) =>

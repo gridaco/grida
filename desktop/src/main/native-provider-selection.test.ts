@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
+import { NativeAgentProcess } from "./native-agent-process";
 import { NativeChatProfiles } from "./native-chat-profiles";
 import { NativeProviderSelection } from "./native-provider-selection";
 import {
@@ -261,6 +262,116 @@ const byokProviders = [
   ["openrouter", "https://openrouter.ai/api/v1"],
   ["vercel", "https://ai-gateway.vercel.sh/v1"],
 ] as const;
+
+it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
+  "enables bounded child work on the saved %s provider across restart",
+  async (provider, endpoint) => {
+    const root = await privateHome();
+    const workspace = path.join(root, "workspace");
+    const home = path.join(root, "credentials");
+    const stateDirectory = path.join(root, "state");
+    const secrets = new SecretsStore(
+      new AuthStore(path.join(root, "legacy")),
+      home
+    );
+    const dispatch = vi.fn<
+      (body: Buffer, signal: AbortSignal) => Promise<Response>
+    >(async (body) => {
+      const request = JSON.parse(body.toString());
+      expect(request.model).toBe(byokModel);
+      return new Response(
+        'data: {"choices":[{"index":0,"delta":{"content":"Bounded work complete."},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'
+      );
+    });
+    const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
+    let agent: NativeAgentProcess | undefined;
+    try {
+      await fs.mkdir(workspace, { mode: 0o700 });
+      await secrets.set(provider, "fixture-key");
+      const profile = await NativeProviderSelection.builtInByok(
+        provider,
+        byokModel,
+        {
+          credentialHome: home,
+          hasKey: (id) => secrets.has(id),
+          network: async () => ({ prepare }),
+        }
+      );
+      const open = () =>
+        NativeAgentProcess.start({
+          ...profile,
+          resourcesPath: packaged!,
+          stateDirectory,
+          capabilities: { "co.grida/session/snapshot": 1 },
+        });
+      agent = await open();
+      expect(agent.acceptsSubagents).toBe(true);
+      expect(agent.acceptsEffort).toBe(false);
+      expect(agent.acceptsGoalEffort).toBe(false);
+      expect(agent.acceptsGoalNamedChild).toBe(false);
+      const { sessionId } = (await agent.request("session/new", {
+        cwd: workspace,
+        mcpServers: [],
+      })) as { sessionId: string };
+      await agent.request("session/prompt", {
+        sessionId,
+        prompt: [{ type: "text", text: "Parent task" }],
+      });
+      const { latest } = (await agent.request("_co.grida/session/snapshot", {
+        sessionId,
+      })) as { latest: { turnId: string } };
+      const { childId } = (await agent.request("_co.grida/subagent/create", {
+        parentSessionId: sessionId,
+        requestId: "create-researcher",
+        name: "Researcher",
+        workTurns: 2,
+      })) as { childId: string };
+      const assignment = {
+        parentSessionId: sessionId,
+        childId,
+        parentTurnId: latest.turnId,
+        inputId: "first-assignment",
+        instructions: "Research",
+      };
+      await agent.request("_co.grida/subagent/assign", assignment);
+      const inspect = () =>
+        agent!.request("_co.grida/subagent/inspect", {
+          parentSessionId: sessionId,
+          childId,
+          inputId: assignment.inputId,
+        }) as Promise<{ assignment: { result: { text: string } | null } }>;
+      await vi.waitFor(
+        async () =>
+          expect((await inspect()).assignment.result?.text).toBe(
+            "Bounded work complete."
+          ),
+        { timeout: 10_000 }
+      );
+      expect(dispatch).toHaveBeenCalledTimes(2);
+      expect(
+        prepare.mock.calls.every(
+          ([target]) => target === `${endpoint}/chat/completions`
+        )
+      ).toBe(true);
+      await agent.close();
+      agent = await open();
+      await agent.request("session/load", {
+        sessionId,
+        cwd: workspace,
+        mcpServers: [],
+      });
+      expect((await inspect()).assignment.result?.text).toBe(
+        "Bounded work complete."
+      );
+      await agent.request("_co.grida/subagent/assign", assignment);
+      expect(dispatch).toHaveBeenCalledTimes(2);
+    } finally {
+      await agent?.close();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  },
+  30_000
+);
 
 it.runIf(sharedCustody).each([...byokProviders, ["local", base]] as const)(
   "rechecks %s custody and grants before network admission",

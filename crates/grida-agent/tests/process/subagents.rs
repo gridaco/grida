@@ -35,6 +35,293 @@ const CAPABILITIES: [&str; 11] = [
 ];
 
 #[tokio::test]
+async fn supervised_children_refuse_unreviewed_provider_profiles() {
+    let temporary = TempDir::new().unwrap();
+    let home = temporary.path().join("credentials");
+    for extra in [
+        vec!["--endpoint", "http://127.0.0.1:1/v1"],
+        vec!["--endpoint", "https://openrouter.ai/api/v1"],
+        vec![
+            "--endpoint",
+            "https://api.openai.com/v1",
+            "--credential-home",
+            home.to_str().unwrap(),
+        ],
+        vec![
+            "--endpoint",
+            "https://openrouter.ai/api/v1",
+            "--credential-home",
+            home.to_str().unwrap(),
+            "--supervised-configured-endpoint-key",
+            "custom",
+        ],
+        vec![
+            "--endpoint",
+            "https://openrouter.ai/api/v1",
+            "--supervised-chatgpt-scope",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        ],
+    ] {
+        let output = executable()
+            .args([
+                "serve",
+                "--stdio",
+                "--subagents",
+                "--supervised-provider",
+                "--state-dir",
+            ])
+            .arg(temporary.path().join("state"))
+            .args(["--model", "fixture-model"])
+            .args(extra)
+            .stdin(Stdio::null())
+            .output()
+            .await
+            .unwrap();
+        assert!(!output.status.success());
+        assert!(
+            String::from_utf8_lossy(&output.stderr)
+                .contains("subagent_supervised_provider_unsupported"),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+
+    async fn start(state: &Path, home: &Path, endpoint: &str, model: &str) -> PrivateStdio {
+        let child = executable()
+            .args([
+                "serve",
+                "--stdio",
+                "--subagents",
+                "--supervised-provider",
+                "--state-dir",
+            ])
+            .arg(state)
+            .arg("--credential-home")
+            .arg(home)
+            .args(["--endpoint", endpoint, "--model", model])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut client = PrivateStdio::from_child(child);
+        let mut initialize = extension_initialize();
+        let meta = &mut initialize["clientCapabilities"]["_meta"];
+        for key in CAPABILITIES {
+            meta[&key[1..]] = 1.into();
+        }
+        meta["co.grida/provider/egress"] = 1.into();
+        for capability in [
+            "co.grida/session/effort",
+            "co.grida/goal/funded-review",
+            "co.grida/goal/named-child",
+        ] {
+            meta[capability] = 1.into();
+        }
+        let ready = client.request("initialize", initialize).await;
+        assert_eq!(
+            ready["result"]["agentCapabilities"]["_meta"][&CREATE[1..]],
+            1,
+            "{ready}"
+        );
+        for capability in [
+            "co.grida/session/effort",
+            "co.grida/goal/funded-review",
+            "co.grida/goal/named-child",
+        ] {
+            assert!(
+                ready["result"]["agentCapabilities"]["_meta"][capability].is_null(),
+                "{ready}"
+            );
+        }
+        client
+    }
+
+    async fn infer(
+        client: &mut PrivateStdio,
+        method: &str,
+        request: Value,
+        endpoint: &str,
+    ) -> Value {
+        let id = client.send(method, request).await;
+        let mut chunk = Some(STANDARD.encode(concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Done.\"},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: [DONE]\n\n"
+        )));
+        let mut result = None;
+        let mut finished = false;
+        while result.is_none() || !finished {
+            let frame = client.read_frame().await;
+            let params = &frame["params"];
+            match frame["method"].as_str() {
+                Some("_co.grida/provider/exchange") => {
+                    let reply = match params["action"].as_str() {
+                        Some("open") => {
+                            assert_eq!(params["target"], format!("{endpoint}/chat/completions"));
+                            assert!(
+                                params["headers"]
+                                    .as_array()
+                                    .unwrap()
+                                    .contains(&json!(["authorization", "Bearer fixture-key"]))
+                            );
+                            let body = STANDARD
+                                .decode(params["initial"].as_str().unwrap())
+                                .unwrap();
+                            let body: Value = serde_json::from_slice(&body).unwrap();
+                            assert_eq!(body["model"], "fixture-model");
+                            json!({"status":"accepted"})
+                        }
+                        Some("dispatch") => json!({"status":"ready","httpStatus":200}),
+                        Some("read") => match chunk.take() {
+                            Some(data) => json!({"status":"chunk","data":data}),
+                            None => json!({"status":"end"}),
+                        },
+                        _ => panic!("unexpected exchange {frame}"),
+                    };
+                    client.respond(&frame["id"], reply).await;
+                }
+                Some("_co.grida/provider/cancel") => finished = true,
+                None if frame["id"] == id => {
+                    assert!(frame.get("error").is_none(), "{frame}");
+                    result = Some(frame["result"].clone());
+                }
+                _ => {}
+            }
+        }
+        result.unwrap()
+    }
+
+    for (provider, endpoint) in [
+        ("openrouter", "https://openrouter.ai/api/v1"),
+        ("vercel", "https://ai-gateway.vercel.sh/v1"),
+    ] {
+        let temporary = TempDir::new().unwrap();
+        let root = temporary.path().canonicalize().unwrap();
+        let home = root.join("credentials");
+        let state = root.join("state");
+        let workspace = root.join("workspace");
+        std::fs::create_dir(&workspace).unwrap();
+        let credentials = grida_auth::ProviderStore::new(home.clone()).unwrap();
+        credentials.set(provider, "fixture-key").unwrap();
+        let mut client = start(&state, &home, endpoint, "fixture-model").await;
+        let parent = new_session(&mut client, &workspace).await;
+        let forbidden = client.request("_co.grida/session/submit", json!({"sessionId":parent,"inputId":"ultra-refused","effort":"ultra","prompt":[{"type":"text","text":"No funded review"}]})).await;
+        assert!(forbidden.get("error").is_some(), "{forbidden}");
+        let prompt = json!({"sessionId":parent,"prompt":[{"type":"text","text":"Parent"}]});
+        assert_eq!(
+            infer(&mut client, "session/prompt", prompt, endpoint).await["stopReason"],
+            "end_turn"
+        );
+        let snapshot = client
+            .request("_co.grida/session/snapshot", json!({"sessionId":parent}))
+            .await;
+        let turn = snapshot["result"]["latest"]["turnId"].as_str().unwrap();
+        let created = client.request(CREATE, create(&parent)).await;
+        let child = created["result"]["childId"].as_str().unwrap();
+        let work = assign(&parent, child, turn, "child-input", "Investigate");
+        assert_eq!(
+            infer(&mut client, ASSIGN, work.clone(), endpoint).await["disposition"]["kind"],
+            "queued"
+        );
+        let completed = wait_for(&mut client, &parent, child, "child-input", |view| {
+            view["assignment"]["disposition"]["kind"] == "completed"
+        })
+        .await;
+        client.close().await;
+        let mut reopened = start(&state, &home, endpoint, "fixture-model").await;
+        load_parent(&mut reopened, &parent, &workspace).await;
+        let retained = inspect(&mut reopened, &parent, child, "child-input").await;
+        assert_eq!(
+            retained["assignment"]["disposition"],
+            completed["assignment"]["disposition"]
+        );
+        let exact_retry = reopened.request(ASSIGN, work).await;
+        assert_eq!(exact_retry["result"]["disposition"]["kind"], "completed");
+        let denied_id = reopened
+            .send(
+                ASSIGN,
+                assign(&parent, child, turn, "revoked-during-upload", "More work"),
+            )
+            .await;
+        let mut accepted = false;
+        let mut revoked = false;
+        let mut cancelled = false;
+        while !accepted || !cancelled {
+            let frame = reopened.read_frame().await;
+            match frame["method"].as_str() {
+                Some("_co.grida/provider/exchange") => {
+                    assert_eq!(frame["params"]["action"], "open", "{frame}");
+                    credentials.set(provider, "rotated-fixture-key").unwrap();
+                    revoked = true;
+                    reopened
+                        .respond(&frame["id"], json!({"status":"accepted"}))
+                        .await;
+                }
+                Some("_co.grida/provider/cancel") => {
+                    assert!(revoked);
+                    cancelled = true;
+                }
+                None if frame["id"] == denied_id => {
+                    assert!(frame.get("error").is_none(), "{frame}");
+                    accepted = true;
+                }
+                _ => {}
+            }
+        }
+        reopened.close().await;
+
+        let (other_provider, other_endpoint) = if provider == "openrouter" {
+            ("vercel", "https://ai-gateway.vercel.sh/v1")
+        } else {
+            ("openrouter", "https://openrouter.ai/api/v1")
+        };
+        credentials
+            .set(other_provider, "other-fixture-key")
+            .unwrap();
+        let mut other = start(&state, &home, other_endpoint, "fixture-model").await;
+        load_parent(&mut other, &parent, &workspace).await;
+        let cross_profile = other
+            .request(
+                ASSIGN,
+                assign(&parent, child, turn, "cross-profile", "More work"),
+            )
+            .await;
+        assert!(cross_profile.get("error").is_some(), "{cross_profile}");
+        other.close().await;
+
+        credentials.set(provider, "fixture-key").unwrap();
+        let mut other_model = start(&state, &home, endpoint, "different-model").await;
+        load_parent(&mut other_model, &parent, &workspace).await;
+        let wrong_model = other_model
+            .request(
+                ASSIGN,
+                assign(&parent, child, turn, "cross-model", "More work"),
+            )
+            .await;
+        assert!(wrong_model.get("error").is_some(), "{wrong_model}");
+        other_model.close().await;
+
+        credentials.set(provider, "rotated-fixture-key").unwrap();
+        let mut rotated = start(&state, &home, endpoint, "fixture-model").await;
+        load_parent(&mut rotated, &parent, &workspace).await;
+        let changed = rotated
+            .request(
+                ASSIGN,
+                assign(&parent, child, turn, "new-after-rotation", "More work"),
+            )
+            .await;
+        assert!(changed.get("error").is_some(), "{changed}");
+        rotated.close().await;
+    }
+}
+
+#[tokio::test]
 async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_and_restart() {
     use base64::{Engine, engine::general_purpose::STANDARD};
 

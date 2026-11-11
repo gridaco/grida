@@ -9,7 +9,10 @@ format: md
 
 Use a named subagent when an independent investigation or second opinion
 would help. The **Subagents** panel is available in native Desktop chat
-with a supported Grida Gateway connection.
+with a supported Grida Gateway connection or a saved OpenRouter or Vercel AI
+Gateway connection. On the saved-provider connections, named assignments are
+available; Ultra and funded review remain available only where separately
+supported.
 
 1. Finish an **Act** turn in the parent chat. Open **Subagents**, enter a
    name, choose how many assignments to allow, and select **Create**.

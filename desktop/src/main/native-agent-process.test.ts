@@ -71,6 +71,48 @@ lines.on('close', () => fs.writeFileSync(${JSON.stringify(receipt)}, 'eof'));
 }
 
 describe.skipIf(process.platform === "win32")("Native agent process", () => {
+  it("refuses unreviewed supervised subagent routes", async () => {
+    const test = fixture("");
+    const network = { prepare: () => null };
+    try {
+      for (const profile of [
+        {
+          endpoint: "http://127.0.0.1:1/v1",
+          credentialHome: test.root,
+          providerNetwork: network,
+        },
+        { endpoint: "https://openrouter.ai/api/v1", providerNetwork: network },
+        {
+          endpoint: "https://openrouter.ai/api/v1",
+          credentialHome: test.root,
+          providerNetwork: network,
+          configuredEndpointKey: "custom",
+        },
+        {
+          endpoint: "https://openrouter.ai/api/v1/other",
+          credentialHome: test.root,
+          providerNetwork: network,
+        },
+        {
+          endpoint: "https://openrouter.ai/api/v1",
+          provider: "responses" as const,
+          providerNetwork: network,
+          subscriptionScope: "a".repeat(64),
+        },
+      ]) {
+        await expect(
+          NativeAgentProcess.start({
+            ...test.options,
+            ...profile,
+            subagents: true,
+          })
+        ).rejects.toThrow("native_agent_subagent_provider_unsupported");
+      }
+    } finally {
+      test.close();
+    }
+  });
+
   it("negotiates capabilities, correlates updates and responses, and shuts down through EOF", async () => {
     const test = fixture(`
       if (request.method === 'session/prompt') {

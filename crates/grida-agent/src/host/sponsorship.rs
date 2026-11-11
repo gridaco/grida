@@ -372,6 +372,12 @@ fn delegation_unavailable() -> Error {
 }
 
 impl Host {
+    /// Keep manual child work available without funded delegation.
+    pub fn without_sponsorship(mut self) -> Self {
+        self.sponsorship_enabled = false;
+        self
+    }
+
     /// Select the default product effort for new inputs on this trusted host.
     pub fn with_effort(mut self, preset: EffortPreset) -> Result<Self> {
         self.capture_effort(preset)?;
@@ -380,7 +386,8 @@ impl Host {
     }
 
     pub(crate) fn sponsorship_available(&self) -> bool {
-        self.subagents_enabled
+        self.sponsorship_enabled
+            && self.subagents_enabled
             && self.side_context.is_none()
             && self.execution.as_ref().is_some_and(|execution| {
                 execution.config.max_output_tokens.is_some()

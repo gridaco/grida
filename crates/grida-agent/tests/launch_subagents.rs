@@ -1,4 +1,4 @@
-//! GRIDA-SEC-004 — supervised child launches require a Gateway scope.
+//! GRIDA-SEC-004 — supervised child launches require a supported provider route.
 
 use std::process::Command;
 
@@ -22,7 +22,7 @@ fn rejects_supervised_subagents_for_generic_and_subscription_launches() {
         assert!(output.stdout.is_empty());
         assert_eq!(
             String::from_utf8(output.stderr).unwrap().trim(),
-            "grida-agent: subagent_supervised_gateway_required"
+            "grida-agent: subagent_supervised_provider_unsupported"
         );
     }
 }

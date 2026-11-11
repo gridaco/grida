@@ -92,6 +92,21 @@ pub struct ProviderOptions {
     pub llama_cpp_input_count: bool,
 }
 
+impl ProviderOptions {
+    /// Whether supervised children can use this fixed stored-provider route.
+    pub fn permits_stored_subagents(&self) -> bool {
+        if self.credential_home.is_none() || self.credential_env.is_some() {
+            return false;
+        }
+        provider_base(&self.endpoint).ok().is_some_and(|base| {
+            matches!(
+                stored_provider(self.protocol, &base),
+                Some("openrouter" | "vercel")
+            )
+        })
+    }
+}
+
 pub struct HttpTransport {
     binding: ProviderBinding,
     protocol: ProviderProtocol,
@@ -690,6 +705,38 @@ mod tests {
             compatible_output_limit_field: None,
             llama_cpp_input_count: false,
         }
+    }
+
+    #[test]
+    fn stored_subagents_require_an_exact_approved_vendor_route() {
+        let mut settings = options(ProviderProtocol::OpenAiCompatible);
+        settings.credential_home = Some(PathBuf::from("/private/credentials"));
+        for endpoint in [
+            "https://openrouter.ai/api/v1",
+            "https://ai-gateway.vercel.sh/v1",
+        ] {
+            settings.endpoint = endpoint.into();
+            assert!(settings.permits_stored_subagents());
+        }
+        for endpoint in [
+            "https://api.openai.com/v1",
+            "https://openrouter.ai/api/v1/other",
+            "https://openrouter.ai:444/api/v1",
+            "https://openrouter.ai/api/v1?route=other",
+            "http://127.0.0.1:8080/v1",
+        ] {
+            settings.endpoint = endpoint.into();
+            assert!(!settings.permits_stored_subagents(), "{endpoint}");
+        }
+        settings.endpoint = "https://openrouter.ai/api/v1".into();
+        settings.credential_home = None;
+        assert!(!settings.permits_stored_subagents());
+        settings.credential_home = Some(PathBuf::from("/private/credentials"));
+        settings.credential_env = Some("TEST_PROVIDER_KEY".into());
+        assert!(!settings.permits_stored_subagents());
+        settings.credential_env = None;
+        settings.protocol = ProviderProtocol::Responses;
+        assert!(!settings.permits_stored_subagents());
     }
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]

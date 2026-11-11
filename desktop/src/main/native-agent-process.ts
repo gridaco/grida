@@ -371,8 +371,17 @@ export class NativeAgentProcess {
       throw new Error("native_agent_compatible_output_limit_invalid");
     if (options.workspaceConfiguration && !options.providerNetwork)
       throw new Error("native_workspace_configuration_requires_supervision");
-    if (options.subagents && !options.gatewayScope)
-      throw new Error("native_agent_subagents_gateway_required");
+    const storedSubagents =
+      options.provider === "openai-compatible" &&
+      (options.endpoint === "https://openrouter.ai/api/v1" ||
+        options.endpoint === "https://ai-gateway.vercel.sh/v1") &&
+      options.credentialHome !== undefined &&
+      options.providerNetwork !== undefined &&
+      options.configuredEndpointKey === undefined &&
+      options.gatewayScope === undefined &&
+      options.subscriptionScope === undefined;
+    if (options.subagents && !options.gatewayScope && !storedSubagents)
+      throw new Error("native_agent_subagent_provider_unsupported");
     if (
       options.configuredEndpointKey !== undefined &&
       (!options.credentialHome ||
@@ -429,6 +438,11 @@ export class NativeAgentProcess {
       ...options.capabilities,
       ...(permissionProfile ? NativeAgentPermissions.capabilities : {}),
     };
+    if (storedSubagents) {
+      delete capabilities[SESSION_EFFORT];
+      delete capabilities[NativeAgentGoals.fundedReviewCapability];
+      delete capabilities[NativeAgentGoals.namedChildCapability];
+    }
     if (options.gatewayJobBilling && !options.gatewayScope)
       throw new Error("native_agent_gateway_profile_invalid");
     if (options.llamaCppInputCount && !providerEgress)
@@ -532,14 +546,17 @@ export class NativeAgentProcess {
                 [NativeAgentGoals.manualContinuationCapability]: 1,
                 ...(options.subagents && {
                   ...SUBAGENT_CAPABILITIES,
-                  [SESSION_EFFORT]: 1,
-                  [NativeAgentGoals.fundedReviewCapability]: 1,
-                  [NativeAgentGoals.namedChildCapability]: 1,
                   [CHILD_STEERING]: 1,
                   [CHILD_MESSAGING]: 1,
                   [CHILD_QUEUE[0]]: 1,
                   [CHILD_QUEUE[1]]: 1,
                 }),
+                ...(options.subagents &&
+                  options.gatewayScope && {
+                    [SESSION_EFFORT]: 1,
+                    [NativeAgentGoals.fundedReviewCapability]: 1,
+                    [NativeAgentGoals.namedChildCapability]: 1,
+                  }),
                 ...NativeAgentWakeups.capabilities,
                 [NativeEditorSurfaceEndpoints.capability]: 1,
                 ...(providerEgress && {
@@ -608,7 +625,9 @@ export class NativeAgentProcess {
       processOwner.fileInput =
         advertised?.["co.grida/session/selected-file"] === 1;
       processOwner.agentEffort =
-        options.subagents === true && advertised?.[SESSION_EFFORT] === 1;
+        options.subagents === true &&
+        options.gatewayScope !== undefined &&
+        advertised?.[SESSION_EFFORT] === 1;
       processOwner.scheduledWakeups = Object.keys(
         NativeAgentWakeups.capabilities
       ).every((key) => advertised?.[key] === 1);
