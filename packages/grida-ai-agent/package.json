@@ -74,16 +74,6 @@
         "default": "./dist/transport.cjs"
       }
     },
-    "./acp": {
-      "import": {
-        "types": "./dist/acp/index.d.mts",
-        "default": "./dist/acp/index.mjs"
-      },
-      "require": {
-        "types": "./dist/acp/index.d.cts",
-        "default": "./dist/acp/index.cjs"
-      }
-    },
     "./tiers": {
       "import": {
         "types": "./dist/tiers.d.mts",

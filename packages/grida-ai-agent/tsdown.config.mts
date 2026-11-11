@@ -2,7 +2,7 @@ import { defineConfig } from "tsdown";
 
 /**
  * The renderer imports the neutral bindings. Host adapters import the Node
- * service, transport, ACP and sandbox exports. The package manifest declares
+ * service, transport and sandbox exports. The package manifest declares
  * each public entry point.
  */
 const shared = {
@@ -35,7 +35,6 @@ export default defineConfig([
       "src/media-server.ts",
       "src/sandbox/index.ts",
       "src/transport.ts",
-      "src/acp/index.ts",
     ],
     platform: "node",
   },

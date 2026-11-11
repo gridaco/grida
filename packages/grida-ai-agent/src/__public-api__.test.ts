@@ -80,15 +80,6 @@ import {
   type ShellRunOptions,
 } from "./server";
 import {
-  AcpAgentAdapter,
-  promptText,
-  runAcpStdio,
-  toolKind,
-  translateChunk,
-  type AcpCoreClient,
-  type AcpUpdateSink,
-} from "./acp";
-import {
   buildAgentDaemonSandboxPolicy,
   hostFromUrl,
   type AgentDaemonSandboxPolicy,
@@ -504,24 +495,6 @@ describe("@grida/agent public API", () => {
       expect(typeof Daemon.probe).toBe("function");
       expect(typeof Daemon.connect).toBe("function");
       expect(typeof Daemon.connectOrSpawn).toBe("function");
-    });
-  });
-
-  describe("acp subpath", () => {
-    it("exposes the ACP adapter surface (acp.md)", () => {
-      const sink: AcpUpdateSink = { sessionUpdate: async () => {} };
-      const client = {} as AcpCoreClient;
-      expectTypeOf(AcpAgentAdapter).toBeConstructibleWith(sink, { client });
-      expect(typeof runAcpStdio).toBe("function");
-      expect(toolKind("read_file")).toBe("read");
-      expect(promptText([{ type: "text", text: "x" }])).toBe("x");
-      expect(
-        translateChunk({
-          type: "text-delta",
-          id: "t",
-          delta: "x",
-        } as Parameters<typeof translateChunk>[0])
-      ).toMatchObject({ sessionUpdate: "agent_message_chunk" });
     });
   });
 
