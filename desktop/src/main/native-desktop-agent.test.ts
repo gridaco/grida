@@ -882,7 +882,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       agent = await launch();
       await agent.ensure(workspace.id);
       const original = agent.current(workspace.id)!.chat;
-      expect(await original.inspectHooks()).toMatchObject({
+      expect(await original.inspectHooks?.()).toMatchObject({
         saved: [],
         active: [],
         results: [],
