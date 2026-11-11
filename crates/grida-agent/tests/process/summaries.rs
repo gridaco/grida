@@ -6,6 +6,7 @@ use super::*;
 
 const SUMMARY: &str = "co.grida/session/turn-summary";
 const PRIVATE_DIAGNOSTIC: &str = "fixture private provider diagnostic";
+const CONTEXT_LIMIT_SUMMARY: &str = "The request exceeds the selected model's context limit. Shorten the input or compact the conversation.";
 
 fn rejected(status: &str, code: &str) -> Reply {
     let body = json!({"error":{"code":code,"message":PRIVATE_DIAGNOSTIC}}).to_string();
@@ -102,7 +103,7 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
         (
             rejected("400 Bad Request", "context_length_exceeded"),
             "failed",
-            "The request exceeds the selected model's context limit. Shorten the input or compact the conversation.",
+            CONTEXT_LIMIT_SUMMARY,
         ),
         (
             Reply::Stop("length"),
@@ -145,6 +146,15 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
     .into_iter()
     .map(|(reply, status, text)| (reply, (status, text)))
     .unzip();
+    let after_context_limit = expected
+        .iter()
+        .position(|(_, text)| *text == CONTEXT_LIMIT_SUMMARY)
+        .unwrap()
+        + 1;
+    replies.insert(
+        after_context_limit,
+        Reply::Finished("Retained context for the remaining fixture turns."),
+    );
     replies.push(Reply::Stop("length"));
     let mut endpoint = Endpoint::start(replies).await;
     let (first, url) = shared_server(&state, &endpoint.url).await;
@@ -160,17 +170,26 @@ async fn terminal_summaries_reopen_with_exact_turn_status_and_never_start_provid
     let mut retained = Vec::new();
     for (index, (status, text)) in expected.into_iter().enumerate() {
         let input = format!("input-{index}");
+        let prompt = format!("Run fixture {input}.");
         // A settled turn can still be releasing its worker. Enqueue the
         // next input, then read its exact turn after it reaches the provider.
         let accepted = ws_rpc(
             &mut socket,
             index as u64 + 3,
             "_co.grida/session/enqueue",
-            prompt_request(session, &input, "Run the fixture."),
+            prompt_request(session, &input, &prompt),
         )
         .await;
         assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
-        endpoint.request().await;
+        if index == after_context_limit {
+            // The helper uses older history before the new input is claimed.
+            let helper = endpoint.request().await["messages"].to_string();
+            assert!(helper.contains("Run fixture input-0."), "{helper}");
+            assert!(!helper.contains(&prompt), "{helper}");
+        }
+        let dispatched = endpoint.request().await;
+        let last = dispatched["messages"].as_array().unwrap().last().unwrap();
+        assert_eq!(last["content"], prompt, "{dispatched}");
         let receipt = ws_rpc(
             &mut socket,
             90,
