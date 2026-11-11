@@ -1214,9 +1214,6 @@ importers:
 
   packages/grida-ai-agent:
     dependencies:
-      '@agentclientprotocol/sdk':
-        specifier: 0.25.0
-        version: 0.25.0(zod@4.3.6)
       '@ai-sdk/gateway':
         specifier: 3.0.125
         version: 3.0.125(zod@4.3.6)
@@ -1244,9 +1241,6 @@ importers:
       ai:
         specifier: 6.0.197
         version: 6.0.197(zod@4.3.6)
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.36.2)
       hono:
         specifier: ^4.6.14
         version: 4.11.8
@@ -1257,6 +1251,12 @@ importers:
         specifier: ^4
         version: 4.3.6
     devDependencies:
+      '@agentclientprotocol/sdk':
+        specifier: 0.25.0
+        version: 0.25.0(zod@4.3.6)
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.36.2)
       tsdown:
         specifier: ^0.22.1
         version: 0.22.1(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.36)

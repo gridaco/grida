@@ -1,6 +1,6 @@
 /**
  * Public-API guard test. Pins the shape and presence of every symbol
- * the root plus server, sandbox, transport, fs, and todos subpaths export.
+ * the root plus retained host, sandbox, transport, fs, and todos subpaths export.
  *
  * This is intentionally separate from the behavioural tests in
  * `fs/fs.test.ts`, `fs/backends/node.test.ts`, `todos/todos.test.ts`.
@@ -22,8 +22,6 @@ import {
   AGENT_TIERS,
   BYOK_PROVIDER_METADATA,
   BYOK_PROVIDER_IDS,
-  createAgent,
-  createToolset,
   GRIDA_STATUS_SSE_EVENT,
   SURFACE_LIST_OPEN_TOOL_NAME,
   SURFACE_OPEN_TOOL_NAME,
@@ -60,27 +58,19 @@ import {
   type SessionStatus,
 } from ".";
 import {
-  AGENT_DAEMON_DEFAULT_CAPABILITIES,
-  createAgentDaemon,
-  createAgentTenant,
-  defaultScratchBase,
-  prepareScratchAuthority,
-  Daemon,
-  DaemonServer,
-  DAEMON_PROTOCOL,
-  type AgentDaemonOptions,
-  type AgentTenantOptions,
-  type ProviderHttpTransport,
-  type DaemonCapabilities,
-  type DaemonHandshakeResponse,
-  type DaemonHttpAccess,
-  type DaemonTenant,
-  type ShellExecutionScope,
-  type ShellExecutor,
-  type ShellRunOptions,
-} from "./server";
+  ChatGptSubscriptionHost,
+  type ChatGptProviderConfig,
+} from "./chatgpt-host";
+import {
+  createMediaDaemon,
+  createMediaTenant,
+  type MediaDaemonOptions,
+} from "./media-server";
+import { DaemonServer } from "@grida/daemon/server";
 import {
   buildAgentDaemonSandboxPolicy,
+  defaultScratchBase,
+  prepareScratchAuthority,
   hostFromUrl,
   type AgentDaemonSandboxPolicy,
 } from "./sandbox";
@@ -91,7 +81,7 @@ import { AgentSurface } from "./surface";
 import { OpfsBackend } from "./fs/backends/opfs";
 
 describe("@grida/agent public API", () => {
-  describe("root protocol + runtime exports", () => {
+  describe("root protocol exports", () => {
     it("exposes client-safe protocol constants and types", () => {
       const run: AgentRunOptions = {
         messages: [],
@@ -110,9 +100,15 @@ describe("@grida/agent public API", () => {
       expect(waiting.state).toBe("waiting_on_approval");
     });
 
-    it("exposes the runtime-agnostic agent factory and toolset factory", () => {
-      expect(typeof createAgent).toBe("function");
-      expect(typeof createToolset).toBe("function");
+    it("keeps presentation vocabulary without exposing execution factories", () => {
+      for (const name of [
+        "createAgent",
+        "createToolset",
+        "composeSystemPrompt",
+        "createAgentWithUrlPartDownload",
+      ]) {
+        expect(name in root).toBe(false);
+      }
       expect(SURFACE_OPEN_TOOL_NAME).toBe("surface_open");
       expect(SURFACE_LIST_OPEN_TOOL_NAME).toBe("surface_list_open");
     });
@@ -296,76 +292,24 @@ describe("@grida/agent public API", () => {
     });
   });
 
-  describe("server subpath (the agent tenant of @grida/daemon, #927)", () => {
-    it("exposes the composed agent-daemon factory and the tenant", () => {
-      // The composed default: every capability group on.
-      const caps: DaemonCapabilities = AGENT_DAEMON_DEFAULT_CAPABILITIES;
-      expect(caps.agent).toBe(true);
-      expect(caps.files).toBe(true);
-      expect(caps.three_d).toBe(true);
-      expect(caps.music).toBe(true);
-      expect(caps.sound_effects).toBe(true);
-      expect(caps.text_to_speech).toBe(true);
-      expect(caps.shell).toBe(false);
-      const handshake: DaemonHandshakeResponse = {
-        protocol: DAEMON_PROTOCOL,
-        supports: ["agent@1"],
-        capabilities: caps,
+  describe("retained Node host subpaths", () => {
+    it("exposes media composition and native subscription configuration", () => {
+      expectTypeOf(createMediaDaemon).returns.toEqualTypeOf<DaemonServer>();
+      expect(typeof createMediaTenant().register).toBe("function");
+      expect(typeof ChatGptSubscriptionHost).toBe("function");
+      expectTypeOf<
+        ConstructorParameters<
+          typeof ChatGptSubscriptionHost
+        >[0]["configuration"]
+      >().toEqualTypeOf<ChatGptProviderConfig>();
+      const options: Pick<MediaDaemonOptions, "endpoint_settings"> = {
+        endpoint_settings: true,
       };
-      expect(handshake.protocol).toBe(1);
-
-      const httpAccess: DaemonHttpAccess = {
-        allowed_origins: ["https://client.example"],
-        allowed_referer_paths: ["/client"],
-      };
-      const opts: AgentDaemonOptions = {
-        password: "pw",
-        user_data_path: "/tmp/grida",
-        media_root: "/tmp/grida-media",
-        http_access: httpAccess,
-      };
-      // Type-level: the factory returns the daemon's lifecycle class; the
-      // tenant conforms to the daemon's seam contract.
-      expectTypeOf(createAgentDaemon).returns.toEqualTypeOf<DaemonServer>();
-      const providerHttp: ProviderHttpTransport = {
-        request: globalThis.fetch,
-        download: globalThis.fetch,
-      };
-      const shellExecutor: ShellExecutor = async (request) => ({
-        ...request,
-        exit_code: 0,
-        signal: null,
-        stdout: "",
-        stderr: "",
-        duration_ms: 0,
-        timed_out: false,
-        truncated: false,
-      });
-      const tenantOpts: AgentTenantOptions = {
-        interactive: true,
-        provider_http: providerHttp,
-        shell_executor: shellExecutor,
-      };
-      const scope: ShellExecutionScope = {
-        workspace_root: "/workspace",
-        protected_read_roots: [],
-      };
-      const runOptions: ShellRunOptions = {};
-      const tenant: DaemonTenant = createAgentTenant(tenantOpts);
-      expect(typeof tenant.register).toBe("function");
-      expect(scope.workspace_root).toBe("/workspace");
-      expect(runOptions).toEqual({});
+      expect(options.endpoint_settings).toBe(true);
       expect(defaultScratchBase("/agent", "/native-temp")).toMatch(
         /^[/\\]native-temp[/\\]grida-agent-[0-9a-f]{16}$/
       );
       expect(typeof prepareScratchAuthority).toBe("function");
-      expect(tenant.sse_query_token_paths?.length).toBe(2);
-      expect(typeof createAgentDaemon).toBe("function");
-      // Host HTTP stays behind the Node-only server entry. Neither the raw
-      // operations nor the internal URL-part adapter join the neutral root.
-      expect("ProviderHttp" in root).toBe(false);
-      expect("createAgentWithUrlPartDownload" in root).toBe(false);
-      void opts;
     });
 
     it("exposes the package-owned sandbox policy intent", () => {
@@ -472,29 +416,6 @@ describe("@grida/agent public API", () => {
       // socketless host can remove it without changing provider egress policy.
       expect(policy.network.allow_local_binding).toBe(false);
       expect(policy.network.allowed_domains).toContain("openrouter.ai");
-    });
-
-    it("exposes the Daemon discovery contract (WG daemon.md, #798)", () => {
-      expect(Daemon.REGISTRATION_FILENAME).toBe("daemon.json");
-      expect(Daemon.CREDENTIAL_FILENAME).toBe("daemon.credential");
-      expect(Daemon.LOCAL_CLIENT_ORIGIN).toBe("http://127.0.0.1");
-      const p: Daemon.Paths = Daemon.paths("/tmp/state");
-      expect(p.registration.endsWith("daemon.json")).toBe(true);
-      const reg: Daemon.Registration = Daemon.mintRegistration({
-        version: "0.0.0",
-        url: "http://127.0.0.1:1",
-        pid: 1,
-      });
-      expect(reg.id.length).toBeGreaterThan(0);
-      expect(typeof Daemon.publish).toBe("function");
-      expect(typeof Daemon.read).toBe("function");
-      expect(typeof Daemon.unpublish).toBe("function");
-      expect(typeof Daemon.checkOwnership).toBe("function");
-      expect(typeof Daemon.readCredential).toBe("function");
-      expect(typeof Daemon.readOrCreateCredential).toBe("function");
-      expect(typeof Daemon.probe).toBe("function");
-      expect(typeof Daemon.connect).toBe("function");
-      expect(typeof Daemon.connectOrSpawn).toBe("function");
     });
   });
 

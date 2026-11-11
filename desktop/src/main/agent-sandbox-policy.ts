@@ -55,7 +55,7 @@ export namespace DesktopAgentSandboxPolicy {
         ]),
         // The long-lived sidecar owns durable media writes. The root remains
         // outside the agent secret directory and is denied again in every
-        // finite-command profile by AgentCommandHost.
+        // native finite-command profile.
         allow_read: uniquePaths([
           ...(policy.filesystem.allow_read ?? []),
           mediaRoot,

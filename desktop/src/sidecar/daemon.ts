@@ -1,12 +1,12 @@
 // GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-SEC-004 — Desktop selects composition before importing chat machinery.
 // GRIDA-SEC-006 / GRIDA-GG: desktop — one scoped GG authority per launch.
-import type { DaemonServer, ShellExecutor } from "@grida/daemon/server";
+// GRIDA-SEC-008 — retained services construct no subscription provider.
+import type { DaemonServer } from "@grida/daemon/server";
 import type {
   MediaDaemonOptions,
   ProviderHttpTransport,
 } from "@grida/agent/media-server";
-import { CHATGPT_SUBSCRIPTION_CONFIG } from "../chatgpt-configuration";
 
 /** Node host glue only: HTTP adapters and model operations remain package-owned. */
 export namespace DesktopDaemon {
@@ -23,16 +23,7 @@ export namespace DesktopDaemon {
     projects_root?: string;
     editor_base_url: string;
     provider_http: ProviderHttpTransport;
-    agent:
-      | false
-      | "native-chat"
-      | {
-          scratch_base: string;
-          skills_root?: string;
-          sandbox_enforced: boolean;
-          owned_legacy_writer?: boolean;
-          shell_executor?: ShellExecutor;
-        };
+    agent: false | "native-chat";
   };
 
   export async function create(opts: Options): Promise<DaemonServer> {
@@ -43,13 +34,8 @@ export namespace DesktopDaemon {
     ) {
       throw new Error("desktop_provider_transport_required");
     }
-    const ownedLegacy = typeof agent === "object" && agent.owned_legacy_writer;
-    if (ownedLegacy && (!agent.sandbox_enforced || agent.shell_executor)) {
-      throw new Error("owned_legacy_writer_scope_invalid");
-    }
-    if (opts.retained_media_scope && typeof agent === "object") {
-      throw new Error("retained_media_scope_invalid");
-    }
+    if (agent !== false && agent !== "native-chat")
+      throw new Error("desktop_chat_runtime_retired");
     if (
       opts.ordinary_native_chat_services &&
       (agent !== "native-chat" ||
@@ -65,9 +51,7 @@ export namespace DesktopDaemon {
     }
     if (
       (opts.workspace_catalog && opts.agent !== "native-chat") ||
-      (opts.protected_file_roots &&
-        opts.agent !== "native-chat" &&
-        !ownedLegacy) ||
+      (opts.protected_file_roots && opts.agent !== "native-chat") ||
       (opts.retained_media_scope &&
         (opts.workspace_catalog || opts.protected_file_roots))
     )
@@ -88,39 +72,21 @@ export namespace DesktopDaemon {
       gg_base_url: opts.editor_base_url,
       provider_http: opts.provider_http,
     };
-    if (opts.agent === false || opts.agent === "native-chat") {
-      const { createMediaDaemon } = await import("@grida/agent/media-server");
-      return createMediaDaemon(
-        opts.agent === "native-chat" || opts.retained_media_scope
-          ? {
-              ...shared,
-              endpoint_settings: opts.agent === "native-chat",
-              capabilities: {
-                recent: opts.ordinary_native_chat_services === true,
-                ...(opts.workspace_catalog ? { workspaces: false } : undefined),
-                ...(opts.retained_media_scope
-                  ? { files: false, workspaces: false }
-                  : undefined),
-              },
-            }
-          : shared
-      );
-    }
-
-    const { createAgentDaemon } = await import("@grida/agent/server");
-    return createAgentDaemon({
-      ...shared,
-      scratch_base: opts.agent.scratch_base,
-      ...(ownedLegacy ? { retain_session_scratch: true } : {}),
-      skills_root: opts.agent.skills_root,
-      sandbox_enforced: opts.agent.sandbox_enforced,
-      shell_executor: opts.agent.sandbox_enforced
-        ? opts.agent.shell_executor
-        : undefined,
-      interactive: true,
-      library: true,
-      // GRIDA-SEC-008 — native model capacity remains in the full agent host.
-      chatgpt: CHATGPT_SUBSCRIPTION_CONFIG,
-    });
+    const { createMediaDaemon } = await import("@grida/agent/media-server");
+    return createMediaDaemon(
+      opts.agent === "native-chat" || opts.retained_media_scope
+        ? {
+            ...shared,
+            endpoint_settings: opts.agent === "native-chat",
+            capabilities: {
+              recent: opts.ordinary_native_chat_services === true,
+              ...(opts.workspace_catalog ? { workspaces: false } : undefined),
+              ...(opts.retained_media_scope
+                ? { files: false, workspaces: false }
+                : undefined),
+            },
+          }
+        : shared
+    );
   }
 }

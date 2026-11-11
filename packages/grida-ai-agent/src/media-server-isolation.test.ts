@@ -15,9 +15,9 @@ const execute = promisify(execFile);
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
 let stage: string;
 
-// This proves startup independence, not installation independence: the private
-// package keeps its declared dependencies. Fresh production-config output uses
-// actual package exports; dependency links only supply the installed closure.
+// Fresh production-config output uses actual package exports. Installed links
+// supply the retained dependency closure; artifact checks also refuse historical
+// development-only library references in both runtime and declaration output.
 beforeAll(async () => {
   stage = await fs.mkdtemp(path.join(os.tmpdir(), "grida-media-entry-"));
   await fs.mkdir(path.join(stage, "home"));
@@ -29,6 +29,12 @@ beforeAll(async () => {
     path.join(packageRoot, "node_modules"),
     path.join(stage, "node_modules"),
     "dir"
+  );
+  // A rebuild must remove stale output from an earlier full-chat build.
+  await fs.mkdir(path.join(stage, "dist"));
+  await fs.writeFile(
+    path.join(stage, "dist", "server.cjs"),
+    "stale chat server"
   );
   await execute(
     process.execPath,
@@ -50,13 +56,30 @@ beforeAll(async () => {
     }
   );
   await fs.writeFile(path.join(stage, "probe.mjs"), probe);
+  const contract = `
+    import { createMediaDaemon, type MediaDaemonOptions } from "@grida/agent/media-server";
+    import { ChatGptSubscriptionHost, type ChatGptProviderConfig } from "@grida/agent/chatgpt-host";
+    import { RUN_COMMAND_TOOL_NAME, type AgentToolName, type AgentRunOptions, type ChatSessionRow } from "@grida/agent";
+    // @ts-expect-error Historical chat construction is not distributed.
+    import { createAgent, createToolset, composeSystemPrompt } from "@grida/agent";
+    // @ts-expect-error Historical chat server is not a public entrypoint.
+    import type { AgentDaemonOptions } from "@grida/agent/server";
+    const name: AgentToolName = RUN_COMMAND_TOOL_NAME;
+    const verify = (configuration: ChatGptProviderConfig, media: MediaDaemonOptions, run: AgentRunOptions, row: ChatSessionRow) => {
+      const accepts: ConstructorParameters<typeof ChatGptSubscriptionHost>[0]["configuration"] = configuration;
+      return [accepts, createMediaDaemon(media), run.messages, row.id, name];
+    };
+    void verify;
+  `;
+  await fs.writeFile(path.join(stage, "contract.mts"), contract);
+  await fs.writeFile(path.join(stage, "contract.cts"), contract);
 }, 100_000);
 
 afterAll(async () => {
   if (stage) await fs.rm(stage, { recursive: true, force: true });
 });
 
-/** Inspect only chunks reachable from this entry, not deliberately built agent entries. */
+/** Inspect only chunks reachable from the retained media entry. */
 async function assertMediaClosure(entry: string): Promise<void> {
   const visited = new Set<string>();
   async function visit(filename: string): Promise<void> {
@@ -114,8 +137,111 @@ async function assertMediaClosure(entry: string): Promise<void> {
   expect(visited.size).toBeGreaterThan(1);
 }
 
-describe("built media-only entry", () => {
+describe("built retained package", () => {
+  it("resolves retained declarations and refuses retired imports in both module formats", async () => {
+    const { stdout, stderr } = await execute(
+      process.execPath,
+      [
+        path.join(packageRoot, "../../node_modules/typescript/bin/tsc"),
+        "--noEmit",
+        "--skipLibCheck",
+        "--target",
+        "es2022",
+        "--module",
+        "nodenext",
+        "--moduleResolution",
+        "nodenext",
+        "contract.mts",
+        "contract.cts",
+      ],
+      { cwd: stage, timeout: 20_000, maxBuffer: 256 * 1024 }
+    );
+    expect(stdout).toBe("");
+    expect(stderr).toBe("");
+  });
+
+  it("distributes retained output without historical server or dependency imports", async () => {
+    const manifest = JSON.parse(
+      await fs.readFile(path.join(stage, "package.json"), "utf8")
+    );
+    expect(manifest.files).toEqual(["dist"]);
+    expect(manifest.exports).not.toHaveProperty("./server");
+    for (const dependency of ["@agentclientprotocol/sdk", "drizzle-orm"]) {
+      expect(manifest.dependencies).not.toHaveProperty(dependency);
+      expect(typeof manifest.devDependencies[dependency]).toBe("string");
+    }
+    await expect(
+      fs.access(path.join(stage, "dist", "server.cjs"))
+    ).rejects.toMatchObject({ code: "ENOENT" });
+    const filenames = await fs.readdir(path.join(stage, "dist"), {
+      recursive: true,
+    });
+    for (const filename of filenames) {
+      const full = path.join(stage, "dist", filename);
+      if (!(await fs.stat(full)).isFile()) continue;
+      const source = await fs.readFile(full, "utf8");
+      expect(
+        source.match(
+          /["'](?:@agentclientprotocol\/sdk|drizzle-orm)(?:\/[^"']*)?["']/
+        )
+      ).toBeNull();
+      expect(
+        source.match(
+          /#region src\/(?:runtime\/|agent\/index|tools\/index|server\.ts|session\/(?:db|store|schema))/
+        )
+      ).toBeNull();
+      expect(
+        source.match(
+          /\b(?:createAgentWithUrlPartDownload|AgentRuntime|SessionsStore|SessionScheduler|openSessionsDb)\b/
+        )
+      ).toBeNull();
+    }
+  });
   for (const format of ["esm", "cjs"] as const) {
+    it(`loads every retained ${format} entry without chat state and rejects retired execution exports`, async () => {
+      const { stderr } = await execute(
+        process.execPath,
+        [
+          "--input-type=module",
+          "--eval",
+          String.raw`
+        import assert from "node:assert/strict";
+        import fs from "node:fs";
+        import { createRequire, registerHooks } from "node:module";
+        const require = createRequire(import.meta.url);
+        registerHooks({ resolve(specifier, context, next) {
+          if (/^(?:node:sqlite|sqlite|drizzle-orm|@agentclientprotocol\/sdk)(?:\/|$)/.test(specifier))
+            throw new Error("chat dependency forbidden");
+          return next(specifier, context);
+        } });
+        assert.throws(() => require("node:sqlite"), /chat dependency forbidden/);
+        const manifest = JSON.parse(fs.readFileSync("package.json", "utf8"));
+        const load = ${format === "esm" ? "(specifier) => import(specifier)" : "async (specifier) => require(specifier)"};
+        for (const subpath of Object.keys(manifest.exports)) {
+          const specifier = "@grida/agent" + (subpath === "." ? "" : subpath.slice(1));
+          await load(specifier);
+        }
+        const root = await load("@grida/agent");
+        for (const name of ["createAgent", "createToolset", "composeSystemPrompt"])
+          assert.equal(name in root, false);
+        await assert.rejects(load("@grida/agent/server"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
+        await assert.rejects(load("@grida/agent/src/server.ts"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
+        assert.equal(typeof (await load("@grida/agent/chatgpt-host")).ChatGptSubscriptionHost, "function");
+      `,
+        ],
+        {
+          cwd: stage,
+          timeout: 10_000,
+          env: {
+            PATH: process.env.PATH,
+            HOME: path.join(stage, "home"),
+            TMPDIR: stage,
+          },
+        }
+      );
+      expect(stderr).toBe("");
+    });
+
     it(`imports sandbox helpers through public ${format} exports without the daemon server`, async () => {
       const { stderr } = await execute(
         process.execPath,

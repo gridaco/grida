@@ -111,7 +111,7 @@ describe("AgentSidecarSupervisor recovery", () => {
       activeGeneration: 3,
       info: {
         connection: { port: 43123, password: "fixture" },
-        mode: "enabled",
+        mode: "disabled",
       },
       networkHost: { requestDrain: async () => {}, close: vi.fn<() => void>() },
       daemonSocketHost: { close: vi.fn<() => void>() },
@@ -135,8 +135,8 @@ describe("AgentSidecarSupervisor recovery", () => {
 
     await state.initSandbox();
 
-    expect(state.scratchBase).toBeNull();
-    expect(state.commandHost).toBeNull();
+    expect(state.scratchBase).toBeUndefined();
+    expect(state.commandHost).toBeUndefined();
     expect(app.getPath).not.toHaveBeenCalledWith("temp");
     expect(ensureInitialized).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -181,8 +181,8 @@ describe("AgentSidecarSupervisor recovery", () => {
           commandHost: unknown;
         };
         await state.initSandbox();
-        expect(state.scratchBase).toBeNull();
-        expect(state.commandHost).toBeNull();
+        expect(state.scratchBase).toBeUndefined();
+        expect(state.commandHost).toBeUndefined();
         const protectedChat = [
           source.scratchBase,
           path.join(browser, NativeDesktopProfile.chatStateDirectory),
@@ -411,38 +411,12 @@ describe("AgentSidecarSupervisor recovery", () => {
     }
   });
 
-  it("prepares an owned writer without admitting scratch or commands before wrapping", async () => {
-    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/owned/agent");
-    vi.spyOn(NativeDesktopProfile, "configure").mockResolvedValueOnce(
-      "gateway"
+  it("refuses a retired chat owner before preparing scratch or spawning", () => {
+    expect(() => new AgentSidecarSupervisor({ agent: true })).toThrow(
+      "desktop_chat_runtime_retired"
     );
-    const supervisor = new AgentSidecarSupervisor();
-    vi.spyOn(
-      supervisor as unknown as { skillsRootPath(): string | undefined },
-      "skillsRootPath"
-    ).mockReturnValue(undefined);
-    vi.mocked(wrap).mockRejectedValueOnce(
-      new Error("fixture wrapper unavailable")
-    );
-    await expect(supervisor.startOwnedLegacyWriter()).rejects.toThrow(
-      "fixture wrapper unavailable"
-    );
-    expect(vi.mocked(wrap).mock.calls.at(-1)?.[0]).toContain(
-      "--owned-legacy-writer=1"
-    );
-    expect(
-      (supervisor as unknown as { commandHost: unknown }).commandHost
-    ).toBeNull();
-    expect(
-      (supervisor as unknown as { ownedLegacy: { claim?: unknown } })
-        .ownedLegacy.claim
-    ).toBeUndefined();
-    await expect(supervisor.start()).rejects.toThrow(
-      "owned_legacy_writer_already_selected"
-    );
-    await expect(supervisor.sealLegacyChatForColdStart()).rejects.toThrow(
-      "legacy_chat_cold_start_required"
-    );
+    expect(ensureInitialized).not.toHaveBeenCalled();
+    expect(wrap).not.toHaveBeenCalled();
   });
 
   it("forwards disabled agent startup without scratch or skill arguments", async () => {

@@ -22,9 +22,9 @@ external destinations or local binding. Removing that backstop requires separate
 non-agent service qualification. An admitted managed macOS profile can use the
 native retained-media launcher described below.
 
-The historical TypeScript chat runtime is available only to an explicitly
-managed predecessor used for archival handoff. Ordinary native startup failure
-does not activate it. Windows starts retained services with chat unavailable
+The historical TypeScript chat runtime is absent from distributed entrypoints.
+Retired chat launch modes and options fail before storage startup. Native
+startup failure never selects another chat engine. Windows starts retained services with chat unavailable
 until native private storage is supported. Its retained filesystem routes have
 no kernel containment; HTTP admission does not establish that boundary.
 
@@ -231,80 +231,42 @@ The macOS transfer path has an end-to-end `srt` proof. Linux descriptor
 preservation and namespace behavior are source-audited; a packaged Linux
 end-to-end transfer test remains a release gate.
 
-## AgentSidecar host containment
+## Retained-service containment
 
-The outer AgentSidecar boundary remains a coarse backstop for structured file
-capabilities:
+The retained file/media sidecar keeps its existing outer sandbox and Main-owned
+provider transport. It does not construct a chat scheduler, session database,
+skill loader or model command executor. Its process can read only through the
+existing secret-path exclusions and has no direct provider networking or local
+binding. Human-selected file/workspace operations keep their established owner.
+The sidecar still runs under SRT on macOS/Linux unless an admitted managed
+profile uses the narrower native retained-media launcher.
 
-- reads deny user credential/configuration locations the sidecar does not own;
-- writes are limited to the union of opened workspaces, sidecar state, and
-  scratch roots;
-- direct external networking is denied in Desktop; provider HTTP uses the
-  private host service;
-- generic local bind/connect authority is denied; daemon access arrives only as
-  a main-accepted connected-socket capability;
-- model-selected commands reach process creation only through the structured
-  `run_command` and approval path; the sidecar delegates each finite command
-  back to Electron main for a fresh exact-root SRT profile; external ACP is
-  absent; and
-- fixed helpers, if any, have host-fixed executable and argument shapes.
-
-This outer boundary cannot hide sidecar-owned BYOK/session data from a
-compromise in the same process, and by itself cannot distinguish roots held by
-one sidecar. The per-command host closes the model-selected ambient-path gap
-for scratch and secrets: main denies the shared scratch parent, `userData`,
-and the shared provider credential directory (GRIDA-SEC-014), then re-allows only the request's own scratch and private temp. Workspace reads
-retain SRT's default broad-read posture; the exact workspace is the command's
-cwd/write grant, not its exclusive readable tree.
-
-The sidecar runtime—not the model—supplies those roots, but the current private
-frame still names them as paths. Main canonicalizes their shape and overlap; it
-does not authenticate them against a fully compromised sidecar. A capability
-that must resist that threat belongs in its own worker or must receive a
-main-issued opaque workspace/session grant rather than caller-named paths.
+Retiring this service dependency requires a separately qualified file/media
+host boundary. Removing SRT simply because command execution moved to Rust
+would discard the service's current filesystem and network backstop.
 
 ## Raw execution and extensions
 
-The runtime never treats `sandbox_enforced: true` as command authority. The
-capability is the injected `ShellExecutor`: the sidecar emits a bounded private
-request, and main independently canonicalizes the working directory, named
-workspace, session-shaped scratch, shared scratch authority root, host secret
-root, and command temp before launch. The command and arguments remain
-structured until main shell-quotes the complete argv solely for SRT's wrapper;
-the resulting wrapper is spawned with `shell: false`.
+Model commands run through the Rust host and native sandbox helper. The host
+captures explicit directory permissions, protected paths, trusted executable
+identity, deadlines and bounded output. Plan withholds command execution. A
+profile denies the shared provider credential root (GRIDA-SEC-014) alongside
+host state and other protected paths; additional access cannot override it. A
+failed or unavailable boundary refuses the command rather than selecting an
+unconfined executor. Native macOS/Linux confinement, cancellation and trusted
+checks have built-process coverage.
 
-One-shot shell, long-lived ACP stdio, and managed MCP/extension lifecycle are
-separate behavioral contracts. A private launcher may serve all three, but no
-public shared API is promoted until these consumers have proved the common
-shape.
+The historical TypeScript/SRT finite-command host is removed. The retained
+service supervisor supplies no command executor, scratch sweep or skills root.
+Retired entrypoint flags are rejected before old chat storage is opened.
+The native master retains operation identity and uncertain outcomes independently
+of provider networking and editor semantics. Shutdown and Stop join the work
+owned by each process; platform-specific descendant revocation limits still
+follow the native sandbox contract.
 
-`runShell` owns a fresh POSIX process group and terminates that group before
-main removes command temp or releases SRT's per-command bookkeeping. This
-reclaims ordinary background descendants. It is not a macOS kernel job object:
-model-selected code that deliberately creates a new session with `setsid(2)`
-can leave the original group while retaining its inherited Seatbelt profile.
-The current command surface therefore does not claim hard process revocation
-against deliberate daemonization on macOS. Any workload requiring that
-guarantee needs a dedicated worker/job mechanism; Linux Bubblewrap's PID
-namespace is stronger, but its packaged end-to-end evidence remains pending.
-
-Turn cancellation observes the same ordering. The sidecar forwards the AI SDK
-tool abort as `command.abort`; main does not acknowledge it until the executor
-returns and the cleanup above has finished. The agent runtime keeps the session
-occupied through both that acknowledgement and the model pump consuming the
-aborted tool result. A replacement run or session deletion therefore remains
-busy rather than overlapping a command whose authority is still being
-reclaimed. This does not make a deliberately detached macOS process revocable;
-it only closes the lifecycle gap for the process group and SRT worker the host
-still owns.
-
-The installed srt `0.0.65` manager has process-global proxy state. Desktop
-therefore gives every finite command the same empty external-domain set and
-never mutates a global command allowlist as requests come and go. Per-command
-custom filesystem configuration supplies exact scratch/workspace grants. A
-future feature that needs distinct command network identities must use one
-manager-owning worker per concurrent authority domain, add an attributable
-mediator, or replace the enforcer.
+One-shot commands, external ACP stdio and managed MCP/extension lifecycles keep
+their own contracts. Capability discovery does not grant authority or turn an
+unqualified platform into a supported execution environment.
 
 Raw networking follows these postures:
 
@@ -374,8 +336,8 @@ ACP handshake and Main rechecks the seal and archive. Existing-data
 preparation refuses an absent source. Ordinary macOS and Linux Desktop instead
 keeps previous chat material in place and starts fresh native history in a
 separate store. It claims neither archival custody nor retirement of other
-installed versions. Only an explicit managed predecessor starts the historical
-chat engine; native startup failure never selects it.
+installed versions. Current builds cannot start a historical writer; native
+startup failure never selects another chat engine.
 The seal relies on the historical forward-version check and requires a
 separate deployment boundary for unreviewed legacy writers.
 

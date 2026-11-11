@@ -159,28 +159,14 @@ export type {
   PatchSessionOptions,
 } from "./session/rows";
 
-// Grida agent surface — runtime-agnostic factory, types, prompt
-// composition, tool registry, tier constants, tool-name vocab.
+// Presentation vocabulary survives independently of the historical agent factory.
 export {
-  createAgent,
-  type Agent,
-  type AgentCallOptions,
-  type AgentMessage,
-  type CreateAgentOptions,
-  type ModelFactory,
-  type RunCommandBackend,
-} from "./agent";
-export { composeSystemPrompt } from "./agent/prompts";
-export {
-  createToolset,
   RUN_COMMAND_TOOL_NAME,
   QUESTION_TOOL_NAME,
   SURFACE_OPEN_TOOL_NAME,
   SURFACE_LIST_OPEN_TOOL_NAME,
   type AgentToolName,
-  type RunCommandOutcome,
-  type ToolsetCapabilities,
-} from "./tools";
+} from "./tools/names";
 export { AGENT_DEFAULT_TIER, AGENT_TIERS, type ModelTier } from "./tiers";
 
 export type { GGModelsView } from "./protocol/gg-models";

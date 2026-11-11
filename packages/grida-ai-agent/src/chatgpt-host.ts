@@ -12,6 +12,8 @@ import {
 } from "./providers/chatgpt";
 import { ProviderHttp } from "./providers/http";
 
+export type { ChatGptProviderConfig } from "./providers/chatgpt";
+
 const MAX_CEREMONY_BYTES = 32 * 1024;
 const CEREMONY_ROUTES = new Set<string>(
   Object.values(CHATGPT_AUTH_ROUTE_PATHS)

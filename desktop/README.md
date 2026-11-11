@@ -37,7 +37,7 @@ Electron main/preload (desktop)
 Desktop sidecar composition
   -> @grida/daemon owns the perimeter, shared-provider adapter and local resources
   -> @grida/agent/media-server serves media through @grida/ai without chat startup
-  -> full @grida/agent/server also enables sessions and desktop agent execution
+  -> never loads a TypeScript chat server; the retired entrypoint is unavailable
   -> serves authenticated daemon HTTP only on main-transferred sockets
   -> requires a host transport over bounded framed stdin/stdout for provider
      requests and credential-free provider-asset downloads
@@ -52,7 +52,8 @@ Old chats and their inputs remain in place, while new chats use `native-chat/`
 beside the browser profile. This is a fresh history boundary, not an archive or
 a migration. An interrupted first launch can reopen the separate native store.
 An unavailable native executable or failed handshake never starts the old agent.
-The old runtime is available only to an explicitly managed historical handoff.
+Current builds do not distribute or start the old chat runtime. Retired chat
+launch options fail before opening historical chat storage.
 Windows currently starts retained services with chat unavailable pending an
 ACL-aware native storage contract.
 
@@ -169,8 +170,8 @@ Resume targets a verified pause. Reconnecting requires loading the session
 again before submitting or controlling work.
 
 The cold-start coordinator selects the non-chat sidecar before starting native
-chat. The source selects native workspace and selected SVG chat on ordinary
-macOS arm64 Stable profiles; they use a separate `native-chat` store and leave
+chat. The source selects native workspace chat on ordinary macOS/Linux launches and
+selected SVG chat on macOS. They use a separate `native-chat` store and leave
 the previous chat database and scratch in place. Other editions can still
 modify their shared legacy data and settings. Workspace image placement and
 local image references are not available through this ordinary path. Native
@@ -203,28 +204,12 @@ Up to eight workspace and connection workers can be live per Desktop owner.
 Changing the viewed connection keeps previous workers and their work active.
 Desktop closes those workers on quit or account change.
 
-For a managed legacy-to-native deployment, a packaged macOS arm64 Stable
-predecessor built with `GRIDA_MANAGED_LEGACY_PREDECESSOR=1` instead enrolls a
-separate kind of profile at that same isolated location. It holds the source
-claim before starting its confined chat sidecar. Command and external-agent
-execution are unavailable in this predecessor. Clean quit acknowledges the
-exact writer and permits another predecessor launch. A selector-aware Stable
-successor archives the acknowledged chat and scratch before opening fresh
-native chats. Once promotion starts, the predecessor refuses that profile. A
-successor can retry after interrupted archival. An unacknowledged writer makes
-the profile unavailable for promotion.
-
-The managed predecessor preserves session scratch across clean restarts so the
-archive can include it. Explicit chat deletion still removes its scratch.
-Per-request upload limits still apply.
-
-This handoff applies to chats created inside the managed predecessor profile.
-The deployment owner selects a successor that recognizes the legacy enrollment
-and respects its promotion record.
-Ordinary legacy profiles need separate proof of writer custody and historical
-scratch provenance. The managed handoff keeps the browser, media, projects and
-provider data in place. Native workspace registrations and recents use their
-own stores.
+Existing managed archival receipts remain readable and verified. A successor
+can retry an already admitted handoff and reopen the separate native store.
+Current builds cannot create or launch the historical predecessor chat engine.
+An unverified or undrained source remains unavailable for managed promotion.
+The ordinary fresh-store cutover needs no archive and preserves previous data
+in place. These paths do not claim exclusion of other installed older editions.
 
 On macOS and Linux, Desktop refuses ordinary startup if the configured chat
 source has a handoff record or if Desktop cannot inspect its location. Open the

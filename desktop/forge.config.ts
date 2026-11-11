@@ -119,10 +119,6 @@ const config: ForgeConfig = {
     extraResource: [
       // .grida file preview icon for macOS
       "mac/dotgrida.icns",
-      // The host-bundled agent skills tree (repo-root `skills/`). Lands at
-      // `<resources>/skills` (see AgentSidecarSupervisor.skillsRootPath). The
-      // agent advertises these built-in skills and loads them on demand.
-      "../skills",
     ],
     name: productName,
     // @electron/packager couples CFBundleDisplayName to `executableName`

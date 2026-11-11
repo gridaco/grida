@@ -21,8 +21,7 @@ settings, but the endpoint is unavailable for new native chats.
 
 ## Start a chat with a saved model
 
-In a managed native workspace on macOS with Apple silicon, wait for workspace
-chat to be ready. Open **Model connection** and choose a model under **New chat
+In a native workspace, wait for chat to be ready. Open **Model connection** and choose a model under **New chat
 with…**. Grida lists its current tool-capable Gateway text models when discovery
 is available. Add an OpenRouter or Vercel AI Gateway key, or save and approve a
 compatible endpoint in Desktop settings, to see those models too. Use
@@ -46,6 +45,20 @@ Removing a key, changing an endpoint, or losing access to the original Gateway
 organization can make its saved chats unavailable. A Gateway model must also
 remain available for chat. Restore access to the original connection to reopen
 its chats.
+
+## Provider availability
+
+The optimized macOS Apple Silicon headless host has bounded live checks with
+OpenRouter and `openai/gpt-4.1-mini`: text and permission-checked file reads in
+Plan/Act and Standard/Ultra. These checks verify the selected connection and
+retained accounting; they are not a broad model-quality comparison. Other live
+providers and operating systems remain unqualified. Connection discovery alone
+does not verify credentials, credits, generation or model access.
+
+Compatible streaming keeps a valid completed answer when the provider sends its
+final usage record. Additional content or changed completion identity still
+leaves an uncertain result. An earlier uncertain turn remains in history;
+reopening it does not retry generation.
 
 ## Recover a connection
 

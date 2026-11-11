@@ -197,7 +197,7 @@ export class AgentSidecarNetwork {
         const pending = this.pendingCommands.get(requestId);
         if (!pending || pending.abortError) return;
         // Keep the tool promise pending until main confirms that the confined
-        // worker returned and AgentCommandHost's finally cleanup completed.
+        // executor returned and its owned cleanup completed.
         pending.abortError = abortError(signal?.reason);
         void this.send({
           v: 1,

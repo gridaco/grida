@@ -23,7 +23,6 @@ import {
   closeRetainedMediaSidecar,
   hasCompletedMediaArchive,
   revealCompletedMediaArchive,
-  startOwnedLegacyWriter,
   getAgentSidecarInfo,
   getAgentSidecarMode,
   stopAgentSidecar,
@@ -39,10 +38,7 @@ import {
   registerWorkspaceMediaScheme,
   handleWorkspaceMediaProtocol,
 } from "./main/workspace-media-protocol";
-import {
-  notifyNativeChat,
-  startAgentNotifications,
-} from "./main/agent-notifications";
+import { notifyNativeChat } from "./main/agent-notifications";
 import type { NativeChatLifecycle } from "./main/native-agent-chat";
 import { protocol_router } from "./main/protocol-router";
 import { dirtyState } from "./main/dirty-state";
@@ -113,11 +109,7 @@ app.commandLine.appendSwitch("js-flags", "--expose-gc");
 app.setName(RUNTIME_APP_NAME);
 if (app.isPackaged && !IS_INSIDERS) {
   try {
-    NativeDesktopProfile.prepareFirst(
-      app,
-      MANAGED_NATIVE_FIRST === 1,
-      MANAGED_LEGACY_PREDECESSOR === 1
-    );
+    NativeDesktopProfile.prepareFirst(app, MANAGED_NATIVE_FIRST === 1);
   } catch {
     console.error("[grida] The managed Desktop profile could not be verified.");
     // Waiting for ready would let Chromium initialize the default profile.
@@ -160,7 +152,6 @@ const workspaceReview = new NativeWorkspaceReview(
 let nativeDesktopAgent: NativeDesktopAgent | undefined;
 let nativeDocuments: NativeDocumentFiles | undefined;
 let nativeFileWorkspaces: NativeWorkspaceCatalog | undefined;
-let managedLegacyStart: ReturnType<typeof startOwnedLegacyWriter> | undefined;
 let recentFiles = agentSidecarClient.recent;
 let nativeQuitDrain: Promise<void> | undefined;
 let nativeEditorMcp: NativeEditorMcpExport | undefined;
@@ -1035,10 +1026,7 @@ app.on("ready", async () => {
   // approval UI—sit in front of the required Grida account entry flow.
   const sidecarStartup = (async (): Promise<boolean> => {
     try {
-      if (NativeDesktopProfile.managedPredecessor()) {
-        managedLegacyStart = startOwnedLegacyWriter();
-        agentSidecarInfo = (await managedLegacyStart).connection;
-      } else if (strictRetainedMedia) {
+      if (strictRetainedMedia) {
         agentSidecarInfo = await startRetainedMediaSidecar();
       } else {
         agentSidecarInfo = await startAgentSidecar(workspaceCatalog?.directory);
@@ -1046,12 +1034,6 @@ app.on("ready", async () => {
       console.log(
         `[grida] agent sidecar ready on 127.0.0.1:${agentSidecarInfo.port}`
       );
-      // Desktop notifications on turn-finish / pending-approval (RFC
-      // `events.md` §the first consumer). Main-owned so a turn with no
-      // renderer attached (queue drain, closed window) still notifies.
-      if (!nativeDesktopAgent && getAgentSidecarMode() === "enabled") {
-        startAgentNotifications(windowAdmission);
-      }
       // Now that the sidecar is up, serve `grida-workspace://` media requests
       // by proxying to its streamed `/workspaces/file` route (#924).
       handleWorkspaceMediaProtocol(workspaceCatalog);
@@ -1171,7 +1153,7 @@ app.once("will-quit", () => {
   // A dirty window can cancel quit. Keep shared services available until
   // Electron confirms that all windows have closed.
   closeChatGptOAuth();
-  if (!managedLegacyStart && !strictRetainedMedia) stopAgentSidecar();
+  if (!strictRetainedMedia) stopAgentSidecar();
   disposeAllTerminals();
   void disposeAllWorkspaceWatches();
 });
@@ -1186,7 +1168,6 @@ app.on("will-quit", (event) => {
     (!nativeDesktopAgent &&
       !nativeEditorMcp &&
       !nativeExternalRuns &&
-      !managedLegacyStart &&
       !strictRetainedMedia) ||
     nativeQuitReady
   )
@@ -1196,7 +1177,6 @@ app.on("will-quit", (event) => {
     nativeDesktopAgent?.close(),
     nativeEditorMcp?.close(),
     nativeExternalRuns?.close(),
-    managedLegacyStart?.then((writer) => writer.drain()),
     strictRetainedMedia ? closeRetainedMediaSidecar() : undefined,
   ])
     .then((outcomes) => {

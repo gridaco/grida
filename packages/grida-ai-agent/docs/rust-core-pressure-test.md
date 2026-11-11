@@ -669,7 +669,7 @@ validated roots, and OS sandbox creation. Its supervised approval flow preserves
 the exact request and consuming run. These provide existing execution contracts
 to retain, while an automatic reviewer adds a separate decision route.
 [Host executor scope](../../grida-daemon/src/shell/runner.ts),
-[Native command host](../../../desktop/src/main/agent-command-host.ts),
+[Historical native command host](https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/desktop/src/main/agent-command-host.ts),
 [Approval consumption](../src/session/store.ts).
 
 | Pressure case                                                      | Required result                                                  |
@@ -851,7 +851,7 @@ validates command roots independently, and waits for worker cleanup on
 cancellation. It also documents a macOS process-group revocation limitation.
 These supply concrete acceptance cases for the replacement.
 [Shell executor](../../grida-daemon/src/shell/runner.ts),
-[Command confinement](../../../desktop/src/main/agent-command-host.ts),
+[Historical command confinement](https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/desktop/src/main/agent-command-host.ts),
 [Cancellation acknowledgment](../../../desktop/src/agent-sidecar-network.ts),
 [Current host authority and limitations](../../../desktop/docs/agent-authority.md).
 

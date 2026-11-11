@@ -149,7 +149,7 @@ export type PatchSessionOptions = {
   archived?: boolean;
 };
 
-/** Arguments to {@link SessionsStore.fork} (RFC `session / fork API`). */
+/** Historical session-fork options (RFC `session / fork API`). */
 export type ForkSessionOptions = {
   parent_session_id: string;
   /** A `chat_messages.id` reachable (and visible) from the parent. */
@@ -158,7 +158,7 @@ export type ForkSessionOptions = {
   metadata?: Record<string, unknown>;
 };
 
-/** Result of {@link SessionsStore.rewind}. */
+/** Historical session-rewind result. */
 export type RewindResult = {
   /** The session that was rewound. */
   session_id: string;

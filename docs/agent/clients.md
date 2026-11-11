@@ -26,7 +26,10 @@ those new chats; reopening one does not submit another model request. A host
 startup failure reports unavailable chat rather than selecting another engine.
 
 Windows currently retains file and media workflows with chat unavailable.
-Signed delivery and live-provider qualification are still pending.
+The optimized macOS Apple Silicon candidate has packaged process evidence.
+The headless host has bounded live OpenRouter `openai/gpt-4.1-mini` text and file-read checks.
+Other live providers, other operating systems and signed delivery remain
+unqualified.
 
 ## Build the host
 

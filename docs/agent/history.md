@@ -7,6 +7,18 @@ format: md
 
 # Return to work and manage chat history
 
+## Reopen after a native Desktop update
+
+An update keeps native chats in their separate history store. Select the saved
+chat to read it again; reopening does not ask the model to repeat the work.
+Previous TypeScript chats remain in their original storage and do not appear as
+new native conversations.
+
+If native chat is unavailable after an update, restore the accepted current
+build and the chat's original model connection. The app does not start another
+chat engine as a fallback. Keep the application data and previous chat files in
+place while recovering; deleting them is not a connection reset.
+
 ## Reopen or organize a chat
 
 In a native workspace chat, use the **Chat** selector to reopen a conversation.

@@ -18,8 +18,6 @@ vi.mock("electron", () => ({ net: {}, session: {} }));
 import { AgentNetworkHost } from "../main/agent-network-host";
 import { AgentNetworkAuthority } from "../main/agent-network-authority";
 import { AgentDaemonSocketHost } from "../main/agent-daemon-socket-host";
-import { LegacyChatArchive } from "../main/legacy-chat-archive";
-import { LegacyChatSourceLease } from "../main/legacy-chat-source-lease";
 import { DesktopMediaHost } from "../main/media-host";
 import { RetainedMediaLaunch } from "../main/retained-media-launch";
 import { NativeWorkspaceCatalog } from "../main/native-workspace-catalog";
@@ -1187,150 +1185,85 @@ describe("built Desktop media startup", () => {
     }
   }, 120_000);
 
-  it.skipIf(process.platform === "win32")(
-    "joins a real legacy database writer before retiring its isolated source",
-    async () => {
-      const root = await fs.mkdtemp(
-        path.join(await fs.realpath(os.tmpdir()), "grida-legacy-writer-")
+  it("refuses retired chat startup before opening historical data or creating scratch", async () => {
+    const root = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-retired-chat-")
+    );
+    const userData = path.join(root, "state");
+    const mediaRoot = path.join(root, "media");
+    const output = path.join(root, "build");
+    const scratch = path.join(root, "scratch");
+    try {
+      for (const directory of [userData, mediaRoot, scratch])
+        await fs.mkdir(directory, { mode: 0o700 });
+      const { DatabaseSync } = await import("node:sqlite");
+      const database = path.join(userData, "sessions.db");
+      const db = new DatabaseSync(database);
+      db.exec(
+        "CREATE TABLE chat_sessions(id TEXT PRIMARY KEY); INSERT INTO chat_sessions VALUES ('retained');"
       );
-      const userData = path.join(root, "state");
-      const mediaRoot = path.join(root, "media");
-      const output = path.join(root, "build");
-      const home = path.join(root, "home");
-      const temporary = path.join(root, "tmp");
-      const scratchBase = path.join(root, "scratch");
-      let active: Sidecar | undefined;
-      try {
-        for (const directory of [
-          userData,
-          mediaRoot,
-          home,
-          temporary,
-          scratchBase,
-        ])
-          await fs.mkdir(directory, { mode: 0o700 });
-        const env = {
-          HOME: home,
-          USERPROFILE: home,
-          TMPDIR: temporary,
-          TMP: temporary,
-          TEMP: temporary,
-        };
-        await runBuild(root, output, env);
-        await fs.symlink(
-          path.join(desktop, "node_modules"),
-          path.join(root, "node_modules"),
-          "dir"
-        );
-        const source = { userDataPath: userData, scratchBase };
-        const lease = new LegacyChatSourceLease(source);
-        const writer = await lease.claimWriter();
-        const metadata = ggContractFixture([]);
-        let inference = 0;
-        active = await Sidecar.start({
-          root,
-          output,
-          userData,
-          mediaRoot,
-          env,
-          runtime: await sidecarRuntime(),
-          generation: 1,
-          fetchProvider: async (url, init) => {
-            const discovery = metadata.response(url);
-            if (discovery) return discovery;
-            expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
-            expect(init.method).toBe("POST");
-            expect(new Headers(init.headers).get("authorization")).toBe(
-              `Bearer ${key}`
-            );
-            expect(await new Response(init.body).text()).toContain(
-              "Legacy provider transport check"
-            );
-            inference++;
-            return new Response(
-              'data: {"id":"fixture","choices":[{"index":0,"delta":{"content":"Legacy provider reply"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n',
-              { headers: { "content-type": "text/event-stream" } }
-            );
-          },
-          legacyScratch: scratchBase,
-        });
-        const handshake = await active.post("/handshake");
-        expect((await handshake.json()).capabilities).toMatchObject({
-          agent: true,
-          sessions: true,
-          shell: false,
-        });
-        const created = await active.post("/sessions", {
-          agent: "grida",
-          title: "Saved legacy chat",
-        });
-        expect(created.status).toBe(200);
-        const { id } = await created.json();
-        expect(
-          (
-            await active.post("/secrets/set", {
-              provider_id: "openrouter",
-              key,
-            })
-          ).status
-        ).toBe(200);
-        const reply = await active.post("/agent/run", {
-          session_id: id,
-          provider_id: "openrouter",
-          tier: "nano",
-          messages: [
-            {
-              id: "legacy-user",
-              role: "user",
-              parts: [
-                { type: "text", text: "Legacy provider transport check" },
-              ],
-            },
+      db.close();
+      const original = await fs.readFile(database);
+      const input = path.join(scratch, "input.txt");
+      await fs.writeFile(input, "Retained user input", { mode: 0o600 });
+      const env = {
+        HOME: root,
+        USERPROFILE: root,
+        TMPDIR: root,
+        TMP: root,
+        TEMP: root,
+      };
+      await runBuild(root, output, env);
+      await fs.symlink(
+        path.join(desktop, "node_modules"),
+        path.join(root, "node_modules"),
+        "dir"
+      );
+      const runtime = await sidecarRuntime();
+      for (const [flags, reason] of [
+        [
+          ["--agent=enabled", `--scratch-base=${scratch}`],
+          "TypeScript chat runtime is retired",
+        ],
+        [
+          ["--agent=disabled", `--skills-root=${scratch}`],
+          "retired chat launch option",
+        ],
+      ] as const) {
+        const child = spawn(
+          runtime.executable,
+          [
+            path.join(output, "sidecar.cjs"),
+            ...flags,
+            `--user-data=${userData}`,
+            `--media-root=${mediaRoot}`,
           ],
-        });
-        expect(reply.status).toBe(200);
-        expect(await reply.text()).toContain("Legacy provider reply");
-        expect(inference).toBe(1);
-        await expect(lease.claimWriter()).rejects.toThrow(
-          "legacy_chat_source_dirty"
+          {
+            env: { ...env, ELECTRON_RUN_AS_NODE: "1" },
+            stdio: ["pipe", "pipe", "pipe", "ipc"],
+          }
         );
-        const owned = active;
-        await writer.completeDrain(async (claimId) => {
-          if (claimId !== writer.claimId) return false;
-          await owned.stop();
-          return true;
+        let diagnostic = "";
+        child.stderr!.on("data", (chunk) => {
+          diagnostic += String(chunk);
         });
-        active = undefined;
-        const report = JSON.parse(
-          await fs.readFile(path.join(root, "guard-1.json"), "utf8")
-        );
-        expect(report.counts).toEqual({ imports: 0, network: 0, processes: 0 });
-        const archive = new LegacyChatArchive(source);
-        const retired = await lease.retire({
-          requestId: "fixture-retirement",
-          verifyWriterAdmission: async () => true,
-          verifyArchive: async () => {
-            const captured = await archive.snapshotQuiesced();
-            return captured ? (await archive.verify(captured.id)).id : null;
-          },
+        const timer = setTimeout(() => child.kill("SIGKILL"), 10000);
+        const code = await new Promise<number | null>((resolve, reject) => {
+          child.once("error", reject);
+          child.once("close", resolve);
         });
-        expect(retired.archiveId).toMatch(/^[a-f0-9]{64}$/);
-        expect(await archive.verify(retired.archiveId!)).toMatchObject({
-          sessionCount: 1,
-        });
-        await expect(lease.claimWriter()).rejects.toThrow(
-          "legacy_chat_source_retired"
-        );
-      } finally {
-        try {
-          await active?.stop(false);
-        } finally {
-          await fs.rm(root, { recursive: true, force: true });
-        }
+        clearTimeout(timer);
+        expect(code).toBe(1);
+        expect(diagnostic).toContain(reason);
+        expect(await fs.readFile(database)).toEqual(original);
+        expect(await fs.readFile(input, "utf8")).toBe("Retained user input");
+        expect(await fs.readdir(userData)).toEqual(["sessions.db"]);
+        expect(await fs.readdir(scratch)).toEqual(["input.txt"]);
       }
-    },
-    120_000
-  );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  }, 60000);
 });
 
 type StartOptions = {
@@ -1353,7 +1286,6 @@ type StartOptions = {
       env: NodeJS.ProcessEnv;
     }>;
   };
-  legacyScratch?: string;
 };
 
 class Sidecar {
@@ -1370,7 +1302,6 @@ class Sidecar {
   private constructor(
     private readonly child: ChildProcess,
     fetchProvider: StartOptions["fetchProvider"],
-    private readonly legacy: boolean,
     private readonly prepareProviderCustody?: () => Promise<void>
   ) {
     this.exit = new Promise((resolve, reject) => {
@@ -1400,13 +1331,7 @@ class Sidecar {
       "--require",
       path.join(fixture, "media-startup-guard.cjs"),
       path.join(options.output, "sidecar.cjs"),
-      ...(options.legacyScratch
-        ? [
-            "--agent=enabled",
-            `--scratch-base=${options.legacyScratch}`,
-            `--skills-root=${options.legacyScratch}`,
-          ]
-        : [options.nativeChat ? "--agent=native-chat" : "--agent=disabled"]),
+      options.nativeChat ? "--agent=native-chat" : "--agent=disabled",
       `--user-data=${options.userData}`,
       `--media-root=${options.mediaRoot}`,
       `--editor-base-url=${origin}`,
@@ -1431,7 +1356,6 @@ class Sidecar {
         ELECTRON_RUN_AS_NODE: "1",
         GRIDA_MEDIA_STARTUP_ROOT: options.root,
         GRIDA_MEDIA_STARTUP_STATE: options.userData,
-        ...(options.legacyScratch && { GRIDA_MEDIA_STARTUP_LEGACY_CHAT: "1" }),
         GRIDA_MEDIA_STARTUP_REPORT: path.join(
           options.root,
           `guard-${options.generation}.json`
@@ -1439,11 +1363,7 @@ class Sidecar {
       },
       stdio: ["pipe", "pipe", "pipe", "ipc"],
     });
-    return await Sidecar.initialize(
-      child,
-      options.fetchProvider,
-      options.legacyScratch !== undefined
-    );
+    return await Sidecar.initialize(child, options.fetchProvider);
   }
   static async startRetained(
     options: RetainedMediaLaunch.Options,
@@ -1453,22 +1373,15 @@ class Sidecar {
     return await Sidecar.initialize(
       launch.child,
       fetchProvider,
-      false,
       launch.prepareProviderCustody
     );
   }
   private static async initialize(
     child: ChildProcess,
     fetchProvider: StartOptions["fetchProvider"],
-    legacy: boolean,
     prepareProviderCustody?: () => Promise<void>
   ) {
-    const sidecar = new Sidecar(
-      child,
-      fetchProvider,
-      legacy,
-      prepareProviderCustody
-    );
+    const sidecar = new Sidecar(child, fetchProvider, prepareProviderCustody);
     let startupTimer: ReturnType<typeof setTimeout>;
     const deadline = new Promise<never>((_resolve, reject) => {
       startupTimer = setTimeout(
@@ -1550,16 +1463,15 @@ class Sidecar {
         assert.deepEqual(this.errors, []);
         assert.equal(this.stderr.includes(key), false);
         assert.equal(this.stderr.includes(ggToken), false);
-        if (!this.legacy)
-          assert.doesNotMatch(
-            this.prepareProviderCustody
-              ? this.stderr.replace(
-                  /^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature.*$/m,
-                  ""
-                )
-              : this.stderr,
-            /SQLite|scratch|skills-root|forbidden imports|forbidden network/
-          );
+        assert.doesNotMatch(
+          this.prepareProviderCustody
+            ? this.stderr.replace(
+                /^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature.*$/m,
+                ""
+              )
+            : this.stderr,
+          /SQLite|scratch|skills-root|forbidden imports|forbidden network/
+        );
       }
     } catch (error) {
       this.network.close();

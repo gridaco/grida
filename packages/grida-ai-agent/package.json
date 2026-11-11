@@ -2,13 +2,12 @@
   "name": "@grida/agent",
   "version": "0.0.0",
   "private": true,
-  "description": "Grida's configured agent and application runtime: prompts, tools, sessions, workspace bindings and the agent tenant of @grida/daemon. Shared model operations are consumed from @grida/ai.",
+  "description": "Retained Grida agent host services, provider custody, media operations and client-safe contracts. Native chat execution is owned by the application host.",
   "license": "MIT",
   "author": "Grida",
   "repository": "https://github.com/gridaco/grida",
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -22,16 +21,6 @@
       "require": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
-      }
-    },
-    "./server": {
-      "import": {
-        "types": "./dist/server.d.mts",
-        "default": "./dist/server.mjs"
-      },
-      "require": {
-        "types": "./dist/server.d.cts",
-        "default": "./dist/server.cjs"
       }
     },
     "./media-server": {
@@ -155,7 +144,6 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json && tsc --noEmit -p tsconfig.browser-backends.json"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "0.25.0",
     "@ai-sdk/gateway": "3.0.125",
     "@ai-sdk/openai": "3.0.0",
     "@ai-sdk/openai-compatible": "2.0.48",
@@ -165,12 +153,13 @@
     "@grida/home": "workspace:*",
     "@hono/node-server": "^1.13.7",
     "ai": "6.0.197",
-    "drizzle-orm": "^0.45.2",
     "hono": "^4.6.14",
     "yaml": "^2.7.0",
     "zod": "^4"
   },
   "devDependencies": {
+    "@agentclientprotocol/sdk": "0.25.0",
+    "drizzle-orm": "^0.45.2",
     "tsdown": "^0.22.1",
     "typescript": "^6",
     "vitest": "^4"

@@ -1,13 +1,13 @@
 // GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-GG: desktop — pass the GG base URL to the daemon (docs/wg/platform/hosted-ai.md)
 // GRIDA-SEC-006 — the selected composition receives the scoped GG custody owner.
-// GRIDA-SEC-008 — construct the native provider inside Grida's agent tenant.
+// GRIDA-SEC-008 — retained services receive no subscription credential authority.
 /**
  * Agent sidecar entry point.
  *
  * Thin: argv parsing + daemon lifecycle + tidy shutdown. All HTTP
- * surface lives in packages. `sidecar/daemon.ts` chooses the media-only or
- * full agent composition before importing chat. Both use `@grida/daemon`'s
+ * surface lives in packages. `sidecar/daemon.ts` starts retained services
+ * without importing a chat runtime. It uses `@grida/daemon`'s
  * perimeter and the same package-owned media adapters.
  *
  * The Desktop supervisor uses Electron-as-Node under its compatibility
@@ -27,20 +27,15 @@
  *   stdin              framed host→sidecar control and provider responses
  *   Node IPC           main-accepted connected daemon sockets only
  *   process.argv[2+]   optional `--key=value` flags. Currently:
- *                        --agent=enabled|disabled|native-chat
- *                          Host launch choice; enabled by default. Media
- *                          compositions do not load scratch or skills.
+ *                        --agent=disabled|native-chat
+ *                          Host launch choice; disabled by default. Neither
+ *                          composition loads chat scratch or skills.
  *                        --retained-media-scope=1
  *                          Private packaged media launcher without chat startup.
- *                        --owned-legacy-writer=1
- *                          Confined legacy writer with no command executor.
  *                        --legacy-state-root=<absolute path>
  *                          Private native preview denials, one per root.
  *                        --user-data=<absolute path>
  *                          The host-owned agent data or retained settings root.
- *                        --scratch-base=<absolute path>
- *                          Electron-main-resolved temp authority root. This is
- *                          intentionally resolved before SRT rewrites TMPDIR.
  *                        --media-root=<absolute path>
  *                          Platform-local app-managed durable media root.
  *                          Required and resolved by trusted Electron main.
@@ -96,36 +91,25 @@ if (!mediaRoot) {
   process.exit(1);
 }
 const requiredMediaRoot = mediaRoot;
-const agentMode = getCliArg("agent") ?? "enabled";
+const agentMode = getCliArg("agent") ?? "disabled";
+if (agentMode !== "disabled" && agentMode !== "native-chat") {
+  console.error("[agent-sidecar] fatal: TypeScript chat runtime is retired");
+  process.exit(1);
+}
 if (
-  agentMode !== "enabled" &&
-  agentMode !== "disabled" &&
-  agentMode !== "native-chat"
+  ["scratch-base", "skills-root", "owned-legacy-writer"].some(
+    (name) => getCliArg(name) !== undefined
+  )
 ) {
-  console.error("[agent-sidecar] fatal: invalid agent composition");
+  console.error("[agent-sidecar] fatal: retired chat launch option");
   process.exit(1);
 }
-const scratchBase = getCliArg("scratch-base");
-if (agentMode === "enabled" && !scratchBase) {
-  console.error("[agent-sidecar] fatal: missing --scratch-base");
-  process.exit(1);
-}
-const requiredScratchBase = scratchBase;
 const runtimeEditorBaseUrl = getCliArg("editor-base-url") ?? EDITOR_BASE_URL;
 // GRIDA-SEC-004 — the supervisor tells us whether it wrapped this spawn with
 // srt. Trusted: argv is set by the trusted main process, not the renderer.
-// Default-off is fail-closed — a missing/`0` flag means the shell tool stays
-// disabled, so a future supervisor bug that drops the flag can't silently
-// expose an unsandboxed shell.
+// Native-chat service settings require this attestation unless selected through
+// the separately confined retained-media launcher. Neither path owns commands.
 const sandboxEnforced = getCliArg("sandbox-enforced") === "1";
-const ownedLegacyWriter = getCliArg("owned-legacy-writer");
-if (
-  ownedLegacyWriter !== undefined &&
-  (ownedLegacyWriter !== "1" || agentMode !== "enabled" || !sandboxEnforced)
-) {
-  console.error("[agent-sidecar] fatal: invalid owned legacy writer scope");
-  process.exit(1);
-}
 const retainedMediaScope = getCliArg("retained-media-scope");
 const ordinaryNativeChatServices = getCliArg("ordinary-native-chat-services");
 const workspaceCatalog = getCliArg("workspace-catalog");
@@ -155,9 +139,7 @@ const legacyStateRoots = process.argv
 if (
   legacyStateRoots.length > 0 &&
   (legacyStateRoots.length > 24 ||
-    (!workspaceCatalog &&
-      ownedLegacyWriter !== "1" &&
-      ordinaryNativeChatServices !== "1") ||
+    (!workspaceCatalog && ordinaryNativeChatServices !== "1") ||
     legacyStateRoots.some(
       (root) => !root.startsWith("/") || Buffer.byteLength(root) > 4096
     ))
@@ -167,7 +149,7 @@ if (
 }
 if (
   retainedMediaScope !== undefined &&
-  (retainedMediaScope !== "1" || agentMode === "enabled" || sandboxEnforced)
+  (retainedMediaScope !== "1" || sandboxEnforced)
 ) {
   console.error("[agent-sidecar] fatal: invalid retained media scope");
   process.exit(1);
@@ -176,20 +158,6 @@ if (
 // (`~/Documents/Grida Projects`). The supervisor owns the path fact and forwards it;
 // absent (e.g. a future supervisor bug) means auto-create simply refuses.
 const projectsRoot = getCliArg("projects-root");
-// The host-bundled skills dir (repo-root `skills/`), resolved by the supervisor
-// (dev = repo path; packaged = resources). Absent ⇒ no built-in skills.
-const skillsRoot =
-  agentMode === "enabled" ? getCliArg("skills-root") : undefined;
-if (agentMode === "enabled" && !skillsRoot) {
-  // A silent undefined here is exactly how the built-ins first shipped dormant
-  // (see the `agentTenantOptionsFromDaemon` regression). Warn so a repeat —
-  // a dropped/misnamed flag from the supervisor — is visible at startup
-  // instead of only surfacing as "the agent knows no skills" in a live run.
-  console.warn(
-    "[agent-sidecar] --skills-root not provided; built-in skills (svg/dotcanvas/slides) will not be discovered."
-  );
-}
-
 async function main() {
   const network = new AgentSidecarNetwork(process.stdin, process.stdout);
   let daemonSockets: AgentSidecarDaemonSockets | null = null;
@@ -242,22 +210,7 @@ async function main() {
       : undefined,
     projects_root: projectsRoot,
     editor_base_url: runtimeEditorBaseUrl,
-    agent:
-      agentMode === "enabled"
-        ? {
-            // The enabled-mode argv guard above requires this host authority.
-            scratch_base: requiredScratchBase!,
-            skills_root: skillsRoot,
-            sandbox_enforced: sandboxEnforced,
-            owned_legacy_writer: ownedLegacyWriter === "1",
-            shell_executor:
-              sandboxEnforced && ownedLegacyWriter === undefined
-                ? network.shellExecutor
-                : undefined,
-          }
-        : agentMode === "native-chat"
-          ? "native-chat"
-          : false,
+    agent: agentMode === "native-chat" ? "native-chat" : false,
     // Provider and asset traffic uses the private channel to Electron Main.
     provider_http: network.providerHttp,
   });

@@ -483,7 +483,7 @@ export class AgentNetworkHost {
       workspace_root: frame.workspaceRoot,
       scratch_root: frame.scratchDir,
       // These roots are host facts and therefore are deliberately absent from
-      // the untrusted frame. AgentCommandHost binds them from constructor state.
+      // the untrusted frame. The executor binds them from trusted construction state.
       protected_read_roots: [],
     });
     void this.executeCommand(frame, scope, controller).catch((error) =>
@@ -507,7 +507,7 @@ export class AgentNetworkHost {
     if (this.abortingCommands.has(requestId)) {
       throw new Error("duplicate command abort");
     }
-    // Keep the request active until the executor returns: for AgentCommandHost,
+    // Keep the request active until the executor returns: for a process owner,
     // that means its finally block has removed command temp and released SRT's
     // per-command bookkeeping. Only then may command.aborted settle the tool.
     this.abortingCommands.add(requestId);
