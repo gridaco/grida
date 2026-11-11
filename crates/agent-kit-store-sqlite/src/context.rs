@@ -1,8 +1,8 @@
 //! Retained model context replacements backed by owned turn outcomes.
 
 use super::history::{
-    HistoryBasis, HistorySeed, HistorySelection, RetainedHistory, View, read_view, require_basis,
-    seed_bytes, select_view,
+    HistoryBasis, HistorySeed, HistorySelection, RetainedHistory, View, read_view,
+    read_view_projection, require_basis, seed_bytes, select_view,
 };
 use super::{
     Acquired, ClaimRecord, MAX_HISTORY_BYTES, PreparedClaim, SqliteStore, bump_revision,
@@ -44,6 +44,15 @@ pub struct ContextInstall {
     pub covered_through: Option<TurnId>,
 }
 
+/// A bounded oldest projection with the exact basis of its full source.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ContextPrefix {
+    pub history: RetainedHistory,
+    /// The last projected nonempty turn when a suffix did not fit. All later
+    /// turns remain outside the projection and must be retained.
+    pub unprojected_suffix_after: Option<TurnId>,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 enum StoredContextReplacement {
@@ -62,6 +71,28 @@ impl SqliteStore {
         execute(Arc::clone(&self.inner), move |_, connection| {
             let revision = load_session(connection, &session)?.revision;
             read_context(connection, &session, revision, before_turn, &project)
+        })
+        .await
+    }
+
+    /// Project a complete-turn context prefix within the ordinary record and
+    /// byte bounds. If the projection exceeds its budget before a nonempty
+    /// turn fits, refuse. The history basis still covers the entire source
+    /// under the normal scan cap.
+    pub async fn context_prefix_with(
+        &self,
+        session: SessionId,
+        project: impl Fn(&TurnState) -> Vec<HistoryRecord> + Send + 'static,
+    ) -> Result<ContextPrefix> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let revision = load_session(connection, &session)?.revision;
+            let (view, before) = context_view(connection, &session, None)?;
+            let (history, unprojected_suffix_after) =
+                read_view_projection(connection, &session, revision, view, before, &project, true)?;
+            Ok(ContextPrefix {
+                history,
+                unprojected_suffix_after,
+            })
         })
         .await
     }

@@ -135,6 +135,13 @@ matching its retained outcome and covered history. Model reads select the
 latest eligible replacement and newer local turns. Transcript reads and
 queued submissions retain their existing records.
 
+A bounded context-prefix read can return an older complete-turn prefix when
+the ordinary context projection would exceed its record or byte limit. It
+identifies the last projected turn and retains the exact basis of the full
+source for claim and installation. All later turns remain outside the
+projection. The full snapshot scan keeps its existing bounds and refuses
+malformed snapshots even in the unprojected suffix.
+
 Caller-owned pure projections can inspect a committed turn or transform each
 turn's history within those bounded reads. They acquire no execution lease.
 External answers and history contributions are rejected after cancellation,

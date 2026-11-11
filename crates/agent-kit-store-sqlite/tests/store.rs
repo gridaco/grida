@@ -1326,12 +1326,20 @@ async fn input_observation_preserves_payload_and_disposition_after_reopen() {
 #[tokio::test]
 async fn oversized_history_is_refused_without_returning_a_partial_projection() {
     let (_directory, store) = store().await;
+    finish_history_turn(&store, session(), "empty-turn", vec![]).await;
     let records: Vec<_> = (0..4_097)
         .map(|i| history_message(&format!("message-{i}"), "text"))
         .collect();
     let turn = finish_history_turn(&store, session(), "large-turn", records.clone()).await;
     assert_error(
         store.history(session(), None).await,
+        ErrorKind::LimitExceeded,
+        "history_projection_limit",
+    );
+    assert_error(
+        store
+            .context_prefix_with(session(), |state| state.history().records().to_vec())
+            .await,
         ErrorKind::LimitExceeded,
         "history_projection_limit",
     );
@@ -1348,6 +1356,176 @@ async fn oversized_history_is_refused_without_returning_a_partial_projection() {
         .unwrap();
     assert_eq!(replay.next().await.unwrap(), Some(records));
     assert_eq!(replay.next().await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn bounded_context_prefix_keeps_whole_turns_and_checks_the_full_source() {
+    use agent_kit_core::turn::TurnState;
+    use agent_kit_store_sqlite::context::{ContextInstall, UnpromptedClaim};
+
+    let (directory, store) = store().await;
+    let prefix: Vec<_> = (0..4_094)
+        .map(|index| history_message(&format!("old-{index}"), "older text"))
+        .collect();
+    let boundary = finish_history_turn(&store, session(), "prefix", prefix.clone()).await;
+    finish_history_turn(&store, session(), "empty", vec![]).await;
+    let suffix = vec![
+        history_message("suffix-one", "keep one"),
+        history_message("suffix-two", "keep two"),
+        history_message("suffix-three", "keep three"),
+    ];
+    finish_history_turn(&store, session(), "suffix", suffix.clone()).await;
+    let project = |state: &TurnState| state.history().records().to_vec();
+    let captured = store.context_prefix_with(session(), project).await.unwrap();
+    assert_eq!(captured.unprojected_suffix_after.as_ref(), Some(&boundary));
+    assert_eq!(captured.history.clone().into_records(), prefix);
+    assert_error(
+        store.context_history_with(session(), None, project).await,
+        ErrorKind::LimitExceeded,
+        "history_projection_limit",
+    );
+
+    // A later turn that could fit alone still belongs to the untouched suffix.
+    let later = history_message("later", "keep the later complete turn");
+    finish_history_turn(&store, session(), "later", vec![later.clone()]).await;
+    let current = store.context_prefix_with(session(), project).await.unwrap();
+    assert_eq!(current.unprojected_suffix_after.as_ref(), Some(&boundary));
+    assert_eq!(current.history.clone().into_records(), prefix);
+    assert_eq!(
+        current.history.basis,
+        store
+            .context_history_with(session(), None, |_| Vec::new())
+            .await
+            .unwrap()
+            .basis
+    );
+    let request = UnpromptedClaim {
+        session: session(),
+        turn: TurnId::new("replacement-turn").unwrap(),
+        request: change("replace-prefix"),
+        expected_revision: current.history.session_revision,
+        expected_context: current.history.basis,
+        checkpoint: payload("current basis"),
+    };
+    assert_error(
+        store
+            .claim_unprompted(UnpromptedClaim {
+                expected_context: captured.history.basis,
+                ..request.clone()
+            })
+            .await,
+        ErrorKind::Conflict,
+        "history_basis_changed",
+    );
+    let ClaimOutcome::Acquired(claim) = store.claim_unprompted(request.clone()).await.unwrap()
+    else {
+        panic!("expected unprompted owner")
+    };
+    let outcome = TurnOutcome {
+        status: OutcomeStatus::Succeeded,
+        account: None,
+        evidence: vec![],
+    };
+    commit(&claim, "done", vec![JournalAction::Settle(outcome.clone())]).await;
+    drop(claim);
+    let summary = history_message("summary", "compact prefix");
+    store
+        .install_context(ContextInstall {
+            session: session(),
+            turn: request.turn,
+            expected_context: request.expected_context,
+            expected_outcome: Fingerprint::of(&outcome).unwrap(),
+            replacement: HistorySeed {
+                records: vec![summary.clone()],
+                provenance: payload("covered prefix"),
+            },
+            covered_through: current.unprojected_suffix_after,
+        })
+        .await
+        .unwrap();
+    drop(store);
+    let store = SqliteStore::open(directory.path().join("sessions.sqlite")).unwrap();
+    let compacted = store.context_prefix_with(session(), project).await.unwrap();
+    assert!(compacted.unprojected_suffix_after.is_none());
+    assert_eq!(
+        compacted.history.into_records(),
+        [vec![summary], suffix.clone(), vec![later.clone()]].concat()
+    );
+    let mut replay = store.open_history_replay(session(), project).await.unwrap();
+    let mut visible = Vec::new();
+    while let Some(records) = replay.next().await.unwrap() {
+        visible.extend(records);
+    }
+    assert_eq!(visible, [prefix, suffix, vec![later]].concat());
+}
+
+#[tokio::test]
+async fn bounded_context_prefix_still_refuses_a_malformed_or_oversized_scan() {
+    use agent_kit_core::turn::{TurnBinding, TurnState};
+
+    let (directory, store) = store().await;
+    let prefix = (0..4_096)
+        .map(|index| history_message(&format!("prefix-{index}"), "older text"))
+        .collect();
+    finish_history_turn(&store, session(), "prefix", prefix).await;
+    finish_history_turn(
+        &store,
+        session(),
+        "suffix",
+        vec![history_message("suffix", "unprojected suffix")],
+    )
+    .await;
+    drop(store);
+    let path = directory.path().join("sessions.sqlite");
+    let corrupt = rusqlite::Connection::open(&path).unwrap();
+    corrupt
+        .execute(
+            "INSERT INTO turns(session,id,snapshot) VALUES(?1,'malformed',?2)",
+            rusqlite::params![session().as_str(), b"invalid"],
+        )
+        .unwrap();
+    drop(corrupt);
+    let project = |state: &TurnState| state.history().records().to_vec();
+    let store = SqliteStore::open(&path).unwrap();
+    assert_error(
+        store.context_prefix_with(session(), project).await,
+        ErrorKind::InvalidState,
+        "stored_data_invalid",
+    );
+    drop(store);
+
+    let mut connection = rusqlite::Connection::open(&path).unwrap();
+    let transaction = connection.transaction().unwrap();
+    transaction
+        .execute("DELETE FROM turns WHERE id='malformed'", [])
+        .unwrap();
+    for index in 0..4_095 {
+        let turn = TurnId::new(format!("empty-{index}")).unwrap();
+        let state = TurnState::new(TurnBinding {
+            session: session(),
+            turn: turn.clone(),
+            epoch: 1,
+        })
+        .unwrap();
+        transaction
+            .execute(
+                "INSERT INTO turns(session,id,snapshot) VALUES(?1,?2,?3)",
+                rusqlite::params![
+                    session().as_str(),
+                    turn.as_str(),
+                    serde_json::to_vec(&state).unwrap()
+                ],
+            )
+            .unwrap();
+    }
+    transaction.commit().unwrap();
+    drop(connection);
+    let store = SqliteStore::open(&path).unwrap();
+    assert_error(
+        store.context_prefix_with(session(), project).await,
+        ErrorKind::LimitExceeded,
+        "history_projection_limit",
+    );
 }
 
 #[tokio::test]

@@ -692,6 +692,27 @@ pub(super) fn read_view(
     before: Option<i64>,
     project: &TurnProjection<'_>,
 ) -> Result<RetainedHistory> {
+    read_view_projection(
+        connection,
+        session,
+        session_revision,
+        view,
+        before,
+        project,
+        false,
+    )
+    .map(|(history, _)| history)
+}
+
+pub(super) fn read_view_projection(
+    connection: &Connection,
+    session: &SessionId,
+    session_revision: SessionRevision,
+    view: View,
+    before: Option<i64>,
+    project: &TurnProjection<'_>,
+    allow_prefix: bool,
+) -> Result<(RetainedHistory, Option<TurnId>)> {
     let mut query = connection.prepare(
         "SELECT ordinal,id,snapshot FROM turns
          WHERE session=?1 AND ordinal>?2 AND (?3 IS NULL OR ordinal<=?3) AND (?4 IS NULL OR ordinal<?4)
@@ -710,8 +731,9 @@ pub(super) fn read_view(
     if let Some(seed) = &view.seed {
         budget.add(&seed.records)?;
     }
-    let mut records = Vec::new();
+    let mut records: Vec<RetainedRecord> = Vec::new();
     let mut snapshots = Vec::new();
+    let mut unprojected_suffix_after = None;
     let mut scanned_turns = 0;
     let mut scanned_bytes = 0;
     while let Some(row) = rows.next().map_err(database_error)? {
@@ -729,13 +751,23 @@ pub(super) fn read_view(
         }
         let state = decode_turn(snapshot, session, &turn)?;
         let position = state.position();
-        let projected = project(&state);
-        budget.add(&projected)?;
-        records.extend(projected.into_iter().map(|record| RetainedRecord {
-            turn: turn.clone(),
-            position,
-            record,
-        }));
+        if unprojected_suffix_after.is_none() {
+            let projected = project(&state);
+            match budget.add(&projected) {
+                Ok(()) => records.extend(projected.into_iter().map(|record| RetainedRecord {
+                    turn: turn.clone(),
+                    position,
+                    record,
+                })),
+                Err(error) if allow_prefix && error == projection_limit() => {
+                    let last = records.last().ok_or(error)?;
+                    unprojected_suffix_after = Some(last.turn.clone());
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        // The basis describes the full source even when only a complete-turn
+        // prefix fits the projection. Claim and installation verify it again.
         snapshots.push((
             HistoryTail {
                 turn,
@@ -745,7 +777,7 @@ pub(super) fn read_view(
             state.binding().epoch,
         ));
     }
-    Ok(RetainedHistory {
+    let history = RetainedHistory {
         basis: HistoryBasis {
             view: view.id,
             tail: snapshots.last().map(|(tail, _)| tail.clone()),
@@ -754,7 +786,8 @@ pub(super) fn read_view(
         session_revision,
         seed: view.seed,
         records,
-    })
+    };
+    Ok((history, unprojected_suffix_after))
 }
 
 #[derive(Default)]
