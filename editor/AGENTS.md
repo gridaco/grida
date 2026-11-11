@@ -13,7 +13,7 @@ This package is the Next.js app that powers **`grida.co`** and tenant domains (e
   Read [`lib/api/README.md`](lib/api/README.md) before adding or changing its routes,
   request policy, or Next redirects. Run `pnpm test:api` and `pnpm test:api:http`.
 - **Layouts are per route group**: there isn’t a single shared root layout across the whole `app/` tree — top-level route groups own their root `layout.tsx`/metadata.
-- **Edge entrypoint is `proxy.ts`**: on Next.js 16 this replaces `middleware.ts` (same runtime + semantics). Don’t add a new `middleware.ts`. In this repo it’s also where maintenance mode, Supabase session refresh, and host-based tenant routing are wired together (see “Multi-tenancy” below).
+- **Edge entrypoint is `proxy.ts`**: on Next.js 16 this replaces `middleware.ts` (same runtime + semantics). Don’t add a new `middleware.ts`. In this repo it’s also where maintenance mode, Supabase session refresh, and host-based tenant routing are wired together (see “Multi-tenancy” below). The maintenance-mode Edge Config flag is reused per server instance by [`lib/maintenance/server-instance-cache.ts`](lib/maintenance/server-instance-cache.ts) (`GRIDA_MAINTENANCE_MODE_CACHE_TTL_MS`).
 - **Tenant pages are tenant-aware**: follow [`app/(tenant)/README.md`](<app/(tenant)/README.md>) for host-prefixed fetches (`server.HOST` / `web.HOST`) and tenant-friendly `href="/path"` patterns.
 - **Shared UI boundaries matter**:
   - `components/` should remain route-agnostic and override-friendly (see [`components/AGENTS.md`](components/AGENTS.md))
