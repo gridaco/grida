@@ -55,5 +55,5 @@ Desktop verifies the archive before opening its location.
 
 In an idle chat with an open, empty queue, send **`/compact`** on its own to
 summarize earlier material for future model requests. The transcript stays in
-the chat. Some Act tasks compact earlier context automatically.
+the chat. Some ordinary Plan and Act text tasks compact earlier context automatically.
 [Compact model context](./clients.md#compact-model-context)

@@ -93,6 +93,20 @@ fn compact(session: &str, id: &str) -> Value {
     json!({"sessionId":session,"requestId":id})
 }
 
+fn offers_tool(request: &Value, name: &str) -> bool {
+    request["tools"]
+        .as_array()
+        .is_some_and(|tools| tools.iter().any(|tool| tool["function"]["name"] == name))
+}
+
+fn assert_plan_request(request: &Value) {
+    assert!(request["messages"].to_string().contains("Plan is active"));
+    assert!(offers_tool(request, "config_inspect"));
+    for denied in ["config_update", "config_reload", "run_command"] {
+        assert!(!offers_tool(request, denied), "{request}");
+    }
+}
+
 async fn prime_automatic_history(
     endpoint: &mut Endpoint,
     socket: &mut SharedSocket,
@@ -109,32 +123,68 @@ async fn prime_automatic_history(
 
 #[tokio::test]
 async fn identified_submit_keeps_one_queued_receipt_during_automatic_compaction() {
+    let workspace = TempDir::new().unwrap();
+    identified_submit_compacts_in_regime("act", workspace.path(), None).await;
+}
+
+#[tokio::test]
+async fn identified_plan_submit_compacts_without_widening_captured_authority() {
+    let workspace = TempDir::new().unwrap();
+    identified_submit_compacts_in_regime("plan", workspace.path(), None).await;
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+#[ignore = "requires a reviewed native helper"]
+async fn identified_plan_compaction_preserves_native_read_scope_and_withholds_commands() {
+    let fixture = super::approvals::Fixture::new(true);
+    identified_submit_compacts_in_regime("plan", &fixture.primary, Some(&fixture.profile)).await;
+}
+
+async fn identified_submit_compacts_in_regime(
+    regime: &str,
+    workspace: &Path,
+    profile: Option<&Path>,
+) {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("state");
-    let workspace = TempDir::new().unwrap();
+    let (release_initial, initial_held) = tokio::sync::oneshot::channel();
     let (release, held) = tokio::sync::oneshot::channel();
     let mut endpoint = Endpoint::start(vec![
-        Reply::Finished("Initial direct answer."),
+        Reply::Release("Initial direct answer.", initial_held),
         Reply::Finished("First original answer."),
         Reply::Finished("Recent original answer."),
         Reply::Finished("Synchronous prompt answer."),
         Reply::Release("Earlier work and unresolved decisions.", held),
         Reply::Finished("Direct input answer."),
+        Reply::Finished("Unexpected replay request."),
     ])
     .await;
-    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let (host, url) =
+        shared_server_with_profile(&state, &endpoint.url, TEST_CREDENTIAL, profile).await;
     let mut socket = client(&url).await;
-    let session = create(&mut socket, workspace.path()).await;
-    let ordinary = ws_rpc(
-        &mut socket,
-        9,
-        "_co.grida/session/submit",
-        prompt_request(&session, "initial-direct", "Small identified submission."),
-    )
-    .await;
+    let session = create(&mut socket, workspace).await;
+    let mut initial = prompt_request(&session, "initial-direct", "Small identified submission.");
+    initial["operatingRegime"] = regime.into();
+    let ordinary = ws_rpc(&mut socket, 9, "_co.grida/session/submit", initial.clone()).await;
     assert_eq!(ordinary["result"]["disposition"], "claimed", "{ordinary}");
     assert!(ordinary["result"]["turnId"].is_string());
-    endpoint.request().await;
+    let initial_request = endpoint.request().await;
+    if regime == "plan" {
+        assert_plan_request(&initial_request);
+    }
+    let retained = ws_rpc(
+        &mut socket,
+        90,
+        "_co.grida/session/input",
+        json!({"sessionId":session,"inputId":"initial-direct"}),
+    )
+    .await;
+    assert_eq!(retained["result"]["settings"]["operatingRegime"], regime);
+    let initial_retry = ws_rpc(&mut socket, 91, "_co.grida/session/submit", initial).await;
+    assert_eq!(initial_retry["result"], ordinary["result"]);
+    assert!(endpoint.requests.try_recv().is_err());
+    release_initial.send(()).unwrap();
     wait_for_snapshot(&mut socket, &session, |snapshot| {
         snapshot["current"].is_null()
     })
@@ -153,6 +203,9 @@ async fn identified_submit_keeps_one_queued_receipt_during_automatic_compaction(
         "{synchronous}"
     );
     let synchronous_request = endpoint.request().await;
+    if profile.is_some() {
+        assert!(offers_tool(&synchronous_request, "run_command"));
+    }
     assert_eq!(
         synchronous_request["messages"]
             .as_array()
@@ -168,7 +221,7 @@ async fn identified_submit_keeps_one_queued_receipt_during_automatic_compaction(
         "direct-after-history",
         "Exactly one direct input.",
     );
-    direct["operatingRegime"] = "act".into();
+    direct["operatingRegime"] = regime.into();
     let pending = ws_rpc(&mut socket, 11, "_co.grida/session/submit", direct.clone()).await;
     assert_eq!(pending["result"]["disposition"], "queued", "{pending}");
     assert!(pending["result"]["turnId"].is_null());
@@ -189,11 +242,12 @@ async fn identified_submit_keeps_one_queued_receipt_during_automatic_compaction(
     )
     .await;
     assert_eq!(captured["result"]["receipt"], pending["result"]);
-    assert_eq!(captured["result"]["settings"]["operatingRegime"], "act");
+    assert_eq!(captured["result"]["settings"]["operatingRegime"], regime);
     let retried = ws_rpc(&mut socket, 13, "_co.grida/session/submit", direct.clone()).await;
     assert_eq!(retried["result"], pending["result"]);
-    direct["operatingRegime"] = "plan".into();
-    let changed = ws_rpc(&mut socket, 14, "_co.grida/session/submit", direct).await;
+    let mut changed = direct.clone();
+    changed["operatingRegime"] = if regime == "plan" { "act" } else { "plan" }.into();
+    let changed = ws_rpc(&mut socket, 14, "_co.grida/session/submit", changed).await;
     assert!(
         changed["error"]
             .to_string()
@@ -202,15 +256,33 @@ async fn identified_submit_keeps_one_queued_receipt_during_automatic_compaction(
     );
     release.send(()).unwrap();
     let user = endpoint.request().await;
+    if regime == "plan" {
+        assert_plan_request(&user);
+        if profile.is_some() {
+            assert!(offers_tool(&user, "read_file"));
+        }
+    }
     let messages = user["messages"].to_string();
     assert!(messages.contains("Earlier work and unresolved decisions."));
     assert!(messages.contains("Keep this standard prompt verbatim."));
+    assert!(messages.contains("Synchronous prompt answer."));
+    assert!(!messages.contains(&older));
+    assert_eq!(
+        user["messages"].as_array().unwrap().last().unwrap()["content"],
+        "Exactly one direct input."
+    );
     assert_eq!(messages.matches("Exactly one direct input.").count(), 1);
     wait_for_snapshot(&mut socket, &session, |snapshot| {
         snapshot["current"].is_null()
     })
     .await;
-    let settled = ws_rpc(&mut socket, 15, "_co.grida/session/input", receipt_request).await;
+    let settled = ws_rpc(
+        &mut socket,
+        15,
+        "_co.grida/session/input",
+        receipt_request.clone(),
+    )
+    .await;
     assert_eq!(
         settled["result"]["settings"],
         captured["result"]["settings"]
@@ -222,12 +294,32 @@ async fn identified_submit_keeps_one_queued_receipt_during_automatic_compaction(
         pending["result"]["inputPosition"]
     );
     assert_ne!(settled["result"]["receipt"]["turnId"], helper_turn);
-    let transcript = load(&mut socket, &session, workspace.path()).await.join("");
+    let transcript = load(&mut socket, &session, workspace).await.join("");
     assert_eq!(transcript.matches("Exactly one direct input.").count(), 1);
+    assert!(transcript.contains(&older));
     assert!(!transcript.contains("Earlier work and unresolved decisions."));
     drop(socket);
     terminate_shared_server(host).await;
-    endpoint.done().await;
+
+    let (host, url) =
+        shared_server_with_profile(&state, &endpoint.url, TEST_CREDENTIAL, profile).await;
+    let mut socket = client(&url).await;
+    assert_eq!(
+        load(&mut socket, &session, workspace).await.join(""),
+        transcript
+    );
+    let reopened = ws_rpc(&mut socket, 16, "_co.grida/session/input", receipt_request).await;
+    assert_eq!(reopened["result"], settled["result"]);
+    let replayed = ws_rpc(&mut socket, 17, "_co.grida/session/submit", direct).await;
+    assert_eq!(replayed["result"], settled["result"]["receipt"]);
+    assert!(
+        timeout(Duration::from_millis(150), endpoint.requests.recv())
+            .await
+            .is_err()
+    );
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.task.abort();
 }
 
 #[tokio::test]
@@ -444,6 +536,15 @@ async fn automatic_compaction_fails_once_and_uses_the_previous_context() {
 
 #[tokio::test]
 async fn automatic_compaction_pause_and_restart_keep_the_exact_queue_until_stop_released() {
+    paused_automatic_compaction_keeps_queue("act").await;
+}
+
+#[tokio::test]
+async fn paused_plan_compaction_preserves_the_exact_input_across_restart_and_stop() {
+    paused_automatic_compaction_keeps_queue("plan").await;
+}
+
+async fn paused_automatic_compaction_keeps_queue(regime: &str) {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("state");
     let workspace = TempDir::new().unwrap();
@@ -458,17 +559,13 @@ async fn automatic_compaction_pause_and_restart_keep_the_exact_queue_until_stop_
     let mut socket = client(&url).await;
     let session = create(&mut socket, workspace.path()).await;
     let older = prime_automatic_history(&mut endpoint, &mut socket, &session).await;
-    let queued = ws_rpc(
-        &mut socket,
-        5,
-        "_co.grida/session/enqueue",
-        prompt_request(
-            &session,
-            "held-input",
-            "Preserve the accepted queued input.",
-        ),
-    )
-    .await;
+    let mut request = prompt_request(
+        &session,
+        "held-input",
+        "Preserve the accepted queued input.",
+    );
+    request["operatingRegime"] = regime.into();
+    let queued = ws_rpc(&mut socket, 5, "_co.grida/session/enqueue", request).await;
     assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
     endpoint.request().await;
     let active = session_snapshot(&mut socket, &session).await;
@@ -496,6 +593,11 @@ async fn automatic_compaction_pause_and_restart_keep_the_exact_queue_until_stop_
     let paused = session_snapshot(&mut socket, &session).await;
     assert_eq!(paused["current"]["turnId"], turn);
     assert_eq!(paused["current"]["disposition"], "suspended");
+    assert!(
+        timeout(Duration::from_millis(150), endpoint.requests.recv())
+            .await
+            .is_err()
+    );
     let stop = ws_rpc(
         &mut socket,
         7,
@@ -517,6 +619,7 @@ async fn automatic_compaction_pause_and_restart_keep_the_exact_queue_until_stop_
     )
     .await;
     assert_eq!(retained["result"]["receipt"], queued["result"]);
+    assert_eq!(retained["result"]["settings"]["operatingRegime"], regime);
     assert!(endpoint.requests.try_recv().is_err());
     let released = ws_rpc(
         &mut socket,
@@ -527,6 +630,9 @@ async fn automatic_compaction_pause_and_restart_keep_the_exact_queue_until_stop_
     .await;
     assert!(released.get("result").is_some(), "{released}");
     let next = endpoint.request().await;
+    if regime == "plan" {
+        assert_plan_request(&next);
+    }
     assert!(next["messages"].to_string().contains(&older));
     assert_eq!(
         next["messages"].as_array().unwrap().last().unwrap()["content"],

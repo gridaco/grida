@@ -344,7 +344,6 @@ impl Host {
         let stored: StoredPrompt = decode_input(head)?;
         if stored.goal.is_some()
             || !ordinary_text(
-                stored.operating_regime,
                 stored.configuration_permission,
                 stored.effort.is_some(),
                 &stored.parts,
@@ -790,13 +789,11 @@ impl Host {
 }
 
 pub(super) fn ordinary_text(
-    regime: OperatingRegime,
     configuration: crate::ConfigurationPermission,
     ultra: bool,
     parts: &[PromptPart],
 ) -> bool {
-    regime.is_act()
-        && configuration != crate::ConfigurationPermission::Change
+    configuration != crate::ConfigurationPermission::Change
         && !ultra
         && parts
             .iter()

@@ -817,7 +817,7 @@ prompt or call the identified compaction operation. Start from an idle chat
 with an open, empty queue. The summary uses the selected model. New prompts
 can enter the queue while it runs.
 
-For ordinary **Act** text, the native host can summarize a large earlier part
+For ordinary **Plan** or **Act** text, the native host can summarize a large earlier part
 of the conversation before starting an accepted queued message or an
 identified submit. An identified submit reports the same accepted input as
 queued while the summary runs. The host keeps the most recent turn verbatim

@@ -1098,7 +1098,6 @@ impl Host {
         validate_prompt_parts(&parts)?;
         let launch = if identified
             && compaction::ordinary_text(
-                policy.operating_regime,
                 policy.configuration_permission,
                 policy.effort.is_some(),
                 &parts,
