@@ -77,7 +77,7 @@ impl Turn {
             .collect::<Result<_>>()?;
         let history = if tools
             .iter()
-            .any(|tool| matches!(tool.outcome, InvokeOutcome::Deferred(_)))
+            .any(|tool| !matches!(tool.outcome, InvokeOutcome::Complete(_)))
         {
             vec![]
         } else {

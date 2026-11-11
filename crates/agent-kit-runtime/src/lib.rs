@@ -122,6 +122,9 @@ pub enum ToolDecision {
 pub enum InvokeOutcome {
     Complete(ToolOutcome),
     Deferred(WaitId),
+    /// Actual turn Pause interrupted admission before the attempt committed.
+    /// The prepared operation can be reconsidered under new controls.
+    Paused,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

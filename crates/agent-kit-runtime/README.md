@@ -51,7 +51,11 @@ principal or scope prevents pending execution.
 Each local owner captures its admission control revision. Pause and Cancel
 interrupt older owners even when a control reader sees only the latest snapshot
 after Resume. An attempt commit checks that same admission on retry. A known
-control interruption is retained in the inference result. Dispatched tool work
+control interruption is retained in the inference result. A Pause observed
+before a tool attempt returns `InvokeOutcome::Paused` and leaves the exact
+operation prepared for reconsideration. The operations view has been refreshed
+from the journal, so it may already show a later Resume. A committed Stop still
+records definite nonexecution for the unstarted target. Dispatched tool work
 can still have an uncertain result.
 
 Journal acknowledgment loss triggers readback using the same change identity.
@@ -79,7 +83,8 @@ inference failure preserves those outcomes.
 results. The master installs it together with its next checkpoint using
 `publish_continuation`. Replaying a completed step reconstructs the candidate
 without requiring a live provider or the old tool inventory. Deferred tool work
-returns its wait identity and leaves transcript installation to continuation.
+returns its wait identity. A step with deferred or paused tool work retains
+sibling results and leaves transcript installation to continuation.
 `recorded_step_history` projects completed exchanges from the journal without
 starting provider or tool work. It keeps the original call identity and omits
 unpaired declarations. A master can publish this history when stopping a step

@@ -592,12 +592,21 @@ impl Master {
                     return Err(error);
                 }
             };
+            if step
+                .tools
+                .iter()
+                .any(|tool| matches!(tool.outcome, InvokeOutcome::Paused))
+            {
+                // Revisit the same captured step after controls settle. A sibling
+                // may already have committed an effect under this step identity.
+                continue;
+            }
             let deferred: Vec<_> = step
                 .tools
                 .iter()
                 .filter_map(|tool| match &tool.outcome {
                     InvokeOutcome::Deferred(wait) => Some(wait.clone()),
-                    InvokeOutcome::Complete(_) => None,
+                    InvokeOutcome::Complete(_) | InvokeOutcome::Paused => None,
                 })
                 .collect();
             if !deferred.is_empty() {

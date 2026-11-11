@@ -936,6 +936,8 @@ struct FaultJournal {
 enum RacePoint {
     Boundary,
     Start,
+    Reject,
+    RejectThenStop,
 }
 
 impl TurnJournal for FaultJournal {
@@ -954,6 +956,9 @@ impl TurnJournal for FaultJournal {
                         matches!(action, JournalAction::Settle(_) | JournalAction::Suspend)
                     }
                     RacePoint::Start => matches!(action, JournalAction::StartAttempt { .. }),
+                    RacePoint::Reject | RacePoint::RejectThenStop => {
+                        matches!(action, JournalAction::RejectPrepared { .. })
+                    }
                 })
                 && !self.raced.swap(true, Ordering::SeqCst)
             {
@@ -965,13 +970,17 @@ impl TurnJournal for FaultJournal {
                         ControlDirective::Pause,
                     )
                     .await?;
-                if matches!(point, RacePoint::Start) {
+                if !matches!(point, RacePoint::Boundary) {
                     let state = self.lease.journal().load().await?;
                     control
                         .change(
-                            ChangeId::new("race-resume").unwrap(),
+                            ChangeId::new("race-followup").unwrap(),
                             state.controls().revision,
-                            ControlDirective::Resume,
+                            if matches!(point, RacePoint::RejectThenStop) {
+                                ControlDirective::Cancel
+                            } else {
+                                ControlDirective::Resume
+                            },
                         )
                         .await?;
                 }
@@ -1179,11 +1188,12 @@ async fn gate_activates_captured_grant_before_dispatch_validation() {
     assert_eq!(tool.calls.load(Ordering::SeqCst), 1);
 }
 
-struct PauseGate {
+struct InterruptGate {
     control: Arc<EphemeralControl>,
+    directive: ControlDirective,
 }
 
-impl ToolGate for PauseGate {
+impl ToolGate for InterruptGate {
     fn decide(
         &self,
         _: ToolAdmission,
@@ -1192,25 +1202,26 @@ impl ToolGate for PauseGate {
         Box::pin(async move {
             self.control
                 .change(
-                    ChangeId::new("pause-in-gate").unwrap(),
+                    ChangeId::new("interrupt-in-gate").unwrap(),
                     context.operations.view().state.controls().revision,
-                    ControlDirective::Pause,
+                    self.directive,
                 )
                 .await?;
-            Ok(ToolDecision::Permit)
+            std::future::pending().await
         })
     }
 }
 
 #[tokio::test]
-async fn pause_between_prepare_and_dispatch_records_definite_nonexecution() {
+async fn pause_during_the_gate_leaves_a_prepared_operation_and_allows_suspension() {
     let ephemeral = EphemeralJournal::create(binding()).unwrap();
     let tool = CounterTool::new(None);
     let runtime = runtime(
         ScriptedProvider::complete(),
         &tool,
-        Arc::new(PauseGate {
+        Arc::new(InterruptGate {
             control: Arc::new(ephemeral.control),
+            directive: ControlDirective::Pause,
         }),
         Authority::allowed(),
     );
@@ -1220,21 +1231,15 @@ async fn pause_between_prepare_and_dispatch_records_definite_nonexecution() {
         .invoke(OperationKey::new("paused").unwrap(), invocation(1))
         .await
         .unwrap();
-    assert!(matches!(
-        result,
-        InvokeOutcome::Complete(ToolOutcome {
-            status: OutcomeStatus::Failed,
-            ..
-        })
-    ));
+    assert_eq!(result, InvokeOutcome::Paused);
     assert_eq!(tool.calls.load(Ordering::SeqCst), 0);
     let view = turn.view();
-    assert!(
-        view.state
-            .operations()
-            .values()
-            .all(|operation| operation.outcome().is_some())
-    );
+    assert!(view.state.controls().paused);
+    let operation = turn
+        .operation(&OperationKey::new("paused").unwrap())
+        .unwrap()
+        .unwrap();
+    assert!(operation.outcome().is_none() && operation.attempts.is_empty());
     assert!(matches!(
         turn.try_suspend(SuspensionDraft {
             expected_control: view.state.controls().revision,
@@ -1245,6 +1250,120 @@ async fn pause_between_prepare_and_dispatch_records_definite_nonexecution() {
         .unwrap(),
         SuspendOutcome::Suspended(_)
     ));
+}
+
+#[tokio::test]
+async fn stop_during_the_gate_records_definite_nonexecution() {
+    let ephemeral = EphemeralJournal::create(binding()).unwrap();
+    let tool = CounterTool::new(None);
+    let runtime = runtime(
+        ScriptedProvider::complete(),
+        &tool,
+        Arc::new(InterruptGate {
+            control: Arc::new(ephemeral.control),
+            directive: ControlDirective::Cancel,
+        }),
+        Authority::allowed(),
+    );
+    let turn = runtime.open(ephemeral.lease).await.unwrap().turn;
+    let key = OperationKey::new("stopped").unwrap();
+    assert_eq!(
+        turn.operations()
+            .invoke(key.clone(), invocation(1))
+            .await
+            .unwrap(),
+        InvokeOutcome::Complete(ToolOutcome::failed("turn_cancelled"))
+    );
+    let operation = turn.operation(&key).unwrap().unwrap();
+    assert!(operation.rejection.is_some() && operation.attempts.is_empty());
+    assert_eq!(tool.calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn tool_start_does_not_rebase_across_a_coalesced_pause_and_resume() {
+    let tool = CounterTool::new(None);
+    let runtime = runtime(
+        ScriptedProvider::complete(),
+        &tool,
+        Arc::new(Allow),
+        Authority::allowed(),
+    );
+    let (lease, _) = fault_lease(0, false, Some(RacePoint::Start));
+    let turn = runtime.open(lease).await.unwrap().turn;
+    let operations = turn.operations();
+    let key = OperationKey::new("tool-start-race").unwrap();
+    assert_eq!(
+        operations.invoke(key.clone(), invocation(1)).await.unwrap(),
+        InvokeOutcome::Paused
+    );
+    let before = turn.operation(&key).unwrap().unwrap();
+    assert!(before.outcome().is_none() && before.attempts.is_empty());
+    assert!(turn.view().state.controls().admits_work());
+    assert_eq!(tool.calls.load(Ordering::SeqCst), 0);
+    let resumed = operations.invoke(key.clone(), invocation(1)).await.unwrap();
+    assert!(matches!(
+        resumed,
+        InvokeOutcome::Complete(ToolOutcome {
+            status: OutcomeStatus::Succeeded,
+            ..
+        })
+    ));
+    assert_eq!(
+        operations.invoke(key.clone(), invocation(1)).await.unwrap(),
+        resumed
+    );
+    let after = turn.operation(&key).unwrap().unwrap();
+    assert_eq!(before.record, after.record);
+    assert_eq!(after.attempts.len(), 1);
+    assert_eq!(tool.calls.load(Ordering::SeqCst), 1);
+}
+
+struct ForgedPause;
+
+impl ToolGate for ForgedPause {
+    fn decide(&self, _: ToolAdmission, _: AdmissionContext) -> BoxFuture<'_, Result<ToolDecision>> {
+        Box::pin(async { Err(Error::new(ErrorKind::InvalidState, "turn_paused")) })
+    }
+}
+
+#[tokio::test]
+async fn tool_rejection_obeys_durable_controls_and_ignores_a_forged_pause() {
+    for (race, expected) in [
+        (
+            None,
+            InvokeOutcome::Complete(ToolOutcome::failed("turn_paused")),
+        ),
+        (Some(RacePoint::Reject), InvokeOutcome::Paused),
+        (
+            Some(RacePoint::RejectThenStop),
+            InvokeOutcome::Complete(ToolOutcome::failed("turn_cancelled")),
+        ),
+    ] {
+        let tool = CounterTool::new(None);
+        let runtime = runtime(
+            ScriptedProvider::complete(),
+            &tool,
+            Arc::new(ForgedPause),
+            Authority::allowed(),
+        );
+        let (lease, _) = fault_lease(0, false, race);
+        let turn = runtime.open(lease).await.unwrap().turn;
+        let key = OperationKey::new("tool-reject-race").unwrap();
+        assert_eq!(
+            turn.operations()
+                .invoke(key.clone(), invocation(1))
+                .await
+                .unwrap(),
+            expected
+        );
+        let operation = turn.operation(&key).unwrap().unwrap();
+        assert_eq!(
+            operation.rejection.is_none(),
+            expected == InvokeOutcome::Paused
+        );
+        assert!(operation.attempts.is_empty());
+        assert_eq!(tool.calls.load(Ordering::SeqCst), 0);
+    }
 }
 
 #[tokio::test]

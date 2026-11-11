@@ -473,7 +473,7 @@ impl TurnOperations {
             None => {
                 let outcome = inference_failure("provider_unavailable", FailureKind::Configuration);
                 self.inner
-                    .reject(&id, OperationOutcome::Inference(outcome.clone()))
+                    .reject(&id, OperationOutcome::Inference(outcome.clone()), None)
                     .await?;
                 return Ok(outcome);
             }
@@ -634,7 +634,7 @@ impl TurnOperations {
     ) -> Result<InferenceOutcome> {
         let outcome = failed_inference(failure);
         self.inner
-            .reject(id, OperationOutcome::Inference(outcome.clone()))
+            .reject(id, OperationOutcome::Inference(outcome.clone()), None)
             .await?;
         Ok(outcome)
     }
@@ -726,7 +726,7 @@ impl TurnOperations {
             Claim::Owner(owner) => owner,
         };
         if let Err(error) = owner.admission.ensure_pending() {
-            return self.reject_tool(&id, &error.code).await;
+            return self.reject_tool(&owner, &error.code).await;
         }
         let admission = ToolAdmission {
             operation: id.clone(),
@@ -753,6 +753,12 @@ impl TurnOperations {
                 if !state.waits().contains_key(&wait) {
                     return Err(Error::new(ErrorKind::InvalidState, "deferred_wait_missing"));
                 }
+                if state.controls().cancelled {
+                    return self.reject_tool(&owner, "turn_cancelled").await;
+                }
+                if owner.admission.paused_before_attempt(state.controls()) {
+                    return Ok(InvokeOutcome::Paused);
+                }
                 let _ = self.inner.events.send(TurnUpdate::Deferred {
                     operation: id,
                     wait: wait.clone(),
@@ -760,17 +766,13 @@ impl TurnOperations {
                 return Ok(InvokeOutcome::Deferred(wait));
             }
             Ok(ToolDecision::Deny(Denial { reason })) | Err(reason) => {
-                let outcome = ToolOutcome::failed(&reason.code);
-                self.inner
-                    .reject(&id, OperationOutcome::Tool(outcome.clone()))
-                    .await?;
-                return Ok(InvokeOutcome::Complete(outcome));
+                return self.reject_tool(&owner, &reason.code).await;
             }
         }
         let permit = tokio::select! {
-            _ = owner.admission.cancellation.cancelled() => return self.reject_tool(&id, owner.admission.cancellation_code()).await,
+            _ = owner.admission.cancellation.cancelled() => return self.reject_tool(&owner, owner.admission.cancellation_code()).await,
             result = Arc::clone(&self.inner.tool_permits).acquire_owned() => result.map_err(|_| Error::new(ErrorKind::Unavailable, "tool_capacity_closed"))?,
-            _ = tokio::time::sleep_until(deadline.into()) => return self.reject_tool(&id, "deadline").await,
+            _ = tokio::time::sleep_until(deadline.into()) => return self.reject_tool(&owner, "deadline").await,
         };
         if let Err(error) = self
             .inner
@@ -778,12 +780,12 @@ impl TurnOperations {
             .await
         {
             drop(permit);
-            return self.reject_tool(&id, &error.code).await;
+            return self.reject_tool(&owner, &error.code).await;
         }
         let attempt = match self.inner.start_attempt(&owner).await {
             Ok(attempt) => attempt,
             Err(error) if error.kind == ErrorKind::InvalidState => {
-                return self.reject_tool(&id, &error.code).await;
+                return self.reject_tool(&owner, &error.code).await;
             }
             Err(error) => return Err(error),
         };
@@ -811,12 +813,42 @@ impl TurnOperations {
         Ok(InvokeOutcome::Complete(outcome))
     }
 
-    async fn reject_tool(&self, id: &OperationId, code: &str) -> Result<InvokeOutcome> {
-        let outcome = ToolOutcome::failed(code);
-        self.inner
-            .reject(id, OperationOutcome::Tool(outcome.clone()))
-            .await?;
-        Ok(InvokeOutcome::Complete(outcome))
+    async fn reject_tool(&self, owner: &Owner, code: &str) -> Result<InvokeOutcome> {
+        let mut code = code;
+        loop {
+            let outcome = ToolOutcome::failed(code);
+            let rejected = self
+                .inner
+                .reject(
+                    &owner.id,
+                    OperationOutcome::Tool(outcome.clone()),
+                    Some(CommitBasis::ToolRejection {
+                        admission: &owner.admission,
+                        reports_stop: code == "turn_cancelled",
+                    }),
+                )
+                .await;
+            match rejected {
+                Ok(()) => return Ok(InvokeOutcome::Complete(outcome)),
+                Err(error)
+                    if error.kind == ErrorKind::InvalidState
+                        && error.code == "turn_paused"
+                        && owner.admission.interruption_reason()
+                            == Some(InterruptionReason::Pause) =>
+                {
+                    return Ok(InvokeOutcome::Paused);
+                }
+                Err(error)
+                    if error.kind == ErrorKind::InvalidState
+                        && error.code == "turn_cancelled"
+                        && code != "turn_cancelled"
+                        && self.view().state.controls().cancelled =>
+                {
+                    code = "turn_cancelled"
+                }
+                Err(error) => return Err(error),
+            }
+        }
     }
 
     pub async fn request_input(&self, request: WaitRecord) -> Result<CommitReceipt> {
@@ -1268,15 +1300,24 @@ impl Admission {
     }
 
     fn interruption_code(&self) -> Option<&'static str> {
-        match *self.interruption.lock().expect("interruption lock") {
+        match self.interruption_reason() {
             Some(InterruptionReason::Pause) => Some("turn_paused"),
             Some(InterruptionReason::Cancel) => Some("turn_cancelled"),
             None => None,
         }
     }
 
+    fn interruption_reason(&self) -> Option<InterruptionReason> {
+        *self.interruption.lock().expect("interruption lock")
+    }
+
     fn cancellation_code(&self) -> &'static str {
         self.interruption_code().unwrap_or("cancelled")
+    }
+
+    fn paused_before_attempt(&self, controls: &ControlSnapshot) -> bool {
+        self.observe(controls);
+        !controls.cancelled && self.interruption_reason() == Some(InterruptionReason::Pause)
     }
 
     fn ensure_pending(&self) -> Result<()> {
@@ -1328,6 +1369,10 @@ enum Claim {
 enum CommitBasis<'a> {
     Completion(ControlRevision, HistoryPosition),
     Admission(&'a Admission),
+    ToolRejection {
+        admission: &'a Admission,
+        reports_stop: bool,
+    },
 }
 
 impl Inner {
@@ -1564,6 +1609,17 @@ impl Inner {
                     return Err(Error::new(ErrorKind::Conflict, "stale_completion_basis"));
                 }
                 Some(CommitBasis::Admission(admission)) => admission.check(state.controls())?,
+                Some(CommitBasis::ToolRejection {
+                    admission,
+                    reports_stop,
+                }) => {
+                    if state.controls().cancelled && !reports_stop {
+                        return Err(Error::new(ErrorKind::InvalidState, "turn_cancelled"));
+                    }
+                    if admission.paused_before_attempt(state.controls()) {
+                        return Err(Error::new(ErrorKind::InvalidState, "turn_paused"));
+                    }
+                }
                 _ => {}
             }
             let change = JournalChange::new(
@@ -1660,13 +1716,20 @@ impl Inner {
         Ok(attempt)
     }
 
-    async fn reject(&self, id: &OperationId, outcome: OperationOutcome) -> Result<()> {
-        self.apply(
+    async fn reject(
+        &self,
+        id: &OperationId,
+        outcome: OperationOutcome,
+        basis: Option<CommitBasis<'_>>,
+    ) -> Result<()> {
+        let _serial = self.serial.lock().await;
+        self.commit_with_basis(
             phase_id(id, "reject", &outcome)?,
             vec![JournalAction::RejectPrepared {
                 operation: id.clone(),
                 outcome: outcome.clone(),
             }],
+            basis,
         )
         .await?;
         let _ = self.events.send(TurnUpdate::Operation {

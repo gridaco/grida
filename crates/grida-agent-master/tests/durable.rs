@@ -222,8 +222,11 @@ impl Provider for ScriptProvider {
                 Box::pin(stream::iter([ProviderEvent::Finished(outcome)]))
             }));
         }
-        let tools = matches!(self.script, Script::Tools | Script::ToolAndDeferred)
-            || matches!(self.script, Script::ToolThenAnswer) && index == 0;
+        let tools = matches!(self.script, Script::Tools)
+            || matches!(
+                self.script,
+                Script::ToolThenAnswer | Script::ToolAndDeferred
+            ) && index == 0;
         let mut content = if tools {
             let call = ToolCall {
                 id: ToolCallId::new(format!("call-{index}"))?,
@@ -299,7 +302,7 @@ impl Provider for ScriptProvider {
                 };
             }
         }
-        if matches!(self.script, Script::ToolAndDeferred) {
+        if matches!(self.script, Script::ToolAndDeferred) && index == 0 {
             content.push(Content::ToolCall(ToolCall {
                 id: ToolCallId::new(format!("deferred-{index}"))?,
                 tool: tool_id(),
@@ -2379,6 +2382,169 @@ impl ToolGate for DeferForInput {
                 .await?;
             Ok(ToolDecision::Defer(wait))
         })
+    }
+}
+
+#[derive(Default)]
+struct PauseSecondTool {
+    entered: tokio::sync::Notify,
+    visits: AtomicUsize,
+}
+
+impl ToolGate for PauseSecondTool {
+    fn decide(
+        &self,
+        admission: ToolAdmission,
+        _: AdmissionContext,
+    ) -> BoxFuture<'_, Result<ToolDecision>> {
+        Box::pin(async move {
+            if matches!(admission.invocation.arguments(), ToolArguments::Json(value) if value["value"] == "ask")
+                && self.visits.fetch_add(1, Ordering::SeqCst) == 0
+            {
+                self.entered.notify_one();
+                std::future::pending::<()>().await;
+            }
+            Ok(ToolDecision::Permit)
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_paused_gate_preserves_the_step_and_its_completed_sibling() {
+    for stop in [false, true] {
+        let fixture = Fixture::new(Script::ToolAndDeferred);
+        let gate = Arc::new(PauseSecondTool::default());
+        let store = fixture.store();
+        let claim = fixture.claim(&store).await;
+        let mut opened = fixture
+            .runtime_with_gate(gate.clone())
+            .open(claim.lease)
+            .await
+            .unwrap();
+        let master = fixture.master(3, "Use both tools");
+        let task = tokio::spawn(async move { master.run(opened.turn, input()).await });
+        tokio::time::timeout(Duration::from_secs(2), async {
+            gate.entered.notified().await;
+            loop {
+                if opened.observer.snapshot().state.operations().values().any(|record| {
+                    matches!(record.outcome(), Some(OperationOutcome::Tool(outcome)) if outcome.status == OutcomeStatus::Succeeded)
+                }) {
+                    break;
+                }
+                opened.observer.next().await.expect("sibling remains observable");
+            }
+        }).await.unwrap();
+        let view = store.inspect(session_id()).await.unwrap();
+        store
+            .control(ControlRequest {
+                id: change_id("pause-tool-gate"),
+                session: session_id(),
+                expected_revision: view.revision,
+                action: SessionControl::Turn {
+                    turn: turn_id(),
+                    expected: view.current.unwrap().controls.revision,
+                    directive: ControlDirective::Pause,
+                },
+            })
+            .await
+            .unwrap();
+        let MasterOutcome::Suspended(suspended) =
+            tokio::time::timeout(Duration::from_secs(2), task)
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap()
+        else {
+            panic!("expected a paused step")
+        };
+        store
+            .verify(CommitReceipt::Suspended(suspended))
+            .await
+            .unwrap();
+        assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
+        let history = store.history(session_id(), None).await.unwrap();
+        assert_eq!(
+            history.len(),
+            1,
+            "candidate history must remain unpublished"
+        );
+
+        let view = store.inspect(session_id()).await.unwrap();
+        let current = view.current.unwrap();
+        store
+            .control(ControlRequest {
+                id: change_id("resolve-tool-gate"),
+                session: session_id(),
+                expected_revision: view.revision,
+                action: if stop {
+                    SessionControl::PauseAndCancel {
+                        turn: turn_id(),
+                        expected: current.controls.revision,
+                    }
+                } else {
+                    SessionControl::Turn {
+                        turn: turn_id(),
+                        expected: current.controls.revision,
+                        directive: ControlDirective::Resume,
+                    }
+                },
+            })
+            .await
+            .unwrap();
+        let claim = if stop {
+            fixture.recover(&store).await
+        } else {
+            let view = store.inspect(session_id()).await.unwrap();
+            let current = view.current.unwrap();
+            let ClaimOutcome::Acquired(claim) = store
+                .claim(ClaimRequest {
+                    id: change_id("resume-tool-gate"),
+                    session: session_id(),
+                    expected_revision: view.revision,
+                    selection: TurnSelection::Resume {
+                        turn: turn_id(),
+                        epoch: current.binding.epoch,
+                        position: current.position,
+                    },
+                })
+                .await
+                .unwrap()
+            else {
+                panic!("expected resumed step owner")
+            };
+            claim
+        };
+        let opened = fixture
+            .runtime_with_gate(gate.clone())
+            .open(claim.lease)
+            .await
+            .unwrap();
+        let MasterOutcome::Settled(receipt) = fixture
+            .master(3, "Use both tools")
+            .run(opened.turn, input())
+            .await
+            .unwrap()
+        else {
+            panic!("expected terminal settlement")
+        };
+        let expected_work = if stop { 1 } else { 2 };
+        assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), expected_work);
+        assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), expected_work);
+        assert_eq!(gate.visits.load(Ordering::SeqCst), expected_work);
+        assert_eq!(
+            receipt.outcome.status,
+            if stop {
+                OutcomeStatus::Cancelled
+            } else {
+                OutcomeStatus::Succeeded
+            }
+        );
+        let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+        assert!(account.unresolved.is_empty());
+        let tools = account.tool_activity.unwrap();
+        assert_eq!(tools.succeeded, expected_work);
+        assert_eq!(tools.cancelled, usize::from(stop));
     }
 }
 

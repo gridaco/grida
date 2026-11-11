@@ -145,11 +145,11 @@ impl CompletionChecks {
                 review.decision = Decision::Reconsider;
                 break;
             }
-            let (evidence, deferred) = result?;
+            let (evidence, interruption) = result?;
             let allowed = evidence.status == CheckStatus::Allowed;
             review.checks.push(evidence);
-            if let Some(wait) = deferred {
-                review.decision = Decision::Deferred(wait);
+            if let Some(decision) = interruption {
+                review.decision = decision;
                 break;
             }
             if !allowed && check.mode == CheckMode::Required {
@@ -268,7 +268,7 @@ async fn execute_check(
     check: &CompletionCheck,
     tools: &InventorySnapshot,
     grant: Option<&GrantSelection>,
-) -> Result<(CheckEvidence, Option<WaitId>)> {
+) -> Result<(CheckEvidence, Option<Decision>)> {
     // A changed revision keeps the operation key. Its different captured
     // invocation cannot reuse a result or dispatch over the original record.
     let key = OperationKey::new(format!(
@@ -315,14 +315,18 @@ async fn execute_check(
     if recorded_check(&view, &id, check, &arguments)?.is_some() {
         evidence.operation = Some(id);
     }
-    let deferred = match result {
+    let interruption = match result {
         Ok(InvokeOutcome::Complete(outcome)) => {
             (evidence.status, evidence.reason) = project_reply(&outcome);
             None
         }
         Ok(InvokeOutcome::Deferred(wait)) => {
             evidence.status = CheckStatus::Deferred;
-            Some(wait)
+            Some(Decision::Deferred(wait))
+        }
+        Ok(InvokeOutcome::Paused) => {
+            evidence.status = CheckStatus::Deferred;
+            Some(Decision::Reconsider)
         }
         Err(error) if error.kind == ErrorKind::Conflict => return Err(error),
         Err(error) => {
@@ -335,7 +339,7 @@ async fn execute_check(
             None
         }
     };
-    Ok((evidence, deferred))
+    Ok((evidence, interruption))
 }
 
 fn occurrence_identity(
