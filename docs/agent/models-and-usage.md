@@ -56,8 +56,11 @@ The optimized macOS Apple Silicon headless host has bounded live checks with
 OpenRouter and `openai/gpt-4.1-mini`: text and permission-checked file reads in
 Plan/Act and Standard/Ultra. These checks verify the selected connection and
 retained accounting; they are not a broad model-quality comparison. Other live
-providers and operating systems remain unqualified. Connection discovery alone
-does not verify credentials, credits, generation or model access.
+providers and operating systems remain unqualified. The development macOS
+Desktop host also has live OpenRouter `google/gemini-3.8-flash` checks for a reply,
+a workspace-file read, follow-up context and transcript restoration without
+repeating inference. These do not qualify a signed distribution. Connection
+discovery alone does not verify credentials, credits, generation or model access.
 
 Compatible streaming keeps a valid completed answer when the provider sends its
 final usage record. Additional content or changed completion identity still
@@ -76,9 +79,9 @@ reopening it does not retry generation.
   the profile. A saved endpoint uses its default or first registered
   model when no model is specified.
 
-If your network redirects a provider request to a separate sign-in service,
-complete that network sign-in before retrying. Grida does not forward the
-provider API key to another destination.
+A network authentication redirect can prevent provider access. Grida does not
+forward the provider API key to another destination. Provider API requests use
+Grida's own client identity and remain separate from browser sign-in cookies.
 
 An unavailable explicit selection leaves the workspace chat closed until
 the connection is ready. A supported rate-limit response during a turn can

@@ -5,6 +5,7 @@ import { net, session } from "electron";
 import type { ShellExecutor } from "@grida/daemon/server";
 
 vi.mock("electron", () => ({
+  app: { getVersion: () => "0.0.25" },
   session: {
     fromPartition:
       vi.fn<(partition: string, options?: { cache?: boolean }) => unknown>(),
@@ -23,6 +24,27 @@ import { NativeProviderEgress } from "./native-provider-egress";
 
 describe("AgentNetworkHost", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("identifies native provider traffic separately from browser navigation", async () => {
+    const setUserAgent = vi.fn<(value: string) => void>();
+    const setProxy = vi.fn<() => Promise<void>>(async () => undefined);
+    vi.mocked(session.fromPartition).mockReturnValue({
+      setUserAgent,
+      setProxy,
+    } as never);
+    await AgentNetworkHost.nativeProviderNetwork(
+      new AgentNetworkAuthority("https://grida.co"),
+      "provider:built-in"
+    );
+    expect(session.fromPartition).toHaveBeenCalledWith("grida-agent-provider", {
+      cache: false,
+    });
+    expect(setUserAgent).toHaveBeenCalledWith(
+      "Grida/0.0.25 NativeProviderClient"
+    );
+    expect(setProxy).toHaveBeenCalledWith({ mode: "system" });
+    expect(net.request).not.toHaveBeenCalled();
+  });
 
   it("correlates the shutdown acknowledgement and denies new dispatch during drain", async () => {
     const fetch = vi.fn<() => Promise<Response>>();
@@ -136,7 +158,11 @@ describe("AgentNetworkHost", () => {
   it("bootstraps and updates control while authorized provider session setup is pending", async () => {
     const pending = Promise.withResolvers<void>();
     const setProxy = vi.fn<() => Promise<void>>(() => pending.promise);
-    vi.mocked(session.fromPartition).mockReturnValue({ setProxy } as never);
+    const setUserAgent = vi.fn<(value: string) => void>();
+    vi.mocked(session.fromPartition).mockReturnValue({
+      setProxy,
+      setUserAgent,
+    } as never);
     mockEmptyProviderResponse();
     const harness = await createElectronHarness();
     expect(session.fromPartition).not.toHaveBeenCalled();
@@ -152,6 +178,9 @@ describe("AgentNetworkHost", () => {
       { cache: false }
     );
     expect(setProxy).toHaveBeenCalledWith({ mode: "system" });
+    expect(setUserAgent).toHaveBeenCalledWith(
+      "Grida/0.0.25 NativeProviderClient"
+    );
     expect(net.request).not.toHaveBeenCalled();
     const updated = harness.host.updateGrants();
     const grant = await harness.untilFrame("grant.update");
@@ -178,7 +207,10 @@ describe("AgentNetworkHost", () => {
     const setProxy = vi.fn<() => Promise<void>>(() =>
       attempt++ === 0 ? pending.promise : Promise.resolve()
     );
-    vi.mocked(session.fromPartition).mockReturnValue({ setProxy } as never);
+    vi.mocked(session.fromPartition).mockReturnValue({
+      setProxy,
+      setUserAgent: vi.fn<(value: string) => void>(),
+    } as never);
     mockEmptyProviderResponse();
     const harness = await createElectronHarness();
     await harness.start();
@@ -201,7 +233,10 @@ describe("AgentNetworkHost", () => {
 
   it("reuses the same nonpersistent Chromium context after a channel restart", async () => {
     const setProxy = vi.fn<() => Promise<void>>(async () => undefined);
-    vi.mocked(session.fromPartition).mockReturnValue({ setProxy } as never);
+    vi.mocked(session.fromPartition).mockReturnValue({
+      setProxy,
+      setUserAgent: vi.fn<(value: string) => void>(),
+    } as never);
     mockEmptyProviderResponse();
     for (let restart = 0; restart < 2; restart++) {
       const harness = await createElectronHarness();
@@ -219,6 +254,7 @@ describe("AgentNetworkHost", () => {
   it("re-authorizes a provider grant revoked while system proxy setup was pending", async () => {
     const pending = Promise.withResolvers<void>();
     vi.mocked(session.fromPartition).mockReturnValue({
+      setUserAgent: vi.fn<(value: string) => void>(),
       setProxy: vi.fn<() => Promise<void>>(() => pending.promise),
     } as never);
     const harness = await createElectronHarness();
@@ -244,6 +280,7 @@ describe("AgentNetworkHost", () => {
     async (outcome) => {
       const pending = Promise.withResolvers<void>();
       vi.mocked(session.fromPartition).mockReturnValue({
+        setUserAgent: vi.fn<(value: string) => void>(),
         setProxy: vi.fn<() => Promise<void>>(() => pending.promise),
       } as never);
       const harness = await createElectronHarness();
@@ -265,7 +302,10 @@ describe("AgentNetworkHost", () => {
   it("cancels a request during provider setup without cancelling setup shared by another request", async () => {
     const pending = Promise.withResolvers<void>();
     const setProxy = vi.fn<() => Promise<void>>(() => pending.promise);
-    vi.mocked(session.fromPartition).mockReturnValue({ setProxy } as never);
+    vi.mocked(session.fromPartition).mockReturnValue({
+      setProxy,
+      setUserAgent: vi.fn<(value: string) => void>(),
+    } as never);
     mockEmptyProviderResponse();
     const harness = await createElectronHarness();
     await harness.start();
@@ -658,6 +698,7 @@ describe("AgentNetworkHost", () => {
       });
       vi.mocked(net.request).mockReturnValue(request as never);
       vi.mocked(session.fromPartition).mockReturnValue({
+        setUserAgent: vi.fn<(value: string) => void>(),
         setProxy: vi.fn<(config: unknown) => Promise<void>>(),
       } as never);
       const authority = new AgentNetworkAuthority("https://grida.co");

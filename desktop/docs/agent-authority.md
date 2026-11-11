@@ -92,6 +92,11 @@ Moving the service into a separately confined native helper remains desirable
 if steady-state credential custody ever moves out of AgentSidecar; a bare
 `utilityProcess` alone would be process isolation, not authority confinement.
 
+The provider context identifies requests as `Grida/<version> NativeProviderClient`,
+independently of the renderer browser identity. Explicit provider SDK headers
+remain intact. A missing SDK identity must not make native API calls look like
+browser navigations that can complete cookie-based sign-in.
+
 The provider transport uses a dedicated credential-clean network context. It
 MUST NOT attach the webview's Electron session or partition, inherit its cookie
 jar, or receive its durable login. Proxy authentication belongs to the host

@@ -4,7 +4,13 @@
 import { isIP } from "node:net";
 import { randomUUID } from "node:crypto";
 import { finished, Readable, type Writable } from "node:stream";
-import { net, session, type IncomingMessage, type Session } from "electron";
+import {
+  app,
+  net,
+  session,
+  type IncomingMessage,
+  type Session,
+} from "electron";
 import type {
   ShellExecutionScope,
   ShellExecutor,
@@ -213,6 +219,11 @@ export class AgentNetworkHost {
     const networkSession = session.fromPartition("grida-agent-provider", {
       cache: false,
     });
+    // This context makes native API requests, not browser navigations. Keep its
+    // identity separate from the renderer and from provider-supplied SDK headers.
+    networkSession.setUserAgent(
+      `Grida/${app.getVersion()} NativeProviderClient`
+    );
     await networkSession.setProxy({ mode: "system" });
     return networkSession;
   }
