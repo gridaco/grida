@@ -530,7 +530,8 @@ impl Host {
         claim: WorkerClaim,
         plan: CompactionPlan,
     ) -> Result<Option<Admitted>> {
-        self.execution()?;
+        let view = self.store.inspect(session.clone()).await?;
+        self.check_execution(&view)?;
         let claim = match claim {
             WorkerClaim::Select(request) => self.store.claim(request).await?,
             WorkerClaim::Recover(request) => self.store.recover(request).await?,
@@ -742,6 +743,8 @@ impl Host {
         let status = match outcome.status {
             OutcomeStatus::Succeeded => {
                 let (records, provenance) = account.replacement(plan.source.fingerprint)?;
+                let view = self.store.inspect(session.clone()).await?;
+                self.check_execution(&view)?;
                 match self
                     .store
                     .install_context(ContextInstall {

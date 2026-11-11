@@ -1210,6 +1210,42 @@ async fn interrupted_compaction_requires_explicit_recovery_and_failed_candidates
     drop(socket);
     host.kill().await.unwrap();
 
+    let mut recover = compact(&session, "interrupted");
+    recover["recover"] = true.into();
+    let mut foreign = Endpoint::start(vec![Reply::Finished("Unexpected recovery.")]).await;
+    let (foreign_host, foreign_url) = shared_server(&state, &foreign.url).await;
+    let mut foreign_socket = client(&foreign_url).await;
+    assert_eq!(
+        load(&mut foreign_socket, &session, workspace.path()).await,
+        [original.as_str(), "Original answer."]
+    );
+    let interrupted = session_snapshot(&mut foreign_socket, &session).await;
+    assert_eq!(interrupted["current"]["turnId"], turn);
+    assert_eq!(interrupted["current"]["disposition"], "interrupted");
+    let denied = ws_rpc(
+        &mut foreign_socket,
+        4,
+        "_co.grida/session/compact",
+        recover.clone(),
+    )
+    .await;
+    assert_eq!(
+        denied["error"]["data"], "session_execution_configuration_changed",
+        "{denied}"
+    );
+    assert_eq!(
+        session_snapshot(&mut foreign_socket, &session).await,
+        interrupted
+    );
+    assert!(matches!(
+        foreign.requests.try_recv(),
+        Err(mpsc::error::TryRecvError::Empty)
+    ));
+    drop(foreign_socket);
+    terminate_shared_server(foreign_host).await;
+    foreign.task.abort();
+    assert!(foreign.task.await.unwrap_err().is_cancelled());
+
     let (host, url) = shared_server(&state, &endpoint.url).await;
     let mut socket = client(&url).await;
     assert_eq!(
@@ -1226,8 +1262,6 @@ async fn interrupted_compaction_requires_explicit_recovery_and_failed_candidates
     assert_eq!(observed["result"]["status"], "interrupted", "{observed}");
     assert_eq!(observed["result"]["turnId"], turn);
     assert!(endpoint.requests.try_recv().is_err());
-    let mut recover = compact(&session, "interrupted");
-    recover["recover"] = true.into();
     let recovered = ws_rpc(&mut socket, 5, "_co.grida/session/compact", recover).await;
     assert_eq!(recovered["result"]["status"], "uncertain", "{recovered}");
     assert_eq!(recovered["result"]["turnId"], turn);
