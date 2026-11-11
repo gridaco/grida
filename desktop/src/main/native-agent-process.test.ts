@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
+import { NativeAgentGoals } from "./native-agent-goals";
 import {
   NativeAgentProcess,
   TRANSCRIPT_WINDOW,
@@ -36,7 +37,7 @@ function launch(
 function fixture(
   source: string,
   initializationVersion = 1,
-  capabilities?: Record<string, number>
+  capabilities?: Record<string, number | null>
 ) {
   const directory = state();
   const resources = path.join(directory.root, "native-agent");
@@ -49,11 +50,14 @@ const fs = require('node:fs');
 const readline = require('node:readline');
 const lines = readline.createInterface({input:process.stdin});
 const send = (value) => process.stdout.write(JSON.stringify({jsonrpc:'2.0',...value})+'\\n');
+let requested;
 lines.on('line', line => {
   const request = JSON.parse(line);
   if (request.method === 'initialize') {
+    requested = request.params.clientCapabilities._meta;
     const offered = ${JSON.stringify(capabilities ?? null)};
-    const meta = offered ? {...request.params?.clientCapabilities?._meta,...offered} : {'co.grida/session/history':1};
+    const meta = offered ? {...requested,...offered} : {'co.grida/session/history':1};
+    for (const key of Object.keys(meta)) if (meta[key] === null) delete meta[key];
     send({id:request.id,result:{protocolVersion:${initializationVersion},agentInfo:{name:'grida-agent'},agentCapabilities:{_meta:meta}}});
     return;
   }
@@ -112,6 +116,48 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       test.close();
     }
   });
+
+  it.each([
+    { echo: null, acceptsEffort: false },
+    { echo: 1, acceptsEffort: true },
+  ])(
+    "negotiates saved BYOK effort with worker echo $echo independently of Goal funding",
+    async ({ echo, acceptsEffort }) => {
+      const effort = "co.grida/session/effort";
+      const funded = NativeAgentGoals.fundedReviewCapability;
+      const named = NativeAgentGoals.namedChildCapability;
+      const test = fixture("send({id:request.id,result:requested});", 1, {
+        [effort]: echo,
+        [funded]: 1,
+        [named]: 1,
+      });
+      let agent: NativeAgentProcess | undefined;
+      try {
+        agent = await NativeAgentProcess.start({
+          ...test.options,
+          endpoint: "https://openrouter.ai/api/v1",
+          credentialHome: test.root,
+          providerNetwork: { prepare: () => null },
+          subagents: true,
+          capabilities: { [effort]: 1, [funded]: 1, [named]: 1 },
+        });
+        const requested = await agent.request("fixture/initialize", {});
+        expect(requested).toHaveProperty([effort], 1);
+        expect(requested).not.toHaveProperty([funded]);
+        expect(requested).not.toHaveProperty([named]);
+        expect(agent.acceptsSubagents).toBe(true);
+        expect(agent.acceptsEffort).toBe(acceptsEffort);
+        expect(agent.acceptsGoalEffort).toBe(false);
+        expect(agent.acceptsGoalNamedChild).toBe(false);
+      } finally {
+        try {
+          await agent?.close();
+        } finally {
+          test.close();
+        }
+      }
+    }
+  );
 
   it("negotiates capabilities, correlates updates and responses, and shuts down through EOF", async () => {
     const test = fixture(`

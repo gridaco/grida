@@ -119,6 +119,7 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
         meta["co.grida/provider/egress"] = 1.into();
         for capability in [
             "co.grida/session/effort",
+            "co.grida/goal/start",
             "co.grida/goal/funded-review",
             "co.grida/goal/named-child",
         ] {
@@ -130,11 +131,11 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
             1,
             "{ready}"
         );
-        for capability in [
-            "co.grida/session/effort",
-            "co.grida/goal/funded-review",
-            "co.grida/goal/named-child",
-        ] {
+        assert_eq!(
+            ready["result"]["agentCapabilities"]["_meta"]["co.grida/session/effort"], 1,
+            "{ready}"
+        );
+        for capability in ["co.grida/goal/funded-review", "co.grida/goal/named-child"] {
             assert!(
                 ready["result"]["agentCapabilities"]["_meta"][capability].is_null(),
                 "{ready}"
@@ -149,6 +150,7 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
         request: Value,
         endpoint: &str,
     ) -> Value {
+        let ultra = request["effort"] == "ultra";
         let id = client.send(method, request).await;
         let mut chunk = Some(STANDARD.encode(concat!(
             "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Done.\"},\"finish_reason\":\"stop\"}]}\n\n",
@@ -175,6 +177,15 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
                                 .unwrap();
                             let body: Value = serde_json::from_slice(&body).unwrap();
                             assert_eq!(body["model"], "fixture-model");
+                            for tool in ["delegate_review", "collect_review"] {
+                                assert_eq!(
+                                    body["tools"].as_array().is_some_and(|tools| tools
+                                        .iter()
+                                        .any(|offer| offer["function"]["name"] == tool)),
+                                    ultra,
+                                    "{body}"
+                                );
+                            }
                             json!({"status":"accepted"})
                         }
                         Some("dispatch") => json!({"status":"ready","httpStatus":200}),
@@ -211,8 +222,15 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
         credentials.set(provider, "fixture-key").unwrap();
         let mut client = start(&state, &home, endpoint, "fixture-model").await;
         let parent = new_session(&mut client, &workspace).await;
-        let forbidden = client.request("_co.grida/session/submit", json!({"sessionId":parent,"inputId":"ultra-refused","effort":"ultra","prompt":[{"type":"text","text":"No funded review"}]})).await;
-        assert!(forbidden.get("error").is_some(), "{forbidden}");
+        let forbidden = client.request("_co.grida/goal/start", json!({
+            "sessionId":parent,"inputId":"ultra-goal-refused","effort":"ultra",
+            "prompt":[{"type":"text","text":"Try a funded Goal"}],
+            "goal":{"objective":{"description":"Review the draft","criteria":["Draft is reviewed"]},"allowance":{"work_turns":1,"inference_steps":4}}
+        })).await;
+        assert_eq!(
+            forbidden["error"]["data"], "goal_funded_review_unavailable",
+            "{forbidden}"
+        );
         let prompt = json!({"sessionId":parent,"prompt":[{"type":"text","text":"Parent"}]});
         assert_eq!(
             infer(&mut client, "session/prompt", prompt, endpoint).await["stopReason"],
@@ -233,6 +251,34 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
             view["assignment"]["disposition"]["kind"] == "completed"
         })
         .await;
+        let ultra = infer(
+            &mut client,
+            "_co.grida/session/submit",
+            json!({
+                "sessionId":parent,"inputId":"ordinary-ultra","effort":"ultra",
+                "prompt":[{"type":"text","text":"Review this draft"}]
+            }),
+            endpoint,
+        )
+        .await;
+        assert_eq!(ultra["inputId"], "ordinary-ultra");
+        timeout(WAIT, async {
+            loop {
+                let input = client
+                    .request(
+                        "_co.grida/session/input",
+                        json!({"sessionId":parent,"inputId":"ordinary-ultra"}),
+                    )
+                    .await;
+                if input["result"]["receipt"]["disposition"] == "completed" {
+                    break;
+                }
+                assert!(input.get("error").is_none(), "{input}");
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
         client.close().await;
         let mut reopened = start(&state, &home, endpoint, "fixture-model").await;
         load_parent(&mut reopened, &parent, &workspace).await;

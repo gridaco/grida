@@ -61,9 +61,10 @@ pub(super) fn advertised(
     subagents: bool,
     delete_chat: bool,
     effort: bool,
+    goal_effort: bool,
     files: bool,
 ) -> Meta {
-    capability_keys(reviewer, subagents, delete_chat, effort, files)
+    capability_keys(reviewer, subagents, delete_chat, effort, goal_effort, files)
         .map(|key| (key.into(), 1.into()))
         .collect()
 }
@@ -94,9 +95,10 @@ pub(super) fn negotiated(
     subagents: bool,
     delete_chat: bool,
     effort: bool,
+    goal_effort: bool,
     files: bool,
 ) -> BTreeSet<&'static str> {
-    capability_keys(reviewer, subagents, delete_chat, effort, files)
+    capability_keys(reviewer, subagents, delete_chat, effort, goal_effort, files)
         .filter(|key| meta.and_then(|meta| meta.get(*key)).and_then(Value::as_u64) == Some(1))
         .collect()
 }
@@ -106,6 +108,7 @@ fn capability_keys(
     subagents: bool,
     delete_chat: bool,
     effort: bool,
+    goal_effort: bool,
     files: bool,
 ) -> impl Iterator<Item = &'static str> {
     CAPABILITIES
@@ -126,8 +129,8 @@ fn capability_keys(
         .chain(wakeups::capabilities(reviewer))
         .chain(subagents::capabilities(reviewer && subagents))
         .chain((reviewer && effort).then_some(EFFORT))
-        .chain((reviewer && effort).then_some(goals::FUNDED_REVIEW))
-        .chain((reviewer && effort && subagents).then_some(goals::NAMED_CHILD))
+        .chain((reviewer && goal_effort).then_some(goals::FUNDED_REVIEW))
+        .chain((reviewer && goal_effort && subagents).then_some(goals::NAMED_CHILD))
         .chain((reviewer && files).then_some(FILE_INTAKE))
         .chain(reviewer.then_some(super::projection::TRANSCRIPT_WINDOW))
 }

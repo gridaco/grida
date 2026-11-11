@@ -71,6 +71,7 @@ impl Host {
             desktop_image_generation: None,
             subagents_enabled: false,
             sponsorship_enabled: false,
+            goal_sponsorship_enabled: false,
             effort: EffortPreset::Standard,
             operating_regime: OperatingRegime::Act,
             require_completion_text: false,

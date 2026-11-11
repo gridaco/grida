@@ -131,6 +131,7 @@ pub struct Host {
     pub(crate) desktop_image_generation: Option<image_generation::DesktopImageGeneration>,
     subagents_enabled: bool,
     sponsorship_enabled: bool,
+    goal_sponsorship_enabled: bool,
     effort: EffortPreset,
     operating_regime: OperatingRegime,
     require_completion_text: bool,
@@ -710,6 +711,7 @@ impl Host {
             desktop_image_generation: None,
             subagents_enabled: false,
             sponsorship_enabled: true,
+            goal_sponsorship_enabled: true,
             effort: EffortPreset::Standard,
             operating_regime: OperatingRegime::default(),
             require_completion_text: false,
@@ -1517,6 +1519,10 @@ impl Host {
             && let Some(profile) = &subagent
         {
             profile.require_authority(&execution.authority.inference.authority)?;
+            if let Some(sponsor) = profile.sponsorship() {
+                self.require_sponsored_origin(profile.parent(), &sponsor.parent_turn)
+                    .await?;
+            }
         }
         let claimed = match claim_request {
             WorkerClaim::Select(request) => {
@@ -2235,12 +2241,25 @@ impl Host {
                 if !cancellation_only && effort.is_some() && !self.sponsorship_available() {
                     return Err(problem(ErrorKind::Unsupported, "delegation_unavailable"));
                 }
+                if !cancellation_only
+                    && effort.is_some()
+                    && stored.goal.is_some()
+                    && !self.goal_sponsorship_available()
+                {
+                    return Err(goals::funded_review_unavailable());
+                }
                 subagent = stored.subagent.is_some();
                 if let Some(assignment) = &stored.subagent {
                     let profile = subagent_profile.ok_or_else(|| {
                         problem(ErrorKind::InvalidState, "subagent_assignment_mismatch")
                     })?;
                     profile.require_assignment(assignment, !stored.operating_regime.is_act())?;
+                    if !cancellation_only
+                        && assignment.named_sponsorship.is_some()
+                        && !self.goal_sponsorship_available()
+                    {
+                        return Err(goals::funded_review_unavailable());
+                    }
                     if !cancellation_only
                         && !(if profile.sponsorship().is_some()
                             || assignment.named_sponsorship.is_some()

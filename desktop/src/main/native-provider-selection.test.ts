@@ -263,6 +263,35 @@ const byokProviders = [
   ["vercel", "https://ai-gateway.vercel.sh/v1"],
 ] as const;
 
+type ByokRequest = {
+  model: string;
+  messages: { role: string }[];
+  tools?: { function: { name: string } }[];
+};
+
+function byokReply(delta: object, finish_reason: "stop" | "tool_calls") {
+  return new Response(
+    `data: ${JSON.stringify({ choices: [{ index: 0, delta, finish_reason }] })}\n\ndata: [DONE]\n\n`,
+    { headers: { "content-type": "text/event-stream" } }
+  );
+}
+
+function byokTool(name: string, args: object) {
+  return byokReply(
+    {
+      tool_calls: [
+        {
+          index: 0,
+          id: name,
+          type: "function",
+          function: { name, arguments: JSON.stringify(args) },
+        },
+      ],
+    },
+    "tool_calls"
+  );
+}
+
 it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
   "enables bounded child work on the saved %s provider across restart",
   async (provider, endpoint) => {
@@ -306,7 +335,7 @@ it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
         });
       agent = await open();
       expect(agent.acceptsSubagents).toBe(true);
-      expect(agent.acceptsEffort).toBe(false);
+      expect(agent.acceptsEffort).toBe(true);
       expect(agent.acceptsGoalEffort).toBe(false);
       expect(agent.acceptsGoalNamedChild).toBe(false);
       const { sessionId } = (await agent.request("session/new", {
@@ -367,6 +396,268 @@ it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
       expect(dispatch).toHaveBeenCalledTimes(2);
     } finally {
       await agent?.close();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  },
+  30_000
+);
+
+it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
+  "collects an ordinary Ultra review on saved %s without enabling Goal funding",
+  async (provider, endpoint) => {
+    const root = await privateHome();
+    const cwd = path.join(root, "workspace");
+    const credentialHome = path.join(root, "credentials");
+    const store = new SecretsStore(
+      new AuthStore(path.join(root, "legacy")),
+      credentialHome
+    );
+    const assignment = "Inspect the sample independently.";
+    const finding = "The sample is missing a required field.";
+    const prompt = "Private parent task context.";
+    const release = Promise.withResolvers<void>();
+    const dispatch = vi.fn<
+      (body: Buffer, signal: AbortSignal) => Promise<Response>
+    >(async (body) => {
+      const request = JSON.parse(body.toString()) as ByokRequest;
+      if (!request.tools) {
+        await release.promise;
+        return byokReply({ content: finding }, "stop");
+      }
+      if (JSON.stringify(request.messages).includes(finding))
+        return byokReply(
+          { content: "Integrated the independent finding." },
+          "stop"
+        );
+      if (request.messages.some(({ role }) => role === "tool")) {
+        release.resolve();
+        return byokTool("collect_review", {});
+      }
+      return byokTool("delegate_review", { instructions: assignment });
+    });
+    const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
+    let chat: NativeAgentChat | undefined;
+    try {
+      await fs.mkdir(cwd, { mode: 0o700 });
+      await store.set(provider, "fixture-key");
+      const profile = await NativeProviderSelection.builtInByok(
+        provider,
+        byokModel,
+        {
+          credentialHome,
+          hasKey: (id) => store.has(id),
+          network: async () => ({ prepare }),
+        }
+      );
+      chat = await NativeAgentChat.start({
+        ...profile,
+        cwd,
+        stateDirectory: path.join(root, "state"),
+        resourcesPath: packaged!,
+      });
+      expect(chat.acceptsEffort).toBe(true);
+      expect(chat.acceptsGoalEffort).toBe(false);
+      const session = await chat.create();
+      expect(
+        (await chat.observe(session)).goalNamedChildAvailable
+      ).toBeUndefined();
+      await expect(
+        chat.startGoal(session, "funded-goal", {
+          objective: "Review the sample",
+          criteria: ["Review the required fields"],
+          allowance: { workTurns: 2, inferenceSteps: 8 },
+          automatic: false,
+          effort: "ultra",
+        })
+      ).rejects.toThrow("native_chat_goal_effort_unavailable");
+      expect(dispatch).not.toHaveBeenCalled();
+      const regime = provider === "openrouter" ? "plan" : "act";
+      await chat.submit(
+        session,
+        "ordinary-ultra",
+        prompt,
+        regime,
+        undefined,
+        "ultra"
+      );
+      const settled = await vi.waitFor(
+        async () => {
+          const view = await chat!.observe(session);
+          expect(view.latest?.status).toBe("succeeded");
+          return view;
+        },
+        { timeout: 10_000 }
+      );
+      expect(await chat.turnSummary(session, settled)).toMatchObject({
+        text: "Integrated the independent finding.",
+        reviewFindingsCollected: true,
+      });
+      expect(dispatch).toHaveBeenCalledTimes(4);
+      expect(
+        prepare.mock.calls.map(([url, headers]) => [
+          url,
+          headers.get("authorization"),
+        ])
+      ).toEqual(
+        Array.from({ length: 4 }, () => [
+          `${endpoint}/chat/completions`,
+          "Bearer fixture-key",
+        ])
+      );
+      const requests = dispatch.mock.calls.map(
+        ([body]) => JSON.parse(body.toString()) as ByokRequest
+      );
+      expect(requests.map(({ model }) => model)).toEqual(
+        Array(4).fill(byokModel)
+      );
+      const child = requests.find(({ tools }) => !tools);
+      expect(JSON.stringify(child)).toContain(assignment);
+      expect(JSON.stringify(child)).not.toContain(prompt);
+      expect(requests[0].tools?.map(({ function: { name } }) => name)).toEqual(
+        expect.arrayContaining(["delegate_review", "collect_review"])
+      );
+    } finally {
+      release.resolve();
+      await chat?.close();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  },
+  30_000
+);
+
+it.runIf(sharedCustody && Boolean(packaged))(
+  "refuses an admitted Ultra child exchange when its saved key changes before dispatch",
+  async () => {
+    const [provider, endpoint] = byokProviders[0];
+    const root = await privateHome();
+    const cwd = path.join(root, "workspace");
+    const credentialHome = path.join(root, "credentials");
+    const store = new SecretsStore(
+      new AuthStore(path.join(root, "legacy")),
+      credentialHome
+    );
+    const assignment = "Inspect the sample for rotation evidence.";
+    const rotated = Promise.withResolvers<void>();
+    let childUploadAccepted = false;
+    const dispatch = vi.fn<
+      (body: Buffer, signal: AbortSignal) => Promise<Response>
+    >(async (body) => {
+      const request = JSON.parse(body.toString()) as ByokRequest;
+      if (
+        request.messages.some(({ role }) => role === "tool") ||
+        !request.tools
+      ) {
+        await rotated.promise;
+        return byokReply(
+          { content: "No independent finding collected." },
+          "stop"
+        );
+      }
+      return byokTool("delegate_review", { instructions: assignment });
+    });
+    const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
+    const exchange = NativeProviderEgress.prototype.exchange;
+    const observeUpload = vi
+      .spyOn(NativeProviderEgress.prototype, "exchange")
+      .mockImplementation(async function (this: NativeProviderEgress, request) {
+        const reply = await exchange.call(this, request);
+        const frame = request as { action?: string; initial?: string };
+        if (
+          frame.action === "open" &&
+          reply.status === "accepted" &&
+          frame.initial
+        ) {
+          const body = JSON.parse(
+            Buffer.from(frame.initial, "base64").toString()
+          ) as ByokRequest;
+          if (
+            !body.tools &&
+            JSON.stringify(body.messages).includes(assignment)
+          ) {
+            await store.set(provider, "rotated-fixture-key");
+            childUploadAccepted = true;
+            rotated.resolve();
+          }
+        }
+        return reply;
+      });
+    let chat: NativeAgentChat | undefined;
+    try {
+      await fs.mkdir(cwd, { mode: 0o700 });
+      await store.set(provider, "fixture-key");
+      const profile = await NativeProviderSelection.builtInByok(
+        provider,
+        byokModel,
+        {
+          credentialHome,
+          hasKey: (id) => store.has(id),
+          network: async () => ({ prepare }),
+        }
+      );
+      chat = await NativeAgentChat.start({
+        ...profile,
+        cwd,
+        stateDirectory: path.join(root, "state"),
+        resourcesPath: packaged!,
+      });
+      const session = await chat.create();
+      await chat.submit(
+        session,
+        "review-before-key-rotation",
+        "Review the sample.",
+        "act",
+        undefined,
+        "ultra"
+      );
+      await vi.waitFor(() => expect(childUploadAccepted).toBe(true), {
+        timeout: 5_000,
+      });
+      const current = () => {};
+      const { children } = await chat.listSubagents(
+        session,
+        undefined,
+        current
+      );
+      expect(children).toHaveLength(1);
+      const attachment = {};
+      await vi.waitFor(
+        async () => {
+          const observation = await chat!.inspectSubagent(
+            attachment,
+            session,
+            children[0].childId,
+            undefined,
+            current
+          );
+          expect(observation.child.assignment?.result?.status).toBe("failed");
+          expect((await chat!.observe(session)).latest?.disposition).toBe(
+            "settled"
+          );
+        },
+        { timeout: 5_000 }
+      );
+      expect(dispatch).toHaveBeenCalled();
+      expect(
+        dispatch.mock.calls.every(
+          ([body]) =>
+            (JSON.parse(body.toString()) as ByokRequest).tools !== undefined
+        )
+      ).toBe(true);
+      expect(
+        prepare.mock.calls.map(([url, headers]) => [
+          url,
+          headers.get("authorization"),
+        ])
+      ).toEqual(
+        dispatch.mock.calls.map(() => [
+          `${endpoint}/chat/completions`,
+          "Bearer fixture-key",
+        ])
+      );
+    } finally {
+      rotated.resolve();
+      observeUpload.mockRestore();
+      await chat?.close();
       await fs.rm(root, { recursive: true, force: true });
     }
   },

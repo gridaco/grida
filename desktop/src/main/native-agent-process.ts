@@ -78,7 +78,7 @@ export type NativeAgentLaunch = {
   gatewayScope?: string;
   gatewayJobBilling?: NativeGatewayConnection["readJobBilling"];
   subscriptionScope?: string;
-  /** Trusted Main opt-in for the captured Gateway connection. */
+  /** Trusted Main opt-in for the captured Gateway or saved BYOK connection. */
   subagents?: true;
   mcp?: NativeMcpLaunch;
   workspace?: NativeWorkspaceSelection;
@@ -268,9 +268,7 @@ export class NativeAgentProcess {
   }
 
   get acceptsGoalNamedChild(): boolean {
-    return (
-      this.acceptsGoalEffort && this.acceptsSubagents && this.goalNamedChild
-    );
+    return this.acceptsSubagents && this.goalNamedChild;
   }
 
   get acceptsSubagents(): boolean {
@@ -439,6 +437,7 @@ export class NativeAgentProcess {
       ...(permissionProfile ? NativeAgentPermissions.capabilities : {}),
     };
     if (storedSubagents) {
+      // Request ordinary effort optionally below. Goal funding stays Gateway-only.
       delete capabilities[SESSION_EFFORT];
       delete capabilities[NativeAgentGoals.fundedReviewCapability];
       delete capabilities[NativeAgentGoals.namedChildCapability];
@@ -550,10 +549,10 @@ export class NativeAgentProcess {
                   [CHILD_MESSAGING]: 1,
                   [CHILD_QUEUE[0]]: 1,
                   [CHILD_QUEUE[1]]: 1,
+                  [SESSION_EFFORT]: 1,
                 }),
                 ...(options.subagents &&
                   options.gatewayScope && {
-                    [SESSION_EFFORT]: 1,
                     [NativeAgentGoals.fundedReviewCapability]: 1,
                     [NativeAgentGoals.namedChildCapability]: 1,
                   }),
@@ -625,9 +624,7 @@ export class NativeAgentProcess {
       processOwner.fileInput =
         advertised?.["co.grida/session/selected-file"] === 1;
       processOwner.agentEffort =
-        options.subagents === true &&
-        options.gatewayScope !== undefined &&
-        advertised?.[SESSION_EFFORT] === 1;
+        options.subagents === true && advertised?.[SESSION_EFFORT] === 1;
       processOwner.scheduledWakeups = Object.keys(
         NativeAgentWakeups.capabilities
       ).every((key) => advertised?.[key] === 1);
@@ -639,9 +636,11 @@ export class NativeAgentProcess {
       processOwner.goalManualContinuation =
         advertised?.[NativeAgentGoals.manualContinuationCapability] === 1;
       processOwner.goalFundedReview =
+        options.gatewayScope !== undefined &&
         processOwner.agentEffort &&
         advertised?.[NativeAgentGoals.fundedReviewCapability] === 1;
       processOwner.goalNamedChild =
+        processOwner.goalFundedReview &&
         advertised?.[NativeAgentGoals.namedChildCapability] === 1;
       processOwner.namedChildren =
         options.subagents === true &&

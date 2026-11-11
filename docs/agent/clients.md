@@ -146,7 +146,7 @@ requires an Act launch.
 
 ### Choose how much effort a task gets
 
-In a supported Gateway chat in Desktop, choose **Standard** or **Ultra** in
+In a supported Gateway, saved OpenRouter, or saved Vercel chat in Desktop, choose **Standard** or **Ultra** in
 **Effort for next message**. You can use either with **Plan** or **Act**. The
 choice applies when you send or queue a message. Steering keeps the current
 turn's effort. Editing a queued or earlier message keeps its original effort.

@@ -14,6 +14,10 @@ use std::num::NonZeroU32;
 
 pub(super) const INSTRUCTIONS: &str = "This work was explicitly reserved for a persistent goal. Use goal_inspect for the captured objective, criteria, and allowance. Record one goal_report when the work has been assessed. A completion proposal needs verified evidence for every criterion. Existing permissions still apply.";
 
+pub(super) fn funded_review_unavailable() -> Error {
+    problem(ErrorKind::Unsupported, "goal_funded_review_unavailable")
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GoalRequest {
@@ -171,7 +175,9 @@ impl Host {
             {
                 return Err(problem(ErrorKind::Conflict, "input_identity_reused"));
             }
-            if accepted.disposition == InputDisposition::Queued {
+            if accepted.disposition == InputDisposition::Queued
+                && (effort != EffortPreset::Ultra || self.goal_sponsorship_available())
+            {
                 self.kick_queue(request.session.clone()).await;
             }
             return Ok(DurableSubmission {
@@ -186,6 +192,9 @@ impl Host {
         }
         let view = self.store.inspect(request.session.clone()).await?;
         self.check_execution(&view)?;
+        if effort == EffortPreset::Ultra && !self.goal_sponsorship_available() {
+            return Err(funded_review_unavailable());
+        }
         require_goal_start(&view)?;
         if let Some(child) = &goal.named_child {
             self.require_goal_named_child(&request.session, child)
@@ -233,7 +242,7 @@ impl Host {
 
     async fn require_goal_named_child(&self, parent: &SessionId, child: &SessionId) -> Result<()> {
         let unavailable = || problem(ErrorKind::Unavailable, "goal_named_child_unavailable");
-        if !self.subagents_available() || !self.sponsorship_available() {
+        if !self.subagents_available() || !self.goal_sponsorship_available() {
             return Err(unavailable());
         }
         let child_view = self
@@ -434,7 +443,9 @@ impl Host {
         if !automatic && !goal.explicit_continuation() {
             return Ok(None);
         }
-        if captured.effort.is_some() && !self.sponsorship_enabled {
+        if captured.effort.is_some()
+            && (!self.sponsorship_enabled || !self.goal_sponsorship_enabled)
+        {
             return Ok(None);
         }
         if captured.effort.as_ref().is_some_and(|effort| {
@@ -505,7 +516,12 @@ impl Host {
             Some(
                 self.goal_origin(&control.session, &control.basis)
                     .await
-                    .map(|(_, automatic)| automatic),
+                    .and_then(|(captured, automatic)| {
+                        if captured.effort.is_some() && !self.goal_sponsorship_enabled {
+                            return Err(funded_review_unavailable());
+                        }
+                        Ok(automatic)
+                    }),
             )
         } else {
             None
@@ -516,6 +532,7 @@ impl Host {
         let intent = encode("grida.agent.goal.control", 1, &(&basis, &action))?;
         let decision = action.clone();
         let request = control.id.clone();
+        let goal_sponsorship_enabled = self.goal_sponsorship_enabled;
         let receipt = self
             .store
             .control_driver_state(
@@ -559,6 +576,9 @@ impl Host {
                         }
                         GoalAction::Resume => {
                             if let Some(current) = current {
+                                if !goal_sponsorship_enabled {
+                                    automatic.expect("goal resume decision")?;
+                                }
                                 if current.disposition != TurnDisposition::Suspended
                                     || !current.controls.paused
                                     || current.controls.cancelled

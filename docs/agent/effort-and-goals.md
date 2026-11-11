@@ -23,6 +23,9 @@ ordinary work allowance or **Ultra** for work that may benefit from an
 independent review. Either effort can be used with Plan or Act. Ultra can
 give one reviewer a separate text assignment while the main agent continues.
 The turn summary records whether the agent collected that reviewer’s findings.
+On supported saved OpenRouter and Vercel connections, Ultra is available for
+ordinary messages; Goal-funded reviews remain available on supported Gateway
+connections. The work allowance limits inference steps, not a monetary spend cap.
 [Work with subagents](./subagents.md)
 
 ## Keep an objective across turns

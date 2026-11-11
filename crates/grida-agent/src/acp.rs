@@ -199,8 +199,9 @@ async fn serve_connection(
                 let subagents = initialized_host.subagents_available();
                 let deletion = reviewer && initialized_host.deletion_available();
                 let effort = initialized_host.sponsorship_available();
+                let goal_effort = initialized_host.goal_sponsorship_available();
                 let mut advertised =
-                    extensions::advertised(reviewer, subagents, deletion, effort, files);
+                    extensions::advertised(reviewer, subagents, deletion, effort, goal_effort, files);
                 let library_selection = reviewer && initialized_host.accepts_library_selection();
                 let library_negotiated = library_selection
                     && extensions::library::CAPABILITIES.iter().all(|key| {
@@ -335,7 +336,7 @@ async fn serve_connection(
                     sessions.initialized = true;
                     let meta = request.client_capabilities.meta.as_ref();
                     sessions.negotiated =
-                        extensions::negotiated(meta, reviewer, subagents, deletion, effort, files);
+                        extensions::negotiated(meta, reviewer, subagents, deletion, effort, goal_effort, files);
                     if library_negotiated {
                         sessions.negotiated.extend(extensions::library::CAPABILITIES);
                     }

@@ -378,6 +378,12 @@ impl Host {
         self
     }
 
+    /// Allow turn-local reviews while withholding reviews funded by a Goal.
+    pub fn without_goal_sponsorship(mut self) -> Self {
+        self.goal_sponsorship_enabled = false;
+        self
+    }
+
     /// Select the default product effort for new inputs on this trusted host.
     pub fn with_effort(mut self, preset: EffortPreset) -> Result<Self> {
         self.capture_effort(preset)?;
@@ -396,6 +402,10 @@ impl Host {
                         .capabilities(&execution.config.model)
                         .is_ok_and(|model| model.json_tools)
             })
+    }
+
+    pub(crate) fn goal_sponsorship_available(&self) -> bool {
+        self.goal_sponsorship_enabled && self.sponsorship_available()
     }
 
     pub(super) fn capture_effort(&self, preset: EffortPreset) -> Result<Option<EffortPolicy>> {
@@ -590,6 +600,47 @@ impl Host {
             .map(Some)
     }
 
+    async fn sponsored_parent_prompt(
+        &self,
+        parent: &SessionId,
+        turn: &TurnId,
+    ) -> Result<StoredPrompt> {
+        let inputs = self
+            .store
+            .turn_submissions(parent.clone(), turn.clone())
+            .await?;
+        let [input] = inputs.as_slice() else {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "sponsored_subagent_source_input",
+            ));
+        };
+        if input.payload.schema().as_str() != INPUT_SCHEMA || input.payload.version() != 2 {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "sponsored_subagent_source_input",
+            ));
+        }
+        decode_input(input)
+    }
+
+    pub(super) async fn require_sponsored_origin(
+        &self,
+        parent: &SessionId,
+        turn: &TurnId,
+    ) -> Result<()> {
+        if !self.goal_sponsorship_enabled
+            && self
+                .sponsored_parent_prompt(parent, turn)
+                .await?
+                .goal
+                .is_some()
+        {
+            return Err(goals::funded_review_unavailable());
+        }
+        Ok(())
+    }
+
     async fn sponsored_claim(
         &self,
         source: OperationClaimSource,
@@ -601,19 +652,10 @@ impl Host {
         let view = self.store.inspect(source.binding.session.clone()).await?;
         self.check_execution(&view)?;
         let mut config = session_configuration(&view)?;
-        let inputs = self
-            .store
-            .turn_submissions(source.binding.session.clone(), source.binding.turn.clone())
+        let mut captured = self
+            .sponsored_parent_prompt(&source.binding.session, &source.binding.turn)
             .await?;
-        let [input] = inputs.as_slice() else {
-            return Err(problem(
-                ErrorKind::Unsupported,
-                "sponsored_subagent_source_input",
-            ));
-        };
-        let mut captured: StoredPrompt = decode_input(input)?;
-        if input.payload.version() != 2
-            || config.subagent.is_some()
+        if config.subagent.is_some()
             || captured.subagent.is_some()
             || captured
                 .effort
@@ -627,6 +669,9 @@ impl Host {
             ));
         }
         if captured.goal.is_some() {
+            if !self.goal_sponsorship_available() {
+                return Err(goals::funded_review_unavailable());
+            }
             let state = view.driver_state.value().ok_or_else(sponsored_slot_used)?;
             let goal = grida_agent_master::goals::Goal::decode(state)?;
             if goal.paused()
@@ -772,6 +817,10 @@ impl Host {
         let config = decode_session_configuration(configuration)?;
         let profile = config.subagent.ok_or_else(sponsored_slot_used)?;
         profile.require_authority(&execution.authority.inference.authority)?;
+        if let Some(sponsor) = profile.sponsorship() {
+            self.require_sponsored_origin(profile.parent(), &sponsor.parent_turn)
+                .await?;
+        }
         let prepared = self.prepare_input(
             execution,
             &session,
@@ -1011,6 +1060,10 @@ impl Host {
         };
         if self.sponsorship_available()
             && let Some(related) = &receipt.related
+            && self
+                .require_sponsored_origin(&receipt.turn.binding.session, &receipt.turn.binding.turn)
+                .await
+                .is_ok()
         {
             let wake = SponsoredWake::from_receipt(related)?;
             let child = match self.store.inspect(wake.binding.session.clone()).await {
@@ -1251,9 +1304,20 @@ mod tests {
         regime: OperatingRegime,
         instructions: &str,
     ) -> (agent_kit_sessions::ClaimedTurn, OperationClaimSource) {
+        capture_parent_delegation(host, cwd, regime, instructions, None).await
+    }
+
+    async fn capture_parent_delegation(
+        host: &Host,
+        cwd: &Path,
+        regime: OperatingRegime,
+        instructions: &str,
+        goal: Option<GoalRequest>,
+    ) -> (agent_kit_sessions::ClaimedTurn, OperationClaimSource) {
         let session = host.new_session(cwd.canonicalize().unwrap()).await.unwrap();
         let view = host.store.inspect(session.clone()).await.unwrap();
-        let submission = host
+        let effort = host.capture_effort(EffortPreset::Ultra).unwrap();
+        let mut submission = host
             .capture_input(
                 &view,
                 change_id().unwrap(),
@@ -1273,31 +1337,40 @@ mod tests {
                     editor_svg_target: None,
                     operating_regime: regime,
                     subagent: None,
-                    effort: host.capture_effort(EffortPreset::Ultra).unwrap(),
+                    effort: effort.clone(),
                 },
             )
             .await
             .unwrap();
         let id = submission.id.clone();
+        let goal = goal.map(goals::GoalInput::Start);
+        if let Some(goal) = &goal {
+            let mut stored: StoredPrompt = decode_input(&submission).unwrap();
+            stored.goal = Some(goal.clone());
+            submission.payload = encode(INPUT_SCHEMA, 2, &stored).unwrap();
+        }
         host.store
             .submit(session.clone(), submission)
             .await
             .unwrap();
         let view = host.store.inspect(session.clone()).await.unwrap();
-        let ClaimOutcome::Acquired(owner) = host
-            .store
-            .claim(
-                new_claim(
-                    session,
-                    TurnId::new("parent-turn").unwrap(),
-                    view.revision,
-                    vec![id],
-                )
-                .unwrap(),
+        let turn = TurnId::new("parent-turn").unwrap();
+        let claim = new_claim(session, turn.clone(), view.revision, vec![id.clone()]).unwrap();
+        let claim = if let Some(goal) = goal {
+            let change = goals::claim_update(
+                &view,
+                &id,
+                &turn,
+                &goal,
+                host.execution().unwrap().config.max_steps,
+                effort.as_ref(),
             )
-            .await
-            .unwrap()
-        else {
+            .unwrap();
+            host.store.claim_with_driver_state(claim, change).await
+        } else {
+            host.store.claim(claim).await
+        };
+        let ClaimOutcome::Acquired(owner) = claim.unwrap() else {
             panic!("expected parent lease")
         };
         let definition = delegation_definition().unwrap();
@@ -1427,10 +1500,11 @@ mod tests {
         host: &Host,
         root: &Path,
         independent: bool,
+        goal: Option<GoalRequest>,
     ) -> (SessionView, SessionId) {
         let instructions = "Check the retained result independently.";
         let (owner, source) =
-            capture_delegation(host, root, OperatingRegime::Act, instructions).await;
+            capture_parent_delegation(host, root, OperatingRegime::Act, instructions, goal).await;
         let parent = source.binding.session.clone();
         let child = sponsored_identity(&parent, &source.binding.turn).unwrap();
         let SponsoredClaim::Fresh(work) = host
@@ -1464,6 +1538,143 @@ mod tests {
         (host.store.inspect(parent).await.unwrap(), child)
     }
 
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[tokio::test]
+    async fn ordinary_only_review_cannot_resume_a_retained_goal_child() {
+        use grida_agent_master::goals::{Allowance, Objective};
+        use std::num::NonZeroU32;
+
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        let home = root.path().canonicalize().unwrap().join("credentials");
+        grida_auth::ProviderStore::new(home.clone())
+            .unwrap()
+            .set("openrouter", "fixture-key")
+            .unwrap();
+        let options = || ProviderOptions {
+            endpoint: "https://openrouter.ai/api/v1".into(),
+            model: ModelId::new("fixture").unwrap(),
+            max_output_tokens: 1024,
+            credential_env: None,
+            protocol: ProviderProtocol::OpenAiCompatible,
+            credential_home: Some(home.clone()),
+            compatible_output_limit_field: None,
+            llama_cpp_input_count: false,
+        };
+        let host = Host::open(&state, Some(options()))
+            .unwrap()
+            .with_subagents();
+        let (parent, child) = paused_parent_and_child(
+            &host,
+            root.path(),
+            false,
+            Some(GoalRequest {
+                objective: Objective {
+                    description: "Review the work".into(),
+                    criteria: vec!["Review received".into()],
+                },
+                allowance: Allowance {
+                    work_turns: NonZeroU32::new(1).unwrap(),
+                    inference_steps: NonZeroU32::new(5).unwrap(),
+                },
+                automatic: false,
+                user_review: false,
+                named_child: None,
+            }),
+        )
+        .await;
+        let turn = parent.current.unwrap();
+        let request = ClaimRequest {
+            id: change_id().unwrap(),
+            session: parent.session.clone(),
+            expected_revision: parent.revision,
+            selection: TurnSelection::ResumePaused {
+                turn: turn.binding.turn.clone(),
+                epoch: turn.binding.epoch,
+                position: turn.position,
+                control_revision: turn.controls.revision,
+            },
+        };
+        // The headless owner commits both decisions, then exits before its
+        // ready child can be admitted under the saved provider.
+        let ClaimOutcome::Acquired(owner) = host
+            .claim_parent_resume(request.clone(), &turn.binding.turn)
+            .await
+            .unwrap()
+        else {
+            panic!("expected retained parent resume")
+        };
+        drop(owner);
+        assert!(matches!(
+            host.work.lock().await.ready.front(),
+            Some(ReadyWork::Sponsored(_))
+        ));
+        host.shutdown().await.unwrap();
+        drop(host);
+
+        let reopened = Host::open_supervised(
+            &state,
+            options(),
+            crate::SupervisedProvider::default(),
+            None,
+        )
+        .unwrap()
+        .with_subagents()
+        .without_goal_sponsorship();
+        let before = reopened.store.inspect(child.clone()).await.unwrap();
+        reopened.check_execution(&before).unwrap();
+        let observed = reopened.resume_receipt(request).await.unwrap().unwrap();
+        assert_eq!(observed.binding.turn, turn.binding.turn);
+        {
+            let work = reopened.work.lock().await;
+            assert!(work.ready.is_empty() && work.active.is_empty());
+        }
+        let unchanged = reopened.store.inspect(child.clone()).await.unwrap();
+        assert_eq!(unchanged.revision, before.revision);
+        assert_eq!(unchanged.current, before.current);
+
+        reopened.pause(turn_control(&unchanged)).await.unwrap();
+        let paused = reopened.store.inspect(child.clone()).await.unwrap();
+        let current = paused.current.as_ref().unwrap();
+        let denied = reopened
+            .resume(
+                turn_control(&paused),
+                current.binding.epoch,
+                current.position,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(denied.code, "goal_funded_review_unavailable");
+        assert_eq!(
+            reopened.store.inspect(child.clone()).await.unwrap().current,
+            paused.current
+        );
+        let control = turn_control(&paused);
+        reopened
+            .stop(
+                control.session,
+                control.turn,
+                control.request,
+                control.expected_session,
+                control.expected_control,
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let view = reopened.store.inspect(child.clone()).await.unwrap();
+                if let Some(outcome) = view.latest.and_then(|turn| turn.outcome) {
+                    assert_eq!(outcome.status, OutcomeStatus::Cancelled);
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap();
+        reopened.shutdown().await.unwrap();
+    }
+
     #[tokio::test]
     async fn parent_resume_starts_the_child_before_either_response() {
         let root = tempfile::tempdir().unwrap();
@@ -1483,7 +1694,7 @@ mod tests {
         )
         .unwrap()
         .with_subagents();
-        let (parent, child) = paused_parent_and_child(&host, root.path(), false).await;
+        let (parent, child) = paused_parent_and_child(&host, root.path(), false, None).await;
         let current = parent.current.as_ref().unwrap();
         host.resume(
             turn_control(&parent),
@@ -1554,7 +1765,7 @@ mod tests {
         let host = Host::open(&state, Some(options()))
             .unwrap()
             .with_subagents();
-        let (parent, child) = paused_parent_and_child(&host, root.path(), false).await;
+        let (parent, child) = paused_parent_and_child(&host, root.path(), false, None).await;
         let control = turn_control(&parent);
         let current = parent.current.unwrap();
         let request = ClaimRequest {
@@ -1689,7 +1900,7 @@ mod tests {
         )
         .unwrap()
         .with_subagents();
-        let (parent, child) = paused_parent_and_child(&host, root.path(), true).await;
+        let (parent, child) = paused_parent_and_child(&host, root.path(), true, None).await;
         let current = parent.current.unwrap();
         let request = ClaimRequest {
             id: change_id().unwrap(),

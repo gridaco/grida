@@ -685,7 +685,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         host
     };
     let host = if subagents && supervisor.is_some() && gateway_scope.is_none() && stored_subagents {
-        host.without_sponsorship()
+        host.without_goal_sponsorship()
     } else {
         host
     };
