@@ -32,6 +32,7 @@ const copiedFiles = [
   "package.json",
   "tsconfig.json",
   "proxy.ts",
+  "lib/maintenance/server-instance-cache.ts",
   "lib/api/operations.ts",
   "lib/api/policy.ts",
   "lib/api/native.ts",
@@ -2663,6 +2664,8 @@ async function main() {
       GRIDA_OAUTH_CLIENT_IDS: issuer.client,
       GRIDA_API_ORIGIN: apiOrigin,
       GRIDA_API_MAINTENANCE: "0",
+      // Every web request must reach the Edge Config stub for the tripwires.
+      GRIDA_MAINTENANCE_MODE_CACHE_TTL_MS: "0",
       GG_TOKEN_SECRET: signingSecret,
       GRIDA_AI_GATEWAY_ORIGIN: `http://127.0.0.1:${ggPort}`,
       GRIDA_AI_GATEWAY_ALLOW_LOCAL: "1",
