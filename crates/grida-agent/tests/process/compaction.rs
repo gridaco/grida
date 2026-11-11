@@ -3,6 +3,7 @@ use super::lifecycle::{
     wait_for_snapshot,
 };
 use super::*;
+use agent_kit_core::history::HistoryRecord;
 use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::tungstenite::Message;
 
@@ -615,9 +616,12 @@ async fn oversized_history_compacts_complete_early_turns_and_keeps_the_exact_suf
     endpoint.done().await;
 }
 
-#[tokio::test]
-async fn manual_compaction_recovers_a_chat_beyond_the_context_projection_limit() {
-    use agent_kit_core::history::HistoryRecord;
+async fn seed_oversized_context(
+    state: &Path,
+    session: &str,
+    middle_count: usize,
+    mut older_extra: Vec<HistoryRecord>,
+) -> Vec<String> {
     use agent_kit_core::messages::{
         Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role,
     };
@@ -627,31 +631,13 @@ async fn manual_compaction_recovers_a_chat_beyond_the_context_projection_limit()
     use agent_kit_store_sqlite::SqliteStore;
     use agent_kit_store_sqlite::context::UnpromptedClaim;
 
-    let temporary = TempDir::new().unwrap();
-    let state = temporary.path().join("state");
-    let workspace = TempDir::new().unwrap();
-    let summary = "The earliest retained decisions.";
-    let mut endpoint = Endpoint::start(vec![
-        Reply::Finished(summary),
-        Reply::Finished("Continued after compaction."),
-    ])
-    .await;
-    let (host, url) = shared_server(&state, &endpoint.url).await;
-    let mut socket = client(&url).await;
-    let session = create(&mut socket, workspace.path()).await;
-    drop(socket);
-    terminate_shared_server(host).await;
-
-    // Seed through the journal so the live ACP path starts with retained
-    // history beyond the request projection limit without 4,098 wire updates
-    // during fixture setup. The first two turns fit that record projection,
-    // but only the first fits the bounded summary input.
+    // Retain complete turns through the same journal used by live requests.
     let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
-    let session_id = SessionId::new(session.clone()).unwrap();
+    let session_id = SessionId::new(session).unwrap();
     let mut original = Vec::new();
     for (turn, count, padding) in [
-        ("older", 2_000, 96),
-        ("middle", 2_000, 32),
+        ("older", 2_000, 0),
+        ("middle", middle_count, 96),
         ("recent", 98, 0),
     ] {
         let mut records = Vec::with_capacity(count);
@@ -674,6 +660,9 @@ async fn manual_compaction_recovers_a_chat_beyond_the_context_projection_limit()
                     fingerprint: None,
                 },
             }));
+        }
+        if turn == "older" {
+            records.append(&mut older_extra);
         }
         let context = store
             .context_history_with(session_id.clone(), None, |_| Vec::new())
@@ -717,8 +706,27 @@ async fn manual_compaction_recovers_a_chat_beyond_the_context_projection_limit()
             .await
             .unwrap();
     }
-    drop(store);
+    original
+}
 
+#[tokio::test]
+async fn manual_compaction_recovers_a_chat_beyond_the_context_projection_limit() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let summary = "The earliest retained decisions.";
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished(summary),
+        Reply::Finished("Continued after compaction."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+    drop(socket);
+    terminate_shared_server(host).await;
+    // Two turns fit the context projection, and only the oldest fits the summary.
+    let original = seed_oversized_context(&state, &session, 2_000, Vec::new()).await;
     let (host, url) = shared_server(&state, &endpoint.url).await;
     let mut socket = client(&url).await;
     assert_eq!(
@@ -779,6 +787,167 @@ async fn manual_compaction_recovers_a_chat_beyond_the_context_projection_limit()
     drop(socket);
     terminate_shared_server(host).await;
     endpoint.done().await;
+}
+
+#[tokio::test]
+async fn automatic_compaction_recovers_queued_work_from_one_projectable_turn() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let summary = "The earliest retained decisions.";
+    let answer = "Continued after automatic compaction.";
+    let (release, held) = tokio::sync::oneshot::channel();
+    let mut endpoint =
+        Endpoint::start(vec![Reply::Release(summary, held), Reply::Finished(answer)]).await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+    drop(socket);
+    terminate_shared_server(host).await;
+    // The complete-turn projection can include only the oldest turn.
+    let mut original = seed_oversized_context(&state, &session, 2_100, Vec::new()).await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    assert_eq!(
+        load(&mut socket, &session, workspace.path()).await,
+        original
+    );
+    let followup = "Continue the accepted queued work.";
+    let request = prompt_request(&session, "queued-after-overflow", followup);
+    let accepted = ws_rpc(&mut socket, 3, "_co.grida/session/submit", request.clone()).await;
+    assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
+    let helper = endpoint.request().await;
+    let source = helper["messages"][1]["content"].as_str().unwrap();
+    assert!(source.len() < 96 * 1024, "overflow alone triggers recovery");
+    assert!(source.contains(&original[0]));
+    assert!(source.contains(&original[1_999]));
+    assert!(!source.contains(&original[2_000]));
+    assert!(!source.contains(original.last().unwrap()));
+    let replay = ws_rpc(&mut socket, 4, "_co.grida/session/submit", request).await;
+    assert_eq!(replay["result"], accepted["result"]);
+    release.send(()).unwrap();
+
+    let next = endpoint.request().await;
+    let mut contents = next["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .rev()
+        .map(|message| message["content"].as_str().unwrap());
+    assert_eq!(contents.next(), Some(followup));
+    for text in original[2_000..].iter().rev() {
+        assert_eq!(contents.next(), Some(text.as_str()));
+    }
+    assert!(contents.next().unwrap().contains(summary));
+    assert!(!next.to_string().contains("Original older-"));
+    let settled = wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null() && snapshot["queuedInputs"] == 0
+    })
+    .await;
+    assert_eq!(settled["latest"]["status"], "succeeded");
+    drop(socket);
+    terminate_shared_server(host).await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    original.extend([followup.to_owned(), answer.to_owned()]);
+    assert_eq!(
+        load(&mut socket, &session, workspace.path()).await,
+        original
+    );
+    assert!(endpoint.requests.try_recv().is_err());
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn automatic_compaction_does_not_omit_a_retained_tool_image_on_overflow() {
+    use agent_kit_core::messages::{
+        Content, MediaRef, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent,
+        Retention, Role, ToolArguments, ToolCall, ToolResult,
+    };
+    use agent_kit_core::{ArtifactId, BindingId, MessageId, ToolCallId, ToolId};
+
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![Reply::Finished("Unexpected inference.")]).await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+    drop(socket);
+    terminate_shared_server(host).await;
+
+    let record = |id, role, content| {
+        HistoryRecord::Message(Message {
+            id: MessageId::new(id).unwrap(),
+            role,
+            phase: None,
+            content: vec![content],
+            provenance: Provenance {
+                source: "fixture".into(),
+                kind: ProvenanceKind::Observed,
+                fingerprint: None,
+            },
+        })
+    };
+    let call = ToolCallId::new("view-png").unwrap();
+    let exchange = vec![
+        record(
+            "visual-call",
+            Role::Assistant,
+            Content::ToolCall(ToolCall {
+                id: call.clone(),
+                tool: ToolId::new("view_image").unwrap(),
+                arguments: ToolArguments::Json(json!({})),
+            }),
+        ),
+        record(
+            "visual-result",
+            Role::Tool,
+            Content::ToolResult(ToolResult {
+                call,
+                status: OutcomeStatus::Succeeded,
+                content: vec![ResultContent::Media(MediaRef {
+                    id: ArtifactId::new("workspace-view/fixture").unwrap(),
+                    media_type: "image/png".into(),
+                    locator: "retained-input:fixture".into(),
+                    access_scope: BindingId::new("fixture").unwrap(),
+                    retention: Retention::Retained,
+                })],
+                structured: None,
+                truncated: false,
+            }),
+        ),
+    ];
+    seed_oversized_context(&state, &session, 2_100, exchange).await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    load(&mut socket, &session, workspace.path()).await;
+    let reply = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/submit",
+        prompt_request(&session, "after-tool-image", "Continue the visual work."),
+    )
+    .await;
+    // The input was already accepted. Admission refusal retains its queue slot.
+    assert_eq!(reply["result"]["disposition"], "queued", "{reply}");
+    let retained = session_snapshot(&mut socket, &session).await;
+    assert_eq!(retained["queuedInputs"], 1);
+    assert_eq!(retained["latest"]["turnId"], "recent");
+    assert!(retained["current"].is_null());
+    assert!(matches!(
+        endpoint.requests.try_recv(),
+        Err(mpsc::error::TryRecvError::Empty)
+    ));
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.task.abort();
+    assert!(endpoint.task.await.unwrap_err().is_cancelled());
 }
 
 async fn compact_on_peer(

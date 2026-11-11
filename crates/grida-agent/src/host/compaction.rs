@@ -87,7 +87,10 @@ pub(super) struct AutomaticCompaction {
 
 enum CompactionTrigger {
     Manual,
-    Automatic { verified_pressure: bool },
+    Automatic {
+        verified_pressure: bool,
+        has_unprojected_suffix: bool,
+    },
 }
 
 impl Host {
@@ -376,32 +379,34 @@ impl Host {
             None,
             InputAuthority::RequireCaptured,
         )?;
-        let context = self
+        let prefix = self
             .store
-            .context_history_with(
-                view.session.clone(),
-                None,
-                grida_agent_master::history::project,
-            )
+            .context_prefix_with(view.session.clone(), grida_agent_master::history::project)
             .await?;
+        let has_unprojected_suffix = prefix.unprojected_suffix_after.is_some();
+        let context = prefix.history;
         if context.session_revision != view.revision {
             return Ok(None);
         }
-        let verified_pressure = self
-            .verified_compaction_pressure(
-                view,
-                execution,
-                &input,
-                context.records.last().map(|entry| &entry.turn),
-            )
-            .await
-            .unwrap_or(false);
+        let verified_pressure = has_unprojected_suffix
+            || self
+                .verified_compaction_pressure(
+                    view,
+                    execution,
+                    &input,
+                    context.records.last().map(|entry| &entry.turn),
+                )
+                .await
+                .unwrap_or(false);
         let Some(plan) = compaction_plan_for(
             execution,
             &input.config,
             input.limit,
             context,
-            CompactionTrigger::Automatic { verified_pressure },
+            CompactionTrigger::Automatic {
+                verified_pressure,
+                has_unprojected_suffix,
+            },
         )?
         else {
             return Ok(None);
@@ -816,9 +821,16 @@ fn compaction_plan_for(
             _ => turns.push((entry.turn, vec![message])),
         }
     }
-    let prefix_end = if matches!(&trigger, CompactionTrigger::Automatic { .. }) {
-        // Keep the most recent complete conversational turn unchanged.
-        turns.pop();
+    let prefix_end = if let CompactionTrigger::Automatic {
+        has_unprojected_suffix,
+        ..
+    } = &trigger
+    {
+        // Keep the most recent complete turn. A bounded projection already
+        // leaves that turn outside the summary source.
+        if !has_unprojected_suffix {
+            turns.pop();
+        }
         let Some((last, _)) = turns.last() else {
             return Ok(None);
         };
@@ -840,7 +852,9 @@ fn compaction_plan_for(
     else {
         return Ok(None);
     };
-    if let CompactionTrigger::Automatic { verified_pressure } = trigger
+    if let CompactionTrigger::Automatic {
+        verified_pressure, ..
+    } = trigger
         && ((!verified_pressure && coverage.input_bytes < AUTOMATIC_SOURCE_BYTES)
             || coverage.omissions.media != 0
             || coverage.omissions.tool_results_with_media != 0)
