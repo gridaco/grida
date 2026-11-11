@@ -1063,6 +1063,7 @@ describe("createWorkspaceAgentBindings — read-only directory references", () =
       matches: [
         { path: `${mount}/nested/marker.txt`, line: 1, text: "E2E_MARKER" },
       ],
+      truncated: false,
     });
   });
 
@@ -1130,7 +1131,7 @@ describe("createWorkspaceAgentBindings — read-only directory references", () =
 
     expect(readOutput).toMatchObject({ ok: false, reason: "io_error" });
     expect(listOutput).toMatchObject({ folders: [], files: [] });
-    expect(grepOutput).toMatchObject({ matches: [] });
+    expect(grepOutput).toMatchObject({ matches: [], truncated: true });
     expect(viewError).toMatchObject({
       name: "DirectoryReferencePathError",
       reason: "unreadable",
@@ -1228,12 +1229,45 @@ describe("createWorkspaceAgentBindings — read-only directory references", () =
     });
 
     expect(output.matches).toEqual([]);
+    expect(output.truncated).toBe(true);
+    expect(output).not.toHaveProperty("next_offset");
     expect(yielded).toBe(999);
     expect(closed).toBe(true);
     expect(readFile).toHaveBeenCalledTimes(599);
     expect(readFile.mock.calls.some(([, rel]) => rel === "after-cap.txt")).toBe(
       false
     );
+  });
+
+  it("reports reference grep as truncated when a file read fails", async () => {
+    const result = await bindings();
+    const mount = "/__references__/dir_11111111-1111-4111-8111-111111111111";
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(workspaceFs, "iterateDir").mockImplementation(async function* () {
+      yield { name: "private.txt", rel_path: "private.txt", kind: "file" };
+      yield { name: "public.txt", rel_path: "public.txt", kind: "file" };
+    });
+    vi.spyOn(workspaceFs, "readFile").mockImplementation(
+      async (_scope, relPath) => {
+        if (relPath === "private.txt") {
+          throw Object.assign(new Error("permission denied"), {
+            code: "EACCES",
+          });
+        }
+        return { content: "NEEDLE", mtime: 0 };
+      }
+    );
+
+    const output = await result!.fs.grep_fresh({
+      pattern: "NEEDLE",
+      path_prefix: mount,
+    });
+
+    expect(output.matches).toEqual([
+      { path: `${mount}/public.txt`, line: 1, text: "NEEDLE" },
+    ]);
+    expect(output.truncated).toBe(true);
+    expect(output).not.toHaveProperty("next_offset");
   });
 
   it.skipIf(process.platform === "win32")(

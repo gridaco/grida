@@ -159,11 +159,18 @@ Implementation guidance:
 ### `grep_files`
 
 Literal substring search across every known file. Returns one entry
-per matching line with a 1-indexed line number and the full line
-text. Mirrors `grep -n -F` (case-sensitive, fixed-string by default;
-pass `case_sensitive: false` for `-i`). A result may provide enough
-text for a unique edit, but the agent should read the file when it
-needs broader context.
+per matching line with a 1-indexed line number and the line text.
+Mirrors `grep -n -F` (case-sensitive, fixed-string by default; pass
+`case_sensitive: false` for `-i`). A result may provide enough text
+for a unique edit, but the agent should read the file when it needs
+broader context.
+
+Matches are sorted by path and line and returned one page at a time:
+200 by default, up to 1000 with `limit`. `truncated: true` marks a
+partial result; `next_offset` fetches the next page when one exists.
+A backend that stops early or fails reports `truncated` without
+`next_offset`, so the agent narrows the search instead. Lines longer
+than 2000 characters are clipped and marked `text_truncated: true`.
 
 Roadmap:
 

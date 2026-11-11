@@ -63,9 +63,9 @@ Filesystem tools:
   Match-and-replace. The default write path.
 - ${fs.write_file}: { path, content }. Full-file upsert; creates a
   missing file or intentionally replaces the whole existing file.
-- ${fs.grep_files}: { pattern, path_prefix?, case_sensitive? }.
+- ${fs.grep_files}: { pattern, path_prefix?, case_sensitive?, offset?, limit? }.
   Literal substring search across files (mirrors \`grep -n -F\`).
-  Returns one entry per matching line with a 1-indexed line number.
+  Returns one page of entries per matching line with a 1-indexed line number.
   Use it to find references before editing; read the file when a
   matching line does not provide enough unique context.
 
@@ -88,6 +88,9 @@ Rules:
 7. Treat ${fs.list_files} results as one directory page. If \`truncated\`
    is true, call it again with \`next_offset\`; use ${fs.grep_files} or
    command/search tools for broad searches.
+8. If ${fs.grep_files} returns \`truncated: true\`, the matches are partial.
+   Narrow the pattern or \`path_prefix\`, or call it again with \`next_offset\`
+   when present, before treating the result as exhaustive.
 </filesystem>
 
 <planning>
