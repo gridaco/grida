@@ -88,6 +88,16 @@ also reacquire a released cancelled suspension to record its final disposition.
 Cancellation remains active during that recovery. The adapter supplies no
 clock-based takeover.
 
+`active_turn_page` lists at most 32 active session and turn identities in
+ascending session order without reading snapshots or acquiring leases. Its
+cursor is the last returned session identity, even if that session is later
+removed. Pages reflect each read rather than a frozen snapshot; a caller must
+recheck an identity before acting and restart a pass to observe concurrent
+insertions behind its cursor. Malformed stored identities fail explicitly.
+The partial active-session index makes each page an indexed traversal. Its
+first creation on an existing database scans sessions once, without changing
+the database version or requiring a new reader format.
+
 On Unix, the parent directory must exclude group/other access. Database and lock
 files use owner-only permissions, and existing symlinks or hard-linked files are
 rejected. Other platforms rely on the host's application-directory access policy.

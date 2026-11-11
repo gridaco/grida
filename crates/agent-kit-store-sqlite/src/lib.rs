@@ -28,7 +28,9 @@ use agent_kit_sessions::{
     SessionRevision, SessionStore, SessionView, Submission, TurnDisposition, TurnSelection,
     TurnView,
 };
-use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
+use rusqlite::{
+    Connection, OptionalExtension, Transaction, TransactionBehavior, params, types::ValueRef,
+};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{File, OpenOptions};
@@ -45,6 +47,7 @@ const MAX_HISTORY_TURNS: i64 = 4_096;
 const MAX_HISTORY_RECORDS: usize = 4_096;
 const MAX_HISTORY_BYTES: usize = 8 * 1024 * 1024;
 const MAX_HISTORY_SCAN_BYTES: usize = 128 * 1024 * 1024;
+const ACTIVE_TURN_PAGE_SIZE: usize = 32;
 const OPERATION_CLAIM: &str = "operation-claim";
 
 /// The exact running tool attempt allowed to create one independent turn.
@@ -55,6 +58,20 @@ pub struct OperationClaimSource {
     pub operation: OperationId,
     pub attempt: AttemptId,
     pub action: Fingerprint,
+}
+
+/// A session's observed active turn identity. It does not grant a lease.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ActiveTurnIdentity {
+    pub session: SessionId,
+    pub turn: TurnId,
+}
+
+/// One bounded, observational page in ascending session identity order.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ActiveTurnPage {
+    pub entries: Vec<ActiveTurnIdentity>,
+    pub next_after: Option<SessionId>,
 }
 
 /// Create a fresh session and claim its first input from a running operation.
@@ -413,6 +430,13 @@ impl SqliteStore {
             }
             _ => return Err(error(ErrorKind::Unsupported, "store_schema_unsupported")),
         }
+        // This additive index changes no persisted authority or schema version.
+        // An interrupted build rolls back and is retried on the next open.
+        connection
+            .execute_batch(
+                "CREATE INDEX IF NOT EXISTS sessions_active_turn_scan ON sessions(id,active_turn) WHERE active_turn IS NOT NULL",
+            )
+            .map_err(database_error)?;
         if let Some(project) = catalog {
             catalog::project_existing(&mut connection, project)?;
         }
@@ -429,6 +453,46 @@ impl SqliteStore {
                 _lock: lock,
             }),
         })
+    }
+
+    /// List a bounded page of active identities without reading turn snapshots
+    /// or acquiring leases. Pages are not a snapshot: concurrent changes may
+    /// require a new pass. The cursor remains valid if its session is removed.
+    pub async fn active_turn_page(&self, after: Option<SessionId>) -> Result<ActiveTurnPage> {
+        execute(Arc::clone(&self.inner), move |_, connection| {
+            let query = if after.is_some() {
+                "SELECT id,active_turn FROM sessions INDEXED BY sessions_active_turn_scan WHERE active_turn IS NOT NULL AND id>?1 ORDER BY id LIMIT ?2"
+            } else {
+                "SELECT id,active_turn FROM sessions INDEXED BY sessions_active_turn_scan WHERE active_turn IS NOT NULL AND ?1 IS NULL ORDER BY id LIMIT ?2"
+            };
+            let mut statement = connection.prepare_cached(query).map_err(database_error)?;
+            let mut rows = statement
+                .query(params![after.as_ref().map(SessionId::as_str), (ACTIVE_TURN_PAGE_SIZE + 1) as i64])
+                .map_err(database_error)?;
+            let mut entries = Vec::with_capacity(ACTIVE_TURN_PAGE_SIZE);
+            while let Some(row) = rows.next().map_err(database_error)? {
+                if entries.len() == ACTIVE_TURN_PAGE_SIZE {
+                    return Ok(ActiveTurnPage {
+                        next_after: entries.last().map(|entry: &ActiveTurnIdentity| entry.session.clone()),
+                        entries,
+                    });
+                }
+                let identity = |index| match row.get_ref(index).map_err(database_error)? {
+                    ValueRef::Text(bytes) if bytes.len() <= 256 => std::str::from_utf8(bytes)
+                        .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid")),
+                    _ => Err(error(ErrorKind::InvalidState, "stored_data_invalid")),
+                };
+                let session = identity(0)?;
+                let turn = identity(1)?;
+                let session = SessionId::new(session)
+                    .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
+                let turn = TurnId::new(turn)
+                    .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
+                entries.push(ActiveTurnIdentity { session, turn });
+            }
+            Ok(ActiveTurnPage { entries, next_after: None })
+        })
+        .await
     }
 
     /// Observe a submission's retained payload and disposition in its session.
