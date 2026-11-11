@@ -855,7 +855,9 @@ success criteria, and separate allowances for work turns and inference steps.
 Opt in to automatic continuation when you start the goal. The next reserved
 turn follows any prompts already in the queue. The agent waits if it needs
 input, runs out of allowance, or records no further progress.
-Without that opt-in, the goal reserves its first work turn only.
+Without that opt-in, the goal reserves its first work turn only. An explicit
+Resume can authorize one more work turn within the remaining allowance; it does
+not turn on automatic continuation. Earlier queued messages go first.
 
 Inspect the goal to see progress, allowance used and held, and any blocker.
 Pause and Resume preserve the allowance for the same suspended turn. Revising

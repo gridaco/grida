@@ -420,7 +420,7 @@ impl Host {
         };
         let (mut captured, automatic) =
             self.goal_origin(&view.session, &continuation.basis).await?;
-        if !automatic {
+        if !automatic && !goal.explicit_continuation() {
             return Ok(None);
         }
         if captured.effort.as_ref().is_some_and(|effort| {
@@ -486,6 +486,16 @@ impl Host {
             }
             _ => None,
         };
+        // Exact control retries are answered by the store before using this lookup.
+        let automatic = if matches!(&control.action, GoalAction::Resume) {
+            Some(
+                self.goal_origin(&control.session, &control.basis)
+                    .await
+                    .map(|(_, automatic)| automatic),
+            )
+        } else {
+            None
+        };
         let session = control.session;
         let basis = control.basis;
         let action = control.action;
@@ -547,7 +557,11 @@ impl Host {
                                 goal.resume_reserved(&basis, &current.binding.turn)?;
                                 Some(ControlDirective::Resume)
                             } else {
-                                goal.resume_idle(&basis)?;
+                                if automatic.expect("goal resume decision")? {
+                                    goal.resume_idle(&basis)?;
+                                } else {
+                                    goal.resume_idle_once(&basis)?;
+                                }
                                 None
                             }
                         }

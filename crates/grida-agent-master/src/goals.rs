@@ -228,6 +228,8 @@ struct State {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     last_work: Option<TurnId>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    explicit_continuation: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     user_review: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     review: Option<CompletionReview>,
@@ -260,6 +262,7 @@ impl Goal {
                 status: Status::Active,
                 progress: None,
                 last_work: None,
+                explicit_continuation: false,
                 user_review,
                 review: None,
                 named_child: None,
@@ -400,6 +403,10 @@ impl Goal {
         })
     }
 
+    pub fn explicit_continuation(&self) -> bool {
+        self.state.explicit_continuation
+    }
+
     /// Work already reserved remains unavailable until the owning turn is reconciled.
     pub fn remaining(&self) -> Usage {
         let held_turns = u32::from(self.state.reservation.is_some());
@@ -507,6 +514,16 @@ impl Goal {
         Ok(())
     }
 
+    /// Authorize one idle work turn without enabling automatic continuation.
+    pub fn resume_idle_once(&mut self, expected: &Basis) -> Result<()> {
+        if self.state.last_work.is_none() {
+            return Err(problem(ErrorKind::Conflict, "goal_work_not_accounted"));
+        }
+        self.resume_idle(expected)?;
+        self.state.explicit_continuation = true;
+        Ok(())
+    }
+
     /// The scheduler must persist this with admission before starting work.
     pub fn reserve(
         &mut self,
@@ -562,6 +579,7 @@ impl Goal {
             named_child: child_inference_steps.and(self.state.named_child.clone()),
             objective_fingerprint: Some(Fingerprint::of(&self.state.objective)?),
         };
+        self.state.explicit_continuation = false;
         self.state.reservation = Some(reservation.clone());
         Ok(reservation)
     }
@@ -741,6 +759,7 @@ impl Goal {
             .revision
             .checked_add(1)
             .ok_or_else(|| problem(ErrorKind::LimitExceeded, "goal_revision_limit"))?;
+        self.state.explicit_continuation = false;
         Ok(())
     }
 
@@ -807,6 +826,13 @@ impl Goal {
             || state.spent.inference_steps > state.allowance.inference_steps.get()
             || bad_reservation
             || bad_review
+            || state.explicit_continuation
+                && (state.status != Status::Active
+                    || state.paused
+                    || state.reservation.is_some()
+                    || state.last_work.is_none()
+                    || state.spent.work_turns == state.allowance.work_turns.get()
+                    || state.spent.inference_steps == state.allowance.inference_steps.get())
             || state.status == Status::Blocked(Blocker::UncertainWork)
             || state.status == Status::Complete
                 && (state.reservation.is_some() || state.progress.is_none() || state.paused)

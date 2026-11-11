@@ -1,4 +1,7 @@
-use super::lifecycle::{session_snapshot, terminate_shared_server, wait_for_snapshot};
+use super::lifecycle::{
+    prompt_request, queue_basis, session_snapshot, task_basis, terminate_shared_server,
+    wait_for_snapshot,
+};
 use super::*;
 use agent_kit_core::{ChangeId, ModelId, SessionId};
 use agent_kit_sessions::{InputDisposition, TurnDisposition};
@@ -703,6 +706,177 @@ async fn automatic_goal_yields_to_user_queue_and_stops_at_repeated_progress() {
     );
     reopened.shutdown().await.unwrap();
     endpoint.done().await;
+}
+
+#[tokio::test]
+async fn manual_goal_resume_authorizes_one_turn_after_a_held_queue_and_restart() {
+    const BLOCKED: &str = r#"{"report":{"kind":"blocked","reason":"needs_input","summary":"Waiting for the user to continue"}}"#;
+    const PROGRESS: &str = r#"{"report":{"kind":"progress","summary":"Prepared another export"}}"#;
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("goal_report", BLOCKED),
+        Reply::Finished("First Goal turn"),
+        Reply::Hold("Interrupt this ordinary turn"),
+        Reply::Finished("Queued ordinary answer"),
+        Reply::Tool("goal_report", PROGRESS),
+        Reply::Finished("One explicit Goal continuation"),
+        Reply::Finished("Unexpected unapproved continuation"),
+    ])
+    .await;
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut client = goal_client(&url, true, false).await;
+    let opened = ws_rpc(
+        &mut client,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = opened["result"]["sessionId"].as_str().unwrap();
+    let selector = json!({"sessionId":session});
+    let start = ws_rpc(
+        &mut client,
+        3,
+        "_co.grida/goal/start",
+        json!({
+            "sessionId":session,"inputId":"manual-goal",
+            "prompt":[{"type":"text","text":"Prepare the export"}],"goal":goal(),
+        }),
+    )
+    .await;
+    assert_eq!(start["result"]["inputId"], "manual-goal", "{start}");
+    endpoint.request().await;
+    endpoint.request().await;
+    wait_for_snapshot(&mut client, session, |view| view["current"].is_null()).await;
+    assert!(
+        timeout(Duration::from_millis(100), endpoint.requests.recv())
+            .await
+            .is_err()
+    );
+
+    let queued = ws_rpc(
+        &mut client,
+        4,
+        "_co.grida/session/enqueue",
+        prompt_request(session, "held-turn", "Interrupt me"),
+    )
+    .await;
+    assert!(queued.get("result").is_some(), "{queued}");
+    endpoint.request().await;
+    let queued = ws_rpc(
+        &mut client,
+        5,
+        "_co.grida/session/enqueue",
+        prompt_request(session, "next-user-turn", "Prioritize this ordinary input"),
+    )
+    .await;
+    assert!(queued.get("result").is_some(), "{queued}");
+    let running = session_snapshot(&mut client, session).await;
+    let stopped = ws_rpc(
+        &mut client,
+        6,
+        "_co.grida/session/stop",
+        task_basis(&running, session, "hold-ordinary-queue"),
+    )
+    .await;
+    assert!(stopped.get("result").is_some(), "{stopped}");
+    let held = wait_for_snapshot(&mut client, session, |view| view["current"].is_null()).await;
+    assert_eq!(held["admissionPaused"], true);
+    let before = ws_rpc(&mut client, 7, "_co.grida/goal/inspect", selector.clone()).await;
+    assert_eq!(
+        before["result"]["goal"]["status"],
+        json!({"status":"blocked","reason":"needs_input"})
+    );
+    assert_eq!(
+        before["result"]["goal"]["spent"],
+        json!({"work_turns":1,"inference_steps":2})
+    );
+    let resume = json!({
+        "sessionId":session,"requestId":"manual-goal-resume",
+        "expectedSessionRevision":before["result"]["revision"],
+        "expectedStateRevision":before["result"]["stateRevision"],
+        "basis":before["result"]["goal"]["basis"],"change":{"action":"resume"},
+    });
+    let accepted = ws_rpc(&mut client, 8, "_co.grida/goal/control", resume.clone()).await;
+    assert_eq!(
+        accepted["result"]["requestId"], "manual-goal-resume",
+        "{accepted}"
+    );
+    assert!(
+        timeout(Duration::from_millis(100), endpoint.requests.recv())
+            .await
+            .is_err()
+    );
+    terminate_shared_server(child).await;
+    drop(client);
+
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut client = goal_client(&url, true, false).await;
+    let load = ws_rpc(
+        &mut client,
+        2,
+        "session/load",
+        json!({
+            "sessionId":session,"cwd":workspace.path(),"mcpServers":[],
+        }),
+    )
+    .await;
+    assert!(load.get("result").is_some(), "{load}");
+    let replay = ws_rpc(&mut client, 3, "_co.grida/goal/control", resume.clone()).await;
+    assert_eq!(replay["result"], accepted["result"]);
+    let held = session_snapshot(&mut client, session).await;
+    assert_eq!(held["admissionPaused"], true);
+    let unpaused = ws_rpc(
+        &mut client,
+        4,
+        "_co.grida/session/resume-queue",
+        queue_basis(&held, session, "release-ordinary-queue"),
+    )
+    .await;
+    assert!(unpaused.get("result").is_some(), "{unpaused}");
+    let ordinary = endpoint.request().await;
+    assert!(!ordinary["tools"].to_string().contains("goal_report"));
+    let continued = endpoint.request().await;
+    assert!(continued["tools"].to_string().contains("goal_report"));
+    assert!(
+        continued["messages"]
+            .to_string()
+            .contains("Prioritize this ordinary input")
+    );
+    endpoint.request().await;
+    let settled = wait_for_snapshot(&mut client, session, |view| view["current"].is_null()).await;
+    let goal = ws_rpc(&mut client, 5, "_co.grida/goal/inspect", selector.clone()).await;
+    assert_eq!(goal["result"]["goal"]["automatic"], false);
+    assert_eq!(
+        goal["result"]["goal"]["spent"],
+        json!({"work_turns":2,"inference_steps":4})
+    );
+    assert_eq!(
+        goal["result"]["goal"]["remaining"],
+        json!({"work_turns":1,"inference_steps":1})
+    );
+    let replay = ws_rpc(&mut client, 6, "_co.grida/goal/control", resume).await;
+    assert_eq!(replay["result"], accepted["result"]);
+    let recovered = ws_rpc(&mut client, 7, "_co.grida/goal/recover", selector).await;
+    assert!(recovered.get("result").is_some(), "{recovered}");
+    assert!(
+        timeout(Duration::from_millis(100), endpoint.requests.recv())
+            .await
+            .is_err()
+    );
+    assert_eq!(session_snapshot(&mut client, session).await, settled);
+    let unchanged = ws_rpc(
+        &mut client,
+        8,
+        "_co.grida/goal/inspect",
+        json!({"sessionId":session}),
+    )
+    .await;
+    assert_eq!(unchanged["result"], goal["result"]);
+    terminate_shared_server(child).await;
+    endpoint.task.abort();
 }
 
 #[tokio::test]

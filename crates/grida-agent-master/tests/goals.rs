@@ -703,3 +703,38 @@ fn continuation_identity_is_stable_across_reload_and_stale_after_goal_controls()
         }
     );
 }
+
+#[test]
+fn explicit_continuation_is_cleared_when_the_goal_basis_changes_or_work_is_reserved() {
+    let mut goal = goal(4, 9);
+    let first = turn("first");
+    goal.reserve(&goal.basis().clone(), first.clone(), limit(3))
+        .unwrap();
+    goal.account(&first, WorkOutcome::NotDispatched).unwrap();
+    goal.resume_idle_once(&goal.basis().clone()).unwrap();
+    let mut goal = Goal::decode(&goal.encode().unwrap()).unwrap();
+    assert!(goal.explicit_continuation());
+
+    let old_basis = goal.basis().clone();
+    goal.set_paused(&old_basis, true).unwrap();
+    assert!(!goal.explicit_continuation());
+    assert_eq!(
+        goal.resume_idle_once(&old_basis).unwrap_err().code,
+        "goal_revision_changed"
+    );
+    goal.resume_idle_once(&goal.basis().clone()).unwrap();
+    goal.revise(
+        &goal.basis().clone(),
+        Objective {
+            description: "Verify a different export".into(),
+            criteria: vec!["The new export opens".into()],
+        },
+    )
+    .unwrap();
+    assert!(!goal.explicit_continuation());
+
+    goal.resume_idle_once(&goal.basis().clone()).unwrap();
+    goal.reserve(&goal.basis().clone(), turn("next"), limit(3))
+        .unwrap();
+    assert!(!goal.explicit_continuation());
+}
