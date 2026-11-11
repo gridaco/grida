@@ -3768,6 +3768,10 @@ durable or discard unrelated OAuth records.
    unsupported custody fails closed. A match establishes equality between the
    observed values. The host establishes account identity and execution
    authorization separately.
+   The shared provider store can admit a trusted synchronous action while an
+   exact captured key still matches under its writer lock. It passes no key to
+   the action and rejects reentrant custody access. Errors after the action may
+   have started an external effect and cannot prove that dispatch was refused.
 
 9. **Native provider requests keep their selected destination.** The HTTP adapter
    injects a freshly validated credential only for its captured provider binding
