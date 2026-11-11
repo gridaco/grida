@@ -41,7 +41,8 @@ connection. Select it for a new chat when you need a hard context input limit.
 Each chat keeps its original model connection. **Saved chats by model** reopens
 the chat list for that connection, and **Default connection** returns to the default
 list. Switching lists leaves existing work and pending questions in their
-original chats. All connections in the workspace share its context-limit setting.
+original chats. Reconnecting the pane restores its selected connection before
+opening that connection's history. All connections in the workspace share its context-limit setting.
 Send or remove any pending attachment before choosing a different model
 connection. The draft stays in its current chat until then.
 Removing a key, changing an endpoint, or losing access to the original Gateway
@@ -74,6 +75,10 @@ reopening it does not retry generation.
 - If the selected model is unavailable, check the model configured for
   the profile. A saved endpoint uses its default or first registered
   model when no model is specified.
+
+If your network redirects a provider request to a separate sign-in service,
+complete that network sign-in before retrying. Grida does not forward the
+provider API key to another destination.
 
 An unavailable explicit selection leaves the workspace chat closed until
 the connection is ready. A supported rate-limit response during a turn can

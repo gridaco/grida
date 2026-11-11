@@ -3531,6 +3531,43 @@ describe("Native workspace chat controller", () => {
     }
   });
 
+  it("restores the selected connection after a pane reconnects during host selection", async () => {
+    const { bridge, controller } = fixture();
+    const id = "b".repeat(64);
+    const switching = Promise.withResolvers<void>();
+    let busy = false;
+    bridge.selectProfile = vi.fn<
+      NonNullable<DesktopNativeChat["selectProfile"]>
+    >(async () => {
+      expect(busy).toBe(false);
+      busy = true;
+      await switching.promise;
+      busy = false;
+    });
+    const load = vi.spyOn(bridge, "create");
+    try {
+      controller.connect(null, id);
+      await vi.waitFor(() => expect(busy).toBe(true));
+      controller.disconnect();
+      controller.connect(null, id);
+      expect(bridge.selectProfile).toHaveBeenCalledTimes(1);
+      switching.resolve();
+      await vi.waitFor(() => {
+        expect(controller.read()).toMatchObject({
+          selected: null,
+          loading: false,
+          profileBusy: false,
+          profileError: null,
+        });
+      });
+      expect(bridge.selectProfile).toHaveBeenCalledTimes(2);
+      expect(load).not.toHaveBeenCalled();
+    } finally {
+      switching.resolve();
+      controller.disconnect();
+    }
+  });
+
   it("projects UTF-8 offsets, duplicate chunks, and a final replacement without repeating text", async () => {
     const { controller, running, updates } = fixture();
     running.add("a");

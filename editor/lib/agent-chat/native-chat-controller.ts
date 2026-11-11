@@ -347,6 +347,7 @@ export class NativeChatController {
   private recents: readonly string[] = [];
   private profileId: string | null = null;
   private profileRead?: object;
+  private profileSelection?: Promise<void>;
   private pendingFocus?: { sessionId: string; profileId?: string };
 
   constructor(
@@ -517,7 +518,7 @@ export class NativeChatController {
       return false;
     this.update({ profileBusy: true, profileError: null });
     try {
-      await this.bridge.selectProfile(selection);
+      if (!(await this.commitProfile(selection, connection))) return false;
       return this.catalogConnection === connection;
     } catch {
       if (this.catalogConnection === connection)
@@ -545,6 +546,23 @@ export class NativeChatController {
     } catch {
       if (owns())
         this.update({ profileError: "Couldn't load model connections." });
+    }
+  }
+
+  private async commitProfile(
+    selection: NativeChatProfileSelection,
+    connection: object
+  ): Promise<boolean> {
+    // A disconnected pane can still own an outstanding host selection.
+    await this.profileSelection?.catch(() => {});
+    if (this.catalogConnection !== connection) return false;
+    const pending = this.bridge.selectProfile!(selection);
+    this.profileSelection = pending;
+    try {
+      await pending;
+      return this.catalogConnection === connection;
+    } finally {
+      if (this.profileSelection === pending) this.profileSelection = undefined;
     }
   }
 
@@ -609,7 +627,7 @@ export class NativeChatController {
     }
     this.update({ profileBusy: true, profileError: null });
     try {
-      await this.bridge.selectProfile(selection);
+      if (!(await this.commitProfile(selection, connection))) return;
       if (this.catalogConnection !== connection) return;
       this.profileId = selection.kind === "default" ? null : selection.id;
       this.catalogConnection = {};
