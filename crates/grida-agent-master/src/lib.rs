@@ -159,6 +159,7 @@ pub struct Master {
     goal_verifier: Option<Box<goals::settlement::Verifier>>,
     goal_child_work: Option<Arc<dyn goals::ChildWorkObserver>>,
     completion_checks: Option<CompletionChecksExecution>,
+    required_admission_check: Option<GrantSelection>,
     approval_reviewer: Option<Arc<dyn approval_review::Reviewer>>,
 }
 
@@ -252,6 +253,7 @@ impl Master {
             goal_verifier: None,
             goal_child_work: None,
             completion_checks: None,
+            required_admission_check: None,
             approval_reviewer: None,
         })
     }
@@ -260,6 +262,18 @@ impl Master {
     pub fn with_history(mut self, history: Vec<Message>) -> Self {
         self.history = history;
         self
+    }
+
+    /// Hold this turn if its host-owned admission check has an unverified result.
+    pub fn with_required_admission_check(mut self, grant: GrantSelection) -> Self {
+        self.required_admission_check = Some(grant);
+        self
+    }
+
+    fn admission_unverified(&self, view: &TurnView) -> bool {
+        self.required_admission_check
+            .as_ref()
+            .is_some_and(|grant| hooks::has_unverified_admission_check(view, grant))
     }
 
     /// Apply the accepted task's hard limit to the complete provider input.
@@ -350,17 +364,7 @@ impl Master {
         let max_steps = max_steps - u32::from(reviewer.is_some());
         let mut continuation = self.continuation(&turn)?;
         self.accept_input(&mut turn, input).await?;
-        let view = turn.view();
-        let orphaned: Vec<_> = view
-            .state
-            .operations()
-            .iter()
-            .filter(|(id, operation)| operation.is_running() && !view.active.contains(id))
-            .map(|(id, _)| id.clone())
-            .collect();
-        for operation in orphaned {
-            turn.operations().record_interruption(operation).await?;
-        }
+        Self::retain_orphaned_work(&turn, &turn.view()).await?;
         let mut effort_to_verify = self.effort.as_ref();
         loop {
             let view = turn.view();
@@ -378,8 +382,38 @@ impl Master {
                 }
             }
             if view.state.controls().paused {
+                if self.admission_unverified(&view) {
+                    // A cancelled parent gate can drop a started private check.
+                    // Preserve its orphaned attempt before releasing this owner.
+                    Self::retain_orphaned_work(&turn, &view).await?;
+                }
+                let basis = turn.view();
+                if basis.state.controls().revision != view.state.controls().revision {
+                    continue;
+                }
                 continuation.interrupted = true;
-                match self.suspend(&mut turn, &continuation, &view).await? {
+                match self.suspend(&mut turn, &continuation, &basis).await? {
+                    Some(outcome) => return Ok(outcome),
+                    None => continue,
+                }
+            }
+            if self.admission_unverified(&view) {
+                let outcome = self
+                    .interrupted_continuation(
+                        &mut turn,
+                        &mut continuation,
+                        OutcomeStatus::Uncertain,
+                        "A required tool check has an unconfirmed outcome.",
+                    )
+                    .await?;
+                let basis = turn.view();
+                if basis.state.controls().revision != view.state.controls().revision {
+                    continue;
+                }
+                match self
+                    .finish(&mut turn, &mut continuation, outcome, &basis)
+                    .await?
+                {
                     Some(outcome) => return Ok(outcome),
                     None => continue,
                 }
@@ -540,6 +574,9 @@ impl Master {
                 Ok(step) => step,
                 Err(error) => {
                     let current = turn.view();
+                    if self.admission_unverified(&current) {
+                        continue;
+                    }
                     if current.state.controls().paused && !current.state.controls().cancelled {
                         continuation.interrupted = true;
                         match self.suspend(&mut turn, &continuation, &current).await? {
@@ -592,10 +629,11 @@ impl Master {
                     return Err(error);
                 }
             };
-            if step
-                .tools
-                .iter()
-                .any(|tool| matches!(tool.outcome, InvokeOutcome::Paused))
+            if self.admission_unverified(&turn.view())
+                || step
+                    .tools
+                    .iter()
+                    .any(|tool| matches!(tool.outcome, InvokeOutcome::Paused))
             {
                 // Revisit the same captured step after controls settle. A sibling
                 // may already have committed an effect under this step identity.
@@ -986,6 +1024,16 @@ impl Master {
         }
     }
 
+    async fn retain_orphaned_work(turn: &Turn, view: &TurnView) -> Result<()> {
+        let operations = turn.operations();
+        for (id, operation) in view.state.operations() {
+            if operation.is_running() && !view.active.contains(id) {
+                operations.record_interruption(id.clone()).await?;
+            }
+        }
+        Ok(())
+    }
+
     async fn retire_outstanding_work(turn: &Turn) -> Result<()> {
         let view = turn.view();
         let operations = turn.operations();
@@ -1023,7 +1071,24 @@ impl Master {
         turn: &mut Turn,
         continuation: &mut Continuation,
     ) -> Result<TurnOutcome> {
-        let mut outcome = self.cancelled_outcome(turn, continuation.step).await?;
+        self.interrupted_continuation(
+            turn,
+            continuation,
+            OutcomeStatus::Cancelled,
+            "Work was stopped.",
+        )
+        .await
+    }
+
+    async fn interrupted_continuation(
+        &self,
+        turn: &mut Turn,
+        continuation: &mut Continuation,
+        status: OutcomeStatus,
+        text: &str,
+    ) -> Result<TurnOutcome> {
+        Self::retire_outstanding_work(turn).await?;
+        let mut outcome = self.account(turn, status, continuation.step, text, None, None)?;
         if continuation.request.is_some() {
             let step = continuation.step;
             let key = continuation.step_key();
@@ -1034,14 +1099,7 @@ impl Master {
                 continuation.step = step
                     .checked_add(1)
                     .ok_or_else(|| Error::new(ErrorKind::LimitExceeded, "step_counter_overflow"))?;
-                outcome = self.account(
-                    turn,
-                    OutcomeStatus::Cancelled,
-                    continuation.step,
-                    "Work was stopped.",
-                    None,
-                    None,
-                )?;
+                outcome = self.account(turn, status, continuation.step, text, None, None)?;
             }
             continuation.request = None;
             continuation.request_generation = 0;

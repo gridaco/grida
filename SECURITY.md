@@ -1525,9 +1525,16 @@ Today:
   ACLs. A separate unprivileged profile cannot use its write grant to modify
   these bytes. Both checks stay outside the model's tool inventory. A trusted
   hook-only profile also withholds the general command offer and its grant.
-  The private check retains the same sandbox and cleanup owner. [Process tests](crates/grida-agent/tests/process/hooks.rs)
-  cover hook-only launch, refusal of a matching user-owned program, launch
-  changes, interruption, and exact retained attempts.
+  The private check retains the same sandbox and cleanup owner. A trusted
+  `beforeTool` profile can also require the private [pre-tool check](crates/grida-agent/src/host/before_tool.rs)
+  for an Act command after permission and before the target attempt. It receives
+  the bounded validated command arguments, including explicit environment and
+  stdin values, and cannot grant the target authority.
+  An unconfirmed check blocks later admissions in the same turn after it is observed; effects
+  already admitted can finish. Starting a Goal with this profile is unavailable.
+  [Process tests](crates/grida-agent/tests/process/hooks.rs) cover hook-only
+  launch, refusal of a matching user-owned program, launch changes,
+  interruption, and exact retained attempts.
 - [Private side-chat controls](crates/grida-agent/src/acp/extensions/side_chats.rs)
   require negotiation and an attached parent. The [side-chat owner](crates/grida-agent/src/host/side_chats.rs)
   keeps a separate in-memory journal, uses only the selected inference authority,

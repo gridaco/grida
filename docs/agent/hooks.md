@@ -1,6 +1,6 @@
 ---
 title: Automate lifecycle checks
-description: Require a final answer or run a reviewed read-only command before a headless Act task completes.
+description: Run trusted checks before a headless Act command or task completion.
 keywords: [agent hooks, completion checks, headless agent, Grida]
 format: md
 ---
@@ -11,6 +11,22 @@ Source-built native clients can ask Grida to check the result of a task
 before marking it complete. For example, require a final answer, or run a
 reviewed read-only command that checks a workspace manifest after an **Act**
 turn. Select these checks in the trusted launch configuration.
+
+## Check a command before it runs
+
+A source-built headless Act host can select one required `beforeTool` command
+in its trusted permission profile. The check receives a bounded `before_tool`
+event with the proposed command arguments, including any explicit environment
+values and standard input. It can allow or deny that command;
+it cannot grant permissions the command did not already have. A denial appears
+as a generic check failure. The handler's diagnostic stays in its private
+record.
+
+This first version checks `run_command` only. Starting a Goal with this profile,
+Desktop configuration, observational pre-tool checks, and other tool events
+are not available yet. An unconfirmed check blocks later admissions in the same turn after it is
+observed; actions already admitted in the same step may finish.
+[Configure a trusted check](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#check-a-command-before-it-runs)
 
 ## Choose what counts as complete
 

@@ -3,7 +3,7 @@
 use crate::command::CommandLimits;
 use crate::goal_verification::ReadVerification;
 use crate::permissions::{
-    AccessRule, CommandProfile, CompletionHook, DirectoryAccess, PermissionProfile,
+    AccessRule, CommandProfile, DirectoryAccess, PermissionProfile, ReviewedHookCommand,
 };
 use crate::workspace::{DirectorySpec, ProtectedRoots, WorkspaceSnapshot, validate_absolute};
 use agent_kit_core::{BindingId, Error, ErrorKind, Fingerprint, Result};
@@ -34,7 +34,8 @@ struct ProfileFile {
     #[serde(default)]
     protected_paths: Vec<PathBuf>,
     command: Option<Command>,
-    before_completion: Option<BeforeCompletion>,
+    before_completion: Option<CommandHook>,
+    before_tool: Option<CommandHook>,
     automatic_read_review: Option<ReadProfile>,
     goal_read_verification: Option<ReadVerification>,
     goal_read_verifications: Option<Vec<ReadVerification>>,
@@ -75,7 +76,7 @@ pub(crate) struct Executable {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct BeforeCompletion {
+struct CommandHook {
     executable: Executable,
     #[serde(default)]
     arguments: Vec<String>,
@@ -83,8 +84,8 @@ struct BeforeCompletion {
     timeout_ms: u32,
 }
 
-impl BeforeCompletion {
-    fn reviewed(self, command: Option<&Command>) -> Result<CompletionHook> {
+impl CommandHook {
+    fn reviewed(self, command: Option<&Command>) -> Result<ReviewedHookCommand> {
         let command = command.ok_or_else(invalid)?;
         let executable = self.executable;
         validate_absolute(&executable.path)?;
@@ -110,7 +111,7 @@ impl BeforeCompletion {
             command.helper.sha256,
             command.bubblewrap.as_ref().map(|entry| entry.sha256),
         ))?;
-        Ok(CompletionHook {
+        Ok(ReviewedHookCommand {
             executable: executable.into(),
             arguments: self.arguments,
             mode: self.mode,
@@ -167,14 +168,18 @@ pub fn load_permission_profile(
         .before_completion
         .map(|hook| hook.reviewed(profile.command.as_ref()))
         .transpose()?;
+    let before_tool = profile
+        .before_tool
+        .map(|hook| hook.reviewed(profile.command.as_ref()))
+        .transpose()?;
     let hooks_only = profile
         .command
         .as_ref()
         .is_some_and(|command| command.hooks_only);
-    if hooks_only && completion.is_none() {
+    if hooks_only && (completion.is_none() || before_tool.is_some()) {
         return Err(invalid());
     }
-    if let Some(hook) = &completion {
+    for hook in completion.iter().chain(before_tool.iter()) {
         write.push(hook.executable.path.clone());
     }
     let command = if let Some(command) = profile.command {
@@ -247,6 +252,10 @@ pub fn load_permission_profile(
     )?;
     let profile = match completion {
         Some(hook) => profile.with_completion_hook(hook, hooks_only)?,
+        None => profile,
+    };
+    let profile = match before_tool {
+        Some(hook) => profile.with_before_tool_hook(hook)?,
         None => profile,
     };
     let profile = match selected_review {

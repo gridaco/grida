@@ -65,7 +65,7 @@ pub struct CommandProfile {
 }
 
 #[derive(Clone)]
-pub(crate) struct CompletionHook {
+pub(crate) struct ReviewedHookCommand {
     pub executable: TrustedExecutable,
     pub arguments: Vec<String>,
     pub mode: CheckMode,
@@ -81,7 +81,8 @@ pub struct PermissionProfile {
     command_denials: Vec<ProtectedPath>,
     command: Option<CommandProfile>,
     hooks_only: bool,
-    completion_hook: Option<CompletionHook>,
+    completion_hook: Option<ReviewedHookCommand>,
+    before_tool_hook: Option<ReviewedHookCommand>,
     automatic_read_review: Option<ReadProfile>,
     goal_read_verifications: Vec<ReadVerification>,
     revision: BindingId,
@@ -202,6 +203,7 @@ impl PermissionProfile {
             command,
             hooks_only: false,
             completion_hook: None,
+            before_tool_hook: None,
             automatic_read_review: None,
             goal_read_verifications: Vec::new(),
             revision,
@@ -212,9 +214,35 @@ impl PermissionProfile {
 
     pub(crate) fn with_completion_hook(
         mut self,
-        mut hook: CompletionHook,
+        mut hook: ReviewedHookCommand,
         hooks_only: bool,
     ) -> Result<Self> {
+        self.validate_hook_scope(&hook, "completion_hook_scope_invalid")?;
+        if hooks_only {
+            self.identity = Fingerprint::of(&(self.identity, "completion-only"))?;
+            self.hooks_only = true;
+        }
+        hook.revision = Fingerprint::of(&(self.identity, hook.revision))?;
+        self.completion_hook = Some(hook);
+        Ok(self)
+    }
+
+    pub(crate) fn with_before_tool_hook(mut self, mut hook: ReviewedHookCommand) -> Result<Self> {
+        self.validate_hook_scope(&hook, "before_tool_hook_scope_invalid")?;
+        if self.hooks_only || hook.mode != CheckMode::Required {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "before_tool_hook_profile_invalid",
+            ));
+        }
+        self.identity =
+            Fingerprint::of(&(self.identity, "before-tool-run-command-v1", hook.revision))?;
+        hook.revision = self.identity;
+        self.before_tool_hook = Some(hook);
+        Ok(self)
+    }
+
+    fn validate_hook_scope(&self, hook: &ReviewedHookCommand, code: &'static str) -> Result<()> {
         let command = self.command.as_ref().ok_or_else(command_unavailable)?;
         let primary = self.workspace.permission_directory(None, &self.protected)?;
         if self
@@ -227,22 +255,17 @@ impl PermissionProfile {
                 .directories()
                 .any(|directory| hook.executable.path.starts_with(directory.root()))
         {
-            return Err(problem(
-                ErrorKind::InvalidInput,
-                "completion_hook_scope_invalid",
-            ));
+            return Err(problem(ErrorKind::InvalidInput, code));
         }
-        if hooks_only {
-            self.identity = Fingerprint::of(&(self.identity, "completion-only"))?;
-            self.hooks_only = true;
-        }
-        hook.revision = Fingerprint::of(&(self.identity, hook.revision))?;
-        self.completion_hook = Some(hook);
-        Ok(self)
+        Ok(())
     }
 
-    pub(crate) fn completion_hook(&self) -> Option<&CompletionHook> {
+    pub(crate) fn completion_hook(&self) -> Option<&ReviewedHookCommand> {
         self.completion_hook.as_ref()
+    }
+
+    pub(crate) fn before_tool_hook(&self) -> Option<&ReviewedHookCommand> {
+        self.before_tool_hook.as_ref()
     }
 
     pub(crate) fn supports_workspace_image_reference(&self) -> bool {
@@ -549,16 +572,17 @@ struct Ready {
 }
 
 impl TurnPermissions {
-    pub(crate) fn review_completion_command(
+    pub(crate) fn before_tool_hook(&self) -> Option<&ReviewedHookCommand> {
+        self.profile.before_tool_hook()
+    }
+
+    pub(crate) fn review_hook_command(
         self: &Arc<Self>,
+        hook: &ReviewedHookCommand,
         grants: GrantSelection,
         stdin: Vec<u8>,
         maximum: usize,
     ) -> Result<ReviewedCommand> {
-        let hook = self
-            .profile
-            .completion_hook()
-            .ok_or_else(command_unavailable)?;
         let primary = self.captured_directory(None)?;
         let cwd = primary.root().to_owned();
         let scope = self

@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::command::{CommandTool, project_process};
-use crate::permissions::{CompletionHook, TurnPermissions};
+use crate::permissions::{ReviewedHookCommand, TurnPermissions};
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
 use agent_kit_core::tools::{
@@ -21,7 +21,7 @@ const CHECK: &str = "require-completion-text";
 const TOOL: &str = "require_completion_text";
 const COMMAND_CHECK: &str = "before-completion-command";
 const COMMAND_TOOL: &str = "before_completion_command";
-const COMMAND_MAX_OUTPUT: usize = 4 * 1024;
+pub(super) const COMMAND_MAX_OUTPUT: usize = 4 * 1024;
 
 impl Host {
     /// Require a nonempty answer on newly accepted conversational work.
@@ -49,7 +49,7 @@ impl Host {
     pub(super) fn completion_hook(
         &self,
         operating_regime: OperatingRegime,
-    ) -> Option<&CompletionHook> {
+    ) -> Option<&ReviewedHookCommand> {
         self.permissions
             .as_ref()
             .filter(|_| operating_regime.is_act())
@@ -85,6 +85,7 @@ impl CompletionAccess {
                 check,
                 definition,
                 Handler::Command {
+                    hook: hook.clone(),
                     permissions: permissions.cloned().ok_or_else(unavailable)?,
                     command: command.cloned().ok_or_else(unavailable)?,
                 },
@@ -134,6 +135,7 @@ impl ToolGate for CompletionAccess {
 enum Handler {
     Text,
     Command {
+        hook: ReviewedHookCommand,
         permissions: Arc<TurnPermissions>,
         command: Arc<CommandTool>,
     },
@@ -222,6 +224,7 @@ impl Tool for CompletionHandler {
                 Err(error) => return ToolOutcome::failed(&error.code),
             };
             if let Handler::Command {
+                hook,
                 permissions,
                 command,
             } = &self.handler
@@ -232,7 +235,7 @@ impl Tool for CompletionHandler {
                     _ => return ToolOutcome::failed("completion_hook_event_limit"),
                 };
                 let reviewed =
-                    match permissions.review_completion_command(self.grant.clone(), stdin, maximum)
+                    match permissions.review_hook_command(hook, self.grant.clone(), stdin, maximum)
                     {
                         Ok(reviewed) => reviewed,
                         Err(error) => return ToolOutcome::failed(&error.code),
@@ -260,9 +263,23 @@ impl Tool for CompletionHandler {
 }
 
 fn project_completion(evidence: ProcessEvidence, maximum: usize) -> (ToolOutcome, bool) {
+    project_hook(
+        evidence,
+        maximum,
+        "completion_hook_timed_out",
+        "completion_hook_output_limit",
+    )
+}
+
+pub(super) fn project_hook(
+    evidence: ProcessEvidence,
+    maximum: usize,
+    timeout_code: &str,
+    output_code: &str,
+) -> (ToolOutcome, bool) {
     let limit = match evidence.stopped {
-        Some(StopReason::Deadline) => Some("completion_hook_timed_out"),
-        Some(StopReason::OutputLimit) => Some("completion_hook_output_limit"),
+        Some(StopReason::Deadline) => Some(timeout_code),
+        Some(StopReason::OutputLimit) => Some(output_code),
         _ => None,
     };
     let reply = (!evidence.output_truncated)
@@ -319,7 +336,7 @@ fn command_definition() -> Result<ToolDefinition> {
 }
 
 fn command_selection(
-    hook: &CompletionHook,
+    hook: &ReviewedHookCommand,
     definition: &ToolDefinition,
 ) -> Result<CompletionCheck> {
     Ok(CompletionCheck {

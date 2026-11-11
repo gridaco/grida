@@ -1,6 +1,7 @@
 //! Product composition and ownership for native agent turns.
 
 mod approval_review;
+mod before_tool;
 mod catalog;
 mod compaction;
 mod completion_checks;
@@ -1693,6 +1694,15 @@ impl Host {
                 )
             })
             .transpose()?;
+        let before_tool = if prepared.operating_regime.is_act() && !cancellation_only {
+            before_tool::BeforeToolCheck::bind(
+                claim.lease.binding(),
+                permission_scope.as_ref(),
+                command.as_ref(),
+            )?
+        } else {
+            None
+        };
         if let Some(image_generation) = prepared.image_generation.take() {
             let workspace_capture = authority.tools.get(&agent_kit_core::ToolId::new(
                 crate::file_tools::CAPTURE_IMAGE_REFERENCE,
@@ -1720,7 +1730,10 @@ impl Host {
                 file: file.clone(),
             },
             wakeups.clone(),
-            completion.clone(),
+            permissions::HookTools {
+                completion: completion.clone(),
+                before_tool: before_tool.clone(),
+            },
             host_tools.clone(),
             delegation.clone(),
         );
@@ -1889,6 +1902,9 @@ impl Host {
                 None => (Inventory::new().snapshot(&[])?, BTreeMap::new()),
             };
             master = master.with_completion_checks(checks, inventory, grants);
+        }
+        if let Some(check) = before_tool {
+            master = master.with_required_admission_check(check.grant());
         }
         Ok(Some(Admitted {
             opened,

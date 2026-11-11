@@ -89,6 +89,14 @@ pub struct Review {
     pub checks: Vec<CheckEvidence>,
 }
 
+/// An interrupted private check cannot authorize fresh work under this turn.
+pub fn has_unverified_admission_check(view: &TurnView, grant: &GrantSelection) -> bool {
+    view.state.operations().iter().any(|(id, operation)| {
+        &operation.record.grants == grant
+            && (operation.is_uncertain() || (operation.is_running() && !view.active.contains(id)))
+    })
+}
+
 impl CompletionChecks {
     pub fn new(checks: Vec<CompletionCheck>) -> Result<Self> {
         let selected = Self(checks);

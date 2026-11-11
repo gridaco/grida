@@ -23,6 +23,11 @@ const HEARTBEAT: &str = r#"
     while :; do printf . >&3; /bin/sleep 0.04; done
 "#;
 
+const BEFORE_TOOL_CHECK: &str = r#"
+    index($0, "\"event\":\"before_tool\"") && index($0, "\"tool\":\"run_command\"") && index($0, "printf x >> effect") { valid = 1 }
+    END { if (!valid) print "unexpected event"; else print response }
+"#;
+
 fn hook(fixture: &Fixture, path: &str, arguments: &[&str], mode: &str, changed: bool) -> PathBuf {
     let path = Path::new(path).canonicalize().unwrap();
     let mut sha256: [u8; 32] = Sha256::digest(fs::read(&path).unwrap()).into();
@@ -49,6 +54,82 @@ fn select_hooks_only(fixture: &Fixture, enabled: bool) {
     let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
     profile["command"]["hooksOnly"] = json!(enabled);
     fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+}
+
+fn before_tool(fixture: &Fixture, path: &str, arguments: &[&str]) -> PathBuf {
+    let temporary = hook(fixture, path, arguments, "required", false);
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    let fields = profile.as_object_mut().unwrap();
+    let definition = fields.remove("beforeCompletion").unwrap();
+    fields.insert("beforeTool".into(), definition);
+    profile["directories"][0]["commandReadWrite"] = json!("allow");
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    temporary
+}
+
+fn command_call(fixture: &Fixture) -> Reply {
+    Reply::Tool(
+        "run_command",
+        Box::leak(
+            json!({
+                "directory":"primary", "access":"read_write", "program":"/bin/bash",
+                "cwd":fixture.primary, "args":["-c", "printf x >> effect"],
+            })
+            .to_string()
+            .into_boxed_str(),
+        ),
+    )
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn before_tool_checks_the_exact_command_and_preserves_a_refusal() {
+    for (reply, blocked) in [
+        (r#"{"decision":"allow"}"#, false),
+        (r#"{"decision":"deny","reason":"private diagnostic"}"#, true),
+    ] {
+        let fixture = Fixture::new(true);
+        let response = format!("response={reply}");
+        let temporary = before_tool(
+            &fixture,
+            "/usr/bin/awk",
+            &["-v", &response, BEFORE_TOOL_CHECK],
+        );
+        let mut endpoint =
+            Endpoint::start(vec![command_call(&fixture), Reply::Finished("Done.")]).await;
+        let output = timeout(
+            WAIT,
+            fixture
+                .process(&endpoint.url, "run")
+                .args(["--mode", "act", "--prompt", "Review and run the command."])
+                .arg("--cwd")
+                .arg(&fixture.primary)
+                .output(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert!(
+            output.status.success(),
+            "{} {}",
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        );
+        let first = endpoint.request().await.to_string();
+        assert!(first.contains("run_command"));
+        assert!(!first.contains("before_tool_command"));
+        let next = endpoint.request().await.to_string();
+        assert_eq!(next.contains("before_tool_hook_denied"), blocked, "{next}");
+        assert!(!next.contains("private diagnostic"));
+        let effect = fs::read_to_string(fixture.primary.join("effect"));
+        if blocked {
+            assert_eq!(effect.unwrap_err().kind(), std::io::ErrorKind::NotFound);
+        } else {
+            assert_eq!(effect.unwrap(), "x");
+        }
+        assert!(fs::read_dir(temporary).unwrap().next().is_none());
+        endpoint.done().await;
+    }
 }
 
 #[tokio::test]
@@ -484,9 +565,102 @@ async fn connect(mut command: Command) -> PrivateStdio {
         .unwrap();
     meta.insert("co.grida/session/questions".into(), 1.into());
     meta.insert("co.grida/session/answer-question".into(), 1.into());
+    meta.insert("co.grida/goal/start".into(), 1.into());
     let initialized = client.request("initialize", capabilities).await;
     assert_eq!(initialized["result"]["protocolVersion"], 1);
     client
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn interrupted_before_tool_check_blocks_the_command_and_next_model_request() {
+    let fixture = Fixture::new(true);
+    let temporary = before_tool(&fixture, "/bin/sh", &["-c", HEARTBEAT]);
+    let mut endpoint = Endpoint::start(vec![
+        command_call(&fixture),
+        Reply::Finished("Unexpected continuation."),
+    ])
+    .await;
+    let endpoint_url = endpoint.url.clone();
+    let open = || {
+        let mut command = fixture.process(&endpoint_url, "serve");
+        command.arg("--stdio");
+        connect(command)
+    };
+    let mut host = open().await;
+    let session = start(&mut host, &fixture.primary).await;
+    let goal = host.request("_co.grida/goal/start", json!({
+        "sessionId":session,"inputId":"goal","prompt":[{"type":"text","text":"Run a Goal"}],
+        "goal":{"objective":{"description":"Check the task","criteria":["Check the target"]},"allowance":{"work_turns":1,"inference_steps":4},"automatic":false}
+    })).await;
+    assert_eq!(
+        goal["error"]["data"], "before_tool_hook_goal_unavailable",
+        "{goal}"
+    );
+    endpoint.request().await;
+    timeout(WAIT, async {
+        loop {
+            if fs::read_dir(&temporary).unwrap().flatten().any(|entry| {
+                fs::metadata(entry.path().join("heartbeat")).is_ok_and(|file| file.len() >= 2)
+            }) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    let working = snapshot(&mut host, &session).await;
+    let receipt = host
+        .request(
+            "_co.grida/session/pause",
+            task_basis(&working, &session, "pause-check"),
+        )
+        .await;
+    assert!(receipt.get("error").is_none(), "{receipt}");
+    let paused = wait_for(&mut host, &session, |view| {
+        view["current"]["disposition"] == "suspended"
+    })
+    .await;
+    let closed = host.finish().await;
+    #[cfg(target_os = "macos")]
+    assert!(
+        closed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&closed.stderr)
+    );
+    #[cfg(target_os = "linux")]
+    assert_eq!(closed.status.code(), Some(5));
+    assert!(fs::read_dir(&temporary).unwrap().next().is_none());
+    let resume = json!({
+        "task":task_basis(&paused,&session,"resume-check"),
+        "expectedEpoch":paused["current"]["epoch"],
+        "expectedJournalPosition":paused["current"]["journalPosition"],
+    });
+    before_tool(&fixture, "/bin/sh", &["-c", HEARTBEAT, "changed"]);
+    let mut changed = open().await;
+    load(&mut changed, &session, &fixture.primary).await;
+    let denied = changed
+        .request("_co.grida/session/resume", resume.clone())
+        .await;
+    assert_eq!(
+        denied["error"]["data"], "permission_profile_changed",
+        "{denied}"
+    );
+    changed.close().await;
+
+    before_tool(&fixture, "/bin/sh", &["-c", HEARTBEAT]);
+    let mut reopened = open().await;
+    load(&mut reopened, &session, &fixture.primary).await;
+    let resumed = reopened.request("_co.grida/session/resume", resume).await;
+    assert!(resumed.get("error").is_none(), "{resumed}");
+    let stopped = wait_for(&mut reopened, &session, |view| view["current"].is_null()).await;
+    assert_eq!(stopped["latest"]["status"], "uncertain", "{stopped}");
+    reopened.close().await;
+    assert!(!fixture.primary.join("effect").exists());
+    assert!(fs::read_dir(&temporary).unwrap().next().is_none());
+    assert!(endpoint.requests.try_recv().is_err());
+    endpoint.task.abort();
 }
 
 #[tokio::test]

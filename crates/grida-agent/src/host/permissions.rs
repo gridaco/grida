@@ -32,7 +32,7 @@ pub(super) struct ToolAuthority {
     permissions: Option<Arc<TurnPermissions>>,
     attachments: AttachmentTools,
     wakeups: Option<Arc<wakeups::WakeupAccess>>,
-    completion: Option<Arc<completion_checks::CompletionAccess>>,
+    hooks: HookTools,
     host_tools: Vec<Arc<host_tools::TurnTools>>,
     delegation: Option<Arc<sponsorship::DelegationAccess>>,
 }
@@ -42,13 +42,18 @@ pub(super) struct AttachmentTools {
     pub(super) file: Option<Arc<retained_file::TurnFile>>,
 }
 
+pub(super) struct HookTools {
+    pub(super) completion: Option<Arc<completion_checks::CompletionAccess>>,
+    pub(super) before_tool: Option<Arc<before_tool::BeforeToolCheck>>,
+}
+
 impl ToolAuthority {
     pub(super) fn bind(
         base: Arc<ExecutionAuthority>,
         permissions: Option<Arc<TurnPermissions>>,
         attachments: AttachmentTools,
         wakeups: Option<Arc<wakeups::WakeupAccess>>,
-        completion: Option<Arc<completion_checks::CompletionAccess>>,
+        hooks: HookTools,
         host_tools: Vec<Arc<host_tools::TurnTools>>,
         delegation: Option<Arc<sponsorship::DelegationAccess>>,
     ) -> Option<Arc<Self>> {
@@ -56,7 +61,8 @@ impl ToolAuthority {
             && attachments.image.is_none()
             && attachments.file.is_none()
             && wakeups.is_none()
-            && completion.is_none()
+            && hooks.completion.is_none()
+            && hooks.before_tool.is_none()
             && host_tools.is_empty()
             && delegation.is_none()
         {
@@ -67,7 +73,7 @@ impl ToolAuthority {
             permissions,
             attachments,
             wakeups,
-            completion,
+            hooks,
             host_tools,
             delegation,
         }))
@@ -77,6 +83,14 @@ impl ToolAuthority {
 impl AuthorityValidator for ToolAuthority {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
         if self
+            .hooks
+            .before_tool
+            .as_ref()
+            .is_some_and(|check| check.is_fenced())
+        {
+            return Box::pin(async { Err(before_tool::uncertain()) });
+        }
+        if self
             .delegation
             .as_ref()
             .is_some_and(|scope| scope.accepts(&request.selection))
@@ -84,9 +98,15 @@ impl AuthorityValidator for ToolAuthority {
             return Box::pin(async { Ok(()) });
         }
         if self
+            .hooks
             .completion
             .as_ref()
             .is_some_and(|scope| scope.handles(&request.selection))
+            || self
+                .hooks
+                .before_tool
+                .as_ref()
+                .is_some_and(|scope| scope.handles(&request.selection))
         {
             return Box::pin(async { Ok(()) });
         }
@@ -137,6 +157,11 @@ impl ToolGate for ToolAuthority {
         admission: ToolAdmission,
         context: AdmissionContext,
     ) -> BoxFuture<'_, Result<ToolDecision>> {
+        if let Some(check) = &self.hooks.before_tool
+            && let Err(error) = check.require_unfenced(&context)
+        {
+            return Box::pin(async { Err(error) });
+        }
         if let Some(delegation) = self
             .delegation
             .as_ref()
@@ -145,11 +170,20 @@ impl ToolGate for ToolAuthority {
             return delegation.decide(admission, context);
         }
         if let Some(completion) = self
+            .hooks
             .completion
             .as_ref()
             .filter(|scope| scope.handles(&admission.grants))
         {
             return completion.decide(admission, context);
+        }
+        if let Some(before_tool) = self
+            .hooks
+            .before_tool
+            .as_ref()
+            .filter(|scope| scope.handles(&admission.grants))
+        {
+            return Box::pin(async move { before_tool.admit(&admission, &context) });
         }
         if let Some(wakeups) = self
             .wakeups
@@ -179,6 +213,22 @@ impl ToolGate for ToolAuthority {
             .as_ref()
             .filter(|scope| scope.handles(&admission.grants))
         {
+            if let Some(before_tool) = self
+                .hooks
+                .before_tool
+                .as_ref()
+                .filter(|scope| scope.matches(&admission.invocation))
+            {
+                return Box::pin(async move {
+                    let decision = permissions
+                        .decide(admission.clone(), context.clone())
+                        .await?;
+                    if matches!(decision, ToolDecision::Permit) {
+                        return before_tool.review(&admission, &context).await;
+                    }
+                    Ok(decision)
+                });
+            }
             return permissions.decide(admission, context);
         }
         if let Some(host_tools) = self

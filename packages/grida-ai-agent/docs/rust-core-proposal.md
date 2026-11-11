@@ -1215,30 +1215,34 @@ socket or file.
 
 ### Configured lifecycle hooks
 
-The native host currently supports the final-text check and one reviewed
-before-completion command. The [hook contract](https://grida.co/docs/wg/ai/agent/hooks)
+The native host currently supports the final-text check, one reviewed
+before-completion command, and one required pre-tool command for Act
+`run_command` calls. The [hook contract](https://grida.co/docs/wg/ai/agent/hooks)
 describes the remaining lifecycle events. Their host dispatcher would use the
 admission gate, recorded outcome boundaries, and ordinary scoped operations.
 Runtime has no configured-handler registry or named hook-event vocabulary.
-The host owns handler selection and result interpretation; the planned
-dispatcher also owns discovery, matching, order, and recursion suppression.
+The host owns handler selection and result interpretation. The pre-tool check
+matches the exact command tool and excludes its private handler from recursion;
+general discovery, matching, and ordering remain planned.
 
-The completion command executes through an admitted tool under the selected
+Each reviewed command executes through an admitted tool under the selected
 confinement profile. The host assigns stable operation keys
 and records the selected handler identity with its invocation. Recovery can
 reuse completed results. Interrupted commands retain the executor's ordinary
 uncertainty and recovery behavior.
 
-Pre-tool checks would use the gate so calls produced inside `step` receive the
+The pre-tool command uses the gate so calls produced inside `step` receive the
 same policy as direct invocations. The host would consume recorded outcomes for
 after-tool checks. The master would run input checks at its decision boundary
 and runs completion checks at its completion boundary.
-A required check that affects subsequent work must complete before that work is
-admitted. Ordinary event subscriptions remain observational.
+A required check completes before its governed action is admitted. Sibling
+effects already admitted in the same step can finish. Ordinary event
+subscriptions remain observational.
 
-The planned policy runs handlers in declared order, blocks the governed
-action on required-check failure, and suppresses recursive user-hook dispatch
-for its own handler operations. Authority checks still apply to those operations.
+The current required checks block their governed action on failure and suppress
+recursive hook dispatch for their own handler operations. The planned multi-hook
+policy runs selected handlers in declared order. Authority checks still apply
+to those operations.
 Stop and Pause govern handler work through the same controls as other operations.
 Executable work after settlement needs another explicitly admitted owner.
 

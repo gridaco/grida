@@ -192,6 +192,16 @@ impl Host {
         }
         let view = self.store.inspect(request.session.clone()).await?;
         self.check_execution(&view)?;
+        if self
+            .permissions
+            .as_ref()
+            .is_some_and(|profile| profile.before_tool_hook().is_some())
+        {
+            return Err(problem(
+                ErrorKind::Unsupported,
+                "before_tool_hook_goal_unavailable",
+            ));
+        }
         if effort == EffortPreset::Ultra && !self.goal_sponsorship_available() {
             return Err(funded_review_unavailable());
         }

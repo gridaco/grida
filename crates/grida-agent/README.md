@@ -189,6 +189,23 @@ cleanup and uncertain outcomes keep their original attempt identity.
 `inspect` reads the latest and current persisted turn state without provider
 configuration. Use it after the process that owns the state directory exits.
 
+### Check a command before it runs
+
+A trusted native permission profile can declare one required `beforeTool`
+command with the same `executable`, `arguments`, and `timeoutMs` fields as
+`beforeCompletion`, and `mode: "required"`. It checks the validated
+`run_command` action in Act after ordinary permission and before the action's
+attempt. Its bounded `before_tool` JSON event includes the proposed command
+arguments, including any explicit environment values and standard input. It
+returns the same allow or deny JSON shape as the completion
+command, with read-only workspace access, private temporary storage, and no network. The action
+receives a generic refusal code; the handler diagnostic remains in the private
+record. Continue a retained task with the same reviewed profile.
+
+Starting a Goal with this profile or pairing it with `command.hooksOnly` is not
+supported. The profile is not configurable in Desktop. If a check's result is unconfirmed, later admissions in the same turn
+stop once the uncertainty is observed; effects already admitted may finish.
+
 ### Check a workspace manifest
 
 This example accepts a `design-manifest.txt` in the primary directory when it
