@@ -2491,7 +2491,10 @@ into scratch (where the shell can then exfiltrate them).
    A client-provided working directory alone selects bundled skills. The native
    reader opens fixed names relative to a pinned directory, refuses links and
    nonregular files, and bounds document reads. The accepted snapshot carries
-   text and provenance. It grants no tool access and follows no companion paths.
+   text and provenance. A newly captured project skill also carries a labeled
+   workspace-relative directory derived from its validated name and layer. It
+   grants no tool access and follows no companion paths; later supporting-file
+   reads use the ordinary workspace authority.
 
 **Files bound by this id.**
 

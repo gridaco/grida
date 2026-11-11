@@ -32,8 +32,10 @@ On Unix, the native host can read `AGENTS.md` in its explicitly readable
 primary project folder. It looks for a selected project skill in
 `.agents/skills/<name>/SKILL.md`, then `.claude/skills/<name>/SKILL.md`, then
 the bundled set. An accepted or queued message keeps the instructions it
-captured. File changes apply to later messages. If an ACP skill selection is
-stale, refresh the catalog and select it again.
+captured. New project-skill selections include the skill's workspace-relative directory so
+the agent can locate supporting files. Reading those files still requires the
+chat's existing workspace access. File changes apply to later messages. If an
+ACP skill selection is stale, refresh the catalog and select it again.
 
 ## Use the tools available to the task
 

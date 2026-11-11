@@ -96,11 +96,102 @@ async fn headless_selected_skills_apply_without_granting_tool_capabilities() {
     let request = endpoint.request().await;
     let messages = request["messages"].to_string();
     assert!(messages.contains("Use the explicit local slide workflow."));
+    assert!(messages.contains("Host-supplied workspace-relative skill directory"));
+    assert!(messages.contains(".agents/skills/slides"));
     assert!(messages.contains("Use this project guidance."));
     assert!(messages.contains("live render of what you wrote"));
     assert!(!messages.contains("also_in_load"));
     assert!(!messages.contains("Build a Grida slides deck"));
     assert!(request.get("tools").is_none());
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn selected_project_skill_supporting_files_use_existing_read_authority() {
+    use std::os::unix::fs::symlink;
+    let fixture = super::approvals::Fixture::new(false);
+    write_skill(
+        &fixture.primary,
+        "Read references/example.txt for the selected workflow.",
+    );
+    let references = fixture.primary.join(".agents/skills/slides/references");
+    std::fs::create_dir(&references).unwrap();
+    std::fs::write(references.join("example.txt"), "AUTHORIZED SUPPORTING FILE").unwrap();
+    let private = fixture
+        .profile
+        .parent()
+        .unwrap()
+        .join("private-reference.txt");
+    std::fs::write(&private, "PRIVATE SUPPORTING FILE").unwrap();
+    symlink(private, references.join("linked.txt")).unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            assert!(messages.contains(".agents/skills/slides"));
+            assert!(!messages.contains("AUTHORIZED SUPPORTING FILE"));
+            Reply::Tool(
+                "read_file",
+                r#"{"path":".agents/skills/slides/references/example.txt"}"#,
+            )
+        })),
+        Reply::Choose(Box::new(|request| {
+            assert!(
+                request["messages"]
+                    .to_string()
+                    .contains("AUTHORIZED SUPPORTING FILE")
+            );
+            Reply::Tool(
+                "read_file",
+                r#"{"path":".agents/skills/slides/references/linked.txt"}"#,
+            )
+        })),
+        Reply::Choose(Box::new(|request| {
+            assert!(
+                !request["messages"]
+                    .to_string()
+                    .contains("PRIVATE SUPPORTING FILE")
+            );
+            Reply::Tool(
+                "read_file",
+                r#"{"path":".agents/skills/slides/../../../../private-reference.txt"}"#,
+            )
+        })),
+        Reply::Choose(Box::new(|request| {
+            let messages = request["messages"].to_string();
+            assert!(!messages.contains("PRIVATE SUPPORTING FILE"));
+            assert!(
+                messages.contains("file_relative_path_invalid"),
+                "{messages}"
+            );
+            Reply::Finished("Applied the reviewed supporting text.")
+        })),
+    ])
+    .await;
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .args([
+                "--skill",
+                "slides",
+                "--prompt",
+                "Use the selected workflow.",
+            ])
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for _ in 0..4 {
+        endpoint.request().await;
+    }
     endpoint.done().await;
 }
 
@@ -213,6 +304,21 @@ async fn queue_retains_selected_guidance_and_new_acceptance_rejects_a_stale_refe
     drop(socket);
     terminate_shared_server(host).await;
 
+    let retained_guidance = {
+        use agent_kit_core::{ChangeId, SessionId};
+        let store =
+            agent_kit_store_sqlite::SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+        let retained = store
+            .input(
+                SessionId::new(session).unwrap(),
+                ChangeId::new("selected").unwrap(),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        let payload: Value = serde_json::from_slice(retained.input.payload.bytes()).unwrap();
+        payload["guidance"].clone()
+    };
     let (host, url) =
         shared_server_with_profile(&state, &endpoint.url, TEST_CREDENTIAL, Some(&profile)).await;
     let mut socket = client(&url).await;
@@ -243,9 +349,27 @@ async fn queue_retains_selected_guidance_and_new_acceptance_rejects_a_stale_refe
         "sessionId":session,"requestId":"resume-selected","expectedSessionRevision":current["sessionRevision"],
     })).await;
     assert!(resumed.get("result").is_some(), "{resumed}");
-    let request = endpoint.request().await.to_string();
+    let request = endpoint.request().await;
+    let supplied = request["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|message| {
+            message["content"].as_str()?.strip_prefix(
+                "Workspace and explicitly selected skill guidance for the next request\n\n",
+            )
+        })
+        .next()
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(supplied).unwrap(),
+        retained_guidance
+    );
+    let request = request.to_string();
     assert!(request.contains("Original selected workflow."));
     assert!(request.contains("Original project guidance."));
+    assert!(request.contains("Host-supplied workspace-relative skill directory"));
+    assert!(request.contains(".agents/skills/slides"));
     assert!(!request.contains("Updated selected workflow."));
     wait_for_snapshot(&mut socket, session, |snapshot| {
         snapshot["current"].is_null()

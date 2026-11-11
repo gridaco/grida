@@ -109,6 +109,8 @@ pub struct SkillDescription {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct CapturedSkill {
     descriptor: SkillDescription,
+    /// Accepted guidance, including any explicit host annotation before the
+    /// verbatim authored text. The descriptor revision identifies the source.
     body: String,
 }
 
@@ -251,7 +253,7 @@ pub(crate) fn capture(
         if skill.is_none() {
             skill = builtin(&reference.name)?;
         }
-        let skill =
+        let mut skill =
             skill.ok_or_else(|| problem(ErrorKind::Unavailable, "selected_skill_unavailable"))?;
         if reference
             .revision
@@ -259,6 +261,17 @@ pub(crate) fn capture(
             .is_some_and(|revision| revision != &skill.descriptor.revision)
         {
             return Err(problem(ErrorKind::Conflict, "selected_skill_changed"));
+        }
+        let layer = match skill.descriptor.source {
+            SkillSource::ProjectAgents => Some(".agents"),
+            SkillSource::ProjectClaude => Some(".claude"),
+            SkillSource::Bundled => None,
+        };
+        if let Some(layer) = layer {
+            skill.body = format!(
+                "Host-supplied workspace-relative skill directory\n{layer}/skills/{}\n\nAuthored skill text\n{}",
+                skill.descriptor.name, skill.body,
+            );
         }
         skills.push(skill);
     }
@@ -421,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn selection_prefers_project_and_retains_its_exact_body() {
+    fn selection_prefers_project_and_retains_its_authored_text() {
         let temporary = tempfile::tempdir().unwrap();
         let root = temporary.path().canonicalize().unwrap();
         let selected = skill(&root, ".agents", "slides", "first project body");
@@ -462,6 +475,64 @@ mod tests {
         let encoded = serde_json::to_string(&first.message(&id).unwrap()).unwrap();
         assert!(encoded.contains("first project body"));
         assert!(!encoded.contains("shadowed project body"));
+    }
+
+    #[test]
+    fn only_new_project_captures_annotate_the_selected_relative_directory() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().canonicalize().unwrap();
+        let authored = "Read references/example.txt.\n  Keep this indentation.\n";
+        let name = "s".repeat(MAX_NAME);
+        for (layer, source) in [
+            (".agents", SkillSource::ProjectAgents),
+            (".claude", SkillSource::ProjectClaude),
+        ] {
+            skill(&root, layer, &name, authored);
+            let project = ProjectRoot::open(&root).unwrap();
+            let description = catalog(Some(&project))
+                .unwrap()
+                .into_iter()
+                .find(|entry| entry.name == name)
+                .unwrap();
+            let document =
+                fs::read_to_string(root.join(layer).join("skills").join(&name).join("SKILL.md"))
+                    .unwrap();
+            let original = parse(&name, source, &document).unwrap().unwrap();
+            assert_eq!(description, original.descriptor);
+            let captured = capture(
+                Some(&project),
+                vec![SkillReference::from_uri(&description.uri).unwrap().unwrap()],
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(captured.selected(), vec![description]);
+            assert_eq!(
+                captured.skills[0].body,
+                format!(
+                    "Host-supplied workspace-relative skill directory\n{layer}/skills/{name}\n\nAuthored skill text\n{authored}"
+                )
+            );
+            assert!(!captured.skills[0].body.contains(root.to_str().unwrap()));
+            let old = CapturedGuidance {
+                project: None,
+                skills: vec![original],
+            };
+            let bytes = serde_json::to_vec(&old).unwrap();
+            let restored: CapturedGuidance = serde_json::from_slice(&bytes).unwrap();
+            let input = ChangeId::new("accepted-before-source-annotation").unwrap();
+            assert_eq!(
+                restored.message(&input).unwrap(),
+                old.message(&input).unwrap()
+            );
+            assert_eq!(serde_json::to_vec(&restored).unwrap(), bytes);
+            assert_eq!(restored.skills[0].body, authored);
+            fs::remove_dir_all(root.join(layer)).unwrap();
+        }
+        let bundled = capture(None, vec![SkillReference::named("svg".into()).unwrap()])
+            .unwrap()
+            .unwrap();
+        assert_eq!(bundled.skills[0], builtin("svg").unwrap().unwrap());
+        assert!(!bundled.skills[0].body.contains("Host-supplied"));
     }
 
     #[test]
