@@ -823,7 +823,10 @@ work can continue with the previous context. Standard ACP `session/prompt`
 still waits for its user turn to finish. Automatic compaction uses the size
 of earlier text. For supported direct OpenAI Responses models, it can also
 use a previous request's reported input count and the verified model window.
-The provider can still report a context limit on the next request.
+A provider's explicit context-limit result can also trigger compaction before
+the next eligible message on the same connection and model. The failed turn
+remains in the transcript and is not replayed. The provider can still report a
+context limit on a later request.
 
 After a successful compaction, future model requests use the summary and any
 turns it did not cover. If the history is too large for one summary request,

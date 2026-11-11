@@ -296,6 +296,104 @@ async fn automatic_compaction_keeps_queue_inputs_and_the_recent_context_exact() 
 }
 
 #[tokio::test]
+async fn provider_context_rejection_compacts_once_before_the_next_input_after_restart() {
+    after_provider_rejection("context_length_exceeded", "context_limit", true).await;
+}
+
+#[tokio::test]
+async fn unrelated_provider_rejection_does_not_compact_after_restart() {
+    after_provider_rejection("unsupported_parameter", "provider_request_rejected", false).await;
+}
+
+async fn after_provider_rejection(provider_code: &str, terminal_code: &str, compacts: bool) {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let error = json!({"error":{"type":"invalid_request_error","code":provider_code}}).to_string();
+    let summary = "A concise account of the earlier agreement.";
+    let mut replies = vec![
+        Reply::Finished("An earlier agreement."),
+        Reply::RawHttp(format!(
+            "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{error}",
+            error.len(),
+        )),
+    ];
+    if compacts {
+        replies.push(Reply::Finished(summary));
+    }
+    replies.push(Reply::Finished("The new request can continue."));
+    let mut endpoint = Endpoint::start(replies).await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+    // Deliberately below the ordinary approximate byte trigger.
+    let older = format!("Earlier requirements {}", "a".repeat(12_000));
+    let failed_input = "Retain this rejected request.";
+    assert!(
+        prompt(&mut socket, 3, &session, &older)
+            .await
+            .get("result")
+            .is_some()
+    );
+    endpoint.request().await;
+    let failed_reply = prompt(&mut socket, 4, &session, failed_input).await;
+    assert_eq!(failed_reply["error"]["data"]["code"], terminal_code);
+    let rejected = endpoint.request().await["messages"].to_string();
+    assert!(rejected.contains(&older));
+    assert!(rejected.contains(failed_input));
+    let failed = wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null() && snapshot["latest"]["status"] == "failed"
+    })
+    .await;
+    let failed_turn = failed["latest"]["turnId"].as_str().unwrap().to_owned();
+    drop(socket);
+    terminate_shared_server(host).await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let original = load(&mut socket, &session, workspace.path()).await.join("");
+    assert!(original.contains(&older));
+    assert!(original.contains(failed_input));
+    assert!(endpoint.requests.try_recv().is_err());
+    let new_input = "Continue with this separate, newly accepted task.";
+    let accepted = ws_rpc(
+        &mut socket,
+        5,
+        "_co.grida/session/enqueue",
+        prompt_request(&session, "after-context-rejection", new_input),
+    )
+    .await;
+    assert_eq!(accepted["result"]["disposition"], "queued", "{accepted}");
+    if compacts {
+        let helper = endpoint.request().await["messages"].to_string();
+        assert!(helper.contains(&older));
+        assert!(!helper.contains(failed_input));
+        assert!(!helper.contains(new_input));
+    }
+    let next = endpoint.request().await["messages"].to_string();
+    assert_eq!(next.contains(summary), compacts);
+    assert_eq!(next.contains(&older), !compacts);
+    assert!(next.contains(failed_input));
+    assert_eq!(next.matches(new_input).count(), 1);
+    let settled = wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+            && snapshot["latest"]["status"] == "succeeded"
+            && snapshot["latest"]["turnId"] != failed_turn
+    })
+    .await;
+    assert_ne!(settled["latest"]["turnId"], failed_turn);
+    let transcript = load(&mut socket, &session, workspace.path()).await.join("");
+    assert!(transcript.contains(&older));
+    assert_eq!(transcript.matches(failed_input).count(), 1);
+    assert!(!transcript.contains(summary));
+    assert!(transcript.contains("The new request can continue."));
+    assert!(endpoint.requests.try_recv().is_err());
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
 async fn automatic_compaction_fails_once_and_uses_the_previous_context() {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("state");

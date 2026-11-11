@@ -2286,7 +2286,7 @@ limitation tracked in [KI-BILL-005](docs/wg/platform/billing/known-issues.md#ki-
   [streaming HTTP owner](crates/grida-cli/src/http/gg_chat.rs).
   The [native process proof](scripts/cli-contracts/installed.mjs) exercises a
   scoped run, concurrent ACP renewal, owned shutdown and changed-organization refusal.
-- Native [context compaction](crates/grida-agent/src/host/compaction.rs) uses the same runtime inference and grant checks as a conversation turn. Recovery may refresh an undispatched request within its captured provider principal and scope. It retains interrupted attempts without sending them again.
+- Native [context compaction](crates/grida-agent/src/host/compaction.rs) uses the same runtime inference and grant checks as a conversation turn. Recovery may refresh an undispatched request within its captured provider principal and scope. It retains interrupted attempts without sending them again. Provider-reported context pressure is attributed to the exact retained request, provider, principal, scope and model before it can trigger a later input's compaction.
 
 - [Windows provider composition tests](packages/grida-ai-agent/src/providers/windows-custody.test.ts) — optional BYOK discovery preserves existing GG eligibility without swallowing custody errors.
 

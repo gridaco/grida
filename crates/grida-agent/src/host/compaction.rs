@@ -17,6 +17,7 @@ use agent_kit_store_sqlite::history::{HistoryBasis, HistorySeed, RetainedHistory
 use grida_agent_master::compaction::{
     CompactionAccount, CompactionFailure, Coverage, SummaryRequest, summary_request,
 };
+use grida_agent_master::read_account;
 use grida_agent_master::usage::InferenceUsage;
 
 const PLAN_SCHEMA: &str = "grida.agent.native.compaction.plan";
@@ -421,22 +422,22 @@ impl Host {
             return Ok(false);
         };
         let model = input.config.model.clone();
-        let Some(window) = transport.verified_context_window(&model) else {
-            return Ok(false);
-        };
-        let Some(output) = input.config.max_output_tokens else {
-            return Ok(false);
-        };
-        let Some(usable) = window.get().checked_sub(output).and_then(NonZeroU64::new) else {
-            return Ok(false);
-        };
-        let threshold = input.limit.map_or(usable, |limit| usable.min(limit));
+        let threshold = transport
+            .verified_context_window(&model)
+            .zip(input.config.max_output_tokens)
+            .and_then(|(window, output)| window.get().checked_sub(output))
+            .and_then(NonZeroU64::new)
+            .map(|usable| input.limit.map_or(usable, |limit| usable.min(limit)));
         let Some(latest) = view.latest.as_ref().filter(|turn| {
             retained_tail == Some(&turn.binding.turn)
                 && turn
                     .outcome
                     .as_ref()
-                    .is_some_and(|outcome| outcome.status == OutcomeStatus::Succeeded)
+                    .is_some_and(|outcome| match outcome.status {
+                        OutcomeStatus::Succeeded => threshold.is_some(),
+                        OutcomeStatus::Failed => true,
+                        _ => false,
+                    })
         }) else {
             return Ok(false);
         };
@@ -445,7 +446,11 @@ impl Host {
             .inspect_turn_with(
                 view.session.clone(),
                 latest.binding.turn.clone(),
-                move |state| Ok(previous_input_reached(state, &binding, &model, threshold)),
+                move |state| {
+                    Ok(previous_context_pressure(
+                        state, &binding, &model, threshold,
+                    ))
+                },
             )
             .await
     }
@@ -849,12 +854,28 @@ fn compaction_plan_for(
     }))
 }
 
-fn previous_input_reached(
+fn previous_context_pressure(
     state: &TurnState,
     binding: &ProviderBinding,
     model: &ModelId,
-    threshold: NonZeroU64,
+    threshold: Option<NonZeroU64>,
 ) -> bool {
+    let Some(terminal) = state.outcome() else {
+        return false;
+    };
+    let threshold = threshold.filter(|_| terminal.status == OutcomeStatus::Succeeded);
+    let rejection = terminal
+        .account
+        .as_ref()
+        .filter(|_| terminal.status == OutcomeStatus::Failed)
+        .and_then(|account| read_account(account).ok())
+        .and_then(|account| account.inference_failure)
+        .filter(|failure| {
+            failure.kind == FailureKind::ContextLimit && failure.code == "context_limit"
+        });
+    if threshold.is_none() && rejection.is_none() {
+        return false;
+    }
     // Helper requests can quote conversation text, but only an ordinary
     // request carries this turn's exact user message in its prepared input.
     let Some(user) = state.history().records().iter().rev().find_map(|record| {
@@ -882,22 +903,28 @@ fn previous_input_reached(
         let Some(OperationOutcome::Inference(outcome)) = &attempt.outcome else {
             return false;
         };
+        if let Some(rejection) = &rejection {
+            return outcome.status == InferenceStatus::Limited
+                && outcome.failure.as_ref() == Some(rejection);
+        }
         outcome.status == InferenceStatus::Completed
-            && outcome
-                .usage
-                .iter()
-                .filter(|usage| {
-                    usage.attempt == attempt.id
-                        && usage.source == binding.provider.as_str()
-                        && usage.category == "input_tokens"
-                        && usage.unit == "tokens"
-                })
-                .max_by_key(|usage| usage.revision)
-                .is_some_and(|usage| {
-                    usage.final_value
-                        && usage.certainty == MeasurementKind::Exact
-                        && usage.quantity >= threshold.get()
-                })
+            && threshold.is_some_and(|threshold| {
+                outcome
+                    .usage
+                    .iter()
+                    .filter(|usage| {
+                        usage.attempt == attempt.id
+                            && usage.source == binding.provider.as_str()
+                            && usage.category == "input_tokens"
+                            && usage.unit == "tokens"
+                    })
+                    .max_by_key(|usage| usage.revision)
+                    .is_some_and(|usage| {
+                        usage.final_value
+                            && usage.certainty == MeasurementKind::Exact
+                            && usage.quantity >= threshold.get()
+                    })
+            })
     })
 }
 
