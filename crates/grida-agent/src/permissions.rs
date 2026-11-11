@@ -27,6 +27,7 @@ use agent_kit_sandbox::{
 use agent_kit_store_sqlite::SqliteStore;
 use grida_agent_master::approval_review::ReadProfile;
 use grida_agent_master::hooks::CheckMode;
+use grida_agent_master::lifecycle_hooks::{HookEvent, LifecycleHook, LifecycleHooks};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -74,6 +75,16 @@ pub(crate) struct ReviewedHookCommand {
     pub revision: Fingerprint,
 }
 
+#[derive(Clone)]
+pub(crate) struct ReviewedLifecycleHook {
+    pub id: BindingId,
+    pub source: String,
+    pub event: HookEvent,
+    pub tool: Option<ToolId>,
+    pub enabled: bool,
+    pub command: ReviewedHookCommand,
+}
+
 /// The host selects this profile independently of any chat or ACP cwd.
 pub struct PermissionProfile {
     workspace: Arc<WorkspaceSnapshot>,
@@ -84,6 +95,7 @@ pub struct PermissionProfile {
     hooks_only: bool,
     completion_hook: Option<ReviewedHookCommand>,
     before_tool_hook: Option<ReviewedHookCommand>,
+    lifecycle_hooks: Vec<ReviewedLifecycleHook>,
     automatic_read_review: Option<ReadProfile>,
     goal_read_verifications: Vec<ReadVerification>,
     revision: BindingId,
@@ -205,6 +217,7 @@ impl PermissionProfile {
             hooks_only: false,
             completion_hook: None,
             before_tool_hook: None,
+            lifecycle_hooks: Vec::new(),
             automatic_read_review: None,
             goal_read_verifications: Vec::new(),
             revision,
@@ -259,6 +272,43 @@ impl PermissionProfile {
             return Err(problem(ErrorKind::InvalidInput, code));
         }
         Ok(())
+    }
+
+    pub(crate) fn with_lifecycle_hooks(
+        mut self,
+        mut hooks: Vec<ReviewedLifecycleHook>,
+        hooks_only: bool,
+    ) -> Result<Self> {
+        let selections = hooks
+            .iter()
+            .map(|hook| {
+                self.validate_hook_scope(&hook.command, "lifecycle_hook_scope_invalid")?;
+                Ok(LifecycleHook {
+                    id: hook.id.clone(),
+                    source: hook.source.clone(),
+                    event: hook.event,
+                    tool: hook.tool.clone(),
+                    mode: hook.command.mode,
+                    revision: hook.command.revision,
+                    handler: ToolId::new(format!("lifecycle_hook/{}", hook.id))?,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        LifecycleHooks::new(selections.clone())?;
+        let enabled = hooks.iter().map(|hook| hook.enabled).collect::<Vec<_>>();
+        if !hooks.is_empty() {
+            self.identity = Fingerprint::of(&(self.identity, &selections, enabled, hooks_only))?;
+            self.hooks_only |= hooks_only;
+            for hook in &mut hooks {
+                hook.command.revision = Fingerprint::of(&(self.identity, hook.command.revision))?;
+            }
+        }
+        self.lifecycle_hooks = hooks;
+        Ok(self)
+    }
+
+    pub(crate) fn lifecycle_hooks(&self) -> &[ReviewedLifecycleHook] {
+        &self.lifecycle_hooks
     }
 
     pub(crate) fn completion_hook(&self) -> Option<&ReviewedHookCommand> {
@@ -663,6 +713,32 @@ impl TurnPermissions {
         self.profile.before_tool_hook()
     }
 
+    pub(crate) fn lifecycle_hooks(&self) -> &[ReviewedLifecycleHook] {
+        self.profile.lifecycle_hooks()
+    }
+
+    pub(crate) fn hook_command_tool(self: &Arc<Self>) -> Result<Option<Arc<CommandTool>>> {
+        if self
+            .profile
+            .lifecycle_hooks
+            .iter()
+            .all(|hook| !hook.enabled)
+        {
+            return Ok(None);
+        }
+        let command = self
+            .profile
+            .command
+            .as_ref()
+            .ok_or_else(command_unavailable)?;
+        let owner = self.clone();
+        Ok(Some(Arc::new(CommandTool::authorized(
+            command.sandbox.clone(),
+            command.limits,
+            Arc::new(move |invocation| owner.command_authority(invocation)),
+        )?)))
+    }
+
     pub(crate) fn review_hook_command(
         self: &Arc<Self>,
         hook: &ReviewedHookCommand,
@@ -799,12 +875,11 @@ impl TurnPermissions {
             && self.profile.directories.values().any(|rule| {
                 rule.command_read != AccessRule::Deny || rule.command_read_write != AccessRule::Deny
             });
-        let Some(command) = self
-            .profile
-            .command
-            .as_ref()
-            .filter(|_| model_commands || self.profile.completion_hook.is_some())
-        else {
+        let Some(command) = self.profile.command.as_ref().filter(|_| {
+            model_commands
+                || self.profile.completion_hook.is_some()
+                || self.profile.lifecycle_hooks.iter().any(|hook| hook.enabled)
+        }) else {
             return Ok(None);
         };
         let owner = self.clone();

@@ -28,8 +28,9 @@ startup failure reports unavailable chat rather than selecting another engine.
 Windows currently retains file and media workflows with chat unavailable.
 The optimized macOS Apple Silicon candidate has packaged process evidence.
 The headless host has bounded live OpenRouter `openai/gpt-4.1-mini` text and file-read checks.
-Other live providers, other operating systems and signed delivery remain
-unqualified.
+The native Linux ARM64 host and retained Desktop service also have isolated
+kernel, process and restart checks. Other live providers, full Linux installer
+delivery, other architectures and signed delivery remain unqualified.
 
 ## Build the host
 

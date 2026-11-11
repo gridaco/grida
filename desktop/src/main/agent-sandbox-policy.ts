@@ -26,7 +26,7 @@ export namespace DesktopAgentSandboxPolicy {
       // authority.
       allow_local_binding: false,
       // Provider/GG requests use Electron's system-network session. Keeping
-      // their hosts out of SRT makes a missed injection fail closed.
+      // their hosts out of the native profile makes missed injection fail closed.
       host_routed_provider_http: true,
       // Raw shell and external children receive no ambient destination.
       direct_network_access: "none",

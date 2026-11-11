@@ -48,6 +48,8 @@ import type {
   NativeChatWakeup,
   NativeContextLimit,
   NativeContextLimitResult,
+  NativeHookInfo,
+  NativeHookInspection,
 } from "@grida/desktop-bridge";
 import { IPC_CHANNELS } from "../bridge/contract";
 import { ipc_sender } from "./ipc-sender";
@@ -159,6 +161,10 @@ export type ActiveNativeChat = Readonly<{
         | "scheduledWakeup"
         | "controlWakeup"
         | "registerEditorSurfaces"
+        | "inspectHooks"
+        | "reviewHook"
+        | "installHook"
+        | "removeHook"
       >
     >;
 }>;
@@ -215,6 +221,7 @@ type Owner = {
   pending: number;
   listing: boolean;
   reviewingConfiguration?: boolean;
+  reviewingHooks?: boolean;
   contextLimit?: {
     id: string;
     basis: ContextLimitBasis;
@@ -348,7 +355,16 @@ export class NativeChatIpc {
     ) => Promise<WorkspaceMediaGrant>,
     private readonly disabled = false,
     private readonly documents?: NativeChatDocumentOwner,
-    private readonly nestedDecks?: NativeChatNestedDeckOwner
+    private readonly nestedDecks?: NativeChatNestedDeckOwner,
+    private readonly hookReview?: {
+      choose(sender: WebContents): Promise<string | null>;
+      confirm(
+        sender: WebContents,
+        definition: NativeHookInfo,
+        workspace: string,
+        action: "install" | "remove"
+      ): Promise<boolean>;
+    }
   ) {}
 
   async documentRequest<T>(
@@ -1600,6 +1616,98 @@ export class NativeChatIpc {
       exactCounting: basis.exactCounting,
       source: basis.source,
     };
+  }
+
+  async inspectHooks(
+    event: IpcMainInvokeEvent,
+    attachmentId?: string
+  ): Promise<NativeHookInspection> {
+    const owner = this.owner(event);
+    const session =
+      attachmentId === undefined
+        ? undefined
+        : this.requireAttachment(event, attachmentId).attachment.session;
+    if (!owner.active.chat.inspectHooks)
+      throw new Error("native_hooks_unavailable");
+    const result = await owner.active.chat.inspectHooks(session?.id);
+    this.revalidate(owner);
+    return result;
+  }
+
+  async importHook(
+    event: IpcMainInvokeEvent
+  ): Promise<NativeHookInspection | null> {
+    const owner = this.owner(event);
+    const chat = owner.active.chat;
+    if (
+      !this.hookReview ||
+      !chat.reviewHook ||
+      !chat.installHook ||
+      !chat.inspectHooks
+    )
+      throw new Error("native_hooks_unavailable");
+    if (owner.reviewingHooks) throw new Error("native_hook_review_busy");
+    owner.reviewingHooks = true;
+    try {
+      const file = await this.hookReview.choose(owner.sender);
+      this.revalidate(owner);
+      if (file === null) return null;
+      const review = await chat.reviewHook(file);
+      this.revalidate(owner);
+      const accepted = await this.hookReview.confirm(
+        owner.sender,
+        review.definition,
+        review.workspace,
+        "install"
+      );
+      this.revalidate(owner);
+      if (!accepted) return null;
+      await chat.installHook(review);
+      this.revalidate(owner);
+      return await this.inspectHooks(event);
+    } finally {
+      owner.reviewingHooks = false;
+    }
+  }
+
+  async removeHook(
+    event: IpcMainInvokeEvent,
+    id: unknown,
+    revision: unknown
+  ): Promise<NativeHookInspection> {
+    const owner = this.owner(event);
+    const chat = owner.active.chat;
+    if (
+      !this.hookReview ||
+      !chat.inspectHooks ||
+      !chat.removeHook ||
+      typeof id !== "string" ||
+      typeof revision !== "string"
+    )
+      throw new Error("native_hooks_unavailable");
+    if (owner.reviewingHooks) throw new Error("native_hook_review_busy");
+    owner.reviewingHooks = true;
+    try {
+      const inspection = await chat.inspectHooks();
+      this.revalidate(owner);
+      const definition = inspection.saved.find(
+        (hook) => hook.id === id && hook.revision === revision
+      );
+      if (!definition) throw new Error("native_hook_revision_changed");
+      const accepted = await this.hookReview.confirm(
+        owner.sender,
+        definition,
+        "Current workspace",
+        "remove"
+      );
+      this.revalidate(owner);
+      if (!accepted) return inspection;
+      await chat.removeHook(id, revision);
+      this.revalidate(owner);
+      return await this.inspectHooks(event);
+    } finally {
+      owner.reviewingHooks = false;
+    }
   }
 
   async saveContextLimit(

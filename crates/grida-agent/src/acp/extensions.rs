@@ -6,7 +6,9 @@ pub(super) mod compaction;
 mod deletion;
 pub(super) mod gateway_billing;
 mod goals;
+pub(super) const GOAL_SPENDING: &str = goals::SPENDING;
 mod history;
+mod hooks;
 pub(super) mod library;
 mod lifecycle;
 mod questions;
@@ -119,6 +121,7 @@ fn capability_keys(
         .chain(history::CAPABILITIES)
         .chain([compaction::COMPACT])
         .chain([skills::CATALOG])
+        .chain([hooks::INSPECT])
         .chain([summaries::SUMMARY])
         .chain(summaries::artifact_capability(reviewer))
         .chain([catalog::ORGANIZE])
@@ -430,6 +433,7 @@ pub(super) fn handlers(
             reviewer,
         ))
         .extend(history::handlers(host.clone(), sessions.clone()))
+        .extend(hooks::handlers(host.clone(), sessions.clone()))
         .extend(library::handlers(host.clone(), sessions.clone()))
         .extend(compaction::handlers(host.clone(), sessions.clone()))
         .extend(catalog::handlers(host.clone(), sessions.clone()))

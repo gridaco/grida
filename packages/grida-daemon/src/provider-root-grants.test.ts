@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WorkspaceRegistry } from "./workspaces";
 import { FileRegistry } from "./files/registry";
 import { filesIo } from "./files/io";
+import { DaemonTransport } from "./transport";
 import { registerWorkspacesRoutes } from "./http/routes/workspaces";
 import { buildServer, type DaemonServices } from "./http/server";
 import {
@@ -158,6 +159,153 @@ describe("native provider-root grants", () => {
       await expect(services!.workspaces.open(providerHome)).rejects.toThrow(
         "workspace-overlaps-protected-root"
       );
+    } finally {
+      server.drain();
+      server.cleanup();
+    }
+  });
+
+  it("rejects host-protected workspace and file topology before persistence while preserving sibling I/O", async () => {
+    const protectedRoot = path.join(root, "host-state");
+    const child = path.join(protectedRoot, "child");
+    const alias = path.join(root, "host-alias");
+    const selected = path.join(root, "project");
+    const state = path.join(root, "state");
+    await fs.mkdir(child, { recursive: true });
+    await fs.mkdir(selected);
+    await fs.symlink(protectedRoot, alias);
+    await fs.writeFile(path.join(protectedRoot, "private.txt"), "host bytes");
+    let services: DaemonServices | undefined;
+    const server = buildServer({
+      password: "synthetic-daemon-password",
+      protocol: DAEMON_PROTOCOL,
+      capabilities: DAEMON_DEFAULT_CAPABILITIES,
+      user_data_path: state,
+      protected_file_roots: [protectedRoot],
+      http_access: {
+        allowed_origins: ["https://host.test"],
+        allowed_referer_paths: ["/client"],
+      },
+      tenants: [
+        {
+          register: (_app, current) => {
+            services = current;
+            return {};
+          },
+        },
+      ],
+    });
+    const post = (route: string, value: unknown) =>
+      server.app.request(route, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: DaemonTransport.buildBasicAuthHeader(
+            "synthetic-daemon-password"
+          ),
+          referer: "https://host.test/client",
+          origin: "https://host.test",
+        },
+        body: JSON.stringify(value),
+      });
+    try {
+      const opened = await post("/workspaces/open", { path: selected });
+      expect(opened.status).toBe(200);
+      const workspace = await opened.json();
+      const catalogPath = path.join(state, "workspaces.json");
+      const before = await fs.readFile(catalogPath, "utf8");
+      for (const candidate of [protectedRoot, child, root, alias]) {
+        expect(() => services!.files.registerPath(candidate)).toThrow(
+          "file-overlaps-protected-root"
+        );
+        const rejected = await post("/workspaces/open", { path: candidate });
+        expect(rejected.status).toBe(400);
+        expect(await rejected.json()).toEqual({
+          error: "workspace-overlaps-protected-root",
+        });
+        expect(await fs.readFile(catalogPath, "utf8")).toBe(before);
+      }
+      expect(
+        (await services!.workspaces.list()).map((entry) => entry.root)
+      ).toEqual([selected]);
+      const written = await post("/workspaces/writefile", {
+        workspace_id: workspace.id,
+        rel_path: "document.txt",
+        content: "ordinary document",
+      });
+      expect(written.status).toBe(200);
+      const read = await post("/workspaces/readfile", {
+        workspace_id: workspace.id,
+        rel_path: "document.txt",
+      });
+      expect(read.status).toBe(200);
+      expect(await read.json()).toMatchObject({ content: "ordinary document" });
+
+      // A saved handle must lose authority when its directory becomes protected.
+      await fs.rm(selected, { recursive: true });
+      await fs.symlink(protectedRoot, selected);
+      expect(await services!.workspaces.findById(workspace.id)).toBeNull();
+      expect(await services!.workspaces.findByRoot(selected)).toBeNull();
+      expect(await services!.workspaces.list()).toEqual([]);
+      expect(services!.workspaces.rootsSnapshot()).toEqual([]);
+      expect(
+        services!.workspaces.containsPath(path.join(selected, "private.txt"))
+      ).toBe(false);
+      for (const route of ["/workspaces/readfile", "/workspaces/writefile"]) {
+        const response = await post(route, {
+          workspace_id: workspace.id,
+          rel_path: "private.txt",
+          content: "overwrite",
+        });
+        expect(response.status).toBe(404);
+        expect(await response.text()).not.toContain("host bytes");
+      }
+      expect(
+        await fs.readFile(path.join(protectedRoot, "private.txt"), "utf8")
+      ).toBe("host bytes");
+    } finally {
+      server.drain();
+      server.cleanup();
+    }
+  });
+
+  it("rejects an enclosing workspace through an alias before a host-protected descendant exists", async () => {
+    const enclosing = path.join(root, "host");
+    const alias = path.join(root, "host-alias");
+    const state = path.join(root, "state");
+    await fs.mkdir(enclosing);
+    await fs.symlink(enclosing, alias);
+    let services: DaemonServices | undefined;
+    const server = buildServer({
+      password: "synthetic-daemon-password",
+      protocol: DAEMON_PROTOCOL,
+      capabilities: DAEMON_DEFAULT_CAPABILITIES,
+      user_data_path: state,
+      protected_file_roots: [path.join(enclosing, "future-state")],
+      http_access: { allowed_origins: [], allowed_referer_paths: [] },
+      tenants: [
+        {
+          register: (_app, current) => {
+            services = current;
+            return {};
+          },
+        },
+      ],
+    });
+    try {
+      for (const candidate of [enclosing, alias]) {
+        expect(() => services!.files.registerPath(candidate)).toThrow(
+          "file-overlaps-protected-root"
+        );
+        await expect(services!.workspaces.open(candidate)).rejects.toThrow(
+          "workspace-overlaps-protected-root"
+        );
+      }
+      expect(await services!.workspaces.list()).toEqual([]);
+      await expect(
+        fs.stat(path.join(state, "workspaces.json"))
+      ).rejects.toMatchObject({ code: "ENOENT" });
+      expect(await fs.readdir(enclosing)).toEqual([]);
     } finally {
       server.drain();
       server.cleanup();

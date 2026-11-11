@@ -13,7 +13,7 @@ can load project context, check an impending tool action, record a result, or
 require another verification pass before completion. The hook declares what
 event it handles and what effect its response may have.
 
-This is a proposed feature. The [feature catalog](../../../agent/features.md)
+The [feature catalog](../../../agent/features.md)
 owns availability. The [master](./master.md) and host own the hook dispatcher and policy. The
 [components](./components.md) supply ordinary execution and durability. The existing
 [event channel](./events.md) remains an observational surface.

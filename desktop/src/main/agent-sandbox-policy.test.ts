@@ -85,7 +85,8 @@ describe("DesktopAgentSandboxPolicy", () => {
       const agent = path.join(root, "agent");
       const scratch = path.join(root, "scratch");
       const legacy = path.join(agent, "sessions.db");
-      const { SandboxManager } = await import("@anthropic-ai/sandbox-runtime");
+      const { RetainedServiceSandbox } =
+        await import("./retained-service-sandbox");
       try {
         await Promise.all(
           [mediaRoot, native, agent, scratch].map((directory) =>
@@ -123,7 +124,7 @@ describe("DesktopAgentSandboxPolicy", () => {
           legacyStateRoots: [legacy, scratch],
           ggHost: "grida.co",
         });
-        await SandboxManager.initialize({
+        const sandbox = new RetainedServiceSandbox({
           network: {
             allowedDomains: [],
             deniedDomains: [],
@@ -136,13 +137,10 @@ describe("DesktopAgentSandboxPolicy", () => {
             allowWrite: policy.filesystem.allow_write,
           },
         });
-        const quote = (value: string) =>
-          "'" + value.replaceAll("'", "'\\''") + "'";
-        const { argv, env } = await SandboxManager.wrapWithSandboxArgv(
-          `${quote(process.execPath)} ${quote(script)}`
-        );
-        await promisify(execFile)(argv[0], argv.slice(1), {
-          env: { ...env, HOME: root, PATH: "/usr/bin:/bin" },
+        const plan = sandbox.prepare(process.execPath, [script]);
+        plan.recheck();
+        await promisify(execFile)(plan.executable, plan.arguments, {
+          env: { HOME: root, PATH: "/usr/bin:/bin" },
           timeout: 5000,
         });
         expect(await fs.readFile(output, "utf8")).toBe("new media");
@@ -152,7 +150,6 @@ describe("DesktopAgentSandboxPolicy", () => {
           )
         ).toEqual(["retained", "retained", "retained"]);
       } finally {
-        await SandboxManager.reset();
         await fs.rm(root, { recursive: true, force: true });
       }
     },

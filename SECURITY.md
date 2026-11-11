@@ -428,7 +428,7 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    that transferred connection: it receives no listener, destination field,
    bind operation, or connect operation. The descriptor is therefore a socket
    capability channel, not a second daemon protocol. This keeps
-   `allow_local_binding: false` in the sidecar's `srt` profile and preserves
+   socket creation denied in the sidecar's native profile and preserves
    the main-owned loopback port across Bubblewrap's private Linux network
    namespace.
 
@@ -484,7 +484,7 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    environment credential. The ChatGPT-subscription lane registered by
    GRIDA-SEC-008 adds only exact `auth.openai.com` token and `chatgpt.com`
    Responses destinations; those grants are never eligible for the asset lane.
-   When this transport is enabled, the outer `srt`
+   When this transport is enabled, the outer native
    policy omits BYOK/GG destinations, so missing provider wiring cannot fall
    back to direct sidecar egress. Electron main transiently observes provider
    request headers and bodies while transporting them, but never persists,
@@ -675,8 +675,16 @@ and [native sandbox](crates/agent-kit-sandbox/src/lib.rs).
 
 Historical TypeScript command execution and its SRT worker were retired. Their
 invariants remain covered by native process/authority tests and the historical
-regression inventory. Retained file/media services keep their separate SRT
-backstop; no new native or platform containment is implied for those services.
+regression inventory. Current retained file/media services use a separate native
+Seatbelt or bubblewrap/seccomp launch; they receive no model command executor.
+The historical network and shell-policy details below describe source-only
+regression evidence, not distributed Desktop execution.
+
+The current macOS retained-service profile permits metadata only on exact
+protected roots and their ancestors, so registry admission can revalidate their
+canonical identities. Protected contents, directory listings, extended
+attributes and other descendant metadata remain denied. Actual native tests
+exercise fresh managed-workspace creation alongside protected-root rejection.
 
 - **Network (allow-only, enumerated).** `srt` denies all outbound except a
   host-set domain allowlist and **forbids `*` / broad patterns by design** —
@@ -834,11 +842,10 @@ registry writes nothing but the directory, so the earlier manifest-injection
 surface is removed outright rather than field-constrained — whatever document
 the workspace eventually holds is created by the AGENT through its own
 already-bound (and separately-gated) fs write capability, not by this route.
-The sidecar's structured `fs` writes remain inside its coarse outer `srt`
+The retained sidecar's structured `fs` writes remain inside its coarse native
 profile. A created project becomes an in-process workspace root for structured
-tools; a shell command receives that exact canonical root again through the
-main-owned per-command SRT profile rather than inheriting the union of every
-opened workspace.
+tools. Native model commands receive their exact permission scope through the
+Rust host and sandbox helper, independently of these retained service roots.
 `workspaces.create.test.ts` pins traversal-name containment,
 that the created project is empty (an unexpected `seed` body is inert), and the
 no-managed-root refusal.
@@ -1573,8 +1580,8 @@ Today:
   loss until the exact child exits. The [supervisor](desktop/src/main/agent-sidecar-supervisor.ts)
   joins that exit and admitted custody work before a replacement. Packaged
   fixtures verify provider mediation, accepted-socket transfer, scope denials,
-  Main crash refusal, and clean drain. Compatibility launches retain their
-  SRT boundary.
+  Main crash refusal, and clean drain. Ordinary services use their separate
+  native Seatbelt or bubblewrap/seccomp boundary.
 - The isolated native Desktop profile gives Main sole ownership of
   `recent.json` in its private browser directory. Its recents IPC uses the
   current authenticated top-level frame. Paths are remembered metadata and
@@ -1770,7 +1777,8 @@ Today:
 - The native [history extension](crates/grida-agent/src/acp/extensions/history.rs) requires a negotiated operation and an attached source session. The [host](crates/grida-agent/src/host/history.rs) binds a derivation to committed history and keeps a fork in the source workspace. The [portable projection](crates/grida-agent-master/src/conversation_seed.rs) copies visible text with omission evidence and keeps raw tool data, provider state, and grants out of the seed. An edit target resolves the visible anchor to the exact retained text-only submission within the attached chat. Inherited context from another chat cannot authorize a source input read. [Native process tests](crates/grida-agent/tests/process/history.rs) cover attachment, source ownership, and fresh tool permissions.
 - Desktop's [bounded transcript read](desktop/src/main/native-agent-chat.ts) rechecks the frame's exact attachment through [Main IPC](desktop/src/main/native-chat-ipc.ts), correlates chunks to the current read, and caps buffered text. The [ACP handler](crates/grida-agent/src/acp.rs) requires the negotiated capability, an attached chat, and its workspace. Cursors select only the attached chat's current history view. Reading grants no execution authority.
 - `desktop/src/main/agent-sandbox-policy.ts` — binds Desktop's strict sandbox posture: empty direct external egress, host-routed provider HTTP, no generic local bind/connect authority, and an exact read/write grant for the long-lived sidecar's app-managed media root.
-- `desktop/src/main/agent-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; initializes the OS sandbox wrapper when supported; owns both private channels, forwards the one main-owned media-root fact, and removes direct provider hosts from the sidecar policy (Desktop deliberately withholds srt's alpha Windows backend pending a supported lifecycle).
+- `desktop/src/main/agent-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; captures the native retained-service scope; owns both private channels, forwards the one main-owned media-root fact, and grants no direct provider networking. Windows retains explicitly unconfined non-agent compatibility services with native chat unavailable.
+- `desktop/src/main/retained-service-sandbox.ts` and its tests — shell-free Seatbelt or bubblewrap launch, executable identity recheck, literal/canonical protected paths, native-ABI seccomp, inherited IPC, denied new sockets and safe owned mask cleanup. Actual macOS and unprivileged Linux ARM64 fixtures cover filesystem denial and Main-transferred connected sockets. Native setup failure has no unconfined fallback on macOS/Linux.
 - `desktop/src/main/desktop-entry-window.ts` — owns the exact bridge-attached entry window and admits auxiliary native windows only while the authenticated main role is active. Committed quit revokes renderer admission and invalidates queued or in-flight entry reconciliation. The Grida-account transition is additionally bound by GRIDA-SEC-005.
 - `desktop/src/main/protocol-router.ts` — deep-link protocol guard; the auth callback arm is bound by GRIDA-SEC-005.
 - `desktop/src/main/media-root.ts` and `desktop/src/main/media-host.ts` — one Main-owned app media root and its purpose-scoped adapter. The renderer can list, read, reveal, or save a copy by opaque item ID, or open the fixed library folder. Paths and filesystem details stay in Main. Whole-file reads are serialized, save-copy admits one active picker, and the recent view is capped at 20 records.
@@ -2053,6 +2061,25 @@ produce a Grida webview cookie session.
 ---
 
 ### `GRIDA-SEC-006` — Hosted-AI scoped-token boundary
+
+The [task spending authority](crates/grida-agent/src/host/spending.rs),
+[Goal adapter](crates/grida-agent/src/host/goals.rs),
+[private Gateway extension](crates/grida-agent/src/acp/extensions/gateway_billing.rs),
+[Desktop egress](desktop/src/main/native-provider-egress.ts), and
+[Gateway connection](desktop/src/main/native-gateway-connection.ts) bind optional
+Goal ceilings to the existing supervised Gateway principal. The
+[capped route](<editor/app/(api)/(public)/api/v1/ai/chat/completions/capped/route.ts>),
+[shared request owner](editor/lib/ai/native-chat-route.ts),
+[cap parser](editor/lib/ai/gateway-spending.ts), and
+[Gateway adapter](editor/lib/ai/gateway-product.ts) require the fixed capped
+request contract before dispatch. An older server refuses that route; there is
+no uncapped retry. Exact retained allocations cover parent and funded child
+inference, including compaction. Unknown outcomes keep their holds. Paid or
+unknown external tool lanes are withheld from capped Goals. Rejected input
+preflight publishes no allocation; accepted retries cannot recreate missing
+authority. Desktop displays this evidence through its
+[Goal owner](desktop/src/main/native-agent-goals.ts) and
+[exact amount parser](editor/lib/agent-chat/goal-spending.ts).
 
 > **Surface.** This is the **security half of Grida Gateway (GG)** — the
 > `token` surface. Every file here carries **both** `GRIDA-SEC-006` and
@@ -3679,6 +3706,20 @@ grant custody and cleanup.
 
 ### `GRIDA-SEC-014` — Shared native provider credential boundary
 
+Desktop [hook registration](desktop/src/main/native-agent-hooks.ts),
+[its tests](desktop/src/main/native-agent-hooks.test.ts),
+[launch profile owner](desktop/src/main/native-agent-permissions.ts),
+[native hook owner](crates/grida-agent/src/host/lifecycle_hooks.rs), and
+[inspection extension](crates/grida-agent/src/acp/extensions/hooks.rs) also bind
+GRIDA-SEC-004. Registration captures explicitly trusted root/system-owned
+program bytes and literal arguments, validates the complete bounded launch
+profile, and waits for a new connection. Checks run in the task's captured
+read scope without networking or credential access. Text-only reviewers gain
+no filesystem grant to run checks. Inspection does not execute handlers, and
+missing or changed programs do not prevent observational recovery or Stop.
+The [master lifecycle](crates/grida-agent-master/src/lifecycle_hooks.rs) decides
+event order and bounded continuation; it receives no credential authority.
+
 **What it protects.** Independent native applications share BYOK API keys in one
 private plaintext TOML authority per Grida home. Account OAuth (GRIDA-SEC-010),
 ChatGPT subscription OAuth (GRIDA-SEC-008) and memory-only GG grants
@@ -3727,6 +3768,13 @@ durable or discard unrelated OAuth records.
    explicitly, and standalone daemon hosts default to their own isolated data
    path. `SecretsStore` delegates to the public owner and runs one-time migration
    through the legacy writer lock. Its routes still expose only presence/set/delete.
+   Linux's retained service binds the same physical provider directory beneath
+   private namespace ancestors with valid mapped ownership. Strict ownership,
+   ACL and path checks remain enabled. The underlying files and SQLite lock
+   inodes are unchanged; migration state and tombstones are neither copied nor
+   reset. Native clients outside the namespace keep the physical canonical home.
+   File/workspace admission excludes both physical private roots and the private
+   namespace prefix; native and legacy exclusions also project into bound views.
    Every updated macOS/Linux OAuth mutation shares the legacy lock and rereads
    disk before changing a record. Strict legacy reads bypass test environment
    content; retirement removes API entries only and cleans validated old temporaries.
@@ -3923,11 +3971,13 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [provider entry](packages/grida-ai/src/providers.ts) remain owned by the AI package
   under GRIDA-SEC-004; they add no provider awareness to the TOML storage protocol.
 - Desktop [supervisor](desktop/src/main/agent-sidecar-supervisor.ts),
+  [retained-service sandbox](desktop/src/main/retained-service-sandbox.ts),
   [sidecar](desktop/src/agent-sidecar.ts),
   [composition](desktop/src/sidecar/daemon.ts),
   [outer policy](desktop/src/main/agent-sandbox-policy.ts), and
   [native permission loader](crates/grida-agent/src/launch_permissions.rs), with
   [supervisor tests](desktop/src/main/agent-sidecar-supervisor.test.ts),
+  [retained-service sandbox tests](desktop/src/main/retained-service-sandbox.test.ts),
   [composition tests](desktop/src/sidecar/daemon.test.ts),
   [outer-policy tests](desktop/src/main/agent-sandbox-policy.test.ts), and
   [native sandbox tests](crates/agent-kit-sandbox/tests).

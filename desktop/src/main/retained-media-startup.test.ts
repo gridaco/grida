@@ -9,18 +9,8 @@ import { AgentSidecarSupervisor } from "./agent-sidecar-supervisor";
 import { DesktopMediaRoot } from "./media-root";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { RetainedMediaLaunch } from "./retained-media-launch";
+import { RetainedServiceSandbox } from "./retained-service-sandbox";
 
-const fixture = vi.hoisted(() => {
-  const sandboxUnavailable = new Error("fixture sandbox package unavailable");
-  return {
-    sandboxUnavailable,
-    loadSandbox: vi.fn<() => never>(() => {
-      throw sandboxUnavailable;
-    }),
-  };
-});
-
-vi.mock("@anthropic-ai/sandbox-runtime", () => fixture.loadSandbox());
 vi.mock("node:child_process", async (original) => ({
   ...(await original<typeof import("node:child_process")>()),
   spawn: vi.fn<typeof spawn>(() => {
@@ -76,9 +66,7 @@ it.each(["managed", "split"])(
         .mockImplementation(() => {
           throw launchObserved;
         });
-      const retained = new AgentSidecarSupervisor({
-        agent: layout === "split",
-      });
+      const retained = new AgentSidecarSupervisor({ agent: false });
       await expect(retained.startRetainedMedia()).rejects.toThrow(
         "retained_media_profile_unavailable"
       );
@@ -102,22 +90,27 @@ it.each(["managed", "split"])(
       });
       expect(prepareSettings).toHaveBeenCalledExactlyOnceWith(agent);
       expect(prepareProviderHome).toHaveBeenCalledExactlyOnceWith(providerHome);
-      expect(fixture.loadSandbox).not.toHaveBeenCalled();
+      expect(Reflect.get(retained, "nativeSandbox")).toBeUndefined();
 
       selected.mockReturnValue(false);
       mediaOnly.mockReturnValue(false);
       vi.mocked(app.getPath).mockClear();
       const ordinary = new AgentSidecarSupervisor();
-      await expect(ordinary.start()).rejects.toMatchObject({
-        cause: fixture.sandboxUnavailable,
-      });
+      const prepare = vi
+        .spyOn(RetainedServiceSandbox.prototype, "prepare")
+        .mockImplementation(() => {
+          throw new Error("fixture native scope unavailable");
+        });
+      await expect(ordinary.start()).rejects.toThrow(
+        "fixture native scope unavailable"
+      );
+      expect(prepare).toHaveBeenCalledOnce();
       expect(app.getPath).not.toHaveBeenCalledWith("temp");
       expect(spawn).not.toHaveBeenCalled();
       expect(ordinary.getInfo()).toBeNull();
     } finally {
       vi.restoreAllMocks();
       vi.unstubAllEnvs();
-      fixture.loadSandbox.mockClear();
       await fs.rm(root, { recursive: true, force: true });
     }
   }

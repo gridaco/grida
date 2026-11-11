@@ -14,6 +14,52 @@ export type NativeChatAttachment = Readonly<{
 export type NativeChatOperatingRegime = "act" | "plan";
 export type NativeChatEffort = "standard" | "ultra";
 
+export type NativeHookEvent =
+  | "session_start"
+  | "before_input"
+  | "before_tool"
+  | "after_tool"
+  | "before_completion";
+
+export type NativeHookInfo = Readonly<{
+  id: string;
+  source: string;
+  event: NativeHookEvent;
+  tool?: string | null;
+  enabled: boolean;
+  mode: "required" | "observe";
+  executable: string;
+  arguments: readonly string[];
+  timeoutMs: number;
+  revision: string;
+}>;
+
+export type NativeHookResult = Readonly<{
+  id: string;
+  revision: string;
+  event: NativeHookEvent;
+  operation: string | null;
+  status:
+    | "allowed"
+    | "denied"
+    | "failed"
+    | "cancelled"
+    | "uncertain"
+    | "invalid_reply"
+    | "unavailable"
+    | "deferred"
+    | "skipped";
+  reason?: string | null;
+}>;
+
+export type NativeHookInspection = Readonly<{
+  supportedEvents: readonly NativeHookEvent[];
+  active: readonly NativeHookInfo[];
+  saved: readonly NativeHookInfo[];
+  activation: "current" | "restart_required";
+  results?: readonly NativeHookResult[];
+}>;
+
 export type NativeChatCommand = "compact" | "fork";
 export type NativeChatCommandResult =
   | Readonly<{ command: "fork"; sessionId: string }>
@@ -149,6 +195,7 @@ export type NativeChatSnapshot = Readonly<{
   historyRevisionAvailable?: true;
   subagentsAvailable?: true;
   goalNamedChildAvailable?: true;
+  goalSpendingAvailable?: true;
   goalManualContinuationAvailable?: true;
   /** Earliest provider retry time in UTC milliseconds for the current turn. */
   retryNotBeforeMs?: number;
@@ -388,6 +435,8 @@ export type NativeChatGoalRequest = Readonly<{
   effort?: NativeChatEffort;
   namedChildId?: string;
   allowWakeup?: true;
+  /** Exact USD mills under a negotiated provider-enforced allocation. */
+  maxCostMills?: string;
 }>;
 
 export type NativeChatGoalStatus =
@@ -411,6 +460,14 @@ export type NativeChatGoal = Readonly<
     continuationPending?: true;
     spent: NativeChatGoalUsage;
     remaining: NativeChatGoalUsage;
+    spending?: Readonly<{
+      maxCostMills: string;
+      perRequestMaxCostMills: string;
+      chargedMills: string;
+      heldMills: string;
+      remainingMills: string;
+      unsettledAttempts: number;
+    }>;
     review?: Readonly<{
       status: "pending" | "confirmed";
       turnId: string;
@@ -557,6 +614,11 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   takeNotificationFocus?(): Promise<NativeChatNotificationFocus | null>;
   list(cursor?: string | null): Promise<NativeChatPage>;
   profiles?(): Promise<NativeChatProfileCatalog | null>;
+  /** Inspect reviewed definitions and retained results without running handlers. */
+  inspectHooks?(attachmentId?: string): Promise<NativeHookInspection>;
+  /** Main owns file selection and the explicit review of executable authority. */
+  importHook?(): Promise<NativeHookInspection | null>;
+  removeHook?(id: string, revision: string): Promise<NativeHookInspection>;
   selectProfile?(selection: NativeChatProfileSelection): Promise<void>;
   listArchived?(cursor?: string | null): Promise<NativeChatPage>;
   catalogEntry?(attachmentId: string): Promise<NativeChatCatalogEntry>;

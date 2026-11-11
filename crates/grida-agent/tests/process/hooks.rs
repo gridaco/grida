@@ -3,6 +3,7 @@
 use super::approvals::{Fixture, Stdio as PrivateStdio};
 use super::lifecycle::{prompt_request, task_basis};
 use super::*;
+use agent_kit_sessions::SessionStore;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
@@ -366,7 +367,71 @@ async fn completion_command_retains_observed_limits_without_exposing_output() {
         .unwrap()
         .unwrap();
         let results = records(&output.stdout);
-        let account = &results[1]["account"];
+        let account = if results[1]["account"].is_null() {
+            #[cfg(target_os = "linux")]
+            {
+                // Forced namespace teardown can remain unverified. The host
+                // must retain that disposition, not discard the recorded limit.
+                assert_eq!(results[1]["reason"], "command_cleanup_unverified");
+                assert_eq!(results[1]["disposition"], "uncertain");
+                assert_eq!(output.status.code(), Some(5));
+                let session =
+                    agent_kit_core::SessionId::new(results[0]["session_id"].as_str().unwrap())
+                        .unwrap();
+                let turn =
+                    agent_kit_core::TurnId::new(results[0]["turn_id"].as_str().unwrap()).unwrap();
+                let store =
+                    agent_kit_store_sqlite::SqliteStore::open(fixture.state.join("runtime.sqlite"))
+                        .unwrap();
+                store
+                    .inspect_turn_with(session, turn, move |state| {
+                        let outcome = state.outcome().expect("retained completion account");
+                        assert_eq!(
+                            outcome.status,
+                            agent_kit_core::messages::OutcomeStatus::Uncertain
+                        );
+                        let command = state
+                            .operations()
+                            .values()
+                            .find(|operation| {
+                                matches!(&operation.record.input,
+                                    agent_kit_core::turn::OperationInput::Tool(invocation)
+                                        if invocation.definition().id.as_str()
+                                            == "before_completion_command")
+                            })
+                            .expect("recorded native completion command");
+                        let Some(agent_kit_core::turn::OperationOutcome::Tool(command)) =
+                            command.outcome()
+                        else {
+                            panic!("native command outcome missing")
+                        };
+                        let receipt: Value =
+                            serde_json::from_slice(command.receipt.as_ref().unwrap().bytes())
+                                .unwrap();
+                        assert_eq!(receipt["backend"], "bubblewrap");
+                        assert_eq!(receipt["descendants"], "unverified");
+                        assert_eq!(receipt["cleanup_verified"], false);
+                        assert_eq!(receipt["temporary_removed"], true);
+                        assert_eq!(
+                            receipt["stop_reason"],
+                            if reason == "completion_hook_timed_out" {
+                                "deadline"
+                            } else {
+                                "output_limit"
+                            }
+                        );
+                        let account =
+                            grida_agent_master::read_account(outcome.account.as_ref().unwrap())?;
+                        Ok(serde_json::to_value(account).unwrap())
+                    })
+                    .await
+                    .unwrap()
+            }
+            #[cfg(not(target_os = "linux"))]
+            panic!("completion account missing: {results:?}");
+        } else {
+            results[1]["account"].clone()
+        };
         let check = &account["completion_checks"][0];
         assert_eq!(
             check["reason"],
@@ -600,6 +665,7 @@ async fn connect(mut command: Command) -> PrivateStdio {
     meta.insert("co.grida/session/effort".into(), 1.into());
     meta.insert("co.grida/goal/start".into(), 1.into());
     meta.insert("co.grida/goal/inspect".into(), 1.into());
+    meta.insert("co.grida/session/hooks".into(), 1.into());
     let initialized = client.request("initialize", capabilities).await;
     assert_eq!(initialized["result"]["protocolVersion"], 1);
     client
@@ -1032,17 +1098,19 @@ async fn wait_for(
     session: &str,
     matches: impl Fn(&Value) -> bool,
 ) -> Value {
-    timeout(WAIT, async {
+    let mut latest = Value::Null;
+    let result = timeout(WAIT, async {
         loop {
             let view = snapshot(client, session).await;
+            latest = view.clone();
             if matches(&view) {
                 return view;
             }
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
     })
-    .await
-    .unwrap()
+    .await;
+    result.unwrap_or_else(|_| panic!("session did not reach the expected state: {latest}"))
 }
 
 async fn start(client: &mut PrivateStdio, workspace: &Path) -> String {
@@ -1197,4 +1265,557 @@ async fn restart_preserves_the_selected_check_and_stop_works_without_the_handler
     assert_eq!(finished["latest"]["status"], "cancelled");
     endpoint.done().await;
     host.close().await;
+}
+
+fn lifecycle_hooks(fixture: &Fixture, definitions: &[(&str, &str, &str, Option<&str>, &str)]) {
+    let executable = Path::new("/usr/bin/printf").canonicalize().unwrap();
+    let digest: [u8; 32] = Sha256::digest(fs::read(&executable).unwrap()).into();
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["directories"][0]["commandRead"] = json!("allow");
+    profile["command"]["hooksOnly"] = json!(true);
+    profile["hooks"]=Value::Array(definitions.iter().map(|(id,event,mode,tool,reply)|json!({
+        "id":id,"source":"reviewed-user-definition","event":event,"tool":tool,"enabled":true,
+        "executable":{"path":executable,"sha256":digest},"arguments":["%s",reply],"mode":mode,"timeoutMs":20_000,
+    })).collect());
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires a provisioned native sandbox helper"]
+async fn lifecycle_hooks_cover_plan_read_tools_context_and_observational_reopen() {
+    let fixture = Fixture::new(true);
+    fs::write(fixture.primary.join("note"), "retained workspace content").unwrap();
+    lifecycle_hooks(
+        &fixture,
+        &[
+            (
+                "start",
+                "session_start",
+                "required",
+                None,
+                r#"{"decision":"allow","context":"Project conventions are contextual data."}"#,
+            ),
+            (
+                "input",
+                "before_input",
+                "required",
+                None,
+                r#"{"decision":"allow"}"#,
+            ),
+            (
+                "read",
+                "before_tool",
+                "required",
+                Some("read_file"),
+                r#"{"decision":"allow"}"#,
+            ),
+            (
+                "observed",
+                "after_tool",
+                "observe",
+                Some("read_file"),
+                r#"{"decision":"deny","reason":"An observational rejection cannot rewrite the read."}"#,
+            ),
+            (
+                "complete",
+                "before_completion",
+                "required",
+                None,
+                r#"{"decision":"allow"}"#,
+            ),
+        ],
+    );
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("read_file", r#"{"path":"note"}"#),
+        Reply::Finished("Read the retained note."),
+    ])
+    .await;
+    let mut command = fixture.process(&endpoint.url, "serve");
+    command.arg("--stdio");
+    let mut host = connect(command).await;
+    let before = host.request("_co.grida/session/hooks", json!({})).await;
+    assert_eq!(
+        before["result"]["hooks"].as_array().unwrap().len(),
+        5,
+        "{before}"
+    );
+    assert!(before["result"]["results"].as_array().unwrap().is_empty());
+    assert!(endpoint.requests.try_recv().is_err());
+    let session = new_session(&mut host, &fixture.primary).await;
+    let mut prompt = prompt_request(&session, "lifecycle-input", "Read note using read_file.");
+    prompt["operatingRegime"] = json!("plan");
+    let accepted = host.request("_co.grida/session/submit", prompt).await;
+    assert_eq!(accepted["result"]["disposition"], "claimed", "{accepted}");
+    let finished = wait_for(&mut host, &session, |view| view["current"].is_null()).await;
+    assert_eq!(finished["latest"]["status"], "succeeded", "{finished}");
+    let first = endpoint.request().await;
+    let second = endpoint.request().await;
+    for request in [&first, &second] {
+        assert!(!request.to_string().contains("lifecycle_hook/"));
+        assert!(
+            !request["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|tool| tool["function"]["name"] == "run_command")
+        );
+    }
+    assert!(first.to_string().contains("contextual_data"));
+    assert!(second.to_string().contains("retained workspace content"));
+    let inspected = host
+        .request("_co.grida/session/hooks", json!({"sessionId":session}))
+        .await;
+    let results = inspected["result"]["results"].as_array().unwrap();
+    assert_eq!(results.len(), 5, "{inspected}");
+    assert!(
+        results
+            .iter()
+            .any(|result| result["id"] == "observed" && result["status"] == "denied")
+    );
+    host.close().await;
+    let mut command = fixture.process(&endpoint.url, "serve");
+    command.arg("--stdio");
+    let mut host = connect(command).await;
+    load(&mut host, &session, &fixture.primary).await;
+    let reopened = host
+        .request("_co.grida/session/hooks", json!({"sessionId":session}))
+        .await;
+    assert_eq!(
+        reopened["result"]["results"],
+        inspected["result"]["results"]
+    );
+    assert!(endpoint.requests.try_recv().is_err());
+    host.close().await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a provisioned native sandbox helper"]
+async fn required_input_hooks_reject_before_inference_and_keep_ordered_skips() {
+    let fixture = Fixture::new(true);
+    lifecycle_hooks(
+        &fixture,
+        &[
+            (
+                "reject",
+                "before_input",
+                "required",
+                None,
+                r#"{"decision":"deny","reason":"Input needs review."}"#,
+            ),
+            (
+                "later",
+                "before_input",
+                "required",
+                None,
+                r#"{"decision":"allow"}"#,
+            ),
+        ],
+    );
+    let mut endpoint = Endpoint::start(vec![]).await;
+    let mut command = fixture.process(&endpoint.url, "serve");
+    command.arg("--stdio");
+    let mut host = connect(command).await;
+    let session = start(&mut host, &fixture.primary).await;
+    let finished = wait_for(&mut host, &session, |view| view["current"].is_null()).await;
+    assert_eq!(finished["latest"]["status"], "failed", "{finished}");
+    let inspected = host
+        .request("_co.grida/session/hooks", json!({"sessionId":session}))
+        .await;
+    let results = inspected["result"]["results"].as_array().unwrap();
+    assert_eq!(results.len(), 2, "{inspected}");
+    assert!(
+        results
+            .iter()
+            .any(|result| result["id"] == "reject" && result["status"] == "denied")
+    );
+    assert!(results.iter().any(|result| result["id"] == "later"
+        && result["status"] == "skipped"
+        && result["operation"].is_null()));
+    assert!(endpoint.requests.try_recv().is_err());
+    host.close().await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a provisioned native sandbox helper"]
+async fn a_required_after_tool_hook_retains_the_successful_read_before_blocking() {
+    let fixture = Fixture::new(true);
+    fs::write(fixture.primary.join("note"), "verified original content").unwrap();
+    lifecycle_hooks(
+        &fixture,
+        &[(
+            "after",
+            "after_tool",
+            "required",
+            Some("read_file"),
+            r#"{"decision":"deny","reason":"Follow-up verification did not pass."}"#,
+        )],
+    );
+    let mut endpoint = Endpoint::start(vec![Reply::Tool("read_file", r#"{"path":"note"}"#)]).await;
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .args(["--mode", "plan", "--prompt", "Read note."])
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let records = records(&output.stdout);
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "{records:?} {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        records[1]["account"]["failure"]["code"],
+        "lifecycle_hook_blocked"
+    );
+    let session =
+        agent_kit_core::SessionId::new(records[0]["session_id"].as_str().unwrap()).unwrap();
+    let turn = agent_kit_core::TurnId::new(records[0]["turn_id"].as_str().unwrap()).unwrap();
+    let store =
+        agent_kit_store_sqlite::SqliteStore::open(fixture.state.join("runtime.sqlite")).unwrap();
+    let preserved=store.inspect_turn_with(session,turn,|state|Ok(state.operations().values().any(|operation|matches!(&operation.record.input,agent_kit_core::turn::OperationInput::Tool(invocation) if invocation.definition().id.as_str()=="read_file") && matches!(operation.outcome(),Some(agent_kit_core::turn::OperationOutcome::Tool(outcome)) if outcome.status==agent_kit_core::messages::OutcomeStatus::Succeeded && serde_json::to_string(outcome).unwrap().contains("verified original content"))))).await.unwrap();
+    assert!(preserved);
+    endpoint.request().await;
+    assert!(endpoint.requests.try_recv().is_err());
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a provisioned native sandbox helper"]
+async fn an_oversized_input_event_keeps_a_diagnostic_without_running_a_handler() {
+    let fixture = Fixture::new(true);
+    lifecycle_hooks(
+        &fixture,
+        &[(
+            "bounded",
+            "before_input",
+            "required",
+            None,
+            r#"{"decision":"allow"}"#,
+        )],
+    );
+    let mut endpoint = Endpoint::start(vec![]).await;
+    let prompt = "x".repeat(100_000);
+    let output = timeout(
+        WAIT,
+        fixture
+            .process(&endpoint.url, "run")
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .args(["--prompt", &prompt])
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let records = records(&output.stdout);
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "{records:?} {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(records[0]["kind"], "accepted");
+    let result = &records[1]["account"]["lifecycle_hooks"][0];
+    assert_eq!(result["id"], "bounded");
+    assert_eq!(result["status"], "unavailable");
+    assert_eq!(result["reason"], "hook_event_limit");
+    assert!(result["operation"].is_null());
+    assert!(endpoint.requests.try_recv().is_err());
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a provisioned native sandbox helper"]
+async fn completion_hooks_can_request_only_bounded_additional_work() {
+    let fixture = Fixture::new(true);
+    lifecycle_hooks(
+        &fixture,
+        &[(
+            "verify",
+            "before_completion",
+            "required",
+            None,
+            r#"{"decision":"continue","context":"Perform another bounded verification pass."}"#,
+        )],
+    );
+    let mut endpoint = Endpoint::start(
+        (0..8)
+            .map(|_| Reply::Finished("Candidate answer."))
+            .collect(),
+    )
+    .await;
+    let output = timeout(
+        Duration::from_secs(45),
+        fixture
+            .process(&endpoint.url, "run")
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .args(["--prompt", "Prepare an answer."])
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let records = records(&output.stdout);
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "{records:?} {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        records[1]["account"]["failure"]["code"],
+        "lifecycle_hook_step_limit"
+    );
+    assert_eq!(records[1]["account"]["steps"], 8);
+    endpoint.request().await;
+    let second = endpoint.request().await;
+    assert!(
+        second
+            .to_string()
+            .contains("Perform another bounded verification pass.")
+    );
+    assert!(second.to_string().contains("contextual_data"));
+    for _ in 2..8 {
+        endpoint.request().await;
+    }
+    assert!(endpoint.requests.try_recv().is_err());
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a provisioned native sandbox helper"]
+async fn registered_hook_changes_cannot_replace_a_paused_turns_captured_policy() {
+    for original_hooks in [false, true] {
+        let fixture = Fixture::new(true);
+        if original_hooks {
+            lifecycle_hooks(
+                &fixture,
+                &[(
+                    "original",
+                    "before_input",
+                    "required",
+                    None,
+                    r#"{"decision":"allow"}"#,
+                )],
+            );
+        }
+        let mut endpoint = Endpoint::start(vec![Reply::Question("question")]).await;
+        let mut command = fixture.process(&endpoint.url, "serve");
+        command.arg("--stdio");
+        let mut host = connect(command).await;
+        let session = start(&mut host, &fixture.primary).await;
+        endpoint.request().await;
+        let pending = wait_for(&mut host, &session, |view| {
+            view["current"]["disposition"] == "suspended"
+        })
+        .await;
+        let paused = host
+            .request(
+                "_co.grida/session/pause",
+                task_basis(&pending, &session, "pause-before-change"),
+            )
+            .await;
+        assert!(paused.get("error").is_none(), "{paused}");
+        let basis = wait_for(&mut host, &session, |view| {
+            view["current"]["paused"] == true
+        })
+        .await;
+        host.close().await;
+        lifecycle_hooks(
+            &fixture,
+            &[(
+                "replacement",
+                "before_input",
+                "required",
+                None,
+                r#"{"decision":"deny","reason":"Must never run for old work."}"#,
+            )],
+        );
+        let mut command = fixture.process(&endpoint.url, "serve");
+        command.arg("--stdio");
+        let mut host = connect(command).await;
+        load(&mut host, &session, &fixture.primary).await;
+        let before = host
+            .request("_co.grida/session/hooks", json!({"sessionId":session}))
+            .await;
+        assert!(
+            !before["result"]["results"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|result| result["id"] == "replacement")
+        );
+        let resumed=host.request("_co.grida/session/resume",json!({"task":task_basis(&basis,&session,"resume-after-change"),"expectedEpoch":basis["current"]["epoch"],"expectedJournalPosition":basis["current"]["journalPosition"]})).await;
+        assert!(
+            matches!(
+                resumed["error"]["data"].as_str(),
+                Some("permission_profile_changed" | "lifecycle_hook_profile_unavailable")
+            ),
+            "{resumed}"
+        );
+        let current = snapshot(&mut host, &session).await;
+        let stopped = host
+            .request(
+                "_co.grida/session/stop",
+                task_basis(&current, &session, "stop-old-policy"),
+            )
+            .await;
+        assert!(stopped.get("error").is_none(), "{stopped}");
+        wait_for(&mut host, &session, |view| {
+            view["current"].is_null() && view["latest"]["status"] == "cancelled"
+        })
+        .await;
+        let after = host
+            .request("_co.grida/session/hooks", json!({"sessionId":session}))
+            .await;
+        assert_eq!(after["result"]["results"], before["result"]["results"]);
+        assert!(endpoint.requests.try_recv().is_err());
+        host.close().await;
+        endpoint.done().await;
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires a provisioned native sandbox helper"]
+async fn a_sponsored_child_cannot_bypass_its_captured_input_hooks() {
+    let fixture = Fixture::new(true);
+    lifecycle_hooks(
+        &fixture,
+        &[(
+            "review-child",
+            "before_input",
+            "required",
+            None,
+            r#"{"decision":"allow"}"#,
+        )],
+    );
+    let executable = Path::new("/usr/bin/awk").canonicalize().unwrap();
+    let digest: [u8; 32] = Sha256::digest(fs::read(&executable).unwrap()).into();
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["hooks"][0]["executable"] = json!({"path":executable,"sha256":digest});
+    profile["hooks"][0]["arguments"] = json!([
+        r#"index($0, "CHILD_REVIEW_SENTINEL") { blocked=1 } END { if (blocked) print "{\"decision\":\"deny\",\"reason\":\"The child requires review.\"}"; else print "{\"decision\":\"allow\"}" }"#
+    ]);
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool(
+            "delegate_review",
+            r#"{"instructions":"Review CHILD_REVIEW_SENTINEL independently."}"#,
+        ),
+        Reply::Tool("collect_review", "{}"),
+        Reply::Finished("The independent review could not proceed."),
+    ])
+    .await;
+    let output = timeout(
+        Duration::from_secs(45),
+        fixture
+            .process(&endpoint.url, "run")
+            .arg("--cwd")
+            .arg(&fixture.primary)
+            .args([
+                "--effort",
+                "ultra",
+                "--mode",
+                "plan",
+                "--prompt",
+                "Parent-only task context.",
+            ])
+            .output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let records = records(&output.stdout);
+    assert!(
+        output.status.success(),
+        "{records:?} {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let child = records[1]["account"]["independent_review"]["child"]
+        .as_str()
+        .unwrap();
+    for _ in 0..3 {
+        assert!(
+            endpoint.request().await["messages"]
+                .to_string()
+                .contains("Parent-only task context.")
+        );
+    }
+    assert!(endpoint.requests.try_recv().is_err());
+    let store =
+        agent_kit_store_sqlite::SqliteStore::open(fixture.state.join("runtime.sqlite")).unwrap();
+    let session = agent_kit_core::SessionId::new(child).unwrap();
+    let view = store.inspect(session.clone()).await.unwrap();
+    let turn = view.latest.unwrap();
+    assert_eq!(
+        turn.outcome.as_ref().unwrap().status,
+        agent_kit_core::messages::OutcomeStatus::Failed
+    );
+    let denied = store
+        .inspect_turn_with(session, turn.binding.turn, |state| {
+            let account = grida_agent_master::read_account(
+                state.outcome().unwrap().account.as_ref().unwrap(),
+            )?;
+            Ok(account.steps == 0
+                && account.lifecycle_hooks.iter().any(|result| {
+                    result.id.as_str() == "review-child"
+                        && result.status == grida_agent_master::hooks::CheckStatus::Denied
+                }))
+        })
+        .await
+        .unwrap();
+    assert!(denied);
+    endpoint.done().await;
+}
+
+#[tokio::test]
+#[ignore = "requires a provisioned native sandbox helper"]
+async fn an_unavailable_hook_program_keeps_inspection_and_retained_controls_available() {
+    let fixture = Fixture::new(true);
+    lifecycle_hooks(
+        &fixture,
+        &[(
+            "missing-program",
+            "before_input",
+            "required",
+            None,
+            r#"{"decision":"allow"}"#,
+        )],
+    );
+    let missing = Path::new("/usr/bin/grida-nonexistent-hook-fixture");
+    assert!(!missing.exists());
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["hooks"][0]["executable"]["path"] = json!(missing);
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    let mut endpoint = Endpoint::start(vec![]).await;
+    let mut command = fixture.process(&endpoint.url, "serve");
+    command.arg("--stdio");
+    let mut host = connect(command).await;
+    let inspected = host.request("_co.grida/session/hooks", json!({})).await;
+    assert_eq!(
+        inspected["result"]["hooks"][0]["executable"],
+        missing.to_str().unwrap(),
+        "{inspected}"
+    );
+    let session = start(&mut host, &fixture.primary).await;
+    let failed = wait_for(&mut host, &session, |view| view["current"].is_null()).await;
+    assert_eq!(failed["latest"]["status"], "failed", "{failed}");
+    let inspected = host
+        .request("_co.grida/session/hooks", json!({"sessionId":session}))
+        .await;
+    assert_eq!(inspected["result"]["results"][0]["id"], "missing-program");
+    assert_eq!(inspected["result"]["results"][0]["status"], "failed");
+    assert!(endpoint.requests.try_recv().is_err());
+    host.close().await;
+    endpoint.done().await;
 }

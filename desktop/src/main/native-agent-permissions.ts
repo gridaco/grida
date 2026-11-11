@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import type { NativeHookLaunchProfile } from "./native-agent-hooks";
 import {
   atomicWrite,
   type WorkspaceDirectoryIdentity,
@@ -73,45 +74,14 @@ export class NativeAgentPermissions {
   /** Publish a Rust v1 launch profile. The path is stable across exact restarts. */
   static async stage(
     stateDirectory: string,
-    workspace: NativeWorkspaceSelection
+    workspace: NativeWorkspaceSelection,
+    hooks?: NativeHookLaunchProfile
   ): Promise<{
     stateDirectory: string;
     profile: string;
     askRoots: ReadonlyMap<string, string>;
   }> {
-    if (process.platform !== "darwin" && process.platform !== "linux")
-      throw new Error("native_agent_permissions_platform_unsupported");
-    if (!identity(workspace.id) || workspace.additionalReadRoots.length > 31)
-      throw invalidProfile();
-    const [primary, ...additional] = await Promise.all(
-      [workspace.primary, ...workspace.additionalReadRoots].map(
-        captureDirectory
-      )
-    );
-    const directories = [
-      { ...primary, read: "allow" },
-      ...additional.map((directory) => ({ ...directory, read: "ask" })),
-    ];
-    if (
-      new Set(directories.map((entry) => entry.id)).size !==
-        directories.length ||
-      new Set(directories.map((entry) => entry.path)).size !==
-        directories.length
-    )
-      throw invalidProfile();
-
-    const protectedPaths = [...new Set(workspace.protectedPaths)].sort();
-    if (protectedPaths.some((entry) => !path.isAbsolute(entry)))
-      throw invalidProfile();
-    const data = JSON.stringify({
-      version: 1,
-      workspace: workspace.id,
-      revision: "ask-me-v1",
-      primary: primary.id,
-      directories,
-      protectedPaths,
-    });
-    if (Buffer.byteLength(data) > 64 * 1024) throw invalidProfile();
+    const { data, askRoots } = await this.capture(workspace, hooks);
     // Use a content-derived filename so competing launches with different
     // trusted selections cannot exchange profile files before either starts.
     const base = await fs.realpath(path.dirname(stateDirectory));
@@ -134,6 +104,58 @@ export class NativeAgentPermissions {
     return {
       stateDirectory: directory,
       profile,
+      askRoots,
+    };
+  }
+
+  /** Validate a proposed hook selection without publishing a file or changing live work. */
+  static async validateHookProfile(
+    workspace: NativeWorkspaceSelection,
+    hooks?: NativeHookLaunchProfile
+  ): Promise<void> {
+    await this.capture(workspace, hooks);
+  }
+
+  private static async capture(
+    workspace: NativeWorkspaceSelection,
+    hooks?: NativeHookLaunchProfile
+  ): Promise<{ data: string; askRoots: ReadonlyMap<string, string> }> {
+    if (process.platform !== "darwin" && process.platform !== "linux")
+      throw new Error("native_agent_permissions_platform_unsupported");
+    if (!identity(workspace.id) || workspace.additionalReadRoots.length > 31)
+      throw invalidProfile();
+    const [primary, ...additional] = await Promise.all(
+      [workspace.primary, ...workspace.additionalReadRoots].map(
+        captureDirectory
+      )
+    );
+    const directories = [
+      { ...primary, read: "allow", ...(hooks ? { commandRead: "allow" } : {}) },
+      ...additional.map((directory) => ({ ...directory, read: "ask" })),
+    ];
+    if (
+      new Set(directories.map((entry) => entry.id)).size !==
+        directories.length ||
+      new Set(directories.map((entry) => entry.path)).size !==
+        directories.length
+    )
+      throw invalidProfile();
+
+    const protectedPaths = [...new Set(workspace.protectedPaths)].sort();
+    if (protectedPaths.some((entry) => !path.isAbsolute(entry)))
+      throw invalidProfile();
+    const data = JSON.stringify({
+      version: 1,
+      workspace: workspace.id,
+      revision: "ask-me-v1",
+      primary: primary.id,
+      directories,
+      protectedPaths,
+      ...(hooks ? { hooks: hooks.hooks, command: hooks.command } : {}),
+    });
+    if (Buffer.byteLength(data) > 64 * 1024) throw invalidProfile();
+    return {
+      data,
       askRoots: new Map(additional.map((entry) => [entry.id, entry.path])),
     };
   }

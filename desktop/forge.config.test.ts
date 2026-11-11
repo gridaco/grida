@@ -137,7 +137,10 @@ describe("Desktop native agent package", () => {
       await prePackage(forge, platform, arch);
       fs.mkdirSync(resources, { recursive: true });
       fs.mkdirSync(build, { recursive: true });
-      fs.writeFileSync(path.join(build, "main.js"), "void 0;");
+      fs.writeFileSync(
+        path.join(build, "main.js"),
+        'require("missing-runtime-fixture");'
+      );
       await createPackage(app, path.join(resources, "app.asar"));
       await packageAfterCopy(
         forge,
@@ -156,16 +159,8 @@ describe("Desktop native agent package", () => {
       await expect(preMake(forge)).rejects.toThrow(
         "Desktop installers require a fresh verified package"
       );
-      const applyPath = path.join(
-        resources,
-        "app.asar.unpacked/node_modules/@anthropic-ai/sandbox-runtime/vendor/seccomp",
-        arch,
-        "apply-seccomp"
-      );
-      fs.mkdirSync(path.dirname(applyPath), { recursive: true });
-      fs.writeFileSync(applyPath, fixtureBinary({ os: platform, cpu: arch }), {
-        mode: 0o755,
-      });
+      fs.writeFileSync(path.join(build, "main.js"), "void 0;");
+      await createPackage(app, path.join(resources, "app.asar"));
       await postPackage(forge, packaged);
       await expect(preMake(forge)).resolves.toBeUndefined();
       await expect(preMake(forge)).rejects.toThrow(

@@ -45,6 +45,7 @@ pub(super) struct AttachmentTools {
 pub(super) struct HookTools {
     pub(super) completion: Option<Arc<completion_checks::CompletionAccess>>,
     pub(super) before_tool: Option<Arc<before_tool::BeforeToolCheck>>,
+    pub(super) lifecycle: Option<Arc<lifecycle_hooks::LifecycleAccess>>,
 }
 
 impl ToolAuthority {
@@ -63,6 +64,7 @@ impl ToolAuthority {
             && wakeups.is_none()
             && hooks.completion.is_none()
             && hooks.before_tool.is_none()
+            && hooks.lifecycle.is_none()
             && host_tools.is_empty()
             && delegation.is_none()
         {
@@ -105,6 +107,11 @@ impl AuthorityValidator for ToolAuthority {
             || self
                 .hooks
                 .before_tool
+                .as_ref()
+                .is_some_and(|scope| scope.handles(&request.selection))
+            || self
+                .hooks
+                .lifecycle
                 .as_ref()
                 .is_some_and(|scope| scope.handles(&request.selection))
         {
@@ -151,8 +158,8 @@ impl AuthorityValidator for ToolAuthority {
     }
 }
 
-impl ToolGate for ToolAuthority {
-    fn decide(
+impl ToolAuthority {
+    fn decide_target(
         &self,
         admission: ToolAdmission,
         context: AdmissionContext,
@@ -239,6 +246,51 @@ impl ToolGate for ToolAuthority {
             return host_tools.decide(admission, context);
         }
         self.base.decide(admission, context)
+    }
+}
+
+impl ToolGate for ToolAuthority {
+    fn decide(
+        &self,
+        admission: ToolAdmission,
+        context: AdmissionContext,
+    ) -> BoxFuture<'_, Result<ToolDecision>> {
+        Box::pin(async move {
+            if let Some(hooks) = &self.hooks.lifecycle {
+                if hooks.unverified(&context.operations.view()) {
+                    return Err(problem(ErrorKind::Uncertain, "lifecycle_hook_uncertain"));
+                }
+                if hooks.handles(&admission.grants) {
+                    return hooks.admit(&admission, &context);
+                }
+            }
+            let decision = self
+                .decide_target(admission.clone(), context.clone())
+                .await?;
+            if !matches!(decision, ToolDecision::Permit) {
+                return Ok(decision);
+            }
+            if let Some(hooks) = &self.hooks.lifecycle {
+                // Internal checks never recursively dispatch user handlers.
+                if !self
+                    .hooks
+                    .completion
+                    .as_ref()
+                    .is_some_and(|scope| scope.handles(&admission.grants))
+                    && !self
+                        .hooks
+                        .before_tool
+                        .as_ref()
+                        .is_some_and(|scope| scope.handles(&admission.grants))
+                {
+                    hooks.before_tool(&admission, &context).await?;
+                    // The runtime revalidates the exact original action's live
+                    // authority after this gate. A hook supplies no grant.
+                    return Ok(ToolDecision::Permit);
+                }
+            }
+            Ok(decision)
+        })
     }
 }
 

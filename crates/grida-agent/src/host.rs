@@ -14,6 +14,7 @@ mod image_tools;
 mod images;
 pub(crate) mod library;
 mod lifecycle;
+mod lifecycle_hooks;
 pub(crate) mod live;
 mod permissions;
 mod questions;
@@ -22,6 +23,7 @@ mod retained_inputs;
 mod selected_file;
 pub(crate) mod side_chats;
 mod skills;
+mod spending;
 mod sponsorship;
 mod subagents;
 mod wakeups;
@@ -37,9 +39,11 @@ pub use images::ImageUpload;
 pub(crate) use images::MAX_IMAGE_BYTES;
 pub(crate) use images::is_retained_image;
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
+pub use lifecycle_hooks::HookInspection;
 pub use permissions::{Approvals, PendingApproval};
 pub use questions::{PendingQuestion, Questions};
 pub use retained_file::FileUpload;
+pub use spending::SpendingInspection;
 pub use subagents::{
     SubagentAssignment, SubagentInspection, SubagentMessage, SubagentMessageReceipt, SubagentWork,
 };
@@ -68,7 +72,7 @@ use agent_kit_core::turn::{
 };
 use agent_kit_core::{
     BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, MessageId, ModelId,
-    OperationId, PrincipalId, Result, SchemaId, ScopeId, SessionId, TurnId,
+    OperationId, PrincipalId, ProviderId, Result, SchemaId, ScopeId, SessionId, TurnId,
 };
 use agent_kit_providers::{
     Anthropic, Gemini, GeminiProfile, ModelProfile, OpenAiCompatible, OutputLimitField, Responses,
@@ -125,6 +129,7 @@ pub struct Host {
     state_dir: Option<Arc<Path>>,
     execution: Option<Arc<Execution>>,
     gg_connection: Option<Arc<GgConnection>>,
+    spending: Arc<spending::Store>,
     configuration: Option<Arc<Configuration>>,
     permissions: Option<Arc<crate::permissions::PermissionProfile>>,
     host_tools: Option<Arc<host_tools::HostTools>>,
@@ -154,6 +159,7 @@ struct Execution {
     runtime: Runtime,
     config: MasterConfig,
     provider: Arc<dyn Provider>,
+    spending_profile: Option<Arc<spending::ProviderProfile>>,
     authority: MasterAuthority,
     authorization: Arc<ExecutionAuthority>,
     questions: Arc<questions::QuestionAccess>,
@@ -334,6 +340,10 @@ impl DurableSubmission {
 
 #[derive(Serialize, Deserialize)]
 struct StoredPrompt {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lifecycle_hooks: Option<grida_agent_master::lifecycle_hooks::LifecycleHooks>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    spending: Option<spending::Selection>,
     parts: Vec<PromptPart>,
     configuration: ConfigurationSnapshot,
     max_output_tokens: Option<u64>,
@@ -488,6 +498,8 @@ enum TurnWork {
 }
 
 struct PreparedInput {
+    lifecycle_hooks: Option<grida_agent_master::lifecycle_hooks::LifecycleHooks>,
+    spending: Option<spending::Selection>,
     config: MasterConfig,
     effort: Option<EffortPolicy>,
     subagent: bool,
@@ -703,6 +715,7 @@ impl Host {
             .canonicalize()
             .map_err(|_| problem(ErrorKind::Unavailable, "state_directory_unavailable"))?;
         Ok(Self {
+            spending: Arc::new(spending::Store::new(&state_dir, store.clone())),
             store,
             state_dir: Some(state_dir.into()),
             execution,
@@ -1704,6 +1717,23 @@ impl Host {
             }
             None => None,
         };
+        let command = match command {
+            Some(command) => Some(command),
+            None => permission_scope
+                .as_ref()
+                .map(|scope| scope.hook_command_tool())
+                .transpose()?
+                .flatten(),
+        };
+        let lifecycle_hooks = if cancellation_only || prepared.lifecycle_hooks.is_none() {
+            None
+        } else {
+            lifecycle_hooks::LifecycleAccess::bind(
+                claim.lease.binding(),
+                permission_scope.as_ref(),
+                command.as_ref(),
+            )?
+        };
         let completion = prepared
             .completion_authorized
             .then(|| {
@@ -1756,6 +1786,7 @@ impl Host {
             permissions::HookTools {
                 completion: completion.clone(),
                 before_tool: before_tool.clone(),
+                lifecycle: lifecycle_hooks.clone(),
             },
             host_tools.clone(),
             delegation.clone(),
@@ -1770,36 +1801,48 @@ impl Host {
                     ),
                 };
             Some(
-                goals::GoalAuthority::bind(&claim, validator, gate, before_tool.clone())
-                    .await
-                    .map_err(|_| {
-                        problem(ErrorKind::Uncertain, "admitted_goal_authority_unavailable")
-                    })?,
+                goals::GoalAuthority::bind(
+                    &claim,
+                    validator,
+                    gate,
+                    before_tool.clone(),
+                    lifecycle_hooks.clone(),
+                )
+                .await
+                .map_err(|_| {
+                    problem(ErrorKind::Uncertain, "admitted_goal_authority_unavailable")
+                })?,
             )
         } else {
             None
         };
+        let provider = self.spending_provider(
+            execution,
+            prepared.spending.as_ref().filter(|_| !cancellation_only),
+        )?;
+        let spending_runtime = (!cancellation_only && prepared.spending.is_some())
+            .then(|| {
+                execution
+                    .runtime
+                    .with_provider(ProviderId::new("gg")?, provider.clone())
+            })
+            .transpose()?;
+        let base_runtime = spending_runtime.as_ref().unwrap_or(&execution.runtime);
         let runtime = self
             .side_context
             .as_ref()
             .map(|_| {
                 let authority = Arc::new(side_chats::InferenceOnly::new(execution));
-                execution
-                    .runtime
-                    .with_authorization(authority.clone(), authority)
+                base_runtime.with_authorization(authority.clone(), authority)
             })
             .or_else(|| {
-                goal_authority.as_ref().map(|goal| {
-                    execution
-                        .runtime
-                        .with_authorization(goal.clone(), goal.clone())
-                })
+                goal_authority
+                    .as_ref()
+                    .map(|goal| base_runtime.with_authorization(goal.clone(), goal.clone()))
             })
             .or_else(|| {
                 tool_authority.as_ref().map(|authorization| {
-                    execution
-                        .runtime
-                        .with_authorization(authorization.clone(), authorization.clone())
+                    base_runtime.with_authorization(authorization.clone(), authorization.clone())
                 })
             });
         let (opened, closing) = self
@@ -1807,7 +1850,7 @@ impl Host {
                 session,
                 turn,
                 claim.lease,
-                runtime.as_ref().unwrap_or(&execution.runtime),
+                runtime.as_ref().unwrap_or(base_runtime),
             )
             .await?;
         let operations = opened.turn.operations();
@@ -1885,14 +1928,9 @@ impl Host {
         }
         let mut prior = history.messages;
         prior.extend(prepared.guidance);
-        let mut master = Master::new(
-            prepared.config,
-            execution.provider.clone(),
-            tools,
-            authority,
-        )?
-        .with_history(prior)
-        .with_input_limit(prepared.limit);
+        let mut master = Master::new(prepared.config, provider, tools, authority)?
+            .with_history(prior)
+            .with_input_limit(prepared.limit);
         if let Some(file) = file {
             master = master.with_retained_file_check(move || file.check());
         }
@@ -1929,6 +1967,13 @@ impl Host {
         }
         if let Some(check) = before_tool {
             master = master.with_required_admission_check(check.grant());
+        }
+        if let Some(selected) = prepared.lifecycle_hooks {
+            let (inventory, grants) = match lifecycle_hooks {
+                Some(hooks) => (hooks.inventory()?, hooks.grants()),
+                None => (Inventory::new().snapshot(&[])?, BTreeMap::new()),
+            };
+            master = master.with_lifecycle_hooks(selected, inventory, grants);
         }
         Ok(Some(Admitted {
             opened,
@@ -2164,52 +2209,55 @@ impl Host {
                 .desktop_image_generation
                 .as_ref()
                 .is_some_and(image_generation::DesktopImageGeneration::workspace_references);
+        let lifecycle_hooks = if permission_capture.is_some() {
+            self.capture_lifecycle_hooks()?
+        } else {
+            None
+        };
         Ok(Submission {
             id,
-            payload: encode(
-                INPUT_SCHEMA,
-                2,
-                &StoredPrompt {
-                    parts,
-                    configuration,
-                    max_output_tokens: execution.config.max_output_tokens,
-                    max_steps: Some(if child_work {
-                        grida_agent_master::subagents::INFERENCE_STEPS_PER_ASSIGNMENT
-                    } else {
-                        execution.config.max_steps
-                    }),
-                    effort,
-                    model: Some(execution.config.model.clone()),
-                    authority: Some(CapturedAuthority {
-                        principal: execution.authority.inference.authority.principal.clone(),
-                        scope: execution.authority.inference.authority.scope.clone(),
-                    }),
-                    operating_regime,
-                    questions,
-                    allow_wakeups,
-                    allow_library_selection,
-                    configuration_permission,
-                    permission_capture,
-                    allow_reviewer_primary_read,
-                    host_tools_capture,
-                    desktop_image_generation,
-                    allow_image_reference,
-                    allow_attachment_reference,
-                    allow_workspace_reference,
-                    allow_image_placement,
-                    editor_endpoint,
-                    editor_presentation,
-                    editor_svg_target,
-                    guidance,
-                    goal: None,
-                    subagent,
-                    completion_checks: if child_work {
-                        None
-                    } else {
-                        self.capture_completion_checks(operating_regime)?
-                    },
+            payload: encode_stored_prompt(&StoredPrompt {
+                lifecycle_hooks,
+                spending: None,
+                parts,
+                configuration,
+                max_output_tokens: execution.config.max_output_tokens,
+                max_steps: Some(if child_work {
+                    grida_agent_master::subagents::INFERENCE_STEPS_PER_ASSIGNMENT
+                } else {
+                    execution.config.max_steps
+                }),
+                effort,
+                model: Some(execution.config.model.clone()),
+                authority: Some(CapturedAuthority {
+                    principal: execution.authority.inference.authority.principal.clone(),
+                    scope: execution.authority.inference.authority.scope.clone(),
+                }),
+                operating_regime,
+                questions,
+                allow_wakeups,
+                allow_library_selection,
+                configuration_permission,
+                permission_capture,
+                allow_reviewer_primary_read,
+                host_tools_capture,
+                desktop_image_generation,
+                allow_image_reference,
+                allow_attachment_reference,
+                allow_workspace_reference,
+                allow_image_placement,
+                editor_endpoint,
+                editor_presentation,
+                editor_svg_target,
+                guidance,
+                goal: None,
+                subagent,
+                completion_checks: if child_work {
+                    None
+                } else {
+                    self.capture_completion_checks(operating_regime)?
                 },
-            )?,
+            })?,
         })
     }
 
@@ -2222,6 +2270,8 @@ impl Host {
         authority: InputAuthority,
     ) -> Result<PreparedInput> {
         let mut config = execution.config.clone();
+        let mut lifecycle_hooks = None;
+        let mut spending = None;
         if self.side_context.is_some() {
             if !config.instructions.is_empty() {
                 config.instructions.push_str("\n\n");
@@ -2268,8 +2318,30 @@ impl Host {
                     None,
                 )
             }
-            2 if input.payload.schema().as_str() == INPUT_SCHEMA => {
+            2 | 3 if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
+                if (input.payload.version() == 3)
+                    != (stored.spending.is_some() || stored.lifecycle_hooks.is_some())
+                {
+                    return Err(problem(
+                        ErrorKind::Unsupported,
+                        "submission_policy_version_unsupported",
+                    ));
+                }
+                lifecycle_hooks = stored.lifecycle_hooks.clone();
+                spending = stored.spending.clone();
+                if !cancellation_only
+                    && spending.is_some()
+                    && (stored.host_tools_capture.is_some()
+                        || stored.desktop_image_generation.is_some()
+                        || stored.editor_endpoint.is_some()
+                        || stored.allow_library_selection)
+                {
+                    return Err(problem(
+                        ErrorKind::Unsupported,
+                        "goal_spending_tool_scope_unavailable",
+                    ));
+                }
                 if !cancellation_only {
                     retained_file = stored.parts.iter().find_map(|part| match part {
                         PromptPart::RetainedFile { work } => Some(work.clone()),
@@ -2542,6 +2614,21 @@ impl Host {
                 ));
             }
         };
+        if !cancellation_only && lifecycle_hooks.is_some() && permission_capture.is_none() {
+            return Err(problem(
+                ErrorKind::Unavailable,
+                "lifecycle_hook_scope_unavailable",
+            ));
+        }
+        if !cancellation_only
+            && lifecycle_hooks.is_some()
+            && lifecycle_hooks != self.capture_lifecycle_hooks()?
+        {
+            return Err(problem(
+                ErrorKind::Unavailable,
+                "lifecycle_hook_profile_unavailable",
+            ));
+        }
         if let Some(capture) = &permission_capture {
             let permissions = self
                 .permissions
@@ -2566,6 +2653,8 @@ impl Host {
             ));
         }
         Ok(PreparedInput {
+            lifecycle_hooks,
+            spending,
             config,
             effort,
             subagent,
@@ -3242,16 +3331,20 @@ impl Execution {
             capabilities.revision = BindingId::new("gg-selected-png-v1")?;
             capabilities.input_modalities.insert(Modality::Image);
         }
+        let profile = ModelProfile {
+            capabilities,
+            output_limit: OutputLimitField::CompletionTokens,
+            include_usage: true,
+        };
+        let spending_profile = Arc::new(spending::ProviderProfile {
+            binding: binding.clone(),
+            model: options.model.clone(),
+            profile: profile.clone(),
+            images: image_resolver.clone(),
+        });
         let provider = OpenAiCompatible::with_image_resolver(
             binding.clone(),
-            BTreeMap::from([(
-                options.model.clone(),
-                ModelProfile {
-                    capabilities,
-                    output_limit: OutputLimitField::CompletionTokens,
-                    include_usage: true,
-                },
-            )]),
+            BTreeMap::from([(options.model.clone(), profile)]),
             transport,
             PROVIDER_LIMITS,
             image_resolver,
@@ -3269,6 +3362,7 @@ impl Execution {
             credential,
         )?;
         execution.accepts_selected_png = images.is_some();
+        execution.spending_profile = Some(spending_profile);
         Ok(execution)
     }
 
@@ -3354,6 +3448,7 @@ impl Execution {
                 max_output_tokens,
             },
             provider,
+            spending_profile: None,
             authority: MasterAuthority {
                 inference,
                 tools: BTreeMap::new(),
@@ -3601,6 +3696,17 @@ fn new_claim(
         expected_revision: revision,
         selection: TurnSelection::New { turn, inputs },
     })
+}
+
+// Extended task policy has a distinct envelope version so earlier hosts
+// reject it before work instead of ignoring unfamiliar authority fields.
+fn encode_stored_prompt(prompt: &StoredPrompt) -> Result<Envelope> {
+    let version = if prompt.spending.is_some() || prompt.lifecycle_hooks.is_some() {
+        3
+    } else {
+        2
+    };
+    encode(INPUT_SCHEMA, version, prompt)
 }
 
 fn decode_input<T: serde::de::DeserializeOwned>(input: &Submission) -> Result<T> {

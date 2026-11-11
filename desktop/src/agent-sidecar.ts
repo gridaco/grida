@@ -11,7 +11,7 @@
  * perimeter and the same package-owned media adapters.
  *
  * The Desktop supervisor uses Electron-as-Node under its compatibility
- * SRT profile on macOS and Linux. The packaged retained-media launcher
+ * native profile on macOS and Linux. The packaged retained-media launcher
  * uses an exact macOS Seatbelt profile and mounts only media and provider
  * settings. Both profiles scope filesystem access and direct networking.
  *
@@ -32,8 +32,8 @@
  *                          composition loads chat scratch or skills.
  *                        --retained-media-scope=1
  *                          Private packaged media launcher without chat startup.
- *                        --legacy-state-root=<absolute path>
- *                          Private native preview denials, one per root.
+ *                        --protected-file-root=<absolute path>
+ *                          Main-owned file/workspace denials, one per root.
  *                        --user-data=<absolute path>
  *                          The host-owned agent data or retained settings root.
  *                        --media-root=<absolute path>
@@ -45,11 +45,12 @@
  *
  * Trust boundary: `GRIDA-SEC-004`. The composed Desktop boundary is recorded
  * in `SECURITY.md`: renderer scoping/CSP, the authenticated HTTP perimeter,
- * the OS-level srt scope, secrets discipline, the main-owned loopback
+ * the native retained-service scope, secrets discipline, the main-owned loopback
  * listener/socket capability channel, and the main-owned provider transport.
  * This process creates no listener; it serves only sockets main already
  * accepted on exact loopback.
  */
+import path from "node:path";
 import { AgentSidecarNetwork } from "./agent-sidecar-network";
 import { AgentSidecarDaemonSockets } from "./agent-sidecar-daemon-sockets";
 import { RetainedMediaOwner } from "./retained-media-owner";
@@ -97,8 +98,16 @@ if (agentMode !== "disabled" && agentMode !== "native-chat") {
   process.exit(1);
 }
 if (
-  ["scratch-base", "skills-root", "owned-legacy-writer"].some(
-    (name) => getCliArg(name) !== undefined
+  [
+    "scratch-base",
+    "skills-root",
+    "owned-legacy-writer",
+    "legacy-state-root",
+  ].some((name) =>
+    process.argv.some(
+      (argument) =>
+        argument === `--${name}` || argument.startsWith(`--${name}=`)
+    )
   )
 ) {
   console.error("[agent-sidecar] fatal: retired chat launch option");
@@ -106,7 +115,7 @@ if (
 }
 const runtimeEditorBaseUrl = getCliArg("editor-base-url") ?? EDITOR_BASE_URL;
 // GRIDA-SEC-004 — the supervisor tells us whether it wrapped this spawn with
-// srt. Trusted: argv is set by the trusted main process, not the renderer.
+// native confinement. Trusted: argv is set by the trusted main process, not the renderer.
 // Native-chat service settings require this attestation unless selected through
 // the separately confined retained-media launcher. Neither path owns commands.
 const sandboxEnforced = getCliArg("sandbox-enforced") === "1";
@@ -131,20 +140,23 @@ if (
   console.error("[agent-sidecar] fatal: invalid ordinary native chat services");
   process.exit(1);
 }
-const legacyRootFlag = "--legacy-state-root=";
-const legacyStateRoots = process.argv
+const protectedRootFlag = "--protected-file-root=";
+const protectedFileRoots = process.argv
   .slice(2)
-  .filter((argument) => argument.startsWith(legacyRootFlag))
-  .map((argument) => argument.slice(legacyRootFlag.length));
+  .filter((argument) => argument.startsWith(protectedRootFlag))
+  .map((argument) => argument.slice(protectedRootFlag.length));
 if (
-  legacyStateRoots.length > 0 &&
-  (legacyStateRoots.length > 24 ||
-    (!workspaceCatalog && ordinaryNativeChatServices !== "1") ||
-    legacyStateRoots.some(
-      (root) => !root.startsWith("/") || Buffer.byteLength(root) > 4096
+  protectedFileRoots.length > 0 &&
+  (protectedFileRoots.length > 64 ||
+    retainedMediaScope !== undefined ||
+    protectedFileRoots.some(
+      (root) =>
+        !path.isAbsolute(root) ||
+        root.includes("\0") ||
+        Buffer.byteLength(root) > 4096
     ))
 ) {
-  console.error("[agent-sidecar] fatal: invalid legacy state protection");
+  console.error("[agent-sidecar] fatal: invalid protected file root");
   process.exit(1);
 }
 if (
@@ -205,8 +217,8 @@ async function main() {
     retained_media_scope: retainedMediaScope === "1",
     ordinary_native_chat_services: ordinaryNativeChatServices === "1",
     workspace_catalog: workspaceCatalog,
-    protected_file_roots: legacyStateRoots.length
-      ? legacyStateRoots
+    protected_file_roots: protectedFileRoots.length
+      ? protectedFileRoots
       : undefined,
     projects_root: projectsRoot,
     editor_base_url: runtimeEditorBaseUrl,

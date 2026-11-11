@@ -55,6 +55,30 @@ impl Runtime {
         }
     }
 
+    /// Select an adapter for an already registered provider without changing
+    /// request identity, authority, or shared execution admission capacity.
+    pub fn with_provider(&self, id: ProviderId, provider: Arc<dyn Provider>) -> Result<Self> {
+        if !self.services.providers.contains_key(&id) {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "provider_not_registered",
+            ));
+        }
+        let mut providers = self.services.providers.clone();
+        providers.insert(id, provider);
+        Ok(Self {
+            services: Arc::new(ExecutionServices {
+                providers,
+                tools: self.services.tools.clone(),
+                authority: self.services.authority.clone(),
+                gate: self.services.gate.clone(),
+                limits: self.services.limits.clone(),
+            }),
+            inference_permits: self.inference_permits.clone(),
+            tool_permits: self.tool_permits.clone(),
+        })
+    }
+
     pub async fn open(&self, lease: TurnLease) -> Result<OpenedTurn> {
         let state = lease.journal().load().await?;
         state.validate()?;

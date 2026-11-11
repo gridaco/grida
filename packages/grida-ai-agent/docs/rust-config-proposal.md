@@ -73,20 +73,20 @@ have their existing owners and are excluded from this initial schema.
 ## Hook definitions
 
 The [hook behavior contract](https://grida.co/docs/wg/ai/agent/hooks) defines
-execution boundaries. The native host currently accepts one reviewed
-`beforeCompletion` command in its trusted launch permission profile. Its
-definition binds a canonical system executable and digest, literal arguments,
-mode, timeout and the captured read-only command scope. An unprivileged host
-verifies ownership and ACLs on the executable and its ancestors before launch.
-User-owned commands require a separate executable custody contract. The command
-runs only for Act work. Plan leaves it disabled.
+execution boundaries. Trusted native profiles select up to eight ordered
+`session_start`, `before_input`, `before_tool`, `after_tool`, or
+`before_completion` checks. Each binds a canonical system executable and digest,
+literal arguments, source, required/observe behavior, timeout and captured
+read-only command scope. Executable and ancestor ownership and ACL checks remain
+mandatory. User-owned programs require a separate custody contract.
 
-Review event names, exact matchers, command/executable binding, source and
-revision, scope, timeout, output/context bounds, required-check behavior, and
-activation timing before enabling registration. Start with explicit user
-definitions and command handlers. Project/plugin discovery is a later source
-adapter with review of new or changed executable content. Accepted work keeps
-its selected definitions, while revocation still takes effect before execution.
+Desktop workspace registration uses explicit native trust and a separate private
+registry. Saved changes activate on a new connection; accepted work retains its
+captured policy. A changed capture cannot resume paused work. Stop and inspection
+remain available without rerunning checks. Checks can run in Plan or Act when
+the task already has the required read scope. A text-only child gains no scope
+merely to execute a check. Project/plugin discovery remains a later source
+adapter with review of new or changed executable content.
 
 The user-writable configuration service keeps its scalar setting. Hook
 registration, inspection, and editing through that service require a separate

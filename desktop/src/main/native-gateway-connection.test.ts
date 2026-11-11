@@ -53,6 +53,35 @@ function fixture(first?: Partial<DesktopGatewayGrant>) {
   };
 }
 
+it("keeps the enforced cost header and exact capped route through bearer injection", async () => {
+  const f = fixture();
+  const owner = await NativeGatewayConnection.open(f.options);
+  const capped = target + "/capped";
+  expect(owner.prepare(capped, new Headers())).toBeNull();
+  expect(
+    owner.prepare(target, new Headers({ "x-gg-max-cost-mills": "1" }))
+  ).toBeNull();
+  for (const value of ["0", "-1", "NaN", "1000000000000000000", "1e3"]) {
+    expect(
+      owner.prepare(capped, new Headers({ "x-gg-max-cost-mills": value }))
+    ).toBeNull();
+  }
+  const dispatch = owner.prepare(
+    capped,
+    new Headers({ "x-gg-max-cost-mills": "1.000000000000000001" })
+  );
+  expect(dispatch).not.toBeNull();
+  await dispatch!(body, new AbortController().signal);
+  expect(f.prepare.mock.calls[0][0]).toBe(capped);
+  expect(f.prepare.mock.calls[0][1].get("x-gg-max-cost-mills")).toBe(
+    "1.000000000000000001"
+  );
+  expect(f.prepare.mock.calls[0][1].get("authorization")).toBe(
+    "Bearer synthetic.fixture.initial"
+  );
+  owner.close();
+});
+
 it("injects only the current scoped bearer into the fixed Gateway chat request", async () => {
   let live = true;
   const owner = fixture({ isCurrent: () => live });
@@ -428,9 +457,18 @@ it.skipIf(!resourcesPath)(
   20_000
 );
 
-it.skipIf(!resourcesPath)(
-  "accounts for the exact funded Goal review and its Gateway charges after restart",
-  async () => {
+it.skipIf(!resourcesPath).each([
+  {
+    capped: false,
+    name: "accounts for the exact funded Goal review and its Gateway charges after restart",
+  },
+  {
+    capped: true,
+    name: "enforces one shared Goal spending ceiling through Desktop and exact restart",
+  },
+])(
+  "$name",
+  async ({ capped }) => {
     const root = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-goal-funding-")
     );
@@ -551,6 +589,7 @@ it.skipIf(!resourcesPath)(
       expect(ipc.acceptsGoalEffort(event)).toBe(true);
       const initial = await ipc.create(event);
       const request = {
+        ...(capped && { maxCostMills: "7" }),
         objective: "Check the export",
         criteria: ["The export opens"],
         allowance: { workTurns: 2, inferenceSteps: 7 },
@@ -586,16 +625,19 @@ it.skipIf(!resourcesPath)(
           attachmentId,
           (await ipc.observe(event, attachmentId)).observationId
         );
-      const held = await vi.waitFor(async () => {
-        const state = await inspect(initial.attachmentId);
-        expect(state.goal?.reservation).toMatchObject({
-          inferenceSteps: 7,
-          reviewInferenceSteps: 2,
-          uncertain: true,
-        });
-        expect(state.goal?.effort).toBe("ultra");
-        return state;
-      });
+      const held = await vi.waitFor(
+        async () => {
+          const state = await inspect(initial.attachmentId);
+          expect(state.goal?.reservation).toMatchObject({
+            inferenceSteps: 7,
+            reviewInferenceSteps: 2,
+            uncertain: true,
+          });
+          expect(state.goal?.effort).toBe("ultra");
+          return state;
+        },
+        { timeout: 8000 }
+      );
       const change = {
         action: "reconcile_review",
         observationId: held.observationId,
@@ -694,6 +736,23 @@ it.skipIf(!resourcesPath)(
       expect(jobNetwork.mock.calls.map(([id]) => id)).toEqual([reviewRequest]);
       await expect(readSummary()).resolves.toEqual(summary);
       expect(owner.dispatch).toHaveBeenCalledTimes(3);
+      expect(owner.prepare.mock.calls).toHaveLength(3);
+      for (const [route, headers] of owner.prepare.mock.calls) {
+        expect(route).toBe(target + (capped ? "/capped" : ""));
+        expect(headers.get("x-gg-max-cost-mills")).toBe(capped ? "1" : null);
+      }
+      expect((await inspect(reopened.attachmentId)).goal?.spending).toEqual(
+        capped
+          ? {
+              maxCostMills: "7",
+              perRequestMaxCostMills: "1",
+              chargedMills: "0.775",
+              heldMills: "0",
+              remainingMills: "6.225",
+              unsettledAttempts: 0,
+            }
+          : undefined
+      );
     } finally {
       release.resolve();
       connection.close();

@@ -38,6 +38,7 @@ export class NativeAgentGoals {
     "co.grida/goal/manual-continuation";
   static readonly fundedReviewCapability = "co.grida/goal/funded-review";
   static readonly namedChildCapability = "co.grida/goal/named-child";
+  static readonly spendingCapability = "co.grida/goal/spending";
   private readonly issued = new WeakSet<NativeGoalInspection>();
 
   constructor(
@@ -59,6 +60,10 @@ export class NativeAgentGoals {
         ? undefined
         : member(input.effort, ["standard", "ultra"] as const);
     const allowWakeup = input.allowWakeup === true;
+    const maxCostMills =
+      input.maxCostMills === undefined
+        ? undefined
+        : amount(input.maxCostMills, true);
     const namedChildId =
       input.namedChildId === undefined
         ? undefined
@@ -69,10 +74,16 @@ export class NativeAgentGoals {
           Number(operatingRegime !== undefined) +
           Number(effort !== undefined) +
           Number(allowWakeup) +
+          Number(maxCostMills !== undefined) +
           Number(namedChildId !== undefined) ||
       Object.keys(allowance).length !== 2
     )
       throw invalid();
+    if (
+      maxCostMills !== undefined &&
+      number(allowance.inferenceSteps, 1, MAX_U32) > 4096
+    )
+      throw new Error("native_chat_goal_spending_allowance_limit");
     return {
       objective: text(input.objective, OBJECTIVE_LIMIT),
       criteria: criteria(input.criteria),
@@ -85,6 +96,7 @@ export class NativeAgentGoals {
       ...(effort && { effort }),
       ...(namedChildId && { namedChildId }),
       ...(allowWakeup && { allowWakeup: true }),
+      ...(maxCostMills !== undefined && { maxCostMills }),
     };
   }
 
@@ -97,6 +109,11 @@ export class NativeAgentGoals {
       criteria: Object.freeze(criteria(objective.criteria)),
       allowance: usage(row.allowance, 1),
       automatic: flag(row.automatic),
+      ...(row.maxCostMills !== undefined
+        ? { maxCostMills: amount(row.maxCostMills, true) }
+        : row.spending !== undefined
+          ? { maxCostMills: amount(object(row.spending).maxCostMills, true) }
+          : {}),
       ...(namedChildId === undefined
         ? {}
         : { namedChildId: identity(namedChildId) }),
@@ -123,6 +140,7 @@ export class NativeAgentGoals {
       fundedReview: boolean;
       namedChild: boolean;
       wakeups: boolean;
+      spending?: boolean;
     }
   ): Promise<unknown> {
     const {
@@ -134,7 +152,10 @@ export class NativeAgentGoals {
       effort,
       allowWakeup,
       namedChildId,
+      maxCostMills,
     } = NativeAgentGoals.readRequest(request);
+    if (maxCostMills !== undefined && !capabilities.spending)
+      throw new Error("native_chat_goal_spending_unavailable");
     if (
       allowWakeup &&
       (!capabilities.wakeups ||
@@ -160,6 +181,7 @@ export class NativeAgentGoals {
       ...(effort === "ultra" && { effort }),
       ...(regime && { operatingRegime: regime }),
       ...(allowWakeup && { allowWakeups: true }),
+      ...(maxCostMills !== undefined && { maxCostMills }),
       goal: {
         objective: { description: objective, criteria },
         allowance: {
@@ -249,6 +271,7 @@ export class NativeAgentGoals {
       reservation,
       ...(continuationPending && { continuationPending: true as const }),
       ...(completion && { review: completion }),
+      ...(row.spending !== undefined && { spending: spending(row.spending) }),
     });
     const inspection = Object.freeze({
       sessionId,
@@ -366,6 +389,45 @@ function state(value: unknown): NativeChatGoalStatus {
   return row.status === "blocked"
     ? Object.freeze({ status: "blocked", reason: member(row.reason, BLOCKERS) })
     : Object.freeze({ status: member(row.status, STATUSES) });
+}
+
+function amount(value: unknown, positive = false): string {
+  if (
+    typeof value !== "string" ||
+    value.length > 64 ||
+    !/^(?:0|[1-9]\d{0,17})(?:\.\d{1,18})?$/.test(value) ||
+    (positive && !/[1-9]/.test(value))
+  )
+    throw invalid();
+  return value;
+}
+
+function spending(value: unknown): NonNullable<NativeChatGoal["spending"]> {
+  const row = object(value);
+  if (Object.keys(row).length !== 6) throw invalid();
+  const maxCostMills = amount(row.maxCostMills, true);
+  const perRequestMaxCostMills = amount(row.perRequestMaxCostMills, true);
+  const chargedMills = amount(row.chargedMills);
+  const heldMills = amount(row.heldMills);
+  const remainingMills = amount(row.remainingMills);
+  const scaled = (value: string): bigint => {
+    const [whole, fraction = ""] = value.split(".");
+    return BigInt(whole + fraction.padEnd(18, "0"));
+  };
+  if (
+    scaled(chargedMills) + scaled(heldMills) + scaled(remainingMills) !==
+      scaled(maxCostMills) ||
+    scaled(perRequestMaxCostMills) > scaled(maxCostMills)
+  )
+    throw invalid();
+  return Object.freeze({
+    maxCostMills,
+    perRequestMaxCostMills,
+    chargedMills,
+    heldMills,
+    remainingMills,
+    unsettledAttempts: number(row.unsettledAttempts),
+  });
 }
 
 function usage(value: unknown, minimum = 0): NativeChatGoalUsage {

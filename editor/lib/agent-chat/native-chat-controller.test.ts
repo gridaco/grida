@@ -115,6 +115,123 @@ function fixture() {
   };
 }
 
+it("inspects the current chat's hooks and removes only an observed saved revision", async () => {
+  const f = fixture();
+  const hook = {
+    id: "check",
+    source: "user-selected:check.json",
+    event: "before_tool",
+    enabled: true,
+    mode: "required",
+    executable: "/usr/bin/printf",
+    arguments: [],
+    timeoutMs: 1000,
+    revision: "a".repeat(64),
+  } as const;
+  const inspection = {
+    supportedEvents: ["before_tool"],
+    active: [],
+    saved: [hook],
+    activation: "restart_required",
+  } as const;
+  const inspect = vi.fn<NonNullable<DesktopNativeChat["inspectHooks"]>>(
+    async () => inspection
+  );
+  const remove = vi.fn<NonNullable<DesktopNativeChat["removeHook"]>>(
+    async () => ({ ...inspection, saved: [] })
+  );
+  f.bridge.inspectHooks = inspect;
+  f.bridge.importHook = async () => null;
+  f.bridge.removeHook = remove;
+  try {
+    await f.controller.select("chat");
+    await f.controller.toggleHooks();
+    expect(inspect).toHaveBeenCalledWith("chat");
+    await f.controller.removeHook(hook.id, "stale");
+    expect(remove).not.toHaveBeenCalled();
+    await f.controller.removeHook(hook.id, hook.revision);
+    expect(remove).toHaveBeenCalledWith(hook.id, hook.revision);
+    expect(f.controller.read().hooks?.saved).toEqual([]);
+  } finally {
+    f.controller.disconnect();
+  }
+});
+
+it("ignores a hook inspection from a chat that has been replaced", async () => {
+  const f = fixture();
+  const pending =
+    Promise.withResolvers<
+      import("@grida/desktop-bridge").NativeHookInspection
+    >();
+  f.bridge.inspectHooks = async () => pending.promise;
+  f.bridge.importHook = async () => null;
+  f.bridge.removeHook = async () => pending.promise;
+  try {
+    await f.controller.select("first");
+    const read = f.controller.toggleHooks();
+    await f.controller.select("second");
+    pending.resolve({
+      supportedEvents: [],
+      active: [],
+      saved: [],
+      activation: "current",
+    });
+    await read;
+    expect(f.controller.read()).toMatchObject({
+      hooksOpen: false,
+      hooks: null,
+      hooksBusy: false,
+    });
+  } finally {
+    f.controller.disconnect();
+  }
+});
+
+it("sends an exact dollar cap only when the attached Goal advertises enforcement", async () => {
+  for (const supported of [false, true]) {
+    const f = fixture();
+    const observe = f.bridge.observe.bind(f.bridge);
+    f.bridge.observe = async (id) => {
+      const value = await observe(id);
+      return {
+        ...value,
+        snapshot: {
+          ...value.snapshot,
+          ...(supported && { goalSpendingAvailable: true as const }),
+        },
+      };
+    };
+    f.bridge.goal = async () => ({ observationId: null, goal: null });
+    const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>(
+      async (sessionId, inputId) => ({
+        sessionId,
+        inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: "goal-work",
+      })
+    );
+    f.bridge.startGoal = start;
+    try {
+      await f.controller.select("chat");
+      const request = {
+        objective: "Inspect the file",
+        criteria: ["Read the original"],
+        allowance: { workTurns: 1, inferenceSteps: 8 },
+        automatic: false,
+      };
+      expect(await f.controller.startGoal(request, "0.001001")).toBe(supported);
+      expect(start).toHaveBeenCalledTimes(Number(supported));
+      expect(start.mock.calls[0]?.[0]).toBe(supported ? "chat" : undefined);
+      expect(start.mock.calls[0]?.[2].maxCostMills).toBe(
+        supported ? "1.001" : undefined
+      );
+    } finally {
+      f.controller.disconnect();
+    }
+  }
+});
+
 it("offers recovery for an unpaused saved queue only when Main advertises it", async () => {
   const { bridge, controller } = fixture();
   const observe = bridge.observe.bind(bridge);

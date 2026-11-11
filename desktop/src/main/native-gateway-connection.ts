@@ -151,8 +151,18 @@ export class NativeGatewayConnection implements NativeProviderNetwork {
   }
 
   prepare(target: string, headers: Headers) {
+    const capped = target === `${this.target}/capped`;
+    const maximum = headers.get("x-gg-max-cost-mills");
     if (
-      target !== this.target ||
+      (target !== this.target && !capped) ||
+      (capped
+        ? !(
+            maximum &&
+            maximum.length <= 64 &&
+            /^(?:0|[1-9]\d{0,17})(?:\.\d{1,18})?$/.test(maximum) &&
+            /[1-9]/.test(maximum)
+          )
+        : maximum !== null) ||
       headers.has("authorization") ||
       !this.#grant?.isCurrent() ||
       this.closing.signal.aborted
@@ -173,7 +183,7 @@ export class NativeGatewayConnection implements NativeProviderNetwork {
       authorized.set("x-grida-billing-receipt", "1");
       let dispatch;
       try {
-        dispatch = this.network.prepare(this.target, authorized);
+        dispatch = this.network.prepare(target, authorized);
       } catch {
         return null;
       }

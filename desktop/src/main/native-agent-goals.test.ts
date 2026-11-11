@@ -20,6 +20,42 @@ const REQUEST: NativeChatGoalRequest = {
   automatic: false,
 };
 
+it("requires monetary capability and preserves the exact cap in the Goal start envelope", async () => {
+  const request =
+    vi.fn<(method: string, params: unknown) => Promise<unknown>>();
+  const goals = new NativeAgentGoals(request);
+  const capabilities = { fundedReview: true, namedChild: true, wakeups: true };
+  expect(() =>
+    goals.start(
+      "session",
+      "input",
+      { ...REQUEST, maxCostMills: "10.001" },
+      capabilities
+    )
+  ).toThrow("native_chat_goal_spending_unavailable");
+  expect(request).not.toHaveBeenCalled();
+  for (const maxCostMills of ["0", "-1", "1e2", "01", "1000000000000000000"]) {
+    expect(() =>
+      goals.start(
+        "session",
+        "input",
+        { ...REQUEST, maxCostMills },
+        { ...capabilities, spending: true }
+      )
+    ).toThrow("native_chat_goal_invalid");
+  }
+  goals.start(
+    "session",
+    "input",
+    { ...REQUEST, maxCostMills: "10.001" },
+    { ...capabilities, spending: true }
+  );
+  expect(request).toHaveBeenCalledWith(
+    "_co.grida/goal/start",
+    expect.objectContaining({ maxCostMills: "10.001" })
+  );
+});
+
 it("binds a named reviewer only to a negotiated Ultra Goal start", async () => {
   const request =
     vi.fn<(method: string, params: unknown) => Promise<unknown>>();

@@ -28,7 +28,7 @@ folder grants; folders inside the readable primary workspace remain accessible.
 The turn summary records whether the agent collected that reviewer’s findings.
 On supported Gateway, saved OpenRouter, and saved Vercel connections, Ultra is
 available for ordinary messages and Goal-funded reviews. The work allowance
-limits inference steps, not a monetary spend cap.
+limits inference steps. An optional Gateway spending ceiling is a separate limit.
 [Work with subagents](./subagents.md)
 
 ## Keep an objective across turns
@@ -75,3 +75,27 @@ their first turn. [Schedule a follow-up](./scheduled-work.md)
 
 Private native clients can also use reviewed automatic verification.
 [Use goals from a native client](./clients.md#work-toward-a-persistent-goal)
+
+## Set a maximum spend
+
+When a Gateway connection offers **Maximum spend (USD, optional)** while
+starting a Goal, enter the total amount you authorize for that Goal. Parent and
+funded subagent requests share one retained allocation. Each paid request has a
+provider-enforced ceiling; separate paid media and external-tool lanes are not
+available to capped Goal work. BYOK, custom endpoints and subscription
+connections do not offer this monetary ceiling.
+
+The Goal shows charged, held and available amounts separately. Its fixed per-request
+ceiling divides the total by the inference-step allowance. A large request can
+exceed its share even when the task has more remaining; choose the spending
+ceiling and step allowance together before starting. A capped Goal supports at
+most 4,096 inference steps. An interrupted
+request or pending billing record keeps its hold. Refreshing authoritative
+billing can settle that original request; it does not repeat inference or refund
+an unknown outcome. Pause, restart, retry and objective edits preserve the same
+allocation. Deleting a child does not reset the parent allocation.
+
+The selected service must support capped requests. An older or unavailable
+service fails the request without falling back to an uncapped route. The amount
+is exact; unsupported precision is rejected rather than rounded. Inference-step
+and work-turn allowances still apply independently.

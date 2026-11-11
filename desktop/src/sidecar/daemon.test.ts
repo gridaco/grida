@@ -53,6 +53,21 @@ describe("Desktop daemon composition", () => {
     });
   });
 
+  it("preserves host-owned root exclusions when chat is disabled", async () => {
+    const protected_file_roots = [
+      "/retained-service",
+      "/synthetic/native-chat",
+    ];
+    await DesktopDaemon.create({
+      ...common,
+      agent: false,
+      protected_file_roots,
+    });
+    expect(mocks.media).toHaveBeenCalledWith(
+      expect.objectContaining({ protected_file_roots })
+    );
+  });
+
   it("refuses startup without both host provider operations", async () => {
     for (const provider_http of [undefined, { request: transport.request }]) {
       await expect(

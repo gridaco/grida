@@ -8,11 +8,13 @@ import type {
 } from "@ai-sdk/provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { ProductBillingError } from "@/lib/platform/product-billing";
+import { GatewaySpending } from "./gateway-spending";
 
 export type GatewayContext = {
   organizationId: number;
   feature: string;
   transactionId?: string;
+  maxCostMills?: string;
 };
 
 // Native chat can refresh pending billing after inference finishes.
@@ -72,7 +74,8 @@ export function gatewayContext(options: unknown): GatewayContext {
     !g ||
     !Number.isSafeInteger(g.organizationId) ||
     g.organizationId <= 0 ||
-    !/^[A-Za-z0-9][A-Za-z0-9/_.:-]{0,127}$/.test(g.feature)
+    !/^[A-Za-z0-9][A-Za-z0-9/_.:-]{0,127}$/.test(g.feature) ||
+    (g.maxCostMills !== undefined && !GatewaySpending.amount(g.maxCostMills))
   )
     throw new GatewayProductError(400, "missing_organization_id");
   return g;
@@ -101,6 +104,8 @@ export async function gatewayFetch(
   headers.set("X-Grida-Organization-ID", String(ctx.organizationId));
   headers.set("X-Grida-Feature", ctx.feature);
   if (identity) headers.set("Idempotency-Key", identity);
+  if (ctx.maxCostMills !== undefined)
+    headers.set("X-GG-Max-Cost-Mills", ctx.maxCostMills);
   let response: Response;
   try {
     response = await fetch(`${c.origin}/internal/grida${path}`, {

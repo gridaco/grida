@@ -13,13 +13,12 @@ to supervisor-owned per-command confinement.
 Ordinary macOS and Linux Desktop chat runs in the Rust host over private ACP
 pipes. The shared master owns conversation behavior and durable execution.
 Electron owns user presence, editor tool hosting, provider networking and worker
-lifetime. Native finite commands use scoped sandbox helpers rather than SRT.
+lifetime. Native finite commands use their own scoped sandbox helpers.
 
 A socketless service sidecar retains files, workspaces, recents, provider
 settings and media. Main owns its authenticated loopback listener and transfers
-accepted sockets. This retained composition still uses SRT with no direct
-external destinations or local binding. Removing that backstop requires separate
-non-agent service qualification. An admitted managed macOS profile can use the
+accepted sockets. Native Seatbelt or bubblewrap/seccomp confines this retained
+composition without direct destinations or socket creation. An admitted managed macOS profile can use the
 native retained-media launcher described below.
 
 The historical TypeScript chat runtime is absent from distributed entrypoints.
@@ -109,7 +108,7 @@ credential-free provider-asset downloads. The service accepts one of those
 classes plus an opaque host-issued grant, validates the
 method/origin/headers/body bounds, and performs the request. AgentSidecar's
 provider adapter adds credentials before the private hop; the service never
-invents a credential or accepts a renderer URL. The outer `srt` profile omits
+invents a credential or accepts a renderer URL. The outer native profile omits
 BYOK/GG destinations, so the injected operation is an authority boundary rather
 than a routing preference.
 
@@ -227,9 +226,11 @@ This channel is why the sidecar can run with `allow_local_binding: false` and
 why its daemon remains reachable when Linux Bubblewrap gives it a private
 network namespace. It does not grant arbitrary loopback access: main chooses
 the listener, accepts the peer, and transfers only that connected capability.
-The macOS transfer path has an end-to-end `srt` proof. Linux descriptor
-preservation and namespace behavior are source-audited; a packaged Linux
-end-to-end transfer test remains a release gate.
+Actual native macOS and unprivileged Linux ARM64 fixtures verify private IPC,
+Main-transferred paused sockets, file access, protected-state denial and blocked
+bind/connect. The built ordinary macOS sidecar also verifies its authenticated
+workspace catalog and media/custody services. Linux installer and signed
+Desktop delivery remain separate qualification gates.
 
 ## Retained-service containment
 
@@ -238,12 +239,38 @@ provider transport. It does not construct a chat scheduler, session database,
 skill loader or model command executor. Its process can read only through the
 existing secret-path exclusions and has no direct provider networking or local
 binding. Human-selected file/workspace operations keep their established owner.
-The sidecar still runs under SRT on macOS/Linux unless an admitted managed
-profile uses the narrower native retained-media launcher.
+The native retained-service launcher uses Seatbelt on macOS and bubblewrap with
+a native-ABI seccomp filter on Linux. It rechecks the executable identity and
+never uses a shell or provider proxy. Linux receives its bounded compiled filter
+on descriptor 4, which bubblewrap consumes before executing the service;
+descriptor 3 remains the sole Node IPC capability channel. The filter rejects
+new sockets, namespace changes and out-of-process descriptor acquisition. A
+missing or unsupported native boundary fails startup closed.
 
-Retiring this service dependency requires a separately qualified file/media
-host boundary. Removing SRT simply because command execution moved to Rust
-would discard the service's current filesystem and network backstop.
+On macOS, exact protected roots and their ancestors retain only the metadata
+needed to revalidate canonical path identities. Private contents, directory
+listings and other descendant metadata remain denied. File/workspace admission
+can therefore reject protected paths without disabling ordinary fresh workspace
+creation.
+
+Linux user namespaces do not preserve root-owned host ancestor identities.
+The launcher therefore builds a private root view and binds the existing
+settings, provider directory and media library beneath `/retained-service`.
+It validates the actual host directories before binding; strict credential
+ownership, ACL, path and migration checks are unchanged. These are views of the
+same files and SQLite lock inodes, not copies or replacement stores. The host's
+normal top-level entries and selected file/workspace paths stay available;
+the namespace does not take over `/media` or removable-drive paths. Both the
+physical private roots and their namespace prefix are excluded from file and
+workspace admission. Existing native/legacy exclusions also apply inside bound
+directories. Internal temporary work uses a namespace-local tmpfs.
+
+Linux bind masks for absent protected paths use exclusively created owned
+mountpoints. Concurrent generations retain them until the last child closes.
+Cleanup checks identity, removes only empty unchanged nodes and leaves changed
+or pre-existing data alone. Abrupt host loss can leave empty mask nodes; they
+are never adopted as removable user data by a later launch. The narrow managed
+macOS retained-media launcher remains independent of ordinary services.
 
 ## Raw execution and extensions
 
@@ -302,9 +329,8 @@ return a `sandbox_enforced` assertion.
 
 The target contract is: no containment means no model-invocable local
 filesystem, raw shell, external agent, or extension runtime unless the user
-deliberately enters a visibly unsandboxed posture. srt 0.0.65 contains an alpha
-Windows backend, but Desktop deliberately withholds it until its argv-based
-spawn, provisioning, packaging, lifecycle, and regression contract are owned.
+deliberately enters a visibly unsandboxed posture. A Windows confinement
+backend requires its own provisioning, lifecycle and regression contract.
 
 The current Windows build starts retained file and media services unwrapped.
 It does not start either chat engine, so it provides no model-invocable local
@@ -366,7 +392,7 @@ outlives Main keeps that lock until exit. Main joins the exact child and any
 admitted custody work before same-process replacement. Failure leaves the
 retained role unavailable for that launch.
 
-Desktop keeps its existing SRT launch for the remaining compatibility
+Desktop uses the native retained-service launcher for ordinary
 services. Compatibility profiles use the sidecar for standalone document
 and workspace registration, file I/O, recents, and ranged workspace media.
 Main's workspace Trash helper covers one path-checked native operation.
@@ -436,7 +462,7 @@ true in the same change set:
   inheritance or a boolean assertion;
 - external ACP and local MCP/extension processes have independently tested
   authority domains or are withheld;
-- parallel grants cannot bleed through srt's global manager state;
+- captured native launch scopes do not share mutable process-global policy;
 - redirects, directly observed private-address resolution, external-proxy trust
   boundaries, cancellation, cleanup, and SSE have deterministic regression
   coverage; and
@@ -483,10 +509,10 @@ The implementation must prove at least:
   reauthentication work from resurrecting stale credentials.
 
 Current platform evidence is intentionally narrower than this full contract.
-The main-accepted socket transfer has been exercised end to end under the
-macOS `srt` wrapper. The Linux descriptor path and Bubblewrap namespace behavior
-have been source-audited, but a packaged Linux end-to-end transfer run is still
-pending. No release or PR description may collapse those two evidence levels
+Main-accepted socket transfer has native macOS and unprivileged Linux ARM64
+process evidence. The built ordinary macOS service has authenticated workspace,
+provider/custody and durable media evidence. The current Linux installer and
+signed delivery paths still require their own qualification. No release or PR description may collapse those two evidence levels
 into one cross-platform verification claim.
 
 ## Release impact

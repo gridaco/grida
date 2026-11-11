@@ -3,6 +3,7 @@
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 import fs from "node:fs/promises";
+import { mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,13 +29,6 @@ vi.mock("./sidecar-log", () => ({
     write() {}
   },
 }));
-vi.mock("./sandbox/manager", () => ({
-  ensureInitialized: vi.fn<() => Promise<void>>(async () => undefined),
-  wrap: vi.fn<(command: string) => Promise<string>>(async (command) => command),
-  dispose: vi.fn<() => Promise<void>>(async () => undefined),
-  isSupportedPlatform: vi.fn<() => boolean>(() => true),
-  checkDependencies: vi.fn<() => null>(() => null),
-}));
 
 import { AgentSidecarSupervisor } from "./agent-sidecar-supervisor";
 import { app } from "electron";
@@ -44,7 +38,7 @@ import { NativeDesktopProfile } from "./native-desktop-profile";
 import { RetainedMediaLaunch } from "./retained-media-launch";
 import { LegacyChatSourceLease } from "./legacy-chat-source-lease";
 import { DesktopMediaRoot } from "./media-root";
-import { ensureInitialized, wrap } from "./sandbox/manager";
+import { RetainedServiceSandbox } from "./retained-service-sandbox";
 
 const supportsCutover =
   process.platform === "darwin" || process.platform === "linux";
@@ -131,16 +125,26 @@ describe("AgentSidecarSupervisor recovery", () => {
     };
     vi.spyOn(app, "isPackaged", "get").mockReturnValue(false);
     vi.mocked(app.getPath).mockClear();
-    vi.mocked(ensureInitialized).mockClear();
 
     await state.initSandbox();
 
     expect(state.scratchBase).toBeUndefined();
     expect(state.commandHost).toBeUndefined();
     expect(app.getPath).not.toHaveBeenCalledWith("temp");
-    expect(ensureInitialized).toHaveBeenCalledWith(
+    expect(
+      (supervisor as unknown as { nativeSandbox: RetainedServiceSandbox })
+        .nativeSandbox.configuration.filesystem.denyRead
+    ).toContain(
+      path.join(
+        app.getPath("userData"),
+        NativeDesktopProfile.chatStateDirectory
+      )
+    );
+    expect(
+      (supervisor as unknown as { nativeSandbox: RetainedServiceSandbox })
+        .nativeSandbox.configuration
+    ).toEqual(
       expect.objectContaining({
-        seccomp: undefined,
         network: expect.objectContaining({
           allowedDomains: [],
           allowLocalBinding: false,
@@ -172,7 +176,7 @@ describe("AgentSidecarSupervisor recovery", () => {
         );
         vi.spyOn(app, "isPackaged", "get").mockReturnValue(false);
         vi.spyOn(DesktopMediaRoot, "current").mockReturnValue(media);
-        vi.mocked(ensureInitialized).mockClear();
+
         const supervisor = new AgentSidecarSupervisor();
         const source = await supervisor.sealLegacyChatForColdStart(true);
         const state = supervisor as unknown as {
@@ -195,7 +199,10 @@ describe("AgentSidecarSupervisor recovery", () => {
             "legacy-chat-ownership",
           ].map((name) => path.join(data, name)),
         ];
-        expect(ensureInitialized).toHaveBeenCalledExactlyOnceWith(
+        expect(
+          (supervisor as unknown as { nativeSandbox: RetainedServiceSandbox })
+            .nativeSandbox.configuration
+        ).toEqual(
           expect.objectContaining({
             filesystem: expect.objectContaining({
               denyRead: expect.arrayContaining(protectedChat),
@@ -204,8 +211,9 @@ describe("AgentSidecarSupervisor recovery", () => {
             }),
           })
         );
-        const filesystem =
-          vi.mocked(ensureInitialized).mock.calls[0]?.[0].filesystem;
+        const filesystem = (
+          supervisor as unknown as { nativeSandbox: RetainedServiceSandbox }
+        ).nativeSandbox.configuration.filesystem;
         expect(filesystem?.denyRead).not.toContain(browser);
         expect(filesystem?.denyWrite).not.toContain(browser);
         expect(await fs.readdir(temporary)).toEqual([]);
@@ -218,56 +226,6 @@ describe("AgentSidecarSupervisor recovery", () => {
       }
     }
   );
-
-  it("requires the physical packaged Linux seccomp helper before starting SRT", async () => {
-    const resources = await fs.mkdtemp(
-      path.join(await fs.realpath(os.tmpdir()), "grida-srt-resources-")
-    );
-    const descriptors = Object.getOwnPropertyDescriptors(process);
-    const applyPath = path.join(
-      resources,
-      "app.asar.unpacked/node_modules/@anthropic-ai/sandbox-runtime/vendor/seccomp/arm64/apply-seccomp"
-    );
-    const initSandbox = () =>
-      (
-        new AgentSidecarSupervisor({ agent: false }) as unknown as {
-          initSandbox(): Promise<void>;
-        }
-      ).initSandbox();
-    try {
-      Object.defineProperty(process, "platform", {
-        ...descriptors.platform,
-        value: "linux",
-      });
-      Object.defineProperty(process, "arch", {
-        ...descriptors.arch,
-        value: "arm64",
-      });
-      Object.defineProperty(process, "resourcesPath", {
-        value: resources,
-        configurable: true,
-      });
-      await fs.mkdir(path.dirname(applyPath), { recursive: true });
-      await fs.writeFile(applyPath, "fixture", { mode: 0o700 });
-      vi.mocked(ensureInitialized).mockClear();
-      await initSandbox();
-      expect(ensureInitialized).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({ seccomp: { applyPath } })
-      );
-
-      await fs.unlink(applyPath);
-      vi.mocked(ensureInitialized).mockClear();
-      await expect(initSandbox()).rejects.toMatchObject({ code: "ENOENT" });
-      expect(ensureInitialized).not.toHaveBeenCalled();
-    } finally {
-      for (const key of ["platform", "arch", "resourcesPath"] as const) {
-        if (descriptors[key])
-          Object.defineProperty(process, key, descriptors[key]);
-        else Reflect.deleteProperty(process, key);
-      }
-      await fs.rm(resources, { recursive: true, force: true });
-    }
-  });
 
   it("starts strict media on the disabled native profile without sealing chat", async () => {
     const root = await fs.mkdtemp(
@@ -415,18 +373,20 @@ describe("AgentSidecarSupervisor recovery", () => {
     expect(() => new AgentSidecarSupervisor({ agent: true })).toThrow(
       "desktop_chat_runtime_retired"
     );
-    expect(ensureInitialized).not.toHaveBeenCalled();
-    expect(wrap).not.toHaveBeenCalled();
   });
 
   it("forwards disabled agent startup without scratch or skill arguments", async () => {
     const supervisor = new AgentSidecarSupervisor({ agent: false });
-    // Inspect the exact wrapped argv, then stop before spawning a real child.
-    vi.mocked(wrap).mockRejectedValueOnce(new Error("stop before spawn"));
+    // Inspect the exact native argv, then stop before spawning a real child.
+    const prepare = vi
+      .spyOn(RetainedServiceSandbox.prototype, "prepare")
+      .mockImplementationOnce(() => {
+        throw new Error("stop before spawn");
+      });
 
     await expect(supervisor.start()).rejects.toThrow("stop before spawn");
 
-    const command = vi.mocked(wrap).mock.calls.at(-1)?.[0];
+    const command = prepare.mock.calls.at(-1)?.[1].join(" ");
     expect(command).toContain("--agent=disabled");
     expect(command).toContain("--media-root=");
     expect(command).toContain("--provider-home=");
@@ -444,7 +404,7 @@ describe("AgentSidecarSupervisor recovery", () => {
       const agent = path.join(root, "agent");
       const marker = LegacyChatSourceLease.controlRoot(agent);
       vi.stubEnv("GRIDA_AGENT_USER_DATA", agent);
-      vi.mocked(wrap).mockClear();
+
       try {
         await fs.mkdir(agent);
         await fs.symlink(path.join(root, "missing"), marker);
@@ -460,7 +420,10 @@ describe("AgentSidecarSupervisor recovery", () => {
           "legacy_chat_handoff_required"
         );
         expect(await fs.readFile(agent, "utf8")).toBe("unexpected owner path");
-        expect(wrap).not.toHaveBeenCalled();
+        expect(
+          (supervisor as unknown as { nativeSandbox?: RetainedServiceSandbox })
+            .nativeSandbox
+        ).toBeUndefined();
       } finally {
         await fs.rm(root, { recursive: true, force: true });
       }
@@ -477,7 +440,14 @@ describe("AgentSidecarSupervisor recovery", () => {
       try {
         const supervisor = new AgentSidecarSupervisor({ agent: false });
         Object.assign(supervisor, {
-          compatibilitySandbox: await import("./sandbox/manager"),
+          nativeSandbox: new RetainedServiceSandbox({
+            network: {
+              allowedDomains: [],
+              deniedDomains: [],
+              allowLocalBinding: false,
+            },
+            filesystem: { allowWrite: [], denyRead: [], denyWrite: [] },
+          }),
         });
         const restart = supervisor as unknown as {
           handleRestartFailure(error: unknown): void;
@@ -493,11 +463,15 @@ describe("AgentSidecarSupervisor recovery", () => {
           }
         );
         const marker = LegacyChatSourceLease.controlRoot(root);
-        vi.mocked(wrap)
-          .mockClear()
-          .mockImplementationOnce(async () => {
-            await fs.mkdir(marker);
-            return "exit 19";
+        const prepare = vi
+          .spyOn(RetainedServiceSandbox.prototype, "prepare")
+          .mockImplementationOnce(() => {
+            mkdirSync(marker);
+            return {
+              executable: process.execPath,
+              arguments: [],
+              recheck() {},
+            };
           });
         restart.scheduleRestart();
         await vi.advanceTimersByTimeAsync(250);
@@ -506,7 +480,7 @@ describe("AgentSidecarSupervisor recovery", () => {
         });
         expect(restart.restartTimer).toBeNull();
         expect(supervisor.getInfo()).toBeNull();
-        expect(wrap).toHaveBeenCalledOnce();
+        expect(prepare).toHaveBeenCalledOnce();
         expect(await fs.readdir(marker)).toEqual([]);
       } finally {
         await fs.rm(root, { recursive: true, force: true });
@@ -556,9 +530,13 @@ describe("AgentSidecarSupervisor recovery", () => {
       })
     );
     expect(await supervisor.sealLegacyChatForColdStart()).toBe(source);
-    vi.mocked(wrap).mockRejectedValueOnce(new Error("stop before spawn"));
+    const prepare = vi
+      .spyOn(RetainedServiceSandbox.prototype, "prepare")
+      .mockImplementationOnce(() => {
+        throw new Error("stop before spawn");
+      });
     await expect(supervisor.start()).rejects.toThrow("stop before spawn");
-    const argv = vi.mocked(wrap).mock.calls.at(-1)?.[0];
+    const argv = prepare.mock.calls.at(-1)?.[1].join(" ");
     expect(argv).toContain("--agent=native-chat");
     expect(argv).not.toContain("--scratch-base=");
     expect(argv).not.toContain("--skills-root=");

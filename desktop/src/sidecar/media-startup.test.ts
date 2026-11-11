@@ -25,7 +25,7 @@ import { NativeDocumentFiles } from "../main/native-document-files";
 import { NativeFirstProfile } from "../main/native-first-profile";
 import { WorkspaceFileWorkers } from "../main/workspace-file-worker";
 import { DesktopAgentSandboxPolicy } from "../main/agent-sandbox-policy";
-import { dispose, ensureInitialized, wrapArgv } from "../main/sandbox/manager";
+import { RetainedServiceSandbox } from "../main/retained-service-sandbox";
 
 const desktop = fileURLToPath(new URL("../..", import.meta.url));
 const fixture = fileURLToPath(new URL("./testing/", import.meta.url));
@@ -705,7 +705,7 @@ describe("built Desktop media startup", () => {
           home: root,
           ggHost: new URL(origin).hostname,
         });
-        await ensureInitialized({
+        const sandbox = new RetainedServiceSandbox({
           network: {
             allowedDomains: policy.network.allowed_domains,
             deniedDomains: policy.network.denied_domains,
@@ -731,18 +731,15 @@ describe("built Desktop media startup", () => {
           assert.throws(() => fs.renameSync(sibling, catalog), {code:"EPERM"});
         `
         );
-        const confined = (executable: string, argv: string[]) =>
-          wrapArgv([executable, ...argv].map(shellQuote).join(" "), {});
+        const confined = async (executable: string, argv: string[]) =>
+          sandbox.prepare(executable, argv);
         const probe = await confined(process.execPath, [
           proof,
           path.join(catalog.directory, "workspaces.json"),
           path.join(root, "probe-control"),
         ]);
-        const checked = spawn(probe.argv[0], probe.argv.slice(1), {
-          cwd: root,
-          env: { ...env, ...probe.env },
-          stdio: "inherit",
-        });
+        const checked = RetainedServiceSandbox.start(probe, env);
+        checked.stderr?.pipe(process.stderr);
         const deadline = setTimeout(() => checked.kill("SIGKILL"), 10_000);
         try {
           expect(
@@ -764,10 +761,36 @@ describe("built Desktop media startup", () => {
           generation: 1,
           nativeChat: true,
           workspaceCatalog: { directory: catalog.directory, confined },
-          fetchProvider: async () => {
-            throw new Error("unexpected provider request");
+          fetchProvider: async (url, init) => {
+            expect(url).toBe(
+              "https://api.elevenlabs.io/v1/sound-generation?output_format=mp3_44100_128"
+            );
+            expect(init.method).toBe("POST");
+            expect(new Headers(init.headers).get("xi-api-key")).toBe(key);
+            return new Response(audio, {
+              headers: { "content-type": "audio/mpeg" },
+            });
           },
         });
+        await fs.writeFile(path.join(root, "allow-custody"), "enabled", {
+          mode: 0o600,
+        });
+        expect(
+          (
+            await sidecar.post("/secrets/set", {
+              provider_id: "elevenlabs",
+              key,
+            })
+          ).status
+        ).toBe(200);
+        const generated = await sidecar.post("/audio/sound-effects/generate", {
+          model_id: "eleven_text_to_sound_v2",
+          prompt: "A door closes",
+        });
+        expect(generated.status).toBe(200);
+        const result = await generated.json();
+        await expectReceipt(mediaRoot, result.stored_media);
+        expect((await sidecar.get("/sessions")).status).toBe(404);
         expect(
           (await sidecar.post("/workspaces/open", { path: workspace })).status
         ).toBe(404);
@@ -797,7 +820,6 @@ describe("built Desktop media startup", () => {
         try {
           await sidecar?.stop();
         } finally {
-          await dispose();
           await fs.rm(root, { recursive: true, force: true });
         }
       }
@@ -1281,10 +1303,7 @@ type StartOptions = {
     confined: (
       executable: string,
       argv: string[]
-    ) => Promise<{
-      argv: string[];
-      env: NodeJS.ProcessEnv;
-    }>;
+    ) => Promise<RetainedServiceSandbox.Plan>;
   };
 };
 
@@ -1347,22 +1366,24 @@ class Sidecar {
           options.runtime.executable,
           argv
         )
-      : { argv: [options.runtime.executable, ...argv], env: {} };
-    const child = spawn(launch.argv[0], launch.argv.slice(1), {
-      cwd: options.root,
-      env: {
-        ...options.env,
-        ...launch.env,
-        ELECTRON_RUN_AS_NODE: "1",
-        GRIDA_MEDIA_STARTUP_ROOT: options.root,
-        GRIDA_MEDIA_STARTUP_STATE: options.userData,
-        GRIDA_MEDIA_STARTUP_REPORT: path.join(
-          options.root,
-          `guard-${options.generation}.json`
-        ),
-      },
-      stdio: ["pipe", "pipe", "pipe", "ipc"],
-    });
+      : undefined;
+    const environment = {
+      ...options.env,
+      ELECTRON_RUN_AS_NODE: "1",
+      GRIDA_MEDIA_STARTUP_ROOT: options.root,
+      GRIDA_MEDIA_STARTUP_STATE: options.userData,
+      GRIDA_MEDIA_STARTUP_REPORT: path.join(
+        options.root,
+        `guard-${options.generation}.json`
+      ),
+    };
+    const child = launch
+      ? RetainedServiceSandbox.start(launch, environment)
+      : spawn(options.runtime.executable, argv, {
+          cwd: options.root,
+          env: environment,
+          stdio: ["pipe", "pipe", "pipe", "ipc"],
+        });
     return await Sidecar.initialize(child, options.fetchProvider);
   }
   static async startRetained(
@@ -1494,10 +1515,6 @@ class Sidecar {
       this.network.close();
     }
   }
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 async function runBuild(root: string, output: string, env: NodeJS.ProcessEnv) {

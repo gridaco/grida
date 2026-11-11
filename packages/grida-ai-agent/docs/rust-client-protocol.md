@@ -537,6 +537,17 @@ publication. It distinguishes a new file, an exact file already at the
 destination, a declined review, a conflicting file, and unavailable or
 unverified work. Reconnect does not repeat a dispatched placement.
 
+### Lifecycle check inspection
+
+Private stdio clients can negotiate `co.grida/session/hooks` version 1 and call
+`_co.grida/session/hooks` with an optional attached `sessionId`. Without a
+session it returns the selected trusted policy and no results. With one it
+projects current or latest retained check results. `supportedEvents`, `hooks`
+and `results` are bounded; a result's `operation` is null when no operation was
+admitted. Inspection neither discovers programs nor executes a handler. Trusted
+host launch policy owns registration and executable authority. See the
+[configuration binding](./rust-config-proposal.md#hook-definitions).
+
 ### Gateway settlement lookup
 
 On a supervised Gateway connection, negotiate
@@ -564,6 +575,25 @@ one eligible row from the attached latest settled turn and returns the current
 observation without changing the original summary evidence.
 
 ### Persistent goal operations
+
+An attached private supervised Gateway client can additionally negotiate
+`co.grida/goal/spending` version 1. Goal Start then accepts the separate optional
+`maxCostMills` decimal string. The positive amount has at most 18 integer and
+18 fractional digits. It captures one retained allocation shared by the parent
+and funded children, including compaction. Other provider profiles refuse it.
+Each request uses the fixed capped Gateway route with an enforced ceiling;
+older deployments cannot fall back to ordinary execution.
+
+Goal inspection adds `spending` with exact decimal strings `maxCostMills`,
+`perRequestMaxCostMills`, `chargedMills`, `heldMills`, `remainingMills`, and the
+integer `unsettledAttempts`. Charged plus held plus remaining equals the maximum.
+The per-request ceiling is the initial amount divided by the initial inference
+allowance, rounded down to 18 fractional digits; reclaiming a hold does not raise
+it. Capped Goals admit at most 4,096 inference steps. Unknown outcomes retain
+their holds, including after Stop. External paid or unknown tool lanes remain
+unavailable. Queued input inspection retains the separate captured amount as
+`settings.goalMaxCostMills`; retrying an accepted input cannot create a new
+allocation. A worker unable to interpret that captured policy refuses execution.
 
 Negotiate each `co.grida/goal/` capability at version `1`. The methods apply
 to an attached session. Start accepts the same ACP prompt parts as Submit

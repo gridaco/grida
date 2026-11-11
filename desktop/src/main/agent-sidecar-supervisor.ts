@@ -1,47 +1,12 @@
 // GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 // GRIDA-GG: desktop — pass the GG host into the sandbox policy (docs/wg/platform/hosted-ai.md)
 /**
- * GRIDA-SEC-004 — AgentSidecar supervisor.
+ * GRIDA-SEC-004 — retained-service supervision and private host channels.
  *
- * Spawns and supervises the confined Desktop sidecar. The retained media
- * service has its own native launcher. The compatibility lifecycle uses SRT:
- *
- *   1. On first `start()`:
- *      - Generate a 256-bit per-spawn Basic-Auth password.
- *      - Build the outer-wrap policy from build-time config +
- *        the host's userData path.
- *      - `await ensureInitialized(policy)` — spins up srt's
- *        HTTP/SOCKS5 proxies.
- *      - Build the sidecar command line (Electron-as-node +
- *        sidecar bin + argv) and `await wrap(cmd)` to get the
- *        sandbox-wrapped shell string.
- *      - `child_process.spawn(wrapped, { shell: true, env, stdio })`.
- *
- *   2. On unexpected child exit: restart with exponential backoff
- *      (250ms → 10s). The wrap is recomputed each time —
- *      `ensureInitialized` is a no-op on subsequent calls (proxies
- *      stay up).
- *
- *   3. On `will-quit`: stop the child and dispose of the sandbox to tear
- *      srt's proxies down.
- *
- * Switching from `utilityProcess.fork` to `child_process.spawn`
- * means we re-exec Electron's own binary in Node mode
- * (`ELECTRON_RUN_AS_NODE=1`). The `RunAsNode` fuse in
- * `forge.config.ts` MUST be `true` for this to work in packaged
- * builds; dev electron honours the env var regardless.
- *
- * The password is held in this module's closure and crosses in the private
- * framed stdin bootstrap (NOT argv, NOT env, NOT disk). The same inherited
- * stdio pair carries the host-routed provider transport for issue #974.
- *
- * Windows behaviour: srt 0.0.65 includes an alpha Windows backend, but Desktop
- * deliberately withholds it until it owns the required provisioning, argv
- * spawn, packaging, and lifecycle. On Windows we fall back to the unwrapped
- * path (still using
- * `child_process.spawn` + Electron-as-node so the spawn model is
- * uniform) but log a loud warning. Desktop's Windows adoption is
- * tracked in `desktop/docs/agent-authority.md`.
+ * Native Seatbelt or bubblewrap confines the socketless service on macOS/Linux.
+ * Main supplies connected daemon sockets and provider HTTP through inherited
+ * channels. The retained process has no model command or direct network owner.
+ * Windows keeps its explicitly unconfined non-agent compatibility services.
  */
 import { app } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -63,6 +28,7 @@ import { NativeGatewayConnection } from "./native-gateway-connection";
 import { AgentNetworkPolicy } from "../agent-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { RetainedMediaLaunch } from "./retained-media-launch";
+import { RetainedServiceSandbox } from "./retained-service-sandbox";
 
 export type AgentSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
@@ -73,7 +39,7 @@ export type AgentSidecarInfo = {
 
 type AgentSidecarMode = "disabled" | "native-chat";
 
-const STARTUP_TIMEOUT_MS = 15_000; // bumped from 8s — srt init adds proxy startup time
+const STARTUP_TIMEOUT_MS = 15_000;
 const DRAIN_EXIT_TIMEOUT_MS = 10_000;
 const BACKOFF_INITIAL_MS = 250;
 const BACKOFF_MAX_MS = 10_000;
@@ -118,10 +84,11 @@ export class AgentSidecarSupervisor {
   private drainingChild: ChildProcess | null = null;
   private restartTimer: NodeJS.Timeout | null = null;
   // A null value reserves the compatibility role while its module loads.
-  private compatibilitySandbox?: typeof import("./sandbox/manager") | null;
+  private nativeSandbox?: RetainedServiceSandbox;
   private sandboxReady = false;
   private workspaceCatalog?: string;
   private legacyStateRoots: readonly string[] = [];
+  private protectedFileRoots: readonly string[] = [];
   private readonly networkAuthority = new AgentNetworkAuthority(
     new URL(EDITOR_BASE_URL).origin
   );
@@ -171,10 +138,6 @@ export class AgentSidecarSupervisor {
         this.restartTimer = null;
       }
       this.stop();
-      // Fire-and-forget — Electron's `will-quit` doesn't await
-      // listeners. `dispose()` is best-effort; the OS reclaims srt's
-      // proxy sockets at process exit regardless.
-      void this.compatibilitySandbox?.dispose();
     });
   }
 
@@ -184,7 +147,7 @@ export class AgentSidecarSupervisor {
     if (
       (workspaceCatalog &&
         (!this.coldStartSource ||
-          !(await this.loadCompatibilitySandbox()).isSupportedPlatform())) ||
+          !RetainedServiceSandbox.isSupportedPlatform())) ||
       (this.sandboxReady && workspaceCatalog !== this.workspaceCatalog)
     )
       throw new Error("workspace_catalog_scope_invalid");
@@ -216,6 +179,14 @@ export class AgentSidecarSupervisor {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
       throw new LegacyChatHandoffRequired(error);
     }
+    // A native Linux mask is not a historical writer claim. It remains bound
+    // to this live generation's exact owned inode and is removed only on close.
+    if (
+      RetainedServiceSandbox.ownsMountpoint(
+        LegacyChatSourceLease.controlRoot(this.user_data_path)
+      )
+    )
+      return;
     throw new LegacyChatHandoffRequired();
   }
 
@@ -228,7 +199,7 @@ export class AgentSidecarSupervisor {
       !app.isPackaged ||
       !NativeDesktopProfile.selected() ||
       this.servicesStarted ||
-      this.compatibilitySandbox !== undefined ||
+      this.nativeSandbox !== undefined ||
       this.isShuttingDown
     )
       throw new Error("retained_media_profile_unavailable");
@@ -564,43 +535,26 @@ export class AgentSidecarSupervisor {
     }
   }
 
-  /**
-   * One-shot srt bring-up. Builds the outer policy from build-time
-   * config and the host's userData path, runs dependency checks
-   * (Linux: bubblewrap + socat + ripgrep), and initializes the
-   * proxies. Called once per Electron launch.
-   */
+  /** Capture the retained service scope before any process is launched. */
   private async initSandbox(): Promise<void> {
     if (this.sandboxReady) return;
-    const sandbox = await this.loadCompatibilitySandbox();
-    if (!sandbox.isSupportedPlatform()) {
+    if (!RetainedServiceSandbox.isSupportedPlatform()) {
       if (this.coldStartSource)
         throw new Error("native_retained_sidecar_sandbox_unavailable");
-      // Windows or another unsupported platform. Log loudly and let
-      // the spawn proceed unwrapped — the alternative is refusing
-      // to start at all, which would brick the app on Windows.
-      // GRIDA-SEC-004 layers (Basic Auth, Origin/Referer) still
-      // apply at the HTTP boundary.
+      this.protectedFileRoots = [
+        path.join(
+          app.getPath("userData"),
+          NativeDesktopProfile.chatStateDirectory
+        ),
+      ];
+      // Existing Windows file/media services have no native confinement claim.
+      if (process.platform !== "win32")
+        throw new Error("retained_service_platform_unsupported");
       console.warn(
-        "[agent-sidecar:srt] platform not supported by sandbox-runtime — " +
-          "starting agent sidecar WITHOUT srt wrap. Tracked in " +
-          "desktop/docs/agent-authority.md"
+        "[agent-sidecar] Windows retained services have no kernel confinement"
       );
       this.sandboxReady = true;
       return;
-    }
-    const deps = sandbox.checkDependencies();
-    if (deps) {
-      for (const warning of deps.warnings ?? []) {
-        console.warn(`[agent-sidecar:srt] dep warning: ${warning}`);
-      }
-      for (const error of deps.errors ?? []) {
-        console.error(`[agent-sidecar:srt] dep error: ${error}`);
-      }
-      // We deliberately don't bail on errors here — srt's
-      // `initialize()` will throw with a clearer per-dep message
-      // (e.g. "bwrap not found in PATH"). Letting it throw means
-      // one error path, not two.
     }
     const coldSource = await this.coldStartSource;
     let legacyPolicyRoots: readonly string[] = [];
@@ -654,17 +608,29 @@ export class AgentSidecarSupervisor {
         ...this.legacyStateRoots,
       ];
     }
+    const nativeStateRoot =
+      this.ordinaryNativeChat && coldSource
+        ? path.join(
+            coldSource.desktopUserDataPath,
+            NativeDesktopProfile.chatStateDirectory
+          )
+        : (coldSource?.desktopUserDataPath ??
+          path.join(
+            app.getPath("userData"),
+            NativeDesktopProfile.chatStateDirectory
+          ));
+    this.protectedFileRoots = [
+      ...new Set([
+        ...this.legacyStateRoots,
+        nativeStateRoot,
+        ...(this.workspaceCatalog ? [path.dirname(this.workspaceCatalog)] : []),
+      ]),
+    ];
     const policy = DesktopAgentSandboxPolicy.build({
       userData: this.user_data_path,
       providerRoot: path.join(this.provider_home, "providers"),
       mediaRoot: this.media_root,
-      desktopStateRoot:
-        this.ordinaryNativeChat && coldSource
-          ? path.join(
-              coldSource.desktopUserDataPath,
-              NativeDesktopProfile.chatStateDirectory
-            )
-          : coldSource?.desktopUserDataPath,
+      desktopStateRoot: nativeStateRoot,
       legacyStateRoots: legacyPolicyRoots,
       workspaceCatalogRoot: this.workspaceCatalog
         ? path.dirname(this.workspaceCatalog)
@@ -672,8 +638,7 @@ export class AgentSidecarSupervisor {
       home: app.getPath("home"),
       ggHost: new URL(EDITOR_BASE_URL).hostname,
     });
-    await sandbox.ensureInitialized({
-      seccomp: this.packagedSeccomp(),
+    this.nativeSandbox = new RetainedServiceSandbox({
       network: {
         allowedDomains: policy.network.allowed_domains,
         deniedDomains: policy.network.denied_domains,
@@ -687,44 +652,6 @@ export class AgentSidecarSupervisor {
       },
     });
     this.sandboxReady = true;
-  }
-
-  private packagedSeccomp(): { applyPath: string } | undefined {
-    if (
-      !app.isPackaged ||
-      process.platform !== "linux" ||
-      (process.arch !== "arm64" && process.arch !== "x64")
-    )
-      return;
-    // SRT runs this in a shell outside Electron's virtual ASAR filesystem.
-    // Use the physical package file and refuse a missing or redirected helper.
-    const applyPath = path.join(
-      fs.realpathSync(process.resourcesPath),
-      "app.asar.unpacked",
-      "node_modules",
-      "@anthropic-ai",
-      "sandbox-runtime",
-      "vendor",
-      "seccomp",
-      process.arch,
-      "apply-seccomp"
-    );
-    if (
-      !fs.lstatSync(applyPath).isFile() ||
-      fs.realpathSync(applyPath) !== applyPath
-    )
-      throw new Error("agent_sidecar_packaged_seccomp_invalid");
-    fs.accessSync(applyPath, fs.constants.X_OK);
-    return { applyPath };
-  }
-
-  private async loadCompatibilitySandbox() {
-    if (!this.compatibilitySandbox) {
-      this.compatibilitySandbox = null;
-      this.compatibilitySandbox = await import("./sandbox/manager");
-    }
-    if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
-    return this.compatibilitySandbox;
   }
 
   /**
@@ -758,15 +685,10 @@ export class AgentSidecarSupervisor {
     const scriptPath = this.sidecarScriptPath();
     const password = crypto.randomBytes(32).toString("base64url");
 
-    // `wrap()` returns the sandbox-wrapped shell string. On
-    // unsupported platforms, avoid shell quoting entirely and spawn
-    // Electron-as-node with an argv array so Windows paths with spaces
-    // work under cmd.exe.
-    const compatibility = retained ? undefined : this.compatibilitySandbox;
-    if (!retained && !compatibility)
+    const sandbox = retained ? undefined : this.nativeSandbox;
+    const supportedSandbox = sandbox !== undefined;
+    if (!retained && !supportedSandbox && process.platform !== "win32")
       throw new Error("agent_sidecar_sandbox_unavailable");
-    const sandbox = compatibility?.isSupportedPlatform() ? compatibility : null;
-    const supportedSandbox = sandbox !== null;
 
     const mode =
       this.coldStartSource && !retained?.mediaOnly ? "native-chat" : "disabled";
@@ -780,33 +702,29 @@ export class AgentSidecarSupervisor {
       ...(this.workspaceCatalog
         ? [`--workspace-catalog=${this.workspaceCatalog}`]
         : []),
-      ...this.legacyStateRoots.map((root) => `--legacy-state-root=${root}`),
+      ...this.protectedFileRoots.map((root) => `--protected-file-root=${root}`),
       // GRIDA-SEC-004 — host-injected managed root for the auto-create flow.
       // A visible, Finder-navigable location (files stay visible); the sidecar
       // may only mint project folders INSIDE this root. `documents` needs a
       // ready app, which holds at spawn time (post `app.whenReady`).
       `--projects-root=${path.join(app.getPath("documents"), "Grida Projects")}`,
       `--editor-base-url=${EDITOR_BASE_URL}`,
-      // GRIDA-SEC-004 — attest the coarse outer SRT wrap. The sidecar exposes
-      // `run_command` only when this is true AND main injected the private
-      // per-command executor above. On unsupported platforms both are absent.
+      // GRIDA-SEC-004 — only native retained-service confinement supplies this fact.
       `--sandbox-enforced=${supportedSandbox ? "1" : "0"}`,
     ];
-    let wrappedCmd: string | null = null;
-    if (supportedSandbox) {
-      // The shell command we want to run — Electron's own binary in
-      // Node mode, the sidecar script, and `--user-data=...` on argv[2].
-      // Quoting is critical: paths can contain spaces on macOS
-      // ("Application Support"). The password is not on argv; it is
-      // written to child stdin after spawn.
-      const cmd = [shellQuote(process.execPath), ...args.map(shellQuote)].join(
-        " "
-      );
-      wrappedCmd = await sandbox.wrap(cmd);
-    }
     if (!retained) await this.assertCompatibilitySourceAvailable();
-    if (generation !== this.nextGeneration || this.isShuttingDown) {
-      throw new Error("agent sidecar startup was cancelled");
+    const nativePlan = sandbox?.prepare(process.execPath, args, process, {
+      state: this.user_data_path,
+      providerHome: this.provider_home,
+      media: this.media_root,
+    });
+    try {
+      if (!retained) await this.assertCompatibilitySourceAvailable();
+      if (generation !== this.nextGeneration || this.isShuttingDown)
+        throw new Error("agent sidecar startup was cancelled");
+    } catch (error) {
+      nativePlan?.release?.();
+      throw error;
     }
     return await new Promise<AgentSidecarInfo>((resolve, reject) => {
       let resolved = false;
@@ -824,49 +742,44 @@ export class AgentSidecarSupervisor {
         reject(new Error("agent sidecar startup timed out"));
       }, STARTUP_TIMEOUT_MS);
 
-      // The compatibility wrapper supplies its own sandbox environment.
-      // Strip inherited proxy settings so the launching shell cannot
-      // compete with it. Main owns the provider HTTP transport.
-      const cleanedEnv: NodeJS.ProcessEnv = { ...process.env };
-      for (const key of [
-        "HTTP_PROXY",
-        "HTTPS_PROXY",
-        "ALL_PROXY",
-        "NO_PROXY",
-        "http_proxy",
-        "https_proxy",
-        "all_proxy",
-        "no_proxy",
-      ]) {
-        delete cleanedEnv[key];
-      }
-
-      // Pass through env (minus proxy vars; see above), then overlay
-      // ELECTRON_RUN_AS_NODE=1 so Electron boots as Node and runs the
-      // sidecar script. The `RunAsNode` fuse in forge.config.ts must be
-      // `true` for packaged builds; dev electron honours the env always.
+      // Main owns all provider HTTP. The service receives only its explicit
+      // process facts, never ambient provider keys, shell startup or proxy state.
       const childEnv: NodeJS.ProcessEnv = {
-        ...cleanedEnv,
         ELECTRON_RUN_AS_NODE: "1",
+        HOME: app.getPath("home"),
+        TMPDIR: app.getPath("temp"),
+        TMP: app.getPath("temp"),
+        TEMP: app.getPath("temp"),
+        LANG: "C",
+        LC_ALL: "C",
+        ...(process.platform === "win32" &&
+        (process.env.SystemRoot || process.env.SYSTEMROOT)
+          ? { SystemRoot: process.env.SystemRoot || process.env.SYSTEMROOT }
+          : {}),
+        ...(process.env.GRIDA_AGENT_DISABLE_MODELS_FETCH === "1"
+          ? { GRIDA_AGENT_DISABLE_MODELS_FETCH: "1" }
+          : {}),
       };
-      child =
-        retainedLaunch?.child ??
-        (supportedSandbox
-          ? spawn(wrappedCmd!, {
-              shell: true,
-              env: childEnv,
-              stdio: ["pipe", "pipe", "pipe", "ipc"],
-            })
-          : spawn(process.execPath, args, {
-              shell: false,
-              env: childEnv,
-              stdio: ["pipe", "pipe", "pipe", "ipc"],
-            }));
+      try {
+        child =
+          retainedLaunch?.child ??
+          (nativePlan
+            ? RetainedServiceSandbox.start(nativePlan, childEnv)
+            : spawn(process.execPath, args, {
+                shell: false,
+                env: childEnv,
+                stdio: ["pipe", "pipe", "pipe", "ipc"],
+              }));
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
+        return;
+      }
       this.child = child;
       this.activeGeneration = generation;
       this.note(
         "sup",
-        `spawned pid=${child.pid ?? "?"} sandbox=${retained ? "retained-media" : supportedSandbox ? "srt" : "none"}`
+        `spawned pid=${child.pid ?? "?"} sandbox=${retained ? "retained-media" : supportedSandbox ? process.platform : "none"}`
       );
       if (!child.stdin || !child.stdout || !child.send || !child.connected) {
         resolved = true;
@@ -1078,21 +991,6 @@ export class AgentSidecarSupervisor {
   }
 }
 
-/**
- * Minimal shell-quote — wraps a string in single quotes and
- * escapes embedded single quotes. We need this because `wrap`
- * returns a shell string and the sidecar path / userData path can
- * contain spaces and other shell-meaningful characters (especially
- * "Application Support" on macOS). srt itself uses `shell-quote`
- * internally; we replicate the discipline here for our own pieces.
- */
-function shellQuote(s: string): string {
-  if (s.length === 0) return "''";
-  // POSIX-portable single-quote escape: close, escape, reopen.
-  return `'${s.replace(/'/g, `'\\''`)}'`;
-}
-
-// Host launch configuration only; never a renderer-controlled capability.
 let supervisor: AgentSidecarSupervisor | undefined;
 
 function sidecar(): AgentSidecarSupervisor {

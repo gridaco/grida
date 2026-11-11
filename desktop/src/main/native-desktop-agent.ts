@@ -38,6 +38,7 @@ import {
   type NativeNestedDeckGrant,
 } from "./native-workspace-catalog";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
+import { NativeAgentHooks } from "./native-agent-hooks";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 import type { NativeChatLifecycle } from "./native-agent-chat";
 
@@ -850,7 +851,7 @@ export class NativeDesktopAgent {
     const workspaceConfiguration =
       this.selectableProfiles && !nestedProtectedPaths
         ? {
-            directory: await this.cutover.workspaceDirectory(id, root),
+            directory: await this.cutover.workspaceDirectory(id, root, true),
             epoch: this.configurationEpoch,
           }
         : undefined;
@@ -868,6 +869,9 @@ export class NativeDesktopAgent {
         ? this.reviewImageReference?.({ id, root })
         : undefined,
       workspaceConfiguration,
+      hooks: workspaceConfiguration
+        ? await NativeAgentHooks.open(workspaceConfiguration.directory, root)
+        : undefined,
       resourcesPath: this.resourcesPath,
       workspace: {
         id,

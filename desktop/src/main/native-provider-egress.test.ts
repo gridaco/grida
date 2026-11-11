@@ -21,6 +21,64 @@ const endpoint = "http://127.0.0.1:1/v1";
 const target = endpoint + "/chat/completions";
 const id = "f78fb11f-4e95-4c02-a315-3bcfd15bc536";
 
+it("admits a monetary ceiling only on the opted-in fixed capped Gateway route", async () => {
+  const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => null);
+  const raw = open({
+    target: target + "/capped",
+    headers: [
+      ["accept", "text/event-stream"],
+      ["content-type", "application/json"],
+      ["x-gg-max-cost-mills", "0.001"],
+    ],
+  });
+  const plain = new NativeProviderEgress(
+    { prepare },
+    "openai-compatible",
+    endpoint,
+    "fixture"
+  );
+  expect(await plain.exchange(raw)).toEqual({ status: "unavailable" });
+  const capped = new NativeProviderEgress(
+    { prepare },
+    "openai-compatible",
+    endpoint,
+    "fixture",
+    undefined,
+    true
+  );
+  for (const value of [
+    "0",
+    "-1",
+    "1e3",
+    "1.0000000000000000001",
+    "1000000000000000000",
+    "01",
+  ]) {
+    expect(
+      await capped.exchange({
+        ...raw,
+        headers: [
+          ["accept", "text/event-stream"],
+          ["content-type", "application/json"],
+          ["x-gg-max-cost-mills", value],
+        ],
+      })
+    ).toEqual({ status: "unavailable" });
+  }
+  expect(await capped.exchange({ ...raw, target })).toEqual({
+    status: "unavailable",
+  });
+  expect(await capped.exchange(open({ target: target + "/capped" }))).toEqual({
+    status: "unavailable",
+  });
+  expect(await capped.exchange(raw)).toEqual({ status: "accepted" });
+  await capped.exchange({ id, action: "dispatch" });
+  expect(prepare).toHaveBeenCalledWith(target + "/capped", expect.any(Headers));
+  expect(prepare.mock.calls[0][1].get("x-gg-max-cost-mills")).toBe("0.001");
+  capped.close();
+  plain.close();
+});
+
 function open(overrides: Record<string, unknown> = {}) {
   return {
     id,

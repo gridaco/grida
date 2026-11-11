@@ -82,6 +82,8 @@ pub struct GoalInspection {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GoalView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spending: Option<SpendingInspection>,
     pub basis: Basis,
     pub objective: Objective,
     pub status: Status,
@@ -126,9 +128,32 @@ impl Host {
         allow_wakeups: bool,
     ) -> Result<DurableSubmission> {
         self.owned_control(move |host| async move {
-            host.accept_goal(request, goal, allow_wakeups).await
+            host.accept_goal(request, goal, allow_wakeups, None).await
         })
         .await
+    }
+
+    /// Start a Gateway Goal with a retained exact USD-mills spending ceiling.
+    /// Each generation receives a bounded partition of the same authority.
+    pub async fn start_goal_with_spending(
+        &self,
+        request: PromptRequest,
+        goal: GoalRequest,
+        max_cost_mills: String,
+        allow_wakeups: bool,
+    ) -> Result<DurableSubmission> {
+        self.owned_control(move |host| async move {
+            host.accept_goal(request, goal, allow_wakeups, Some(max_cost_mills))
+                .await
+        })
+        .await
+    }
+
+    pub(crate) fn supports_goal_spending(&self) -> bool {
+        cfg!(any(target_os = "macos", target_os = "linux"))
+            && self.side_context.is_none()
+            && self.state_dir.is_some()
+            && self.supervised_gateway().is_some()
     }
 
     async fn accept_goal(
@@ -136,6 +161,7 @@ impl Host {
         request: PromptRequest,
         goal: GoalRequest,
         allow_wakeups: bool,
+        max_cost_mills: Option<String>,
     ) -> Result<DurableSubmission> {
         let effort = request.effort.unwrap_or(EffortPreset::Standard);
         if goal.named_child.is_some() && effort != EffortPreset::Ultra {
@@ -153,13 +179,33 @@ impl Host {
         validate_prompt_parts(&request.parts)?;
         goal.start(request.id.clone())?;
         let _admission = self.configuration_admission.lock().await;
-        if let Some(accepted) = self
+        let previous = self
             .store
             .input(request.session.clone(), request.id.clone())
-            .await?
-        {
+            .await?;
+        let spending = max_cost_mills
+            .as_ref()
+            .map(|maximum| {
+                if !self.supports_goal_spending() {
+                    return Err(problem(ErrorKind::Unsupported, "goal_spending_unavailable"));
+                }
+                let gateway = self
+                    .supervised_gateway()
+                    .ok_or_else(|| problem(ErrorKind::Unsupported, "goal_spending_unavailable"))?;
+                gateway.validate()?;
+                spending::Store::select(
+                    gateway.scope,
+                    &request.session,
+                    &request.id,
+                    maximum,
+                    goal.allowance.inference_steps.get(),
+                )
+            })
+            .transpose()?;
+        if let Some(accepted) = previous {
             let stored = retained_goal_prompt(&accepted.input)?;
             if stored.goal.as_ref() != Some(&GoalInput::Start(goal))
+                || stored.spending != spending
                 || !images::same_prompt(&stored.parts, &request.parts)
                 || stored.allow_wakeups != allow_wakeups
                 || request
@@ -174,6 +220,9 @@ impl Host {
                     != (request.configuration_permission == crate::ConfigurationPermission::Change)
             {
                 return Err(problem(ErrorKind::Conflict, "input_identity_reused"));
+            }
+            if let Some(selection) = &spending {
+                self.spending.inspect(selection)?;
             }
             if accepted.disposition == InputDisposition::Queued
                 && (effort != EffortPreset::Ultra || self.goal_sponsorship_available())
@@ -226,6 +275,9 @@ impl Host {
             ));
         }
         policy.allow_host_tools = false;
+        if spending.is_some() {
+            policy.allow_library_selection = false;
+        }
         policy.desktop_image_generation = None;
         policy.allow_image_placement = false;
         if policy.effort.as_ref().is_some_and(|effort| {
@@ -240,13 +292,22 @@ impl Host {
             .capture_input(&view, request.id, request.parts, policy)
             .await?;
         let mut stored: StoredPrompt = decode_input(&input)?;
+        stored.spending = spending.clone();
         stored.allow_reviewer_primary_read = false;
         stored.goal = Some(GoalInput::Start(goal));
-        input.payload = encode(INPUT_SCHEMA, 2, &stored)?;
+        input.payload = encode_stored_prompt(&stored)?;
         let accepted = self
             .store
             .submit_at_revision(request.session, input, view.revision)
             .await?;
+        if let Some(selection) = &spending {
+            self.spending.publish_initial(selection).map_err(|_| {
+                problem(
+                    ErrorKind::Uncertain,
+                    "goal_spending_publication_unconfirmed",
+                )
+            })?;
+        }
         self.kick_queue(accepted.session.clone()).await;
         Ok(DurableSubmission {
             session: accepted.session,
@@ -291,6 +352,11 @@ impl Host {
             let goal = Goal::decode(value)?;
             let (captured, automatic) = self.goal_origin(&session, goal.basis()).await?;
             Some(GoalView {
+                spending: captured
+                    .spending
+                    .as_ref()
+                    .map(|selection| self.spending.inspect(selection))
+                    .transpose()?,
                 basis: goal.basis().clone(),
                 objective: goal.objective().clone(),
                 status: goal.status(),
@@ -490,7 +556,7 @@ impl Host {
         captured.goal = Some(GoalInput::Continue(continuation));
         Ok(Some(Submission {
             id,
-            payload: encode(INPUT_SCHEMA, 2, &captured)?,
+            payload: encode_stored_prompt(&captured)?,
         }))
     }
 
@@ -851,7 +917,8 @@ pub(super) fn require_goal_resolved_for_revision(view: &SessionView) -> Result<(
 }
 
 fn retained_goal_prompt(input: &Submission) -> Result<StoredPrompt> {
-    if input.payload.schema().as_str() != INPUT_SCHEMA || input.payload.version() != 2 {
+    if input.payload.schema().as_str() != INPUT_SCHEMA || !matches!(input.payload.version(), 2 | 3)
+    {
         return Err(problem(ErrorKind::Conflict, "input_identity_reused"));
     }
     decode_input(input)
@@ -864,6 +931,7 @@ pub(super) struct GoalAuthority {
     base: Arc<dyn AuthorityValidator>,
     gate: Arc<dyn ToolGate>,
     before_tool: Option<Arc<before_tool::BeforeToolCheck>>,
+    lifecycle_hooks: Option<Arc<lifecycle_hooks::LifecycleAccess>>,
 }
 
 impl GoalAuthority {
@@ -872,6 +940,7 @@ impl GoalAuthority {
         base: Arc<dyn AuthorityValidator>,
         gate: Arc<dyn ToolGate>,
         before_tool: Option<Arc<before_tool::BeforeToolCheck>>,
+        lifecycle_hooks: Option<Arc<lifecycle_hooks::LifecycleAccess>>,
     ) -> Result<Arc<Self>> {
         let state = claim.lease.journal().load().await?;
         let value = state
@@ -899,6 +968,7 @@ impl GoalAuthority {
             base,
             gate,
             before_tool,
+            lifecycle_hooks,
         }))
     }
 
@@ -950,7 +1020,15 @@ impl ToolGate for GoalAuthority {
             .iter()
             .any(|tool| tool.definition() == admission.invocation.definition())
         {
-            Box::pin(async { Ok(ToolDecision::Permit) })
+            Box::pin(async move {
+                if let Some(hooks) = &self.lifecycle_hooks {
+                    if hooks.unverified(&context.operations.view()) {
+                        return Err(problem(ErrorKind::Uncertain, "lifecycle_hook_uncertain"));
+                    }
+                    return hooks.before_tool(&admission, &context).await;
+                }
+                Ok(ToolDecision::Permit)
+            })
         } else {
             Box::pin(async { Err(problem(ErrorKind::InvalidInput, "goal_tool_scope_mismatch")) })
         }

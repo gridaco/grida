@@ -114,3 +114,14 @@ uses the original candidate and result without repeating effects. The caller
 settles against the original control and history positions and adds check
 evidence to the final account after review. Handler registration and executable
 dispatch stay with the host.
+
+Lifecycle policy additionally selects ordered session-start, accepted-input,
+pre-tool, post-tool and completion handlers. Each invocation retains its full
+ordered definition selection and exact event occurrence. A required rejection
+skips later checks; observational failures retain diagnostics. Post-effect
+checks preserve the actual outcome. Context is bounded, source-attributed data,
+kept separate from user instructions and execution authority. Completion can
+request another step only within the captured task allowance. Private checks
+are ordinary durable operations, excluded from recursive hook dispatch. Reads
+and reconnect never execute them. The host owns trusted registration, executable
+review, live grants and native confinement.

@@ -93,3 +93,9 @@ unavailable amounts stay unknown. Use **Refresh billing** when offered to check
 that request's current settlement. Reopening the chat shows the original recorded
 evidence and leaves refresh to you. Use the connection's billing record for
 totals and for charges from other providers or work outside the displayed turn.
+
+Supported Gateway Goals can also have a maximum spend. The Goal panel shows
+charged, held and remaining amounts, including funded child work. An uncertain
+request keeps its hold until its settlement is known; stopping work does not
+refund a request. This is separate from a turn summary's reported usage.
+[Set a maximum spend](./effort-and-goals.md#set-a-maximum-spend)

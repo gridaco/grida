@@ -307,7 +307,9 @@ impl Host {
         visible: &Message,
     ) -> Result<(String, Option<EffortPreset>)> {
         for input in self.store.turn_submissions(session, turn).await? {
-            if input.payload.schema().as_str() != INPUT_SCHEMA || input.payload.version() != 2 {
+            if input.payload.schema().as_str() != INPUT_SCHEMA
+                || !matches!(input.payload.version(), 2 | 3)
+            {
                 continue;
             }
             let stored: StoredPrompt = decode_input(&input)?;

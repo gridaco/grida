@@ -2600,3 +2600,93 @@ async fn an_expired_count_rejects_before_generation() {
     );
     assert_eq!(provider.inner.starts.load(Ordering::SeqCst), 0);
 }
+
+#[tokio::test]
+async fn a_derived_provider_preserves_shared_inference_and_tool_admission() {
+    let (original, sender) = ScriptedProvider::streaming();
+    let replacement = ScriptedProvider::complete();
+    let release = Arc::new(Notify::new());
+    let tool = CounterTool::new(Some(release.clone()));
+    let authority = Authority::allowed();
+    let runtime = runtime(original.clone(), &tool, Arc::new(Allow), authority.clone());
+    assert!(
+        runtime
+            .with_provider(ProviderId::new("missing").unwrap(), replacement.clone())
+            .is_err()
+    );
+    let derived = runtime
+        .with_provider(ProviderId::new("test").unwrap(), replacement.clone())
+        .unwrap();
+    let first = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let mut other_binding = binding();
+    other_binding.turn = TurnId::new("other-turn").unwrap();
+    let second = derived
+        .open(EphemeralJournal::create(other_binding).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let first_operations = first.operations();
+    let first_request = request(&original, &inventory(&tool));
+    let first_inference = tokio::spawn(async move {
+        first_operations
+            .infer(
+                OperationKey::new("inference").unwrap(),
+                first_request,
+                grants(),
+            )
+            .await
+    });
+    wait_for_count(&original.starts, 1).await;
+    let second_operations = second.operations();
+    let second_request = request(&replacement, &inventory(&tool));
+    let second_inference = tokio::spawn(async move {
+        second_operations
+            .infer(
+                OperationKey::new("inference").unwrap(),
+                second_request,
+                grants(),
+            )
+            .await
+    });
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(replacement.starts.load(Ordering::SeqCst), 0);
+    sender
+        .send(ProviderEvent::Finished(inference_outcome(vec![
+            Content::Text("first".into()),
+        ])))
+        .unwrap();
+    first_inference.await.unwrap().unwrap();
+    second_inference.await.unwrap().unwrap();
+    assert_eq!(original.starts.load(Ordering::SeqCst), 1);
+    assert_eq!(replacement.starts.load(Ordering::SeqCst), 1);
+
+    let first_operations = first.operations();
+    let first_tool = tokio::spawn(async move {
+        first_operations
+            .invoke(OperationKey::new("tool").unwrap(), invocation(1))
+            .await
+    });
+    wait_for_count(&tool.calls, 1).await;
+    let second_operations = second.operations();
+    let second_tool = tokio::spawn(async move {
+        second_operations
+            .invoke(OperationKey::new("tool").unwrap(), invocation(2))
+            .await
+    });
+    for _ in 0..20 {
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(tool.calls.load(Ordering::SeqCst), 1);
+    release.notify_one();
+    first_tool.await.unwrap().unwrap();
+    wait_for_count(&tool.calls, 2).await;
+    release.notify_one();
+    second_tool.await.unwrap().unwrap();
+    assert!(!authority.requests.lock().unwrap().is_empty());
+}

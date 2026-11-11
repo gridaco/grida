@@ -53,7 +53,7 @@ export class NativeProviderEgress {
   static readonly cancelMethod = "_co.grida/provider/cancel";
 
   private readonly exchanges = new Map<string, Exchange>();
-  private readonly targets: ReadonlyMap<string, string>;
+  private readonly targets: Map<string, string>;
   private closed = false;
 
   constructor(
@@ -61,7 +61,8 @@ export class NativeProviderEgress {
     private readonly protocol: Protocol,
     endpoint: string,
     model: string,
-    llamaCppInputCount?: true
+    llamaCppInputCount?: true,
+    private readonly gatewayCeilings?: true
   ) {
     this.targets = providerTargets(
       protocol,
@@ -69,6 +70,14 @@ export class NativeProviderEgress {
       model,
       llamaCppInputCount
     );
+    if (gatewayCeilings) {
+      if (protocol !== "openai-compatible" || llamaCppInputCount)
+        throw new Error("native_gateway_ceiling_profile_invalid");
+      this.targets.set(
+        new URL(`${endpoint.replace(/\/$/, "")}/chat/completions/capped`).href,
+        "text/event-stream"
+      );
+    }
   }
 
   async exchange(value: unknown): Promise<Reply> {
@@ -127,7 +136,14 @@ export class NativeProviderEgress {
       return { status: "unavailable" };
     const accept = this.targets.get(target);
     const headers = accept
-      ? providerHeaders(this.protocol, accept, input.headers)
+      ? providerHeaders(
+          this.protocol,
+          accept,
+          input.headers,
+          this.gatewayCeilings && target.endsWith("/chat/completions/capped")
+            ? true
+            : undefined
+        )
       : undefined;
     const initial = decode(input.initial);
     if (!headers || !initial) return { status: "unavailable" };
@@ -290,8 +306,13 @@ function providerTargets(
   return routes;
 }
 
-function providerHeaders(protocol: Protocol, accept: string, raw: unknown) {
-  if (!Array.isArray(raw) || raw.length > 4) return;
+function providerHeaders(
+  protocol: Protocol,
+  accept: string,
+  raw: unknown,
+  capped?: true
+) {
+  if (!Array.isArray(raw) || raw.length > (capped ? 5 : 4)) return;
   const credential =
     protocol === "anthropic"
       ? "x-api-key"
@@ -301,6 +322,7 @@ function providerHeaders(protocol: Protocol, accept: string, raw: unknown) {
   const allowed = new Set(["content-type", "accept"]);
   if (protocol !== "chatgpt-subscription") allowed.add(credential);
   if (protocol === "anthropic") allowed.add("anthropic-version");
+  if (capped) allowed.add("x-gg-max-cost-mills");
   const headers = new Headers();
   for (const field of raw) {
     if (!Array.isArray(field) || field.length !== 2) return;
@@ -320,6 +342,7 @@ function providerHeaders(protocol: Protocol, accept: string, raw: unknown) {
   if (
     headers.get("content-type") !== "application/json" ||
     headers.get("accept") !== accept ||
+    (capped && !validCostCeiling(headers.get("x-gg-max-cost-mills"))) ||
     (protocol === "anthropic" &&
       headers.get("anthropic-version") !== "2023-06-01") ||
     (credential === "authorization" &&
@@ -328,6 +351,15 @@ function providerHeaders(protocol: Protocol, accept: string, raw: unknown) {
   )
     return;
   return headers;
+}
+
+function validCostCeiling(value: string | null): boolean {
+  return (
+    value !== null &&
+    value.length <= 64 &&
+    /^(?:0|[1-9]\d{0,17})(?:\.\d{1,18})?$/.test(value) &&
+    /[1-9]/.test(value)
+  );
 }
 
 function object(value: unknown): Record<string, unknown> | undefined {

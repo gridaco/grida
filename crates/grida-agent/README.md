@@ -163,7 +163,8 @@ beforeCompletion
 
 Set `command.hooksOnly` to `true` to keep general command execution out of
 the model's tools while running this reviewed check. This setting requires
-`beforeCompletion` and the same primary `commandRead: "allow"` review.
+`beforeCompletion` or an ordered `hooks` selection and the same primary
+`commandRead: "allow"` review.
 Omitting it preserves the profile's ordinary command permissions.
 
 The command receives a bounded versioned `before_completion` JSON event on
@@ -207,6 +208,95 @@ Standard Act Goals can use this profile. Plan Goals, Ultra Goals, and
 selected at native launch. If a check's result is unconfirmed, later admissions
 in the same turn stop once the uncertainty is observed. Effects already
 admitted may finish. An uncertain Goal turn retains its work reservation.
+
+### Configure lifecycle hooks
+
+The launch-only permission profile can select up to eight ordered `hooks`.
+Each definition has this shape; `executable.sha256` is the canonical program's
+SHA-256 as 32 byte values, as in the command examples above.
+
+```text
+hooks[]
+  id          unique stable identifier
+  source      attributed definition source, at most 256 bytes
+  event       session_start | before_input | before_tool | after_tool | before_completion
+  tool        optional exact tool ID, only for before_tool or after_tool
+  enabled     true or false (default true)
+  executable  { path, sha256 }
+  arguments   [literal argument strings]
+  mode        required | observe
+  timeoutMs   1 through 30000
+```
+
+The trusted supervisor owns discovery, explicit review, registration, and
+selection of this file. Loading a project does not discover or trust code.
+The command profile supplies the pinned sandbox helper, runtime roots and
+private temporary parent. The primary directory must grant read-only command
+access. `command.hooksOnly: true` runs these handlers without offering
+`run_command` to the model. Ordered hooks cover Plan and Act and the corresponding
+Goal work. A child that inherits the primary read profile retains its checks
+under its own turn identity. Text-only reviewers without native workspace
+authority do not acquire executable-hook filesystem access.
+Existing `beforeTool` and `beforeCompletion` fields retain their narrower
+single-check semantics. Project-local/user-owned hook executables remain unavailable: use a
+canonical reviewed system program with literal arguments. Handler bytes, the
+selected definitions, and the permission scope participate in the captured
+revision. Changes apply to future accepted work through a newly selected launch
+profile; they cannot replace handlers for an in-progress task.
+
+A handler reads one bounded JSON object on stdin:
+
+```text
+{ hook, selection, occurrence: { version: 1, session, turn, moment } }
+```
+
+`hook` identifies this definition and `selection` retains the complete ordered
+selection. `moment.event` names the event. Session start carries the control
+revision; input carries the retained user message; tool events carry the exact
+operation and validated invocation, with the recorded outcome for `after_tool`;
+completion carries the proposed outcome. Events are limited to 64 KiB. A handler
+must exit zero and print one of these JSON replies on stdout:
+
+```json
+{ "decision": "allow", "context": "Optional attributed contextual data." }
+```
+
+```json
+{ "decision": "deny", "reason": "The verification did not pass." }
+```
+
+A `before_completion` handler may instead print
+`{"decision":"continue","context":"Perform another verification pass."}`.
+This requests another model step within the original task allowance. Exhaustion
+fails the check rather than extending the allowance. The context limit is 4 KiB.
+Other events reject this response. Observers retain diagnostics and may contribute
+context, but cannot reject the original action or require another model step.
+Hook output is labeled contextual data with its source and revision; it grants no
+access and does not become a user instruction. At most 64 contexts enter the
+next request, with an explicit omitted count when the retained set is larger.
+
+Handlers run in order through private ordinary runtime operations, read-only
+native confinement, deadlines and cancellation. They do not recursively run
+hooks for internal check operations. Before-tool checks run after ordinary action
+admission and revalidate that original authority afterward. An after-tool failure
+preserves the actual effect and blocks only later dependent work or completion
+when required. Effects already admitted in the same step may finish. Pause and
+Stop prevent new handler admission. Unknown handler outcomes remain uncertain;
+reopen and replay reuse recorded outcomes instead of executing code again.
+
+Negotiate `co.grida/session/hooks: 1` and call
+`_co.grida/session/hooks` with `{}` to inspect selected definitions without work.
+An attached `sessionId` adds bounded results from its current or latest turn.
+The response contains `supportedEvents`, `hooks`, and `results`. Results identify
+hook/event/revision, status and safe reason. A skipped or unadmitted handler has
+`operation: null`; it does not pretend to own an executed operation. Final
+accounts retain the same lifecycle results, including bounded-event failures.
+No observer subscription, history read or client reconnect executes handlers.
+An unavailable or changed handler cannot prevent inspection; a required
+invocation fails against its original pin. Stop uses the retained selection
+without requiring that executable to be available. Resume cannot replace a
+paused task's captured definitions, including tasks accepted before hooks were
+registered.
 
 ### Check a workspace manifest
 
@@ -598,6 +688,60 @@ the ordinary task Pause, Resume, and Stop controls while the funded turn
 owns work. If the review is still unsettled when the parent finishes, Goal
 Recover can account for it once its outcome is known. See the
 [Goal client contract](../../packages/grida-ai-agent/docs/rust-client-protocol.md#persistent-goal-operations).
+
+A private supervised Gateway client can negotiate `co.grida/goal/spending`
+version 1 and add `maxCostMills` to Goal Start. This is an exact USD-mills
+string, independent of inference steps: `"1000"` authorizes at most USD 1.
+The positive amount supports up to eighteen integer and eighteen fractional
+mill digits. The initial ceiling is divided, rounding down, across the Goal's
+total inference-step allowance. Each generation receives at most that fixed
+partition and the still-available task authority; parent and funded reviewer
+share one retained allocation. At most 4,096 generation steps are supported by
+this profile. An amount too small to give every step a positive partition is
+rejected.
+This equal partition is a product policy, not a price estimate: a large-context
+or high-output request can be rejected even when the task has more money left.
+Choose the monetary ceiling and inference-step allowance together. Settlement
+releases unused authority into the shared pool but does not raise the fixed
+per-request maximum or silently reduce the model's request.
+
+Every capped generation uses the separate
+`/api/v1/ai/chat/completions/capped` route and an exact
+`X-GG-Max-Cost-Mills` header. The server requires Gateway execution and forwards
+that ceiling under its existing workload authority. Gateway rejects an
+excessive reservation before paid dispatch. A missing route never falls back
+to ordinary chat, and BYOK/custom/subscription connections cannot accept this
+monetary policy. This does not compute prices locally or reserve organization
+credits in the agent. See the [Gateway authorization contract](https://gateway.grida.ai/llms.txt).
+
+Capped work withholds media generation, MCP and editor tool hosts, and Library
+selection. Local structured files, image inspection/cropping and confined
+commands remain subject to their existing permissions; raw command and hook
+networking stays denied. Paid model work, including the funded reviewer, must
+pass through the same capped Gateway owner. A retained input with an unsupported
+tool host is rejected rather than continuing under a narrower spend promise.
+
+Goal inspection exposes `spending` with the maximum, per-request ceiling,
+authoritatively charged amount, held partitions, remaining authority and
+`unsettledAttempts`. An interrupted or pending-billing attempt retains its
+entire partition. Verified failure before HTTP dispatch costs zero. An original
+Gateway settlement, including an explicit billing refresh for a retained
+attempt, releases only the unused partition; duplicate settlement cannot
+increase authority. Stop and restart retain these records. Reopening and
+inspection do not execute inference. A missing or corrupt spending record
+blocks continuation and cannot be recreated by retrying Goal Start. Preserve
+the complete native state directory when recovering a capped Goal.
+Rejected Goal admission does not publish monetary authority, so the same input
+identity can be corrected before acceptance. If durable acceptance succeeds
+but monetary publication fails, the task remains accepted and cannot dispatch;
+an exact retry cannot create replacement authority.
+Saved-chat deletion retires only that parent's local task authority after its
+owned work is excluded. Removing a child does not remove the parent's shared
+authority, and deleting local records never refunds remote pending charges.
+Capped work and registered lifecycle-hook work use an extended input-envelope
+version. Older native workers may read its history but cannot resume the task
+by ignoring unknown policy fields. Continue with a compatible worker; do not
+remove the retained policy or spending records to force a downgrade.
 
 An opted-in private ACP submission can schedule one wake-up for its own task.
 Goal Start can also opt in for the first Standard Act reservation. The timer

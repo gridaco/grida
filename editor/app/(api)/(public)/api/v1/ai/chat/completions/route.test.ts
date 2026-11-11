@@ -137,6 +137,7 @@ vi.mock("@/lib/ai/models", async (original) => ({
 }));
 
 import { POST } from "./route";
+import { POST as CAPPED_POST } from "./capped/route";
 import { ProductBillingError } from "@/lib/platform/product-billing";
 import { signGgToken, GG_TOKEN_AUDIENCE } from "@/lib/auth/gg-token";
 
@@ -240,6 +241,94 @@ const TOOLS: LanguageModelV3CallOptions["tools"] = [
 ];
 
 describe("POST /api/v1/ai/chat/completions (contract)", () => {
+  it("keeps capped admission when the router accepted an encoded path spelling", async () => {
+    const response = await CAPPED_POST(
+      new Request("http://grida.test/api/v1/ai/chat/completions/%63apped", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${await mintedToken()}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: "user", content: "hello" }],
+          stream: true,
+        }),
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(h.lastCallOptions).toBeNull();
+  });
+  it.each([undefined, "-1", "1e3", "NaN", "1.0000000000000000001", "01"])(
+    "rejects an invalid capped request before provider work: %s",
+    async (maximum) => {
+      const response = await CAPPED_POST(
+        new Request("http://grida.test/api/v1/ai/chat/completions/capped", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${await mintedToken()}`,
+            "content-type": "application/json",
+            ...(maximum === undefined
+              ? {}
+              : { "x-gg-max-cost-mills": maximum }),
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [{ role: "user", content: "hello" }],
+            stream: true,
+          }),
+        })
+      );
+      expect(response.status).toBe(400);
+      expect(h.lastCallOptions).toBeNull();
+      expect(mockedAdmission).not.toHaveBeenCalled();
+    }
+  );
+
+  it("captures the exact capped-route authorization in Gateway provider options", async () => {
+    const response = await CAPPED_POST(
+      new Request("http://grida.test/api/v1/ai/chat/completions/capped", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${await mintedToken()}`,
+          "content-type": "application/json",
+          "x-gg-max-cost-mills": "0.000000000000000001",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: "user", content: "hello" }],
+          stream: true,
+        }),
+      })
+    );
+    expect(response.status).toBe(200);
+    await response.text();
+    expect(h.lastCallOptions).toMatchObject({
+      providerOptions: {
+        grida: { organizationId: ORG, maxCostMills: "0.000000000000000001" },
+      },
+    });
+    expect(mockedAdmission).not.toHaveBeenCalled();
+  });
+
+  it("refuses nonstreaming execution on the capped route", async () => {
+    const response = await CAPPED_POST(
+      new Request("http://grida.test/api/v1/ai/chat/completions/capped", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${await mintedToken()}`,
+          "content-type": "application/json",
+          "x-gg-max-cost-mills": "1",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: "user", content: "hello" }],
+        }),
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(h.lastCallOptions).toBeNull();
+  });
   it.each([
     ["timeout", "req_native", "pending", "TimeoutError"],
     ["cancelled", "req_native", "pending", "AbortError"],

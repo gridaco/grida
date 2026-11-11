@@ -8,6 +8,7 @@ import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
 import { NativeAgentCommands } from "./native-agent-commands";
+import { NativeAgentHooks } from "./native-agent-hooks";
 import { NativeAgentRevisions } from "./native-agent-revisions";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeAgentGoals } from "./native-agent-goals";
@@ -74,6 +75,7 @@ export type NativeAgentLaunch = {
   credentialHome?: string;
   configuredEndpointKey?: string;
   workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
+  hooks?: NativeAgentHooks;
   providerNetwork?: NativeProviderNetwork;
   gatewayScope?: string;
   gatewayJobBilling?: NativeGatewayConnection["readJobBilling"];
@@ -162,6 +164,7 @@ export class NativeAgentProcess {
   private goalManualContinuation = false;
   private goalFundedReview = false;
   private goalNamedChild = false;
+  private goalSpending = false;
   private editorSurfaces = false;
   private editorSurfaceOpen = false;
   private editorSvgText = false;
@@ -269,6 +272,10 @@ export class NativeAgentProcess {
 
   get acceptsGoalNamedChild(): boolean {
     return this.acceptsSubagents && this.goalNamedChild;
+  }
+
+  get acceptsGoalSpending(): boolean {
+    return this.connected && this.goalSpending;
   }
 
   get acceptsSubagents(): boolean {
@@ -420,7 +427,8 @@ export class NativeAgentProcess {
     const permissionProfile = options.workspace
       ? await NativeAgentPermissions.stage(
           options.stateDirectory,
-          options.workspace
+          options.workspace,
+          await options.hooks?.launch(options.resourcesPath, options.workspace)
         )
       : undefined;
     const providerEgress = options.providerNetwork
@@ -429,11 +437,13 @@ export class NativeAgentProcess {
           options.subscriptionScope ? "chatgpt-subscription" : options.provider,
           options.endpoint,
           options.model,
-          options.llamaCppInputCount
+          options.llamaCppInputCount,
+          options.gatewayScope && options.gatewayJobBilling ? true : undefined
         )
       : undefined;
     const capabilities: Record<string, 1> = {
       ...options.capabilities,
+      ...(options.hooks ? NativeAgentHooks.capabilities : {}),
       ...(permissionProfile ? NativeAgentPermissions.capabilities : {}),
     };
     if (storedSubagents) {
@@ -543,6 +553,10 @@ export class NativeAgentProcess {
                 ...NativeAgentRevisions.capabilities,
                 [NativeAgentGoals.completionCapability]: 1,
                 [NativeAgentGoals.manualContinuationCapability]: 1,
+                ...(options.gatewayScope &&
+                  options.gatewayJobBilling && {
+                    [NativeAgentGoals.spendingCapability]: 1,
+                  }),
                 ...(options.subagents && {
                   ...SUBAGENT_CAPABILITIES,
                   [CHILD_STEERING]: 1,
@@ -639,6 +653,10 @@ export class NativeAgentProcess {
         (options.gatewayScope !== undefined || storedSubagents) &&
         processOwner.agentEffort &&
         advertised?.[NativeAgentGoals.fundedReviewCapability] === 1;
+      processOwner.goalSpending =
+        !!options.gatewayScope &&
+        !!options.gatewayJobBilling &&
+        advertised?.[NativeAgentGoals.spendingCapability] === 1;
       processOwner.goalNamedChild =
         processOwner.goalFundedReview &&
         advertised?.[NativeAgentGoals.namedChildCapability] === 1;

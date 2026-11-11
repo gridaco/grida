@@ -14,6 +14,7 @@ const CONFIRM_COMPLETION: &str = "co.grida/goal/confirm-completion";
 const MANUAL_CONTINUATION: &str = "co.grida/goal/manual-continuation";
 pub(super) const FUNDED_REVIEW: &str = "co.grida/goal/funded-review";
 pub(super) const NAMED_CHILD: &str = "co.grida/goal/named-child";
+pub(super) const SPENDING: &str = "co.grida/goal/spending";
 pub(super) const CAPABILITIES: [&str; 6] = [
     START,
     INSPECT,
@@ -35,6 +36,8 @@ struct Start {
     effort: Option<crate::EffortPreset>,
     #[serde(default)]
     allow_wakeups: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    max_cost_mills: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -110,29 +113,39 @@ pub(super) fn handlers(
                         return Err(Error::method_not_found());
                     }
                     goal.user_review = review;
-                    start
-                        .0
-                        .start_goal_with_wakeup(
-                            PromptRequest {
-                                id: request.input_id,
-                                session: request.session_id,
-                                parts,
-                                questions: questions::available(&start.1),
-                                configuration_permission: configuration_permission(
-                                    &start.1, false,
-                                )?,
-                                operating_regime: operating_regime(
-                                    &start.1,
-                                    request.operating_regime,
-                                )?,
-                                effort: effort(&start.1, request.effort)?,
-                            },
-                            goal,
-                            request.allow_wakeups,
-                        )
-                        .await
-                        .map(SubmitResponse::from)
-                        .map_err(host_error)
+                    if request.max_cost_mills.is_some() {
+                        require(&start.1, SPENDING, None)?;
+                    }
+                    let prompt = PromptRequest {
+                        id: request.input_id,
+                        session: request.session_id,
+                        parts,
+                        questions: questions::available(&start.1),
+                        configuration_permission: configuration_permission(&start.1, false)?,
+                        operating_regime: operating_regime(&start.1, request.operating_regime)?,
+                        effort: effort(&start.1, request.effort)?,
+                    };
+                    match request.max_cost_mills {
+                        Some(maximum) => {
+                            start
+                                .0
+                                .start_goal_with_spending(
+                                    prompt,
+                                    goal,
+                                    maximum,
+                                    request.allow_wakeups,
+                                )
+                                .await
+                        }
+                        None => {
+                            start
+                                .0
+                                .start_goal_with_wakeup(prompt, goal, request.allow_wakeups)
+                                .await
+                        }
+                    }
+                    .map(SubmitResponse::from)
+                    .map_err(host_error)
                 }
                 .await;
                 responder.respond_with_result(result)

@@ -34,6 +34,124 @@ const UPDATE = {
   replace: true,
 } as const;
 
+const HOOK = {
+  id: "inspect",
+  source: "user-selected:check.json",
+  event: "before_tool",
+  tool: "read_file",
+  enabled: true,
+  mode: "required",
+  executable: "/usr/bin/printf",
+  arguments: ["%s", '{"decision":"allow"}'],
+  timeoutMs: 1000,
+  revision: "a".repeat(64),
+} as const;
+const HOOKS = {
+  supportedEvents: ["before_tool"],
+  active: [],
+  saved: [HOOK],
+  activation: "current",
+  results: [],
+} as const;
+
+it("inspects hook results only for an attachment owned by the current frame", async () => {
+  const f = setup();
+  const inspect = vi.fn<NonNullable<typeof f.chat.inspectHooks>>(
+    async () => HOOKS
+  );
+  f.chat.inspectHooks = inspect;
+  const attachment = await f.ipc.create(f.first.event);
+  await expect(
+    f.ipc.inspectHooks(f.second.event, attachment.attachmentId)
+  ).rejects.toThrow("native_chat_attachment_unavailable");
+  expect(inspect).not.toHaveBeenCalled();
+  expect(
+    await f.ipc.inspectHooks(f.first.event, attachment.attachmentId)
+  ).toEqual(HOOKS);
+  expect(inspect).toHaveBeenCalledWith(attachment.sessionId);
+});
+
+it("requires native selection and exact trust before saving a hook", async () => {
+  const choose = vi.fn<() => Promise<string | null>>(
+    async () => "/fixture/check.json"
+  );
+  const confirm = vi.fn<() => Promise<boolean>>(async () => false);
+  const f = setup(undefined, undefined, undefined, { choose, confirm });
+  const review = { definition: HOOK, workspace: "/fixture/workspace" };
+  f.chat.reviewHook = vi.fn<NonNullable<typeof f.chat.reviewHook>>(
+    async () => review
+  );
+  const install = vi.fn<NonNullable<typeof f.chat.installHook>>(async () => {});
+  f.chat.installHook = install;
+  f.chat.inspectHooks = vi.fn<NonNullable<typeof f.chat.inspectHooks>>(
+    async () => HOOKS
+  );
+  expect(await f.ipc.importHook(f.first.event)).toBeNull();
+  expect(install).not.toHaveBeenCalled();
+  expect(confirm).toHaveBeenCalledWith(
+    f.first.contents,
+    HOOK,
+    review.workspace,
+    "install"
+  );
+  confirm.mockResolvedValue(true);
+  expect(await f.ipc.importHook(f.first.event)).toEqual(HOOKS);
+  expect(install).toHaveBeenCalledWith(review);
+});
+
+it("revokes hook trust review when its window navigates", async () => {
+  const decision = Promise.withResolvers<boolean>();
+  const confirm = vi.fn<() => Promise<boolean>>(async () => decision.promise);
+  const f = setup(undefined, undefined, undefined, {
+    choose: async () => "/fixture/check.json",
+    confirm,
+  });
+  f.chat.reviewHook = vi.fn<NonNullable<typeof f.chat.reviewHook>>(
+    async () => ({
+      definition: HOOK,
+      workspace: "/fixture/workspace",
+    })
+  );
+  const install = vi.fn<NonNullable<typeof f.chat.installHook>>(async () => {});
+  f.chat.installHook = install;
+  f.chat.inspectHooks = vi.fn<NonNullable<typeof f.chat.inspectHooks>>(
+    async () => HOOKS
+  );
+  const pending = f.ipc.importHook(f.first.event);
+  await vi.waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+  await expect(f.ipc.importHook(f.first.event)).rejects.toThrow(
+    "native_hook_review_busy"
+  );
+  f.first.contents.emit("did-start-navigation", { isMainFrame: true });
+  decision.resolve(true);
+  await expect(pending).rejects.toThrow(
+    /native_chat_(?:scope_changed|attachment_unavailable|unavailable)/
+  );
+  expect(install).not.toHaveBeenCalled();
+});
+
+it("requires current saved revision and native confirmation before removing a hook", async () => {
+  const confirm = vi.fn<() => Promise<boolean>>(async () => false);
+  const f = setup(undefined, undefined, undefined, {
+    choose: async () => null,
+    confirm,
+  });
+  f.chat.inspectHooks = vi.fn<NonNullable<typeof f.chat.inspectHooks>>(
+    async () => HOOKS
+  );
+  const remove = vi.fn<NonNullable<typeof f.chat.removeHook>>(async () => {});
+  f.chat.removeHook = remove;
+  await expect(
+    f.ipc.removeHook(f.first.event, HOOK.id, "stale")
+  ).rejects.toThrow("native_hook_revision_changed");
+  expect(confirm).not.toHaveBeenCalled();
+  await f.ipc.removeHook(f.first.event, HOOK.id, HOOK.revision);
+  expect(remove).not.toHaveBeenCalled();
+  confirm.mockResolvedValue(true);
+  await f.ipc.removeHook(f.first.event, HOOK.id, HOOK.revision);
+  expect(remove).toHaveBeenCalledWith(HOOK.id, HOOK.revision);
+});
+
 it("binds requested Library selection and its answer to the observed chat frame", async () => {
   const { ipc, chat, first, second } = setup();
   expect(ipc.acceptsLibrarySelection(first.event)).toBe(false);
@@ -387,7 +505,8 @@ function setup(
     title: string | null,
     ownedChildren?: number
   ) => Promise<boolean>,
-  selectArtifactDestination?: (sender: WebContents) => Promise<string | null>
+  selectArtifactDestination?: (sender: WebContents) => Promise<string | null>,
+  hookReview?: ConstructorParameters<typeof NativeChatIpc>[11]
 ) {
   const first = windowAt();
   const second = windowAt();
@@ -633,7 +752,13 @@ function setup(
       undefined,
       confirm,
       confirmDeletion,
-      selectArtifactDestination
+      selectArtifactDestination,
+      undefined,
+      undefined,
+      false,
+      undefined,
+      undefined,
+      hookReview
     ),
     emit: (sessionId: string, update: NativeChatStreamUpdate) => {
       for (const listener of listeners.get(sessionId) ?? []) listener(update);

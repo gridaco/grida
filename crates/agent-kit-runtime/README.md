@@ -21,6 +21,12 @@ question work can keep a turn waiting.
 
 ## Durable operations
 
+`with_provider` derives a runtime with a host-selected adapter for one already
+registered provider ID. It preserves shared inference/tool capacity, authority,
+gate, inventory, and limits. It cannot register a new identity or bypass normal
+captured binding checks. `with_authorization` can be composed with that selection
+without allocating another concurrency pool.
+
 Operation keys identify logical work within a turn. The runtime derives stable
 journal and attempt identities from them. Repeating the same captured input
 returns its recorded result or attaches to the local execution. Changed input

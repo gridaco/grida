@@ -64,7 +64,7 @@ and does not modify the shared Electron installation.
 Launching the Desktop app with
 `--disable-agent` selects media-only startup before the chat server is imported.
 The supervisor translates that app flag to the sidecar's `--agent=disabled`;
-direct sidecar invocations use `--agent=enabled|disabled`. Image, video, music,
+direct sidecar invocations use `--agent=disabled|native-chat`. Image, video, music,
 sound effects, speech and 3D routes keep the same authenticated transport,
 BYOK key store, GG memory custody and durable media root. Agent/session routes,
 configured text-provider routes and native ChatGPT auth are absent; the
@@ -103,8 +103,11 @@ from the trusted same-origin renderer.
 
 Shared BYOK custody (GRIDA-SEC-014) is private plaintext on macOS/Linux.
 Desktop and CLI see the same provider changes without either requiring the
-other to run. The supervisor resolves Grida home once and forwards that exact
-path to the sidecar and its sandbox policy. An explicit
+other to run. The supervisor resolves Grida home once and captures the same
+physical authority for custody and confinement. Linux binds that authority
+beneath a private namespace alias; it does not copy keys, reset migration
+fences or create another store. Both physical and namespace private roots are
+excluded from ordinary file and workspace admission. An explicit
 `GRIDA_AGENT_USER_DATA` override isolates both agent state and provider custody.
 Migration preserves ChatGPT OAuth, retires old API entries and resumes pending
 cleanup without reimporting keys. Older mixed-file writers must not run
@@ -114,22 +117,31 @@ happens before access, and malformed provider custody fails without fallback.
 Windows file privacy relies on the inherited user-directory ACL, not POSIX mode
 bits or the shared custody protocol. No renderer capability returns stored keys.
 
-On macOS and Linux, the sidecar runs under `srt` with no direct external
-destinations and `allow_local_binding: false`; Electron main supplies the two
-explicit capabilities above. A model-selected command is a third private
-sidecar-to-main capability: main gives each finite worker a fresh SRT profile
-containing only its exact workspace, own session scratch, and private command
-temp write roots. The coarse sidecar profile is not used as proof of
-cross-session shell isolation. Windows currently runs the sidecar without the
-outer wrapper: shell and external ACP are withheld, while structured local
-file tools remain available and no kernel egress fence exists. That is a
-documented nonconformance rather than a sandbox claim.
+On macOS and Linux, the retained service sidecar runs under the native
+`RetainedServiceSandbox`: Seatbelt on macOS, bubblewrap with an inherited
+seccomp filter on Linux. It has no new socket, listener or direct provider
+network capability. Main transfers only accepted connections and performs
+provider HTTP. The existing home-secret exclusions, protected native/legacy
+chat state and writable file/media roots remain in force. The launcher uses
+an executable and argument array, captures executable identity and passes no
+ambient shell, proxy or provider-key environment. Linux requires an unprivileged
+bubblewrap build and working user/PID/network namespaces; setup failure stops
+the retained service rather than starting it unconfined.
 
-Windows still accepts per-session scratch staging. Raster inputs remain
-operable through provider perception/`view_image`, and structured text
-(including SVG) remains operable through filesystem tools. Scratch-only binary
-inputs such as PDF/archives are withheld because the confined binary command
-tool is unavailable; the renderer does not create an inert attachment path.
+Linux keeps selected workspace/file paths unchanged while giving settings,
+provider custody and media private namespace ancestors with valid mapped
+ownership. The same physical files and SQLite lock inodes remain shared with
+native clients outside that namespace. Its working temp is namespace-local;
+durable media stays in the existing media library.
+
+The agent's finite commands use the separate Rust native sandbox helper and
+per-action permission scope. Neither command nor chat execution is owned by
+the retained sidecar. The narrow managed macOS retained-media profile remains
+available independently of ordinary file/workspace services.
+
+Windows retains its existing unwrapped file/media services with chat and local
+agent execution unavailable. Those services have no kernel confinement claim;
+renderer admission and HTTP authentication do not establish one.
 
 If a bug reproduces in files, workspaces, BYOK providers, sessions,
 or agent execution, add the first test in

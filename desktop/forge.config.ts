@@ -72,7 +72,7 @@ const osxNotarize =
 // `packagerConfig.ignore` to drop everything except `.vite` — so NO
 // node_modules ships, and anything the bundles leave `external` crashes the app
 // on launch with "Cannot find module" (0.0.3: @grida/desktop-bridge; 0.0.4:
-// @anthropic-ai/sandbox-runtime). This is a known forge bug
+// node-pty). This is a known forge bug
 // (electron/forge#3738, #3917, #4045).
 //
 // Idiomatic fix: package.json `dependencies` are EXACTLY the modules left
@@ -135,16 +135,13 @@ const config: ForgeConfig = {
     // (package.json `dependencies` = the vite externals) ship; `prune` then
     // keeps just those. See GRIDA-DESKTOP-BUILD-GUARD above.
     ignore: packageIgnore,
-    // @anthropic-ai/sandbox-runtime ships executable vendored binaries
-    // (vendor/seccomp/*/apply-seccomp) that cannot run from inside an asar —
-    // unpack it so they land on a real filesystem. node-pty likewise: its
+    // node-pty ships native binaries that must be unpacked. Its
     // native `pty.node` addon and `spawn-helper` executable cannot load/run
     // from inside an asar. @parcel/watcher (issue #805) is the same: its
     // per-platform prebuild package (`@parcel/watcher-<platform>-<arch>`)
     // carries the `.node` addon, which must load from the real filesystem.
     asar: {
-      unpack:
-        "**/node_modules/{@anthropic-ai/sandbox-runtime,node-pty,@parcel/watcher,@parcel/watcher-*}/**",
+      unpack: "**/node_modules/{node-pty,@parcel/watcher,@parcel/watcher-*}/**",
     },
     appBundleId: appBundleId,
     icon: icon,
@@ -290,12 +287,9 @@ const config: ForgeConfig = {
           // grida:// (prod) / grida-dev:// (insiders) deep linking
           `x-scheme-handler/${deepLinkScheme}`,
         ],
-        // GRIDA-SEC-004 — srt's Linux backend shells out to these.
-        // bubblewrap = namespace+seccomp sandbox; socat = unix-socket
-        // bridge for the HTTP/SOCKS5 proxies; ripgrep = mandatory
-        // deny-set search helper. Without them, srt initialize()
-        // throws and the supervisor refuses to boot.
-        requires: ["bubblewrap", "socat", "ripgrep"],
+        // GRIDA-SEC-004 — native retained-service filesystem/PID/network
+        // namespaces and inherited seccomp use the system bubblewrap binary.
+        requires: ["bubblewrap"],
       },
     }),
     new MakerDeb({
@@ -308,7 +302,7 @@ const config: ForgeConfig = {
           `x-scheme-handler/${deepLinkScheme}`,
         ],
         // GRIDA-SEC-004 — see MakerRpm comment above.
-        depends: ["bubblewrap", "socat", "ripgrep"],
+        depends: ["bubblewrap"],
       },
     }),
   ],
@@ -349,7 +343,7 @@ const config: ForgeConfig = {
       // GRIDA-SEC-004 — must be `true` so the supervisor can
       // `child_process.spawn(process.execPath, ..., { env: {
       // ELECTRON_RUN_AS_NODE: '1' } })` to boot the agent sidecar
-      // inside an srt wrap. Residual risk: a local attacker who
+      // inside native process confinement. Residual risk: a local attacker who
       // already controls the binary can pass the same env var to
       // run arbitrary JS — but they already own the binary, so this
       // is not a new vector.

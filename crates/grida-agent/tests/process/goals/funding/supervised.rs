@@ -9,6 +9,7 @@ const PROVIDERS: [(&str, &str); 2] = [
     ("openrouter", "https://openrouter.ai/api/v1"),
     ("vercel", "https://ai-gateway.vercel.sh/v1"),
 ];
+const GATEWAY: &str = "https://grida.co/api/v1/ai";
 
 fn called(request: &Value, name: &str) -> bool {
     request["messages"]
@@ -43,7 +44,8 @@ struct Worker {
 
 impl Worker {
     async fn open(state: &Path, home: &Path, endpoint: &str) -> Self {
-        let child = executable()
+        let mut command = executable();
+        command
             .args([
                 "serve",
                 "--stdio",
@@ -51,9 +53,13 @@ impl Worker {
                 "--supervised-provider",
                 "--state-dir",
             ])
-            .arg(state)
-            .arg("--credential-home")
-            .arg(home)
+            .arg(state);
+        if endpoint == GATEWAY {
+            command.args(["--supervised-gateway-scope", &"a".repeat(64)]);
+        } else {
+            command.arg("--credential-home").arg(home);
+        }
+        let child = command
             .args(["--endpoint", endpoint, "--model", "fixture-model"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -82,12 +88,20 @@ impl Worker {
             "goal/recover",
             "goal/funded-review",
             "goal/named-child",
+            "goal/spending",
+            "gateway/billing-status",
+            "session/turn-summary",
             "subagent/create",
             "subagent/inspect",
         ] {
             initialize["clientCapabilities"]["_meta"][format!("co.grida/{capability}")] = 1.into();
         }
         let ready = worker.request("initialize", initialize).await;
+        assert_eq!(
+            ready["agentCapabilities"]["_meta"]["co.grida/goal/spending"] == 1,
+            endpoint == GATEWAY,
+            "{ready}"
+        );
         for capability in [
             "co.grida/session/effort",
             "co.grida/goal/funded-review",
@@ -148,6 +162,21 @@ impl Worker {
                 Some("_co.grida/provider/cancel") => {
                     self.streams.remove(frame["params"]["id"].as_str().unwrap());
                 }
+                Some("_co.grida/gateway/read-job-billing") => {
+                    assert_eq!(self.endpoint, GATEWAY);
+                    assert!(
+                        frame["params"]["requestId"]
+                            .as_str()
+                            .unwrap()
+                            .starts_with("req_budget_")
+                    );
+                    self.client
+                        .respond(
+                            &frame["id"],
+                            json!({"kind":"settled","chargedMills":"0.25"}),
+                        )
+                        .await;
+                }
                 None if frame["id"] == id => {
                     assert!(frame.get("error").is_none(), "{frame}");
                     return frame["result"].clone();
@@ -164,14 +193,23 @@ impl Worker {
             Some("open") => {
                 assert_eq!(
                     params["target"],
-                    format!("{}/chat/completions", self.endpoint)
+                    format!(
+                        "{}/chat/completions{}",
+                        self.endpoint,
+                        if self.endpoint == GATEWAY {
+                            "/capped"
+                        } else {
+                            ""
+                        }
+                    )
                 );
-                assert!(
-                    params["headers"]
-                        .as_array()
-                        .unwrap()
-                        .contains(&json!(["authorization", "Bearer fixture-key"]))
-                );
+                let headers = params["headers"].as_array().unwrap();
+                if self.endpoint == GATEWAY {
+                    assert!(headers.contains(&json!(["x-gg-max-cost-mills", "1"])));
+                    assert!(!headers.iter().any(|field| field[0] == "authorization"));
+                } else {
+                    assert!(headers.contains(&json!(["authorization", "Bearer fixture-key"])));
+                }
                 let request: Value = serde_json::from_slice(
                     &STANDARD
                         .decode(params["initial"].as_str().unwrap())
@@ -180,6 +218,24 @@ impl Worker {
                 .unwrap();
                 assert_eq!(request["model"], "fixture-model");
                 let child = !offers(&request, "goal_report");
+                if self.endpoint == GATEWAY {
+                    for tool in request["tools"].as_array().into_iter().flatten() {
+                        let name = tool["function"]["name"].as_str().unwrap();
+                        assert!(
+                            [
+                                "goal_inspect",
+                                "goal_report",
+                                "delegate_review",
+                                "collect_review",
+                                "config_inspect",
+                                "question",
+                                "question_async"
+                            ]
+                            .contains(&name),
+                            "unqualified billed lane: {name}"
+                        );
+                    }
+                }
                 let defer_parent = !child
                     && !self.hold
                     && self.rotate.is_none()
@@ -234,10 +290,27 @@ impl Worker {
                     Reply::Finished("The funded review was integrated.")
                 };
                 stream.held = matches!(reply, Reply::Hold(_));
-                stream.chunk =
-                    Some(STANDARD.encode(fixture_body(reply, ProviderProtocol::OpenAiCompatible)));
+                let mut body = fixture_body(reply, ProviderProtocol::OpenAiCompatible);
+                let request_id = format!("req_budget_{}", self.dispatches.len());
+                if self.endpoint == GATEWAY {
+                    body = body.split("\n\n").map(|part| {
+                        if let Some(data) = part.strip_prefix("data: ")
+                            && let Ok(mut frame) = serde_json::from_str::<Value>(data)
+                            && !frame["choices"][0]["finish_reason"].is_null()
+                        {
+                            frame["grida_billing"] = json!({"version":1,"request_id":request_id,"status":"settled","charged_mills":"0.25"});
+                            return format!("data: {frame}");
+                        }
+                        part.to_owned()
+                    }).collect::<Vec<_>>().join("\n\n");
+                }
+                stream.chunk = Some(STANDARD.encode(body));
                 self.dispatches.push(stream.request.clone());
-                json!({"status":"ready","httpStatus":200})
+                if self.endpoint == GATEWAY {
+                    json!({"status":"ready","httpStatus":200,"requestId":request_id})
+                } else {
+                    json!({"status":"ready","httpStatus":200})
+                }
             }
             Some("read") => {
                 let stream = self.streams.get_mut(&id).unwrap();
@@ -323,10 +396,437 @@ impl Worker {
         if let Some(child) = &child {
             request["goal"]["named_child"] = child.clone().into();
         }
+        if self.endpoint == GATEWAY {
+            request["maxCostMills"] = "7".into();
+        }
         let accepted = self.request("_co.grida/goal/start", request.clone()).await;
         assert_eq!(accepted["inputId"], "funded-goal");
         (session, request, child)
     }
+}
+
+#[tokio::test]
+async fn rejected_goal_admission_cannot_publish_or_change_spending_authority() {
+    let root = TempDir::new().unwrap();
+    let directory = root.path().canonicalize().unwrap();
+    let state = directory.join("state");
+    let workspace = directory.join("workspace");
+    std::fs::create_dir(&workspace).unwrap();
+    let mut worker = Worker::open(&state, &directory, GATEWAY).await;
+    let created = worker
+        .request("session/new", json!({"cwd":workspace,"mcpServers":[]}))
+        .await;
+    let session = created["sessionId"].as_str().unwrap().to_owned();
+    worker.parent = session.clone();
+    let mut start = json!({
+        "sessionId":session,"inputId":"funded-goal","effort":"ultra","operatingRegime":"act",
+        "prompt":[{"type":"text","text":"Review the export."}],"maxCostMills":"7",
+        "goal":{"objective":{"description":"Review the export","criteria":["Export reviewed"]},
+            "allowance":{"work_turns":1,"inference_steps":2},"automatic":false},
+    });
+    let rejected = worker
+        .client
+        .request("_co.grida/goal/start", start.clone())
+        .await;
+    assert!(
+        rejected
+            .to_string()
+            .contains("goal_child_allowance_unavailable"),
+        "{rejected}"
+    );
+    assert!(!state.join("task-spending").exists());
+    start["goal"]["allowance"]["inference_steps"] = 7.into();
+    start["goal"]["named_child"] = "missing-child".into();
+    let rejected = worker
+        .client
+        .request("_co.grida/goal/start", start.clone())
+        .await;
+    assert!(
+        rejected
+            .to_string()
+            .contains("goal_named_child_unavailable"),
+        "{rejected}"
+    );
+    assert!(!state.join("task-spending").exists());
+    assert!(worker.dispatches.is_empty());
+    start["goal"].as_object_mut().unwrap().remove("named_child");
+    let accepted = worker.request("_co.grida/goal/start", start).await;
+    assert_eq!(accepted["inputId"], "funded-goal");
+    let goal = worker
+        .wait(
+            "_co.grida/goal/inspect",
+            json!({"sessionId":session}),
+            |view| view["goal"]["spent"]["inference_steps"] == 5,
+        )
+        .await;
+    assert_eq!(
+        goal["goal"]["spending"]["perRequestMaxCostMills"], "1",
+        "{goal}"
+    );
+    assert_eq!(goal["goal"]["spending"]["chargedMills"], "1.25", "{goal}");
+    worker
+        .wait(
+            "_co.grida/session/snapshot",
+            json!({"sessionId":session}),
+            |view| view["current"].is_null(),
+        )
+        .await;
+    assert_eq!(worker.dispatches.len(), 5);
+    worker.client.close().await;
+}
+
+#[tokio::test]
+async fn failed_spending_publication_keeps_accepted_input_fail_closed_on_retry() {
+    let root = TempDir::new().unwrap();
+    let directory = root.path().canonicalize().unwrap();
+    let state = directory.join("state");
+    let workspace = directory.join("workspace");
+    std::fs::create_dir(&workspace).unwrap();
+    let mut worker = Worker::open(&state, &directory, GATEWAY).await;
+    let created = worker
+        .request("session/new", json!({"cwd":workspace,"mcpServers":[]}))
+        .await;
+    let session = created["sessionId"].as_str().unwrap().to_owned();
+    worker.parent = session.clone();
+    let start = json!({
+        "sessionId":session,"inputId":"funded-goal","effort":"ultra","operatingRegime":"act",
+        "prompt":[{"type":"text","text":"Review the export."}],"maxCostMills":"7",
+        "goal":{"objective":{"description":"Review the export","criteria":["Export reviewed"]},
+            "allowance":{"work_turns":1,"inference_steps":7},"automatic":false},
+    });
+    // A real private-state publication error occurs after durable acceptance.
+    // Removing its cause cannot turn an accepted retry into fresh authority.
+    std::fs::write(state.join("task-spending"), b"publication unavailable").unwrap();
+    let rejected = worker
+        .client
+        .request("_co.grida/goal/start", start.clone())
+        .await;
+    assert!(
+        rejected
+            .to_string()
+            .contains("goal_spending_publication_unconfirmed"),
+        "{rejected}"
+    );
+    let captured = worker
+        .request(
+            "_co.grida/session/input",
+            json!({"sessionId":session,"inputId":"funded-goal"}),
+        )
+        .await;
+    assert_eq!(captured["settings"]["goalMaxCostMills"], "7", "{captured}");
+    std::fs::remove_file(state.join("task-spending")).unwrap();
+    let retry = worker.client.request("_co.grida/goal/start", start).await;
+    assert!(retry.get("error").is_some(), "{retry}");
+    assert_eq!(
+        std::fs::read_dir(state.join("task-spending"))
+            .unwrap()
+            .count(),
+        0
+    );
+    assert!(worker.dispatches.is_empty());
+    worker.client.close().await;
+}
+
+#[tokio::test]
+async fn gateway_goal_spending_is_shared_by_parent_and_review_and_retained_after_restart() {
+    for named in [false, true] {
+        let root = TempDir::new().unwrap();
+        let directory = root.path().canonicalize().unwrap();
+        let state = directory.join("state");
+        let workspace = directory.join("workspace");
+        std::fs::create_dir(&workspace).unwrap();
+        let mut worker = Worker::open(&state, &directory, GATEWAY).await;
+        let (session, start, _) = worker.start(&workspace, named, "act").await;
+        let captured = worker
+            .request(
+                "_co.grida/session/input",
+                json!({"sessionId":session,"inputId":"funded-goal"}),
+            )
+            .await;
+        assert_eq!(captured["settings"]["goalMaxCostMills"], "7", "{captured}");
+        let goal = worker
+            .wait(
+                "_co.grida/goal/inspect",
+                json!({"sessionId":session}),
+                |view| view["goal"]["spent"]["inference_steps"] == 5,
+            )
+            .await;
+        let budget = json!({
+            "maxCostMills":"7", "perRequestMaxCostMills":"1", "chargedMills":"1.25",
+            "heldMills":"0", "remainingMills":"5.75", "unsettledAttempts":0,
+        });
+        assert_eq!(goal["goal"]["spending"], budget, "{goal}");
+        assert_eq!(worker.dispatches.len(), 5);
+        worker
+            .wait(
+                "_co.grida/session/snapshot",
+                json!({"sessionId":session}),
+                |view| view["current"].is_null(),
+            )
+            .await;
+        worker.client.close().await;
+
+        let mut reopened = Worker::open(&state, &directory, GATEWAY).await;
+        reopened
+            .request(
+                "session/load",
+                json!({"sessionId":session,"cwd":workspace,"mcpServers":[]}),
+            )
+            .await;
+        let retained = reopened
+            .request("_co.grida/goal/inspect", json!({"sessionId":session}))
+            .await;
+        let captured = reopened
+            .request(
+                "_co.grida/session/input",
+                json!({"sessionId":session,"inputId":"funded-goal"}),
+            )
+            .await;
+        assert_eq!(captured["settings"]["goalMaxCostMills"], "7", "{captured}");
+        assert_eq!(retained["goal"]["spending"], budget);
+        let retry = reopened
+            .request("_co.grida/goal/start", start.clone())
+            .await;
+        assert_eq!(retry["disposition"], "completed", "{retry}");
+        assert!(reopened.dispatches.is_empty());
+
+        // A missing authority record must never be recreated by an exact
+        // start retry, which would erase already charged and held partitions.
+        let owners = std::fs::read_dir(state.join("task-spending"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>();
+        assert_eq!(owners.len(), 1);
+        for entry in std::fs::read_dir(&owners[0]).unwrap() {
+            std::fs::remove_file(entry.unwrap().path()).unwrap();
+        }
+        let missing = reopened.client.request("_co.grida/goal/start", start).await;
+        assert!(missing.get("error").is_some(), "{missing}");
+        assert_eq!(std::fs::read_dir(&owners[0]).unwrap().count(), 0);
+        assert!(reopened.dispatches.is_empty());
+        reopened.client.close().await;
+    }
+}
+
+#[tokio::test]
+async fn gateway_goal_spending_keeps_parent_and_child_holds_after_stop_and_restart() {
+    let root = TempDir::new().unwrap();
+    let directory = root.path().canonicalize().unwrap();
+    let state = directory.join("state");
+    let workspace = directory.join("workspace");
+    std::fs::create_dir(&workspace).unwrap();
+    let mut worker = Worker::open(&state, &directory, GATEWAY).await;
+    worker.hold = true;
+    let (session, _, _) = worker.start(&workspace, false, "act").await;
+    worker.wait_held(&session).await;
+    let select = json!({"sessionId":session});
+    let snapshot = worker
+        .request("_co.grida/session/snapshot", select.clone())
+        .await;
+    let turn = snapshot["current"]["turnId"].clone();
+    worker
+        .request(
+            "_co.grida/session/stop",
+            task_basis(&snapshot, &session, "stop-budgeted-work"),
+        )
+        .await;
+    worker
+        .wait("_co.grida/session/snapshot", select.clone(), |view| {
+            view["current"].is_null()
+        })
+        .await;
+    let goal = worker
+        .request("_co.grida/goal/inspect", select.clone())
+        .await;
+    assert_eq!(goal["goal"]["spending"]["heldMills"], "2", "{goal}");
+    assert_eq!(goal["goal"]["spending"]["chargedMills"], "0.25", "{goal}");
+    assert_eq!(goal["goal"]["spending"]["unsettledAttempts"], 2, "{goal}");
+    worker.client.close().await;
+    let mut reopened = Worker::open(&state, &directory, GATEWAY).await;
+    reopened
+        .request(
+            "session/load",
+            json!({"sessionId":session,"cwd":workspace,"mcpServers":[]}),
+        )
+        .await;
+    let retained = reopened.request("_co.grida/goal/inspect", select).await;
+    assert_eq!(retained["goal"]["spending"], goal["goal"]["spending"]);
+    assert!(reopened.dispatches.is_empty());
+    let summary = reopened
+        .request(
+            "_co.grida/session/turn-summary",
+            json!({"sessionId":session,"turnId":turn}),
+        )
+        .await;
+    let forged = reopened.request("_co.grida/gateway/billing-status", json!({"sessionId":session,"turnId":turn,"operationId":"unrecorded","attemptId":"unrecorded"})).await;
+    assert_eq!(forged, json!({"kind":"unavailable"}));
+    let unchanged = reopened
+        .request("_co.grida/goal/inspect", json!({"sessionId":session}))
+        .await;
+    assert_eq!(unchanged["goal"]["spending"], retained["goal"]["spending"]);
+    let billing = &summary["gatewayBilling"];
+    let mut refreshed = 0;
+    for attempt in billing["attempts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .chain(billing["review"]["attempts"].as_array().unwrap())
+        .filter(|attempt| attempt["kind"] != "settled")
+    {
+        assert_eq!(attempt["refreshable"], true, "{summary}");
+        let refresh = json!({"sessionId":session,"turnId":turn,"operationId":attempt["operationId"],"attemptId":attempt["attemptId"]});
+        for _ in 0..2 {
+            let settled = reopened
+                .request("_co.grida/gateway/billing-status", refresh.clone())
+                .await;
+            assert_eq!(settled, json!({"kind":"settled","chargedMills":"0.25"}));
+        }
+        refreshed += 1;
+    }
+    assert_eq!(refreshed, 2, "{summary}");
+    let reconciled = reopened
+        .request("_co.grida/goal/inspect", json!({"sessionId":session}))
+        .await;
+    assert_eq!(
+        reconciled["goal"]["spending"]["heldMills"], "0",
+        "{reconciled}"
+    );
+    assert_eq!(
+        reconciled["goal"]["spending"]["chargedMills"], "0.75",
+        "{reconciled}"
+    );
+    assert_eq!(
+        reconciled["goal"]["spending"]["remainingMills"], "6.25",
+        "{reconciled}"
+    );
+    assert!(reopened.dispatches.is_empty());
+    reopened.client.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires GRIDA_AGENT_PRE_TASK_POLICY_BIN pointing to a reviewed task-policy-unsupported worker"]
+async fn previous_worker_cannot_resume_a_capped_goal_or_its_review_without_enforcing_spend() {
+    async fn read_without_dispatch(
+        client: &mut PrivateStdio,
+        method: &str,
+        params: Value,
+    ) -> Value {
+        let id = client.send(method, params).await;
+        loop {
+            let frame = client.read_frame().await;
+            assert_ne!(
+                frame["method"], "_co.grida/provider/exchange",
+                "old worker attempted uncapped work"
+            );
+            if frame["id"] == id {
+                return frame;
+            }
+        }
+    }
+    let binary = std::env::var("GRIDA_AGENT_PRE_TASK_POLICY_BIN").unwrap();
+    let root = TempDir::new().unwrap();
+    let directory = root.path().canonicalize().unwrap();
+    let state = directory.join("state");
+    let workspace = directory.join("workspace");
+    std::fs::create_dir(&workspace).unwrap();
+    let mut worker = Worker::open(&state, &directory, GATEWAY).await;
+    worker.hold = true;
+    let (session, mut start, _) = worker.start(&workspace, false, "act").await;
+    worker.wait_held(&session).await;
+    let select = json!({"sessionId":session});
+    let snapshot = worker
+        .request("_co.grida/session/snapshot", select.clone())
+        .await;
+    worker
+        .request(
+            "_co.grida/session/pause",
+            task_basis(&snapshot, &session, "pause-capped-work"),
+        )
+        .await;
+    worker
+        .wait("_co.grida/session/snapshot", select.clone(), |view| {
+            view["current"]["disposition"] == "suspended"
+        })
+        .await;
+    let owner = std::fs::read_dir(state.join("task-spending"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let ledger = std::fs::read_dir(owner)
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let before = std::fs::read(&ledger).unwrap();
+    worker.client.close().await;
+
+    let process = Command::new(binary)
+        .kill_on_drop(true)
+        .args([
+            "serve",
+            "--stdio",
+            "--subagents",
+            "--supervised-provider",
+            "--state-dir",
+        ])
+        .arg(&state)
+        .args([
+            "--supervised-gateway-scope",
+            &"a".repeat(64),
+            "--endpoint",
+            GATEWAY,
+            "--model",
+            "fixture-model",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut previous = PrivateStdio::from_child(process);
+    let mut initialize = extension_initialize();
+    for capability in [
+        "provider/egress",
+        "session/effort",
+        "goal/start",
+        "goal/inspect",
+        "goal/control",
+        "goal/recover",
+        "goal/funded-review",
+        "goal/spending",
+    ] {
+        initialize["clientCapabilities"]["_meta"][format!("co.grida/{capability}")] = 1.into();
+    }
+    let ready = read_without_dispatch(&mut previous, "initialize", initialize).await;
+    assert!(ready["result"]["agentCapabilities"]["_meta"]["co.grida/goal/spending"].is_null());
+    let loaded = read_without_dispatch(
+        &mut previous,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace,"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("error").is_none(), "{loaded}");
+    start.as_object_mut().unwrap().remove("maxCostMills");
+    let retry = read_without_dispatch(&mut previous, "_co.grida/goal/start", start).await;
+    assert_eq!(retry["error"]["data"], "input_identity_reused", "{retry}");
+    let snapshot =
+        read_without_dispatch(&mut previous, "_co.grida/session/snapshot", select.clone()).await;
+    read_without_dispatch(
+        &mut previous,
+        "_co.grida/session/resume",
+        task_basis(&snapshot["result"], &session, "old-resume-capped-work"),
+    )
+    .await;
+    for _ in 0..5 {
+        read_without_dispatch(&mut previous, "_co.grida/goal/recover", select.clone()).await;
+        read_without_dispatch(&mut previous, "_co.grida/session/snapshot", select.clone()).await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(std::fs::read(&ledger).unwrap(), before);
+    previous.close().await;
 }
 
 #[tokio::test]

@@ -139,6 +139,11 @@ accepts fixed absolute protected roots and checks an absolute candidate with
 exists. Unresolvable aliases fail closed. `WorkspaceRegistry` accepts these roots
 as its third constructor argument and `FileRegistry` as its first; both recheck
 saved grants before returning file authority. The daemon supplies its provider
-credential directory to both registries. This prevents opening that directory, a
-child or an ancestor as an ordinary file/workspace grant; it is not an OS sandbox
-or protection against a hostile process racing filesystem mutations.
+credential directory and the host's explicit `protected_file_roots` to both
+registries and to catalog-backed workspace reads. These exclusions reject the
+root, its children, enclosing directories, and canonical aliases before ordinary
+workspace admission changes the persisted list. Existing workspace entries and
+saved file handles are rechecked on use, including after alias retargeting. The
+host chooses additional roots; the daemon does not discover private state or
+infer trust. This is not an OS sandbox or protection against a hostile process
+racing filesystem mutations.

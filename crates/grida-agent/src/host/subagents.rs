@@ -228,7 +228,7 @@ impl Host {
         if view.current.is_none() && !view.admission_paused {
             self.check_ready_capacity(&child).await?;
         }
-        let submission = self
+        let mut submission = self
             .capture_input(
                 &view,
                 input.clone(),
@@ -250,6 +250,21 @@ impl Host {
                 },
             )
             .await?;
+        let parent_inputs = self
+            .store
+            .turn_submissions(parent.clone(), parent_turn.clone())
+            .await?;
+        if let [parent_input] = parent_inputs.as_slice()
+            && parent_input.payload.schema().as_str() == INPUT_SCHEMA
+            && matches!(parent_input.payload.version(), 2 | 3)
+        {
+            let captured: StoredPrompt = decode_input(parent_input)?;
+            if captured.spending.is_some() {
+                let mut child: StoredPrompt = decode_input(&submission)?;
+                child.spending = captured.spending;
+                submission.payload = encode_stored_prompt(&child)?;
+            }
+        }
         self.store
             .submit_at_revision(child.clone(), submission, view.revision)
             .await?;
@@ -667,7 +682,7 @@ pub(super) fn turn_link(
     struct RetainedAssignment {
         subagent: Option<Assignment>,
     }
-    let assignment = (input.schema().as_str() == INPUT_SCHEMA && matches!(input.version(), 1 | 2))
+    let assignment = (input.schema().as_str() == INPUT_SCHEMA && matches!(input.version(), 1..=3))
         .then(|| serde_json::from_slice::<RetainedAssignment>(input.bytes()).ok())
         .flatten()
         .and_then(|stored| stored.subagent);
@@ -876,12 +891,12 @@ mod tests {
             encode(INPUT_SCHEMA, version, &json!({"subagent":assignment})).unwrap()
         };
         let assignment = Assignment::new(turn.clone());
-        for version in [1, 2] {
+        for version in [1, 2, 3] {
             let link = linked(&ordinary, &input(version, assignment.clone()));
             assert_eq!(link.session, parent);
             assert_eq!(link.turn.as_ref(), Some(&turn));
         }
-        let unknown = linked(&ordinary, &input(3, assignment.clone()));
+        let unknown = linked(&ordinary, &input(4, assignment.clone()));
         assert_eq!(unknown.session, parent);
         assert!(unknown.turn.is_none());
         let invalid = encode(INPUT_SCHEMA, 2, &json!({"subagent":{"parent_turn":12}})).unwrap();

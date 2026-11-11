@@ -1,4 +1,5 @@
 import type {
+  NativeHookInspection,
   DesktopNativeChat,
   NativeChatArtifactSaveResult,
   NativeChatApproval,
@@ -46,6 +47,7 @@ import type {
   NativeEditorSvgText,
   NativeSubagentClient,
 } from "@grida/desktop-bridge";
+import { GoalSpending } from "./goal-spending";
 import { isSupportedImageType } from "./image-attachment";
 import { NativeSideChatController } from "./native-side-chat-controller";
 import { NativeSubagentController } from "./native-subagent-controller";
@@ -143,6 +145,10 @@ export type NativeChatView = Readonly<{
   contextLimitDraft: string;
   contextLimitBusy: boolean;
   contextLimitError: string | null;
+  hooksOpen: boolean;
+  hooks: NativeHookInspection | null;
+  hooksBusy: boolean;
+  hooksError: string | null;
   reviewConfiguration: boolean;
   observation: NativeChatObservation | null;
   turnSummary: (NativeChatTurnSummary & { detailsUnavailable?: true }) | null;
@@ -294,6 +300,10 @@ const EMPTY: NativeChatView = Object.freeze({
   contextLimitDraft: "",
   contextLimitBusy: false,
   contextLimitError: null,
+  hooksOpen: false,
+  hooks: null,
+  hooksBusy: false,
+  hooksError: null,
   reviewConfiguration: false,
   observation: null,
   turnSummary: null,
@@ -649,6 +659,10 @@ export class NativeChatController {
       contextLimitDraft: "",
       contextLimitBusy: false,
       contextLimitError: null,
+      hooksOpen: false,
+      hooks: null,
+      hooksBusy: false,
+      hooksError: null,
       reviewConfiguration: false,
       observation: null,
       turnSummary: null,
@@ -980,6 +994,74 @@ export class NativeChatController {
 
   get hasContextLimit(): boolean {
     return !!this.bridge.contextLimit && !!this.bridge.saveContextLimit;
+  }
+
+  get hasHooks(): boolean {
+    return (
+      !!this.bridge.inspectHooks &&
+      !!this.bridge.importHook &&
+      !!this.bridge.removeHook
+    );
+  }
+
+  async toggleHooks(): Promise<void> {
+    if (!this.hasHooks || this.view.hooksBusy) return;
+    const hooksOpen = !this.view.hooksOpen;
+    this.update({ hooksOpen });
+    if (hooksOpen) await this.refreshHooks();
+  }
+
+  async refreshHooks(): Promise<void> {
+    const scope = this.scope;
+    if (!scope || !this.bridge.inspectHooks || this.view.hooksBusy) return;
+    this.update({ hooksBusy: true, hooksError: null });
+    try {
+      const hooks = await this.bridge.inspectHooks(
+        scope.attachment?.attachmentId
+      );
+      if (this.owns(scope)) this.update({ hooks });
+    } catch {
+      if (this.owns(scope))
+        this.update({ hooksError: "Couldn't inspect lifecycle checks." });
+    } finally {
+      if (this.owns(scope)) this.update({ hooksBusy: false });
+    }
+  }
+
+  async importHook(): Promise<void> {
+    if (!this.bridge.importHook) return;
+    await this.changeHooks(() => this.bridge.importHook!());
+  }
+
+  async removeHook(id: string, revision: string): Promise<void> {
+    if (
+      !this.bridge.removeHook ||
+      !this.view.hooks?.saved.some(
+        (hook) => hook.id === id && hook.revision === revision
+      )
+    )
+      return;
+    await this.changeHooks(() => this.bridge.removeHook!(id, revision));
+  }
+
+  private async changeHooks(
+    change: () => Promise<NativeHookInspection | null>
+  ): Promise<void> {
+    const scope = this.scope;
+    if (!scope || this.view.hooksBusy) return;
+    this.update({ hooksBusy: true, hooksError: null });
+    try {
+      const hooks = await change();
+      if (this.owns(scope) && hooks) this.update({ hooks });
+    } catch {
+      if (this.owns(scope))
+        this.update({
+          hooksError:
+            "Couldn't save the lifecycle check. Review its definition and try again.",
+        });
+    } finally {
+      if (this.owns(scope)) this.update({ hooksBusy: false });
+    }
   }
 
   get canReviewConfiguration(): boolean {
@@ -1492,10 +1574,34 @@ export class NativeChatController {
   }
 
   async startGoal(
-    request: Omit<NativeChatGoalRequest, "operatingRegime">
+    request: Omit<NativeChatGoalRequest, "operatingRegime">,
+    maximumUsd?: string
   ): Promise<boolean> {
     const scope = this.scope;
     if (!scope || !this.canStartGoal || !this.bridge.startGoal) return false;
+    try {
+      const maxCostMills =
+        maximumUsd === undefined
+          ? request.maxCostMills
+          : GoalSpending.fromUsd(maximumUsd);
+      const { maxCostMills: _previousMaximum, ...rest } = request;
+      request = {
+        ...rest,
+        ...(maxCostMills !== undefined ? { maxCostMills } : {}),
+      };
+      if (
+        maxCostMills !== undefined &&
+        (!GoalSpending.validMills(maxCostMills, true) ||
+          !this.view.observation?.snapshot.goalSpendingAvailable)
+      )
+        throw new Error("unavailable");
+    } catch {
+      this.update({
+        error:
+          "Enter a positive USD spending limit on a connection that supports enforced goal spending.",
+      });
+      return false;
+    }
     const problem = goalRequestProblem(request, this.view);
     if (problem) {
       this.update({ error: problem });
@@ -4022,6 +4128,11 @@ function goalRequestProblem(
     return "Scheduled goal check-ins are unavailable on this connection.";
   if (request.effort === "ultra" && !view.goalEffortAvailable)
     return "Ultra is unavailable for goals on this connection.";
+  if (
+    request.maxCostMills !== undefined &&
+    request.allowance.inferenceSteps > 4096
+  )
+    return "An enforced spending limit supports at most 4,096 inference steps per goal.";
   if (
     request.namedChildId &&
     (request.effort !== "ultra" ||

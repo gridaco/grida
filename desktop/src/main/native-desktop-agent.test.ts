@@ -882,6 +882,12 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       agent = await launch();
       await agent.ensure(workspace.id);
       const original = agent.current(workspace.id)!.chat;
+      expect(await original.inspectHooks()).toMatchObject({
+        saved: [],
+        active: [],
+        results: [],
+        activation: "current",
+      });
       const originalSession = await original.create();
       const { choices } = await agent.profiles(workspace.id);
       expect(choices).toEqual([
@@ -1819,5 +1825,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       await fs.rm(base, { recursive: true, force: true });
     }
   },
-  30_000
+  // Multiple native workers and credential checks span two host lifetimes.
+  60_000
 );

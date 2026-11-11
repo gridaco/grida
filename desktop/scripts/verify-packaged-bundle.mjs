@@ -7,7 +7,7 @@
 // physically present in the packaged app, or it crashes on launch with
 // "Cannot find module" — while every other CI check stays green. We
 // learned this the expensive way, one missing module per release
-// (@grida/desktop-bridge, then @anthropic-ai/sandbox-runtime, ...).
+// (unbuilt workspace modules or native addons).
 //
 // This oracle inspects the ACTUAL packaged bundles, discovers every
 // external require, and verifies each one resolves in the packaged
@@ -23,10 +23,6 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { verifyNativeAgentRuntime } from "./native-agent-package.mjs";
-
-const { binaryHeader } = await import(
-  new URL("../../scripts/cli-release/native.mjs", import.meta.url).href
-);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -110,37 +106,12 @@ if (!asar || !fs.existsSync(asar)) {
 if (process.argv[3] === "--native-agent") {
   const [platform, arch] = process.argv.slice(4);
   const resources = path.dirname(asar);
-  if (platform === "linux") verifyLinuxSeccomp(resources, arch);
   const ran = await verifyNativeAgentRuntime(resources, platform, arch);
   console.log("✔ packaged native agent executables verified.");
   if (ran)
     console.log(
       "✔ packaged native agent ACP startup, reopen and EOF verified."
     );
-}
-
-function verifyLinuxSeccomp(resources, arch) {
-  if (arch !== "arm64" && arch !== "x64")
-    throw new Error("Unsupported packaged Linux seccomp architecture");
-  const applyPath = path.join(
-    fs.realpathSync(resources),
-    "app.asar.unpacked",
-    "node_modules",
-    "@anthropic-ai",
-    "sandbox-runtime",
-    "vendor",
-    "seccomp",
-    arch,
-    "apply-seccomp"
-  );
-  if (
-    !fs.lstatSync(applyPath).isFile() ||
-    fs.realpathSync(applyPath) !== applyPath
-  )
-    throw new Error("Packaged Linux seccomp helper is not a regular file");
-  fs.accessSync(applyPath, fs.constants.X_OK);
-  binaryHeader(fs.readFileSync(applyPath), { os: "linux", cpu: arch });
-  console.log("✔ packaged Linux seccomp helper verified outside app.asar.");
 }
 
 // Extract the asar so we can resolve modules against the packaged tree
@@ -172,8 +143,8 @@ const bundles = fs
 
 // Verify the FULL transitive closure of every external is present in the
 // packaged tree — not just the top-level requires. A direct external can
-// resolve while one of ITS runtime deps is missing (e.g. sandbox-runtime
-// present but `commander` pruned), which still crashes on launch.
+// resolve while one of ITS runtime deps is missing (e.g. a native watcher
+// present but its platform prebuild pruned), which still crashes on launch.
 const missing = [];
 const closure = new Set(); // package names that legitimately ship
 const visited = new Set();

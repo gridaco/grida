@@ -59,8 +59,10 @@ impl Host {
             basis.fingerprint,
             omissions,
         )?);
+        let store = Arc::new(SqliteStore::open_in_memory()?);
         let host = Self {
-            store: Arc::new(SqliteStore::open_in_memory()?),
+            spending: Arc::new(spending::Store::detached(store.clone())),
+            store,
             state_dir: None,
             execution: self.execution.clone(),
             gg_connection: None,

@@ -7,7 +7,9 @@ use agent_kit_core::tools::{
     Inventory, InventorySnapshot, Invocation, InvocationContext, RecoveryKind, Tool,
     ToolDefinition, ToolOutcome,
 };
-use agent_kit_core::turn::{CommitReceipt, ControlDirective, OperationOutcome, TurnOutcome};
+use agent_kit_core::turn::{
+    CommitReceipt, ControlDirective, OperationInput, OperationOutcome, TurnOutcome,
+};
 use agent_kit_core::{
     BindingId, BoxFuture, ChangeId, Envelope, Error, ErrorKind, Fingerprint, OperationId,
     PrincipalId, Result, SchemaId, ScopeId, SessionId, ToolId, TurnId,
@@ -690,4 +692,303 @@ async fn a_completed_allow_decision_cannot_settle_over_new_input() {
         expected_control:basis.state.controls().revision, expected_history:basis.state.history().position(), outcome,
     }).await.unwrap(), FinishOutcome::Continue(error) if error.kind == ErrorKind::Conflict));
     assert_eq!(fixture.effects(), ["allowed"]);
+}
+
+struct LifecycleFixtureTool {
+    definition: ToolDefinition,
+    log: PathBuf,
+    entered: Arc<Notify>,
+}
+
+impl Tool for LifecycleFixtureTool {
+    fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+    fn validate(&self, arguments: &ToolArguments) -> Result<()> {
+        let ToolArguments::Json(value) = arguments else {
+            panic!("expected hook envelope")
+        };
+        let _: grida_agent_master::lifecycle_hooks::HookInvocation =
+            serde_json::from_value(value.clone()).unwrap();
+        Ok(())
+    }
+    fn invoke(&self, invocation: Invocation, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async move {
+            let ToolArguments::Json(value) = invocation.arguments() else {
+                unreachable!()
+            };
+            let selected: grida_agent_master::lifecycle_hooks::HookInvocation =
+                serde_json::from_value(value.clone()).unwrap();
+            let mut log = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&self.log)
+                .unwrap();
+            writeln!(log, "{}", selected.hook.id).unwrap();
+            log.sync_data().unwrap();
+            if selected.hook.id.as_str() == "interrupted" {
+                self.entered.notify_one();
+                return std::future::pending().await;
+            }
+            let reply = match selected.hook.id.as_str() {
+                "observe" => return ToolOutcome::failed("observer unavailable"),
+                "deny" => json!({"decision":"deny","reason":"Required verification did not pass."}),
+                "invalid" => json!({"decision":"allow","permissions":"all"}),
+                _ => json!({"decision":"allow","context":"Inspected contextual data."}),
+            };
+            ToolOutcome {
+                status: OutcomeStatus::Succeeded,
+                content: vec![],
+                structured: Some(reply),
+                receipt: None,
+                truncated: false,
+            }
+        })
+    }
+}
+
+fn lifecycle_inventory(fixture: &Fixture) -> InventorySnapshot {
+    let mut inventory = Inventory::new();
+    inventory
+        .insert(Arc::new(LifecycleFixtureTool {
+            definition: ToolDefinition {
+                id: tool_id("lifecycle_handler"),
+                version: 1,
+                description: "Reviewed lifecycle fixture.".into(),
+                input: InputFormat::Json(json!({"type":"object"})),
+                max_input_bytes: 64 * 1024,
+                max_output_bytes: 4096,
+                recovery: RecoveryKind::Unavailable,
+            },
+            log: fixture.log_path(),
+            entered: fixture.entered.clone(),
+        }))
+        .unwrap();
+    inventory.snapshot(&[tool_id("lifecycle_handler")]).unwrap()
+}
+
+fn lifecycle_selection(
+    id: &str,
+    event: grida_agent_master::lifecycle_hooks::HookEvent,
+    mode: CheckMode,
+) -> grida_agent_master::lifecycle_hooks::LifecycleHook {
+    grida_agent_master::lifecycle_hooks::LifecycleHook {
+        id: BindingId::new(id).unwrap(),
+        source: "trusted-user".into(),
+        revision: Fingerprint::of(&(id, "reviewed")).unwrap(),
+        event,
+        tool: None,
+        mode,
+        handler: tool_id("lifecycle_handler"),
+    }
+}
+
+#[tokio::test]
+async fn lifecycle_context_is_ordered_attributed_and_reused_after_restart() {
+    use grida_agent_master::lifecycle_hooks::*;
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let mut turn = fixture
+        .open(&store, &CompletionChecks::new(vec![]).unwrap())
+        .await;
+    let hooks = LifecycleHooks::new(vec![
+        lifecycle_selection("observe", HookEvent::SessionStart, CheckMode::Observe),
+        lifecycle_selection("context", HookEvent::SessionStart, CheckMode::Required),
+    ])
+    .unwrap();
+    let grants = hooks
+        .definitions()
+        .iter()
+        .map(|hook| (hook.id.clone(), selection()))
+        .collect();
+    let occurrence = HookOccurrence::new(
+        &turn.view(),
+        HookMoment::SessionStart {
+            control_revision: turn.view().state.controls().revision,
+        },
+    );
+    let review = hooks
+        .review(
+            &turn.operations(),
+            occurrence.clone(),
+            &lifecycle_inventory(&fixture),
+            &grants,
+        )
+        .await
+        .unwrap();
+    assert_eq!(review.decision, HookDecision::Allow);
+    assert_eq!(review.results[0].status, CheckStatus::Failed);
+    assert_eq!(review.results[1].status, CheckStatus::Allowed);
+    assert_eq!(fixture.effects(), ["observe", "context"]);
+    let context = hooks.context(&turn.view());
+    assert_eq!(context.len(), 1);
+    assert_eq!(context[0]["source"], "trusted-user");
+    assert_eq!(context[0]["trust"], "contextual_data");
+    suspend(&mut turn).await;
+    drop(turn);
+    drop(store);
+    let store = fixture.reopen().await;
+    let turn = fixture.resume(&store).await;
+    let review = hooks
+        .review(
+            &turn.operations(),
+            occurrence,
+            &lifecycle_inventory(&fixture),
+            &grants,
+        )
+        .await
+        .unwrap();
+    assert_eq!(review.decision, HookDecision::Allow);
+    assert_eq!(hooks.context(&turn.view()), context);
+    assert_eq!(hooks.results(&turn.view()).len(), 2);
+    assert_eq!(fixture.effects(), ["observe", "context"]);
+}
+
+#[tokio::test]
+async fn an_after_tool_hook_preserves_the_effect_and_records_skipped_following_checks() {
+    use grida_agent_master::lifecycle_hooks::*;
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let turn = fixture
+        .open(&store, &CompletionChecks::new(vec![]).unwrap())
+        .await;
+    let effect = prior_effect(&turn).await;
+    let view = turn.view();
+    let record = view.operation(&effect).unwrap();
+    let OperationInput::Tool(invocation) = &record.record.input else {
+        unreachable!()
+    };
+    let Some(OperationOutcome::Tool(outcome)) = record.outcome() else {
+        unreachable!()
+    };
+    let original = outcome.clone();
+    let mut denied = lifecycle_selection("deny", HookEvent::AfterTool, CheckMode::Required);
+    denied.tool = Some(tool_id("fixture_action"));
+    let hooks = LifecycleHooks::new(vec![
+        denied,
+        lifecycle_selection("later", HookEvent::AfterTool, CheckMode::Required),
+    ])
+    .unwrap();
+    let grants = hooks
+        .definitions()
+        .iter()
+        .map(|hook| (hook.id.clone(), selection()))
+        .collect();
+    let review = hooks
+        .review(
+            &turn.operations(),
+            HookOccurrence::new(
+                &view,
+                HookMoment::AfterTool {
+                    operation: effect.clone(),
+                    invocation: invocation.clone(),
+                    outcome: original.clone(),
+                },
+            ),
+            &lifecycle_inventory(&fixture),
+            &grants,
+        )
+        .await
+        .unwrap();
+    assert_eq!(review.decision, HookDecision::Block);
+    assert_eq!(review.results.len(), 2);
+    assert_eq!(review.results[0].status, CheckStatus::Denied);
+    assert_eq!(review.results[1].status, CheckStatus::Skipped);
+    assert!(review.results[1].operation.is_none());
+    assert!(
+        matches!(turn.view().operation(&effect).unwrap().outcome(),Some(OperationOutcome::Tool(outcome)) if outcome==&original)
+    );
+    assert_eq!(fixture.effects(), ["existing-effect", "deny"]);
+}
+
+#[test]
+fn lifecycle_configuration_and_reply_authority_are_narrow() {
+    use grida_agent_master::lifecycle_hooks::*;
+    let first = lifecycle_selection("same", HookEvent::BeforeTool, CheckMode::Required);
+    assert!(LifecycleHooks::new(vec![first.clone(), first]).is_err());
+    let mut invalid = lifecycle_selection("matcher", HookEvent::BeforeInput, CheckMode::Required);
+    invalid.tool = Some(tool_id("read_file"));
+    assert!(LifecycleHooks::new(vec![invalid]).is_err());
+    assert!(
+        serde_json::from_value::<HookReply>(json!({"decision":"allow","grant":"all"})).is_err()
+    );
+}
+
+#[tokio::test]
+async fn lifecycle_interruption_preserves_unknown_outcomes_without_replaying_after_restart() {
+    use grida_agent_master::lifecycle_hooks::*;
+    for directive in [ControlDirective::Pause, ControlDirective::Cancel] {
+        let fixture = Fixture::new();
+        let store = fixture.store();
+        let turn = fixture
+            .open(&store, &CompletionChecks::new(vec![]).unwrap())
+            .await;
+        let effect = prior_effect(&turn).await;
+        let selected = LifecycleHooks::new(vec![
+            lifecycle_selection(
+                "interrupted",
+                HookEvent::BeforeCompletion,
+                CheckMode::Required,
+            ),
+            lifecycle_selection("later", HookEvent::BeforeCompletion, CheckMode::Required),
+        ])
+        .unwrap();
+        let grants = selected
+            .definitions()
+            .iter()
+            .map(|hook| (hook.id.clone(), selection()))
+            .collect::<BTreeMap<_, _>>();
+        let occurrence = HookOccurrence::new(
+            &turn.view(),
+            HookMoment::BeforeCompletion {
+                proposal: proposal(vec![effect.clone()]),
+            },
+        );
+        let worker = tokio::spawn({
+            let selected = selected.clone();
+            let occurrence = occurrence.clone();
+            let inventory = lifecycle_inventory(&fixture);
+            let grants = grants.clone();
+            async move {
+                let review = selected
+                    .review(&turn.operations(), occurrence, &inventory, &grants)
+                    .await
+                    .unwrap();
+                (turn, review)
+            }
+        });
+        tokio::time::timeout(Duration::from_secs(2), fixture.entered.notified())
+            .await
+            .unwrap();
+        issue(&store, directive).await;
+        let (mut turn, review) = tokio::time::timeout(Duration::from_secs(2), worker)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(review.decision, HookDecision::Reconsider);
+        assert_eq!(review.results[0].status, CheckStatus::Uncertain);
+        assert_eq!(fixture.effects(), ["existing-effect", "interrupted"]);
+        if directive == ControlDirective::Pause {
+            suspend(&mut turn).await;
+            drop(turn);
+            drop(store);
+            let store = fixture.reopen().await;
+            let turn = fixture.resume(&store).await;
+            let review = selected
+                .review(
+                    &turn.operations(),
+                    occurrence,
+                    &lifecycle_inventory(&fixture),
+                    &grants,
+                )
+                .await
+                .unwrap();
+            assert_eq!(review.decision, HookDecision::Uncertain);
+            assert_eq!(review.results[1].status, CheckStatus::Skipped);
+            assert_eq!(fixture.effects(), ["existing-effect", "interrupted"]);
+            assert!(
+                matches!(turn.view().operation(&effect).unwrap().outcome(),Some(OperationOutcome::Tool(outcome)) if outcome.status==OutcomeStatus::Succeeded)
+            );
+        }
+    }
 }

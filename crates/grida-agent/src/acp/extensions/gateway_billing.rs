@@ -50,10 +50,10 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     let request_id = host
                         .gateway_billing_request_id(
                             request.session_id.clone(),
-                            request.turn_id,
-                            request.operation_id,
-                            request.attempt_id,
-                            request.child,
+                            request.turn_id.clone(),
+                            request.operation_id.clone(),
+                            request.attempt_id.clone(),
+                            request.child.clone(),
                         )
                         .await;
                     require(&sessions, CAPABILITY, Some(&request.session_id))?;
@@ -74,10 +74,19 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                     if has_child {
                         require(&sessions, CHILD_CAPABILITY, Some(&request.session_id))?;
                     }
-                    Ok(reply
+                    let billing = reply
                         .ok()
                         .and_then(std::result::Result::ok)
-                        .map_or(GatewayBillingRead::Unavailable, GatewayBillingRead::checked))
+                        .map_or(GatewayBillingRead::Unavailable, GatewayBillingRead::checked);
+                    host.retain_spending_settlement(
+                        request.session_id,
+                        request.turn_id,
+                        request.attempt_id,
+                        &billing,
+                    )
+                    .await
+                    .map_err(host_error)?;
+                    Ok(billing)
                 }
                 .await;
                 responder.respond_with_result(result)

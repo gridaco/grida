@@ -130,6 +130,35 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 describe("trusted GG product adapter", () => {
+  it("forwards an exact spending ceiling under the existing workload authority", async () => {
+    await gatewayFetch(
+      { ...context, maxCostMills: "0.125000000000000001" },
+      "/v1/chat/completions",
+      {
+        method: "POST",
+        body: JSON.stringify({ model: "fixture/model", messages: [] }),
+      },
+      "capped-request"
+    );
+    expect(submitted).toHaveLength(1);
+    const headers = new Headers(submitted[0].headers);
+    expect(headers.get("x-gg-max-cost-mills")).toBe("0.125000000000000001");
+    expect(headers.get("idempotency-key")).toBe("capped-request");
+    expect(headers.get("x-grida-workload-key-id")).toBe("product-test");
+  });
+
+  it.each(["-1", "1e3", "01", "1.", "1.0000000000000000001"])(
+    "rejects malformed authority before a Gateway request: %s",
+    async (maxCostMills) => {
+      await expect(
+        gatewayFetch({ ...context, maxCostMills }, "/v1/chat/completions", {
+          method: "POST",
+          body: "{}",
+        })
+      ).rejects.toBeInstanceOf(GatewayProductError);
+      expect(submitted).toHaveLength(0);
+    }
+  );
   it("uses one submission and authoritative financial metadata", async () => {
     const r = await generateText({
       model: gatewayLanguageModel("openai/gpt-5.6-luna"),

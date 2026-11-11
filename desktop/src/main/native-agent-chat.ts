@@ -49,6 +49,8 @@ import type {
   NativeSubagentCreate,
 } from "@grida/desktop-bridge";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
+import { NativeAgentHooks, type NativeHookReview } from "./native-agent-hooks";
+import type { NativeHookInspection } from "@grida/desktop-bridge";
 import type {
   NativeEditorSurfaceDelivery,
   NativeEditorSurfaceSelection,
@@ -306,7 +308,8 @@ export class NativeAgentChat {
     private readonly process: NativeAgentProcess,
     private readonly cwd: string,
     private readonly scope: string,
-    private readonly onLifecycle?: NativeAgentChatLaunch["onLifecycle"]
+    private readonly onLifecycle?: NativeAgentChatLaunch["onLifecycle"],
+    private readonly hookRegistry?: NativeAgentHooks
   ) {}
 
   private readonly lifecycleSeen = new Set<string>();
@@ -335,7 +338,8 @@ export class NativeAgentChat {
       process,
       cwd,
       JSON.stringify([launch.stateDirectory, cwd]),
-      onLifecycle
+      onLifecycle,
+      launch.hooks
     );
     return client;
   }
@@ -954,6 +958,37 @@ export class NativeAgentChat {
     return this.configuration.inspect();
   }
 
+  async inspectHooks(sessionId?: string): Promise<NativeHookInspection> {
+    this.requireOpen();
+    if (!this.hookRegistry) throw new Error("native_hooks_unavailable");
+    if (sessionId !== undefined && !this.attached.has(sessionId))
+      throw new Error("native_chat_attachment_unavailable");
+    return this.hookRegistry.inspect(
+      await this.process.request(
+        "_co.grida/session/hooks",
+        sessionId === undefined ? {} : { sessionId }
+      )
+    );
+  }
+
+  async reviewHook(file: string): Promise<NativeHookReview> {
+    this.requireOpen();
+    if (!this.hookRegistry) throw new Error("native_hooks_unavailable");
+    return this.hookRegistry.review(file);
+  }
+
+  async installHook(review: NativeHookReview): Promise<void> {
+    this.requireOpen();
+    if (!this.hookRegistry) throw new Error("native_hooks_unavailable");
+    await this.hookRegistry.install(review);
+  }
+
+  async removeHook(id: string, revision: string): Promise<void> {
+    this.requireOpen();
+    if (!this.hookRegistry) throw new Error("native_hooks_unavailable");
+    await this.hookRegistry.remove(id, revision);
+  }
+
   updateContextLimit(
     basis: ContextLimitBasis,
     limit: number | null
@@ -1051,6 +1086,9 @@ export class NativeAgentChat {
       }),
       ...(this.process.acceptsGoalNamedChild && {
         goalNamedChildAvailable: true as const,
+      }),
+      ...(this.process.acceptsGoalSpending && {
+        goalSpendingAvailable: true as const,
       }),
       ...(this.process.acceptsGoalManualContinuation && {
         goalManualContinuationAvailable: true as const,
@@ -1432,6 +1470,7 @@ export class NativeAgentChat {
         fundedReview: this.acceptsGoalEffort,
         namedChild: this.process.acceptsGoalNamedChild,
         wakeups: this.acceptsWakeups,
+        spending: this.process.acceptsGoalSpending,
       }
     );
     return acceptance(accepted, sessionId, inputId);
@@ -2232,7 +2271,12 @@ function queuePositions(
       ...(settings.goalStart === undefined
         ? {}
         : {
-            goalStart: NativeAgentGoals.readStoredRequest(settings.goalStart),
+            goalStart: NativeAgentGoals.readStoredRequest({
+              ...object(settings.goalStart),
+              ...(settings.goalMaxCostMills !== undefined && {
+                maxCostMills: settings.goalMaxCostMills,
+              }),
+            }),
           }),
     };
   });

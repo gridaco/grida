@@ -127,7 +127,12 @@ export type ServerOptions = {
   projects_root?: string;
   /** Host-owned scope source for the guarded file routes only. */
   workspace_catalog?: string;
-  /** Host-owned file and workspace exclusions for the retained native profile. */
+  /**
+   * Fixed absolute host-owned roots excluded from file registration, ordinary
+   * workspace admission, and catalog-backed workspace reads. Ancestors,
+   * descendants, and canonical aliases are denied; saved grants are rechecked.
+   * Additive to the provider credential root; never inferred from client input.
+   */
   protected_file_roots?: readonly string[];
   /**
    * Host-provided dedicated root for durable binary media. Omitted on hosts
@@ -209,17 +214,22 @@ export function buildServer(opts: ServerOptions): BuiltServer {
     opts.provider_home,
     opts.prepare_provider_custody
   );
+  const protectedRoots = [
+    secrets.directory,
+    ...(opts.protected_file_roots ?? []),
+  ];
   const services: DaemonServices = {
     user_data_path: opts.user_data_path,
-    files: new FileRegistry(
-      [secrets.directory, ...(opts.protected_file_roots ?? [])],
-      { refuseHardlinks: Boolean(opts.protected_file_roots?.length) }
-    ),
+    files: new FileRegistry(protectedRoots, {
+      refuseHardlinks: Boolean(opts.protected_file_roots?.length),
+    }),
     recent: new RecentStore(opts.user_data_path),
     media: createMediaPersistence(opts.media_root),
-    workspaces: new WorkspaceRegistry(opts.user_data_path, opts.projects_root, [
-      secrets.directory,
-    ]),
+    workspaces: new WorkspaceRegistry(
+      opts.user_data_path,
+      opts.projects_root,
+      protectedRoots
+    ),
     auth,
     secrets,
   };
@@ -234,9 +244,8 @@ export function buildServer(opts: ServerOptions): BuiltServer {
       app,
       new WorkspaceCatalogReader(opts.workspace_catalog, [
         opts.user_data_path,
-        secrets.directory,
+        ...protectedRoots,
         ...(opts.media_root ? [opts.media_root] : []),
-        ...(opts.protected_file_roots ?? []),
       ])
     );
   } else if (opts.capabilities.workspaces) {

@@ -109,7 +109,9 @@ impl CollectReview {
             })
             .ok_or_else(related_changed)?;
         let input = accepted.input.input;
-        if input.payload.schema().as_str() != INPUT_SCHEMA || input.payload.version() != 2 {
+        if input.payload.schema().as_str() != INPUT_SCHEMA
+            || !matches!(input.payload.version(), 2 | 3)
+        {
             return Err(related_changed());
         }
         let stored: StoredPrompt = decode_input(&input)?;

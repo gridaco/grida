@@ -220,6 +220,8 @@ pub struct InputSettings {
     pub allow_library_selection: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal_start: Option<GoalRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub goal_max_cost_mills: Option<String>,
     #[serde(default)]
     pub configuration_permission: crate::ConfigurationPermission,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -251,9 +253,18 @@ impl InputSettings {
         }
         match input.payload.version() {
             1 => Ok(Self::default()),
-            2 => {
+            2 | 3 => {
                 let stored: StoredPrompt = decode_input(input)?;
+                let goal_max_cost_mills = matches!(&stored.goal, Some(goals::GoalInput::Start(_)))
+                    .then(|| {
+                        stored
+                            .spending
+                            .as_ref()
+                            .map(|selection| selection.maximum().to_owned())
+                    })
+                    .flatten();
                 Ok(Self {
+                    goal_max_cost_mills,
                     model: stored.model,
                     operating_regime: stored.operating_regime,
                     effort: stored.effort.map(|policy| policy.preset()),
@@ -510,7 +521,7 @@ impl Host {
                             .map_or(self.operating_regime, |settings| settings.operating_regime)
                     };
                     let stored = original
-                        .filter(|input| input.payload.version() == 2)
+                        .filter(|input| matches!(input.payload.version(), 2 | 3))
                         .map(decode_input::<StoredPrompt>)
                         .transpose()?;
                     let capture = stored
@@ -526,28 +537,36 @@ impl Host {
                     let allow_image_placement = stored
                         .as_ref()
                         .is_some_and(|input| input.allow_image_placement);
+                    let spending = stored.as_ref().and_then(|input| input.spending.clone());
                     let effort = stored.and_then(|input| input.effort);
-                    self.capture_input(
-                        &view,
-                        replacement,
-                        parts,
-                        SubmissionPolicy {
-                            questions,
-                            configuration_permission,
-                            allow_wakeups: false,
-                            allow_library_selection: false,
-                            allow_host_tools,
-                            desktop_image_generation,
-                            allow_image_placement,
-                            editor_endpoint: None,
-                            editor_presentation: false,
-                            editor_svg_target: None,
-                            operating_regime,
-                            subagent: None,
-                            effort,
-                        },
-                    )
-                    .await?
+                    let mut captured = self
+                        .capture_input(
+                            &view,
+                            replacement,
+                            parts,
+                            SubmissionPolicy {
+                                questions,
+                                configuration_permission,
+                                allow_wakeups: false,
+                                allow_library_selection: false,
+                                allow_host_tools,
+                                desktop_image_generation,
+                                allow_image_placement,
+                                editor_endpoint: None,
+                                editor_presentation: false,
+                                editor_svg_target: None,
+                                operating_regime,
+                                subagent: None,
+                                effort,
+                            },
+                        )
+                        .await?;
+                    if spending.is_some() {
+                        let mut prompt: StoredPrompt = decode_input(&captured)?;
+                        prompt.spending = spending;
+                        captured.payload = encode_stored_prompt(&prompt)?;
+                    }
+                    captured
                 };
                 SessionControl::ReplaceQueued { input, replacement }
             }
@@ -852,7 +871,7 @@ pub(super) fn check_input(input: &Submission, parts: &[PromptPart]) -> Result<()
             let current = prompt_input(&input.id, parts)?;
             previous.len() == 1 && previous[0].content == current[0].content
         }
-        2 => {
+        2 | 3 => {
             let previous: StoredPrompt = decode_input(input)?;
             previous.goal.is_none() && images::same_prompt(&previous.parts, parts)
         }

@@ -615,7 +615,9 @@ impl Host {
                 "sponsored_subagent_source_input",
             ));
         };
-        if input.payload.schema().as_str() != INPUT_SCHEMA || input.payload.version() != 2 {
+        if input.payload.schema().as_str() != INPUT_SCHEMA
+            || !matches!(input.payload.version(), 2 | 3)
+        {
             return Err(problem(
                 ErrorKind::Unsupported,
                 "sponsored_subagent_source_input",
@@ -800,6 +802,11 @@ impl Host {
         captured.allow_wakeups = false;
         captured.configuration_permission = crate::ConfigurationPermission::Disabled;
         captured.permission_capture = primary_read;
+        if captured.permission_capture.is_none() {
+            // Text-only reviewers have no native workspace execution grant.
+            // They cannot inherit an executable handler's workspace access.
+            captured.lifecycle_hooks = None;
+        }
         captured.allow_reviewer_primary_read = false;
         captured.host_tools_capture = None;
         captured.desktop_image_generation = None;
@@ -822,7 +829,7 @@ impl Host {
         captured.completion_checks = None;
         let input = Submission {
             id: input_id,
-            payload: encode(INPUT_SCHEMA, 2, &captured)?,
+            payload: encode_stored_prompt(&captured)?,
         };
         if let Some(target) = target {
             let view = self.store.inspect(child.clone()).await?;
@@ -937,6 +944,33 @@ impl Host {
             .as_ref()
             .map(|capture| self.prepare_sponsored_primary_read(capture, &session, &turn))
             .transpose()?;
+        let provider = self.spending_provider(execution, prepared.spending.as_ref())?;
+        let spending_runtime = prepared
+            .spending
+            .as_ref()
+            .map(|_| {
+                execution
+                    .runtime
+                    .with_provider(ProviderId::new("gg")?, provider.clone())
+            })
+            .transpose()?;
+        let base_runtime = spending_runtime.as_ref().unwrap_or(&execution.runtime);
+        // A sponsored child retains its captured checks under its own turn
+        // authority; delegation does not bypass required lifecycle policy.
+        let hook_command = permission_scope
+            .as_ref()
+            .map(|permissions| permissions.hook_command_tool())
+            .transpose()?
+            .flatten();
+        let hooks = lifecycle_hooks::LifecycleAccess::bind(
+            &agent_kit_core::turn::TurnBinding {
+                session: session.clone(),
+                turn: turn.clone(),
+                epoch: 1,
+            },
+            permission_scope.as_ref(),
+            hook_command.as_ref(),
+        )?;
         let runtime = if let Some(permissions) = &permission_scope {
             permissions.insert_file_tools(&mut inventory, &mut authority.tools, None)?;
             let owner = permissions::ToolAuthority::bind(
@@ -950,6 +984,7 @@ impl Host {
                 permissions::HookTools {
                     completion: None,
                     before_tool: None,
+                    lifecycle: hooks.clone(),
                 },
                 Vec::new(),
                 None,
@@ -960,19 +995,21 @@ impl Host {
                     "sponsored_primary_read_unavailable",
                 )
             })?;
-            Some(execution.runtime.with_authorization(owner.clone(), owner))
+            Some(base_runtime.with_authorization(owner.clone(), owner))
         } else {
             None
         };
         let tools = inventory.snapshot(&authority.tools.keys().cloned().collect::<Vec<_>>())?;
-        let master = Master::new(
-            prepared.config,
-            execution.provider.clone(),
-            tools,
-            authority,
-        )?
-        .with_history(history)
-        .with_input_limit(prepared.limit);
+        let mut master = Master::new(prepared.config, provider, tools, authority)?
+            .with_history(history)
+            .with_input_limit(prepared.limit);
+        if let Some(selected) = prepared.lifecycle_hooks {
+            let (inventory, grants) = match hooks {
+                Some(hooks) => (hooks.inventory()?, hooks.grants()),
+                None => (Inventory::new().snapshot(&[])?, BTreeMap::new()),
+            };
+            master = master.with_lifecycle_hooks(selected, inventory, grants);
+        }
         let claimed = match request {
             SponsoredClaim::Fresh(request) => self.store.claim_from_operation(request).await?,
             SponsoredClaim::Named { request, .. } => {
@@ -990,7 +1027,7 @@ impl Host {
                 &session,
                 &turn,
                 claim.lease,
-                runtime.as_ref().unwrap_or(&execution.runtime),
+                runtime.as_ref().unwrap_or(base_runtime),
             )
             .await?;
         Ok(Some(Admitted {
@@ -998,7 +1035,7 @@ impl Host {
             work: TurnWork::Conversation {
                 master: Box::new(master),
                 input: prepared.messages,
-                command: None,
+                command: hook_command,
             },
             acceptance: None,
         }))
@@ -1490,7 +1527,7 @@ mod tests {
         if let Some(goal) = &goal {
             let mut stored: StoredPrompt = decode_input(&submission).unwrap();
             stored.goal = Some(goal.clone());
-            submission.payload = encode(INPUT_SCHEMA, 2, &stored).unwrap();
+            submission.payload = encode_stored_prompt(&stored).unwrap();
         }
         host.store
             .submit(session.clone(), submission)

@@ -53,6 +53,7 @@ import { NativeGoalPanel } from "./native-goal-panel";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
 import { NativeTurnSummary } from "./native-turn-summary";
 import { NativeContextLimitPanel } from "./native-context-limit-panel";
+import { NativeHooksPanel } from "./native-hooks-panel";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
 import { NativeSubagentsPanel } from "./native-subagents-panel";
 
@@ -415,6 +416,17 @@ export function NativeAgentPane({
             <SlidersHorizontalIcon className="size-3.5" />
           </Button>
         )}
+        {controller.hasHooks && (
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            disabled={state.hooksBusy}
+            onClick={() => void controller.toggleHooks()}
+          >
+            Checks
+          </Button>
+        )}
         <Button
           type="button"
           variant="ghost"
@@ -548,6 +560,9 @@ export function NativeAgentPane({
       )}
       {state.contextLimitOpen && (
         <NativeContextLimitPanel controller={controller} state={state} />
+      )}
+      {state.hooksOpen && (
+        <NativeHooksPanel controller={controller} state={state} />
       )}
       {(state.canReadEarlier ||
         state.earlierMessages ||

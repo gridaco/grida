@@ -146,6 +146,49 @@ impl SupervisedGg {
     pub(crate) fn retained_billing(&self, state: &TurnState) -> Option<GatewayBillingProjection> {
         retained_billing(&self.binding, self.scope, state, true)
     }
+
+    pub(crate) fn send_capped<'a>(
+        &'a self,
+        request: TransportRequest,
+        control: RequestControl,
+        ceiling: &'a str,
+    ) -> BoxFuture<'a, std::result::Result<TransportResponse, TransportFailure>> {
+        Box::pin(async move {
+            if request.binding != self.binding
+                || request.operation != TransportOperation::ChatCompletions
+                || !valid_decimal(ceiling)
+            {
+                return Err(TransportFailure::Unavailable);
+            }
+            let mut target = self.target.clone();
+            target.set_path(&format!("{}/capped", self.target.path()));
+            let mut headers = HeaderMap::new();
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            headers.insert(ACCEPT, HeaderValue::from_static("text/event-stream"));
+            headers.insert(
+                "x-gg-max-cost-mills",
+                HeaderValue::from_str(ceiling).map_err(|_| TransportFailure::Unavailable)?,
+            );
+            self.supervisor
+                .send(
+                    target,
+                    headers,
+                    request.body,
+                    request.max_response_bytes,
+                    control,
+                    None,
+                )
+                .await
+        })
+    }
+}
+
+pub(crate) fn spending_receipt(
+    scope: Fingerprint,
+    receipt: &Envelope,
+) -> Option<GatewayBillingRead> {
+    let retained: RetainedGatewayBilling = serde_json::from_slice(receipt.bytes()).ok()?;
+    retained_billing_receipt(scope, &retained.request_id, receipt)
 }
 
 fn owns_retained_inference(owner: &ProviderBinding, operation: &OperationState) -> bool {

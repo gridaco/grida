@@ -10,6 +10,7 @@ import type {
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import { Textarea } from "@app/ui/components/textarea";
+import { GoalSpending } from "@/lib/agent-chat/goal-spending";
 import type {
   NativeChatController,
   NativeChatView,
@@ -78,19 +79,22 @@ export function NativeGoalPanel({
       ? String(fields.get("namedChildId") ?? "")
       : "";
     void controller
-      .startGoal({
-        objective: objective.description,
-        criteria: objective.criteria,
-        allowance: {
-          workTurns: Number(fields.get("workTurns")),
-          inferenceSteps: Number(fields.get("inferenceSteps")),
+      .startGoal(
+        {
+          objective: objective.description,
+          criteria: objective.criteria,
+          allowance: {
+            workTurns: Number(fields.get("workTurns")),
+            inferenceSteps: Number(fields.get("inferenceSteps")),
+          },
+          automatic: fields.has("automatic"),
+          ...(effort === "ultra" && { effort }),
+          ...(namedChildId && { namedChildId }),
+          ...(canAllowWakeup &&
+            fields.has("allowWakeup") && { allowWakeup: true }),
         },
-        automatic: fields.has("automatic"),
-        ...(effort === "ultra" && { effort }),
-        ...(namedChildId && { namedChildId }),
-        ...(canAllowWakeup &&
-          fields.has("allowWakeup") && { allowWakeup: true }),
-      })
+        String(fields.get("maximumUsd") ?? "")
+      )
       .then((accepted) => {
         if (accepted) setAdding(false);
       });
@@ -126,6 +130,17 @@ export function NativeGoalPanel({
             </span>
           </div>
           <p className="break-words">{goal.objective}</p>
+          {goal.spending && (
+            <p className="text-muted-foreground">
+              Maximum spend {GoalSpending.usd(goal.spending.maxCostMills)} ·
+              charged {GoalSpending.usd(goal.spending.chargedMills)} · held{" "}
+              {GoalSpending.usd(goal.spending.heldMills)} · available{" "}
+              {GoalSpending.usd(goal.spending.remainingMills)} · per request{" "}
+              {GoalSpending.usd(goal.spending.perRequestMaxCostMills)}
+              {goal.spending.unsettledAttempts > 0 &&
+                ` · ${goal.spending.unsettledAttempts} unsettled attempts`}
+            </p>
+          )}
           {goal.progress && (
             <p className="break-words text-muted-foreground">{goal.progress}</p>
           )}
@@ -352,6 +367,22 @@ export function NativeGoalPanel({
               />
             </label>
           </div>
+          {view.observation?.snapshot.goalSpendingAvailable && (
+            <label className="block space-y-1">
+              <span>Maximum spend (USD, optional)</span>
+              <Input
+                name="maximumUsd"
+                inputMode="decimal"
+                maxLength={64}
+                placeholder="For example, 1.00"
+                disabled={view.acting}
+              />
+              <span className="text-muted-foreground">
+                Provider-enforced total for this goal, including subagents.
+                Uncertain work keeps its hold.
+              </span>
+            </label>
+          )}
           {(view.goalEffortAvailable || effort === "ultra") && (
             <label className="flex items-center gap-2">
               Effort for this goal

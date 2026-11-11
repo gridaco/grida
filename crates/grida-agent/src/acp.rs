@@ -203,6 +203,13 @@ async fn serve_connection(
                 let mut advertised =
                     extensions::advertised(reviewer, subagents, deletion, effort, goal_effort, files);
                 let library_selection = reviewer && initialized_host.accepts_library_selection();
+                let spending = reviewer && initialized_host.supports_goal_spending();
+                let spending_negotiated = spending && request.client_capabilities.meta.as_ref()
+                    .and_then(|meta| meta.get(extensions::GOAL_SPENDING))
+                    .and_then(serde_json::Value::as_u64) == Some(1);
+                if spending {
+                    advertised.insert(extensions::GOAL_SPENDING.into(), 1.into());
+                }
                 let library_negotiated = library_selection
                     && extensions::library::CAPABILITIES.iter().all(|key| {
                         request.client_capabilities.meta.as_ref()
@@ -337,6 +344,9 @@ async fn serve_connection(
                     let meta = request.client_capabilities.meta.as_ref();
                     sessions.negotiated =
                         extensions::negotiated(meta, reviewer, subagents, deletion, effort, goal_effort, files);
+                    if spending_negotiated {
+                        sessions.negotiated.insert(extensions::GOAL_SPENDING);
+                    }
                     if library_negotiated {
                         sessions.negotiated.extend(extensions::library::CAPABILITIES);
                     }

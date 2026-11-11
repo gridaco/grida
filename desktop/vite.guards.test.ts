@@ -10,7 +10,7 @@ describe("externalizedWorkspaceImports", () => {
       externalizedWorkspaceImports([
         "node:fs",
         "electron",
-        "@anthropic-ai/sandbox-runtime",
+        "node-pty",
         "@grida/desktop-bridge",
       ])
     ).toEqual(["@grida/desktop-bridge"]);

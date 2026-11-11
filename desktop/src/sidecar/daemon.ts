@@ -51,7 +51,6 @@ export namespace DesktopDaemon {
     }
     if (
       (opts.workspace_catalog && opts.agent !== "native-chat") ||
-      (opts.protected_file_roots && opts.agent !== "native-chat") ||
       (opts.retained_media_scope &&
         (opts.workspace_catalog || opts.protected_file_roots))
     )

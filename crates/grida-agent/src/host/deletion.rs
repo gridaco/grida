@@ -202,6 +202,12 @@ impl Host {
     }
 
     async fn finish_deletion(&self, mut receipt: SessionDeleted) -> Result<SessionDeleted> {
+        let spending = self.spending.clone();
+        let owner = receipt.session.clone();
+        tokio::task::spawn_blocking(move || spending.retire(&owner))
+            .await
+            .map_err(|_| problem(ErrorKind::Uncertain, "session_deletion_unverified"))?
+            .map_err(|_| problem(ErrorKind::Uncertain, "session_deletion_unverified"))?;
         if let Some(identity) = receipt.cleanup {
             self.cleanup_retired(receipt.session.clone(), identity)
                 .await

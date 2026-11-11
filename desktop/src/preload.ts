@@ -801,6 +801,12 @@ const bridge: DesktopBridge = {
         action
       ),
     ...(!selectedDocumentChatRoute() && {
+      inspectHooks: (attachmentId?: string) =>
+        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_HOOKS, attachmentId),
+      importHook: () =>
+        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_IMPORT_HOOK),
+      removeHook: (id: string, revision: string) =>
+        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_REMOVE_HOOK, id, revision),
       contextLimit: () =>
         ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT),
       saveContextLimit: (reviewId, limit) =>

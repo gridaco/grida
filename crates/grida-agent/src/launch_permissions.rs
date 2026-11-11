@@ -4,6 +4,7 @@ use crate::command::CommandLimits;
 use crate::goal_verification::ReadVerification;
 use crate::permissions::{
     AccessRule, CommandProfile, DirectoryAccess, PermissionProfile, ReviewedHookCommand,
+    ReviewedLifecycleHook,
 };
 use crate::workspace::{DirectorySpec, ProtectedRoots, WorkspaceSnapshot, validate_absolute};
 use agent_kit_core::{BindingId, Error, ErrorKind, Fingerprint, Result};
@@ -36,6 +37,8 @@ struct ProfileFile {
     command: Option<Command>,
     before_completion: Option<CommandHook>,
     before_tool: Option<CommandHook>,
+    #[serde(default)]
+    hooks: Vec<LifecycleHookFile>,
     automatic_read_review: Option<ReadProfile>,
     goal_read_verification: Option<ReadVerification>,
     goal_read_verifications: Option<Vec<ReadVerification>>,
@@ -84,13 +87,49 @@ struct CommandHook {
     timeout_ms: u32,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LifecycleHookFile {
+    id: BindingId,
+    source: String,
+    event: grida_agent_master::lifecycle_hooks::HookEvent,
+    tool: Option<agent_kit_core::ToolId>,
+    #[serde(default = "enabled_hook")]
+    enabled: bool,
+    executable: Executable,
+    #[serde(default)]
+    arguments: Vec<String>,
+    mode: CheckMode,
+    timeout_ms: u32,
+}
+
+fn enabled_hook() -> bool {
+    true
+}
+
 impl CommandHook {
     fn reviewed(self, command: Option<&Command>) -> Result<ReviewedHookCommand> {
         let command = command.ok_or_else(invalid)?;
         let executable = self.executable;
         validate_absolute(&executable.path)?;
         let timeout = Duration::from_millis(u64::from(self.timeout_ms));
-        if executable.path.canonicalize().map_err(|_| invalid())? != executable.path
+        let canonical = match executable.path.canonicalize() {
+            Ok(canonical) => Some(canonical),
+            Err(error)
+                if error.kind() == std::io::ErrorKind::NotFound
+                    && std::fs::symlink_metadata(&executable.path)
+                        .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound) =>
+            {
+                None
+            }
+            Err(_) => return Err(invalid()),
+        };
+        // Availability belongs to dispatch, so a missing handler cannot block
+        // inspection or Stop. Native preparation still verifies its pinned
+        // canonical identity and ownership before any process can start.
+        if canonical
+            .as_ref()
+            .is_some_and(|canonical| canonical != &executable.path)
             || timeout.is_zero()
             || timeout > COMMAND_LIMITS.timeout
             || self.arguments.len() > 64
@@ -172,15 +211,41 @@ pub fn load_permission_profile(
         .before_tool
         .map(|hook| hook.reviewed(profile.command.as_ref()))
         .transpose()?;
+    if profile.hooks.len() > grida_agent_master::lifecycle_hooks::MAX_HOOKS {
+        return Err(invalid());
+    }
+    let hooks = profile
+        .hooks
+        .into_iter()
+        .map(|hook| {
+            Ok(ReviewedLifecycleHook {
+                id: hook.id,
+                source: hook.source,
+                event: hook.event,
+                tool: hook.tool,
+                enabled: hook.enabled,
+                command: CommandHook {
+                    executable: hook.executable,
+                    arguments: hook.arguments,
+                    mode: hook.mode,
+                    timeout_ms: hook.timeout_ms,
+                }
+                .reviewed(profile.command.as_ref())?,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
     let hooks_only = profile
         .command
         .as_ref()
         .is_some_and(|command| command.hooks_only);
-    if hooks_only && (completion.is_none() || before_tool.is_some()) {
+    if hooks_only && ((completion.is_none() && hooks.is_empty()) || before_tool.is_some()) {
         return Err(invalid());
     }
     for hook in completion.iter().chain(before_tool.iter()) {
         write.push(hook.executable.path.clone());
+    }
+    for hook in &hooks {
+        write.push(hook.command.executable.path.clone());
     }
     let command = if let Some(command) = profile.command {
         validate_command_paths(&command)?;
@@ -262,6 +327,7 @@ pub fn load_permission_profile(
         Some(review) => profile.with_automatic_read_review(review)?,
         None => profile,
     };
+    let profile = profile.with_lifecycle_hooks(hooks, hooks_only)?;
     Ok(Arc::new(
         profile.with_goal_read_verifications(goal_read_verifications)?,
     ))

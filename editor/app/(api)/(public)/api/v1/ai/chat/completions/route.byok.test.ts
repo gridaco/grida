@@ -109,6 +109,7 @@ vi.mock("@/lib/ai/models", async (orig) => {
 });
 
 import { POST } from "./route";
+import { POST as CAPPED_POST } from "./capped/route";
 import { signGgToken } from "@/lib/auth/gg-token";
 
 const SECRET = "byok-secret-0123456789abcdef0123456789abcdef00";
@@ -133,6 +134,28 @@ beforeEach(() => {
 });
 
 describe("BYOK carve-out on /api/v1/ai/chat/completions", () => {
+  it("refuses the capped route instead of substituting an unbounded BYOK model", async () => {
+    const { token } = await signGgToken("user-1", 7);
+    const response = await CAPPED_POST(
+      new Request("http://grida.test/api/v1/ai/chat/completions/capped", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          "x-gg-max-cost-mills": "1",
+        },
+        body: JSON.stringify({
+          model: "anthropic/claude-sonnet-5",
+          messages: [{ role: "user", content: "hello" }],
+          stream: true,
+        }),
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(h.calls).toBe(0);
+    expect(h.begin).not.toHaveBeenCalled();
+    expect(h.complete).not.toHaveBeenCalled();
+  });
   it("serves unbilled text (no gate, no ingest) but auth still runs", async () => {
     const { token } = await signGgToken("user-1", 7);
     const result = await clientModel(token).doGenerate({

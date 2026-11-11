@@ -229,7 +229,41 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         return files.chatIdentity(docId, { signal: owner.signal, check });
       },
     },
-    options.native_nested_deck_chat
+    options.native_nested_deck_chat,
+    {
+      choose: async (sender) => {
+        const window = admittedWindow(sender);
+        if (!window) throw new Error("native_chat_scope_changed");
+        const result = await dialog.showOpenDialog(window, {
+          title: "Choose a lifecycle check definition",
+          properties: ["openFile"],
+          filters: [{ name: "Lifecycle check", extensions: ["json"] }],
+        });
+        return result.canceled || result.filePaths.length !== 1
+          ? null
+          : result.filePaths[0];
+      },
+      confirm: async (sender, hook, workspace, action) => {
+        const window = admittedWindow(sender);
+        if (!window) return false;
+        const result = await dialog.showMessageBox(window, {
+          type: "warning",
+          message:
+            action === "install"
+              ? `Trust lifecycle check “${hook.id}”?`
+              : `Remove lifecycle check “${hook.id}”?`,
+          detail: `${hook.event}${hook.tool ? ` · ${hook.tool}` : ""}\n${hook.executable}\nArguments: ${JSON.stringify(hook.arguments)}\nWorkspace: ${workspace}\nRead-only access; no network. Workspace-enabled child work inherits these checks; text-only reviewers do not gain execution access. Timeout: ${hook.timeoutMs} ms. ${hook.mode === "required" ? "A failure blocks dependent work." : "Failures are recorded without changing the original result."}\n\nThe change applies after restarting Desktop. Running work keeps its current checks.`,
+          buttons: [
+            "Cancel",
+            action === "install" ? "Trust and save check" : "Remove check",
+          ],
+          defaultId: 0,
+          cancelId: 0,
+          noLink: true,
+        });
+        return result.response === 1;
+      },
+    }
   );
   const externalAgent = new NativeExternalRunIpc(
     EDITOR_ORIGIN,
@@ -566,6 +600,17 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   );
   guarded(IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT, (event) =>
     nativeChat.contextLimit(event)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_HOOKS, (event, attachmentId?: string) =>
+    nativeChat.inspectHooks(event, attachmentId)
+  );
+  guarded(IPC_CHANNELS.NATIVE_CHAT_IMPORT_HOOK, (event) =>
+    nativeChat.importHook(event)
+  );
+  guarded(
+    IPC_CHANNELS.NATIVE_CHAT_REMOVE_HOOK,
+    (event, id: unknown, revision: unknown) =>
+      nativeChat.removeHook(event, id, revision)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SAVE_CONTEXT_LIMIT,
