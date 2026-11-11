@@ -229,7 +229,6 @@ describe("ProviderHttp", () => {
       "../tools/index.ts",
       "../tools/run-command.ts",
       "../runtime/command-backend.ts",
-      "../runtime/agent-provider-run.ts",
       "../agent-provider/index.ts",
     ];
 

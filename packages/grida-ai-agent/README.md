@@ -345,7 +345,8 @@ selections before provider resolution. The refusal preserves the saved model
 and queued work. To continue, explicitly select a supported model.
 
 The source-only ACP harness in `src/agent-provider/consume.bin.ts` still runs
-independently for development. The [feature catalog](../../docs/agent/features.md)
+independently for development. Its session API exposes normalized `ProviderChunk`
+events and explicit cancellation and disposal. The [feature catalog](../../docs/agent/features.md)
 records availability for the separately confined native Local agent.
 
 ## Package Docs

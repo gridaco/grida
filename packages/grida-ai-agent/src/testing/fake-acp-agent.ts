@@ -5,15 +5,14 @@
  * internal contracts, so the only meaningful tests are at the user-outcome
  * boundary: "what does the user get?". This harness lets those tests run in CI
  * with NO real Claude and NO `npx` — we script the agent's ACP behavior and
- * assert Grida's consumer output (`runAgentProviderTurn`'s `AgentUIMessageChunk`s,
- * and which ACP methods the consumer calls).
+ * assert the standalone consumer's normalized events and ACP method calls.
  *
  * Mechanism: the ACP SDK exposes both halves of a connection. We build a real
  * `AgentSideConnection` driven by a scripted {@link Agent}, wire it to Grida's
  * real `ClientSideConnection` over an in-memory duplex (two `TransformStream`
  * byte pipes — `ndJsonStream` works over any web stream, not just stdio), and
  * hand the client end back as a {@link BridgeConnect}. Inject it via
- * `runAgentProviderTurn({ connect })` / `openClaudeSession(opts, { connect })`.
+ * `openProvider("claude", opts, { connect })`.
  */
 import {
   AgentSideConnection,

@@ -544,8 +544,9 @@ config into a generic proxy.
 activation. Its request parser and provider resolver refuse historical
 `claude-acp` model selections before catalogue refresh, credential lookup,
 provider fallback, or a queue claim. Direct runs return `provider_down` and
-retained queue items remain in place. The source-only ACP harness runs
-independently of daemon admission. Native Local agent execution uses its own
+retained queue items remain in place. The source-only ACP harness and its
+normalized session events run independently of daemon admission, with explicit
+session cancellation and disposal. Native Local agent execution uses its own
 reviewed profile and process confinement described below.
 
 **Electron-side hardening (mandatory; see the
