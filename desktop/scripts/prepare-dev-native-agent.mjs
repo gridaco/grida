@@ -25,7 +25,8 @@ if (process.platform !== "win32") {
     ],
     { cwd: workspace, stdio: "inherit" }
   );
-  const resources = path.join(desktop, ".vite", "native-resources");
+  // Forge removes its entire .vite tree before starting the development app.
+  const resources = path.join(desktop, ".native-resources");
   const artifacts = fs.mkdtempSync(path.join(desktop, ".native-artifacts-"));
   try {
     const output = path.join(artifacts, `${process.platform}-${process.arch}`);

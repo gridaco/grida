@@ -527,7 +527,11 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       return NativeDesktopAgent.prepareFresh(
         new DesktopAccountSession({
           base_url: "https://editor.example.test",
-          fetch: vi.fn<typeof fetch>(),
+          fetch: async () =>
+            Response.json(
+              { error: { code: "not_configured" } },
+              { status: 503 }
+            ),
         }),
         resources!,
         {
@@ -618,6 +622,20 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       savedConfig = countedConfig;
       vi.resetModules();
       agent = await launch();
+      sidecar.nativeAgentGatewayConnection.mockImplementationOnce(
+        (account, _organizationId, signal) =>
+          NativeGatewayConnection.open({
+            origin: "https://editor.example.test",
+            account,
+            network: { prepare: () => null },
+            signal,
+          })
+      );
+      await expect(agent.ensure(workspace.id)).rejects.toThrow(
+        "gateway_grant_unavailable"
+      );
+      expect(agent.current(workspace.id)).toBeNull();
+      expect(sidecar.nativeAgentGatewayConnection).toHaveBeenCalledTimes(1);
       const { choices, saved } = await agent.profiles(workspace.id);
       expect(saved).toEqual([
         expect.objectContaining({
@@ -640,6 +658,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         () => {}
       );
       const oldChat = agent.current(workspace.id, oldId)!.chat;
+      expect(sidecar.nativeAgentGatewayConnection).toHaveBeenCalledTimes(1);
       const restored = await oldChat.load(savedId);
       expect(
         (await oldChat.transcript(restored)).map(({ text }) => text)
@@ -751,7 +770,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       ).rejects.toThrow("native_chat_profile_changed");
       expect(counts).toHaveLength(2);
       expect(generated).toHaveLength(4);
-      expect(sidecar.nativeAgentGatewayConnection).not.toHaveBeenCalled();
+      expect(sidecar.nativeAgentGatewayConnection).toHaveBeenCalledTimes(1);
     } finally {
       await agent?.close();
       await fs.rm(base, { recursive: true, force: true });

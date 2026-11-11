@@ -33,6 +33,13 @@ const manifest = JSON.parse(
 };
 
 describe("Desktop package file filter", () => {
+  it("excludes development native resources from the application archive", () => {
+    expect(ignore("/.native-resources")).toBe(true);
+    expect(ignore("/.native-resources/native-agent/grida-agent")).toBe(true);
+    expect(
+      ignore("/.native-resources/native-agent/agent-kit-sandbox-helper")
+    ).toBe(true);
+  });
   it("excludes every linked workspace package before creating the archive", () => {
     const linked = Object.entries({
       ...manifest.dependencies,

@@ -52,6 +52,7 @@ import type {
   NativeHookInspection,
 } from "@grida/desktop-bridge";
 import { IPC_CHANNELS } from "../bridge/contract";
+import { DesktopGatewayGrantUnavailable } from "./account-session";
 import { ipc_sender } from "./ipc-sender";
 import type {
   NativeAgentChat,
@@ -704,6 +705,8 @@ export class NativeChatIpc {
             requireCurrent();
             // Forward only known recovery states. Startup errors can contain
             // private provider or host details.
+            if (error instanceof DesktopGatewayGrantUnavailable)
+              return "native-gateway-unavailable";
             switch (error instanceof Error ? error.message : null) {
               case "native_provider_byok_key_missing":
                 return "native-provider-key-required";

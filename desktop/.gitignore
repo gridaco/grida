@@ -87,6 +87,7 @@ typings/
 
 # Vite
 .vite/
+.native-resources/
 
 # Electron-Forge
 out/

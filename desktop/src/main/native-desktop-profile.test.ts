@@ -4,10 +4,17 @@ import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
 import type { App } from "electron";
+import VitePlugin from "@electron-forge/plugin-vite";
+import type { ResolvedForgeConfig } from "@electron-forge/shared-types";
 import { defaultScratchBase } from "@grida/agent/sandbox";
 import { ProtectedRoots } from "@grida/daemon/server";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { NativeFirstProfile } from "./native-first-profile";
+import { NativeAgentProcess } from "./native-agent-process";
+import {
+  stageNativeAgent,
+  verifyNativeAgent,
+} from "../../scripts/native-agent-package.mjs";
 
 it("selects native chat across Unix channels and isolated ordinary profiles, without a Windows fallback", async () => {
   vi.resetModules();
@@ -49,8 +56,69 @@ it("resolves development resources independently of the shared Electron installa
       isPackaged: false,
       getAppPath: () => "/fixture/desktop",
     })
-  ).toBe(path.join("/fixture/desktop", ".vite", "native-resources"));
+  ).toBe(path.join("/fixture/desktop", ".native-resources"));
+  expect(
+    NativeDesktopProfile.resourcesPath({
+      isPackaged: true,
+      getAppPath: () => "/fixture/desktop",
+    })
+  ).toBe(process.resourcesPath);
 });
+
+it.skipIf(process.platform === "win32")(
+  "preserves staged development worker and helper through Forge startup cleanup",
+  async () => {
+    const root = await fs.mkdtemp(
+      path.join(os.tmpdir(), "grida-dev-resources-")
+    );
+    try {
+      const resources = NativeDesktopProfile.resourcesPath({
+        isPackaged: false,
+        getAppPath: () => root,
+      });
+      const artifacts = path.join(root, "artifacts");
+      const target = path.join(
+        artifacts,
+        `${process.platform}-${process.arch}`
+      );
+      await fs.mkdir(target, { recursive: true });
+      await fs.mkdir(resources);
+      const { fixtureBinary } = (await import(
+        new URL(
+          "../../../scripts/cli-release/native-fixture.mjs",
+          import.meta.url
+        ).href
+      )) as { fixtureBinary(platform: { os: string; cpu: string }): Buffer };
+      const binary = fixtureBinary({ os: process.platform, cpu: process.arch });
+      for (const name of ["grida-agent", "agent-kit-sandbox-helper"])
+        await fs.writeFile(path.join(target, name), binary);
+      stageNativeAgent(resources, artifacts, process.platform, process.arch);
+      const disposable = path.join(root, ".vite", "build");
+      await fs.mkdir(disposable, { recursive: true });
+      await fs.writeFile(path.join(disposable, "stale.js"), "stale");
+      const plugin = new VitePlugin({ build: [], renderer: [] });
+      plugin.setDirectories(root);
+      const hooks = plugin.getHooks().preStart;
+      if (!Array.isArray(hooks) || !hooks[0])
+        throw new Error("Forge startup hook unavailable");
+      await hooks[0].call(null, {} as ResolvedForgeConfig);
+      await expect(fs.stat(path.join(root, ".vite"))).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+      expect(NativeAgentProcess.executable(resources)).toBe(
+        path.join(resources, "native-agent", "grida-agent")
+      );
+      verifyNativeAgent(resources, process.platform, process.arch);
+      expect(
+        await fs.readFile(
+          path.join(resources, "native-agent", "agent-kit-sandbox-helper")
+        )
+      ).toEqual(binary);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  }
+);
 
 it.skipIf(process.platform === "win32")(
   "isolates browser, source, project, temp and media paths for an explicit native profile",

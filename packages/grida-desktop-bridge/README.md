@@ -38,6 +38,10 @@ window/dialog/shell behavior, and AgentHost supervision.
 `nativeChat` is an optional Desktop namespace. Check `status()` in the
 current workspace. If it reports `native-starting`, call `status(true)` to
 start the workspace chat. Known setup failures are fixed readiness values.
+`native-gateway-unavailable` means scoped Gateway access could not be acquired;
+it does not identify a worker or storage failure. `profiles()` remains available
+before startup succeeds. An explicit `selectProfile()` can open a saved or
+configured connection, with no implicit fallback or default retry.
 An unknown result after startup is unavailable. Older bridges use
 `available()`. The app issues an attachment for each
 renderer that creates or loads a chat. Submit keeps the caller's input ID.

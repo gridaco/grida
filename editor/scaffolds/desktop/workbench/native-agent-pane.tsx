@@ -11,6 +11,7 @@ import {
 import type {
   DesktopNativeChat,
   NativeChatReadiness,
+  NativeChatProfileSelection,
 } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
@@ -56,6 +57,7 @@ import { NativeContextLimitPanel } from "./native-context-limit-panel";
 import { NativeHooksPanel } from "./native-hooks-panel";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
 import { NativeSubagentsPanel } from "./native-subagents-panel";
+import { NativeConnectionRecovery } from "./native-connection-recovery";
 
 const NO_COMMANDS: ComposerCatalog["commands"] = [];
 const COMMAND_DESCRIPTIONS = {
@@ -90,6 +92,11 @@ export function NativeAgentPaneGate({
   legacy: ReactNode;
 }) {
   const [attempt, setAttempt] = useState(0);
+  const [recovered, setRecovered] = useState<{
+    bridge: DesktopNativeChat;
+    workspaceId: string;
+    selection: NativeChatProfileSelection;
+  }>();
   const [selection, setSelection] = useState<{
     bridge: DesktopNativeChat;
     attempt: number;
@@ -117,7 +124,7 @@ export function NativeAgentPaneGate({
     );
   if (readiness !== "native-ready")
     return (
-      <div className="flex items-center gap-2 px-3 py-2 text-xs">
+      <div className="flex flex-col gap-2 px-3 py-2 text-xs">
         <span role="alert" className="text-destructive">
           {readiness === null
             ? "Couldn't check chat availability."
@@ -131,15 +138,31 @@ export function NativeAgentPaneGate({
         >
           Retry
         </Button>
+        {workspaceId && bridge.profiles && bridge.selectProfile && (
+          <NativeConnectionRecovery
+            bridge={bridge}
+            onConnected={(selection) => {
+              setRecovered({ bridge, workspaceId, selection });
+              setAttempt((current) => current + 1);
+            }}
+          />
+        )}
       </div>
     );
+  const recovery =
+    recovered?.bridge === bridge && recovered.workspaceId === workspaceId
+      ? recovered.selection
+      : undefined;
   return (
     <NativeAgentPane
       key={initialSession}
       bridge={bridge}
       selectionKey={selectionKey}
       workspaceId={workspaceId}
-      initialSession={initialSession}
+      initialSession={recovery ? null : initialSession}
+      initialProfileId={
+        recovery && recovery.kind !== "default" ? recovery.id : undefined
+      }
       editorSurfaces={editorSurfaces}
     />
   );
@@ -147,6 +170,8 @@ export function NativeAgentPaneGate({
 
 const nativeChatUnavailableMessage = {
   "native-unavailable": "Native chat is unavailable.",
+  "native-gateway-unavailable":
+    "Grida Gateway is unavailable. Choose another model connection or retry.",
   "native-provider-key-required":
     "Add an API key for the selected provider in Desktop settings, then retry.",
   "native-provider-model-unavailable":
@@ -162,12 +187,14 @@ export function NativeAgentPane({
   selectionKey,
   workspaceId,
   initialSession,
+  initialProfileId,
   editorSurfaces,
 }: {
   bridge: DesktopNativeChat;
   selectionKey?: string;
   workspaceId?: string;
   initialSession: string | null;
+  initialProfileId?: string;
   editorSurfaces?: NativeChatEditorSurfaces;
 }) {
   const controller = useMemo(
@@ -202,9 +229,10 @@ export function NativeAgentPane({
   const side = state.sideChat;
   useEffect(() => {
     const profile =
-      workspaceId && initialSession
+      initialProfileId ??
+      (workspaceId && initialSession
         ? new URLSearchParams(window.location.hash.slice(1)).get("chat-profile")
-        : null;
+        : null);
     controller.connect(initialSession, profile);
     const stopFocus =
       workspaceId &&
@@ -218,7 +246,7 @@ export function NativeAgentPane({
       if (stopFocus) stopFocus();
       controller.disconnect();
     };
-  }, [bridge, controller, initialSession, workspaceId]);
+  }, [bridge, controller, initialSession, initialProfileId, workspaceId]);
   const snapshot = state.observation?.snapshot;
   const editHistory = controller.canReviseHistory && !state.revisionDraft;
   const turn = snapshot?.current;

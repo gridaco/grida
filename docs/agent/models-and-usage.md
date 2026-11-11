@@ -9,7 +9,7 @@ format: md
 
 The model connection determines which inputs and tools are available in a
 native workspace chat. Grida Gateway is the default in a managed Desktop profile.
-The isolated native preview can use a saved OpenRouter or Vercel key on
+Native Desktop can use a saved OpenRouter or Vercel key on
 macOS and Linux, or an approved compatible endpoint. On macOS and Linux,
 the endpoint can use a key saved under its own ID.
 [Configure a native Desktop profile](https://github.com/gridaco/grida/blob/main/desktop/README.md#distributions)
@@ -21,8 +21,11 @@ settings, but the endpoint is unavailable for new native chats.
 
 ## Start a chat with a saved model
 
-In a native workspace, wait for chat to be ready. Open **Model connection** and choose a model under **New chat
-with…**. Grida lists its current tool-capable Gateway text models when discovery
+Open **Model connection** in a native workspace and choose a model under **New chat
+with…**. The connection picker also remains available when the default Gateway
+connection cannot start. Choose another configured connection, or retry the
+default once it is available. Listing choices does not open a chat or run a model.
+Grida lists its current tool-capable Gateway text models when discovery
 is available. Add an OpenRouter or Vercel AI Gateway key, or save and approve a
 compatible endpoint in Desktop settings, to see those models too. Use
 **Refresh models** after changing a connection.

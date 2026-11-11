@@ -884,12 +884,25 @@ destination grant before Chromium receives the request. Initialization failure
 has no direct-network fallback. [Boundary tests](desktop/src/main/agent-network-host.test.ts)
 cover delayed/failed setup, revoked grants and late completion after shutdown.
 
+The [account owner](desktop/src/main/account-session.ts) reports scoped Gateway
+mint unavailability through a typed, credential-free failure. The
+[chat IPC owner](desktop/src/main/native-chat-ipc.ts) exposes only its fixed
+readiness state; executable, storage and other startup failures remain distinct.
+Listing model connections does not start the default provider. Explicit selection
+still validates the configured binding and the current frame/workspace before
+activation; it does not authorize a funding fallback or infer permission to use
+a different credential. Renderer recovery preserves the selected profile's
+history boundary. Development worker/helper resources live outside Forge's
+build-cleanup directory and retain the same fixed-path and binary validation.
+
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
 - The [development resource preparer](desktop/scripts/prepare-dev-native-agent.mjs)
   builds the locked Rust host and helper, strips only staged copies and verifies
   their executable format through the same package stager. Main selects that
-  fixed private development location or packaged resources, never a PATH lookup.
+  fixed private development location outside Forge's disposable output or
+  packaged resources, never a PATH lookup. Actual Forge cleanup tests preserve
+  the staged worker/helper and retain the same launch-time resource checks.
   Ordinary macOS/Linux launches select native chat in either channel. The
   supervisor factory starts the historical chat runtime only for an explicitly
   managed predecessor; unavailable native chat cannot silently enable it.

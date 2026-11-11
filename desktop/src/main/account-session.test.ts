@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   DesktopAccountSession,
+  DesktopGatewayGrantUnavailable,
   type DesktopGatewayGrant,
 } from "./account-session";
 
@@ -253,6 +254,46 @@ describe("DesktopAccountSession.withGatewayGrant", () => {
       expect(accept).not.toHaveBeenCalled();
     }
   );
+
+  it.each([
+    async () =>
+      Response.json(
+        { error: { code: "not_configured", detail: "private" } },
+        { status: 503 }
+      ),
+    async () =>
+      Response.json(
+        { error: { code: "insufficient_credits", detail: "private" } },
+        { status: 409 }
+      ),
+    async () => {
+      throw new Error("private network detail");
+    },
+  ])(
+    "identifies unavailable scoped Gateway access without exposing its response %#",
+    async (fetch) => {
+      const session = createSession([], fetch);
+      const accept = vi.fn<(grant: DesktopGatewayGrant) => void>();
+      const error = await session
+        .withGatewayGrant(undefined, accept)
+        .catch((error: unknown) => error);
+      expect(error).toBeInstanceOf(DesktopGatewayGrantUnavailable);
+      expect((error as Error).message).toBe("gateway_grant_unavailable");
+      expect(JSON.stringify(error)).not.toContain("private");
+      expect(accept).not.toHaveBeenCalled();
+    }
+  );
+
+  it("keeps acceptance faults distinct from unavailable Gateway access", async () => {
+    const session = createSession([], async () => Response.json(grant()));
+    const error = await session
+      .withGatewayGrant(undefined, () => {
+        throw new Error("private storage fault");
+      })
+      .catch((error: unknown) => error);
+    expect(error).not.toBeInstanceOf(DesktopGatewayGrantUnavailable);
+    expect((error as Error).message).toBe("gateway_grant_acceptance_failed");
+  });
 
   it("discards a mint that overlaps native sign-out", async () => {
     const mint = Promise.withResolvers<Response>();

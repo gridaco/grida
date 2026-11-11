@@ -158,7 +158,7 @@ export namespace NativeDesktopProfile {
   ): string {
     return app.isPackaged
       ? process.resourcesPath
-      : path.join(app.getAppPath(), ".vite", "native-resources");
+      : path.join(app.getAppPath(), ".native-resources");
   }
 
   export function ordinaryChatProtectedPaths(app: HostApp): readonly string[] {

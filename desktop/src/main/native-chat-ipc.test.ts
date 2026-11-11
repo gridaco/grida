@@ -5,6 +5,7 @@ import fs from "node:fs";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type {
   NativeChatSnapshot,
+  NativeChatProfileSelection,
   NativeChatStreamUpdate,
   NativeChatWakeup,
 } from "@grida/desktop-bridge";
@@ -19,6 +20,7 @@ import type { NativeChatSession } from "./native-agent-chat";
 import type { NativeSavedChatDeletionPreview } from "./native-agent-deletion";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
 import { NativeDocumentIdentityBusy } from "./native-document-files";
+import { DesktopAccountSession } from "./account-session";
 import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
 
 const ORIGIN = "https://fixture.invalid";
@@ -2276,6 +2278,7 @@ describe("native chat IPC", () => {
       "native-provider-endpoint-approval-required",
     ],
     ["native_provider_byok_key_missing: private details", "native-unavailable"],
+    ["gateway_grant_unavailable", "native-unavailable"],
   ])("returns a bounded recovery state for %s", async (message, readiness) => {
     const { first } = setup();
     const ipc = new NativeChatIpc(ORIGIN, () => null, {
@@ -2286,6 +2289,66 @@ describe("native chat IPC", () => {
     await expect(ipc.available(first.event)).rejects.toThrow(
       "native_chat_unavailable"
     );
+  });
+
+  it("allows explicit connection selection after unavailable Gateway access without starting the default again", async () => {
+    const { first, chat } = setup();
+    const id = "a".repeat(64);
+    let selected = false;
+    const account = new DesktopAccountSession({
+      base_url: ORIGIN,
+      fetch: async () =>
+        Response.json({ error: { code: "not_configured" } }, { status: 503 }),
+    });
+    const ensure = vi.fn<() => Promise<void>>(async () =>
+      account.withGatewayGrant(undefined, () => {})
+    );
+    const list = async () => ({ choices: [], saved: [] });
+    const select = vi.fn<
+      (
+        workspace: string,
+        selection: NativeChatProfileSelection,
+        requireCurrent: () => void
+      ) => Promise<void>
+    >(
+      async (
+        _workspace: string,
+        selection: NativeChatProfileSelection,
+        requireCurrent: () => void
+      ) => {
+        requireCurrent();
+        expect(selection).toEqual({ kind: "saved", id });
+        selected = true;
+      }
+    );
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      (_sender, workspaceId, profile) =>
+        selected && profile === id ? { workspaceId, chat } : null,
+      { admits: () => true, ensure },
+      undefined,
+      undefined,
+      undefined,
+      { list, select }
+    );
+    await expect(ipc.status(first.event, true)).resolves.toBe(
+      "native-gateway-unavailable"
+    );
+    await expect(ipc.profiles(first.event)).resolves.toEqual({
+      choices: [],
+      saved: [],
+      active: null,
+    });
+    await ipc.selectProfile(first.event, { kind: "saved", id });
+    await expect(ipc.status(first.event, true)).resolves.toBe("native-ready");
+    await expect(ipc.profiles(first.event)).resolves.toMatchObject({
+      active: id,
+    });
+    await expect(ipc.create(first.event)).resolves.toMatchObject({
+      sessionId: expect.any(String),
+    });
+    expect(ensure).toHaveBeenCalledTimes(1);
+    expect(select).toHaveBeenCalledTimes(1);
   });
 
   it("rejects a startup reply after navigation even if the frame returns to the same URL", async () => {

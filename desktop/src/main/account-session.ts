@@ -24,6 +24,14 @@ export type DesktopGatewayGrant = Readonly<{
   isCurrent: () => boolean;
 }>;
 
+/** Fixed-route scoped access failed; contains no server or credential details. */
+export class DesktopGatewayGrantUnavailable extends Error {
+  constructor() {
+    super("gateway_grant_unavailable");
+    this.name = "DesktopGatewayGrantUnavailable";
+  }
+}
+
 export class DesktopAccountSession {
   private readonly meUrl: string;
   private readonly signOutUrl: string;
@@ -129,7 +137,7 @@ export class DesktopAccountSession {
       (url.protocol !== "https:" &&
         !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
     )
-      throw new Error("gateway_grant_unavailable");
+      throw new DesktopGatewayGrantUnavailable();
     const generation = this.gatewayGeneration;
     const timeout = AbortSignal.timeout(GATEWAY_MINT_TIMEOUT_MS);
     const signal = cancellation
@@ -160,14 +168,14 @@ export class DesktopAccountSession {
       this.signingOut ||
       generation !== this.gatewayGeneration
     )
-      throw new Error("gateway_grant_unavailable");
+      throw new DesktopGatewayGrantUnavailable();
     if (
       this.gatewaySubject !== undefined &&
       this.gatewaySubject !== grant.subject
     ) {
       this.gatewayGeneration += 1;
       this.gatewaySubject = undefined;
-      throw new Error("gateway_grant_unavailable");
+      throw new DesktopGatewayGrantUnavailable();
     }
     this.gatewaySubject = grant.subject;
     const accepted = this.gatewayGeneration;

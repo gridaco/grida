@@ -170,6 +170,7 @@ export type NativeChatReadiness =
   | "native-starting"
   | "native-ready"
   | "native-unavailable"
+  | "native-gateway-unavailable"
   | "native-provider-key-required"
   | "native-provider-model-unavailable"
   | "native-provider-endpoint-https-required"

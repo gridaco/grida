@@ -387,6 +387,7 @@ export class NativeChatController {
           case "native-provider-model-unavailable":
           case "native-provider-endpoint-https-required":
           case "native-provider-endpoint-approval-required":
+          case "native-gateway-unavailable":
             publish(result);
             break;
           default:
@@ -433,8 +434,9 @@ export class NativeChatController {
       profileError: null,
     });
     void this.readProfiles();
-    if (initial && profileId !== null && profileId !== undefined) {
-      void this.focusChat(initial, profileId);
+    if (profileId !== null && profileId !== undefined) {
+      if (initial) void this.focusChat(initial, profileId);
+      else void this.selectProfile({ kind: "saved", id: profileId });
       return;
     }
     void this.listChats();
@@ -490,6 +492,43 @@ export class NativeChatController {
       if (owns()) this.update({ catalogError: "Couldn't list saved chats." });
     } finally {
       if (owns()) this.update({ catalogLoading: false });
+    }
+  }
+
+  /** Inspect connection choices without starting the default provider or opening history. */
+  connectForSelection(): void {
+    if (this.scope || this.catalogConnection) return;
+    this.catalogConnection = {};
+    this.update({ profiles: null, profileBusy: false, profileError: null });
+    void this.readProfiles();
+  }
+
+  /** Commit only an explicit connection choice; the full pane owns chat/history loading. */
+  async selectConnection(
+    selection: NativeChatProfileSelection
+  ): Promise<boolean> {
+    const connection = this.catalogConnection;
+    if (
+      this.scope ||
+      !connection ||
+      !this.bridge.selectProfile ||
+      this.view.profileBusy
+    )
+      return false;
+    this.update({ profileBusy: true, profileError: null });
+    try {
+      await this.bridge.selectProfile(selection);
+      return this.catalogConnection === connection;
+    } catch {
+      if (this.catalogConnection === connection)
+        this.update({
+          profileError:
+            "This model connection is unavailable. Check its saved settings.",
+        });
+      return false;
+    } finally {
+      if (this.catalogConnection === connection)
+        this.update({ profileBusy: false });
     }
   }
 

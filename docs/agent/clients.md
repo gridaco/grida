@@ -32,6 +32,13 @@ The native Linux ARM64 host and retained Desktop service also have isolated
 kernel, process and restart checks. Other live providers, full Linux installer
 delivery, other architectures and signed delivery remain unqualified.
 
+For development, start the local editor and its local authentication services
+before starting the Desktop shell. See the
+[authenticated local setup](https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md#authenticated-local-development).
+The Desktop development command prepares the native worker and helper before
+launch. A missing default Gateway connection can be recovered through explicit
+[model selection](./models-and-usage.md#start-a-chat-with-a-saved-model).
+
 ## Build the host
 
 From the Grida repository, build the executable with the pinned Rust toolchain.

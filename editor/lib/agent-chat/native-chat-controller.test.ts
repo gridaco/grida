@@ -115,6 +115,94 @@ function fixture() {
   };
 }
 
+it("offers explicit connections before a failed default can open chat or history", async () => {
+  const { bridge, controller } = fixture();
+  const id = "c".repeat(64);
+  const profiles = vi.fn<NonNullable<DesktopNativeChat["profiles"]>>(
+    async () => ({
+      active: null,
+      saved: [],
+      choices: [{ id, connection: "Fixture provider", model: "Fixture" }],
+    })
+  );
+  const create = vi.fn<DesktopNativeChat["create"]>(bridge.create.bind(bridge));
+  const load = vi.fn<DesktopNativeChat["load"]>(bridge.load.bind(bridge));
+  const list = vi.fn<DesktopNativeChat["list"]>(bridge.list.bind(bridge));
+  const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+    async () => {}
+  );
+  bridge.profiles = profiles;
+  bridge.create = create;
+  bridge.load = load;
+  bridge.list = list;
+  bridge.selectProfile = choose;
+  try {
+    controller.connectForSelection();
+    await vi.waitFor(() =>
+      expect(controller.read().profiles?.choices).toHaveLength(1)
+    );
+    expect(choose).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(load).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
+    choose.mockRejectedValueOnce(new Error("fixture unavailable"));
+    expect(await controller.selectConnection({ kind: "new", id })).toBe(false);
+    expect(controller.read().profileError).toContain("unavailable");
+    expect(await controller.selectConnection({ kind: "new", id })).toBe(true);
+    expect(choose).toHaveBeenLastCalledWith({ kind: "new", id });
+    expect(create).not.toHaveBeenCalled();
+    expect(load).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
+  } finally {
+    controller.disconnect();
+  }
+});
+
+it("ignores late connection recovery after the pane closes", async () => {
+  const { bridge, controller } = fixture();
+  const pending = Promise.withResolvers<void>();
+  bridge.selectProfile = async () => pending.promise;
+  controller.connectForSelection();
+  const selecting = controller.selectConnection({
+    kind: "saved",
+    id: "b".repeat(64),
+  });
+  controller.disconnect();
+  controller.connectForSelection();
+  pending.resolve();
+  expect(await selecting).toBe(false);
+  expect(controller.read().profileBusy).toBe(false);
+  controller.disconnect();
+});
+
+it("activates a recovered profile before loading any remembered default history", async () => {
+  const { bridge } = fixture();
+  const memory = {
+    getItem: (key: string) =>
+      key === "project"
+        ? JSON.stringify({ selected: "old-default", sessions: ["old-default"] })
+        : null,
+    setItem: () => {},
+  };
+  const controller = new NativeChatController(bridge, memory, "project");
+  const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+    async () => {}
+  );
+  const load = vi.fn<DesktopNativeChat["load"]>(bridge.load.bind(bridge));
+  bridge.selectProfile = choose;
+  bridge.load = load;
+  const id = "d".repeat(64);
+  try {
+    controller.connect(null, id);
+    await vi.waitFor(() => expect(controller.read().scope).toBeGreaterThan(0));
+    expect(choose).toHaveBeenCalledExactlyOnceWith({ kind: "saved", id });
+    expect(controller.read().selected).toBeNull();
+    expect(load).not.toHaveBeenCalled();
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("inspects the current chat's hooks and removes only an observed saved revision", async () => {
   const f = fixture();
   const hook = {
@@ -2975,6 +3063,7 @@ it("captures effort separately from Plan or Act and preserves it across a lost s
 it.each([
   ["native-unavailable", "native-unavailable"],
   ["native-provider-key-required", "native-provider-key-required"],
+  ["native-gateway-unavailable", "native-gateway-unavailable"],
   ["native-provider-model-unavailable", "native-provider-model-unavailable"],
   [
     "native-provider-endpoint-https-required",
