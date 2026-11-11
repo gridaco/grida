@@ -460,10 +460,7 @@ function buildDesktopArguments({
   app: App;
   extra?: string[];
 }): string[] {
-  const workspaceChat = NativeDesktopProfile.ordinaryChat(
-    app,
-    app.isPackaged && !(typeof INSIDERS !== "undefined" && INSIDERS === 1)
-  );
+  const workspaceChat = NativeDesktopProfile.ordinaryChat();
   return [
     `--grida-version=${app.getVersion()}`,
     ...(workspaceChat ? [`--${NATIVE_WORKSPACE_CHAT_ARGUMENT}=1`] : []),

@@ -12,6 +12,22 @@ The native Grida Agent host runs tasks from scripts and serves Agent Client
 Protocol (ACP) clients. Its entrypoints use the same conversation master and
 durable session store. The native executable is available from source.
 
+## Use native chat in Desktop
+
+Current macOS and Linux Desktop source selects the native host for Stable,
+Insiders and development. Open a project or deck and start a new chat. macOS also supports
+standalone SVG chat. Model selection, questions, queued input and history use the same
+native session service as headless clients. Availability still depends on the
+selected connection and the capabilities shown in that chat.
+
+Previous chats and their uploaded inputs remain in their original storage.
+New native chats start with fresh history. Closing or restarting Desktop keeps
+those new chats; reopening one does not submit another model request. A host
+startup failure reports unavailable chat rather than selecting another engine.
+
+Windows currently retains file and media workflows with chat unavailable.
+Signed delivery and live-provider qualification are still pending.
+
 ## Build the host
 
 From the Grida repository, build the executable with the pinned Rust toolchain.

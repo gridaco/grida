@@ -248,11 +248,12 @@ claims described above. An upload ticket is never organization authority.
 
 ### `GRIDA-SEC-004` — Desktop daemon trust boundary
 
-**What it protects.** The Grida Desktop V1 ships a local daemon
-sidecar (Node subprocess of the Electron app) that owns the user's BYOK
-keys (OpenRouter, Vercel AI Gateway, fal, ElevenLabs, Tripo), native-provider
-OAuth credentials (GRIDA-SEC-008), local file paths, chat sessions, and AI
-agent loops.
+**What it protects.** Grida Desktop supervises a native Rust chat host and a
+retained daemon sidecar. The native host owns new chat sessions and agent
+execution. The Node sidecar retains local file paths, workspaces, media,
+provider settings and shared credential adapters. Native-provider OAuth has its
+separate credential boundary (GRIDA-SEC-008). The historical full-agent
+composition is restricted to an explicitly managed archival predecessor.
 Electron main listens on an ephemeral
 `127.0.0.1` port and transfers only accepted connected sockets to the
 socketless sidecar, whose authenticated daemon protocol is the canonical local
@@ -877,6 +878,16 @@ lazy reads, read-only mutation, and symlink escape refusal.
 
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
+- The [development resource preparer](desktop/scripts/prepare-dev-native-agent.mjs)
+  builds the locked Rust host and helper, strips only staged copies and verifies
+  their executable format through the same package stager. Main selects that
+  fixed private development location or packaged resources, never a PATH lookup.
+  Ordinary macOS/Linux launches select native chat in either channel. The
+  supervisor factory starts the historical chat runtime only for an explicitly
+  managed predecessor; unavailable native chat cannot silently enable it.
+  Windows retains non-chat services and withholds chat until native private
+  storage is supported. This does not establish Windows kernel containment.
+
 - The [Desktop packaging entrypoint](desktop/scripts/package-with-native-agent.mjs)
   builds from the locked workspace or takes an explicit absolute artifact root.
   [Native agent package staging](desktop/scripts/native-agent-package.mjs),
@@ -1436,7 +1447,7 @@ Today:
   and write scope. The [file registry](packages/grida-daemon/src/files/registry.ts)
   rechecks those exclusions for retained document IDs and refuses hard-linked
   files in this profile. The exclusions use known launch paths.
-- An ordinary packaged macOS ARM64 launch with the agent disabled can register
+- An ordinary macOS launch with the agent disabled can register
   selected SVGs through [Main's file owner](desktop/src/main/workspace-media-access.ts).
   The exact file and its parent identity constrain the native read and save
   worker. Known agent and scratch roots, Desktop stores, and packaged resources

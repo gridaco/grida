@@ -52,7 +52,7 @@ export function ordinarySelectedSvgFiles(
         path.join(userHome, ".grida", "agent"),
       ].map((directory) => defaultScratchBase(directory, temp)),
       DesktopMediaRoot.current(),
-      path.dirname(process.resourcesPath),
+      path.dirname(NativeDesktopProfile.resourcesPath(app)),
     ],
     userHome,
     fileWorkers(),
@@ -61,14 +61,15 @@ export function ordinarySelectedSvgFiles(
 }
 
 function nativeFilePlatform(): boolean {
-  return (
-    app.isPackaged && process.platform === "darwin" && process.arch === "arm64"
-  );
+  // This selected-document worker uses Seatbelt; Linux retains its file owner.
+  return process.platform === "darwin";
 }
 
 function fileWorkers(): WorkspaceFileWorkers {
   if (workers) return workers;
-  const owner = new WorkspaceFileWorkers(process.resourcesPath);
+  const owner = new WorkspaceFileWorkers(
+    NativeDesktopProfile.resourcesPath(app)
+  );
   workers = owner;
   app.once("will-quit", () => owner.close());
   return owner;

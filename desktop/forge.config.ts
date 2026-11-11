@@ -89,6 +89,7 @@ const osxNotarize =
 function packageIgnore(file: string): boolean {
   if (!file) return false; // app root
   if (file === "/package.json") return false;
+  if (/^\/\.vite\/native-resources(?:\/|$)/.test(file)) return true;
   if (file.startsWith("/.vite")) return false;
   // `@grida/*` are bundled (devDependencies); their node_modules entries are
   // `link:` symlinks to ../../packages that point out of the package and make

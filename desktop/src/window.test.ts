@@ -71,6 +71,9 @@ import {
 const BASE = "https://grida.co";
 
 it("offers a separate preload capability for native document chat", () => {
+  const selection = vi
+    .spyOn(NativeDesktopProfile, "ordinaryChat")
+    .mockReturnValue(false);
   const app = { getVersion: () => "1.0.0" } as App;
   const common = { app, base_url: BASE, doc_id: "selected", native: true };
   open_document_window(common);
@@ -87,6 +90,7 @@ it("offers a separate preload capability for native document chat", () => {
     "--grida-native-document=selected",
     "--grida-native-document-chat=selected",
   ]);
+  selection.mockRestore();
 });
 
 it("passes the ordinary workspace-only chat scope to a deck window", () => {

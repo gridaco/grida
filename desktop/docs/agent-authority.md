@@ -8,75 +8,59 @@ transport slice described below; issue
 [#916](https://github.com/gridaco/grida/issues/916) binds finite shell workers
 to supervisor-owned per-command confinement.
 
-On macOS and Linux, the implementation wraps the entire AgentSidecar with
-`@anthropic-ai/sandbox-runtime` (`srt`) 0.0.65 and one global destination
-policy. Its direct external destination set is empty and
-`allow_local_binding` is false. Electron main owns the exact loopback listener,
-transfers only already-accepted connected sockets to the socketless sidecar,
-and routes trusted provider HTTP through a separate private stdio channel.
-BYOK/GG hosts are absent from the outer policy. The wrap remains the shipping
-backstop for the sidecar's structured capabilities and in-process state.
-Model-selected finite commands no longer spawn inside that coarse authority:
-the sidecar requests them over the same inherited capability channel and main
-creates a fresh SRT filesystem profile for each command. Removing the outer
-wrap would still expose the sidecar itself and is not implied by this narrower
-worker boundary; Desktop continues to withhold the external ACP agent.
+## Current enforcement
 
-Windows currently starts AgentSidecar unwrapped. Shell and external ACP are
-withheld, but
-structured local filesystem capabilities remain available; that is a known
-nonconformance with the target fail-closed posture below, not a sandbox claim.
-The package-level empty destination intent is not a Windows kernel egress
-fence; an AgentSidecar compromise there retains ambient process networking.
-Base64 scratch staging remains available there for raster perception and
-structured text/SVG filesystem access. The renderer refuses a scratch-only
-arbitrary binary file when no provider route exists, because Windows withholds
-the confined binary command capability and a bare path would be inoperable.
+Ordinary macOS and Linux Desktop chat runs in the Rust host over private ACP
+pipes. The shared master owns conversation behavior and durable execution.
+Electron owns user presence, editor tool hosting, provider networking and worker
+lifetime. Native finite commands use scoped sandbox helpers rather than SRT.
+
+A socketless service sidecar retains files, workspaces, recents, provider
+settings and media. Main owns its authenticated loopback listener and transfers
+accepted sockets. This retained composition still uses SRT with no direct
+external destinations or local binding. Removing that backstop requires separate
+non-agent service qualification. An admitted managed macOS profile can use the
+native retained-media launcher described below.
+
+The historical TypeScript chat runtime is available only to an explicitly
+managed predecessor used for archival handoff. Ordinary native startup failure
+does not activate it. Windows starts retained services with chat unavailable
+until native private storage is supported. Its retained filesystem routes have
+no kernel containment; HTTP admission does not establish that boundary.
 
 ## Decision
 
-Desktop uses four authority roles:
+Desktop keeps these authority roles separate:
 
-1. **Electron main is the control supervisor.** It validates user-originated
-   grants, starts principals, owns process lifetime, and owns the exact
-   `127.0.0.1` ephemeral daemon listener. It does not expose a generic fetch,
-   listen, connect, or spawn primitive to the renderer or model.
-2. **AgentSidecar is the contained agent host.** It owns sessions, structured
-   file capabilities, the model loop, and the authenticated renderer perimeter.
-   It starts the daemon socketless and serves only connected sockets transferred
-   by main. Its outer profile is a coarse filesystem/process backstop. Provider
-   egress is not represented by its agent destination allowlist.
-3. **The native provider transport runs in Electron main.** It uses a dedicated
-   non-persistent Chromium network session, owns registered provider origins,
-   and exposes only provider-request and credential-free provider-asset
-   operation classes over the private channel. AgentSidecar still owns and
-   injects BYOK/GG credentials; main can observe them in transit but never
-   stores or logs them.
-4. **Supervisor-owned execution workers contain raw principals.** Shell
-   commands, external ACP agents, local MCP servers, install-time executables,
-   and other raw runtimes are launched with a host-issued grant in an authority
-   domain that cannot mutate another domain.
+1. **Electron main supervises control and user presence.** It validates grants,
+   pins the selected workspace or editor connection, owns worker lifetime and
+   the exact loopback listener. It exposes purpose-specific actions.
+2. **The Rust chat host owns durable execution.** It uses the shared master,
+   records accepted work and invokes registered capabilities. Native command
+   helpers enforce captured filesystem, process and network scope.
+3. **Electron hosts editor tools and provider transport.** The editor decides
+   document semantics. A dedicated Chromium network session handles approved
+   provider requests and credential-free asset downloads on private channels.
+   Credential owners supply execution-time credentials. The renderer and model
+   receive no generic network or process primitive.
+4. **The retained service sidecar owns existing non-chat services.** Its
+   authenticated interface keeps file, workspace, settings and media callers
+   available without opening the old chat database or sweeping chat scratch.
+   It keeps its existing containment until separately replaced.
 
 ```text
-hosted renderer
-      │ path-scoped bridge + per-spawn auth
+Desktop renderer
+      │ path-scoped preload / sender-checked IPC
       ▼
-main-owned 127.0.0.1 listener
-      │ accepted connected socket (Node IPC fd 3)
-      ▼
-socketless contained AgentSidecar ── provider frames ─► native network service
-      │                                                   │
-      │ opaque grant + workload                           └─ Chromium host route
-      ▼
-execution supervisor
-      ├─ confined shell process tree
-      ├─ confined external-agent process tree
-      └─ confined extension process tree
+Electron main ─── private ACP ───► Rust host + shared master
+      │                              │
+      │ editor tools / provider I/O  └──► scoped native execution helper
+      │
+      └── authenticated accepted sockets ───► retained non-chat services
 ```
 
-The roles are security boundaries, not package names. An implementation may
-split them further, but it may not collapse a raw principal into the network
-service or expose either service's underlying I/O primitive to model output.
+These roles define authority rather than requiring a language or package for
+every capability. Raw execution cannot inherit provider-service authority.
 
 ## User grant ceremony
 
@@ -360,9 +344,10 @@ deliberately enters a visibly unsandboxed posture. srt 0.0.65 contains an alpha
 Windows backend, but Desktop deliberately withholds it until its argv-based
 spawn, provisioning, packaging, lifecycle, and regression contract are owned.
 
-The current Windows build is therefore nonconforming with that target: it runs
-AgentSidecar unwrapped and withholds shell and external ACP, but still exposes
-structured local filesystem capabilities and has no kernel network fence.
+The current Windows build starts retained file and media services unwrapped.
+It does not start either chat engine, so it provides no model-invocable local
+capabilities. Retained structured filesystem routes still have no kernel network
+fence.
 Controls at the renderer/HTTP boundary and the bounded provider transport
 remain real for ordinary product calls; they must not be described as
 filesystem or compromise containment. Closing this gap is a release
@@ -386,8 +371,11 @@ If startup is interrupted after the source commit, preparation verifies the
 archive named by the source seal before publishing its local receipt.
 Desktop publishes native readiness after the workspace process completes its
 ACP handshake and Main rechecks the seal and archive. Existing-data
-preparation refuses an absent source. Normal Desktop starts the compatibility
-chat path, while isolated disposable profiles can start fresh native chat.
+preparation refuses an absent source. Ordinary macOS and Linux Desktop instead
+keeps previous chat material in place and starts fresh native history in a
+separate store. It claims neither archival custody nor retirement of other
+installed versions. Only an explicit managed predecessor starts the historical
+chat engine; native startup failure never selects it.
 The seal relies on the historical forward-version check and requires a
 separate deployment boundary for unreviewed legacy writers.
 

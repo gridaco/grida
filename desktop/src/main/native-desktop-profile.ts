@@ -138,24 +138,27 @@ export namespace NativeDesktopProfile {
     );
   }
 
-  /** Ordinary Stable chat keeps the browser and non-chat service owners in place. */
-  export function ordinaryChat(app: HostApp, packagedStable: boolean): boolean {
+  /** Ordinary chat keeps the browser and non-chat service owners in place. */
+  export function ordinaryChat(): boolean {
     return (
-      packagedStable &&
-      process.platform === "darwin" &&
-      process.arch === "arm64" &&
+      (process.platform === "darwin" || process.platform === "linux") &&
       !first &&
-      !process.env.GRIDA_AGENT_USER_DATA &&
-      !app.commandLine.getSwitchValue("user-data-dir") &&
       !process.argv.some(
         (arg) =>
           arg === "--disable-agent" ||
           arg === "--native-chat" ||
-          arg.startsWith("--native-chat-") ||
-          arg === "--user-data-dir" ||
-          arg.startsWith("--user-data-dir=")
+          arg.startsWith("--native-chat-")
       )
     );
+  }
+
+  /** Development stages the same resource layout without modifying Electron. */
+  export function resourcesPath(
+    app: Pick<App, "isPackaged" | "getAppPath">
+  ): string {
+    return app.isPackaged
+      ? process.resourcesPath
+      : path.join(app.getAppPath(), ".vite", "native-resources");
   }
 
   export function ordinaryChatProtectedPaths(app: HostApp): readonly string[] {

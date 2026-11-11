@@ -665,10 +665,8 @@ app.on("ready", async () => {
 
   // Keep a disposable profile on the build it was launched to exercise.
   const nativeProfile = NativeDesktopProfile.selected();
-  const ordinaryNativeChat = NativeDesktopProfile.ordinaryChat(
-    app,
-    app.isPackaged && !IS_INSIDERS
-  );
+  const ordinaryNativeChat = NativeDesktopProfile.ordinaryChat();
+  const nativeResources = NativeDesktopProfile.resourcesPath(app);
   const nativeChatProfile = nativeProfile && !NativeDesktopProfile.mediaOnly();
   let externalProfile: string | undefined;
   try {
@@ -785,7 +783,7 @@ app.on("ready", async () => {
         nativeDesktopAgent = NativeDesktopProfile.managedCutover()
           ? await NativeDesktopAgent.prepareExisting(
               accountSession,
-              process.resourcesPath,
+              nativeResources,
               {
                 requireDrainedClaim: true,
                 verifyWriterAdmission: async (identity, claimId) => {
@@ -798,7 +796,7 @@ app.on("ready", async () => {
             )
           : await NativeDesktopAgent.prepareFresh(
               accountSession,
-              process.resourcesPath,
+              nativeResources,
               options
             );
       }
@@ -809,7 +807,7 @@ app.on("ready", async () => {
           NativeExternalRuns.open({
             ...access,
             profileFile,
-            resourcesPath: process.resourcesPath,
+            resourcesPath: nativeResources,
             packaged: app.isPackaged,
           })
         );
@@ -832,7 +830,7 @@ app.on("ready", async () => {
         nativeEditorMcp = await NativeEditorMcpExport.start(
           process.argv,
           app.getPath("userData"),
-          process.resourcesPath,
+          nativeResources,
           {
             editorOrigin: new URL(EDITOR_BASE_URL).origin,
             admits: (sender) => {
@@ -871,7 +869,7 @@ app.on("ready", async () => {
           NativeDesktopProfile.ordinaryChatProtectedPaths(app);
         nativeDesktopAgent = await NativeDesktopAgent.prepareOrdinary(
           accountSession,
-          process.resourcesPath,
+          nativeResources,
           protectedPaths,
           {
             onLifecycle: onNativeLifecycle,
@@ -950,7 +948,7 @@ app.on("ready", async () => {
   registerIpcHandlers({
     resolve_ipc_role: (window) => entryWindow?.ipcRoleFor(window) ?? null,
     recent_files: recentFiles,
-    native_chat_disabled: NativeDesktopProfile.mediaOnly(),
+    native_chat_disabled: !native,
     document_files: nativeDocuments,
     native_external_agent: nativeExternalRuns,
     resolve_document_window: (id) => documentWindows.get(id),

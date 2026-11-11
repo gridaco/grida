@@ -4,11 +4,12 @@
 
 The desktop app is the Electron host for the Grida editor. It loads the
 hosted editor under `/desktop/*`, exposes a path-scoped preload bridge,
-and starts the agent sidecar through `desktop/src/agent-sidecar.ts`.
+and supervises the native Rust chat host over private ACP pipes. A retained
+service sidecar keeps files, workspaces, recents, provider settings and media.
 
-Most native behavior does not belong in this directory. Shared model operations
-live in `@grida/ai`; their HTTP adapters and the agent system live in
-`@grida/agent`. Desktop stays thin: windows, menus,
+The conversation master and durable chat execution live in the Rust workspace.
+Shared retained media operations live in `@grida/ai`; their HTTP adapters remain
+in `@grida/agent`. Desktop stays thin: windows, menus,
 protocol routing, app lifecycle, IPC sender validation, and sidecar
 supervision.
 
@@ -45,7 +46,21 @@ editor /desktop/*
   -> owns UX only, through typed bridge clients
 ```
 
-Desktop starts with the agent enabled. Launching the Desktop app with
+On macOS and Linux, ordinary Stable, Insiders and development launches use
+native chat. The browser profile and retained service stores keep their owners.
+Old chats and their inputs remain in place, while new chats use `native-chat/`
+beside the browser profile. This is a fresh history boundary, not an archive or
+a migration. An interrupted first launch can reopen the separate native store.
+An unavailable native executable or failed handshake never starts the old agent.
+The old runtime is available only to an explicitly managed historical handoff.
+Windows currently starts retained services with chat unavailable pending an
+ACL-aware native storage contract.
+
+Development startup builds and stages the Rust host and helper under
+`desktop/.vite/native-resources/`. It preserves the original Cargo debug binaries
+and does not modify the shared Electron installation.
+
+Launching the Desktop app with
 `--disable-agent` selects media-only startup before the chat server is imported.
 The supervisor translates that app flag to the sidecar's `--agent=disabled`;
 direct sidecar invocations use `--agent=enabled|disabled`. Image, video, music,

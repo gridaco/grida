@@ -9,43 +9,48 @@ import { ProtectedRoots } from "@grida/daemon/server";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { NativeFirstProfile } from "./native-first-profile";
 
-it.runIf(process.platform === "darwin" && process.arch === "arm64")(
-  "selects separate chat for an ordinary Stable launch and leaves explicit profiles alone",
-  async () => {
-    vi.resetModules();
-    const { NativeDesktopProfile: profile } =
-      await import("./native-desktop-profile");
-    const argv = process.argv;
-    const setPath = vi.fn<App["setPath"]>();
-    const app = {
-      commandLine: { getSwitchValue: () => "" },
-      getPath: () => "/fixture",
-      setPath,
-    };
-    try {
-      vi.stubEnv("GRIDA_AGENT_USER_DATA", undefined);
-      process.argv = argv.slice(0, 2);
-      expect(profile.ordinaryChat(app, true)).toBe(true);
-      expect(profile.ordinaryChat(app, false)).toBe(false);
-      for (const flag of [
-        "--native-chat",
-        "--native-chat-provider=gateway",
-        "--disable-agent",
-        "--user-data-dir=/fixture",
-      ]) {
-        process.argv = [...argv.slice(0, 2), flag];
-        expect(profile.ordinaryChat(app, true)).toBe(false);
-      }
-      process.argv = argv.slice(0, 2);
-      vi.stubEnv("GRIDA_AGENT_USER_DATA", "/fixture/isolated");
-      expect(profile.ordinaryChat(app, true)).toBe(false);
-      expect(setPath).not.toHaveBeenCalled();
-    } finally {
-      process.argv = argv;
-      vi.unstubAllEnvs();
+it("selects native chat across Unix channels and isolated ordinary profiles, without a Windows fallback", async () => {
+  vi.resetModules();
+  const { NativeDesktopProfile: profile } =
+    await import("./native-desktop-profile");
+  const argv = process.argv;
+  try {
+    vi.stubEnv("GRIDA_AGENT_USER_DATA", undefined);
+    process.argv = argv.slice(0, 2);
+    for (const platform of ["darwin", "linux", "win32"]) {
+      vi.stubGlobal("INSIDERS", 0);
+      vi.stubGlobal("process", { ...process, platform });
+      expect(profile.ordinaryChat()).toBe(platform !== "win32");
+      vi.stubGlobal("INSIDERS", 1);
+      expect(profile.ordinaryChat()).toBe(platform !== "win32");
+      vi.unstubAllGlobals();
     }
+    for (const flag of [
+      "--native-chat",
+      "--native-chat-provider=gateway",
+      "--disable-agent",
+    ]) {
+      process.argv = [...argv.slice(0, 2), flag];
+      expect(profile.ordinaryChat()).toBe(false);
+    }
+    process.argv = [...argv.slice(0, 2), "--user-data-dir=/fixture"];
+    vi.stubEnv("GRIDA_AGENT_USER_DATA", "/fixture/isolated");
+    expect(profile.ordinaryChat()).toBe(process.platform !== "win32");
+  } finally {
+    process.argv = argv;
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   }
-);
+});
+
+it("resolves development resources independently of the shared Electron installation", () => {
+  expect(
+    NativeDesktopProfile.resourcesPath({
+      isPackaged: false,
+      getAppPath: () => "/fixture/desktop",
+    })
+  ).toBe(path.join("/fixture/desktop", ".vite", "native-resources"));
+});
 
 it.skipIf(process.platform === "win32")(
   "isolates browser, source, project, temp and media paths for an explicit native profile",

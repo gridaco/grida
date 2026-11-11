@@ -1267,7 +1267,11 @@ let supervisor: AgentSidecarSupervisor | undefined;
 
 function sidecar(): AgentSidecarSupervisor {
   return (supervisor ??= new AgentSidecarSupervisor({
-    agent: !process.argv.includes("--disable-agent"),
+    // The historical runtime is available only to the explicit handoff owner.
+    // An unavailable native host never falls back to another chat engine.
+    agent:
+      NativeDesktopProfile.managedPredecessor() &&
+      !process.argv.includes("--disable-agent"),
   }));
 }
 

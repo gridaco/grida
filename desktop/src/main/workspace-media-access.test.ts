@@ -39,6 +39,7 @@ vi.mock("./native-desktop-profile", () => ({
     selected: () => false,
     firstSelected: () => host.managed,
     agentData: () => host.agent,
+    resourcesPath: () => process.resourcesPath,
   },
 }));
 
@@ -117,7 +118,7 @@ it.runIf(
       await fs.writeFile(selected, "<svg>Original</svg>");
       process.argv = [...process.argv, "--disable-agent"];
       host.packaged = false;
-      expect(ordinarySelectedSvgFiles()).toBeUndefined();
+      expect(ordinarySelectedSvgFiles()).toBeDefined();
       host.packaged = true;
       host.managed = true;
       expect(ordinarySelectedSvgFiles()).toBeUndefined();
