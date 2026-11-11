@@ -735,7 +735,10 @@ suspension. Resume uses that turn's current revision and preserves its
 accepted settings. A changed provider credential can make the retained task
 unavailable for resumption. Stop pauses queue advancement, which you can
 reopen separately with Resume Queue. Opening a session after restart only
-loads its retained state.
+loads its retained state. An ACP client that saved a Resume Queue request ID
+can retry it to recover the same unchanged queue; the retry does not start
+later inputs added after that decision. Desktop does not retain the request ID
+after a full restart, and an idle unpaused queue may require separate recovery.
 
 Negotiate `co.grida/session/turn-summary` to read a settled turn by its
 `sessionId` and `turnId`. The response reports the retained answer or a status

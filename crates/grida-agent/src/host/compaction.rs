@@ -292,10 +292,12 @@ impl Host {
         session: &SessionId,
         reserved: &TurnId,
         direct: Option<&ChangeId>,
+        recovery: Option<SessionRevision>,
     ) -> Option<(TurnId, AutomaticCompaction)> {
         let view = self.store.inspect(session.clone()).await.ok()?;
         if view.current.is_some()
             || view.admission_paused
+            || recovery.is_some_and(|revision| revision != view.revision)
             || direct
                 .is_some_and(|input| view.queued.first().map(|head| &head.input.id) != Some(input))
         {

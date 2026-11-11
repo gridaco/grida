@@ -1570,11 +1570,9 @@ mod tests {
         };
         {
             let mut work = host.work.lock().await;
-            work.ready.extend(
-                (0..MAX_READY_SESSIONS).map(|index| {
-                    ReadyWork::Queue(SessionId::new(format!("full-{index}")).unwrap())
-                }),
-            );
+            work.ready.extend((0..MAX_READY_SESSIONS).map(|index| {
+                ReadyWork::Queue(SessionId::new(format!("full-{index}")).unwrap(), None)
+            }));
         }
         let error = host
             .claim_parent_resume(request.clone(), &current.binding.turn)

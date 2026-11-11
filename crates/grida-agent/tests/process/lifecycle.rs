@@ -2,6 +2,10 @@ use super::*;
 
 #[tokio::test]
 async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
+    use agent_kit_core::{ChangeId, SessionId};
+    use agent_kit_sessions::{ControlRequest, SessionControl, SessionStore, Submission};
+    use agent_kit_store_sqlite::SqliteStore;
+
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("agent-state");
     let workspace = TempDir::new().unwrap();
@@ -9,6 +13,7 @@ async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
         Reply::Hold("Working."),
         Reply::Finished("Third first."),
         Reply::Finished("Replacement second."),
+        Reply::Finished("Later work explicitly resumed."),
     ])
     .await;
     let (child, url) = shared_server(&state, &endpoint.url).await;
@@ -121,11 +126,12 @@ async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
         endpoint.requests.try_recv(),
         Err(mpsc::error::TryRecvError::Empty)
     ));
+    let resume_request = queue_basis(&stopped, session, "release-queue");
     let resumed = ws_rpc(
         &mut socket,
         16,
         "_co.grida/session/resume-queue",
-        queue_basis(&stopped, session, "release-queue"),
+        resume_request.clone(),
     )
     .await;
     assert_eq!(resumed["result"]["requestId"], "release-queue", "{resumed}");
@@ -150,6 +156,121 @@ async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
     })
     .await;
     assert_eq!(settled["latest"]["status"], "succeeded");
+    drop(socket);
+    terminate_shared_server(child).await;
+
+    // Simulate a later accepted input whose worker had not claimed it when
+    // the previous host stopped. The original Resume must not release it.
+    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let session_id = SessionId::new(session).unwrap();
+    let view = store.inspect(session_id.clone()).await.unwrap();
+    store
+        .control(ControlRequest {
+            id: ChangeId::new("hold-before-crash").unwrap(),
+            session: session_id.clone(),
+            expected_revision: view.revision,
+            action: SessionControl::PauseAdmission,
+        })
+        .await
+        .unwrap();
+    let payload = store
+        .input(session_id.clone(), ChangeId::new("c").unwrap())
+        .await
+        .unwrap()
+        .unwrap()
+        .input
+        .payload;
+    store
+        .submit(
+            session_id.clone(),
+            Submission {
+                id: ChangeId::new("later-input").unwrap(),
+                payload,
+            },
+        )
+        .await
+        .unwrap();
+    let view = store.inspect(session_id.clone()).await.unwrap();
+    let resume_after_crash = json!({
+        "sessionId":session,
+        "requestId":"resume-before-crash",
+        "expectedSessionRevision":view.revision.0,
+    });
+    // The durable decision survives a process exit before its scheduler kick.
+    let committed = store
+        .control(ControlRequest {
+            id: ChangeId::new("resume-before-crash").unwrap(),
+            session: session_id,
+            expected_revision: view.revision,
+            action: SessionControl::ResumeAdmission,
+        })
+        .await
+        .unwrap();
+    drop(store);
+
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = initialized_shared_socket(&url).await;
+    let loaded = ws_rpc(
+        &mut socket,
+        2,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("result").is_some(), "{loaded}");
+    let before_retry = session_snapshot(&mut socket, session).await;
+    assert_eq!(queue_ids(&before_retry), ["later-input"]);
+    let retried = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/resume-queue",
+        resume_request,
+    )
+    .await;
+    assert_eq!(retried["result"], resumed["result"]);
+    assert!(
+        timeout(Duration::from_millis(150), endpoint.requests.recv())
+            .await
+            .is_err()
+    );
+    assert_eq!(session_snapshot(&mut socket, session).await, before_retry);
+
+    let recovered = ws_rpc(
+        &mut socket,
+        4,
+        "_co.grida/session/resume-queue",
+        resume_after_crash.clone(),
+    )
+    .await;
+    assert_eq!(
+        recovered["result"]["requestId"], "resume-before-crash",
+        "{recovered}"
+    );
+    assert_eq!(recovered["result"]["sessionRevision"], committed.revision.0);
+    assert_eq!(
+        endpoint.request().await["messages"]
+            .as_array()
+            .unwrap()
+            .last()
+            .unwrap()["content"],
+        "c"
+    );
+    let later = wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"].is_null() && queue_ids(snapshot).is_empty()
+    })
+    .await;
+    assert_eq!(later["latest"]["status"], "succeeded");
+    assert_ne!(later["latest"]["turnId"], settled["latest"]["turnId"]);
+    let replayed = ws_rpc(
+        &mut socket,
+        5,
+        "_co.grida/session/resume-queue",
+        resume_after_crash,
+    )
+    .await;
+    assert_eq!(replayed["result"], recovered["result"]);
+    assert_eq!(session_snapshot(&mut socket, session).await, later);
+    assert!(endpoint.requests.try_recv().is_err());
     endpoint.done().await;
     drop(socket);
     terminate_shared_server(child).await;

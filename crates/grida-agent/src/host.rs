@@ -174,7 +174,7 @@ struct Work {
 
 #[derive(PartialEq, Eq)]
 enum ReadyWork {
-    Queue(SessionId),
+    Queue(SessionId, Option<SessionRevision>),
     Stop(SessionId, TurnId),
     Sponsored(sponsorship::SponsoredWake),
     Answered {
@@ -187,7 +187,7 @@ enum ReadyWork {
 impl ReadyWork {
     fn session(&self) -> &SessionId {
         match self {
-            Self::Queue(session) | Self::Stop(session, _) | Self::Answered { session, .. } => {
+            Self::Queue(session, _) | Self::Stop(session, _) | Self::Answered { session, .. } => {
                 session
             }
             Self::Sponsored(wake) => &wake.binding.session,
@@ -201,10 +201,23 @@ impl ReadyWork {
 
 impl Work {
     fn defer(&mut self, ready: ReadyWork) {
-        if !self.retiring.contains(ready.session())
-            && self.ready.len() < MAX_READY_SESSIONS
-            && !self.ready.contains(&ready)
+        if self.retiring.contains(ready.session()) {
+            return;
+        }
+        if let ReadyWork::Queue(session, incoming) = &ready
+            && let Some(ReadyWork::Queue(_, pending)) = self
+                .ready
+                .iter_mut()
+                .find(|pending| matches!(pending, ReadyWork::Queue(owner, _) if owner == session))
         {
+            match (*pending, *incoming) {
+                (Some(old), Some(new)) if new.0 > old.0 => *pending = Some(new),
+                (Some(_), None) => *pending = None,
+                _ => {}
+            }
+            return;
+        }
+        if self.ready.len() < MAX_READY_SESSIONS && !self.ready.contains(&ready) {
             if matches!(ready, ReadyWork::Stop(..)) {
                 self.ready.push_front(ready);
             } else {
@@ -408,7 +421,8 @@ enum Launch {
         parts: Vec<PromptPart>,
         policy: SubmissionPolicy,
     },
-    Queued(Option<Acceptance>),
+    /// An optional revision limits recovery to an unchanged accepted Resume.
+    Queued(Option<Acceptance>, Option<SessionRevision>),
     Sponsored(Box<sponsorship::SponsoredClaim>),
     Compact(ChangeId),
     RecoverCompaction(RecoveryRequest),
@@ -1131,7 +1145,11 @@ impl Host {
             }
             .then(|| host.live_updates.clone());
             let identified = matches!(&launch, Launch::Identified { .. });
-            let queue_admission = identified || matches!(&launch, Launch::Queued(_));
+            let queue_recovery = match &launch {
+                Launch::Queued(_, revision) => *revision,
+                _ => None,
+            };
+            let queue_admission = identified || matches!(&launch, Launch::Queued(..));
             let result = host.admit(&worker_session, &worker_turn, launch).await;
             let admitted = match result {
                 Ok(Some(run)) => run,
@@ -1151,9 +1169,10 @@ impl Host {
                         error.code.as_str(),
                         "stale_session_revision" | "suspension_mismatch"
                     );
-                    let retry_queue = queue_waiting
-                        || (queue_admission
-                            && (basis_changed || error.code == "history_basis_changed"));
+                    let retry_queue = queue_recovery.is_none()
+                        && (queue_waiting
+                            || (queue_admission
+                                && (basis_changed || error.code == "history_basis_changed")));
                     host.finish_work(
                         &worker_session,
                         error.kind == ErrorKind::Uncertain,
@@ -1292,16 +1311,17 @@ impl Host {
                     .store
                     .submit_at_revision(session.clone(), input, view.revision)
                     .await?;
-                Launch::Queued(Some(accepted))
+                Launch::Queued(Some(accepted), None)
             }
             other => other,
         };
-        if let Launch::Queued(direct) = &launch
+        if let Launch::Queued(direct, recovery) = &launch
             && let Some((maintenance, candidate)) = self
                 .select_queued_compaction(
                     session,
                     turn,
                     direct.as_ref().map(|acceptance| &acceptance.input),
+                    *recovery,
                 )
                 .await
         {
@@ -1334,12 +1354,17 @@ impl Host {
         }
         let execution = self.execution()?;
         let configuration_admission =
-            if matches!(&launch, Launch::Prompt { .. } | Launch::Queued(_)) {
+            if matches!(&launch, Launch::Prompt { .. } | Launch::Queued(..)) {
                 Some(self.configuration_admission.lock().await)
             } else {
                 None
             };
         let view = self.store.inspect(session.clone()).await?;
+        if let Launch::Queued(_, Some(revision)) = &launch
+            && revision != &view.revision
+        {
+            return Ok(None);
+        }
         self.check_execution(&view)?;
         let SessionConfiguration { cwd, subagent, .. } = session_configuration(&view)?;
         let (claim_request, input, acceptance, history) = match launch {
@@ -1370,7 +1395,7 @@ impl Host {
                     history,
                 )
             }
-            Launch::Queued(direct) => {
+            Launch::Queued(direct, _) => {
                 require_idle(&view)?;
                 self.install_pending_automatic_compaction(&view).await?;
                 if let Some(accepted) = &direct
@@ -2470,17 +2495,23 @@ impl Host {
     }
 
     async fn kick_queue(&self, session: SessionId) {
+        self.kick_queue_at(session, None).await;
+    }
+
+    async fn kick_queue_at(&self, session: SessionId, recovery: Option<SessionRevision>) {
         if self.work.lock().await.closed {
             return;
         }
         let Ok(view) = self.store.inspect(session.clone()).await else {
             return;
         };
-        if view.admission_paused {
+        if view.admission_paused || recovery.is_some_and(|revision| revision != view.revision) {
             return;
         }
         if view.current.is_some() {
-            self.kick_resumed_goal(&view).await;
+            if recovery.is_none() {
+                self.kick_resumed_goal(&view).await;
+            }
             return;
         }
         if subagents::queued_work(&view).is_none()
@@ -2496,12 +2527,12 @@ impl Host {
             return;
         }
         if work.active.contains_key(&session) || work.active.len() >= MAX_ACTIVE_RUNS {
-            work.defer(ReadyWork::Queue(session));
+            work.defer(ReadyWork::Queue(session, recovery));
             return;
         }
         // Dropping the automatic continuation ticket detaches its result
         // channels. The registered worker still owns the selected turn.
-        let _ = self.register(&mut work, session, turn, Launch::Queued(None));
+        let _ = self.register(&mut work, session, turn, Launch::Queued(None, recovery));
     }
 
     async fn wake_ready(&self) {
@@ -2555,7 +2586,9 @@ impl Host {
                 work.ready.remove(index)
             };
             match next {
-                Some(ReadyWork::Queue(session)) => self.kick_queue(session).await,
+                Some(ReadyWork::Queue(session, recovery)) => {
+                    self.kick_queue_at(session, recovery).await
+                }
                 Some(ReadyWork::Stop(session, turn)) => self.kick_stopped(session, turn).await,
                 Some(ReadyWork::Answered { .. }) => unreachable!("answered wake registered above"),
                 Some(ReadyWork::Sponsored(_)) => unreachable!("sponsored wake registered above"),

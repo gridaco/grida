@@ -671,7 +671,7 @@ impl Host {
             return;
         }
         if work.active.contains_key(&session) || work.active.len() >= MAX_ACTIVE_RUNS {
-            work.defer(ReadyWork::Queue(session));
+            work.defer(ReadyWork::Queue(session, None));
             return;
         }
         let _ = self.register(&mut work, session, turn, Launch::Resume(claim));

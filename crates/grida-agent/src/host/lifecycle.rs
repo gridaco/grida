@@ -2,6 +2,35 @@
 
 use super::*;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn queue_readiness_coalesces_recovery_without_restricting_ordinary_wakes() {
+        let session = SessionId::new("queued").unwrap();
+        let mut work = Work::default();
+        for revision in [2, 1, 3] {
+            work.defer(ReadyWork::Queue(
+                session.clone(),
+                Some(SessionRevision(revision)),
+            ));
+        }
+        assert_eq!(work.ready.len(), 1);
+        assert!(matches!(
+            work.ready.front(),
+            Some(ReadyWork::Queue(_, Some(SessionRevision(3))))
+        ));
+        work.defer(ReadyWork::Queue(session.clone(), None));
+        work.defer(ReadyWork::Queue(session, Some(SessionRevision(4))));
+        assert_eq!(work.ready.len(), 1);
+        assert!(matches!(
+            work.ready.front(),
+            Some(ReadyWork::Queue(_, None))
+        ));
+    }
+}
+
 pub enum QueueEdit {
     Replace {
         input: ChangeId,
@@ -395,22 +424,25 @@ impl Host {
         expected: SessionRevision,
     ) -> Result<ControlReceipt> {
         self.owned_control(move |host| async move {
-            let admission = host.configuration_admission.lock().await;
+            let _admission = host.configuration_admission.lock().await;
+            let control = ControlRequest {
+                id: request,
+                session: session.clone(),
+                expected_revision: expected,
+                action: SessionControl::ResumeAdmission,
+            };
+            if let Some(receipt) = host.store.control_receipt(control.clone()).await? {
+                // Recover a committed Resume whose worker never claimed its
+                // queue, without allowing the retry to release newer work.
+                host.kick_queue_at(session, Some(receipt.revision)).await;
+                return Ok(receipt);
+            }
             let view = host.store.inspect(session.clone()).await?;
             if view.current.is_none() && super::subagents::queued_work(&view).is_some() {
                 host.check_ready_capacity(&session).await?;
             }
-            let receipt = host
-                .store
-                .control(ControlRequest {
-                    id: request,
-                    session: session.clone(),
-                    expected_revision: expected,
-                    action: SessionControl::ResumeAdmission,
-                })
-                .await?;
+            let receipt = host.store.control(control).await?;
             host.kick_queue(session).await;
-            drop(admission);
             Ok(receipt)
         })
         .await
