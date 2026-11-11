@@ -1051,6 +1051,9 @@ export class NativeAgentChat {
       ...(this.process.acceptsGoalNamedChild && {
         goalNamedChildAvailable: true as const,
       }),
+      ...(this.process.acceptsGoalManualContinuation && {
+        goalManualContinuationAvailable: true as const,
+      }),
       ...(current?.disposition === "running" &&
         !current.paused &&
         !current.cancelled &&
@@ -1404,7 +1407,8 @@ export class NativeAgentChat {
     const goal = await this.goals.inspect(
       sessionId,
       snapshot.sessionRevision,
-      this.process.acceptsGoalCompletion
+      this.process.acceptsGoalCompletion,
+      this.process.acceptsGoalManualContinuation
     );
     this.requireAttached(session);
     return goal;

@@ -159,6 +159,7 @@ export class NativeAgentProcess {
   private savedChatDeletion = false;
   private savedChatDeletionPreview = false;
   private goalCompletionReview = false;
+  private goalManualContinuation = false;
   private goalFundedReview = false;
   private goalNamedChild = false;
   private editorSurfaces = false;
@@ -256,6 +257,10 @@ export class NativeAgentProcess {
 
   get acceptsGoalCompletion(): boolean {
     return this.connected && this.goalCompletionReview;
+  }
+
+  get acceptsGoalManualContinuation(): boolean {
+    return this.connected && this.goalManualContinuation;
   }
 
   get acceptsGoalEffort(): boolean {
@@ -524,6 +529,7 @@ export class NativeAgentProcess {
                 ...NativeAgentCommands.capabilities,
                 ...NativeAgentRevisions.capabilities,
                 [NativeAgentGoals.completionCapability]: 1,
+                [NativeAgentGoals.manualContinuationCapability]: 1,
                 ...(options.subagents && {
                   ...SUBAGENT_CAPABILITIES,
                   [SESSION_EFFORT]: 1,
@@ -611,6 +617,8 @@ export class NativeAgentProcess {
       ).every((key) => advertised?.[key] === 1);
       processOwner.goalCompletionReview =
         advertised?.[NativeAgentGoals.completionCapability] === 1;
+      processOwner.goalManualContinuation =
+        advertised?.[NativeAgentGoals.manualContinuationCapability] === 1;
       processOwner.goalFundedReview =
         processOwner.agentEffort &&
         advertised?.[NativeAgentGoals.fundedReviewCapability] === 1;

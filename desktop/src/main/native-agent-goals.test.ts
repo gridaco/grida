@@ -140,6 +140,33 @@ it("sends confirmation only for the exact negotiated goal review", async () => {
   });
 });
 
+it("projects queued manual continuation only on a negotiated worker", async () => {
+  const goals = new NativeAgentGoals(async () => ({
+    session: "session",
+    revision: 7,
+    stateRevision: 3,
+    goal: {
+      basis: { goal: "goal-id", revision: 2 },
+      objective: { description: REQUEST.objective, criteria: REQUEST.criteria },
+      automatic: false,
+      allowance: { work_turns: 2, inference_steps: 3 },
+      spent: { work_turns: 1, inference_steps: 2 },
+      remaining: { work_turns: 1, inference_steps: 1 },
+      status: { status: "active" },
+      reservation: null,
+      paused: false,
+      progress: null,
+      continuationPending: true,
+    },
+  }));
+  expect(
+    (await goals.inspect("session", 7)).goal?.continuationPending
+  ).toBeUndefined();
+  expect(
+    (await goals.inspect("session", 7, false, true)).goal?.continuationPending
+  ).toBe(true);
+});
+
 async function provider(
   mode: "completion" | "capacity" | "review" = "completion"
 ) {
@@ -263,6 +290,9 @@ it.runIf(Boolean(packaged))(
       );
       const { attachmentId } = await ipc.create(event);
       const snapshot = () => ipc.observe(event, attachmentId);
+      expect((await snapshot()).snapshot.goalManualContinuationAvailable).toBe(
+        true
+      );
       const inspect = async () =>
         ipc.goal(event, attachmentId, (await snapshot()).observationId);
       await ipc.startGoal(event, attachmentId, "review-goal", {

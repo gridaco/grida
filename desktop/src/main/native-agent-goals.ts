@@ -34,6 +34,8 @@ export type NativeGoalInspection = Readonly<{
 
 export class NativeAgentGoals {
   static readonly completionCapability = "co.grida/goal/confirm-completion";
+  static readonly manualContinuationCapability =
+    "co.grida/goal/manual-continuation";
   static readonly fundedReviewCapability = "co.grida/goal/funded-review";
   static readonly namedChildCapability = "co.grida/goal/named-child";
   private readonly issued = new WeakSet<NativeGoalInspection>();
@@ -173,7 +175,8 @@ export class NativeAgentGoals {
   async inspect(
     sessionId: string,
     expectedRevision: number,
-    completionAvailable = false
+    completionAvailable = false,
+    manualContinuationAvailable = false
   ): Promise<NativeGoalInspection> {
     const result = object(
       await this.request("_co.grida/goal/inspect", { sessionId })
@@ -220,6 +223,8 @@ export class NativeAgentGoals {
     }
     const status = state(row.status);
     const paused = flag(row.paused);
+    const continuationPending =
+      manualContinuationAvailable && row.continuationPending === true;
     const progress =
       row.progress === null ? null : text(row.progress, PROGRESS_LIMIT);
     const completion =
@@ -242,6 +247,7 @@ export class NativeAgentGoals {
       spent: usage(row.spent),
       remaining: usage(row.remaining),
       reservation,
+      ...(continuationPending && { continuationPending: true as const }),
       ...(completion && { review: completion }),
     });
     const inspection = Object.freeze({

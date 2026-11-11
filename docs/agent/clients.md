@@ -858,6 +858,8 @@ input, runs out of allowance, or records no further progress.
 Without that opt-in, the goal reserves its first work turn only. An explicit
 Resume can authorize one more work turn within the remaining allowance; it does
 not turn on automatic continuation. Earlier queued messages go first.
+On a compatible Desktop connection, choose **Continue goal** for an active idle
+manual goal, or **Resume goal** when it is paused or blocked.
 
 Inspect the goal to see progress, allowance used and held, and any blocker.
 Pause and Resume preserve the allowance for the same suspended turn. Revising
@@ -901,6 +903,8 @@ continuation. Later automatic Goal turns receive their own permissions.
 
 Negotiate the version-1 capabilities `co.grida/goal/start`, `co.grida/goal/inspect`,
 `co.grida/goal/control`, and `co.grida/goal/recover` for these operations.
+`co.grida/goal/manual-continuation` additionally identifies support for one-turn
+manual continuation and reports when that continuation is queued.
 The [client protocol reference](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-client-protocol.md#persistent-goal-operations)
 lists their parameters.
 

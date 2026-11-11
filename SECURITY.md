@@ -1148,7 +1148,9 @@ lazy reads, read-only mutation, and symlink escape refusal.
   For a manual goal, an explicit idle Resume records authority for one further
   work turn. The existing claim atomically consumes that authority under the
   captured goal revision and allowance; replaying the control cannot create
-  another turn. Pause, objective changes and Clear invalidate it.
+  another turn. While it is queued, a distinct Resume is refused and the
+  pending state is disclosed only to clients that negotiated it. Pause,
+  objective changes and Clear invalidate it.
   The [Desktop goal adapter](desktop/src/main/native-agent-goals.ts) retains
   the exact goal, driver, and session revisions behind a frame-scoped token.
   Goal inspection is read-only. Desktop starts work through explicit user

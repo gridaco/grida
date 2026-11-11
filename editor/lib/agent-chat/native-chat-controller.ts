@@ -228,7 +228,11 @@ type Scope = {
   goalNeedsRefresh?: boolean;
   awaitingGoalId?: string;
   pendingGoalStart?: { key: string; inputId: string };
-  pendingGoalControl?: { key: string; change: NativeChatGoalControl };
+  pendingGoalControl?: {
+    key: string;
+    change: NativeChatGoalControl;
+    manualGoalId?: string;
+  };
   pendingCommand?: { command: NativeChatCommand; requestId: string };
   pendingRevision?: NativeChatRevisionInput;
   replay: boolean;
@@ -1389,6 +1393,29 @@ export class NativeChatController {
     );
   }
 
+  get showsManualGoalContinuation(): boolean {
+    const goal = this.view.goal?.goal;
+    const snapshot = this.scope?.observation?.snapshot;
+    return (
+      goal?.automatic === false &&
+      snapshot?.goalManualContinuationAvailable === true &&
+      !snapshot.current &&
+      !goal.reservation &&
+      (goal.state.status === "active" || goal.state.status === "blocked")
+    );
+  }
+
+  get canRetryManualGoalConfirmation(): boolean {
+    const goal = this.view.goal?.goal;
+    return (
+      !!goal &&
+      (goal.continuationPending === true || this.showsManualGoalContinuation) &&
+      this.scope?.observation?.snapshot.goalManualContinuationAvailable ===
+        true &&
+      this.scope?.pendingGoalControl?.manualGoalId === goal.goalId
+    );
+  }
+
   canControlGoal(action: NativeChatGoalChange["action"]): boolean {
     const goal = this.view.goal?.goal;
     const snapshot = this.scope?.observation?.snapshot;
@@ -1397,10 +1424,16 @@ export class NativeChatController {
       !this.bridge.controlGoal ||
       !this.view.goalReady ||
       this.view.acting ||
-      !goal ||
-      (current && current.turnId !== goal.reservation?.turnId)
+      !goal
     )
       return false;
+    if (
+      action === "resume" &&
+      goal.continuationPending &&
+      this.canRetryManualGoalConfirmation
+    )
+      return true;
+    if (current && current.turnId !== goal.reservation?.turnId) return false;
     const funded = !!goal.reservation?.reviewInferenceSteps;
     if (action === "reconcile_review")
       return (
@@ -1439,14 +1472,23 @@ export class NativeChatController {
         (!goal.remaining.workTurns || !goal.remaining.inferenceSteps))
     )
       return false;
-    return current
-      ? goal.paused &&
-          current.paused &&
-          !current.cancelled &&
-          current.disposition === "suspended"
-      : goal.automatic &&
-          !goal.reservation &&
-          (goal.paused || goal.state.status === "blocked");
+    if (current)
+      return (
+        goal.paused &&
+        current.paused &&
+        !current.cancelled &&
+        current.disposition === "suspended"
+      );
+    if (goal.automatic)
+      return (
+        !goal.reservation && (goal.paused || goal.state.status === "blocked")
+      );
+    return (
+      this.showsManualGoalContinuation &&
+      !goal.continuationPending &&
+      goal.remaining.workTurns > 0 &&
+      goal.remaining.inferenceSteps > 0
+    );
   }
 
   async startGoal(
@@ -1553,11 +1595,18 @@ export class NativeChatController {
         : action === "confirm_completion"
           ? goal.goal?.review?.turnId
           : undefined;
-    const key = JSON.stringify([decision, basis, reviewTurn]);
+    const key = JSON.stringify([
+      goal.goal?.goalId,
+      decision,
+      basis,
+      reviewTurn,
+    ]);
     const pending =
       scope.pendingGoalControl?.key === key
         ? scope.pendingGoalControl
         : undefined;
+    if (action === "resume" && goal.goal?.continuationPending && !pending)
+      return false;
     if (
       basis &&
       (goal.goal?.goalId !== basis.goalId ||
@@ -1574,7 +1623,14 @@ export class NativeChatController {
       observationId,
       requestId: crypto.randomUUID(),
     };
-    scope.pendingGoalControl = { key, change };
+    scope.pendingGoalControl = pending ?? {
+      key,
+      change,
+      ...(action === "resume" &&
+        this.showsManualGoalContinuation && {
+          manualGoalId: goal.goal?.goalId,
+        }),
+    };
     this.update({ acting: true, error: null });
     try {
       await this.bridge.controlGoal(scope.attachment.attachmentId, change);

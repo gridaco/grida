@@ -5,6 +5,7 @@ import type {
   NativeChatCommandResult,
   NativeChatGatewayBillingAttempt,
   NativeChatCatalogEntry,
+  NativeChatGoal,
   NativeChatMessage,
   NativeChatObservation,
   NativeChatPage,
@@ -1360,6 +1361,198 @@ it("retries an accepted Goal revision exactly and refuses a stale changed draft"
       objective,
     });
   } finally {
+    controller.disconnect();
+  }
+});
+
+it.each([
+  {
+    phase: "active",
+    supported: true,
+    automatic: false,
+    manual: true,
+    enabled: true,
+  },
+  {
+    phase: "paused",
+    supported: true,
+    automatic: false,
+    manual: true,
+    enabled: true,
+  },
+  {
+    phase: "blocked",
+    supported: true,
+    automatic: false,
+    manual: true,
+    enabled: true,
+  },
+  {
+    phase: "active",
+    supported: false,
+    automatic: false,
+    manual: false,
+    enabled: false,
+  },
+  {
+    phase: "blocked",
+    supported: false,
+    automatic: false,
+    manual: false,
+    enabled: false,
+  },
+  {
+    phase: "active",
+    supported: true,
+    automatic: true,
+    manual: false,
+    enabled: false,
+  },
+  {
+    phase: "blocked",
+    supported: false,
+    automatic: true,
+    manual: false,
+    enabled: true,
+  },
+  {
+    phase: "exhausted",
+    supported: true,
+    automatic: false,
+    manual: false,
+    enabled: false,
+  },
+  {
+    phase: "held queue",
+    supported: true,
+    automatic: false,
+    manual: true,
+    enabled: false,
+  },
+] as const)(
+  "gates $phase Goal continuation (manual capability $supported, automatic $automatic)",
+  async ({ phase, supported, automatic, manual, enabled }) => {
+    const { bridge, controller } = fixture();
+    const observe = bridge.observe.bind(bridge);
+    bridge.observe = async (id) => {
+      const result = await observe(id);
+      return {
+        ...result,
+        snapshot: {
+          ...result.snapshot,
+          ...(supported && { goalManualContinuationAvailable: true as const }),
+          admissionPaused: phase === "held queue",
+        },
+      };
+    };
+    const goal: NativeChatGoal = {
+      goalId: "goal",
+      objective: "Check the export",
+      criteria: ["The export opens"],
+      automatic,
+      allowance: { workTurns: 3, inferenceSteps: 8 },
+      spent: { workTurns: 1, inferenceSteps: 2 },
+      remaining:
+        phase === "exhausted"
+          ? { workTurns: 0, inferenceSteps: 0 }
+          : { workTurns: 2, inferenceSteps: 6 },
+      paused: phase === "paused",
+      progress: "First export checked",
+      state:
+        phase === "blocked"
+          ? { status: "blocked", reason: "needs_input" }
+          : { status: phase === "exhausted" ? "exhausted" : "active" },
+      reservation: null,
+    };
+    bridge.startGoal = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
+    bridge.goal = async () => ({ observationId: "goal-observation", goal });
+    bridge.controlGoal = vi.fn<NonNullable<DesktopNativeChat["controlGoal"]>>();
+    try {
+      await controller.select("chat-a");
+      expect(controller.showsManualGoalContinuation).toBe(manual);
+      expect(controller.canControlGoal("resume")).toBe(enabled);
+    } finally {
+      controller.disconnect();
+    }
+  }
+);
+
+it("retries the exact lost manual Resume receipt after observing queued continuation", async () => {
+  const { bridge, controller } = fixture();
+  let queued = false;
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const result = await observe(id);
+    return {
+      ...result,
+      snapshot: {
+        ...result.snapshot,
+        sessionRevision: queued ? 3 : 2,
+        admissionPaused: queued,
+        goalManualContinuationAvailable: true,
+      },
+    };
+  };
+  bridge.startGoal = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
+  bridge.goal = async () => ({
+    observationId: queued
+      ? "queued-goal-observation"
+      : "manual-goal-observation",
+    goal: {
+      goalId: "manual-goal",
+      objective: "Check the export",
+      criteria: ["The export opens"],
+      automatic: false,
+      allowance: { workTurns: 3, inferenceSteps: 8 },
+      spent: { workTurns: 1, inferenceSteps: 2 },
+      remaining: { workTurns: 2, inferenceSteps: 6 },
+      paused: false,
+      progress: "First export checked",
+      state: { status: "active" },
+      reservation: null,
+      ...(queued && { continuationPending: true as const }),
+    },
+  });
+  const first = Promise.withResolvers<void>();
+  const control = vi.fn<NonNullable<DesktopNativeChat["controlGoal"]>>(
+    async (sessionId, change) => ({
+      sessionId,
+      requestId: change.requestId,
+      sessionRevision: 3,
+      stateRevision: 2,
+      turnId: null,
+      journalPosition: null,
+    })
+  );
+  control.mockImplementationOnce(async () => {
+    await first.promise;
+    queued = true;
+    throw new Error("fixture lost the Resume receipt");
+  });
+  bridge.controlGoal = control;
+  try {
+    await controller.select("chat-a");
+    const submitted = controller.controlGoal("resume");
+    await controller.controlGoal("resume");
+    expect(control).toHaveBeenCalledTimes(1);
+    expect(controller.canControlGoal("resume")).toBe(false);
+    first.resolve();
+    await submitted;
+    expect(controller.read().goal?.goal?.continuationPending).toBe(true);
+    expect(controller.canRetryManualGoalConfirmation).toBe(true);
+    expect(controller.canControlGoal("resume")).toBe(true);
+    await controller.controlGoal("resume");
+    expect(control.mock.calls[1]).toEqual(control.mock.calls[0]);
+    expect(control.mock.calls[0]?.[1]).toMatchObject({
+      observationId: "manual-goal-observation",
+      action: "resume",
+    });
+    expect(controller.canRetryManualGoalConfirmation).toBe(false);
+    expect(controller.canControlGoal("resume")).toBe(false);
+    await controller.controlGoal("resume");
+    expect(control).toHaveBeenCalledTimes(2);
+  } finally {
+    first.resolve();
     controller.disconnect();
   }
 });

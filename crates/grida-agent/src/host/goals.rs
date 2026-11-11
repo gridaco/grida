@@ -82,6 +82,8 @@ pub struct GoalView {
     pub status: Status,
     pub paused: bool,
     pub automatic: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub continuation_pending: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effort: Option<EffortPreset>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -261,6 +263,7 @@ impl Host {
                 status: goal.status(),
                 paused: goal.paused(),
                 automatic,
+                continuation_pending: goal.explicit_continuation(),
                 effort: captured.effort.as_ref().map(EffortPolicy::preset),
                 named_child_id: goal.named_child().cloned(),
                 progress: goal.progress().map(str::to_owned),

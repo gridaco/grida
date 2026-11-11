@@ -149,6 +149,7 @@ export type NativeChatSnapshot = Readonly<{
   historyRevisionAvailable?: true;
   subagentsAvailable?: true;
   goalNamedChildAvailable?: true;
+  goalManualContinuationAvailable?: true;
   /** Earliest provider retry time in UTC milliseconds for the current turn. */
   retryNotBeforeMs?: number;
   admissionPaused: boolean;
@@ -405,6 +406,7 @@ export type NativeChatGoal = Readonly<
     state: NativeChatGoalStatus;
     paused: boolean;
     progress: string | null;
+    continuationPending?: true;
     spent: NativeChatGoalUsage;
     remaining: NativeChatGoalUsage;
     review?: Readonly<{

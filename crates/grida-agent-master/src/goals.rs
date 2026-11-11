@@ -516,6 +516,10 @@ impl Goal {
 
     /// Authorize one idle work turn without enabling automatic continuation.
     pub fn resume_idle_once(&mut self, expected: &Basis) -> Result<()> {
+        self.require_basis(expected)?;
+        if self.state.explicit_continuation {
+            return Err(problem(ErrorKind::Conflict, "goal_continuation_pending"));
+        }
         if self.state.last_work.is_none() {
             return Err(problem(ErrorKind::Conflict, "goal_work_not_accounted"));
         }

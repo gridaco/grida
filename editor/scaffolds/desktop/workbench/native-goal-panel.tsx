@@ -51,7 +51,13 @@ export function NativeGoalPanel({
   const goalTurn =
     !!goal?.reservation &&
     goal.reservation.turnId === view.observation?.snapshot.current?.turnId;
-  const canManageWork = goalTurn || goal?.automatic;
+  const manualContinuation = controller.showsManualGoalContinuation;
+  const retryManualConfirmation = controller.canRetryManualGoalConfirmation;
+  const canManageWork =
+    goalTurn ||
+    goal?.automatic ||
+    manualContinuation ||
+    retryManualConfirmation;
   const fundedTurn = goalTurn && !!goal?.reservation?.reviewInferenceSteps;
   const canStart = controller.canStartGoal;
   const canAllowWakeup =
@@ -203,6 +209,11 @@ export function NativeGoalPanel({
               turn.
             </p>
           )}
+          {goal.continuationPending && (
+            <p className="text-muted-foreground" role="status">
+              Next goal turn queued.
+            </p>
+          )}
           {!fundedTurn && goal.state.status !== "cleared" && (
             <div className="flex flex-wrap gap-1">
               {goalRevision !== undefined &&
@@ -227,7 +238,10 @@ export function NativeGoalPanel({
                   </Button>
                 )}
               {canManageWork &&
-              (goal.paused || goal.state.status === "blocked") ? (
+              (manualContinuation ||
+                retryManualConfirmation ||
+                goal.paused ||
+                goal.state.status === "blocked") ? (
                 <Button
                   size="xs"
                   variant="ghost"
@@ -235,7 +249,13 @@ export function NativeGoalPanel({
                   disabled={!controller.canControlGoal("resume")}
                   onClick={() => void controller.controlGoal("resume")}
                 >
-                  Resume goal
+                  {retryManualConfirmation
+                    ? "Retry confirmation"
+                    : manualContinuation &&
+                        !goal.paused &&
+                        goal.state.status === "active"
+                      ? "Continue goal"
+                      : "Resume goal"}
                 </Button>
               ) : canManageWork && goal.state.status === "active" ? (
                 <Button

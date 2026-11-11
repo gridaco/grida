@@ -11,9 +11,17 @@ const INSPECT: &str = "co.grida/goal/inspect";
 const CONTROL: &str = "co.grida/goal/control";
 const RECOVER: &str = "co.grida/goal/recover";
 const CONFIRM_COMPLETION: &str = "co.grida/goal/confirm-completion";
+const MANUAL_CONTINUATION: &str = "co.grida/goal/manual-continuation";
 pub(super) const FUNDED_REVIEW: &str = "co.grida/goal/funded-review";
 pub(super) const NAMED_CHILD: &str = "co.grida/goal/named-child";
-pub(super) const CAPABILITIES: [&str; 5] = [START, INSPECT, CONTROL, RECOVER, CONFIRM_COMPLETION];
+pub(super) const CAPABILITIES: [&str; 6] = [
+    START,
+    INSPECT,
+    CONTROL,
+    RECOVER,
+    CONFIRM_COMPLETION,
+    MANUAL_CONTINUATION,
+];
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/goal/start", response = SubmitResponse)]
@@ -144,6 +152,11 @@ pub(super) fn handlers(
                         && let Some(goal) = result.goal.as_mut()
                     {
                         goal.review = None;
+                    }
+                    if require(&inspect.1, MANUAL_CONTINUATION, None).is_err()
+                        && let Some(goal) = result.goal.as_mut()
+                    {
+                        goal.continuation_pending = false;
                     }
                     if require(&inspect.1, NAMED_CHILD, None).is_err()
                         && let Some(goal) = result.goal.as_mut()

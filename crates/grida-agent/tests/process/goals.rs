@@ -60,14 +60,14 @@ fn request(session: &SessionId, id: &str, text: &str) -> PromptRequest {
 }
 
 async fn goal_client(url: &str, negotiate: bool, inspect_config: bool) -> SharedSocket {
-    goal_connection(url, negotiate, inspect_config, false).await
+    goal_connection(url, negotiate, inspect_config, None).await
 }
 
 async fn goal_connection(
     url: &str,
     negotiate: bool,
     inspect_config: bool,
-    completion_review: bool,
+    extra: Option<&str>,
 ) -> SharedSocket {
     let mut socket = connect_shared(url, Some(SERVER_TOKEN), None, None)
         .await
@@ -85,8 +85,8 @@ async fn goal_connection(
                 1.into();
         }
     }
-    if completion_review {
-        initialize["clientCapabilities"]["_meta"]["co.grida/goal/confirm-completion"] = 1.into();
+    if let Some(capability) = extra {
+        initialize["clientCapabilities"]["_meta"][capability] = 1.into();
     }
     let response = ws_rpc(&mut socket, 1, "initialize", initialize).await;
     assert_eq!(
@@ -111,7 +111,8 @@ async fn the_user_can_confirm_only_exact_accounted_goal_work_after_restart() {
     let state = temporary.path().join("state");
     let workspace = TempDir::new().unwrap();
     let (child, url) = shared_server(&state, &endpoint.url).await;
-    let mut client = goal_connection(&url, true, true, true).await;
+    let mut client =
+        goal_connection(&url, true, true, Some("co.grida/goal/confirm-completion")).await;
     let new = ws_rpc(
         &mut client,
         2,
@@ -234,7 +235,8 @@ async fn the_user_can_confirm_only_exact_accounted_goal_work_after_restart() {
     endpoint.done().await;
 
     let (child, url) = shared_server(&state, &endpoint_url).await;
-    let mut client = goal_connection(&url, true, true, true).await;
+    let mut client =
+        goal_connection(&url, true, true, Some("co.grida/goal/confirm-completion")).await;
     let foreign = ws_rpc(
         &mut client,
         2,
@@ -710,6 +712,7 @@ async fn automatic_goal_yields_to_user_queue_and_stops_at_repeated_progress() {
 
 #[tokio::test]
 async fn manual_goal_resume_authorizes_one_turn_after_a_held_queue_and_restart() {
+    const CAPABILITY: &str = "co.grida/goal/manual-continuation";
     const BLOCKED: &str = r#"{"report":{"kind":"blocked","reason":"needs_input","summary":"Waiting for the user to continue"}}"#;
     const PROGRESS: &str = r#"{"report":{"kind":"progress","summary":"Prepared another export"}}"#;
     let mut endpoint = Endpoint::start(vec![
@@ -726,7 +729,7 @@ async fn manual_goal_resume_authorizes_one_turn_after_a_held_queue_and_restart()
     let state = temporary.path().join("agent-state");
     let workspace = TempDir::new().unwrap();
     let (child, url) = shared_server(&state, &endpoint.url).await;
-    let mut client = goal_client(&url, true, false).await;
+    let mut client = goal_connection(&url, true, false, Some(CAPABILITY)).await;
     let opened = ws_rpc(
         &mut client,
         2,
@@ -813,7 +816,7 @@ async fn manual_goal_resume_authorizes_one_turn_after_a_held_queue_and_restart()
     drop(client);
 
     let (child, url) = shared_server(&state, &endpoint.url).await;
-    let mut client = goal_client(&url, true, false).await;
+    let mut client = goal_connection(&url, true, false, Some(CAPABILITY)).await;
     let load = ws_rpc(
         &mut client,
         2,
@@ -826,6 +829,45 @@ async fn manual_goal_resume_authorizes_one_turn_after_a_held_queue_and_restart()
     assert!(load.get("result").is_some(), "{load}");
     let replay = ws_rpc(&mut client, 3, "_co.grida/goal/control", resume.clone()).await;
     assert_eq!(replay["result"], accepted["result"]);
+    let pending = ws_rpc(&mut client, 30, "_co.grida/goal/inspect", selector.clone()).await;
+    assert_eq!(pending["result"]["goal"]["continuationPending"], true);
+    let duplicate = ws_rpc(
+        &mut client,
+        31,
+        "_co.grida/goal/control",
+        json!({
+            "sessionId":session,"requestId":"second-manual-resume",
+            "expectedSessionRevision":pending["result"]["revision"],
+            "expectedStateRevision":pending["result"]["stateRevision"],
+            "basis":pending["result"]["goal"]["basis"],"change":{"action":"resume"},
+        }),
+    )
+    .await;
+    assert_eq!(
+        duplicate["error"]["data"], "goal_continuation_pending",
+        "{duplicate}"
+    );
+    let unchanged = ws_rpc(&mut client, 32, "_co.grida/goal/inspect", selector.clone()).await;
+    assert_eq!(unchanged["result"], pending["result"]);
+    let mut older = goal_client(&url, true, false).await;
+    let loaded = ws_rpc(
+        &mut older,
+        2,
+        "session/load",
+        json!({
+            "sessionId":session,"cwd":workspace.path(),"mcpServers":[],
+        }),
+    )
+    .await;
+    assert!(loaded.get("result").is_some(), "{loaded}");
+    let older_view = ws_rpc(&mut older, 3, "_co.grida/goal/inspect", selector.clone()).await;
+    assert_eq!(older_view["result"]["goal"]["status"]["status"], "active");
+    assert!(
+        older_view["result"]["goal"]
+            .get("continuationPending")
+            .is_none()
+    );
+    drop(older);
     let held = session_snapshot(&mut client, session).await;
     assert_eq!(held["admissionPaused"], true);
     let unpaused = ws_rpc(
@@ -849,6 +891,7 @@ async fn manual_goal_resume_authorizes_one_turn_after_a_held_queue_and_restart()
     let settled = wait_for_snapshot(&mut client, session, |view| view["current"].is_null()).await;
     let goal = ws_rpc(&mut client, 5, "_co.grida/goal/inspect", selector.clone()).await;
     assert_eq!(goal["result"]["goal"]["automatic"], false);
+    assert!(goal["result"]["goal"].get("continuationPending").is_none());
     assert_eq!(
         goal["result"]["goal"]["spent"],
         json!({"work_turns":2,"inference_steps":4})
