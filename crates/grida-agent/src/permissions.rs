@@ -30,7 +30,7 @@ use grida_agent_master::hooks::CheckMode;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
 const REQUEST: &str = "grida.agent.approval";
@@ -38,6 +38,7 @@ const ANSWER: &str = "grida.agent.approval.answer";
 const MAX_APPROVAL_BYTES: usize = 128 * 1024;
 const MAX_ACTIONS: usize = 32;
 const MAX_GOAL_READ_VERIFICATIONS: usize = 16;
+const PRIMARY_REVIEW_CONTEXT: &str = "\nYou may inspect the primary workspace with read_file, list_files, and search_text. Use relative paths and omit the directory field.";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -394,6 +395,43 @@ impl PermissionProfile {
         self.workspace.permission_identity(&self.protected)
     }
 
+    pub(crate) fn allows_primary_review(&self) -> bool {
+        self.workspace
+            .primary()
+            .and_then(|id| self.directories.get(id))
+            .is_some_and(|rule| rule.read == AccessRule::Allow)
+    }
+
+    pub(crate) fn capture_primary_review(
+        &self,
+        parent: &PermissionCapture,
+        cwd: &Path,
+        scope: ScopeId,
+    ) -> Result<PermissionCapture> {
+        self.validate_capture(parent)?;
+        if !self.allows_primary_review() || !self.matches_primary(cwd) {
+            return Err(denied());
+        }
+        Ok(PermissionCapture {
+            scope,
+            profile: self.identity,
+            context: PRIMARY_REVIEW_CONTEXT.into(),
+        })
+    }
+
+    pub(crate) fn validate_primary_review(
+        &self,
+        capture: &PermissionCapture,
+    ) -> Result<Fingerprint> {
+        if capture.profile != self.identity
+            || capture.context != PRIMARY_REVIEW_CONTEXT
+            || !self.allows_primary_review()
+        {
+            return Err(problem(ErrorKind::Conflict, "permission_profile_changed"));
+        }
+        self.workspace.permission_identity(&self.protected)
+    }
+
     /// Bind one owner epoch. Allowing a review means an authorized reviewer
     /// may resolve it later, even when no such client is currently attached.
     pub fn bind(
@@ -403,14 +441,46 @@ impl PermissionProfile {
         store: Arc<SqliteStore>,
         allow_review: bool,
     ) -> Result<Arc<TurnPermissions>> {
-        let workspace_identity = self.validate_capture(capture)?;
+        let owner = self.prepare_scope(
+            capture,
+            (&binding.session, &binding.turn),
+            store,
+            allow_review,
+            false,
+        )?;
+        owner.bind_claim(binding)?;
+        Ok(owner)
+    }
+
+    pub(crate) fn prepare_primary_review(
+        self: &Arc<Self>,
+        capture: &PermissionCapture,
+        selection: (&SessionId, &TurnId),
+        store: Arc<SqliteStore>,
+    ) -> Result<Arc<TurnPermissions>> {
+        self.prepare_scope(capture, selection, store, false, true)
+    }
+
+    fn prepare_scope(
+        self: &Arc<Self>,
+        capture: &PermissionCapture,
+        (session, turn): (&SessionId, &TurnId),
+        store: Arc<SqliteStore>,
+        allow_review: bool,
+        primary_review: bool,
+    ) -> Result<Arc<TurnPermissions>> {
+        let workspace_identity = if primary_review {
+            self.validate_primary_review(capture)?
+        } else {
+            self.validate_capture(capture)?
+        };
         let authority = AuthorityBinding {
             principal: PrincipalId::new("grida-local")?,
             binding: BindingId::new(format!(
                 "native-permissions/{}",
                 hex(&Fingerprint::of(&(
-                    &binding.session,
-                    &binding.turn,
+                    session,
+                    turn,
                     capture.profile,
                     workspace_identity
                 ))?)
@@ -419,9 +489,11 @@ impl PermissionProfile {
         };
         Ok(Arc::new(TurnPermissions {
             profile: self.clone(),
-            binding,
+            selection: (session.clone(), turn.clone()),
+            binding: Arc::default(),
             store,
             allow_review,
+            primary_review,
             files: GrantSelection {
                 authority: authority.clone(),
                 grants: vec![GrantId::new("workspace-file-read")?],
@@ -550,9 +622,11 @@ pub(crate) fn reviewed_approval_answer(
 #[derive(Clone)]
 pub struct TurnPermissions {
     profile: Arc<PermissionProfile>,
-    binding: TurnBinding,
+    selection: (SessionId, TurnId),
+    binding: Arc<OnceLock<TurnBinding>>,
     store: Arc<SqliteStore>,
     allow_review: bool,
+    primary_review: bool,
     files: GrantSelection,
     commands: GrantSelection,
     state: Arc<Mutex<PermissionState>>,
@@ -572,6 +646,19 @@ struct Ready {
 }
 
 impl TurnPermissions {
+    /// Activate an owner prepared for this selection with the store's actual lease.
+    pub(crate) fn bind_claim(&self, binding: TurnBinding) -> Result<()> {
+        if binding.session != self.selection.0 || binding.turn != self.selection.1 {
+            return Err(problem(
+                ErrorKind::Uncertain,
+                "admitted_turn_binding_changed",
+            ));
+        }
+        self.binding
+            .set(binding)
+            .map_err(|_| problem(ErrorKind::Uncertain, "admitted_turn_binding_already_set"))
+    }
+
     pub(crate) fn before_tool_hook(&self) -> Option<&ReviewedHookCommand> {
         self.profile.before_tool_hook()
     }
@@ -617,7 +704,8 @@ impl TurnPermissions {
     }
 
     pub fn handles(&self, selection: &GrantSelection) -> bool {
-        selection == &self.files || (!self.profile.hooks_only && selection == &self.commands)
+        selection == &self.files
+            || (!self.primary_review && !self.profile.hooks_only && selection == &self.commands)
     }
 
     pub(crate) fn goal_read_verifier(
@@ -657,6 +745,11 @@ impl TurnPermissions {
         capture_image: Option<Arc<ImageCapture>>,
         capture_reference: Option<Arc<ImageCapture>>,
     ) -> Result<()> {
+        let (capture_image, capture_reference) = if self.primary_review {
+            (None, None)
+        } else {
+            (capture_image, capture_reference)
+        };
         if self
             .profile
             .directories
@@ -699,6 +792,9 @@ impl TurnPermissions {
         capture_reference: Option<Arc<ImageCapture>>,
     ) -> Result<Option<Arc<CommandTool>>> {
         self.insert_file_tools_with_images(inventory, grants, capture_image, capture_reference)?;
+        if self.primary_review {
+            return Ok(None);
+        }
         let model_commands = !self.profile.hooks_only
             && self.profile.directories.values().any(|rule| {
                 rule.command_read != AccessRule::Deny || rule.command_read_write != AccessRule::Deny
@@ -767,6 +863,14 @@ impl TurnPermissions {
         if admission.operation != *invocation.id() {
             return Err(denied());
         }
+        if self.primary_review
+            && !matches!(
+                invocation.definition().id.as_str(),
+                "read_file" | "list_files" | "search_text"
+            )
+        {
+            return Err(denied());
+        }
         let (directory, effect, command_capture, rule) = match invocation.definition().id.as_str() {
             "run_command" if !self.profile.hooks_only && admission.grants == self.commands => {
                 let command = self
@@ -823,12 +927,17 @@ impl TurnPermissions {
             {
                 let request = read_request(invocation)?;
                 let directory = self.captured_directory(request.directory.as_ref())?;
+                if self.primary_review
+                    && Some(&directory.spec().id) != self.profile.workspace.primary()
+                {
+                    return Err(denied());
+                }
                 let rule = self
                     .profile
                     .directories
                     .get(&directory.spec().id)
                     .map_or(AccessRule::Deny, |rule| rule.read);
-                if rule == AccessRule::Deny {
+                if rule == AccessRule::Deny || (self.primary_review && rule != AccessRule::Allow) {
                     return Err(denied());
                 }
                 let effect = ApprovalEffect::Read {
@@ -848,8 +957,8 @@ impl TurnPermissions {
         Ok((
             Ready {
                 request: ApprovalRequest {
-                    session: self.binding.session.clone(),
-                    turn: self.binding.turn.clone(),
+                    session: self.selection.0.clone(),
+                    turn: self.selection.1.clone(),
                     operation: admission.operation.clone(),
                     action: invocation.fingerprint(),
                     scope,
@@ -945,7 +1054,7 @@ impl ToolGate for TurnPermissions {
         context: AdmissionContext,
     ) -> BoxFuture<'_, Result<ToolDecision>> {
         Box::pin(async move {
-            if context.operations.view().state.binding() != &self.binding {
+            if self.binding.get() != Some(context.operations.view().state.binding()) {
                 return Err(denied());
             }
             let owner = self.clone();
@@ -957,7 +1066,11 @@ impl ToolGate for TurnPermissions {
                     })??;
             let wait_id = wait_id(&ready.request.operation)?;
             let view = context.operations.view();
-            if let Some(wait) = view.state.waits().get(&wait_id) {
+            if self.primary_review {
+                if view.state.waits().contains_key(&wait_id) {
+                    return Err(denied());
+                }
+            } else if let Some(wait) = view.state.waits().get(&wait_id) {
                 if read_approval(wait)? != ready.request {
                     return Err(problem(ErrorKind::Conflict, "permission_action_changed"));
                 }
@@ -1010,7 +1123,7 @@ impl AuthorityValidator for TurnPermissions {
                 }
                 (ready.approval.clone(), ready.request.clone())
             };
-            let binding = self.binding.clone();
+            let binding = self.binding.get().cloned().ok_or_else(denied)?;
             let operation = request.operation.clone();
             let action = request.action;
             self.store.inspect_turn_with(binding.session.clone(), binding.turn.clone(), move |state| {

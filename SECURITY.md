@@ -1266,8 +1266,8 @@ lazy reads, read-only mutation, and symlink escape refusal.
   queue release and Steer revalidate provider continuity. Child creation holds
   the session admission lock through the parent check and durable insertion.
   The [allocation policy](crates/grida-agent-master/src/subagents.rs)
-  binds a work reservation to the ordinary durable claim. Child work receives no
-  workspace, tool, or delegation grants. The
+  binds a work reservation to the ordinary durable claim. Named assignments
+  receive no workspace, tool, or delegation grants. The
   [process fixtures](crates/grida-agent/tests/process/subagents.rs) check
   attachment scope, restart, exact result attribution, and allowance reuse.
 - A sponsored child profile binds one funded slot to an exact source turn
@@ -1275,8 +1275,15 @@ lazy reads, read-only mutation, and symlink escape refusal.
   definition, arguments, grant, and attempt. The
   [claim transaction](crates/agent-kit-store-sqlite/src/lib.rs)
   verifies current source ownership and controls before admitting a worker.
-  The child uses the captured model and operating regime with a separate
-  text-only assignment and no tool grants. Exact start retries observe the
+  The child uses the captured model and operating regime with a separate text
+  assignment and does not automatically inherit the parent transcript. A new
+  anonymous ordinary review may
+  receive a child-bound read-only grant for the already-allowed primary directory.
+  It receives no additional-directory grant, commands, writes, approvals, or
+  delegation. Existing protected-path rules still apply within the primary tree.
+  Goal-funded, named, and older text-only work retain their original scope.
+  The host verifies the retained parent, profile and directory identity again
+  on recovery. Exact start retries observe the
   retained assignment without redispatch. Parent Pause and Stop, including
   cancellation and shutdown, apply through the
   [operation pair transaction](crates/agent-kit-store-sqlite/src/control_pair.rs),

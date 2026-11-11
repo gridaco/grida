@@ -155,8 +155,11 @@ Resubmitting an earlier Ultra message requires a connection that supports Ultra.
 `run --effort standard` uses the ordinary task allowance and is the default.
 Use `run --effort ultra` when an independent review could help. Ultra gives
 the main agent more room to work and can start one separate reviewer while it
-continues. The reviewer receives a text assignment without access to the
-parent's tools or chat history. The agent can collect a verified finding or
+continues. The reviewer receives a text assignment and does not automatically
+receive the parent's chat history. For a new ordinary review, it can inspect the
+primary workspace when that folder already permits reading. It does not receive
+additional folder grants, command execution, writes, or delegation. A folder
+nested within the readable primary workspace remains accessible through it. The agent can collect a verified finding or
 see that the review is still pending or uncertain.
 The finished record identifies the reviewer and records whether its verified
 findings were collected. Desktop shows whether findings were collected in

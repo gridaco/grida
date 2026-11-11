@@ -641,6 +641,90 @@ impl Host {
         Ok(())
     }
 
+    fn capture_sponsored_primary_read(
+        &self,
+        parent: &StoredPrompt,
+        cwd: &Path,
+        input: &ChangeId,
+    ) -> Result<crate::permissions::PermissionCapture> {
+        let unavailable = || problem(ErrorKind::Unavailable, "sponsored_primary_read_unavailable");
+        if !parent.allow_reviewer_primary_read
+            || parent.goal.is_some()
+            || parent.subagent.is_some()
+            || parent.effort.as_ref().map(EffortPolicy::preset) != Some(EffortPreset::Ultra)
+        {
+            return Err(unavailable());
+        }
+        self.permissions
+            .as_ref()
+            .ok_or_else(unavailable)?
+            .capture_primary_review(
+                parent.permission_capture.as_ref().ok_or_else(unavailable)?,
+                cwd,
+                ScopeId::new(input.as_str())?,
+            )
+    }
+
+    pub(super) async fn require_sponsored_primary_read(
+        &self,
+        profile: &Profile,
+        cwd: &Path,
+        input: &ChangeId,
+        capture: &crate::permissions::PermissionCapture,
+    ) -> Result<()> {
+        let unavailable = || problem(ErrorKind::Unavailable, "sponsored_primary_read_unavailable");
+        let sponsor = profile.sponsorship().ok_or_else(unavailable)?;
+        let parent_view = self.store.inspect(profile.parent().clone()).await?;
+        self.check_execution(&parent_view)?;
+        if session_configuration(&parent_view)?.cwd != cwd {
+            return Err(unavailable());
+        }
+        let parent = self
+            .sponsored_parent_prompt(profile.parent(), &sponsor.parent_turn)
+            .await?;
+        if self.capture_sponsored_primary_read(&parent, cwd, input)? != *capture {
+            return Err(unavailable());
+        }
+        Ok(())
+    }
+
+    pub(super) async fn require_committed_primary_reviewer(
+        &self,
+        profile: &Profile,
+        session: &SessionId,
+        turn: &TurnId,
+    ) -> Result<()> {
+        let unavailable = || problem(ErrorKind::Unavailable, "sponsored_primary_read_unavailable");
+        let sponsor = profile.sponsorship().ok_or_else(unavailable)?;
+        let session = session.clone();
+        let turn = turn.clone();
+        let committed = self
+            .store
+            .inspect_operation_claim_with(
+                profile.parent().clone(),
+                sponsor.parent_turn.clone(),
+                vec![sponsor.operation.clone()],
+                move |state| Ok(state.binding().session == session && state.binding().turn == turn),
+            )
+            .await?;
+        if committed != Some(true) {
+            return Err(unavailable());
+        }
+        Ok(())
+    }
+
+    pub(super) fn prepare_sponsored_primary_read(
+        &self,
+        capture: &crate::permissions::PermissionCapture,
+        session: &SessionId,
+        turn: &TurnId,
+    ) -> Result<Arc<crate::permissions::TurnPermissions>> {
+        self.permissions
+            .as_ref()
+            .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?
+            .prepare_primary_review(capture, (session, turn), self.store.clone())
+    }
+
     async fn sponsored_claim(
         &self,
         source: OperationClaimSource,
@@ -697,6 +781,14 @@ impl Host {
             admission: Some(Fingerprint::of(&source)?),
             attempt: Some(source.attempt.clone()),
         };
+        let input_id = match target {
+            Some(target) => target.input.clone(),
+            None => ChangeId::new(CHILD_INPUT)?,
+        };
+        let primary_read =
+            (target.is_none() && captured.goal.is_none() && captured.allow_reviewer_primary_read)
+                .then(|| self.capture_sponsored_primary_read(&captured, &config.cwd, &input_id))
+                .transpose()?;
         captured.parts = vec![PromptPart::Text {
             text: instructions.to_owned(),
         }];
@@ -707,7 +799,8 @@ impl Host {
         captured.allow_library_selection = false;
         captured.allow_wakeups = false;
         captured.configuration_permission = crate::ConfigurationPermission::Disabled;
-        captured.permission_capture = None;
+        captured.permission_capture = primary_read;
+        captured.allow_reviewer_primary_read = false;
         captured.host_tools_capture = None;
         captured.desktop_image_generation = None;
         captured.allow_image_reference = false;
@@ -728,10 +821,7 @@ impl Host {
         captured.subagent = Some(assignment);
         captured.completion_checks = None;
         let input = Submission {
-            id: match target {
-                Some(target) => target.input.clone(),
-                None => ChangeId::new(CHILD_INPUT)?,
-            },
+            id: input_id,
             payload: encode(INPUT_SCHEMA, 2, &captured)?,
         };
         if let Some(target) = target {
@@ -795,10 +885,10 @@ impl Host {
         request: SponsoredClaim,
     ) -> Result<Option<Admitted>> {
         let execution = self.execution()?;
-        let (configuration, session, input, history) = match &request {
+        let (configuration, selection, input, history) = match &request {
             SponsoredClaim::Fresh(request) => (
                 &request.create.configuration,
-                request.create.id.clone(),
+                &request.claim,
                 &request.input,
                 Vec::new(),
             ),
@@ -807,13 +897,18 @@ impl Host {
                 configuration,
             } => (
                 configuration,
-                request.claim.session.clone(),
+                &request.claim,
                 &request.input,
                 self.provider_history(request.claim.session.clone(), None)
                     .await?
                     .messages,
             ),
         };
+        let TurnSelection::New { turn, .. } = &selection.selection else {
+            return Err(sponsored_slot_used());
+        };
+        let session = selection.session.clone();
+        let turn = turn.clone();
         let config = decode_session_configuration(configuration)?;
         let profile = config.subagent.ok_or_else(sponsored_slot_used)?;
         profile.require_authority(&execution.authority.inference.authority)?;
@@ -828,14 +923,53 @@ impl Host {
             Some(&profile),
             InputAuthority::RequireCaptured,
         )?;
+        if let Some(capture) = &prepared.permission_capture {
+            self.require_sponsored_primary_read(&profile, &config.cwd, &input.id, capture)
+                .await?;
+        }
+        let mut inventory = Inventory::new();
+        let mut authority = MasterAuthority {
+            inference: execution.authority.inference.clone(),
+            tools: BTreeMap::new(),
+        };
+        let permission_scope = prepared
+            .permission_capture
+            .as_ref()
+            .map(|capture| self.prepare_sponsored_primary_read(capture, &session, &turn))
+            .transpose()?;
+        let runtime = if let Some(permissions) = &permission_scope {
+            permissions.insert_file_tools(&mut inventory, &mut authority.tools, None)?;
+            let owner = permissions::ToolAuthority::bind(
+                execution.authorization.clone(),
+                Some(permissions.clone()),
+                permissions::AttachmentTools {
+                    image: None,
+                    file: None,
+                },
+                None,
+                permissions::HookTools {
+                    completion: None,
+                    before_tool: None,
+                },
+                Vec::new(),
+                None,
+            )
+            .ok_or_else(|| {
+                problem(
+                    ErrorKind::InvalidState,
+                    "sponsored_primary_read_unavailable",
+                )
+            })?;
+            Some(execution.runtime.with_authorization(owner.clone(), owner))
+        } else {
+            None
+        };
+        let tools = inventory.snapshot(&authority.tools.keys().cloned().collect::<Vec<_>>())?;
         let master = Master::new(
             prepared.config,
             execution.provider.clone(),
-            Inventory::new().snapshot(&[])?,
-            MasterAuthority {
-                inference: execution.authority.inference.clone(),
-                tools: BTreeMap::new(),
-            },
+            tools,
+            authority,
         )?
         .with_history(history)
         .with_input_limit(prepared.limit);
@@ -848,8 +982,17 @@ impl Host {
         let ClaimOutcome::Acquired(claim) = claimed else {
             return Ok(None);
         };
-        let turn = claim.lease.binding().turn.clone();
-        let (opened, _) = self.open_owned_turn(&session, &turn, claim.lease).await?;
+        if let Some(permissions) = permission_scope {
+            permissions.bind_claim(claim.lease.binding().clone())?;
+        }
+        let (opened, _) = self
+            .open_owned_turn_with_runtime(
+                &session,
+                &turn,
+                claim.lease,
+                runtime.as_ref().unwrap_or(&execution.runtime),
+            )
+            .await?;
         Ok(Some(Admitted {
             opened,
             work: TurnWork::Conversation {

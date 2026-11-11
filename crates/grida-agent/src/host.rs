@@ -354,6 +354,8 @@ struct StoredPrompt {
     configuration_permission: crate::ConfigurationPermission,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     permission_capture: Option<crate::permissions::PermissionCapture>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    allow_reviewer_primary_read: bool,
     #[serde(
         rename = "mcp_capture",
         default,
@@ -1515,6 +1517,7 @@ impl Host {
                 "subagent_assignment_mismatch",
             ));
         }
+        let mut sponsored_permissions = None;
         if prepared.is_some()
             && let Some(profile) = &subagent
         {
@@ -1522,6 +1525,18 @@ impl Host {
             if let Some(sponsor) = profile.sponsorship() {
                 self.require_sponsored_origin(profile.parent(), &sponsor.parent_turn)
                     .await?;
+            }
+            if let Some((input, capture)) = input.as_ref().zip(
+                prepared
+                    .as_ref()
+                    .and_then(|input| input.permission_capture.as_ref()),
+            ) {
+                self.require_committed_primary_reviewer(profile, session, turn)
+                    .await?;
+                self.require_sponsored_primary_read(profile, &cwd, &input.id, capture)
+                    .await?;
+                sponsored_permissions =
+                    Some(self.prepare_sponsored_primary_read(capture, session, turn)?);
             }
         }
         let claimed = match claim_request {
@@ -1610,14 +1625,21 @@ impl Host {
             messages.append(&mut prepared.messages);
             prepared.messages = messages;
         }
-        let permission_scope = prepared
-            .permission_capture
-            .as_ref()
-            .map(|capture| {
-                self.bind_permissions(capture, claim.lease.binding().clone())
-                    .map_err(|_| problem(ErrorKind::Uncertain, "admitted_permission_unavailable"))
-            })
-            .transpose()?;
+        let permission_scope = if let Some(permissions) = sponsored_permissions {
+            permissions.bind_claim(claim.lease.binding().clone())?;
+            Some(permissions)
+        } else {
+            prepared
+                .permission_capture
+                .as_ref()
+                .map(|capture| {
+                    self.bind_permissions(capture, claim.lease.binding().clone())
+                        .map_err(|_| {
+                            problem(ErrorKind::Uncertain, "admitted_permission_unavailable")
+                        })
+                })
+                .transpose()?
+        };
         let image = execution
             .image_tools
             .as_ref()
@@ -1664,13 +1686,14 @@ impl Host {
                 images.workspace_reference_capture(claim.lease.binding().session.clone(), cwd)
             });
         let command = match &permission_scope {
-            Some(permissions) if prepared.operating_regime.is_act() => permissions
-                .insert_with_images(
+            Some(permissions) if prepared.operating_regime.is_act() && !prepared.subagent => {
+                permissions.insert_with_images(
                     &mut inventory,
                     &mut authority.tools,
                     capture_image,
                     capture_reference,
-                )?,
+                )?
+            }
             Some(permissions) => {
                 permissions.insert_file_tools(
                     &mut inventory,
@@ -1693,15 +1716,16 @@ impl Host {
                 )
             })
             .transpose()?;
-        let before_tool = if prepared.operating_regime.is_act() && !cancellation_only {
-            before_tool::BeforeToolCheck::bind(
-                claim.lease.binding(),
-                permission_scope.as_ref(),
-                command.as_ref(),
-            )?
-        } else {
-            None
-        };
+        let before_tool =
+            if prepared.operating_regime.is_act() && !prepared.subagent && !cancellation_only {
+                before_tool::BeforeToolCheck::bind(
+                    claim.lease.binding(),
+                    permission_scope.as_ref(),
+                    command.as_ref(),
+                )?
+            } else {
+                None
+            };
         if let Some(image_generation) = prepared.image_generation.take() {
             let workspace_capture = authority.tools.get(&agent_kit_core::ToolId::new(
                 crate::file_tools::CAPTURE_IMAGE_REFERENCE,
@@ -1874,6 +1898,7 @@ impl Host {
         }
         if !cancellation_only
             && prepared.goal.is_none()
+            && !prepared.subagent
             && permission_scope.is_some()
             && let Some(profile) = self
                 .permissions
@@ -2058,6 +2083,12 @@ impl Host {
         } else {
             self.capture_permissions(session, &id)?
         };
+        let allow_reviewer_primary_read = effort.is_some()
+            && permission_capture.is_some()
+            && self
+                .permissions
+                .as_ref()
+                .is_some_and(|profile| profile.allows_primary_review());
         let host_tools_capture =
             self.capture_host_tools(!child_work && allow_host_tools && operating_regime.is_act())?;
         let allow_image_placement = allow_image_placement && desktop_image_generation.is_some();
@@ -2159,6 +2190,7 @@ impl Host {
                     allow_library_selection,
                     configuration_permission,
                     permission_capture,
+                    allow_reviewer_primary_read,
                     host_tools_capture,
                     desktop_image_generation,
                     allow_image_reference,
@@ -2291,7 +2323,8 @@ impl Host {
                         || stored.allow_library_selection
                         || stored.configuration_permission
                             != crate::ConfigurationPermission::Disabled
-                        || stored.permission_capture.is_some()
+                        || stored.allow_reviewer_primary_read
+                        || (stored.permission_capture.is_some() && profile.sponsorship().is_none())
                         || stored.host_tools_capture.is_some()
                         || stored.desktop_image_generation.is_some()
                         || stored.allow_image_reference
@@ -2452,6 +2485,9 @@ impl Host {
                 if let Some(permission) = &stored.permission_capture {
                     config.instructions.push_str(permission.context());
                 }
+                if stored.allow_reviewer_primary_read {
+                    config.instructions.push_str("\nThe independent reviewer returns findings in text and may inspect the primary workspace using read-only tools.");
+                }
                 let guidance = stored
                     .guidance
                     .as_ref()
@@ -2507,10 +2543,15 @@ impl Host {
             }
         };
         if let Some(capture) = &permission_capture {
-            self.permissions
+            let permissions = self
+                .permissions
                 .as_ref()
-                .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?
-                .validate_capture(capture)?;
+                .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?;
+            if subagent {
+                permissions.validate_primary_review(capture)?;
+            } else {
+                permissions.validate_capture(capture)?;
+            }
         }
         if config.max_steps == 0 || config.max_output_tokens == Some(0) {
             return Err(problem(ErrorKind::InvalidInput, "invalid_master_limits"));

@@ -240,6 +240,7 @@ impl Host {
             .capture_input(&view, request.id, request.parts, policy)
             .await?;
         let mut stored: StoredPrompt = decode_input(&input)?;
+        stored.allow_reviewer_primary_read = false;
         stored.goal = Some(GoalInput::Start(goal));
         input.payload = encode(INPUT_SCHEMA, 2, &stored)?;
         let accepted = self

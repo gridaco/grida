@@ -674,6 +674,10 @@ async fn serve_with_key(state: &Path, endpoint: &str, key: &str) -> PrivateStdio
     ]);
     configured(&mut command, state, endpoint);
     command.env("GRIDA_AGENT_PROCESS_TEST_KEY", key);
+    connect_subagents(command).await
+}
+
+async fn connect_subagents(mut command: Command) -> PrivateStdio {
     let child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -693,6 +697,244 @@ async fn serve_with_key(state: &Path, endpoint: &str, key: &str) -> PrivateStdio
         );
     }
     client
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn ordinary_ultra_reviewer_reads_only_its_captured_primary_across_restart() {
+    verify_primary_reviewer("act", true).await;
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn ordinary_ultra_plan_reviewer_reads_only_its_captured_primary_across_restart() {
+    verify_primary_reviewer("plan", true).await;
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn ordinary_ultra_parent_collects_the_primary_review_finding() {
+    verify_primary_reviewer("act", false).await;
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+async fn verify_primary_reviewer(regime: &str, interrupt: bool) {
+    const PRIMARY: &str = "PRIMARY REVIEW FIXTURE CONTENT";
+    const PRIVATE: &str = "ADDITIONAL ROOT MUST STAY PRIVATE";
+    const FINDING: &str = "The primary file is ready for review.";
+    fn reply(request: &Value, interrupt: bool) -> Reply {
+        let messages = request["messages"].to_string();
+        if !messages.contains("You are a subagent.") {
+            return if interrupt || messages.contains(FINDING) {
+                Reply::Finished("Parent step finished.")
+            } else {
+                Reply::Tool("collect_review", "{}")
+            };
+        }
+        if messages.contains(PRIMARY) {
+            return if interrupt {
+                Reply::Hold("Review is ready for interruption.")
+            } else {
+                Reply::Finished(FINDING)
+            };
+        }
+        let calls = json!([
+            {"index":0,"id":"primary","type":"function","function":{
+                "name":"read_file","arguments":r#"{"path":"review.txt"}"#}},
+            {"index":1,"id":"foreign","type":"function","function":{
+                "name":"read_file","arguments":r#"{"directory":"extra","path":"private.txt"}"#}},
+        ]);
+        let delta = json!({"id":"fixture-response","choices":[{"index":0,
+            "delta":{"role":"assistant","tool_calls":calls},"finish_reason":null}]});
+        let finish = json!({"id":"fixture-response","choices":[{"index":0,
+            "delta":{},"finish_reason":"tool_calls"}]});
+        let body = format!("data: {delta}\n\ndata: {finish}\n\ndata: [DONE]\n\n");
+        Reply::RawHttp(format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        ))
+    }
+    let fixture = super::approvals::Fixture::new(false);
+    let mut profile: Value =
+        serde_json::from_slice(&std::fs::read(&fixture.profile).unwrap()).unwrap();
+    if !interrupt {
+        profile["directories"][1]["read"] = json!("allow");
+        std::fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    }
+    let extra = profile["directories"][1]["path"].as_str().unwrap();
+    std::fs::write(fixture.primary.join("review.txt"), PRIMARY).unwrap();
+    std::fs::write(Path::new(extra).join("private.txt"), PRIVATE).unwrap();
+    let follow_ups = if interrupt { 3 } else { 4 };
+    let mut replies = vec![Reply::Tool(
+        "delegate_review",
+        r#"{"instructions":"Check the primary workspace."}"#,
+    )];
+    replies.extend(
+        (0..follow_ups).map(|_| Reply::Choose(Box::new(move |request| reply(request, interrupt)))),
+    );
+    replies.push(Reply::Finished("Unexpected duplicate dispatch."));
+    let mut endpoint = Endpoint::start(replies).await;
+    let endpoint_url = endpoint.url.clone();
+    let open = |old: Option<&Path>| {
+        let mut command = if let Some(old) = old {
+            let mut command = Command::new(old);
+            command.arg("serve");
+            configured(&mut command, &fixture.state, &endpoint_url);
+            command.arg("--permission-profile").arg(&fixture.profile);
+            command.kill_on_drop(true);
+            command
+        } else {
+            fixture.process(&endpoint_url, "serve")
+        };
+        command.args(["--stdio", "--subagents", "--max-output-tokens", "128"]);
+        connect_subagents(command)
+    };
+    let mut host = open(None).await;
+    let parent = new_session(&mut host, &fixture.primary).await;
+    let submitted = host
+        .request(
+            "_co.grida/session/submit",
+            json!({
+                "sessionId":parent,"inputId":"review-primary","effort":"ultra","operatingRegime":regime,
+                "prompt":[{"type":"text","text":"Assess the project."}],
+            }),
+        )
+        .await;
+    let parent_turn = submitted["result"]["turnId"].as_str().unwrap();
+    let first = endpoint.request().await;
+    assert!(first["tools"].to_string().contains("delegate_review"));
+    assert!(
+        first["messages"]
+            .to_string()
+            .contains("may inspect the primary workspace using read-only tools")
+    );
+    let mut reviewer_requests = Vec::new();
+    let mut collected = false;
+    for _ in 0..follow_ups {
+        let request = endpoint.request().await;
+        let messages = request["messages"].to_string();
+        if messages.contains("You are a subagent.") {
+            reviewer_requests.push(request);
+        } else if messages.contains(FINDING) {
+            assert!(!messages.contains(PRIVATE));
+            collected = true;
+        }
+    }
+    let [first, second] = reviewer_requests.as_slice() else {
+        panic!("expected exact reviewer requests: {reviewer_requests:?}");
+    };
+    let names = first["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["function"]["name"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(names, ["list_files", "read_file", "search_text"]);
+    let messages = first["messages"].to_string();
+    assert!(!messages.contains(extra) && !messages.contains(fixture.primary.to_str().unwrap()));
+    let messages = second["messages"].to_string();
+    assert!(
+        messages.contains(PRIMARY) && messages.contains("permission_denied"),
+        "{messages}"
+    );
+    assert!(!messages.contains(PRIVATE) && !messages.contains(extra));
+    let children = host.request(LIST, json!({"parentSessionId":parent})).await;
+    let child = children["result"]["children"][0]["childId"]
+        .as_str()
+        .unwrap();
+    let assignment = observed_assignment(&mut host, &parent, child).await;
+    let input = assignment["inputId"].as_str().unwrap();
+    assert_eq!(assignment["parentTurnId"], parent_turn);
+    assert_eq!(assignment["maxGenerationSteps"], 2);
+    if !interrupt {
+        assert!(collected, "the parent receives the settled review finding");
+        let terminal = wait_for(&mut host, &parent, child, input, |view| {
+            view["current"].is_null()
+        })
+        .await;
+        assert_eq!(
+            terminal["assignment"]["result"]["status"], "succeeded",
+            "{terminal}"
+        );
+        assert_eq!(terminal["assignment"]["result"]["steps"], 2, "{terminal}");
+        host.close().await;
+        assert!(
+            timeout(Duration::from_millis(100), endpoint.requests.recv())
+                .await
+                .is_err()
+        );
+        endpoint.task.abort();
+        return;
+    }
+    let active = inspect(&mut host, &parent, child, input).await;
+    let paused = host
+        .request(PAUSE, child_basis(&active, &parent, child, "pause"))
+        .await;
+    assert!(paused.get("error").is_none(), "{paused}");
+    let paused = wait_for(&mut host, &parent, child, input, |view| {
+        view["current"]["disposition"] == "suspended"
+    })
+    .await;
+    host.close().await;
+    let resume = resume_basis(&paused, &parent, child, "resume");
+    if let Some(binary) = std::env::var_os("GRIDA_AGENT_PRE_PRIMARY_REVIEW_BIN") {
+        let mut old = open(Some(Path::new(&binary))).await;
+        load_parent(&mut old, &parent, &fixture.primary).await;
+        let refused = old.request(RESUME, resume.clone()).await;
+        assert_eq!(
+            refused["error"]["data"], "invalid_subagent_authority",
+            "{refused}"
+        );
+        old.close().await;
+        assert!(endpoint.requests.try_recv().is_err());
+    }
+    let mut changed_profile = profile.clone();
+    changed_profile["revision"] = json!("changed-permissions");
+    std::fs::write(
+        &fixture.profile,
+        serde_json::to_vec(&changed_profile).unwrap(),
+    )
+    .unwrap();
+    let mut changed = open(None).await;
+    load_parent(&mut changed, &parent, &fixture.primary).await;
+    let refused = changed.request(RESUME, resume.clone()).await;
+    assert_eq!(
+        refused["error"]["data"], "permission_profile_changed",
+        "{refused}"
+    );
+    assert_eq!(inspect(&mut changed, &parent, child, input).await, paused);
+    changed.close().await;
+    assert!(endpoint.requests.try_recv().is_err());
+    std::fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    let mut reopened = open(None).await;
+    load_parent(&mut reopened, &parent, &fixture.primary).await;
+    let resumed = reopened.request(RESUME, resume.clone()).await;
+    assert_eq!(
+        resumed["result"]["turn"]["turnId"], paused["current"]["turnId"],
+        "{resumed}"
+    );
+    let terminal = wait_for(&mut reopened, &parent, child, input, |view| {
+        view["current"].is_null()
+    })
+    .await;
+    let result = &terminal["assignment"]["result"];
+    assert_eq!(result["steps"], 2, "{result}");
+    assert_eq!(result["unresolvedOperations"], 1, "{result}");
+    assert_eq!(result["toolActivity"]["succeeded"], 1, "{result}");
+    assert_eq!(result["toolActivity"]["failed"], 1, "{result}");
+    let replay = reopened.request(RESUME, resume).await;
+    assert_eq!(
+        replay["result"]["requestId"],
+        resumed["result"]["requestId"]
+    );
+    assert_eq!(replay["result"]["turn"], terminal["latest"], "{replay}");
+    reopened.close().await;
+    assert!(
+        timeout(Duration::from_millis(100), endpoint.requests.recv())
+            .await
+            .is_err()
+    );
+    endpoint.task.abort();
 }
 
 async fn new_session(client: &mut PrivateStdio, workspace: &Path) -> String {

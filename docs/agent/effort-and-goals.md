@@ -22,6 +22,9 @@ When **Effort for next message** is available, choose **Standard** for the
 ordinary work allowance or **Ultra** for work that may benefit from an
 independent review. Either effort can be used with Plan or Act. Ultra can
 give one reviewer a separate text assignment while the main agent continues.
+For a new ordinary review, the reviewer can read the primary workspace if it is
+already allowed. It does not automatically receive the parent chat or additional
+folder grants; folders inside the readable primary workspace remain accessible.
 The turn summary records whether the agent collected that reviewer’s findings.
 On supported saved OpenRouter and Vercel connections, Ultra is available for
 ordinary messages; Goal-funded reviews remain available on supported Gateway
