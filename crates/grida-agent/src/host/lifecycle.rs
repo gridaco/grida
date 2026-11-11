@@ -547,6 +547,88 @@ impl Host {
         let _ = self.register(&mut work, session, turn, Launch::RecoverStopped(recovery));
     }
 
+    /// Revisit one bounded page after a stop wake could not fit in memory.
+    /// Only a durably cancelled turn under this host's authority can be
+    /// registered; inspection itself never starts provider work.
+    pub(super) async fn scan_missed_stops(&self) {
+        let after = {
+            let mut work = self.work.lock().await;
+            if work.closed || work.active.len() >= MAX_ACTIVE_RUNS {
+                return;
+            }
+            if !work.stop_scan_active {
+                if !work.missed_stops {
+                    return;
+                }
+                work.missed_stops = false;
+                work.stop_scan_active = true;
+                work.stop_scan_after = None;
+            }
+            work.stop_scan_after.clone()
+        };
+
+        let page = self.store.active_turn_page(after).await;
+        let mut last = None;
+        let mut more = false;
+        if let Ok(page) = &page {
+            for (index, entry) in page.entries.iter().enumerate() {
+                {
+                    let work = self.work.lock().await;
+                    if work.closed || work.active.len() >= MAX_ACTIVE_RUNS {
+                        more = true;
+                        break;
+                    }
+                }
+                last = Some(entry.session.clone());
+                more = index + 1 < page.entries.len() || page.next_after.is_some();
+                let Ok(turn) = self
+                    .store
+                    .inspect_turn(entry.session.clone(), entry.turn.clone())
+                    .await
+                else {
+                    continue;
+                };
+                if !turn.controls.cancelled
+                    || !matches!(
+                        turn.disposition,
+                        TurnDisposition::Suspended | TurnDisposition::Interrupted
+                    )
+                {
+                    continue;
+                }
+                let Ok(view) = self.store.inspect(entry.session.clone()).await else {
+                    continue;
+                };
+                if self.check_execution(&view).is_err()
+                    || !view
+                        .current
+                        .as_ref()
+                        .is_some_and(|current| current.binding.turn == entry.turn)
+                {
+                    continue;
+                }
+                self.kick_stopped(entry.session.clone(), entry.turn.clone())
+                    .await;
+                // Interleave ordinary ready work with cancellation recovery.
+                break;
+            }
+        }
+
+        let mut work = self.work.lock().await;
+        if page.is_err() {
+            work.stop_scan_active = false;
+            work.stop_scan_after = None;
+            eprintln!("[agent] stopped-turn recovery scan unavailable");
+        } else if more {
+            if let Some(last) = last {
+                work.stop_scan_after = Some(last);
+            }
+        } else {
+            work.stop_scan_active = false;
+            work.stop_scan_after = None;
+        }
+    }
+
     pub async fn steer(
         &self,
         control: TurnControl,

@@ -80,6 +80,7 @@ impl Host {
             configuration_admission: Arc::default(),
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
             work: Arc::default(),
+            wake_lock: Arc::default(),
             workers: Arc::default(),
             changed: Arc::default(),
             live_updates: broadcast::channel(UPDATE_CAPACITY).0,

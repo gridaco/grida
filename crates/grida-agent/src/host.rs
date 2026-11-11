@@ -140,6 +140,7 @@ pub struct Host {
     configuration_admission: Arc<Mutex<()>>,
     controls: Arc<Semaphore>,
     work: Arc<Mutex<Work>>,
+    wake_lock: Arc<Mutex<()>>,
     workers: Arc<AtomicUsize>,
     changed: Arc<Notify>,
     live_updates: broadcast::Sender<live::LiveUpdate>,
@@ -169,6 +170,10 @@ struct Work {
     active: BTreeMap<SessionId, Active>,
     retiring: BTreeSet<SessionId>,
     ready: VecDeque<ReadyWork>,
+    missed_stops: bool,
+    stop_scan_active: bool,
+    stop_scan_after: Option<SessionId>,
+    stop_scan_turn: bool,
     timers: wakeups::TimerOwners,
 }
 
@@ -217,12 +222,19 @@ impl Work {
             }
             return;
         }
-        if self.ready.len() < MAX_READY_SESSIONS && !self.ready.contains(&ready) {
+        if self.ready.contains(&ready) {
+            return;
+        }
+        if self.ready.len() < MAX_READY_SESSIONS {
             if matches!(ready, ReadyWork::Stop(..)) {
                 self.ready.push_front(ready);
             } else {
                 self.ready.push_back(ready);
             }
+        } else if matches!(ready, ReadyWork::Stop(..)) {
+            // The durable cancellation remains the authority when this
+            // bounded notification queue cannot retain another wake.
+            self.missed_stops = true;
         }
     }
 }
@@ -703,6 +715,7 @@ impl Host {
             configuration_admission: Arc::default(),
             controls: Arc::new(Semaphore::new(MAX_OWNED_CONTROLS)),
             work: Arc::default(),
+            wake_lock: Arc::default(),
             workers: Arc::default(),
             changed: Arc::default(),
             live_updates: broadcast::channel(UPDATE_CAPACITY).0,
@@ -2536,7 +2549,28 @@ impl Host {
     }
 
     async fn wake_ready(&self) {
+        let _wake = self.wake_lock.lock().await;
         loop {
+            let scan_next = {
+                let mut work = self.work.lock().await;
+                if work.closed || work.active.len() >= MAX_ACTIVE_RUNS {
+                    return;
+                }
+                let has_ready = work
+                    .ready
+                    .iter()
+                    .any(|ready| !work.active.contains_key(ready.session()));
+                let scan = (work.stop_scan_active || work.missed_stops)
+                    && (work.stop_scan_turn || !has_ready);
+                if scan {
+                    work.stop_scan_turn = false;
+                }
+                scan
+            };
+            if scan_next {
+                self.scan_missed_stops().await;
+                continue;
+            }
             let next = {
                 let mut work = self.work.lock().await;
                 if work.closed || work.active.len() >= MAX_ACTIVE_RUNS {
@@ -2549,6 +2583,7 @@ impl Host {
                 else {
                     return;
                 };
+                work.stop_scan_turn = true;
                 if let ReadyWork::Answered {
                     session,
                     turn,
