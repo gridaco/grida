@@ -3,11 +3,14 @@ use super::lifecycle::{
     wait_for_snapshot,
 };
 use super::*;
-use agent_kit_core::{ChangeId, ModelId, SessionId};
-use agent_kit_sessions::{InputDisposition, TurnDisposition};
-use grida_agent::host::{GoalRequest, Host, PromptPart, PromptRequest, TurnControl};
+use agent_kit_core::turn::ControlDirective;
+use agent_kit_core::{ChangeId, Envelope, ModelId, SchemaId, SessionId};
+use agent_kit_sessions::{InputDisposition, SessionStore, TurnDisposition};
+use agent_kit_store_sqlite::SqliteStore;
+use agent_kit_store_sqlite::driver::{DriverControlPlan, DriverControlRequest};
+use grida_agent::host::{GoalAction, GoalRequest, Host, PromptPart, PromptRequest, TurnControl};
 use grida_agent::{ConfigurationPermission, ProviderOptions};
-use grida_agent_master::goals::{Allowance, Blocker, Objective, Status, Usage};
+use grida_agent_master::goals::{Allowance, Blocker, Goal, Objective, Status, Usage};
 use std::num::NonZeroU32;
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -920,6 +923,281 @@ async fn manual_goal_resume_authorizes_one_turn_after_a_held_queue_and_restart()
     assert_eq!(unchanged["result"], goal["result"]);
     terminate_shared_server(child).await;
     endpoint.task.abort();
+}
+
+async fn commit_goal_control_without_wake(
+    store: &SqliteStore,
+    session: &SessionId,
+    request: &str,
+    action: GoalAction,
+) -> (Value, u64) {
+    let view = store.inspect(session.clone()).await.unwrap();
+    let mut goal = Goal::decode(view.driver_state.value().unwrap()).unwrap();
+    let basis = goal.basis().clone();
+    let intent = Envelope::new(
+        SchemaId::new("grida.agent.goal.control").unwrap(),
+        1,
+        serde_json::to_vec(&(&basis, &action)).unwrap(),
+    )
+    .unwrap();
+    let params = json!({
+        "sessionId":session,"requestId":request,
+        "expectedSessionRevision":view.revision,
+        "expectedStateRevision":view.driver_state.revision(),
+        "basis":basis,"change":action,
+    });
+    let receipt = store
+        .control_driver_state(
+            DriverControlRequest {
+                id: ChangeId::new(request).unwrap(),
+                session: session.clone(),
+                expected_revision: view.revision,
+                expected_state: view.driver_state.revision(),
+                intent,
+            },
+            move |_, current| {
+                let directive = match action {
+                    GoalAction::Resume => match current {
+                        Some(turn) => {
+                            goal.resume_reserved(&basis, &turn.binding.turn)?;
+                            Some(ControlDirective::Resume)
+                        }
+                        None => {
+                            goal.resume_idle_once(&basis)?;
+                            None
+                        }
+                    },
+                    GoalAction::Pause => {
+                        goal.set_paused(&basis, true)?;
+                        current.map(|_| ControlDirective::Pause)
+                    }
+                    _ => unreachable!(),
+                };
+                Ok(DriverControlPlan {
+                    value: Some(goal.encode()?),
+                    directive,
+                })
+            },
+        )
+        .await
+        .unwrap();
+    (params, receipt.revision.0)
+}
+
+#[tokio::test]
+async fn idle_goal_resume_replay_recovers_only_its_committed_session_revision() {
+    const BLOCKED: &str =
+        r#"{"report":{"kind":"blocked","reason":"needs_input","summary":"Waiting to resume"}}"#;
+    const PROGRESS: &str = r#"{"report":{"kind":"progress","summary":"Prepared the export"}}"#;
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("goal_report", BLOCKED),
+        Reply::Finished("Goal needs input."),
+        Reply::Tool("goal_report", PROGRESS),
+        Reply::Finished("Goal resumed once."),
+    ])
+    .await;
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut client = goal_client(&url, true, false).await;
+    let opened = ws_rpc(
+        &mut client,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = opened["result"]["sessionId"].as_str().unwrap();
+    let started = ws_rpc(
+        &mut client,
+        3,
+        "_co.grida/goal/start",
+        json!({
+            "sessionId":session,"inputId":"goal-with-replayed-resume",
+            "prompt":[{"type":"text","text":"Prepare the export"}],"goal":goal(),
+        }),
+    )
+    .await;
+    assert!(started.get("result").is_some(), "{started}");
+    endpoint.request().await;
+    endpoint.request().await;
+    wait_for_snapshot(&mut client, session, |view| view["current"].is_null()).await;
+    drop(client);
+    terminate_shared_server(child).await;
+
+    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let session_id = SessionId::new(session).unwrap();
+    let (older, older_revision) =
+        commit_goal_control_without_wake(&store, &session_id, "older-resume", GoalAction::Resume)
+            .await;
+    commit_goal_control_without_wake(&store, &session_id, "pause-older-resume", GoalAction::Pause)
+        .await;
+    // This Resume survives an exit before the host can wake its continuation.
+    let (current, current_revision) =
+        commit_goal_control_without_wake(&store, &session_id, "current-resume", GoalAction::Resume)
+            .await;
+    drop(store);
+
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut client = goal_client(&url, true, false).await;
+    let loaded = ws_rpc(
+        &mut client,
+        2,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("result").is_some(), "{loaded}");
+    let before = session_snapshot(&mut client, session).await;
+    let stale = ws_rpc(&mut client, 3, "_co.grida/goal/control", older).await;
+    assert_eq!(stale["result"]["sessionRevision"], older_revision);
+    assert!(
+        timeout(Duration::from_millis(150), endpoint.requests.recv())
+            .await
+            .is_err()
+    );
+    assert_eq!(session_snapshot(&mut client, session).await, before);
+
+    let resumed = ws_rpc(&mut client, 4, "_co.grida/goal/control", current.clone()).await;
+    assert_eq!(resumed["result"]["sessionRevision"], current_revision);
+    assert!(
+        endpoint.request().await["tools"]
+            .to_string()
+            .contains("goal_report")
+    );
+    endpoint.request().await;
+    let settled = wait_for_snapshot(&mut client, session, |view| {
+        view["current"].is_null() && view["latest"] != before["latest"]
+    })
+    .await;
+    assert_eq!(settled["latest"]["status"], "succeeded");
+    let replayed = ws_rpc(&mut client, 5, "_co.grida/goal/control", current).await;
+    assert_eq!(replayed["result"], resumed["result"]);
+    assert_eq!(session_snapshot(&mut client, session).await, settled);
+    assert!(endpoint.requests.try_recv().is_err());
+    drop(client);
+    terminate_shared_server(child).await;
+    endpoint.done().await;
+}
+
+#[tokio::test]
+async fn active_goal_resume_replay_wakes_only_its_original_suspension() {
+    let (release, held) = tokio::sync::oneshot::channel();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Hold("Partial Goal work"),
+        Reply::Release("Same Goal turn resumed", held),
+    ])
+    .await;
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut client = goal_client(&url, true, false).await;
+    let opened = ws_rpc(
+        &mut client,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = opened["result"]["sessionId"].as_str().unwrap();
+    let started = ws_rpc(
+        &mut client,
+        3,
+        "_co.grida/goal/start",
+        json!({
+            "sessionId":session,"inputId":"goal-with-active-resume",
+            "prompt":[{"type":"text","text":"Prepare the export"}],"goal":goal(),
+        }),
+    )
+    .await;
+    assert!(started.get("result").is_some(), "{started}");
+    endpoint.request().await;
+    let observed = ws_rpc(
+        &mut client,
+        4,
+        "_co.grida/goal/inspect",
+        json!({"sessionId":session}),
+    )
+    .await;
+    let goal = &observed["result"];
+    let paused = ws_rpc(
+        &mut client,
+        5,
+        "_co.grida/goal/control",
+        json!({
+            "sessionId":session,"requestId":"first-pause",
+            "expectedSessionRevision":goal["revision"],"expectedStateRevision":goal["stateRevision"],
+            "basis":goal["goal"]["basis"],"change":{"action":"pause"},
+        }),
+    )
+    .await;
+    assert!(paused.get("result").is_some(), "{paused}");
+    let suspended = wait_for_snapshot(&mut client, session, |view| {
+        view["current"]["disposition"] == "suspended"
+    })
+    .await;
+    assert_eq!(suspended["current"]["paused"], true);
+    drop(client);
+    terminate_shared_server(child).await;
+
+    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let session_id = SessionId::new(session).unwrap();
+    let (older, older_revision) =
+        commit_goal_control_without_wake(&store, &session_id, "first-resume", GoalAction::Resume)
+            .await;
+    commit_goal_control_without_wake(&store, &session_id, "second-pause", GoalAction::Pause).await;
+    // Both receipts name the same turn and epoch. Only the later suspension
+    // state can recover its own lost worker wake after restart.
+    let (current, current_revision) =
+        commit_goal_control_without_wake(&store, &session_id, "second-resume", GoalAction::Resume)
+            .await;
+    drop(store);
+
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut client = goal_client(&url, true, false).await;
+    let loaded = ws_rpc(
+        &mut client,
+        2,
+        "session/load",
+        json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    assert!(loaded.get("result").is_some(), "{loaded}");
+    let before = session_snapshot(&mut client, session).await;
+    assert_eq!(before["current"]["turnId"], suspended["current"]["turnId"]);
+    assert_eq!(before["current"]["epoch"], suspended["current"]["epoch"]);
+    assert_eq!(before["current"]["paused"], false);
+    let stale = ws_rpc(&mut client, 3, "_co.grida/goal/control", older).await;
+    assert_eq!(stale["result"]["sessionRevision"], older_revision);
+    assert!(
+        timeout(Duration::from_millis(150), endpoint.requests.recv())
+            .await
+            .is_err()
+    );
+    assert_eq!(session_snapshot(&mut client, session).await, before);
+
+    let resumed = ws_rpc(&mut client, 4, "_co.grida/goal/control", current.clone()).await;
+    assert_eq!(resumed["result"]["sessionRevision"], current_revision);
+    assert!(
+        endpoint.request().await["tools"]
+            .to_string()
+            .contains("goal_report")
+    );
+    let active = session_snapshot(&mut client, session).await;
+    assert_eq!(active["current"]["turnId"], before["current"]["turnId"]);
+    assert!(
+        active["current"]["epoch"].as_u64().unwrap() > before["current"]["epoch"].as_u64().unwrap()
+    );
+    let replayed = ws_rpc(&mut client, 5, "_co.grida/goal/control", current).await;
+    assert_eq!(replayed["result"], resumed["result"]);
+    release.send(()).unwrap();
+    wait_for_snapshot(&mut client, session, |view| view["current"].is_null()).await;
+    assert!(endpoint.requests.try_recv().is_err());
+    drop(client);
+    terminate_shared_server(child).await;
+    endpoint.done().await;
 }
 
 #[tokio::test]

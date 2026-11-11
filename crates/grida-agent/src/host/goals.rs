@@ -3,6 +3,7 @@
 use super::*;
 use agent_kit_core::driver_state::{DriverStateChange, DriverStateRevision};
 use agent_kit_core::messages::OutcomeStatus;
+use agent_kit_core::turn::TurnBinding;
 use agent_kit_core::{GrantId, ToolId};
 use agent_kit_store_sqlite::driver::{DriverControlPlan, DriverControlRequest};
 use grida_agent_master::goals::{
@@ -95,6 +96,13 @@ pub struct GoalView {
     pub reservation: Option<Reservation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review: Option<CompletionReview>,
+}
+
+#[derive(PartialEq, Eq)]
+pub(super) struct GoalResumeWake {
+    pub(super) binding: TurnBinding,
+    position: JournalPosition,
+    revision: SessionRevision,
 }
 
 impl Host {
@@ -615,8 +623,19 @@ impl Host {
                 }
             }
             GoalAction::Resume => {
-                self.changed.notify_waiters();
-                self.kick_queue(session).await;
+                if let Some(turn) = &receipt.turn {
+                    let record = turn.record();
+                    self.kick_goal_resume(GoalResumeWake {
+                        binding: record.binding.clone(),
+                        position: record.position,
+                        revision: receipt.revision,
+                    })
+                    .await;
+                } else {
+                    // An idle Resume may recover its original admission after
+                    // restart. Its receipt cannot authorize a later queue.
+                    self.kick_queue_at(session, Some(receipt.revision)).await;
+                }
             }
             GoalAction::Pause
             | GoalAction::ConfirmCompletion { .. }
@@ -625,7 +644,14 @@ impl Host {
         Ok(receipt)
     }
 
-    pub(super) async fn kick_resumed_goal(&self, view: &SessionView) {
+    pub(super) async fn kick_goal_resume(&self, wake: GoalResumeWake) {
+        let Ok(view) = self.store.inspect(wake.binding.session.clone()).await else {
+            return;
+        };
+        self.kick_resumed_goal(&view, Some(wake)).await;
+    }
+
+    pub(super) async fn kick_resumed_goal(&self, view: &SessionView, wake: Option<GoalResumeWake>) {
         if view.admission_paused {
             return;
         }
@@ -634,8 +660,17 @@ impl Host {
         }) else {
             return;
         };
-        if require_resumable(view, &current.binding.turn).is_err() {
+        if wake.as_ref().is_some_and(|wake| {
+            wake.revision != view.revision
+                || wake.binding != current.binding
+                || wake.position != current.position
+                || self.check_execution(view).is_err()
+        }) || require_resumable(view, &current.binding.turn).is_err()
+        {
             return;
+        }
+        if wake.is_some() {
+            self.changed.notify_waiters();
         }
         let session = view.session.clone();
         let turn = current.binding.turn.clone();
@@ -671,7 +706,7 @@ impl Host {
             return;
         }
         if work.active.contains_key(&session) || work.active.len() >= MAX_ACTIVE_RUNS {
-            work.defer(ReadyWork::Queue(session, None));
+            work.defer(wake.map_or(ReadyWork::Queue(session, None), ReadyWork::GoalResume));
             return;
         }
         let _ = self.register(&mut work, session, turn, Launch::Resume(claim));

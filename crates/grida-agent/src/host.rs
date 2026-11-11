@@ -180,6 +180,7 @@ struct Work {
 #[derive(PartialEq, Eq)]
 enum ReadyWork {
     Queue(SessionId, Option<SessionRevision>),
+    GoalResume(goals::GoalResumeWake),
     Stop(SessionId, TurnId),
     Sponsored(sponsorship::SponsoredWake),
     Answered {
@@ -195,6 +196,7 @@ impl ReadyWork {
             Self::Queue(session, _) | Self::Stop(session, _) | Self::Answered { session, .. } => {
                 session
             }
+            Self::GoalResume(wake) => &wake.binding.session,
             Self::Sponsored(wake) => &wake.binding.session,
         }
     }
@@ -2523,7 +2525,7 @@ impl Host {
         }
         if view.current.is_some() {
             if recovery.is_none() {
-                self.kick_resumed_goal(&view).await;
+                self.kick_resumed_goal(&view, None).await;
             }
             return;
         }
@@ -2624,6 +2626,7 @@ impl Host {
                 Some(ReadyWork::Queue(session, recovery)) => {
                     self.kick_queue_at(session, recovery).await
                 }
+                Some(ReadyWork::GoalResume(wake)) => self.kick_goal_resume(wake).await,
                 Some(ReadyWork::Stop(session, turn)) => self.kick_stopped(session, turn).await,
                 Some(ReadyWork::Answered { .. }) => unreachable!("answered wake registered above"),
                 Some(ReadyWork::Sponsored(_)) => unreachable!("sponsored wake registered above"),
