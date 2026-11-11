@@ -835,7 +835,7 @@ export function NativeAgentPane({
           </div>
         </div>
       )}
-      {snapshot?.admissionPaused && !turn && bridge.editQueue && (
+      {controller.canResumeQueue && (
         <div className="px-3 py-2">
           <Button
             type="button"

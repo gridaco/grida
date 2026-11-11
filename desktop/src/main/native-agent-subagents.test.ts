@@ -331,3 +331,94 @@ it("binds optional child controls to their observed attachment and exact retry",
     inputId: "queued",
   });
 });
+
+it("offers explicit recovery only for a held child queue or idle queued assignments", async () => {
+  const request = vi.fn<(method: string, input: unknown) => Promise<unknown>>();
+  const adapter = new NativeAgentSubagents(request, turn);
+  const attachment = {};
+  const capabilities = { messaging: true, queue: true };
+  const idle = {
+    ...inspection,
+    sessionRevision: 8,
+    current: null,
+    latest: null,
+    queuedInputIds: ["queued"],
+    pendingMessageIds: [],
+  };
+  const inspect = () =>
+    adapter.inspect(
+      attachment,
+      parent,
+      childId,
+      undefined,
+      check,
+      true,
+      capabilities
+    );
+  const resume = (observationId: string) =>
+    adapter.controlChild(
+      attachment,
+      parent,
+      observationId,
+      "resume-child",
+      { kind: "resume-queue" },
+      capabilities,
+      check
+    );
+
+  request.mockResolvedValueOnce({
+    ...idle,
+    sessionRevision: 6,
+    current,
+    observedAssignment: active,
+  });
+  const running = await inspect();
+  expect(running.childControls?.available).not.toContain("resume-queue");
+  await expect(resume(running.childControls!.observationId)).rejects.toThrow(
+    "native_chat_subagent_invalid_input"
+  );
+  request.mockResolvedValueOnce({
+    ...idle,
+    sessionRevision: 7,
+    queuedInputIds: [],
+    pendingMessageIds: ["context-only"],
+  });
+  const empty = await inspect();
+  expect(empty.childControls?.available).not.toContain("resume-queue");
+  await expect(resume(empty.childControls!.observationId)).rejects.toThrow(
+    "native_chat_subagent_invalid_input"
+  );
+  request.mockResolvedValueOnce(idle);
+  const reopened = await inspect();
+  expect(reopened.childControls?.available).toContain("resume-queue");
+  expect(request.mock.calls.map(([method]) => method)).toEqual([
+    "_co.grida/subagent/inspect",
+    "_co.grida/subagent/inspect",
+    "_co.grida/subagent/inspect",
+  ]);
+
+  request.mockRejectedValueOnce(new Error("native_agent_request_timeout"));
+  const observationId = reopened.childControls!.observationId;
+  await expect(resume(observationId)).rejects.toThrow(
+    "native_chat_subagent_unverified"
+  );
+  request.mockResolvedValueOnce({ ...idle, sessionRevision: 9 });
+  await inspect();
+  request.mockResolvedValueOnce({
+    sessionId: childId,
+    requestId: "resume-child",
+    sessionRevision: 9,
+  });
+  await expect(resume(observationId)).resolves.toBeUndefined();
+  const call = [
+    "_co.grida/subagent/resume-queue",
+    {
+      parentSessionId: parent.id,
+      childId,
+      requestId: "resume-child",
+      expectedSessionRevision: 8,
+    },
+  ];
+  expect(request.mock.calls[3]).toEqual(call);
+  expect(request.mock.calls[5]).toEqual(call);
+});

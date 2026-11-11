@@ -2332,6 +2332,16 @@ export class NativeChatController {
     );
   }
 
+  get canResumeQueue(): boolean {
+    const snapshot = this.view.observation?.snapshot;
+    return (
+      !!this.bridge.editQueue &&
+      !!snapshot &&
+      !snapshot.current &&
+      (snapshot.admissionPaused || snapshot.idleQueueResumeAvailable === true)
+    );
+  }
+
   async editQueue(action: NativeChatQueueAction): Promise<void> {
     const scope = this.scope;
     if (

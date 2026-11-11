@@ -153,6 +153,8 @@ export type NativeChatSnapshot = Readonly<{
   /** Earliest provider retry time in UTC milliseconds for the current turn. */
   retryNotBeforeMs?: number;
   admissionPaused: boolean;
+  /** Main accepts an explicit Resume for this idle, unpaused queue. */
+  idleQueueResumeAvailable?: true;
   current: NativeChatTurn | null;
   latest: NativeChatTurn | null;
 }>;

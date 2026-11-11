@@ -115,6 +115,48 @@ function fixture() {
   };
 }
 
+it("offers recovery for an unpaused saved queue only when Main advertises it", async () => {
+  const { bridge, controller } = fixture();
+  const observe = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const result = await observe(id);
+    return {
+      ...result,
+      snapshot: {
+        ...result.snapshot,
+        queuedInputs: 1,
+        admissionPaused: id === "held-by-older-main",
+        ...(id === "idle-on-new-main" && {
+          idleQueueResumeAvailable: true as const,
+        }),
+      },
+    };
+  };
+  const editQueue = vi.fn<NonNullable<DesktopNativeChat["editQueue"]>>();
+  bridge.editQueue = editQueue;
+  try {
+    await controller.select("idle-on-older-main");
+    expect(controller.canResumeQueue).toBe(false);
+    await controller.select("held-by-older-main");
+    expect(controller.canResumeQueue).toBe(true);
+    await controller.select("idle-on-new-main");
+    expect(controller.canResumeQueue).toBe(true);
+    expect(editQueue).not.toHaveBeenCalled();
+
+    await controller.editQueue({ action: "resume" });
+    expect(editQueue).toHaveBeenCalledExactlyOnceWith(
+      "idle-on-new-main",
+      expect.objectContaining({
+        action: "resume",
+        observationId: "observation-idle-on-new-main",
+        requestId: expect.any(String),
+      })
+    );
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("reads bounded earlier messages and ignores a page from a previous chat", async () => {
   const { bridge, controller } = fixture();
   const page = (

@@ -1012,6 +1012,9 @@ lazy reads, read-only mutation, and symlink escape refusal.
   through the [typed bridge](packages/grida-desktop-bridge/src/native-chat.ts).
   [IPC fixtures](desktop/src/main/native-chat-ipc.test.ts) exercise frame and
   workspace isolation, exact control targeting, and navigation cleanup.
+  An explicit Resume Queue for idle retained work uses the attached current
+  observation and its revision. Reopening or inspecting the chat does not
+  dispatch that work; older Main versions do not advertise the added action.
   Transcript reads use the same attachment and recheck scope after a bounded
   replay of committed visible text. Live updates keep their own attribution.
   Turn summaries take an attachment-local observation token. Main selects

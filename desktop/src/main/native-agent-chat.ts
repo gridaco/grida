@@ -1036,6 +1036,7 @@ export class NativeAgentChat {
     const pending = queue.filter((row) => row.goalStart);
     if (pending.length > 1) throw invalidResponse();
     const current = result.current === null ? null : turn(result.current);
+    const admissionPaused = flag(result.admissionPaused);
     const retryAt = result.retryNotBeforeMs;
     const snapshot = Object.freeze({
       sessionId,
@@ -1060,7 +1061,10 @@ export class NativeAgentChat {
         typeof retryAt === "number" &&
         Number.isSafeInteger(retryAt) &&
         retryAt > 0 && { retryNotBeforeMs: retryAt }),
-      admissionPaused: flag(result.admissionPaused),
+      admissionPaused,
+      ...(!admissionPaused &&
+        !current &&
+        queuedInputs > 0 && { idleQueueResumeAvailable: true as const }),
       current,
       latest: result.latest === null ? null : turn(result.latest),
     });
@@ -1323,7 +1327,7 @@ export class NativeAgentChat {
     };
     let result: unknown;
     if (change.action === "resume") {
-      if (!snapshot.admissionPaused)
+      if (!snapshot.admissionPaused && !snapshot.idleQueueResumeAvailable)
         throw new Error("native_chat_queue_not_paused");
       result = await this.process.request(
         "_co.grida/session/resume-queue",

@@ -33,6 +33,9 @@ its approval controls. [Understand agent permissions](./permissions.md)
 - Choose **Stop** to end the current task and hold the queue. Use
   **Resume queue** when you are ready for the waiting messages to start.
 
+After a full Desktop restart, reopening a chat only loads its retained work.
+If messages are waiting in an idle queue, choose **Resume queue** to start them.
+
 Changes already made can remain in the workspace. Check **Turn summary**
 for the outcome, any partial work, and items that need review.
 An interrupted provider request can still have incurred a charge. Its final

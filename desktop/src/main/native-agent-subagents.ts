@@ -77,7 +77,7 @@ type ObservedChild = Readonly<{
   parent: NativeChatSession;
   childId: string;
   revision: number;
-  held: boolean;
+  canResumeQueue: boolean;
   queued: readonly string[];
 }>;
 
@@ -226,13 +226,15 @@ export class NativeAgentSubagents {
           )
         : null;
     const available: NativeSubagentChildControl["kind"][] = [];
+    const canResumeQueue =
+      response.admissionPaused || (!current && queuedInputIds.length > 0);
     const pendingMessages = childCapabilities?.messaging
       ? identifiers(response.pendingMessageIds, MAX_PENDING_MESSAGES).length
       : undefined;
     if (childCapabilities?.messaging) available.push("message");
     if (childCapabilities?.queue) {
       if (queuedInputIds.length) available.push("withdraw");
-      if (response.admissionPaused) available.push("resume-queue");
+      if (canResumeQueue) available.push("resume-queue");
     }
     return {
       child: {
@@ -252,7 +254,7 @@ export class NativeAgentSubagents {
             parent,
             childId,
             revision: response.sessionRevision,
-            held: response.admissionPaused,
+            canResumeQueue,
             queued: queuedInputIds,
           }),
           available,
@@ -453,7 +455,7 @@ export class NativeAgentSubagents {
     if (observed?.parent !== parent)
       throw new Error("native_chat_subagent_observation_unavailable");
     if (
-      (control.kind === "resume-queue" && !observed.held) ||
+      (control.kind === "resume-queue" && !observed.canResumeQueue) ||
       (control.kind === "withdraw" &&
         !observed.queued.includes(control.inputId))
     )

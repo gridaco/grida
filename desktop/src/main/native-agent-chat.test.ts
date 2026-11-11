@@ -115,6 +115,112 @@ it("rejects a chat launch outside the main-selected workspace", async () => {
   }
 });
 
+it("opens a saved queue passively and resumes idle queued work on an exact observation", async () => {
+  const test = fixture();
+  const sessionId = "fixture-queue-session";
+  const saved = {
+    sessionId,
+    sessionRevision: 8,
+    queuedInputs: 1,
+    queue: [{ inputId: "saved-input", inputPosition: 1, settings: {} }],
+    admissionPaused: false,
+    current: null,
+    latest: null,
+  };
+  const request =
+    vi.fn<
+      (method: string, input?: Record<string, unknown>) => Promise<unknown>
+    >();
+  const start = vi.spyOn(NativeAgentProcess, "start").mockResolvedValueOnce({
+    request,
+    close: async () => {},
+  } as unknown as NativeAgentProcess);
+  let client: NativeAgentChat | undefined;
+  try {
+    client = await NativeAgentChat.start({
+      resourcesPath: test.root,
+      stateDirectory: test.stateDirectory,
+      cwd: test.cwd,
+      endpoint: "http://127.0.0.1:1/v1",
+      provider: "openai-compatible",
+      model: "fixture",
+    });
+    request.mockResolvedValueOnce({});
+    const session = await client.load(sessionId);
+    const change = {
+      action: "resume" as const,
+      observationId: "saved-observation",
+      requestId: "resume-saved",
+    };
+    request.mockResolvedValueOnce({
+      ...saved,
+      sessionRevision: 6,
+      current: {
+        turnId: "active",
+        epoch: 1,
+        journalPosition: 1,
+        historyPosition: 1,
+        controlRevision: 0,
+        disposition: "running",
+        status: null,
+        paused: false,
+        cancelled: false,
+      },
+    });
+    const active = await client.observe(session);
+    expect(active).not.toHaveProperty("idleQueueResumeAvailable");
+    await expect(client.editQueue(session, active, change)).rejects.toThrow(
+      "native_chat_queue_not_paused"
+    );
+    request.mockResolvedValueOnce({
+      ...saved,
+      sessionRevision: 7,
+      queuedInputs: 0,
+      queue: [],
+    });
+    const empty = await client.observe(session);
+    expect(empty).not.toHaveProperty("idleQueueResumeAvailable");
+    await expect(client.editQueue(session, empty, change)).rejects.toThrow(
+      "native_chat_queue_not_paused"
+    );
+    request.mockResolvedValueOnce(saved);
+    const observed = await client.observe(session);
+    expect(observed.idleQueueResumeAvailable).toBe(true);
+    expect(request.mock.calls.map(([method]) => method)).toEqual([
+      "session/load",
+      "_co.grida/session/snapshot",
+      "_co.grida/session/snapshot",
+      "_co.grida/session/snapshot",
+    ]);
+
+    request.mockRejectedValueOnce(new Error("native_agent_request_timeout"));
+    await expect(client.editQueue(session, observed, change)).rejects.toThrow(
+      "native_agent_request_timeout"
+    );
+    request.mockResolvedValueOnce({ ...saved, sessionRevision: 9 });
+    await client.observe(session);
+    const receipt = {
+      sessionId,
+      requestId: change.requestId,
+      sessionRevision: 9,
+    };
+    request.mockResolvedValueOnce(receipt);
+    await expect(client.editQueue(session, observed, change)).resolves.toEqual(
+      receipt
+    );
+    const call = [
+      "_co.grida/session/resume-queue",
+      { sessionId, requestId: change.requestId, expectedSessionRevision: 8 },
+    ];
+    expect(request.mock.calls[4]).toEqual(call);
+    expect(request.mock.calls[6]).toEqual(call);
+  } finally {
+    await client?.close();
+    start.mockRestore();
+    test.close();
+  }
+});
+
 it("projects the exact negotiated Library wait and sends only a bounded choice", async () => {
   const test = fixture();
   const sessionId = "fixture-session";
