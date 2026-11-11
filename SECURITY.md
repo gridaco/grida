@@ -925,8 +925,8 @@ lazy reads, read-only mutation, and symlink escape refusal.
   Built-in OpenRouter and Vercel profiles require a selected catalogue model and
   a stored key from the supervisor's credential home. Their broker authorizes
   only that provider's exact Chat Completions route. These profiles permit
-  manual subagents and ordinary Ultra reviews under the same captured authority.
-  Funded Goal review remains unavailable for these profiles. This launch path is limited
+  manual subagents, ordinary Ultra reviews, and Goal-funded reviews under the
+  same captured authority. This launch path is limited
   to shared custody on macOS and Linux. [Process fixtures](desktop/src/main/native-provider-selection.test.ts)
   exercise built-in and configured keys and refusal after credential replacement.
   The isolated [Desktop profile](desktop/src/main/native-desktop-profile.ts)
@@ -1488,7 +1488,8 @@ Today:
   current driver-state revision. While a funded turn owns work, the client
   uses the paired task controls for Pause, Resume and Stop. [Process fixtures](crates/grida-agent/tests/process/goals/funding.rs)
   verify allowance, held usage, restart and control behavior.
-- On reviewed Gateway launches, Desktop can offer an Ultra Goal and explicitly
+- On reviewed Gateway, saved OpenRouter, and saved Vercel launches, Desktop can
+  offer an Ultra Goal and explicitly
   reconcile a held review through the [attached Goal inspection](desktop/src/main/native-agent-goals.ts).
   The negotiated [native control](crates/grida-agent/src/acp/extensions/goals.rs)
   binds the exact objective basis, revisions and reserved turn to an account-only

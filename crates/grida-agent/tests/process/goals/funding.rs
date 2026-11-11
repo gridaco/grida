@@ -6,6 +6,9 @@ use super::*;
 use grida_agent_master::subagents::sponsored_identity;
 use tokio::sync::oneshot;
 
+#[path = "funding/supervised.rs"]
+mod supervised;
+
 const DELEGATE: &str = r#"{"instructions":"Check the export independently."}"#;
 const PROGRESS: &str =
     r#"{"report":{"kind":"progress","summary":"Checked the export structure."}}"#;

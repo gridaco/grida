@@ -136,8 +136,8 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
             "{ready}"
         );
         for capability in ["co.grida/goal/funded-review", "co.grida/goal/named-child"] {
-            assert!(
-                ready["result"]["agentCapabilities"]["_meta"][capability].is_null(),
+            assert_eq!(
+                ready["result"]["agentCapabilities"]["_meta"][capability], 1,
                 "{ready}"
             );
         }
@@ -223,12 +223,12 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
         let mut client = start(&state, &home, endpoint, "fixture-model").await;
         let parent = new_session(&mut client, &workspace).await;
         let forbidden = client.request("_co.grida/goal/start", json!({
-            "sessionId":parent,"inputId":"ultra-goal-refused","effort":"ultra",
+            "sessionId":parent,"inputId":"unfunded-goal","effort":"ultra",
             "prompt":[{"type":"text","text":"Try a funded Goal"}],
-            "goal":{"objective":{"description":"Review the draft","criteria":["Draft is reviewed"]},"allowance":{"work_turns":1,"inference_steps":4}}
+            "goal":{"objective":{"description":"Review the draft","criteria":["Draft is reviewed"]},"allowance":{"work_turns":1,"inference_steps":2}}
         })).await;
         assert_eq!(
-            forbidden["error"]["data"], "goal_funded_review_unavailable",
+            forbidden["error"]["data"], "goal_child_allowance_unavailable",
             "{forbidden}"
         );
         let prompt = json!({"sessionId":parent,"prompt":[{"type":"text","text":"Parent"}]});

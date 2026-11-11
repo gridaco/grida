@@ -26,9 +26,9 @@ For a new ordinary review, the reviewer can read the primary workspace if it is
 already allowed. It does not automatically receive the parent chat or additional
 folder grants; folders inside the readable primary workspace remain accessible.
 The turn summary records whether the agent collected that reviewer’s findings.
-On supported saved OpenRouter and Vercel connections, Ultra is available for
-ordinary messages; Goal-funded reviews remain available on supported Gateway
-connections. The work allowance limits inference steps, not a monetary spend cap.
+On supported Gateway, saved OpenRouter, and saved Vercel connections, Ultra is
+available for ordinary messages and Goal-funded reviews. The work allowance
+limits inference steps, not a monetary spend cap.
 [Work with subagents](./subagents.md)
 
 ## Keep an objective across turns
@@ -57,7 +57,7 @@ goal. Its used and held allowance carries forward. Saving during a goal turn
 stops that turn and keeps its recorded work. For a turn with a funded review,
 use the task controls before editing.
 
-When a native workspace Gateway connection offers **Effort for this goal**,
+When a supported native workspace connection offers **Effort for this goal**,
 choose **Ultra** to let one independent review share the goal's inference
 allowance. Use the task's Pause, Resume, or Stop controls during the funded
 turn. If work finishes before the review can be accounted for, the goal keeps

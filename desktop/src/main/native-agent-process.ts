@@ -437,7 +437,7 @@ export class NativeAgentProcess {
       ...(permissionProfile ? NativeAgentPermissions.capabilities : {}),
     };
     if (storedSubagents) {
-      // Request ordinary effort optionally below. Goal funding stays Gateway-only.
+      // Older workers can omit these optionally requested review capabilities.
       delete capabilities[SESSION_EFFORT];
       delete capabilities[NativeAgentGoals.fundedReviewCapability];
       delete capabilities[NativeAgentGoals.namedChildCapability];
@@ -552,7 +552,7 @@ export class NativeAgentProcess {
                   [SESSION_EFFORT]: 1,
                 }),
                 ...(options.subagents &&
-                  options.gatewayScope && {
+                  (options.gatewayScope !== undefined || storedSubagents) && {
                     [NativeAgentGoals.fundedReviewCapability]: 1,
                     [NativeAgentGoals.namedChildCapability]: 1,
                   }),
@@ -636,7 +636,7 @@ export class NativeAgentProcess {
       processOwner.goalManualContinuation =
         advertised?.[NativeAgentGoals.manualContinuationCapability] === 1;
       processOwner.goalFundedReview =
-        options.gatewayScope !== undefined &&
+        (options.gatewayScope !== undefined || storedSubagents) &&
         processOwner.agentEffort &&
         advertised?.[NativeAgentGoals.fundedReviewCapability] === 1;
       processOwner.goalNamedChild =

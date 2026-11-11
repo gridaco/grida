@@ -336,8 +336,8 @@ it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
       agent = await open();
       expect(agent.acceptsSubagents).toBe(true);
       expect(agent.acceptsEffort).toBe(true);
-      expect(agent.acceptsGoalEffort).toBe(false);
-      expect(agent.acceptsGoalNamedChild).toBe(false);
+      expect(agent.acceptsGoalEffort).toBe(true);
+      expect(agent.acceptsGoalNamedChild).toBe(true);
       const { sessionId } = (await agent.request("session/new", {
         cwd: workspace,
         mcpServers: [],
@@ -403,7 +403,7 @@ it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
 );
 
 it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
-  "collects an ordinary Ultra review on saved %s without enabling Goal funding",
+  "collects an ordinary Ultra review on saved %s",
   async (provider, endpoint) => {
     const root = await privateHome();
     const cwd = path.join(root, "workspace");
@@ -456,20 +456,7 @@ it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
         resourcesPath: packaged!,
       });
       expect(chat.acceptsEffort).toBe(true);
-      expect(chat.acceptsGoalEffort).toBe(false);
       const session = await chat.create();
-      expect(
-        (await chat.observe(session)).goalNamedChildAvailable
-      ).toBeUndefined();
-      await expect(
-        chat.startGoal(session, "funded-goal", {
-          objective: "Review the sample",
-          criteria: ["Review the required fields"],
-          allowance: { workTurns: 2, inferenceSteps: 8 },
-          automatic: false,
-          effort: "ultra",
-        })
-      ).rejects.toThrow("native_chat_goal_effort_unavailable");
       expect(dispatch).not.toHaveBeenCalled();
       const regime = provider === "openrouter" ? "plan" : "act";
       await chat.submit(
@@ -525,9 +512,153 @@ it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
   30_000
 );
 
-it.runIf(sharedCustody && Boolean(packaged))(
-  "refuses an admitted Ultra child exchange when its saved key changes before dispatch",
-  async () => {
+it.runIf(sharedCustody && Boolean(packaged)).each(byokProviders)(
+  "accounts a funded Ultra Goal review on saved %s and reopens without provider replay",
+  async (provider, endpoint) => {
+    const root = await privateHome();
+    const cwd = path.join(root, "workspace");
+    const credentialHome = path.join(root, "credentials");
+    const store = new SecretsStore(
+      new AuthStore(path.join(root, "legacy")),
+      credentialHome
+    );
+    const assignment = "Check the candidate independently.";
+    const finding = "The candidate contains the required field.";
+    const release = Promise.withResolvers<void>();
+    let parentRequests = 0;
+    const dispatch = vi.fn<
+      (body: Buffer, signal: AbortSignal) => Promise<Response>
+    >(async (body) => {
+      const request = JSON.parse(body.toString()) as ByokRequest;
+      if (!request.tools) {
+        await release.promise;
+        return byokReply({ content: finding }, "stop");
+      }
+      parentRequests++;
+      switch (parentRequests) {
+        case 1:
+          return byokTool("delegate_review", { instructions: assignment });
+        case 2:
+          release.resolve();
+          return byokTool("collect_review", {});
+        case 3:
+          return byokTool("goal_report", {
+            report: {
+              kind: "progress",
+              summary: "The candidate was independently checked.",
+            },
+          });
+        default:
+          return byokReply(
+            { content: "The Goal turn integrated the review." },
+            "stop"
+          );
+      }
+    });
+    const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
+    let chat: NativeAgentChat | undefined;
+    try {
+      await fs.mkdir(cwd, { mode: 0o700 });
+      await store.set(provider, "fixture-key");
+      const profile = await NativeProviderSelection.builtInByok(
+        provider,
+        byokModel,
+        {
+          credentialHome,
+          hasKey: (id) => store.has(id),
+          network: async () => ({ prepare }),
+        }
+      );
+      const options = {
+        ...profile,
+        cwd,
+        stateDirectory: path.join(root, "state"),
+        resourcesPath: packaged!,
+      };
+      chat = await NativeAgentChat.start(options);
+      expect(chat.acceptsGoalEffort).toBe(true);
+      const session = await chat.create();
+      expect((await chat.observe(session)).goalNamedChildAvailable).toBe(true);
+      const request = {
+        objective: "Review the candidate",
+        criteria: ["Independently check the required field"],
+        allowance: { workTurns: 2, inferenceSteps: 7 },
+        automatic: false,
+        effort: "ultra",
+      };
+      const accepted = await chat.startGoal(session, "funded-goal", request);
+      expect(
+        (await chat.startGoal(session, "funded-goal", request)).inputId
+      ).toBe(accepted.inputId);
+      const settled = await vi.waitFor(
+        async () => {
+          const snapshot = await chat!.observe(session);
+          expect(snapshot.current).toBeNull();
+          expect(snapshot.latest?.status).toBe("succeeded");
+          const inspection = await chat!.goal(session, snapshot);
+          expect(inspection.goal).toMatchObject({
+            effort: "ultra",
+            spent: { workTurns: 1, inferenceSteps: 5 },
+            remaining: { workTurns: 1, inferenceSteps: 2 },
+            reservation: null,
+          });
+          return snapshot;
+        },
+        { timeout: 10_000 }
+      );
+      expect(await chat.turnSummary(session, settled)).toMatchObject({
+        text: "The Goal turn integrated the review.",
+        reviewFindingsCollected: true,
+      });
+      expect(dispatch).toHaveBeenCalledTimes(5);
+      expect(
+        prepare.mock.calls.map(([url, headers]) => [
+          url,
+          headers.get("authorization"),
+        ])
+      ).toEqual(
+        Array.from({ length: 5 }, () => [
+          `${endpoint}/chat/completions`,
+          "Bearer fixture-key",
+        ])
+      );
+      expect(
+        dispatch.mock.calls.map(
+          ([body]) => (JSON.parse(body.toString()) as ByokRequest).model
+        )
+      ).toEqual(Array(5).fill(byokModel));
+      const parentBodies = dispatch.mock.calls
+        .map(([body]) => JSON.parse(body.toString()) as ByokRequest)
+        .filter(({ tools }) => tools !== undefined);
+      expect(JSON.stringify(parentBodies[2].messages)).toContain(finding);
+      await chat.close();
+      chat = await NativeAgentChat.start(options);
+      const reopened = await chat.load(session.id);
+      const restored = await chat.goal(reopened, await chat.observe(reopened));
+      expect(restored.goal).toMatchObject({
+        effort: "ultra",
+        spent: { workTurns: 1, inferenceSteps: 5 },
+        remaining: { workTurns: 1, inferenceSteps: 2 },
+        reservation: null,
+      });
+      expect(
+        (await chat.startGoal(reopened, "funded-goal", request)).inputId
+      ).toBe(accepted.inputId);
+      expect(dispatch).toHaveBeenCalledTimes(5);
+    } finally {
+      release.resolve();
+      await chat?.close();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  },
+  30_000
+);
+
+it
+  .runIf(sharedCustody && Boolean(packaged))
+  .each(["ordinary", "goal"] as const)(
+  "refuses an admitted %s Ultra child exchange when its saved key changes before dispatch",
+  async (kind) => {
     const [provider, endpoint] = byokProviders[0];
     const root = await privateHome();
     const cwd = path.join(root, "workspace");
@@ -601,14 +732,24 @@ it.runIf(sharedCustody && Boolean(packaged))(
         resourcesPath: packaged!,
       });
       const session = await chat.create();
-      await chat.submit(
-        session,
-        "review-before-key-rotation",
-        "Review the sample.",
-        "act",
-        undefined,
-        "ultra"
-      );
+      if (kind === "goal") {
+        await chat.startGoal(session, "goal-before-key-rotation", {
+          objective: "Review the sample.",
+          criteria: ["Collect independent evidence"],
+          allowance: { workTurns: 2, inferenceSteps: 7 },
+          automatic: false,
+          effort: "ultra",
+        });
+      } else {
+        await chat.submit(
+          session,
+          "review-before-key-rotation",
+          "Review the sample.",
+          "act",
+          undefined,
+          "ultra"
+        );
+      }
       await vi.waitFor(() => expect(childUploadAccepted).toBe(true), {
         timeout: 5_000,
       });

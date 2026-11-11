@@ -684,11 +684,6 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     } else {
         host
     };
-    let host = if subagents && supervisor.is_some() && gateway_scope.is_none() && stored_subagents {
-        host.without_goal_sponsorship()
-    } else {
-        host
-    };
     let host = if ultra {
         host.with_effort(EffortPreset::Ultra)?
     } else {

@@ -118,18 +118,26 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
   });
 
   it.each([
-    { echo: null, acceptsEffort: false },
-    { echo: 1, acceptsEffort: true },
+    { effort: null, funded: 1, named: 1, goal: false, child: false },
+    { effort: 1, funded: null, named: null, goal: false, child: false },
+    { effort: 1, funded: 1, named: null, goal: true, child: false },
+    { effort: 1, funded: 1, named: 1, goal: true, child: true },
   ])(
-    "negotiates saved BYOK effort with worker echo $echo independently of Goal funding",
-    async ({ echo, acceptsEffort }) => {
+    "negotiates saved BYOK Goal funding from optional worker echoes $effort/$funded/$named",
+    async ({
+      effort: effortEcho,
+      funded: fundedEcho,
+      named: namedEcho,
+      goal,
+      child,
+    }) => {
       const effort = "co.grida/session/effort";
       const funded = NativeAgentGoals.fundedReviewCapability;
       const named = NativeAgentGoals.namedChildCapability;
       const test = fixture("send({id:request.id,result:requested});", 1, {
-        [effort]: echo,
-        [funded]: 1,
-        [named]: 1,
+        [effort]: effortEcho,
+        [funded]: fundedEcho,
+        [named]: namedEcho,
       });
       let agent: NativeAgentProcess | undefined;
       try {
@@ -143,10 +151,49 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         });
         const requested = await agent.request("fixture/initialize", {});
         expect(requested).toHaveProperty([effort], 1);
-        expect(requested).not.toHaveProperty([funded]);
-        expect(requested).not.toHaveProperty([named]);
+        expect(requested).toHaveProperty([funded], 1);
+        expect(requested).toHaveProperty([named], 1);
         expect(agent.acceptsSubagents).toBe(true);
-        expect(agent.acceptsEffort).toBe(acceptsEffort);
+        expect(agent.acceptsEffort).toBe(effortEcho === 1);
+        expect(agent.acceptsGoalEffort).toBe(goal);
+        expect(agent.acceptsGoalNamedChild).toBe(child);
+      } finally {
+        try {
+          await agent?.close();
+        } finally {
+          test.close();
+        }
+      }
+    }
+  );
+
+  it.each(["custom", "subscription"] as const)(
+    "withholds Goal review capabilities from an unsolicited %s worker echo",
+    async (kind) => {
+      const test = fixture("send({id:request.id,result:{}});", 1, {
+        "co.grida/session/effort": 1,
+        [NativeAgentGoals.fundedReviewCapability]: 1,
+        [NativeAgentGoals.namedChildCapability]: 1,
+      });
+      let agent: NativeAgentProcess | undefined;
+      try {
+        const profile =
+          kind === "custom"
+            ? { credentialHome: test.root, configuredEndpointKey: "custom" }
+            : {
+                provider: "responses" as const,
+                subscriptionScope: "a".repeat(64),
+              };
+        agent = await NativeAgentProcess.start({
+          ...test.options,
+          ...profile,
+          endpoint:
+            kind === "subscription"
+              ? "https://chatgpt.com/backend-api/codex"
+              : "https://openrouter.ai/api/v1",
+          providerNetwork: { prepare: () => null },
+        });
+        expect(agent.acceptsEffort).toBe(false);
         expect(agent.acceptsGoalEffort).toBe(false);
         expect(agent.acceptsGoalNamedChild).toBe(false);
       } finally {
