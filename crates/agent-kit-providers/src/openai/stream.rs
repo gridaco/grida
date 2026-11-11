@@ -48,6 +48,7 @@ pub(super) fn events(
         usage: BTreeMap::new(),
         usage_revision: 0,
         finish_reason: None,
+        native_finish_reason: None,
         finished: false,
     };
     Box::pin(stream::unfold(state, |mut state| async move {
@@ -75,6 +76,7 @@ struct ResponseStream {
     usage: BTreeMap<&'static str, UsageObservation>,
     usage_revision: u64,
     finish_reason: Option<FinishReason>,
+    native_finish_reason: Option<String>,
     finished: bool,
 }
 
@@ -100,6 +102,9 @@ struct Choice {
     #[serde(default)]
     delta: Delta,
     finish_reason: Option<FinishReason>,
+    native_finish_reason: Option<String>,
+    #[serde(flatten)]
+    extensions: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Default, Deserialize)]
@@ -110,6 +115,8 @@ struct Delta {
     reasoning: Option<String>,
     refusal: Option<String>,
     tool_calls: Option<Vec<CallDelta>>,
+    #[serde(flatten)]
+    extensions: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -127,7 +134,7 @@ struct FunctionDelta {
     arguments: Option<String>,
 }
 
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum FinishReason {
     Stop,
@@ -224,19 +231,62 @@ impl ResponseStream {
         if chunk.choices.len() > 1 {
             return Err("unexpected_choice_count");
         }
-        let final_usage = chunk.choices.is_empty() && self.finish_reason.is_some();
+        let final_usage = self.finish_reason.is_some();
         if let Some(choice) = chunk.choices.into_iter().next() {
-            self.choice(choice)?;
-            if self.finish_reason.is_some()
-                && let (Some(decoder), Some(receipt)) = (&self.receipt_decoder, &self.receipt)
-            {
-                self.terminal_receipt = decoder(receipt, bytes);
+            if self.finish_reason.is_some() {
+                // An accounting envelope cannot re-enter content/call assembly or
+                // replace the terminal evidence captured from the original finish.
+                if !self.is_terminal_usage_choice(&choice, chunk.usage.as_ref()) {
+                    return Err("choice_after_finish");
+                }
+            } else {
+                self.choice(choice)?;
+                if self.finish_reason.is_some()
+                    && let (Some(decoder), Some(receipt)) = (&self.receipt_decoder, &self.receipt)
+                {
+                    self.terminal_receipt = decoder(receipt, bytes);
+                }
             }
         }
         if let Some(usage) = chunk.usage {
             self.observe_usage(usage, final_usage);
         }
         Ok(())
+    }
+
+    fn is_terminal_usage_choice(&self, choice: &Choice, usage: Option<&Usage>) -> bool {
+        let Some(usage) = usage else {
+            return false;
+        };
+        let has_observation = usage.prompt_tokens.is_some()
+            || usage.completion_tokens.is_some()
+            || usage
+                .prompt_tokens_details
+                .as_ref()
+                .is_some_and(|details| details.cached_tokens.is_some())
+            || usage
+                .completion_tokens_details
+                .as_ref()
+                .is_some_and(|details| details.reasoning_tokens.is_some());
+        has_observation
+            && choice.index == 0
+            && choice.finish_reason == self.finish_reason
+            && choice.native_finish_reason == self.native_finish_reason
+            && choice.extensions.values().all(serde_json::Value::is_null)
+            && choice
+                .delta
+                .role
+                .as_deref()
+                .is_none_or(|role| role == "assistant")
+            && choice.delta.content.as_deref().is_none_or(str::is_empty)
+            && choice.delta.reasoning.as_deref().is_none_or(str::is_empty)
+            && choice.delta.refusal.as_deref().is_none_or(str::is_empty)
+            && choice.delta.tool_calls.as_ref().is_none_or(Vec::is_empty)
+            && choice
+                .delta
+                .extensions
+                .values()
+                .all(serde_json::Value::is_null)
     }
 
     fn choice(&mut self, choice: Choice) -> Result<(), &'static str> {
@@ -285,6 +335,7 @@ impl ResponseStream {
                 _ => {}
             }
             self.finish_reason = Some(reason);
+            self.native_finish_reason = choice.native_finish_reason;
         }
         Ok(())
     }

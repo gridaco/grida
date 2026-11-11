@@ -832,6 +832,294 @@ async fn terminal_usage_replaces_cumulative_values_and_keeps_attempt_identity() 
         && !entry.final_value));
 }
 
+// A terminal usage choice repeats the normalized and native finish identities,
+// but carries no additional model output. It is accounting, not another turn.
+fn terminal_usage_choice(finish: &str) -> Value {
+    json!({
+        "id": "response-local",
+        "choices": [{
+            "index": 0,
+            "delta": { "role": "assistant", "content": "" },
+            "finish_reason": finish,
+            "native_finish_reason": finish
+        }],
+        "usage": {
+            "prompt_tokens": 5,
+            "completion_tokens": 9,
+            "prompt_tokens_details": { "cached_tokens": 0 },
+            "completion_tokens_details": { "reasoning_tokens": 1 }
+        }
+    })
+}
+
+#[tokio::test]
+async fn terminal_usage_choices_preserve_content_calls_finish_and_both_receipts() {
+    use agent_kit_core::inference::RequestControl;
+    use agent_kit_core::{BoxFuture, Envelope, SchemaId};
+    use agent_kit_providers::{
+        StreamingTransport, TerminalReceiptDecoder, TransportRequest, TransportResponse,
+    };
+
+    struct ReceiptTransport {
+        inner: Arc<FixtureTransport>,
+        decoded: Arc<AtomicUsize>,
+    }
+    impl StreamingTransport for ReceiptTransport {
+        fn send(
+            &self,
+            request: TransportRequest,
+            control: RequestControl,
+        ) -> BoxFuture<'_, Result<TransportResponse, TransportFailure>> {
+            self.inner.send(request, control)
+        }
+        fn terminal_receipt_decoder(&self) -> Option<Arc<TerminalReceiptDecoder>> {
+            let decoded = self.decoded.clone();
+            Some(Arc::new(move |receipt, bytes| {
+                assert_eq!(receipt.bytes(), b"request_123");
+                let value: Value = serde_json::from_slice(bytes).unwrap();
+                assert!(
+                    value.get("usage").is_none(),
+                    "accounting must not replace finish evidence"
+                );
+                decoded.fetch_add(1, Ordering::SeqCst);
+                Some(
+                    Envelope::new(
+                        SchemaId::new("fixture.terminal").unwrap(),
+                        1,
+                        b"verified-terminal".to_vec(),
+                    )
+                    .unwrap(),
+                )
+            }))
+        }
+    }
+
+    for (finish, expected) in [
+        ("stop", InferenceStatus::Completed),
+        ("tool_calls", InferenceStatus::Completed),
+        ("length", InferenceStatus::Limited),
+        ("content_filter", InferenceStatus::Refused),
+    ] {
+        let with_call = finish == "tool_calls";
+        let mut script = vec![frame(json!({
+            "id": "response-local", "choices": [{ "index": 0, "delta": { "content": "answer", "reasoning": "thought" } }],
+            "usage": { "prompt_tokens": 3, "completion_tokens": 2 }
+        }))];
+        if with_call {
+            script.push(choice(json!({ "tool_calls": [{ "index": 0, "id": "call-local", "type": "function", "function": { "name": "echo", "arguments": "{\"value\":\"one\"}" } }] }), None));
+        }
+        let mut terminal = terminal_usage_choice(finish);
+        terminal.as_object_mut().unwrap().remove("usage");
+        script.extend([
+            frame(terminal),
+            frame(terminal_usage_choice(finish)),
+            done(),
+        ]);
+        let inner = FixtureTransport::new([Ok(response(script, false))]);
+        let decoded = Arc::new(AtomicUsize::new(0));
+        let provider = OpenAiCompatible::new(
+            binding(),
+            [(ModelId::new("model").unwrap(), profile())].into(),
+            Arc::new(ReceiptTransport {
+                inner: inner.clone(),
+                decoded: decoded.clone(),
+            }),
+            limits(),
+        )
+        .unwrap();
+        let prepared = provider
+            .prepare(if with_call { tool_request() } else { request() })
+            .unwrap();
+        let mut run = provider.start(prepared, control("terminal-usage")).unwrap();
+        let mut text = String::new();
+        let mut calls = Vec::new();
+        while let Some(update) = run.next().await {
+            match update {
+                InferenceUpdate::TextDelta { text: part, .. } => text.push_str(&part),
+                InferenceUpdate::ToolCall(call) => calls.push(call),
+                _ => {}
+            }
+        }
+        let result = run.finish().await;
+        assert_eq!(result.status, expected);
+        assert!(result.failure.is_none());
+        assert_eq!(text, "answer");
+        assert_eq!(result.messages.len(), 1);
+        let mut expected_content = vec![
+            Content::Reasoning("thought".into()),
+            Content::Text("answer".into()),
+        ];
+        assert_eq!(calls.len(), usize::from(with_call));
+        if with_call {
+            assert_eq!(calls[0].tool, ToolId::new("echo").unwrap());
+            assert_eq!(
+                calls[0].arguments,
+                ToolArguments::Json(json!({ "value": "one" }))
+            );
+            expected_content.push(Content::ToolCall(calls[0].clone()));
+        }
+        assert_eq!(result.messages[0].content, expected_content);
+        assert_eq!(result.usage.len(), 4);
+        assert!(
+            result
+                .usage
+                .iter()
+                .all(|usage| usage.attempt.as_str() == "terminal-usage"
+                    && usage.final_value
+                    && usage.revision == 2)
+        );
+        assert_eq!(
+            result
+                .usage
+                .iter()
+                .map(|usage| (usage.category.as_str(), usage.quantity))
+                .collect::<Vec<_>>(),
+            [
+                ("cached_input_tokens", 0),
+                ("input_tokens", 5),
+                ("output_tokens", 9),
+                ("reasoning_output_tokens", 1)
+            ]
+        );
+        assert_eq!(result.receipt.unwrap().bytes(), b"request_123");
+        assert_eq!(
+            result.terminal_receipt.unwrap().bytes(),
+            b"verified-terminal"
+        );
+        assert_eq!(decoded.load(Ordering::SeqCst), 1);
+        assert_eq!(inner.requests.lock().unwrap().len(), 1);
+    }
+}
+
+#[tokio::test]
+async fn terminal_usage_choices_refuse_late_output_and_changed_or_missing_evidence() {
+    let base = terminal_usage_choice("stop");
+    let mut cases = Vec::new();
+    for delta in [
+        json!({ "content": "late" }),
+        json!({ "reasoning": "late" }),
+        json!({ "reasoning_content": "late" }),
+        json!({ "refusal": "late" }),
+        json!({ "role": "user" }),
+        json!({ "tool_calls": [{ "index": 0, "id": "late", "function": { "name": "echo", "arguments": "{}" } }] }),
+        json!({ "unrecognized_output": "late" }),
+    ] {
+        let mut value = base.clone();
+        value["choices"][0]["delta"] = delta;
+        cases.push((value, "choice_after_finish"));
+    }
+    for (field, value) in [
+        ("index", json!(1)),
+        ("finish_reason", json!("length")),
+        ("finish_reason", Value::Null),
+        ("native_finish_reason", json!("different")),
+        ("native_finish_reason", Value::Null),
+        ("unrecognized_output", json!("late")),
+    ] {
+        let mut chunk = base.clone();
+        chunk["choices"][0][field] = value;
+        cases.push((chunk, "choice_after_finish"));
+    }
+    for usage in [Value::Null, json!({}), json!({ "cost": 0.1 })] {
+        let mut value = base.clone();
+        value["usage"] = usage;
+        cases.push((value, "choice_after_finish"));
+    }
+    let mut missing_usage = base.clone();
+    missing_usage.as_object_mut().unwrap().remove("usage");
+    cases.push((missing_usage, "choice_after_finish"));
+    for id in ["different", ""] {
+        let mut value = base.clone();
+        value["id"] = json!(id);
+        cases.push((value, "response_identity_changed"));
+    }
+    for quantity in [json!(-1), json!("9")] {
+        let mut value = base.clone();
+        value["usage"]["completion_tokens"] = quantity;
+        cases.push((value, "invalid_completion_chunk"));
+    }
+    let mut multiple = base.clone();
+    multiple["choices"]
+        .as_array_mut()
+        .unwrap()
+        .push(base["choices"][0].clone());
+    cases.push((multiple, "unexpected_choice_count"));
+    for (accounting, code) in cases {
+        let original = json!({ "id": "response-local", "choices": [{ "index": 0, "delta": { "content": "answer" }, "finish_reason": "stop", "native_finish_reason": "stop" }], "usage": { "completion_tokens": 2 } });
+        let transport = FixtureTransport::new([Ok(response(
+            [frame(original), frame(accounting), done()],
+            false,
+        ))]);
+        let result = execute(
+            &adapter(transport.clone()),
+            request(),
+            "invalid-terminal-usage",
+        )
+        .await;
+        assert_eq!(result.status, InferenceStatus::Interrupted);
+        assert_eq!(result.failure.unwrap().code, code);
+        assert_eq!(
+            result.messages[0].content,
+            vec![Content::Text("answer".into())]
+        );
+        assert_eq!(result.usage.len(), 1);
+        assert_eq!(result.usage[0].quantity, 2);
+        assert!(!result.usage[0].final_value);
+        assert!(result.terminal_receipt.is_none());
+        assert_eq!(result.receipt.unwrap().bytes(), b"request_123");
+        assert_eq!(transport.requests.lock().unwrap().len(), 1);
+    }
+}
+
+#[tokio::test]
+async fn repeated_usage_choice_still_requires_done_and_preserves_reported_zero() {
+    for marker in [false, true] {
+        let mut terminal = terminal_usage_choice("stop");
+        terminal.as_object_mut().unwrap().remove("usage");
+        terminal["choices"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("native_finish_reason");
+        terminal["choices"][0]["delta"]["content"] = json!("answer");
+        let mut accounting = terminal_usage_choice("stop");
+        accounting["usage"] = json!({ "completion_tokens": 0 });
+        accounting["choices"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("native_finish_reason");
+        let mut script = vec![frame(terminal), frame(accounting)];
+        if marker {
+            script.push(done());
+        }
+        let result = execute(
+            &adapter(FixtureTransport::new([Ok(response(script, false))])),
+            request(),
+            "zero-terminal-usage",
+        )
+        .await;
+        assert_eq!(
+            result.status,
+            if marker {
+                InferenceStatus::Completed
+            } else {
+                InferenceStatus::Interrupted
+            }
+        );
+        if !marker {
+            assert_eq!(result.failure.unwrap().code, "missing_terminal_event");
+        }
+        assert_eq!(
+            result.messages[0].content,
+            vec![Content::Text("answer".into())]
+        );
+        assert_eq!(result.usage.len(), 1);
+        assert_eq!(result.usage[0].quantity, 0);
+        assert!(result.usage[0].final_value);
+        assert_eq!(result.usage[0].attempt.as_str(), "zero-terminal-usage");
+        assert_eq!(result.receipt.unwrap().bytes(), b"request_123");
+    }
+}
+
 #[tokio::test]
 async fn first_party_usage_frames_preserve_missing_counts_and_reported_zero() {
     // The first-party codec omits its usage frame when no category is known.

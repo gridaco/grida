@@ -59,7 +59,15 @@ Cache-related counters retain their provider-specific meanings.
   option. Completion requires a finish reason and `[DONE]`. It emits calls
   after the tool-call finish reason and JSON validation. Compatible reasoning
   deltas remain separate from answer text and are omitted from portable request
-  history. The Ollama profile uses the `max_tokens` field. [Ollama compatibility](https://docs.ollama.com/api/openai-compatibility) · [Chat Completions streaming](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
+  history. A terminal accounting chunk may have no choices, or one content-free
+  choice repeating index zero and the exact normalized/native finish reasons.
+  A repeated choice must report at least one supported token counter. It cannot
+  add text, reasoning, refusal, tool deltas or non-null unrecognized output
+  fields. Accounting updates the same attempt's final counters without emitting
+  another call or replacing the original terminal receipt. `[DONE]` remains
+  required; malformed late frames preserve the valid prefix and interrupt the
+  attempt. [Compatible terminal usage](https://openrouter.ai/docs/api_reference/streaming)
+  The Ollama profile uses the `max_tokens` field. [Ollama compatibility](https://docs.ollama.com/api/openai-compatibility) · [Chat Completions streaming](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
 - `Responses` uses stateless SSE with top-level instructions, `store: false`,
   and explicitly requested encrypted reasoning. It keeps completed output
   item order and remote function call IDs for replay. Tool calls become
