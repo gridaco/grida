@@ -1215,33 +1215,36 @@ socket or file.
 
 ### Configured lifecycle hooks
 
-The [hook contract](https://grida.co/docs/wg/ai/agent/hooks) is implemented by the
-host dispatcher using the admission gate, recorded outcome boundaries, and
-ordinary scoped operations. Runtime has no configured-handler registry or
-named hook-event vocabulary. The host owns discovery, matching, order, recursion
-suppression, required-check semantics, and result interpretation.
+The native host currently supports the final-text check and one reviewed
+before-completion command. The [hook contract](https://grida.co/docs/wg/ai/agent/hooks)
+describes the remaining lifecycle events. Their host dispatcher would use the
+admission gate, recorded outcome boundaries, and ordinary scoped operations.
+Runtime has no configured-handler registry or named hook-event vocabulary.
+The host owns handler selection and result interpretation; the planned
+dispatcher also owns discovery, matching, order, and recursion suppression.
 
-The initial host supports command handlers. They execute through admitted tools
-under the selected confinement profile. The host assigns stable operation keys
+The completion command executes through an admitted tool under the selected
+confinement profile. The host assigns stable operation keys
 and records the selected handler identity with its invocation. Recovery can
 reuse completed results. Interrupted commands retain the executor's ordinary
 uncertainty and recovery behavior.
 
-Pre-tool checks use the gate so calls produced inside `step` receive the same
-policy as direct invocations. The host consumes recorded outcomes for after-tool
-checks. The master runs input and completion checks at its decision boundaries.
+Pre-tool checks would use the gate so calls produced inside `step` receive the
+same policy as direct invocations. The host would consume recorded outcomes for
+after-tool checks. The master would run input checks at its decision boundary
+and runs completion checks at its completion boundary.
 A required check that affects subsequent work must complete before that work is
 admitted. Ordinary event subscriptions remain observational.
 
-Grida's initial policy runs handlers in declared order, blocks the governed
+The planned policy runs handlers in declared order, blocks the governed
 action on required-check failure, and suppresses recursive user-hook dispatch
 for its own handler operations. Authority checks still apply to those operations.
 Stop and Pause govern handler work through the same controls as other operations.
 Executable work after settlement needs another explicitly admitted owner.
 
-The first host fixture fixes event names, response fields, and how its dispatcher
-uses the minimal gate context. Argument rewriting, background handlers, and
-additional handler types remain separate product extensions.
+The first fixture for each event fixes its name, response fields, and how the
+dispatcher uses the minimal gate context. Argument rewriting, background
+handlers, and additional handler types remain separate product extensions.
 [Codex hooks](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/hooks/src/lib.rs),
 [dispatcher](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/hooks/src/engine/dispatcher.rs),
 [command runner](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/hooks/src/engine/command_runner.rs).
