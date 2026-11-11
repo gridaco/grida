@@ -113,12 +113,13 @@ export async function proxy(req: NextRequest) {
   // #region maintenance mode
   if (IS_PROD) {
     try {
-      const { get } = await import("@vercel/edge-config");
-      // Check whether the maintenance page should be shown
-      const isInMaintenanceMode = await get<boolean>("IS_IN_MAINTENANCE_MODE");
+      // Edge Config value reused per server instance for a bounded window;
+      // see ./lib/maintenance/server-instance-cache for scope and trade-offs.
+      const { isInMaintenanceMode } =
+        await import("./lib/maintenance/server-instance-cache");
 
       // If is in maintenance mode, point the url pathname to the maintenance page
-      if (isInMaintenanceMode) {
+      if (await isInMaintenanceMode()) {
         req.nextUrl.pathname = `/maintenance`;
 
         // Rewrite to the url

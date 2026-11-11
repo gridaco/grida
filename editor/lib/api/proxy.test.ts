@@ -104,6 +104,40 @@ describe("API dispatch before browser work", () => {
     );
     expect(web.session).not.toHaveBeenCalled();
   });
+  it("reuses the web maintenance flag within one server instance", async () => {
+    const { proxy } = await import("../../proxy");
+    for (const path of ["/organizations", "/dashboard", "/v1/example"])
+      await proxy(request(path));
+    expect(web.maintenance).toHaveBeenCalledOnce();
+    expect(web.maintenance).toHaveBeenCalledWith("IS_IN_MAINTENANCE_MODE");
+    expect(web.session).toHaveBeenCalledTimes(3);
+  });
+  it("fails open and retries when the maintenance flag cannot be read", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    web.maintenance
+      .mockRejectedValueOnce(new Error("edge config unavailable"))
+      .mockResolvedValueOnce(true);
+    const { proxy } = await import("../../proxy");
+    const open = await proxy(request("/organizations"));
+    expect(open.headers.has("x-middleware-rewrite")).toBe(false);
+    expect(web.session).toHaveBeenCalledOnce();
+    expect(error).toHaveBeenCalledOnce();
+    const closed = await proxy(request("/organizations"));
+    expect(closed.headers.get("x-middleware-rewrite")).toContain(
+      "/maintenance"
+    );
+    expect(web.maintenance).toHaveBeenCalledTimes(2);
+    error.mockRestore();
+  });
+  it("reads no maintenance flag outside production", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    web.maintenance.mockResolvedValue(true);
+    const { proxy } = await import("../../proxy");
+    const response = await proxy(request("/organizations"));
+    expect(response.headers.has("x-middleware-rewrite")).toBe(false);
+    expect(web.maintenance).not.toHaveBeenCalled();
+    expect(web.session).toHaveBeenCalledOnce();
+  });
   it("retains the production insiders gate", async () => {
     const { proxy } = await import("../../proxy");
     expect(
