@@ -1,12 +1,10 @@
 /**
- * ACP stdio e2e — spawns the REAL `grida-agent acp` process and drives it
- * with raw newline-delimited JSON-RPC, exactly as an ACP client (editor)
- * would: initialize → session/new → session/load. Proves the full
- * plumbing — CLI boot, in-process AgentHost, SDK connection, adapter —
- * without a model call (prompt needs provider credentials; the
- * translation layer is pinned in `adapter.test.ts`).
+ * A separate process hosts the retained HTTP adapter and handles initialize,
+ * session/new, and session/load over newline-delimited JSON-RPC.
+ * These requests use the real session store without invoking a model.
  */
 import { spawn, type ChildProcess } from "node:child_process";
+import { once } from "node:events";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -28,10 +26,9 @@ class AcpProcess {
   constructor(stateDir: string) {
     this.child = spawn(
       process.execPath,
-      ["--import", "tsx", "src/cli.bin.ts", "acp"],
+      ["--import", "tsx", "src/testing/acp-stdio-host.ts", stateDir],
       {
         cwd: path.resolve(__dirname, "..", ".."),
-        env: { ...process.env, GRIDA_AGENT_USER_DATA: stateDir },
         stdio: ["pipe", "pipe", "pipe"],
       }
     );
@@ -60,7 +57,11 @@ class AcpProcess {
     for (;;) {
       const found = this.messages.find((m) => m.id === id);
       if (found) return found;
-      if (Date.now() > deadline) {
+      if (
+        this.child.exitCode !== null ||
+        this.child.signalCode !== null ||
+        Date.now() > deadline
+      ) {
         throw new Error(
           `no response for id=${id}; stderr:\n${this.stderr.join("")}`
         );
@@ -75,20 +76,22 @@ class AcpProcess {
     }
   }
 
-  async close(): Promise<void> {
-    const exited = new Promise<void>((resolve) => {
-      this.child.once("exit", () => resolve());
-      setTimeout(() => {
-        if (this.child.exitCode === null) this.child.kill("SIGKILL");
-        resolve();
-      }, 10_000);
-    });
-    this.child.stdin!.end();
-    await exited;
+  async close(): Promise<unknown[]> {
+    if (this.child.exitCode !== null || this.child.signalCode !== null) {
+      return [this.child.exitCode, this.child.signalCode];
+    }
+    const exited = once(this.child, "exit");
+    const timeout = setTimeout(() => this.child.kill("SIGKILL"), 5_000);
+    try {
+      this.child.stdin!.end();
+      return await exited;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 }
 
-describe("grida-agent acp (real stdio JSON-RPC process)", () => {
+describe("HTTP adapter over a real ACP stdio process", () => {
   let stateDir: string;
   let acp: AcpProcess | null = null;
 
@@ -145,6 +148,9 @@ describe("grida-agent acp (real stdio JSON-RPC process)", () => {
       });
       const loaded = await acp.response(2);
       expect(loaded.error).toBeUndefined();
+      expect(acp.child.exitCode).toBeNull();
+      expect(acp.child.signalCode).toBeNull();
+      expect(await acp.close()).toEqual([0, null]);
     }
   );
 });

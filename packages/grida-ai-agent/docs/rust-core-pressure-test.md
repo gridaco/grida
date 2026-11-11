@@ -322,11 +322,10 @@ client of the shared service leaves that service running.
 | Two clients control the same task                           | Conditional controls produce one ordered disposition and preserve each submitted input.                                                                   |
 | A requested tool needs a live editor or picker              | The host advertises its actual client capabilities. A headless adapter can exercise the interaction contract, with visual acceptance recorded separately. |
 
-The current [CLI tests](../src/cli.test.ts) provide both a spawned server smoke
-and imported-handler tests through HTTP. Their scope is recorded as existing
-evidence, without treating them as full executable coverage of every feature.
-The first native proof uses isolated state and explicit connection targets so
-test runs cannot attach to unrelated personal sessions.
+The [native process tests](../../../crates/grida-agent/tests/process.rs)
+exercise the executable under both a stdio supervisor and the authenticated
+loopback listener. The tests use isolated state and explicit connection targets
+so they cannot attach to unrelated personal sessions.
 
 ## Grida requirements that change the design
 

@@ -170,6 +170,6 @@ These are required working mechanisms behind the features above.
 [reference-picker]: https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/editor/kits/agent-chat/design-search-explorer.ts
 [input-routes]: https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/editor/lib/agent-chat/input-resource-router.test.ts
 [refresh-case]: https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/test/desktop-workbench-canvas-resource-refresh.md
-[headless-source]: https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/packages/grida-ai-agent/src/cli.ts
-[headless-tests]: https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/packages/grida-ai-agent/src/cli.test.ts
-[acp-adapter]: https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/packages/grida-ai-agent/src/acp/adapter.ts
+[headless-source]: https://github.com/gridaco/grida/blob/main/crates/grida-agent/src/main.rs
+[headless-tests]: https://github.com/gridaco/grida/blob/main/crates/grida-agent/tests/process.rs
+[acp-adapter]: https://github.com/gridaco/grida/blob/main/crates/grida-agent/src/acp.rs

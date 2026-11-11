@@ -285,7 +285,7 @@ export class AcpAgentAdapter implements Agent {
         // A dropped client connection must not wedge the run loop —
         // but a silent drop is undebuggable, so say so on stderr
         // (stdout is the JSON-RPC channel; stderr is free).
-        console.error("[grida-agent acp] dropped session update:", err);
+        console.error("[agent ACP adapter] dropped session update:", err);
       });
   }
 }

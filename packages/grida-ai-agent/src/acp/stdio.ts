@@ -1,7 +1,6 @@
 /**
- * stdio wiring for the ACP adapter — the `grida-agent acp` runtime shape:
- * the editor (ACP client) launches this process and speaks
- * newline-delimited JSON-RPC over stdin/stdout (acp.md §what-acp-is).
+ * Stdio wiring for a host process that exposes the HTTP adapter to an ACP
+ * client over newline-delimited JSON-RPC (acp.md §what-acp-is).
  *
  * Node-only by nature (process streams); the adapter itself is
  * transport-only and lives in `adapter.ts`.

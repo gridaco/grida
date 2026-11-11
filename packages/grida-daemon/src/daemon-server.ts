@@ -4,9 +4,8 @@
  * GRIDA-SEC-004 — the authenticated perimeter is identical in listening and
  * socketless host-delivered modes; socket ownership cannot bypass middleware.
  *
- * The architecture blueprint (docs/wg/ai/grida/architecture.md) makes
- * this the one class host adapters and the CLI construct, start, deliver
- * Requests through, and stop. The exposed contract is intentionally tiny:
+ * TypeScript hosts construct, start, and stop this server. They can deliver
+ * requests through its listener or the same perimeter through `fetch()`.
  *
  *   - `constructor(opts)` — wire config + the static tenant list.
  *   - `start()`           — build the Hono app and, by default, bind a
@@ -56,9 +55,8 @@ export type DaemonServerOptions = {
   prepare_provider_custody?: ServerOptions["prepare_provider_custody"];
   /**
    * GRIDA-SEC-004 — host-injected managed root for the auto-create flow
-   * (`POST /workspaces/create`). The desktop supervisor passes `~/Documents/Grida Projects`;
-   * CLI/dev leave it unset (auto-create then refuses). Forwarded to
-   * {@link ServerOptions} by the `...opts` spread below.
+   * (`POST /workspaces/create`). The desktop supervisor passes
+   * `~/Documents/Grida Projects`. Without a managed root, auto-create refuses.
    */
   projects_root?: string;
   workspace_catalog?: string;

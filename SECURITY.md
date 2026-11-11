@@ -705,19 +705,19 @@ merely by argv inspection.
   allowlist and `allow_local_binding` is false. The daemon remains reachable because Electron
   main owns the loopback listener and transfers only accepted connected
   sockets; the wrapped sidecar receives no generic local-connect authority.
-  Windows currently lacks that kernel egress fence. CLI and other hosts retain
-  the package's allowlisted defaults unless they explicitly choose the same
-  strict construction mode.
+  Windows currently lacks that kernel egress fence. Other hosts of the
+  TypeScript daemon retain the package's allowlisted defaults unless they
+  explicitly choose the same strict construction mode.
 
 - **Fail-closed exposure (no executor ⇒ no shell).** `sandbox_enforced` is an
   attestation about the coarse sidecar boundary, not command authority. The
   tenant registers `run_command` only when its host injects a `ShellExecutor`;
   omission is the default. Desktop injects the private main-owned executor only
   on platforms where SRT is enabled, so Windows gets fs/todos/skills but **no**
-  `run_command` and no external ACP agent. The `grida-agent` CLI — a local,
-  user-invoked tool with no OS sandbox — uses the separately named
-  `allow_unsandboxed_shell` opt-in, which explicitly injects the raw runner and
-  logs a warning. A boolean claim alone can never cause raw execution.
+  `run_command` and no external ACP agent. The retained TypeScript server
+  exposes a separate `allow_unsandboxed_shell` host opt-in that injects the raw
+  runner and logs a warning. A sandbox attestation alone cannot cause raw
+  execution. The native agent uses the separate command authority below.
 
 - **Secret-dir containment (per command).** The daemon's own secret dir —
   its `userData`, where OAuth `auth.json`, `workspaces.json`, `recent.json`,
@@ -2194,7 +2194,7 @@ levels into one.
    Completion drops invocation authority; it neither
    persists, refreshes nor automatically re-mints a GG grant. CLI destination and
    output controls are independently registered under GRIDA-SEC-013.
-   The CLI agent obtains its initial scoped grant through the same synchronous
+   The native CLI agent obtains its initial scoped grant through the same synchronous
    handoff. Its session selection binds the
    registered API origin, verified account subject, organization and model.
    Only a matching live authority can prepare the fixed chat POST. The CLI
@@ -3922,8 +3922,7 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   GRIDA-SEC-004's channel, sandbox and renderer guarantees. The
   [Desktop contract](desktop/README.md) and
   [agent authority contract](desktop/docs/agent-authority.md) document host custody.
-- Agent [CLI](packages/grida-ai-agent/src/cli.ts),
-  [full server](packages/grida-ai-agent/src/server.ts),
+- Agent [full server](packages/grida-ai-agent/src/server.ts),
   [media server](packages/grida-ai-agent/src/media-server.ts),
   [runtime](packages/grida-ai-agent/src/runtime/index.ts), and
   [workspace bindings](packages/grida-ai-agent/src/runtime/workspace-agent-bindings.ts),

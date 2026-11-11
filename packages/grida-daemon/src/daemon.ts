@@ -15,7 +15,7 @@
  *
  * It deliberately does NOT own policy: whether to spawn, when to stand
  * down, which origins a daemon allowlists — those are caller decisions
- * (the CLI's `serve --register`, a desktop supervisor, an ACP adapter).
+ * of each process host.
  * Filesystem layout is the only shared fact, so it lives in exactly one
  * place: here.
  *
@@ -50,8 +50,8 @@ export namespace Daemon {
 
   /**
    * The canonical origin + referer root a registered daemon MUST
-   * allowlist so that any local-process client (CLI, ACP adapter,
-   * supervisor probe) can clear the perimeter. Browser clients have
+   * allowlist so that local-process probes and adapters can clear
+   * the perimeter. Browser clients have
    * their own origins — see the WG spec's browser exception.
    */
   export const LOCAL_CLIENT_ORIGIN = "http://127.0.0.1";

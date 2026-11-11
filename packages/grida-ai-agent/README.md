@@ -213,7 +213,7 @@ Node hosts may pass `provider_http` to `createAgentTenant` or
   arbitrary public-web access.
 
 Omitting `provider_http` preserves ambient `globalThis.fetch` only for provider
-`request` operations needed by standalone/CLI hosts. Remote `download`
+`request` operations for standalone TypeScript hosts. Remote `download`
 operations fail closed because the package cannot bind DNS and redirect checks
 to an ambient fetch connection; inline `data:` assets are still decoded
 locally. When a transport is supplied, both functions are required together so
@@ -276,7 +276,7 @@ children—to have no direct outbound destinations can additionally select
 development hosts and all agent-contributed hosts. Local socket binding is
 orthogonal: it remains enabled by default for compatibility, and a host with a
 listener-independent request transport can pass `allow_local_binding: false`.
-The outbound default is `"allowlisted"`, preserving CLI behavior.
+The outbound default for this TypeScript policy is `"allowlisted"`.
 
 ## Finite command execution
 
@@ -350,8 +350,8 @@ model-provider router (the anti-goal above stands). Synthetic `claude-acp/*`
 model ids (`agent-provider/types.ts`) select it; continuity rides ACP
 `session/resume`. Because that subprocess owns its own tools and network stack,
 the construction-time `external_agent_execution` disposition is explicit:
-`"enabled"` is host-authorized execution with no containment claim (the
-CLI's explicit choice), `"sandboxed"` requires `sandbox_enforced: true`, and
+`"enabled"` is host-authorized execution with no containment claim,
+`"sandboxed"` requires `sandbox_enforced: true`, and
 `"disabled"` withholds the capability and is the omission default.
 `allow_unsandboxed_shell` governs only Grida's locked shell and does not affect
 this independent process authority.

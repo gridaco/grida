@@ -14,9 +14,8 @@
  * Dependency direction is one-way —
  * this package imports `@grida/daemon`; the daemon knows no tenant.
  *
- * Hosts (desktop sidecar, CLI) construct the composed server via
- * `createAgentDaemon` — behaviorally today's full agent daemon, wire
- * protocol unchanged.
+ * TypeScript hosts such as the compatibility Desktop sidecar construct the
+ * composed server with `createAgentDaemon`.
  */
 
 import os from "node:os";
@@ -73,8 +72,8 @@ export type {
 export type { ChatGptProviderConfig } from "./providers/chatgpt";
 export { defaultScratchBase, prepareScratchAuthority } from "./session/scratch";
 
-// Re-exported for hosts that compose or probe the daemon through this
-// package (the CLI, tests). The daemon package is the owner.
+// Re-exported for hosts that compose or probe the daemon through this package.
+// The daemon package owns these contracts.
 export {
   DaemonServer,
   DAEMON_DEFAULT_CAPABILITIES,
@@ -139,8 +138,8 @@ export type AgentTenantOptions = {
    * inference and media submit/poll/result calls); `download` is used only for
    * credential-free provider result/assets that the host authorizes. Both are
    * required when supplied so the two authorization classes cannot silently
-   * collapse. Omission retains ambient provider requests for standalone/CLI
-   * compatibility but fails closed for remote asset downloads.
+   * collapse. Omission retains ambient provider requests for standalone
+   * TypeScript hosts but fails closed for remote asset downloads.
    *
    * This grants no network operation to tools, shell commands, or external
    * agent processes. The package shapes provider requests, performs basic URL
@@ -199,12 +198,11 @@ export type AgentTenantOptions = {
    */
   external_agent_execution?: "enabled" | "sandboxed" | "disabled";
   /**
-   * GRIDA-SEC-004 — deliberate raw-execution escape hatch (the `grida-agent`
-   * CLI, local dev). When true and no {@link shell_executor} is supplied, the
-   * package injects {@link runUnsandboxedShell}. Off by default; enabling it is
-   * an
-   * explicit, logged decision by the host author who accepts that the shell
-   * child has no session-bound kernel-level filesystem containment.
+   * GRIDA-SEC-004 — trusted TypeScript host opt-in to raw shell execution.
+   * When true and no {@link shell_executor} is supplied, the package injects
+   * {@link runUnsandboxedShell} and logs a warning. The default is off. A host
+   * that opts in accepts shell execution without session-bound kernel
+   * filesystem containment.
    *
    * This does not affect external ACP agents; their independent disposition is
    * controlled by `external_agent_execution`.
@@ -213,8 +211,7 @@ export type AgentTenantOptions = {
   /**
    * Whether a human UI can answer the locked `question` tool. Default
    * (undefined/false) is FAIL-CLOSED headless: `question` refuses instead of
-   * pausing forever. The desktop sidecar sets this true; CLI/batch runs
-   * override false.
+   * pausing forever. The compatibility Desktop sidecar sets this true.
    */
   interactive?: boolean;
   /**
@@ -243,9 +240,9 @@ export type AgentTenantOptions = {
   /**
    * The host-bundled skills directory (the repo-root `skills/` tree shipped
    * with the app) — the lowest-precedence discovery layer that carries the
-   * built-in `svg`/`dotcanvas`/`slides` skills. The host resolves it (desktop
-   * = packaged resources; CLI = a flag/default). Omit ⇒ no built-in skills
-   * (only project/user skills discovered).
+   * built-in `svg`/`dotcanvas`/`slides` skills. The compatibility Desktop
+   * sidecar resolves it from packaged resources. Omission leaves project and
+   * user skill discovery available.
    */
   skills_root?: string;
 };
@@ -350,8 +347,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       }
       // Chat sessions: SQLite at ${userData}/sessions.db — agent-tenant
       // domain data (#927). Opened once per launch and closed via the
-      // returned cleanup. WAL mode in sessions/db.ts lets a CLI inspector
-      // read concurrently.
+      // returned cleanup. WAL mode in sessions/db.ts allows concurrent readers.
       const sessionsDb = openSessionsDb({
         user_data_path: services.user_data_path,
       });
@@ -375,9 +371,8 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
       // routes created.
       const streams = new StreamRegistry();
 
-      // GRIDA-SEC-004 — a finite command is a host capability, not a boolean
-      // attestation about the daemon's broad process tree. Standalone/CLI hosts
-      // retain raw execution only through the explicit unsandboxed switch.
+      // GRIDA-SEC-004 — finite commands require an explicit host executor.
+      // Only the dedicated unsandboxed opt-in injects the raw runner.
       const shellExecutor =
         opts.shell_executor ??
         (opts.allow_unsandboxed_shell === true
@@ -544,11 +539,6 @@ export type AgentDaemonOptions = AgentTenantOptions & {
 };
 
 /**
- * The composed server hosts actually run: a `DaemonServer` with the agent
- * tenant mounted. One import for the desktop sidecar, the CLI, and tests —
- * `start()` / `stop()` / `port` semantics are the daemon's.
- */
-/**
  * Map the composed-daemon options to the agent tenant's options.
  *
  * `AgentDaemonOptions = AgentTenantOptions & <daemon-frame fields>`, so we peel
@@ -583,6 +573,7 @@ export function agentTenantOptionsFromDaemon(
   return { ...tenant, capabilities };
 }
 
+/** A `DaemonServer` with the agent tenant mounted for a TypeScript host. */
 export function createAgentDaemon(opts: AgentDaemonOptions): DaemonServer {
   const capabilities: DaemonCapabilities = {
     ...AGENT_DAEMON_DEFAULT_CAPABILITIES,

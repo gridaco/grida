@@ -1748,12 +1748,11 @@ Desktop-only resources have explicit client capabilities and protocol test
 adapters. A fixture's presentation acknowledgment establishes that exchange.
 Actual rendering and interaction have their own Desktop acceptance evidence.
 
-The current TypeScript [entrypoint](../src/cli.ts) already composes serving,
-one-shot runs, and session controls. Its [tests](../src/cli.test.ts) include a
-spawned registration/handshake/shutdown smoke alongside in-process HTTP checks.
-Its unattended defaults and host authority are implementation choices, separate
-from the new interaction contract. Codex similarly exposes distinct noninteractive
-execution and application-server commands in its
+The native [entrypoint](../../../crates/grida-agent/src/main.rs) composes
+serving and one-shot execution. The [process tests](../../../crates/grida-agent/tests/process.rs)
+drive the executable with isolated state and explicit provider and connection
+targets. Codex similarly exposes distinct noninteractive execution and
+application-server commands in its
 [dispatcher](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/cli/src/main.rs).
 
 ## Master policy and initial public scope
