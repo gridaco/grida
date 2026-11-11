@@ -104,7 +104,10 @@ import {
   transform_vector_subselection,
   subselection_transform_vertices,
   subset_translation_delta,
+  vector_measurement_operands,
+  project_onto_segment,
   type SubSelectionSnapshot,
+  type VectorMeasurementTarget,
 } from "./core/vector-edit";
 import { policy_class } from "./core/policy-class";
 import type { RetypeRecord } from "./core/document";
@@ -2007,11 +2010,17 @@ class DomSurface implements Surface {
    * additional condition is a derivation, not a separate flag — this keeps
    * a single source of truth and lets future Alt-consumers (constrained
    * resize, axis-lock, …) live next to this one without re-tracking the key.
+   *
+   * In path edit the guide measures points instead of boxes — see
+   * {@link compute_vector_measurement_extra}.
    */
   private compute_measurement_extra(): HUDDraw | undefined {
     const mods = this.hud.modifiers();
     if (!mods.alt) return undefined;
     if (this.hud.gesture().kind !== "idle") return undefined;
+    if (this.vector_edit) {
+      return this.compute_vector_measurement_extra(this.vector_edit);
+    }
     const sel = this.editor.state.selection;
     if (sel.length === 0) return undefined;
     // The `<svg>` root is a snap target (see `compute_neighborhood` /
@@ -2026,27 +2035,14 @@ class DomSurface implements Surface {
     if (!hover) return undefined;
     if (sel.includes(hover)) return undefined;
 
-    // Two measurements:
-    //   container-space — drives the HUD's pixel-aligned visual (line
-    //     lengths, rect outlines must match the rendered SVG).
-    //   world-space — drives the reported distance labels (what the
-    //     user authored, not what the camera scaled).
-    // We feed container rects to measurementToHUDDraw, then overwrite
-    // the primary labels with formatted world-space distances.
     const a_container = sel
       .map((id) => this.container_box(id))
       .filter((r): r is Rect => r !== null);
     if (a_container.length === 0) return undefined;
     const b_container = this.container_box(hover);
     if (!b_container) return undefined;
-    const m_container = measure(cmath.rect.union(a_container), b_container);
-    if (!m_container) return undefined;
 
-    const draw = measurementToHUDDraw(
-      m_container,
-      this.editor.style.measurement_color
-    );
-
+    let world: MeasurementOperands | null = null;
     const geometry = this.editor.geometry;
     if (geometry) {
       const a_world = sel
@@ -2054,19 +2050,151 @@ class DomSurface implements Surface {
         .filter((r): r is Rect => r !== null);
       const b_world = geometry.bounds_of(hover);
       if (a_world.length > 0 && b_world) {
-        const m_world = measure(cmath.rect.union(a_world), b_world);
-        if (m_world) {
-          // Both measurements visit sides in [top, right, bottom, left]
-          // order; a labelled line exists iff both distances are > 0.
-          let cursor = 0;
-          for (const line of draw.lines ?? []) {
-            if (line.label === undefined) continue;
-            const side = next_labellable_side(cursor, m_container, m_world);
-            if (side < 0) break;
-            line.label = cmath.ui.formatNumber(m_world.distance[side], 1);
-            cursor = side + 1;
-          }
+        world = { a: cmath.rect.union(a_world), b: b_world };
+      }
+    }
+
+    return this.measurement_guide(
+      { a: cmath.rect.union(a_container), b: b_container },
+      world
+    );
+  }
+
+  /**
+   * Whether the Alt measurement guide is tracking a point on a hovered
+   * segment. That point follows the cursor along the segment, but the HUD
+   * only reports a redraw when the hovered control changes — so the pointer
+   * path redraws on every move while this holds.
+   */
+  private measures_point_on_segment(): boolean {
+    if (!this.vector_edit) return false;
+    if (!this.hud.modifiers().alt) return false;
+    if (this.hud.gesture().kind !== "idle") return false;
+    const hover = this.hud.vectorHover();
+    return hover?.kind === "segment" || hover?.kind === "ghost";
+  }
+
+  /**
+   * Point measurement in path edit (gridaco/grida#845): Alt-hovering a vertex
+   * or a segment measures from the vector sub-selection to that vertex, or to
+   * the point on the segment nearest the cursor — the Grida Canvas
+   * vector-network measurement behavior. The operands and the A-B
+   * de-duplication rules live in `vector_measurement_operands`; this projects
+   * them out of path-local space.
+   *
+   * The hovered control is the HUD's own vector hover, so the guide always
+   * names the control the next click would select. A segment's point is
+   * projected in screen space (what the user sees under any element
+   * transform) and evaluated at the same `t` in path-local space.
+   */
+  private compute_vector_measurement_extra(
+    session: VectorEditSession
+  ): HUDDraw | undefined {
+    const hover = this.hud.vectorHover();
+    if (!hover || hover.node_id !== session.node_id) return undefined;
+    // Idle gesture (checked by the caller) ⇒ no preview; the live `d` is
+    // the model.
+    const model = this.session_model();
+    if (!model) return undefined;
+    const snapshot = model.snapshot();
+
+    const el = this.element_index.get(session.node_id);
+    if (!(el instanceof SVGGraphicsElement)) return undefined;
+    if (typeof el.getScreenCTM !== "function") return undefined;
+    const screen_ctm = el.getScreenCTM();
+    if (!screen_ctm) return undefined;
+    const offset = this.container_offset();
+    const to_container = (p: readonly [number, number]): cmath.Vector2 =>
+      project_point_through_ctm(p[0], p[1], screen_ctm, offset);
+
+    let target: VectorMeasurementTarget;
+    if (hover.kind === "vertex") {
+      target = { kind: "vertex", vertex: hover.index };
+    } else if (hover.kind === "segment" || hover.kind === "ghost") {
+      // The ghost knob sits on the segment; measure to the cursor's point
+      // on that segment either way.
+      if (!this.last_pointer_valid) return undefined;
+      const t = project_onto_segment(snapshot, hover.segment, to_container, [
+        this.last_pointer.x,
+        this.last_pointer.y,
+      ]);
+      if (t === null) return undefined;
+      target = { kind: "segment", segment: hover.segment, t };
+    } else {
+      return undefined;
+    }
+
+    const operands = vector_measurement_operands(
+      snapshot,
+      {
+        vertices: session.selected_vertices,
+        segments: session.selected_segments,
+      },
+      target
+    );
+    if (!operands) return undefined;
+
+    // `getCTM()` (not `getScreenCTM`) maps path-local into world space —
+    // the root's user units, un-zoomed (see the geometry driver notes).
+    const world_ctm = el.getCTM();
+    const world: MeasurementOperands | null = world_ctm
+      ? {
+          a: cmath.rect.fromPointsOrZero(
+            operands.a.map((p) =>
+              project_point_through_ctm(p[0], p[1], world_ctm, [0, 0])
+            )
+          ),
+          b: project_point_through_ctm(
+            operands.b[0],
+            operands.b[1],
+            world_ctm,
+            [0, 0]
+          ),
         }
+      : null;
+
+    return this.measurement_guide(
+      {
+        a: cmath.rect.fromPointsOrZero(operands.a.map(to_container)),
+        b: to_container(operands.b),
+      },
+      world
+    );
+  }
+
+  /**
+   * Draw a measurement guide from two measurements of the same operands:
+   *   container-space — drives the HUD's pixel-aligned visual (line
+   *     lengths, rect outlines must match the rendered SVG).
+   *   world-space — drives the reported distance labels (what the user
+   *     authored, not what the camera scaled). When absent, the labels
+   *     keep their container-space values.
+   * We feed the container measurement to measurementToHUDDraw, then
+   * overwrite the primary labels with formatted world-space distances.
+   */
+  private measurement_guide(
+    container: MeasurementOperands,
+    world: MeasurementOperands | null
+  ): HUDDraw | undefined {
+    const m_container = measure(container.a, container.b);
+    if (!m_container) return undefined;
+
+    const draw = measurementToHUDDraw(
+      m_container,
+      this.editor.style.measurement_color
+    );
+
+    const m_world = world ? measure(world.a, world.b) : null;
+    if (m_world) {
+      // Both measurements visit sides in [top, right, bottom, left]
+      // order; a labelled line exists iff both distances are > 0.
+      let cursor = 0;
+      for (const line of draw.lines ?? []) {
+        if (line.label === undefined) continue;
+        const side = next_labellable_side(cursor, m_container, m_world);
+        if (side < 0) break;
+        line.label = cmath.ui.formatNumber(m_world.distance[side], 1);
+        cursor = side + 1;
       }
     }
 
@@ -2950,7 +3078,12 @@ class DomSurface implements Surface {
         // Some hosts disallow capture; safe to ignore.
       }
     }
-    if (response.needsRedraw) this.redraw();
+    if (
+      response.needsRedraw ||
+      (kind === "pointer_move" && this.measures_point_on_segment())
+    ) {
+      this.redraw();
+    }
     if (response.cursorChanged) this.sync_cursor();
     if (response.hoverChanged) {
       this.editor_hover_internal?.push_surface_hover(this.hud.hover());
@@ -6488,6 +6621,14 @@ function pick_lowest_side_anchor(
   }
   return best!;
 }
+
+/** The two operands of one measurement, in a single coordinate space. A
+ *  point (a path-edit vertex or point-on-segment) measures as a zero-size
+ *  rect. */
+type MeasurementOperands = {
+  a: cmath.Rectangle;
+  b: cmath.Rectangle | cmath.Vector2;
+};
 
 function next_labellable_side(
   start: number,

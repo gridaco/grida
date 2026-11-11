@@ -298,6 +298,7 @@ surface.draw(extra?);        // merges surface chrome + host extras, one canvas 
 // Read-only introspection
 surface.gesture(): SurfaceGesture;
 surface.hover():   NodeId | null;
+surface.vectorHover(): VectorHover | null;
 surface.cursor():  CursorIcon;
 ```
 
