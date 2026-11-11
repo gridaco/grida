@@ -829,12 +829,15 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
     15000
   );
 
-  it.runIf(Boolean(nativeResources))(
-    "persists selected SVG chat with a rootless native worker and live text reply",
-    async () => {
+  it.runIf(Boolean(nativeResources)).each(["managed", "ordinary"] as const)(
+    "persists %s selected SVG chat with a rootless native worker and live text reply",
+    async (profile) => {
       const test = await fixture();
       writeLegacy(test.database, test.scratchBase);
-      const prepared = await test.prepare();
+      const prepared =
+        profile === "ordinary"
+          ? await test.NativeAgentCutover.prepareOrdinary([test.legacy])
+          : await test.prepare();
       const selected = path.join(test.child("user-files"), "drawing.svg");
       const original = "<svg>Original</svg>";
       fs.writeFileSync(selected, original);
@@ -898,7 +901,10 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
         },
       });
       const workers = new WorkspaceFileWorkers(nativeResources!);
-      const receipts = path.join(electron.userData, "document-identities");
+      const receipts =
+        profile === "ordinary"
+          ? prepared.documentIdentitiesDirectory
+          : path.join(electron.userData, "document-identities");
       const launch = {
         ...connection.launch("fixture"),
         resourcesPath: nativeResources!,

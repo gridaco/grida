@@ -81,6 +81,40 @@ it.runIf(
       });
       process.argv = argv.filter((arg) => arg !== "--disable-agent");
       expect(ordinarySelectedSvgFiles()).toBeUndefined();
+      const temp = host.paths.get("temp")!;
+      const selected = path.join(temp, "drawing.svg");
+      await fs.writeFile(selected, "<svg>Original</svg>");
+      const owner = { signal: new AbortController().signal, check() {} };
+      const chatState = path.join(host.paths.get("userData")!, "native-chat");
+      await fs.mkdir(chatState, { mode: 0o700 });
+      const identities = path.join(chatState, "document-identities");
+      const legacyProfile = path.join(root, "Grida Insiders");
+      const defaultGridaHome = path.join(host.paths.get("home")!, ".grida");
+      await fs.mkdir(legacyProfile);
+      await fs.mkdir(defaultGridaHome);
+      const protectedPaths = [legacyProfile, defaultGridaHome];
+      const chatFiles = ordinarySelectedSvgFiles(identities, protectedPaths)!;
+      for (const directory of protectedPaths) {
+        const protectedSvg = path.join(directory, "retained.svg");
+        await fs.writeFile(protectedSvg, "<svg>Protected</svg>");
+        await expect(chatFiles.register(protectedSvg)).rejects.toThrow(
+          "The selected document is unavailable"
+        );
+      }
+      const chatId = await chatFiles.register(selected);
+      const chatKey = await chatFiles.chatIdentity(chatId, owner);
+      await chatFiles.read(chatId, owner);
+      await chatFiles.write(chatId, "<svg>Saved</svg>", owner);
+      expect(await chatFiles.chatIdentity(chatId, owner)).toBe(chatKey);
+      chatFiles.release(chatId);
+      const reopenedFiles = ordinarySelectedSvgFiles(
+        identities,
+        protectedPaths
+      )!;
+      const reopenedId = await reopenedFiles.register(selected);
+      expect(await reopenedFiles.chatIdentity(reopenedId, owner)).toBe(chatKey);
+      reopenedFiles.release(reopenedId);
+      await fs.writeFile(selected, "<svg>Original</svg>");
       process.argv = [...process.argv, "--disable-agent"];
       host.packaged = false;
       expect(ordinarySelectedSvgFiles()).toBeUndefined();
@@ -90,10 +124,6 @@ it.runIf(
       host.managed = false;
       const documents = ordinarySelectedSvgFiles()!;
       expect(nativeWorkspaceMedia()).toBeUndefined();
-      const temp = host.paths.get("temp")!;
-      const selected = path.join(temp, "drawing.svg");
-      await fs.writeFile(selected, "<svg>Original</svg>");
-      const owner = { signal: new AbortController().signal, check() {} };
       const id = await documents.register(selected);
       expect(await documents.register(selected)).toBe(id);
       expect((await documents.read(id, owner)).content).toBe(
@@ -104,7 +134,9 @@ it.runIf(
       await expect(documents.chatIdentity(id, owner)).rejects.toThrow(
         "The selected document is unavailable"
       );
-      expect(await fs.readdir(host.paths.get("userData")!)).toEqual([]);
+      expect(await fs.readdir(host.paths.get("userData")!)).toEqual([
+        "native-chat",
+      ]);
       const secret = path.join(host.agent, "secret.svg");
       const alias = path.join(root, "alias.svg");
       await fs.writeFile(secret, "<svg>Protected</svg>");

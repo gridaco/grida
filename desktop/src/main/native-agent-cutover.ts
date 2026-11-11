@@ -69,6 +69,11 @@ export class NativeAgentCutover {
     private readonly legacyArchive?: LegacyChatArchive
   ) {}
 
+  /** Main-owned identity receipts for selected standalone documents. */
+  get documentIdentitiesDirectory(): string {
+    return path.join(this.stateDirectory, "document-identities");
+  }
+
   /** Verify the shared legacy cutoff before starting any workspace engine. */
   static prepare(existing: ExistingCutoff): Promise<NativeAgentCutover> {
     return this.claim({

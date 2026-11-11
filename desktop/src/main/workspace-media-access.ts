@@ -17,11 +17,14 @@ export function nativeWorkspaceMedia() {
   return fileWorkers();
 }
 
-/** Ordinary media-only startup owns selected SVGs without a native chat profile. */
-export function ordinarySelectedSvgFiles() {
+/** Ordinary Desktop uses a selected-file owner independently of its workspace registry. */
+export function ordinarySelectedSvgFiles(
+  identityDirectory?: string,
+  protectedPaths: readonly string[] = []
+) {
   if (
     !nativeFilePlatform() ||
-    !process.argv.includes("--disable-agent") ||
+    (!identityDirectory && !process.argv.includes("--disable-agent")) ||
     NativeDesktopProfile.firstSelected()
   )
     return;
@@ -37,6 +40,7 @@ export function ordinarySelectedSvgFiles() {
   const temp = app.getPath("temp");
   return new NativeDocumentFiles(
     [
+      ...protectedPaths,
       ...filesystem.deny_read,
       gridaHome,
       agentData,
@@ -51,7 +55,8 @@ export function ordinarySelectedSvgFiles() {
       path.dirname(process.resourcesPath),
     ],
     userHome,
-    fileWorkers()
+    fileWorkers(),
+    identityDirectory
   );
 }
 

@@ -154,13 +154,13 @@ Resume targets a verified pause. Reconnecting requires loading the session
 again before submitting or controlling work.
 
 The cold-start coordinator selects the non-chat sidecar before starting native
-chat. The source selects native workspace chat on ordinary macOS arm64 Stable
-profiles; it uses a
-separate `native-chat` store and leaves the previous chat database and scratch
-in place. Other editions can still modify their shared legacy data and settings.
-Standalone-file chat, workspace image placement, and local image references
-are not available through this ordinary path. Native startup failures surface
-as errors; retained non-chat services keep their existing owners.
+chat. The source selects native workspace and selected SVG chat on ordinary
+macOS arm64 Stable profiles; they use a separate `native-chat` store and leave
+the previous chat database and scratch in place. Other editions can still
+modify their shared legacy data and settings. Workspace image placement and
+local image references are not available through this ordinary path. Native
+startup failures surface as errors; retained non-chat services keep their
+existing owners.
 
 A managed archival handoff verifies a private archive of the old database and
 its managed scratch before opening a separate native store. Interrupted startup

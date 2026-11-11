@@ -235,6 +235,10 @@ export class NativeDesktopAgent {
     return !this.closed && this.cutover.archive !== null;
   }
 
+  get documentIdentitiesDirectory(): string {
+    return this.cutover.documentIdentitiesDirectory;
+  }
+
   async revealLegacyChatArchive(
     reveal: (directory: string) => void
   ): Promise<void> {

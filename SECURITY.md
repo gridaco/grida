@@ -1433,6 +1433,11 @@ Today:
   worker. Known agent and scratch roots, Desktop stores, and packaged resources
   stay excluded. The file-only preload argument grants neither a native chat
   binding nor durable chat identity.
+- The ordinary native-chat launch uses that same selected SVG owner with
+  private Main-owned document identity receipts. A selected document frame can
+  attach only its exact rootless chat and captured text selection; it receives
+  no surrounding-directory or general filesystem authority. Disabled-agent
+  startup retains its file-only behavior.
 - The [managed first profile](desktop/src/main/native-first-profile.ts) is an
   owner-only directory with an exact receipt for its isolated data roots. Only
   an explicitly enabled Stable build can create it. First-time native enrollment

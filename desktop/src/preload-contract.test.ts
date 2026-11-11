@@ -15,8 +15,8 @@ describe("Desktop preload agent seam", () => {
     expect(preloadSource).toContain(
       "nativeDocumentChatId === nativeDocumentId"
     );
-    expect(preloadSource).toContain(
-      "selectedDocumentChatRoute() && { document: true as const }"
+    expect(preloadSource).toMatch(
+      /selectedDocumentChatRoute\(\)\s*\?\s*{ document: true as const }/
     );
     expect(preloadSource).toMatch(
       /nativeDocumentId !== undefined\s*\? ipcRenderer.invoke\(IPC_CHANNELS.DOCUMENT_READ, docId\)/
