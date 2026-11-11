@@ -187,6 +187,16 @@ This process reduces repeated discovery and makes known regressions detectable.
 Its protection is bounded by the cases found, the paths exercised, and the
 quality of the observations. A new failure revises the contract and its proof.
 
+Composer command selection is an input action. Selecting `/plan` or `/goal`
+retains the surrounding draft and starts no model work. The removable badges
+capture product instructions; permission grants and effort stay separate.
+An unconfirmed Goal start retries the same input and allowance even if work
+has already begun; a changed objective cannot replace that outstanding request.
+[Controller regressions](../../../editor/lib/agent-chat/native-chat-controller.test.ts),
+[real-editor selection tests](../../../editor/kits/composer/composer-command-selection.browser.ts),
+and the [Desktop interaction case](../../../test/desktop-agent-chat-composer-intents.md)
+cover these obligations.
+
 ## Consumer one, a minimal master
 
 The smallest useful master answers a request, optionally calls tools, and returns

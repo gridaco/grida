@@ -154,11 +154,12 @@ available for a manual answer. [Configure automatic read review](https://github.
 
 ### Plan before carrying out a task
 
-In the native Desktop workspace pane, choose **Plan** or **Act** using
-**Mode for next message**. The choice applies to the next message, including
-one you queue while the agent is working. **Send to current turn** keeps
-that turn's accepted mode. To carry out a proposal, choose **Act** and send
-a new message in the same chat.
+In the native Desktop workspace pane, select `/plan` in the composer to add
+planning instructions to the next message. Selection preserves the draft and
+starts no work. The removable **Plan** badge applies to messages you send or
+queue. **Send to current turn** keeps that turn's accepted instructions. To
+carry out a proposal, remove the badge and send a new request in the same chat.
+Planning does not change the chat’s permissions or effort.
 
 Use `--mode plan` with `run` or `serve` to investigate and prepare a proposal.
 The agent can read permitted material and ask enabled questions. Commands,
@@ -174,7 +175,7 @@ requires an Act launch.
 ### Choose how much effort a task gets
 
 In a supported Gateway, saved OpenRouter, or saved Vercel chat in Desktop, choose **Standard** or **Ultra** in
-**Effort for next message**. You can use either with **Plan** or **Act**. The
+the model picker at the bottom of the composer. You can use either with **Plan** or **Act**. The
 choice applies when you send or queue a message. Steering keeps the current
 turn's effort. Editing a queued or earlier message keeps its original effort.
 Resubmitting an earlier Ultra message requires a connection that supports Ultra.
@@ -299,10 +300,10 @@ and unpublished working copies. Authored files, saved exports, and independent
 forks stay available. Retry a lost deletion reply with the original request
 ID, workspace, and revisions, even if the chat has disappeared from the list.
 
-When a native chat owner is active in Desktop, the workspace **Chat** selector
+When a native chat owner is active in Desktop, the chat list at the top left
 shows saved chats in that workspace. Use **Older chats** to browse further or
 **Archived chats** to find an archived chat. Selecting a chat opens its transcript.
-With a chat open, choose **Rename chat** and **Save title**. Clear the title to
+With a chat open, use **Chat options → Rename chat** and save the title. Clear the title to
 use the default name. Choose **Archive chat** to move it out of the active list
 while keeping its draft and any running work. Open it from **Archived chats**
 and choose **Restore chat** to return it to the active list.
@@ -536,7 +537,7 @@ See the [native host request fields](https://github.com/gridaco/grida/blob/main/
 
 ## Ask in a temporary side chat
 
-Choose **Side chat** in an attached native Desktop chat. Ask in its separate
+Choose **Chat options → Open side chat** in an attached native Desktop chat. Ask in its separate
 text composer while the parent continues. Closing the pane or switching
 parent chats discards the side conversation.
 
@@ -569,8 +570,8 @@ future accepted messages. Work already accepted keeps its captured setting.
 The current Gateway and ChatGPT subscription profiles can inspect the limit
 and return an existing valid override to **Automatic**.
 
-To ask the agent to change the default with a compatible provider, select
-**Act** and **Review settings permission on next Act send**. Write a short
+To ask the agent to change the default with a compatible provider, remove the **Plan** badge and enable
+**Review settings permission on next Act send** in **Context settings**. Write a short
 message and confirm it when Desktop asks. That permission covers the context
 input limit for this message. To change a queued message with this permission,
 withdraw it and review a new send.
@@ -878,9 +879,12 @@ and leaves the transcript available.
 
 ### Work toward a persistent goal
 
-In the native Desktop workspace pane, **Add goal** opens the goal form.
-**Start goal** accepts the work and the allowance you entered. Automatic
-continuation is off until you select it. An accepted goal waits in the
+In the native Desktop workspace pane, select `/goal` to add a **Goal** badge.
+Sending the objective starts automatic continuation within eight work turns and
+64 inference steps, using the description as its completion criterion. Selecting
+the command alone starts no work. Open the badge and choose **Customize goal…**
+for separate criteria, different limits, or manual continuation. **Start goal**
+accepts the work and the allowance entered in that form. An accepted goal waits in the
 retained queue until its first work turn is reserved. It appears as a goal
 after restart. To change it before work starts, remove it from the queue and
 start a new goal with the revised objective or allowance.

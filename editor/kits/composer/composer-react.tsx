@@ -6,6 +6,7 @@ import {
   createContext,
   type HTMLAttributes,
   type PropsWithChildren,
+  type RefObject,
   useContext,
   useEffect,
   useId,
@@ -36,6 +37,9 @@ type ComposerContextValue = {
   setEditor: (editor: Editor | null) => void;
   snapshot: ComposerSnapshot;
   triggerMenuId: string;
+  commandSelection: RefObject<
+    ((command: ComposerCommand) => boolean) | undefined
+  >;
 };
 
 export type ComposerController = {
@@ -66,9 +70,14 @@ const ComposerContext = createContext<ComposerContextValue | null>(null);
 export function ComposerProvider({
   catalog,
   children,
+  onCommandSelect,
 }: PropsWithChildren<{
   catalog: ComposerCatalog;
+  /** Return true to handle an explicit command selection without inserting a chip. */
+  onCommandSelect?: (command: ComposerCommand) => boolean;
 }>) {
+  const commandSelection = useRef(onCommandSelect);
+  commandSelection.current = onCommandSelect;
   const core = useRef<ComposerCore | null>(null);
   if (!core.current) {
     core.current = new ComposerCore(catalog);
@@ -98,6 +107,7 @@ export function ComposerProvider({
       setEditor,
       snapshot,
       triggerMenuId,
+      commandSelection,
     }),
     [coreValue, editor, setEditor, snapshot, triggerMenuId]
   );
@@ -110,7 +120,7 @@ export function ComposerProvider({
 }
 
 export function useComposer() {
-  const { core, editor, snapshot } = useComposerInternals();
+  const { core, editor, snapshot, commandSelection } = useComposerInternals();
 
   return useMemo<ComposerController>(
     () => ({
@@ -139,9 +149,13 @@ export function useComposer() {
         core.moveTriggerIndex(delta);
       },
       selectTriggerItem(index) {
-        if (!editor || !snapshot.trigger) return false;
-        ComposerTiptap.selectTriggerItem(editor, snapshot.trigger, index);
-        return true;
+        if (!editor) return false;
+        return ComposerTiptap.selectTriggerItem(
+          editor,
+          core,
+          index,
+          commandSelection.current
+        );
       },
       submit(input) {
         if (editor) {
@@ -150,7 +164,7 @@ export function useComposer() {
         return core.createMessage(input);
       },
     }),
-    [core, editor, snapshot]
+    [core, editor, snapshot, commandSelection]
   );
 }
 
@@ -207,6 +221,7 @@ export function ComposerContent({
 }) {
   const {
     core,
+    commandSelection,
     setEditor,
     snapshot,
     triggerMenuId: defaultTriggerMenuId,
@@ -246,6 +261,7 @@ export function ComposerContent({
           submit() {
             onSubmitRequest?.();
           },
+          onCommandSelect: commandSelection.current,
         });
       },
       handlePaste(_view, event) {

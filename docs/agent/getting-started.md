@@ -10,8 +10,8 @@ format: md
 ## Work in a project
 
 Open a folder in Grida Desktop and open its chat pane. Type `@` to find a
-workspace file, or select relevant material in an attached editor. Use **Plan**
-to investigate and **Act** to carry out changes with
+workspace file, or select relevant material in an attached editor. Select `/plan`
+to investigate; remove the **Plan** badge to carry out changes with
 the tools and access available to the chat. [Understand agent permissions](./permissions.md)
 
 On a Desktop build with native deck chat, open a `.canvas` bundle in its file

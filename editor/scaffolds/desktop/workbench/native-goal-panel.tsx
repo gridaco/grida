@@ -11,9 +11,9 @@ import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import { Textarea } from "@app/ui/components/textarea";
 import { GoalSpending } from "@/lib/agent-chat/goal-spending";
-import type {
+import {
   NativeChatController,
-  NativeChatView,
+  type NativeChatView,
 } from "@/lib/agent-chat/native-chat-controller";
 import type { NativeSubagentController } from "@/lib/agent-chat/native-subagent-controller";
 
@@ -34,12 +34,18 @@ type GoalRevisionDraft = NativeChatGoalObjective & {
 export function NativeGoalPanel({
   controller,
   view,
+  creating = false,
+  onStarted,
+  onCancel,
 }: {
   controller: NativeChatController;
   view: NativeChatView;
+  creating?: boolean;
+  onStarted?: () => void;
+  onCancel?: () => void;
 }) {
-  const [adding, setAdding] = useState(false);
-  const [effort, setEffort] = useState<NativeChatEffort>("standard");
+  const [adding, setAdding] = useState(creating);
+  const [effort, setEffort] = useState<NativeChatEffort>(view.effort);
   const [editing, setEditing] = useState<GoalRevisionDraft | null>(null);
   const goal = view.goal?.goal;
   const goalRevision = view.goal?.goalRevision;
@@ -96,7 +102,10 @@ export function NativeGoalPanel({
         String(fields.get("maximumUsd") ?? "")
       )
       .then((accepted) => {
-        if (accepted) setAdding(false);
+        if (accepted) {
+          setAdding(false);
+          onStarted?.();
+        }
       });
   };
   const revise = (event: FormEvent<HTMLFormElement>) => {
@@ -113,7 +122,7 @@ export function NativeGoalPanel({
       });
   };
 
-  if (!goal && !adding && !canStart && !pending) return null;
+  if (!goal && !adding && !pending) return null;
   return (
     <section
       aria-label="Goal"
@@ -338,7 +347,7 @@ export function NativeGoalPanel({
       {adding ? (
         <form className="space-y-2" onSubmit={submit}>
           <p className="text-muted-foreground">
-            {view.operatingRegime === "plan" ? "Plan goal" : "Act goal"}
+            {view.operatingRegime === "plan" ? "Planning goal" : "Goal"}
           </p>
           <GoalObjectiveFields disabled={view.acting} />
           <div className="grid grid-cols-2 gap-2">
@@ -346,6 +355,9 @@ export function NativeGoalPanel({
               <span>Work turns</span>
               <Input
                 name="workTurns"
+                defaultValue={
+                  NativeChatController.goalComposerAllowance.workTurns
+                }
                 type="number"
                 min={1}
                 max={0xffffffff}
@@ -358,6 +370,9 @@ export function NativeGoalPanel({
               <span>Inference steps</span>
               <Input
                 name="inferenceSteps"
+                defaultValue={
+                  NativeChatController.goalComposerAllowance.inferenceSteps
+                }
                 type="number"
                 min={1}
                 max={0xffffffff}
@@ -411,7 +426,12 @@ export function NativeGoalPanel({
             />
           )}
           <label className="flex items-center gap-2">
-            <input name="automatic" type="checkbox" disabled={view.acting} />
+            <input
+              name="automatic"
+              type="checkbox"
+              defaultChecked
+              disabled={view.acting}
+            />
             Continue automatically within these limits
           </label>
           {canAllowWakeup && (
@@ -430,7 +450,10 @@ export function NativeGoalPanel({
               variant="ghost"
               type="button"
               disabled={view.acting}
-              onClick={() => setAdding(false)}
+              onClick={() => {
+                setAdding(false);
+                onCancel?.();
+              }}
             >
               Cancel
             </Button>
@@ -439,18 +462,6 @@ export function NativeGoalPanel({
             </Button>
           </div>
         </form>
-      ) : canStart ? (
-        <Button
-          type="button"
-          size="xs"
-          variant="outline"
-          onClick={() => {
-            setEffort("standard");
-            setAdding(true);
-          }}
-        >
-          Add goal
-        </Button>
       ) : null}
     </section>
   );

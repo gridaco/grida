@@ -11,7 +11,7 @@ format: md
 In a native Desktop workspace chat, the selected project gives the agent
 access to supported workspace reads. Tools can list folders, search for text,
 and read files within that scope. **Plan** lets the agent investigate. Use
-**Act** when you want it to carry out a change using the tools available in
+an ordinary request without the **Plan** badge when you want it to carry out a change using the tools available in
 your connection. An editor action can depend on the file or selection you
 attached when you sent the message. [Edit selected SVG text](./clients.md#edit-selected-svg-text)
 

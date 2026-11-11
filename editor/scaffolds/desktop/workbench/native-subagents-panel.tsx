@@ -9,8 +9,10 @@ import type { NativeSubagentController } from "@/lib/agent-chat/native-subagent-
 
 export function NativeSubagentsPanel({
   controller,
+  hideToggle = false,
 }: {
   controller: NativeSubagentController;
+  hideToggle?: boolean;
 }) {
   const state = useSyncExternalStore(
     controller.subscribe,
@@ -29,16 +31,18 @@ export function NativeSubagentsPanel({
       className="shrink-0 border-t px-3 py-2"
       data-testid="native-subagents"
     >
-      <Button
-        type="button"
-        size="xs"
-        variant="ghost"
-        aria-expanded={state.open}
-        disabled={state.acting}
-        onClick={() => controller.toggle()}
-      >
-        Subagents
-      </Button>
+      {!hideToggle && (
+        <Button
+          type="button"
+          size="xs"
+          variant="ghost"
+          aria-expanded={state.open}
+          disabled={state.acting}
+          onClick={() => controller.toggle()}
+        >
+          Subagents
+        </Button>
+      )}
       {state.open && state.error && (
         <Button
           type="button"

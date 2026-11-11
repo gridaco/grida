@@ -21,7 +21,7 @@ place while recovering; deleting them is not a connection reset.
 
 ## Reopen or organize a chat
 
-In a native workspace chat, use the **Chat** selector to reopen a conversation.
+In a native workspace chat, open the chat list at the top left to reopen a conversation.
 Its transcript and retained work are available in the original chat. Review any
 pending question, approval, or interruption before continuing.
 [Guide and interrupt work](./controls.md)
@@ -32,7 +32,7 @@ work. Reading earlier messages leaves ongoing work running. If the history
 changes while you browse, start again from the latest messages. Current turn
 details appear with the latest messages.
 
-Choose **Rename chat** to change its title. **Archive chat** moves it out of the
+Open **Chat options** (the three-dot menu) and choose **Rename chat** to change its title. **Archive chat** moves it out of the
 active list and lets any ongoing work continue. Open **Archived chats** to find
 it again or choose **Restore chat** to return it to the active list. When
 **Delete chat** is available, it removes the chat’s private data. Saved project

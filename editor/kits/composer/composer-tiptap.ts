@@ -8,7 +8,6 @@ import {
   type ComposerDocument,
   type ComposerFileReference,
   type ComposerMention,
-  type ComposerTrigger,
 } from "./composer-core";
 
 const ComposerCommandNode = Node.create({
@@ -122,6 +121,8 @@ const ComposerFileReferenceNode = Node.create({
 });
 
 export namespace ComposerTiptap {
+  const selecting = new WeakSet<Editor>();
+
   export function extensions(input: { placeholder: string }) {
     return [
       StarterKit.configure({
@@ -187,6 +188,7 @@ export namespace ComposerTiptap {
     triggerIndex: number;
     moveTriggerIndex: (delta: number) => void;
     submit: () => void;
+    onCommandSelect?: (command: ComposerCommand) => boolean;
   }): boolean {
     if (isComposing(input.event)) {
       return false;
@@ -211,7 +213,12 @@ export namespace ComposerTiptap {
       if (input.event.key === "Enter" && !input.event.shiftKey) {
         if (!input.editor) return false;
         input.event.preventDefault();
-        selectTriggerItem(input.editor, trigger, input.triggerIndex);
+        selectTriggerItem(
+          input.editor,
+          input.core,
+          input.triggerIndex,
+          input.onCommandSelect
+        );
         return true;
       }
     }
@@ -231,15 +238,33 @@ export namespace ComposerTiptap {
 
   export function selectTriggerItem(
     editor: Editor,
-    trigger: ComposerTrigger,
-    index: number
-  ): void {
+    core: ComposerCore,
+    index: number,
+    onCommandSelect?: (command: ComposerCommand) => boolean
+  ): boolean {
+    if (editor.isDestroyed || selecting.has(editor)) return false;
+    const trigger = core.getSnapshot().trigger;
+    if (!trigger) return false;
     const item = trigger.items[Math.min(index, trigger.items.length - 1)];
-    if (!item) return;
-    if (trigger.kind === "command") {
-      insertCommand(editor, trigger.range, item as ComposerCommand);
-    } else {
-      insertMention(editor, trigger.range, item as ComposerMention);
+    if (!item) return false;
+    selecting.add(editor);
+    try {
+      if (trigger.kind === "command") {
+        const command = item as ComposerCommand;
+        if (onCommandSelect?.({ ...command }) === true) {
+          editor.chain().focus().deleteRange(trigger.range).run();
+        } else {
+          insertCommand(editor, trigger.range, command);
+        }
+      } else {
+        insertMention(editor, trigger.range, item as ComposerMention);
+      }
+      // Refresh immediately: a second selection must not reuse a menu captured
+      // by a previous render, even before React receives the editor update.
+      syncCore(core, editor);
+      return true;
+    } finally {
+      selecting.delete(editor);
     }
   }
 

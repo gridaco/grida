@@ -13,7 +13,7 @@ with a supported Grida Gateway connection or a saved OpenRouter or Vercel AI
 Gateway connection. Named assignments, ordinary Ultra reviews, and Goal-funded
 reviews are available on these supported connections.
 
-1. Finish an **Act** turn in the parent chat. Open **Subagents**, enter a
+1. Finish an **Act** turn in the parent chat. Open **Chat options → Subagents**, enter a
    name, choose how many assignments to allow, and select **Create**.
 2. Select the subagent, enter the work to do, and choose **Assign work**.
    For example, ask a researcher to compare two approaches and explain

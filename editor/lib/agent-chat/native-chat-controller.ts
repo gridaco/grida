@@ -179,6 +179,7 @@ export type NativeChatView = Readonly<{
   goalEffortAvailable: boolean;
   goal: NativeChatGoalObservation | null;
   goalReady: boolean;
+  goalIntent: boolean;
   loading: boolean;
   acting: boolean;
   repairing: boolean;
@@ -327,6 +328,7 @@ const EMPTY: NativeChatView = Object.freeze({
   goalEffortAvailable: false,
   goal: null,
   goalReady: false,
+  goalIntent: false,
   loading: false,
   acting: false,
   repairing: false,
@@ -335,6 +337,10 @@ const EMPTY: NativeChatView = Object.freeze({
 
 /** Renderer-owned observation and text projection. Work stays in the native host. */
 export class NativeChatController {
+  static readonly goalComposerAllowance = Object.freeze({
+    workTurns: 8,
+    inferenceSteps: 64,
+  });
   private view = EMPTY;
   private readonly listeners = new Set<() => void>();
   private scope?: Scope;
@@ -418,7 +424,11 @@ export class NativeChatController {
     };
   };
 
-  connect(initial: string | null, profileId?: string | null): void {
+  connect(
+    initial: string | null,
+    profileId?: string | null,
+    startNewChat = false
+  ): void {
     const saved = this.restore();
     this.pendingFocus = undefined;
     this.catalogConnection = {};
@@ -437,7 +447,11 @@ export class NativeChatController {
     void this.readProfiles();
     if (profileId !== null && profileId !== undefined) {
       if (initial) void this.focusChat(initial, profileId);
-      else void this.selectProfile({ kind: "saved", id: profileId });
+      else
+        void this.selectProfile({
+          kind: startNewChat ? "new" : "saved",
+          id: profileId,
+        });
       return;
     }
     void this.listChats();
@@ -685,6 +699,8 @@ export class NativeChatController {
     this.update({
       scope: scope.id,
       selected: sessionId,
+      operatingRegime: "act",
+      goalIntent: false,
       catalogEntry: null,
       catalogEntryError: null,
       catalogChanging: false,
@@ -737,7 +753,6 @@ export class NativeChatController {
       queueLoading: false,
       queueDraft: null,
       steering: false,
-      operatingRegime: "act",
       effort: "standard",
       effortAvailable: false,
       goalEffortAvailable: false,
@@ -788,7 +803,8 @@ export class NativeChatController {
         ? this.canSteer &&
           this.scope.steeringTarget ===
             this.view.observation?.snapshot.current?.turnId
-        : !this.needsQueue ||
+        : (this.view.goalIntent && !!this.scope.pendingGoalStart) ||
+          !this.needsQueue ||
           !!this.bridge.enqueue ||
           !!this.scope.pending?.allowLibrarySelection ||
           (this.view.allowWakeup && !!this.scope.pending?.allowWakeup))
@@ -803,6 +819,7 @@ export class NativeChatController {
       !this.view.profileBusy &&
       !this.view.acting &&
       !this.view.steering &&
+      !this.view.goalIntent &&
       !this.view.reviewConfiguration &&
       !this.view.allowWakeup
     );
@@ -838,8 +855,9 @@ export class NativeChatController {
     const kind = png ? "png" : "file";
     if (!this.canAttach(kind)) {
       this.update({
-        attachmentNotice:
-          this.view.loading || this.acceptsAttachment(kind)
+        attachmentNotice: this.view.goalIntent
+          ? "Use workspace file references for a goal, or remove the goal intent to attach this file."
+          : this.view.loading || this.acceptsAttachment(kind)
             ? "Wait until the chat is ready to attach a file."
             : kind === "png"
               ? "This connection cannot use a PNG attachment."
@@ -1254,7 +1272,14 @@ export class NativeChatController {
         ? selected.title
         : this.catalog?.titles?.find((entry) => entry.sessionId === sessionId)
             ?.title;
-    return title ?? `Chat ${sessionId.slice(0, 8)}`;
+    const firstInput =
+      this.view.selected === sessionId
+        ? this.view.messages.find((message) => message.role === "user")?.text
+        : undefined;
+    return (
+      title ??
+      (firstInput?.trim().split("\n")[0].slice(0, 64) || "Untitled chat")
+    );
   }
 
   beginRename(): void {
@@ -1522,13 +1547,14 @@ export class NativeChatController {
       !this.view.acting &&
       !scope.awaitingGoalId &&
       (!scope.attachment || this.view.goalReady) &&
-      !snapshot?.current &&
-      !snapshot?.queuedInputs &&
-      !snapshot?.admissionPaused &&
-      (!goal ||
-        (!goal.reservation &&
-          (goal.state.status === "complete" ||
-            goal.state.status === "cleared")))
+      (!!scope.pendingGoalStart ||
+        (!snapshot?.current &&
+          !snapshot?.queuedInputs &&
+          !snapshot?.admissionPaused &&
+          (!goal ||
+            (!goal.reservation &&
+              (goal.state.status === "complete" ||
+                goal.state.status === "cleared")))))
     );
   }
 
@@ -1669,6 +1695,13 @@ export class NativeChatController {
       operatingRegime: this.view.operatingRegime,
     };
     const key = JSON.stringify(payload);
+    if (scope.pendingGoalStart && scope.pendingGoalStart.key !== key) {
+      this.update({
+        error:
+          "Retry the original goal draft before starting a different goal.",
+      });
+      return false;
+    }
     const pending =
       scope.pendingGoalStart?.key === key
         ? scope.pendingGoalStart
@@ -1686,8 +1719,10 @@ export class NativeChatController {
       if (
         receipt.disposition === "withdrawn" ||
         receipt.disposition === "superseded"
-      )
+      ) {
+        scope.pendingGoalStart = undefined;
         throw new Error("native_chat_goal_start_unavailable");
+      }
       scope.pendingGoalStart = undefined;
       if (!this.owns(scope)) return false;
       scope.awaitingGoalId =
@@ -1699,6 +1734,14 @@ export class NativeChatController {
       return true;
     } catch (error) {
       if (this.owns(scope)) {
+        // These refusals precede admission; an unknown outcome must keep its identity.
+        if (
+          error instanceof Error &&
+          /goal_child_allowance_unavailable|goal_named_child_unavailable/.test(
+            error.message
+          )
+        )
+          scope.pendingGoalStart = undefined;
         this.update({
           error:
             error instanceof Error &&
@@ -1852,6 +1895,19 @@ export class NativeChatController {
       });
   }
 
+  selectGoalIntent(enabled: boolean): void {
+    if (this.view.acting) return;
+    if (!enabled && this.scope?.pendingGoalStart) return;
+    if (enabled && this.view.attachmentDraft) {
+      this.update({
+        error: "Send or remove the attachment before starting a goal.",
+      });
+      return;
+    }
+    if (!enabled || this.canStartGoal)
+      this.update({ goalIntent: enabled, error: null });
+  }
+
   selectEffort(effort: NativeChatEffort): void {
     if (this.view.effortAvailable && !this.view.acting && !this.view.steering)
       this.update({ effort });
@@ -1861,11 +1917,53 @@ export class NativeChatController {
     const scope = this.scope;
     if (!scope || scope.id !== scopeId || this.view.profileBusy)
       throw new Error("native_chat_not_ready");
+    const intent = /^\/(plan|goal)(?:\s+|$)/.exec(text.trim());
+    if (intent) {
+      if (intent[1] === "plan") {
+        if (!this.bridge.submitInRegime || this.view.steering)
+          throw new Error("Planning is unavailable in this chat.");
+        this.selectOperatingRegime("plan");
+      } else {
+        if (!this.view.goalIntent && !this.canStartGoal)
+          throw new Error(
+            "A goal cannot start while this chat has unfinished work."
+          );
+        this.selectGoalIntent(true);
+        if (!this.view.goalIntent)
+          throw new Error(this.view.error ?? "Goal entry is unavailable.");
+      }
+      text = text.trim().slice(intent[0].length).trim();
+      if (!text) return;
+    }
     const literal = text.trim();
     if (literal === "/compact" || literal === "/fork")
       return this.runCommand(literal === "/compact" ? "compact" : "fork");
     if (!this.canSubmit || !text.trim())
       throw new Error("native_chat_not_ready");
+    if (this.view.goalIntent) {
+      if (this.view.attachmentDraft || this.view.reviewConfiguration)
+        throw new Error(
+          "Remove the attachment or settings review before starting a goal."
+        );
+      if (utf8.encode(text.trim()).length > 1024) {
+        const error =
+          "Use a shorter goal, or customize its objective and success criteria.";
+        this.update({ error });
+        throw new Error(error);
+      }
+      const accepted = await this.startGoal({
+        objective: text.trim(),
+        criteria: [text.trim()],
+        allowance: NativeChatController.goalComposerAllowance,
+        automatic: true,
+        ...(this.view.effort === "ultra" && { effort: "ultra" }),
+        ...(this.view.allowWakeup && { allowWakeup: true }),
+      });
+      if (!accepted)
+        throw new Error(this.view.error ?? "Couldn't start the goal.");
+      if (this.owns(scope)) this.update({ goalIntent: false });
+      return;
+    }
     if (this.view.steering) return this.submitSteering(scope, text);
     const mode = this.needsQueue ? "enqueue" : "submit";
     const selectedAttachment = scope.selectedAttachment;

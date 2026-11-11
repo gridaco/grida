@@ -92,6 +92,8 @@ export type AgentComposerInputProps = {
   /** Action `/`-commands (e.g. `/compact`). Merged into the menu, ahead
    *  of the catalog's own commands, and intercepted on submit. */
   commandActions?: ComposerCommandAction[];
+  /** Handle intent commands when selected, before they become prompt chips. */
+  onCommandSelect?: (command: ComposerCatalog["commands"][number]) => boolean;
   /**
    * Receives the lowered prompt text, provider-native media as AI-SDK `file`
    * parts, and `extras` — operable scratch copies + their marker. One raster
@@ -180,6 +182,7 @@ export type AgentComposerInputProps = {
 export function AgentComposerInput({
   catalog,
   commandActions,
+  onCommandSelect,
   ...rest
 }: AgentComposerInputProps) {
   // Surface action commands in the `/` menu alongside catalog commands.
@@ -197,7 +200,10 @@ export function AgentComposerInput({
   }, [catalog, commandActions]);
 
   return (
-    <ComposerProvider catalog={effectiveCatalog}>
+    <ComposerProvider
+      catalog={effectiveCatalog}
+      onCommandSelect={onCommandSelect}
+    >
       <AgentComposerInner commandActions={commandActions} {...rest} />
     </ComposerProvider>
   );

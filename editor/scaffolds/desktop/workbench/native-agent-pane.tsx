@@ -14,7 +14,6 @@ import type {
   NativeChatProfileSelection,
 } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
-import { Input } from "@app/ui/components/input";
 import { Textarea } from "@app/ui/components/textarea";
 import { MessageAction } from "@app/ui/ai-elements/message";
 import { readLibraryAttachment } from "@/app/(library)/library/attachment";
@@ -23,7 +22,14 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   PencilIcon,
-  SlidersHorizontalIcon,
+  CircleGaugeIcon,
+  LibraryIcon,
+  PaperclipIcon,
+  PlusIcon,
+  ShieldIcon,
+  TargetIcon,
+  ListChecksIcon,
+  ImageIcon,
   XIcon,
 } from "lucide-react";
 import {
@@ -58,6 +64,28 @@ import { NativeHooksPanel } from "./native-hooks-panel";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
 import { NativeSubagentsPanel } from "./native-subagents-panel";
 import { NativeConnectionRecovery } from "./native-connection-recovery";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@app/ui/components/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSeparator,
+} from "@app/ui/components/dropdown-menu";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@app/ui/components/popover";
+import { NativeChatHeader, NativeModelPicker } from "./native-chat-controls";
 
 const NO_COMMANDS: ComposerCatalog["commands"] = [];
 const COMMAND_DESCRIPTIONS = {
@@ -160,6 +188,7 @@ export function NativeAgentPaneGate({
       selectionKey={selectionKey}
       workspaceId={workspaceId}
       initialSession={recovery ? null : initialSession}
+      startNewChat={recovery?.kind === "new"}
       initialProfileId={
         recovery && recovery.kind !== "default" ? recovery.id : undefined
       }
@@ -170,8 +199,7 @@ export function NativeAgentPaneGate({
 
 const nativeChatUnavailableMessage = {
   "native-unavailable": "Native chat is unavailable.",
-  "native-gateway-unavailable":
-    "Grida Gateway is unavailable. Choose another model connection or retry.",
+  "native-gateway-unavailable": "Choose a model connection to start chatting.",
   "native-provider-key-required":
     "Add an API key for the selected provider in Desktop settings, then retry.",
   "native-provider-model-unavailable":
@@ -188,6 +216,7 @@ export function NativeAgentPane({
   workspaceId,
   initialSession,
   initialProfileId,
+  startNewChat = false,
   editorSurfaces,
 }: {
   bridge: DesktopNativeChat;
@@ -195,6 +224,7 @@ export function NativeAgentPane({
   workspaceId?: string;
   initialSession: string | null;
   initialProfileId?: string;
+  startNewChat?: boolean;
   editorSurfaces?: NativeChatEditorSurfaces;
 }) {
   const controller = useMemo(
@@ -226,6 +256,11 @@ export function NativeAgentPane({
     scope: number;
     selectionId: string;
   } | null>(null);
+  const [goalDialog, setGoalDialog] = useState<{
+    scope: number;
+    creating: boolean;
+  } | null>(null);
+  const [subagentsScope, setSubagentsScope] = useState<number | null>(null);
   const side = state.sideChat;
   useEffect(() => {
     const profile =
@@ -233,7 +268,7 @@ export function NativeAgentPane({
       (workspaceId && initialSession
         ? new URLSearchParams(window.location.hash.slice(1)).get("chat-profile")
         : null);
-    controller.connect(initialSession, profile);
+    controller.connect(initialSession, profile, startNewChat);
     const stopFocus =
       workspaceId &&
       subscribeToNativeNotificationFocus(
@@ -246,7 +281,14 @@ export function NativeAgentPane({
       if (stopFocus) stopFocus();
       controller.disconnect();
     };
-  }, [bridge, controller, initialSession, initialProfileId, workspaceId]);
+  }, [
+    bridge,
+    controller,
+    initialSession,
+    initialProfileId,
+    startNewChat,
+    workspaceId,
+  ]);
   const snapshot = state.observation?.snapshot;
   const editHistory = controller.canReviseHistory && !state.revisionDraft;
   const turn = snapshot?.current;
@@ -319,272 +361,19 @@ export function NativeAgentPane({
       data-testid="workspace-native-chat"
       className="flex min-h-0 flex-1 flex-col"
     >
-      {(state.profiles || state.profileError) && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 pt-2 text-xs">
-          {state.profiles && (
-            <select
-              aria-label="Model connection"
-              className="min-w-0 flex-1 truncate rounded border bg-background px-2 py-1"
-              value={
-                state.profiles.active
-                  ? `saved:${state.profiles.active}`
-                  : "default"
-              }
-              disabled={state.profileBusy || state.acting}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                if (value === "default")
-                  void controller.selectProfile({ kind: "default" });
-                else {
-                  const [kind, id] = value.split(":");
-                  if ((kind === "new" || kind === "saved") && id)
-                    void controller.selectProfile({ kind, id });
-                }
-              }}
-            >
-              <option value="default">Default connection</option>
-              {state.profiles.saved.length > 0 && (
-                <optgroup label="Saved chats by model">
-                  {state.profiles.saved.map(
-                    ({ id, connection, model, available }) => (
-                      <option
-                        key={id}
-                        value={`saved:${id}`}
-                        disabled={!available}
-                      >
-                        {connection} · {model}
-                        {available ? "" : " (unavailable)"}
-                      </option>
-                    )
-                  )}
-                </optgroup>
-              )}
-              {state.profiles.choices.length > 0 && (
-                <optgroup label="New chat with…">
-                  {state.profiles.choices.map(({ id, connection, model }) => (
-                    <option key={id} value={`new:${id}`}>
-                      {connection} · {model}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            onClick={() => void controller.readProfiles()}
-          >
-            Refresh models
-          </Button>
-          {state.profileError && (
-            <p role="alert" className="basis-full text-destructive">
-              {state.profileError}
-            </p>
-          )}
-        </div>
-      )}
-      <div className="flex shrink-0 items-center gap-2 px-3 py-2">
-        <select
-          aria-label="Chat"
-          className="min-w-0 flex-1 truncate rounded border bg-background px-2 py-1 text-xs"
-          value={state.selected ?? ""}
-          disabled={state.profileBusy}
-          onChange={(event) =>
-            void controller.select(event.currentTarget.value || null)
-          }
-        >
-          <option value="">New Chat</option>
-          {state.selected && !state.sessions.includes(state.selected) && (
-            <option value={state.selected}>
-              {controller.chatTitle(state.selected)}
-              {state.catalogEntry?.archived ? " (archived)" : ""}
-            </option>
-          )}
-          {state.sessions.map((id) => (
-            <option key={id} value={id}>
-              {controller.chatTitle(id)}
-            </option>
-          ))}
-        </select>
-        {controller.canOrganizeChats && (
-          <Button
-            type="button"
-            size="xs"
-            variant={state.catalogArchived ? "secondary" : "ghost"}
-            disabled={state.catalogLoading}
-            onClick={() =>
-              void controller.listChats(null, !state.catalogArchived)
-            }
-          >
-            {state.catalogArchived ? "Active chats" : "Archived chats"}
-          </Button>
-        )}
-        {controller.canOpenSideChat && (
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            onClick={() => controller.openSideChat()}
-          >
-            Side chat
-          </Button>
-        )}
-        {controller.hasContextLimit && (
-          <Button
-            type="button"
-            size="icon-xs"
-            variant="ghost"
-            aria-label="Context limit"
-            title="Context limit"
-            disabled={state.contextLimitBusy}
-            onClick={() => void controller.toggleContextLimit()}
-          >
-            <SlidersHorizontalIcon className="size-3.5" />
-          </Button>
-        )}
-        {controller.hasHooks && (
-          <Button
-            type="button"
-            size="xs"
-            variant="ghost"
-            disabled={state.hooksBusy}
-            onClick={() => void controller.toggleHooks()}
-          >
-            Checks
-          </Button>
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="xs"
-          onClick={() => void controller.select(null)}
-        >
-          New Chat
-        </Button>
-      </div>
-      {controller.canOrganizeChats && state.selected && (
-        <div className="flex flex-wrap items-center gap-1 px-3 pb-2 text-xs">
-          {state.catalogDraft ? (
-            <form
-              className="flex min-w-0 flex-1 items-center gap-1"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void controller.saveTitle();
-              }}
-            >
-              <Input
-                aria-label="Chat title"
-                autoFocus
-                maxLength={256}
-                value={state.catalogDraft.text}
-                disabled={state.catalogChanging}
-                onChange={(event) =>
-                  controller.changeTitle(event.currentTarget.value)
-                }
-                className="h-7 text-xs md:text-xs"
-              />
-              <Button type="submit" size="xs" disabled={state.catalogChanging}>
-                Save title
-              </Button>
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                disabled={state.catalogChanging}
-                onClick={() => controller.cancelRename()}
-              >
-                Cancel
-              </Button>
-            </form>
-          ) : state.catalogEntry ? (
-            <>
-              {state.catalogEntry.archived && (
-                <span className="text-muted-foreground">Archived</span>
-              )}
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                disabled={state.catalogChanging}
-                onClick={() => controller.beginRename()}
-              >
-                Rename chat
-              </Button>
-              <Button
-                type="button"
-                size="xs"
-                variant="ghost"
-                disabled={state.catalogChanging}
-                onClick={() =>
-                  void controller.setChatArchived(!state.catalogEntry?.archived)
-                }
-              >
-                {state.catalogEntry.archived ? "Restore chat" : "Archive chat"}
-              </Button>
-              {state.catalogEntry.deletionAvailable &&
-                bridge.deleteSavedChat && (
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    className="text-destructive"
-                    disabled={!controller.canDeleteSavedChat}
-                    onClick={() => void controller.deleteSavedChat()}
-                  >
-                    Delete chat
-                  </Button>
-                )}
-            </>
-          ) : state.catalogEntryError ? (
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              onClick={() => void controller.readChatDetails()}
-            >
-              Retry chat details
-            </Button>
-          ) : null}
-          {state.catalogEntryError && (
-            <p role="alert" className="basis-full text-destructive">
-              {state.catalogEntryError}
-            </p>
-          )}
-        </div>
-      )}
-      {(state.catalogCursor ||
-        state.nextCatalogCursor ||
-        state.catalogLoading ||
-        state.catalogError) && (
-        <div className="flex shrink-0 items-center gap-2 px-3 pb-2 text-xs text-muted-foreground">
-          <span role="status">
-            {state.catalogLoading ? "Loading saved chats…" : state.catalogError}
-          </span>
-          {(state.catalogCursor || state.catalogError) && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              disabled={state.catalogLoading}
-              onClick={() => void controller.listChats()}
-            >
-              {state.catalogCursor ? "Newest chats" : "Retry list"}
-            </Button>
-          )}
-          {state.nextCatalogCursor && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              disabled={state.catalogLoading}
-              onClick={() => void controller.listChats(state.nextCatalogCursor)}
-            >
-              Older chats
-            </Button>
-          )}
-        </div>
+      <NativeChatHeader
+        controller={controller}
+        state={state}
+        onGoal={() => setGoalDialog({ scope: state.scope, creating: false })}
+        onSubagents={() => {
+          if (!state.subagents?.read().open) state.subagents?.toggle();
+          setSubagentsScope(state.scope);
+        }}
+      />
+      {(state.profileError || state.catalogEntryError) && (
+        <p role="alert" className="px-3 py-1 text-xs text-destructive">
+          {state.profileError ?? state.catalogEntryError}
+        </p>
       )}
       {state.contextLimitOpen && (
         <NativeContextLimitPanel controller={controller} state={state} />
@@ -1013,34 +802,53 @@ export function NativeAgentPane({
           )}
         </div>
       )}
-      {bridge.goal && bridge.startGoal && (
-        <NativeGoalPanel
-          key={`goal-${state.scope}`}
-          controller={controller}
-          view={state}
-        />
-      )}
-      {state.subagents && (
-        <NativeSubagentsPanel
-          key={`subagents-${state.scope}`}
-          controller={state.subagents}
-        />
-      )}
-      <div className="shrink-0 p-3">
-        {state.wakeupsAvailable &&
-          (controller.canAllowWakeup || state.allowWakeup) && (
-            <label className="mb-1 flex items-center gap-2 text-xs">
-              <input
-                type="checkbox"
-                checked={state.allowWakeup}
-                disabled={state.acting}
-                onChange={(event) =>
-                  controller.setAllowWakeup(event.currentTarget.checked)
-                }
-              />
-              Allow one scheduled check-in
-            </label>
+      <Dialog
+        open={goalDialog?.scope === state.scope}
+        onOpenChange={(open) => {
+          if (!open) setGoalDialog(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {goalDialog?.creating ? "Configure goal" : "Goal details"}
+            </DialogTitle>
+            <DialogDescription>
+              Review the objective, progress and work limits for this chat.
+            </DialogDescription>
+          </DialogHeader>
+          <NativeGoalPanel
+            key={`goal-${state.scope}-${goalDialog?.creating}`}
+            controller={controller}
+            view={state}
+            creating={goalDialog?.creating}
+            onCancel={() => setGoalDialog(null)}
+            onStarted={() => {
+              controller.selectGoalIntent(false);
+              setGoalDialog(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={subagentsScope === state.scope}
+        onOpenChange={(open) => {
+          if (!open) setSubagentsScope(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Subagents</DialogTitle>
+            <DialogDescription>
+              View assignments and continue work with the agents in this chat.
+            </DialogDescription>
+          </DialogHeader>
+          {state.subagents && (
+            <NativeSubagentsPanel controller={state.subagents} hideToggle />
           )}
+        </DialogContent>
+      </Dialog>
+      <div className="shrink-0 p-3">
         {state.reviewConfiguration && (
           <Button
             type="button"
@@ -1151,32 +959,88 @@ export function NativeAgentPane({
         <AgentComposerInput
           key={state.scope}
           catalog={catalog}
-          commandActions={state.commands.map(
-            (command): ComposerCommandAction => ({
-              id: command,
-              title: command,
-              description: COMMAND_DESCRIPTIONS[command],
-              standalone: true,
-              run: () => controller.runCommand(command),
-            })
-          )}
+          className="@container"
+          commandActions={[
+            ...(bridge.submitInRegime &&
+            state.scope > 0 &&
+            !state.loading &&
+            !state.profileBusy &&
+            !state.steering &&
+            !state.acting
+              ? [
+                  {
+                    id: "plan",
+                    title: "plan",
+                    description: "Plan before making changes",
+                    standalone: true as const,
+                    run: () => controller.selectOperatingRegime("plan"),
+                  },
+                ]
+              : []),
+            ...(controller.canStartGoal || state.goal?.goal
+              ? [
+                  {
+                    id: "goal",
+                    title: "goal",
+                    description:
+                      "Work toward a goal with automatic continuation",
+                    standalone: true as const,
+                    run: () =>
+                      controller.canStartGoal
+                        ? controller.selectGoalIntent(true)
+                        : setGoalDialog({
+                            scope: state.scope,
+                            creating: false,
+                          }),
+                  },
+                ]
+              : []),
+            ...state.commands.map(
+              (command): ComposerCommandAction => ({
+                id: command,
+                title: command,
+                description: COMMAND_DESCRIPTIONS[command],
+                standalone: true,
+                run: () => controller.runCommand(command),
+              })
+            ),
+          ]}
+          onCommandSelect={(command) => {
+            if (command.id === "plan") {
+              controller.selectOperatingRegime("plan");
+              return true;
+            }
+            if (command.id === "goal") {
+              if (controller.canStartGoal) controller.selectGoalIntent(true);
+              else setGoalDialog({ scope: state.scope, creating: false });
+              return true;
+            }
+            return false;
+          }}
           attach={false}
           onAttachmentTransfer={({ resources }) =>
             void controller.pickTransferredAttachment(state.scope, resources)
           }
           operableFiles={false}
           awaitSubmission
-          canSubmit={controller.canSubmit}
+          canSubmit={
+            controller.canSubmit &&
+            (!state.goalIntent || controller.canStartGoal)
+          }
           busy={!!turn}
           isStreaming={streamingControlsOnly}
           placeholder={
-            state.attachmentDraft
-              ? "Add a message to send this attachment…"
-              : state.steering
-                ? "Add guidance to this turn…"
-                : turn || snapshot?.admissionPaused || queued
-                  ? "Queue a follow-up…"
-                  : undefined
+            state.goalIntent
+              ? "Describe your goal and what success looks like…"
+              : state.operatingRegime === "plan"
+                ? "What would you like to plan?"
+                : state.attachmentDraft
+                  ? "Add a message to send this attachment…"
+                  : state.steering
+                    ? "Add guidance to this turn…"
+                    : turn || snapshot?.admissionPaused || queued
+                      ? "Queue a follow-up…"
+                      : undefined
           }
           submissionScope={state.scope}
           draftRef={draft}
@@ -1184,84 +1048,212 @@ export function NativeAgentPane({
           onStop={() => void controller.control("stop")}
           toolbarStart={
             <>
-              {state.imageInput && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  disabled={!controller.canAttach("png")}
-                  onClick={() => pngPicker.current?.click()}
-                >
-                  {state.attachmentDraft?.kind === "png"
-                    ? "Replace PNG"
-                    : "Add PNG"}
-                </Button>
+              {(state.imageInput ||
+                state.fileInput ||
+                state.wakeupsAvailable) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label="Add to message"
+                      title="Add to message"
+                      className="shrink-0 rounded-full text-muted-foreground"
+                    >
+                      <PlusIcon className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="top" align="start">
+                    {state.fileInput && (
+                      <DropdownMenuItem
+                        disabled={
+                          state.goalIntent || !controller.canAttach("file")
+                        }
+                        onSelect={() => filePicker.current?.click()}
+                      >
+                        <PaperclipIcon className="size-4" />
+                        Add file
+                      </DropdownMenuItem>
+                    )}
+                    {state.imageInput && (
+                      <DropdownMenuItem
+                        disabled={
+                          state.goalIntent || !controller.canAttach("png")
+                        }
+                        onSelect={() => pngPicker.current?.click()}
+                      >
+                        <ImageIcon className="size-4" />
+                        Add image (PNG)
+                      </DropdownMenuItem>
+                    )}
+                    {workspaceId && state.imageInput && (
+                      <DropdownMenuItem
+                        disabled={state.acting || state.goalIntent}
+                        onSelect={() => setLibraryScope(state.scope)}
+                      >
+                        <LibraryIcon className="size-4" />
+                        Add from Library
+                      </DropdownMenuItem>
+                    )}
+                    {state.wakeupsAvailable && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={state.allowWakeup}
+                          disabled={
+                            state.acting ||
+                            (!controller.canAllowWakeup && !state.allowWakeup)
+                          }
+                          onCheckedChange={(checked) =>
+                            controller.setAllowWakeup(checked)
+                          }
+                        >
+                          Allow a scheduled check-in
+                        </DropdownMenuCheckboxItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
-              {workspaceId && state.imageInput && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  disabled={
-                    state.attachmentReading || !controller.canAttach("png")
-                  }
-                  onClick={() => setLibraryScope(state.scope)}
-                >
-                  {state.attachmentDraft
-                    ? "Replace from Library"
-                    : "Add from Library"}
-                </Button>
-              )}
-              {state.fileInput && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  disabled={!controller.canAttach("file")}
-                  onClick={() => filePicker.current?.click()}
-                >
-                  {state.attachmentDraft?.kind === "file"
-                    ? "Replace file"
-                    : "Attach file"}
-                </Button>
-              )}
-              {bridge.submitInRegime && !state.steering && (
-                <select
-                  aria-label="Mode for next message"
-                  className="rounded-md bg-transparent px-1.5 text-xs"
-                  value={state.operatingRegime}
-                  disabled={state.acting}
-                  onChange={(event) =>
-                    controller.selectOperatingRegime(
-                      event.currentTarget.value === "plan" ? "plan" : "act"
-                    )
-                  }
-                >
-                  <option value="act">Act</option>
-                  <option value="plan">Plan</option>
-                </select>
-              )}
-              {state.effortAvailable &&
-                !state.steering &&
-                !state.revisionDraft && (
-                  <select
-                    aria-label="Effort for next message"
-                    title="Effort for next message"
-                    className="rounded-md bg-transparent px-1.5 text-xs"
-                    value={state.effort}
-                    disabled={state.acting}
-                    onChange={(event) =>
-                      controller.selectEffort(
-                        event.currentTarget.value === "ultra"
-                          ? "ultra"
-                          : "standard"
-                      )
-                    }
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    className="shrink-0 gap-1 px-1.5 text-muted-foreground"
+                    aria-label="Permissions"
                   >
-                    <option value="standard">Standard</option>
-                    <option value="ultra">Ultra</option>
-                  </select>
-                )}
+                    <ShieldIcon className="size-3.5" />
+                    <span className="hidden @[26rem]:inline">Permissions</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side="top"
+                  align="start"
+                  className="w-64 space-y-2 text-xs"
+                >
+                  <p className="font-medium">Workspace permissions</p>
+                  <p className="text-muted-foreground">
+                    The agent works within this workspace’s granted access.
+                    Requests for additional access appear in chat for review.
+                  </p>
+                </PopoverContent>
+              </Popover>
+              {state.operatingRegime === "plan" && (
+                <span className="flex shrink-0 items-center rounded-md bg-muted px-1 text-xs text-muted-foreground">
+                  <ListChecksIcon className="mr-1 size-3.5" />
+                  Plan
+                  <Button
+                    type="button"
+                    size="icon-xs"
+                    variant="ghost"
+                    aria-label="Remove planning intent"
+                    disabled={state.acting}
+                    onClick={() => controller.selectOperatingRegime("act")}
+                  >
+                    <XIcon className="size-3" />
+                  </Button>
+                </span>
+              )}
+              {(state.goalIntent ||
+                snapshot?.pendingGoalId ||
+                (state.goal?.goal &&
+                  state.goal.goal.state.status !== "cleared")) && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="ghost"
+                      className="shrink-0 gap-1 px-1.5 text-muted-foreground"
+                      aria-label="Goal options"
+                    >
+                      <TargetIcon className="size-3.5" />
+                      {state.goalIntent
+                        ? "Goal"
+                        : state.goal?.goal?.review?.status === "pending"
+                          ? "Goal · Review"
+                          : state.goal?.goal?.paused
+                            ? "Goal · Paused"
+                            : state.goal?.goal?.state.status === "complete"
+                              ? "Goal · Complete"
+                              : "Goal"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="top"
+                    align="start"
+                    className="w-64 space-y-2 text-xs"
+                  >
+                    {state.goalIntent ? (
+                      <>
+                        <p className="font-medium">Work toward a goal</p>
+                        <p className="text-muted-foreground">
+                          Send an objective with its success criteria. The agent
+                          can continue automatically for up to{" "}
+                          {NativeChatController.goalComposerAllowance.workTurns}{" "}
+                          work turns and{" "}
+                          {
+                            NativeChatController.goalComposerAllowance
+                              .inferenceSteps
+                          }{" "}
+                          inference steps.
+                        </p>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="ghost"
+                          onClick={() =>
+                            setGoalDialog({
+                              scope: state.scope,
+                              creating: true,
+                            })
+                          }
+                        >
+                          Customize goal…
+                        </Button>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => controller.selectGoalIntent(false)}
+                        >
+                          Remove goal intent
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="line-clamp-3 text-muted-foreground">
+                          {state.goal?.goal?.objective}
+                        </p>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="ghost"
+                          onClick={() =>
+                            setGoalDialog({
+                              scope: state.scope,
+                              creating: false,
+                            })
+                          }
+                        >
+                          View goal details
+                        </Button>
+                      </>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              )}
+              {state.allowWakeup && (
+                <span
+                  className="shrink-0 text-xs text-muted-foreground"
+                  title="One scheduled check-in allowed"
+                >
+                  Check-in
+                </span>
+              )}
               {(running || waitingForCheckIn) && !goalTurn ? (
                 <Button
                   type="button"
@@ -1298,17 +1290,46 @@ export function NativeAgentPane({
             </>
           }
           toolbarEnd={
-            !streamingControlsOnly && canStop ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                disabled={state.acting}
-                onClick={() => void controller.control("stop")}
-              >
-                Stop
-              </Button>
-            ) : null
+            <>
+              {controller.hasContextLimit && (
+                <Button
+                  type="button"
+                  size="icon-xs"
+                  variant="ghost"
+                  aria-label="Context settings"
+                  title="Context settings"
+                  disabled={state.contextLimitBusy}
+                  onClick={() => void controller.toggleContextLimit()}
+                >
+                  <CircleGaugeIcon className="size-3.5 text-muted-foreground" />
+                </Button>
+              )}
+              <NativeModelPicker
+                profiles={state.profiles}
+                busy={state.profileBusy || state.acting}
+                onSelect={(selection) =>
+                  void controller.selectProfile(selection)
+                }
+                onRefresh={() => void controller.readProfiles()}
+                effort={state.effortAvailable ? state.effort : undefined}
+                onEffort={
+                  state.effortAvailable
+                    ? (effort) => controller.selectEffort(effort)
+                    : undefined
+                }
+              />
+              {!streamingControlsOnly && canStop && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  disabled={state.acting}
+                  onClick={() => void controller.control("stop")}
+                >
+                  Stop
+                </Button>
+              )}
+            </>
           }
         />
         {workspaceId && state.imageInput && libraryScope === state.scope && (

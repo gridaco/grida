@@ -17,15 +17,15 @@ it. Available controls and inputs vary with the connection.
 1. Open a workspace and its chat pane with a model connection configured
    for your build. [Choose models and understand usage](./models-and-usage.md)
 2. Give the agent an objective and name the files or tabs that matter.
-   Choose **Plan** to investigate and propose a change, or **Act** to do
-   the work under the chat's permissions. [Start with files and folders](./getting-started.md)
+   Select `/plan` to investigate and propose a change, or send an ordinary
+   request to do the work under the chat's permissions. [Start with files and folders](./getting-started.md)
 3. Review requests for additional access as they appear. To change the
    direction of work, send a correction to the current turn. Queue a
    message when it belongs in the next turn. [Understand permissions](./permissions.md)
    · [Guide and interrupt work](./controls.md)
 
 For example, ask in **Plan**, “Compare the two drafts and propose the
-smaller change.” Review the proposal, then choose **Act** and send a new
+smaller change.” Review the proposal, then remove the **Plan** badge and send a new
 message specifying the change you want. [Plan before acting](./clients.md#plan-before-carrying-out-a-task)
 
 ## Return to the work
@@ -43,9 +43,9 @@ can still work with the same project files.
 
 ## Give independent work a place
 
-On a supported Gateway connection, use **Subagents** to give a named
+On a supported Gateway connection, open **Chat options → Subagents** to give a named
 reviewer an independent text assignment and inspect its findings. Choose
-**Ultra** from **Effort for next message** when the agent should decide whether to start an
+**Ultra** from the composer’s model picker when the agent should decide whether to start an
 independent review. To let
 the same task check back once later, enable a scheduled check-in on an
 eligible Act message. A persistent goal can keep a larger task's objective,

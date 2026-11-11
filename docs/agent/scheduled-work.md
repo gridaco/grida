@@ -8,7 +8,7 @@ format: md
 # Schedule a follow-up
 
 A check-in lets the agent wait and continue the same task later. In a native
-Desktop chat that shows **Allow one scheduled check-in**, turn it on before
+Desktop chat, open **Add to message** (+) and enable **Allow one scheduled check-in** before
 sending a text message from an idle chat in **Act**. Tell the agent what to
 check and when, for example, “Check this export in two minutes and tell me
 whether it’s ready.”

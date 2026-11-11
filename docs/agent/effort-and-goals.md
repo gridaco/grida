@@ -9,18 +9,20 @@ format: md
 
 ## Decide what the agent may do
 
-In a native workspace chat, choose **Plan** in **Mode for next message**
-to inspect allowed material and work out an approach. Send a new message in
-**Act** when you want the agent to carry out the work under the chat’s
-permissions. The mode applies to the message you send or queue. Guidance
-sent to the current turn keeps that turn’s mode.
+In a native workspace chat, type `/plan` and select it to add a **Plan**
+badge. Describe what to investigate and send the message. Remove the badge
+before sending a new request to carry out the work under the chat’s permissions.
+Selecting the command starts no work and keeps the rest of your draft.
+Planning instructions apply to the message you send or queue; guidance sent
+to the current turn keeps that turn’s accepted instructions. Permissions and
+effort remain separate choices.
 [Understand agent permissions](./permissions.md)
 
 ## Choose how much effort to use
 
-When **Effort for next message** is available, choose **Standard** for the
-ordinary work allowance or **Ultra** for work that may benefit from an
-independent review. Either effort can be used with Plan or Act. Ultra can
+Open the model picker at the bottom of the composer. When effort is available,
+choose **Standard** for the ordinary work allowance or **Ultra** for work that
+may benefit from an independent review. Either effort can be used with Plan or Act. Ultra can
 give one reviewer a separate text assignment while the main agent continues.
 For a new ordinary review, the reviewer can read the primary workspace if it is
 already allowed. It does not automatically receive the parent chat or additional
@@ -33,16 +35,23 @@ limits inference steps. An optional Gateway spending ceiling is a separate limit
 
 ## Keep an objective across turns
 
-1. In an idle chat with an empty queue, choose **Add goal**. Enter the
-   objective, the criteria for completion, and the work allowance.
-   Choose **Plan** or **Act** in the chat's mode selector before starting.
-   The goal keeps that mode for its later work.
-2. Select **Continue automatically within these limits** if the agent can
-   reserve further work as it progresses. Then choose **Start goal**. The goal
-   can pause for input or stop when its allowance runs out.
-3. When the goal is **Ready for your review**, compare the result with your
-   criteria. Choose **Confirm goal complete** when they are met. The chat
-   keeps the proposal and confirmation so you can return to them later.
+1. In an idle chat with an empty queue, type `/goal` and select it. The
+   **Goal** badge appears without starting work. Describe the objective and
+   what success looks like, then send. The description becomes both the objective
+   and its completion criterion. Sending authorizes automatic continuation within
+   eight work turns and 64 inference steps.
+2. To set separate criteria or different limits, open the **Goal** badge and
+   choose **Customize goal…** before starting. You can turn automatic continuation
+   off in this form. Add `/plan` first for a goal that investigates and proposes;
+   later work keeps the instructions accepted when the goal started.
+3. Open the **Goal** badge or **Chat options → Goal details** to inspect progress.
+   When it is **Ready for your review**, compare the result with your criteria.
+   Choose **Confirm goal complete** when they are met. The chat keeps the proposal
+   and confirmation so you can return to them later.
+
+Goal entry uses text and workspace references. Send or remove a pending attachment
+before selecting it. Cancelling the custom form keeps the composer’s Goal intent;
+removing the intent starts no work.
 
 For example, set the goal “Find the open decisions in the project notes.”
 Ask for each decision and the section where it appears. Check the retained

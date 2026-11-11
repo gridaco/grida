@@ -175,33 +175,44 @@ it("ignores late connection recovery after the pane closes", async () => {
   controller.disconnect();
 });
 
-it("activates a recovered profile before loading any remembered default history", async () => {
-  const { bridge } = fixture();
-  const memory = {
-    getItem: (key: string) =>
-      key === "project"
-        ? JSON.stringify({ selected: "old-default", sessions: ["old-default"] })
-        : null,
-    setItem: () => {},
-  };
-  const controller = new NativeChatController(bridge, memory, "project");
-  const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
-    async () => {}
-  );
-  const load = vi.fn<DesktopNativeChat["load"]>(bridge.load.bind(bridge));
-  bridge.selectProfile = choose;
-  bridge.load = load;
-  const id = "d".repeat(64);
-  try {
-    controller.connect(null, id);
-    await vi.waitFor(() => expect(controller.read().scope).toBeGreaterThan(0));
-    expect(choose).toHaveBeenCalledExactlyOnceWith({ kind: "saved", id });
-    expect(controller.read().selected).toBeNull();
-    expect(load).not.toHaveBeenCalled();
-  } finally {
-    controller.disconnect();
+it.each([false, true])(
+  "activates a recovered profile before loading history (new chat: %s)",
+  async (startNewChat) => {
+    const { bridge } = fixture();
+    const memory = {
+      getItem: (key: string) =>
+        key === "project"
+          ? JSON.stringify({
+              selected: "old-default",
+              sessions: ["old-default"],
+            })
+          : null,
+      setItem: () => {},
+    };
+    const controller = new NativeChatController(bridge, memory, "project");
+    const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+      async () => {}
+    );
+    const load = vi.fn<DesktopNativeChat["load"]>(bridge.load.bind(bridge));
+    bridge.selectProfile = choose;
+    bridge.load = load;
+    const id = "d".repeat(64);
+    try {
+      controller.connect(null, id, startNewChat);
+      await vi.waitFor(() =>
+        expect(controller.read().scope).toBeGreaterThan(0)
+      );
+      expect(choose).toHaveBeenCalledExactlyOnceWith({
+        kind: startNewChat ? "new" : "saved",
+        id,
+      });
+      expect(controller.read().selected).toBeNull();
+      expect(load).not.toHaveBeenCalled();
+    } finally {
+      controller.disconnect();
+    }
   }
-});
+);
 
 it("inspects the current chat's hooks and removes only an observed saved revision", async () => {
   const f = fixture();
@@ -3687,4 +3698,157 @@ describe("Native workspace chat controller", () => {
       controller.disconnect();
     }
   });
+});
+
+it("selects planning from a slash command without submitting, then sends only the task", async () => {
+  const { bridge, controller } = fixture();
+  bridge.submitInRegime = vi.fn<
+    NonNullable<DesktopNativeChat["submitInRegime"]>
+  >(async (_action, id, inputId) => ({
+    sessionId: id,
+    inputId,
+    disposition: "claimed",
+    inputPosition: 1,
+    turnId: "planning",
+  }));
+  await controller.select(null);
+  await controller.submit("/plan");
+  expect(controller.read().operatingRegime).toBe("plan");
+  expect(bridge.submitInRegime).not.toHaveBeenCalled();
+  await controller.submit("Inspect the export requirements");
+  expect(bridge.submitInRegime).toHaveBeenCalledWith(
+    "submit",
+    "new",
+    expect.any(String),
+    "Inspect the export requirements",
+    "plan"
+  );
+  await controller.select("another");
+  expect(controller.read().operatingRegime).toBe("act");
+  controller.disconnect();
+});
+
+it("starts a composer goal only on send and reuses its accepted request after a lost reply", async () => {
+  const { bridge, controller, running } = fixture();
+  bridge.goal = async () => ({ observationId: null, goal: null });
+  const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>(
+    async (id, inputId) => ({
+      sessionId: id,
+      inputId,
+      disposition: "queued",
+      inputPosition: 1,
+      turnId: null,
+    })
+  );
+  bridge.startGoal = start;
+  const ordinary = vi.spyOn(bridge, "submit");
+  await controller.select(null);
+  await controller.submit("/goal");
+  expect(controller.read().goalIntent).toBe(true);
+  expect(start).not.toHaveBeenCalled();
+  start.mockImplementationOnce(async () => {
+    running.add("new");
+    throw new Error("lost acknowledgement");
+  });
+  await expect(
+    controller.submit("Prepare an SVG that opens correctly")
+  ).rejects.toThrow(/goal request|goal|start/i);
+  expect(controller.read().goalIntent).toBe(true);
+  expect(controller.read().observation?.snapshot.current?.disposition).toBe(
+    "running"
+  );
+  await expect(controller.submit("Start a different task")).rejects.toThrow(
+    /original goal draft/
+  );
+  expect(start.mock.calls).toHaveLength(1);
+  await controller.submit("Prepare an SVG that opens correctly");
+  expect(start.mock.calls).toHaveLength(2);
+  expect(start.mock.calls[1]).toEqual(start.mock.calls[0]);
+  expect(start).toHaveBeenLastCalledWith("new", expect.any(String), {
+    objective: "Prepare an SVG that opens correctly",
+    criteria: ["Prepare an SVG that opens correctly"],
+    allowance: { workTurns: 8, inferenceSteps: 64 },
+    automatic: true,
+    operatingRegime: "act",
+  });
+  expect(ordinary).not.toHaveBeenCalled();
+  expect(controller.read().goalIntent).toBe(false);
+  controller.disconnect();
+});
+
+it("drops an unsent goal intent on chat switch and refuses unavailable goal entry", async () => {
+  const { bridge, controller } = fixture();
+  bridge.goal = async () => ({ observationId: null, goal: null });
+  bridge.startGoal = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
+  await controller.select(null);
+  controller.selectGoalIntent(true);
+  expect(controller.read().goalIntent).toBe(true);
+  await controller.select("another");
+  expect(controller.read().goalIntent).toBe(false);
+  bridge.startGoal = undefined;
+  const ordinary = vi.spyOn(bridge, "submit");
+  await expect(controller.submit("/goal Inspect the file")).rejects.toThrow(
+    /cannot start/
+  );
+  expect(ordinary).not.toHaveBeenCalled();
+  controller.disconnect();
+});
+
+it("keeps an attachment and refuses literal Goal entry instead of sending an ordinary task", async () => {
+  const { bridge, controller } = fixture();
+  bridge.goal = async () => ({ observationId: null, goal: null });
+  bridge.startGoal = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
+  bridge.acceptsPng = async () => true;
+  bridge.submitImage = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>();
+  const ordinary = vi.spyOn(bridge, "submit");
+  await controller.select("chat-a");
+  const png = new Uint8Array([137, 1]).buffer;
+  await controller.pickAttachment(controller.read().scope, "png", {
+    name: "input.png",
+    size: png.byteLength,
+    arrayBuffer: async () => png,
+  });
+  await expect(controller.submit("/goal Describe this image")).rejects.toThrow(
+    /attachment/
+  );
+  expect(controller.read().attachmentDraft?.name).toBe("input.png");
+  expect(bridge.startGoal).not.toHaveBeenCalled();
+  expect(bridge.submitImage).not.toHaveBeenCalled();
+  expect(ordinary).not.toHaveBeenCalled();
+  controller.disconnect();
+});
+
+it("allows a corrected Goal allowance after an explicit pre-admission refusal", async () => {
+  const { bridge, controller } = fixture();
+  bridge.goal = async () => ({ observationId: null, goal: null });
+  bridge.acceptsGoalEffort = async () => true;
+  const start = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>(
+    async (sessionId, inputId) => ({
+      sessionId,
+      inputId,
+      disposition: "queued",
+      inputPosition: 1,
+      turnId: null,
+    })
+  );
+  bridge.startGoal = start;
+  await controller.select("chat-a");
+  const request = {
+    objective: "Review the export",
+    criteria: ["Collect the review"],
+    allowance: { workTurns: 2, inferenceSteps: 1 },
+    effort: "ultra" as const,
+    automatic: true,
+  };
+  start.mockRejectedValueOnce(new Error("goal_child_allowance_unavailable"));
+  expect(await controller.startGoal(request)).toBe(false);
+  expect(
+    await controller.startGoal({
+      ...request,
+      allowance: { workTurns: 2, inferenceSteps: 64 },
+    })
+  ).toBe(true);
+  expect(start).toHaveBeenCalledTimes(2);
+  expect(start.mock.calls[1][1]).not.toBe(start.mock.calls[0][1]);
+  controller.disconnect();
 });
