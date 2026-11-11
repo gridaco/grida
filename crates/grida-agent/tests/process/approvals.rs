@@ -18,7 +18,7 @@ const ANSWER: &str = "co.grida/session/answer-approval";
 
 pub(super) struct Fixture {
     _base: TempDir,
-    state: PathBuf,
+    pub(super) state: PathBuf,
     pub(super) primary: PathBuf,
     extra: PathBuf,
     pub(super) profile: PathBuf,

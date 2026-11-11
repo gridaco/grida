@@ -22,9 +22,9 @@ it cannot grant permissions the command did not already have. A denial appears
 as a generic check failure. The handler's diagnostic stays in its private
 record.
 
-This first version checks `run_command` only. Starting a Goal with this profile,
-Desktop configuration, observational pre-tool checks, and other tool events
-are not available yet. An unconfirmed check blocks later admissions in the same turn after it is
+This first version checks `run_command` only and supports Standard Act Goals.
+Plan and Ultra Goals, Desktop configuration, observational pre-tool checks, and
+other tool events are not available with this profile yet. An unconfirmed check blocks later admissions in the same turn after it is
 observed; actions already admitted in the same step may finish.
 [Configure a trusted check](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#check-a-command-before-it-runs)
 

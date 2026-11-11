@@ -67,18 +67,50 @@ fn before_tool(fixture: &Fixture, path: &str, arguments: &[&str]) -> PathBuf {
     temporary
 }
 
+fn command_arguments(fixture: &Fixture) -> String {
+    json!({
+        "directory":"primary", "access":"read_write", "program":"/bin/bash",
+        "cwd":fixture.primary, "args":["-c", "printf x >> effect"],
+    })
+    .to_string()
+}
+
 fn command_call(fixture: &Fixture) -> Reply {
-    Reply::Tool(
-        "run_command",
-        Box::leak(
-            json!({
-                "directory":"primary", "access":"read_write", "program":"/bin/bash",
-                "cwd":fixture.primary, "args":["-c", "printf x >> effect"],
-            })
-            .to_string()
-            .into_boxed_str(),
-        ),
-    )
+    Reply::Tool("run_command", command_arguments(fixture).leak())
+}
+
+fn command_with_goal_report(fixture: &Fixture) -> Reply {
+    let calls = json!([
+        {"index":0,"id":"report","type":"function","function":{
+            "name":"goal_report","arguments":r#"{"report":{"kind":"progress","summary":"Checked the proposed command."}}"#}},
+        {"index":1,"id":"command","type":"function","function":{
+            "name":"run_command","arguments":command_arguments(fixture)}},
+    ]);
+    let delta = json!({"id":"fixture-response","choices":[{"index":0,
+        "delta":{"role":"assistant","tool_calls":calls},"finish_reason":null}]});
+    let finish = json!({"id":"fixture-response","choices":[{"index":0,
+        "delta":{},"finish_reason":"tool_calls"}]});
+    let body = format!("data: {delta}\n\ndata: {finish}\n\ndata: [DONE]\n\n");
+    Reply::RawHttp(format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    ))
+}
+
+fn goal_request(session: &str) -> Value {
+    json!({
+        "sessionId":session,"inputId":"goal","prompt":[{"type":"text","text":"Run a Goal"}],
+        "goal":{"objective":{"description":"Check the task","criteria":["Check the target"]},
+            "allowance":{"work_turns":1,"inference_steps":4},"automatic":false}
+    })
+}
+
+async fn goal_view(client: &mut PrivateStdio, session: &str) -> Value {
+    let response = client
+        .request("_co.grida/goal/inspect", json!({"sessionId":session}))
+        .await;
+    assert!(response.get("error").is_none(), "{response}");
+    response["result"]["goal"].clone()
 }
 
 #[tokio::test]
@@ -565,7 +597,9 @@ async fn connect(mut command: Command) -> PrivateStdio {
         .unwrap();
     meta.insert("co.grida/session/questions".into(), 1.into());
     meta.insert("co.grida/session/answer-question".into(), 1.into());
+    meta.insert("co.grida/session/effort".into(), 1.into());
     meta.insert("co.grida/goal/start".into(), 1.into());
+    meta.insert("co.grida/goal/inspect".into(), 1.into());
     let initialized = client.request("initialize", capabilities).await;
     assert_eq!(initialized["result"]["protocolVersion"], 1);
     client
@@ -584,32 +618,27 @@ async fn interrupted_before_tool_check_blocks_the_command_and_next_model_request
     let endpoint_url = endpoint.url.clone();
     let open = || {
         let mut command = fixture.process(&endpoint_url, "serve");
-        command.arg("--stdio");
+        command.args(["--stdio", "--subagents"]);
         connect(command)
     };
     let mut host = open().await;
     let session = start(&mut host, &fixture.primary).await;
-    let goal = host.request("_co.grida/goal/start", json!({
-        "sessionId":session,"inputId":"goal","prompt":[{"type":"text","text":"Run a Goal"}],
-        "goal":{"objective":{"description":"Check the task","criteria":["Check the target"]},"allowance":{"work_turns":1,"inference_steps":4},"automatic":false}
-    })).await;
+    let mut goal = goal_request(&session);
+    goal["operatingRegime"] = json!("plan");
+    let goal = host.request("_co.grida/goal/start", goal).await;
+    assert_eq!(
+        goal["error"]["data"], "before_tool_hook_goal_unavailable",
+        "{goal}"
+    );
+    let mut goal = goal_request(&session);
+    goal["effort"] = json!("ultra");
+    let goal = host.request("_co.grida/goal/start", goal).await;
     assert_eq!(
         goal["error"]["data"], "before_tool_hook_goal_unavailable",
         "{goal}"
     );
     endpoint.request().await;
-    timeout(WAIT, async {
-        loop {
-            if fs::read_dir(&temporary).unwrap().flatten().any(|entry| {
-                fs::metadata(entry.path().join("heartbeat")).is_ok_and(|file| file.len() >= 2)
-            }) {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-    })
-    .await
-    .unwrap();
+    wait_for_heartbeat(&temporary).await;
     let working = snapshot(&mut host, &session).await;
     let receipt = host
         .request(
@@ -657,6 +686,186 @@ async fn interrupted_before_tool_check_blocks_the_command_and_next_model_request
     let stopped = wait_for(&mut reopened, &session, |view| view["current"].is_null()).await;
     assert_eq!(stopped["latest"]["status"], "uncertain", "{stopped}");
     reopened.close().await;
+    assert!(!fixture.primary.join("effect").exists());
+    assert!(fs::read_dir(&temporary).unwrap().next().is_none());
+    assert!(endpoint.requests.try_recv().is_err());
+    endpoint.task.abort();
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn before_tool_checks_standard_act_goal_commands_and_accounts_known_work() {
+    for (reply, blocked) in [
+        (r#"{"decision":"allow"}"#, false),
+        (r#"{"decision":"deny","reason":"private diagnostic"}"#, true),
+    ] {
+        let fixture = Fixture::new(true);
+        let response = format!("response={reply}");
+        let temporary = before_tool(
+            &fixture,
+            "/usr/bin/awk",
+            &["-v", &response, BEFORE_TOOL_CHECK],
+        );
+        let mut endpoint = Endpoint::start(vec![
+            command_with_goal_report(&fixture),
+            Reply::Finished("Goal step assessed."),
+        ])
+        .await;
+        let mut command = fixture.process(&endpoint.url, "serve");
+        command.arg("--stdio");
+        let mut host = connect(command).await;
+        let session = new_session(&mut host, &fixture.primary).await;
+        let goal = host
+            .request("_co.grida/goal/start", goal_request(&session))
+            .await;
+        assert_eq!(goal["result"]["inputId"], "goal", "{goal}");
+        let first = endpoint.request().await["tools"].to_string();
+        assert!(
+            first.contains("goal_report") && first.contains("run_command"),
+            "{first}"
+        );
+        assert!(!first.contains("before_tool_command"), "{first}");
+        let next = endpoint.request().await["messages"].to_string();
+        assert_eq!(next.contains("before_tool_hook_denied"), blocked, "{next}");
+        assert!(!next.contains("private diagnostic"), "{next}");
+        wait_for(&mut host, &session, |view| {
+            view["current"].is_null() && view["latest"].is_object()
+        })
+        .await;
+        let settled = goal_view(&mut host, &session).await;
+        assert_eq!(
+            settled["progress"], "Checked the proposed command.",
+            "{settled}"
+        );
+        assert_eq!(
+            settled["spent"],
+            json!({"work_turns":1,"inference_steps":2})
+        );
+        assert!(settled["reservation"].is_null(), "{settled}");
+        let effect = fs::read_to_string(fixture.primary.join("effect"));
+        if blocked {
+            assert_eq!(effect.unwrap_err().kind(), std::io::ErrorKind::NotFound);
+        } else {
+            assert_eq!(effect.unwrap(), "x");
+        }
+        assert!(fs::read_dir(temporary).unwrap().next().is_none());
+        host.close().await;
+        endpoint.done().await;
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires a reviewed native helper and OS confinement"]
+async fn interrupted_goal_before_tool_check_retains_reservation_through_stop_after_restart() {
+    let fixture = Fixture::new(true);
+    let temporary = before_tool(&fixture, "/bin/sh", &["-c", HEARTBEAT]);
+    let mut endpoint = Endpoint::start(vec![
+        command_with_goal_report(&fixture),
+        Reply::Finished("Unexpected continuation."),
+    ])
+    .await;
+    let endpoint_url = endpoint.url.clone();
+    let open = || {
+        let mut command = fixture.process(&endpoint_url, "serve");
+        command.arg("--stdio");
+        connect(command)
+    };
+    let mut host = open().await;
+    let session = new_session(&mut host, &fixture.primary).await;
+    let accepted = host
+        .request("_co.grida/goal/start", goal_request(&session))
+        .await;
+    assert_eq!(accepted["result"]["inputId"], "goal", "{accepted}");
+    endpoint.request().await;
+    wait_for_heartbeat(&temporary).await;
+    let working = snapshot(&mut host, &session).await;
+    let receipt = host
+        .request(
+            "_co.grida/session/pause",
+            task_basis(&working, &session, "pause"),
+        )
+        .await;
+    assert!(receipt.get("error").is_none(), "{receipt}");
+    let paused = wait_for(&mut host, &session, |view| {
+        view["current"]["disposition"] == "suspended"
+    })
+    .await;
+    let held = goal_view(&mut host, &session).await;
+    assert!(held["reservation"].is_object(), "{held}");
+    assert!(held["progress"].is_null(), "{held}");
+    let _ = host.finish().await;
+    assert!(fs::read_dir(&temporary).unwrap().next().is_none());
+
+    before_tool(&fixture, "/bin/sh", &["-c", HEARTBEAT, "changed"]);
+    let mut changed = open().await;
+    load(&mut changed, &session, &fixture.primary).await;
+    let resume = changed
+        .request(
+            "_co.grida/session/resume",
+            json!({
+                "task":task_basis(&paused,&session,"resume"),
+                "expectedEpoch":paused["current"]["epoch"],
+                "expectedJournalPosition":paused["current"]["journalPosition"],
+            }),
+        )
+        .await;
+    assert_eq!(
+        resume["error"]["data"], "permission_profile_changed",
+        "{resume}"
+    );
+    let stopped = changed
+        .request(
+            "_co.grida/session/stop",
+            task_basis(&paused, &session, "stop"),
+        )
+        .await;
+    assert!(stopped.get("error").is_none(), "{stopped}");
+    let terminal = wait_for(&mut changed, &session, |view| view["current"].is_null()).await;
+    assert_eq!(terminal["latest"]["status"], "cancelled", "{terminal}");
+    changed.close().await;
+
+    before_tool(&fixture, "/bin/sh", &["-c", HEARTBEAT]);
+    let mut reopened = open().await;
+    load(&mut reopened, &session, &fixture.primary).await;
+    let stopped = goal_view(&mut reopened, &session).await;
+    assert_eq!(
+        stopped["status"],
+        json!({"status":"blocked","reason":"uncertain_work"}),
+        "{stopped}"
+    );
+    assert_eq!(stopped["reservation"]["turn"], held["reservation"]["turn"]);
+    assert_eq!(stopped["reservation"]["uncertain_steps"], 1);
+    assert_eq!(
+        stopped["spent"],
+        json!({"work_turns":0,"inference_steps":0})
+    );
+    assert!(stopped["progress"].is_null(), "{stopped}");
+    reopened.close().await;
+    let store =
+        agent_kit_store_sqlite::SqliteStore::open(fixture.state.join("runtime.sqlite")).unwrap();
+    let basis = serde_json::from_value(held["basis"].clone()).unwrap();
+    let reported = store
+        .inspect_turn_with(
+            agent_kit_core::SessionId::new(session).unwrap(),
+            serde_json::from_value(held["reservation"]["turn"].clone()).unwrap(),
+            move |state| {
+                Ok(state.operations().values().any(|operation| {
+                    grida_agent_master::goals::tools::read_report(
+                        operation,
+                        &state.binding().turn,
+                        &basis,
+                    )
+                    .unwrap()
+                    .is_some()
+                }))
+            },
+        )
+        .await
+        .unwrap();
+    assert!(
+        reported,
+        "the sibling Goal report was recorded before the hook stopped"
+    );
     assert!(!fixture.primary.join("effect").exists());
     assert!(fs::read_dir(&temporary).unwrap().next().is_none());
     assert!(endpoint.requests.try_recv().is_err());
@@ -837,10 +1046,7 @@ async fn wait_for(
 }
 
 async fn start(client: &mut PrivateStdio, workspace: &Path) -> String {
-    let created = client
-        .request("session/new", json!({"cwd":workspace,"mcpServers":[]}))
-        .await;
-    let session = created["result"]["sessionId"].as_str().unwrap().to_owned();
+    let session = new_session(client, workspace).await;
     let submitted = client
         .request(
             "_co.grida/session/submit",
@@ -849,6 +1055,28 @@ async fn start(client: &mut PrivateStdio, workspace: &Path) -> String {
         .await;
     assert_eq!(submitted["result"]["disposition"], "claimed", "{submitted}");
     session
+}
+
+async fn new_session(client: &mut PrivateStdio, workspace: &Path) -> String {
+    let created = client
+        .request("session/new", json!({"cwd":workspace,"mcpServers":[]}))
+        .await;
+    created["result"]["sessionId"].as_str().unwrap().to_owned()
+}
+
+async fn wait_for_heartbeat(temporary: &Path) {
+    timeout(WAIT, async {
+        loop {
+            if fs::read_dir(temporary).unwrap().flatten().any(|entry| {
+                fs::metadata(entry.path().join("heartbeat")).is_ok_and(|file| file.len() >= 2)
+            }) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
 }
 
 async fn load(client: &mut PrivateStdio, session: &str, workspace: &Path) {

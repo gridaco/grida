@@ -1746,7 +1746,7 @@ impl Host {
                     ),
                 };
             Some(
-                goals::GoalAuthority::bind(&claim, validator, gate)
+                goals::GoalAuthority::bind(&claim, validator, gate, before_tool.clone())
                     .await
                     .map_err(|_| {
                         problem(ErrorKind::Uncertain, "admitted_goal_authority_unavailable")

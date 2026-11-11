@@ -202,9 +202,11 @@ command, with read-only workspace access, private temporary storage, and no netw
 receives a generic refusal code; the handler diagnostic remains in the private
 record. Continue a retained task with the same reviewed profile.
 
-Starting a Goal with this profile or pairing it with `command.hooksOnly` is not
-supported. The profile is not configurable in Desktop. If a check's result is unconfirmed, later admissions in the same turn
-stop once the uncertainty is observed; effects already admitted may finish.
+Standard Act Goals can use this profile. Plan Goals, Ultra Goals, and
+`command.hooksOnly` remain unavailable with `beforeTool`. The profile is
+selected at native launch. If a check's result is unconfirmed, later admissions
+in the same turn stop once the uncertainty is observed. Effects already
+admitted may finish. An uncertain Goal turn retains its work reservation.
 
 ### Check a workspace manifest
 

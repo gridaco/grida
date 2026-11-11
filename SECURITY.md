@@ -1531,7 +1531,8 @@ Today:
   the bounded validated command arguments, including explicit environment and
   stdin values, and cannot grant the target authority.
   An unconfirmed check blocks later admissions in the same turn after it is observed; effects
-  already admitted can finish. Starting a Goal with this profile is unavailable.
+  already admitted can finish. This profile supports Standard Act Goals;
+  Plan and Ultra Goals remain unavailable.
   [Process tests](crates/grida-agent/tests/process/hooks.rs) cover hook-only
   launch, refusal of a matching user-owned program, launch changes,
   interruption, and exact retained attempts.

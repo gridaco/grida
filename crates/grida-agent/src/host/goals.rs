@@ -196,6 +196,11 @@ impl Host {
             .permissions
             .as_ref()
             .is_some_and(|profile| profile.before_tool_hook().is_some())
+            && (effort != EffortPreset::Standard
+                || !request
+                    .operating_regime
+                    .unwrap_or(self.operating_regime)
+                    .is_act())
         {
             return Err(problem(
                 ErrorKind::Unsupported,
@@ -857,6 +862,7 @@ pub(super) struct GoalAuthority {
     tools: [Arc<dyn agent_kit_core::tools::Tool>; 2],
     base: Arc<dyn AuthorityValidator>,
     gate: Arc<dyn ToolGate>,
+    before_tool: Option<Arc<before_tool::BeforeToolCheck>>,
 }
 
 impl GoalAuthority {
@@ -864,6 +870,7 @@ impl GoalAuthority {
         claim: &agent_kit_sessions::ClaimedTurn,
         base: Arc<dyn AuthorityValidator>,
         gate: Arc<dyn ToolGate>,
+        before_tool: Option<Arc<before_tool::BeforeToolCheck>>,
     ) -> Result<Arc<Self>> {
         let state = claim.lease.journal().load().await?;
         let value = state
@@ -890,6 +897,7 @@ impl GoalAuthority {
             tools: tools::for_work(&goal, &binding.turn)?,
             base,
             gate,
+            before_tool,
         }))
     }
 
@@ -908,11 +916,17 @@ impl GoalAuthority {
 
 impl AuthorityValidator for GoalAuthority {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
-        if request.selection == self.selection {
-            Box::pin(async { Ok(()) })
-        } else {
-            self.base.validate(request)
+        if request.selection != self.selection {
+            return self.base.validate(request);
         }
+        if self
+            .before_tool
+            .as_ref()
+            .is_some_and(|check| check.is_fenced())
+        {
+            return Box::pin(async { Err(before_tool::uncertain()) });
+        }
+        Box::pin(async { Ok(()) })
     }
 }
 
@@ -924,6 +938,11 @@ impl ToolGate for GoalAuthority {
     ) -> BoxFuture<'_, Result<ToolDecision>> {
         if admission.grants != self.selection {
             return self.gate.decide(admission, context);
+        }
+        if let Some(check) = &self.before_tool
+            && let Err(error) = check.require_unfenced(&context)
+        {
+            return Box::pin(async { Err(error) });
         }
         if self
             .tools
