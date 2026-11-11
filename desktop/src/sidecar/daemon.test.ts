@@ -98,7 +98,6 @@ describe("Desktop daemon composition", () => {
         shell_executor: shell,
         interactive: true,
         library: true,
-        external_agent_execution: "disabled",
         chatgpt: CHATGPT_SUBSCRIPTION_CONFIG,
         provider_http: transport,
         gg_base_url: common.editor_base_url,
@@ -199,7 +198,6 @@ describe("Desktop daemon composition", () => {
         protected_file_roots: options.protected_file_roots,
         retain_session_scratch: true,
         shell_executor: undefined,
-        external_agent_execution: "disabled",
       })
     );
   });
@@ -214,8 +212,5 @@ describe("Desktop daemon composition", () => {
       },
     });
     expect(mocks.agent.mock.calls[0][0].shell_executor).toBeUndefined();
-    expect(mocks.agent.mock.calls[0][0].external_agent_execution).toBe(
-      "disabled"
-    );
   });
 });

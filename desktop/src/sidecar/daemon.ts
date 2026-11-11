@@ -117,8 +117,6 @@ export namespace DesktopDaemon {
       shell_executor: opts.agent.sandbox_enforced
         ? opts.agent.shell_executor
         : undefined,
-      // External ACP has no separately confined host transport in Desktop.
-      external_agent_execution: "disabled",
       interactive: true,
       library: true,
       // GRIDA-SEC-008 — native model capacity remains in the full agent host.

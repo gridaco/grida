@@ -180,32 +180,17 @@ export type AgentTenantOptions = {
   shell_executor?: ShellExecutor;
   /**
    * GRIDA-SEC-004 — whether this host's process tree is confined by an OS
-   * sandbox (srt Seatbelt/bubblewrap). This attests only the coarse outer
-   * process tree for external ACP's `"sandboxed"` disposition; it does not
-   * expose `run_command`. Finite commands require {@link shell_executor}.
+   * sandbox (srt Seatbelt/bubblewrap). A managed legacy writer requires this
+   * attestation to retain session scratch. Finite commands separately require
+   * {@link shell_executor}.
    */
   sandbox_enforced?: boolean;
-  /**
-   * GRIDA-SEC-004 — host disposition for external ACP process execution.
-   * `"enabled"` is an explicit host authorization to spawn the process and
-   * makes NO containment claim.
-   * `"sandboxed"` additionally requires `sandbox_enforced` to be exactly true.
-   * `"disabled"` withholds the process capability entirely and is the default
-   * when this field is omitted.
-   *
-   * This switch is independent of `allow_unsandboxed_shell`, which authorizes
-   * only Grida's locked shell tool.
-   */
-  external_agent_execution?: "enabled" | "sandboxed" | "disabled";
   /**
    * GRIDA-SEC-004 — trusted TypeScript host opt-in to raw shell execution.
    * When true and no {@link shell_executor} is supplied, the package injects
    * {@link runUnsandboxedShell} and logs a warning. The default is off. A host
    * that opts in accepts shell execution without session-bound kernel
    * filesystem containment.
-   *
-   * This does not affect external ACP agents; their independent disposition is
-   * controlled by `external_agent_execution`.
    */
   allow_unsandboxed_shell?: boolean;
   /**
@@ -259,9 +244,7 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
     (!opts.scratch_base ||
       opts.sandbox_enforced !== true ||
       opts.shell_executor ||
-      opts.allow_unsandboxed_shell ||
-      (opts.external_agent_execution &&
-        opts.external_agent_execution !== "disabled"))
+      opts.allow_unsandboxed_shell)
   )
     throw new Error("managed_scratch_authority_invalid");
   const caps = {
@@ -422,13 +405,6 @@ export function createAgentTenant(opts: AgentTenantOptions = {}): DaemonTenant {
         protected_read_roots: [services.secrets.directory],
         scratch_base: scratchBase,
         shell_executor: shellExecutor,
-        // GRIDA-SEC-004 — the sandboxed ACP disposition consumes this host
-        // attestation; the explicit `enabled` disposition does not.
-        sandbox_enforced: opts.sandbox_enforced === true,
-        // A host may authorize execution without a containment claim, require
-        // containment, or withhold the whole ACP process capability. Omission
-        // cannot itself grant process authority.
-        external_agent_execution: opts.external_agent_execution ?? "disabled",
         // Image generation rides the same capability flag as the
         // `/images/generate` route. The bindings still require a scratch sink +
         // a provider key.

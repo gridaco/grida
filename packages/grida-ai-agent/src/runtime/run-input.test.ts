@@ -776,7 +776,7 @@ describe("parseRunBody", () => {
     expect(parsed instanceof Response ? parsed.status : 200).toBe(400);
   });
 
-  it("rejects directory references for an external-agent provider", async () => {
+  it("refuses a retired external agent even with directory references", async () => {
     const id = "dir_11111111-1111-4111-8111-111111111111";
     const parsed = await parseRunBody(
       {
@@ -809,7 +809,7 @@ describe("parseRunBody", () => {
     expect(parsed instanceof Response ? parsed.status : 200).toBe(409);
     expect(
       parsed instanceof Response ? (await parsed.json()).code : undefined
-    ).toBe("directory-references-unsupported-provider");
+    ).toBe("provider_down");
   });
 
   it("parses the per-run `interactive` flag (boolean only; else absent)", async () => {

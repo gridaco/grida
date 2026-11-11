@@ -37,6 +37,26 @@ import {
 import { sessionIdFromSse } from "../../testing/sse";
 import { registerAgentRoutes } from "./agent";
 
+const { spawnExternal } = vi.hoisted(() => ({
+  spawnExternal: vi.fn<() => never>(() => {
+    throw new Error("Unexpected subprocess in the TypeScript agent daemon");
+  }),
+}));
+vi.mock("node:child_process", async (original) => ({
+  ...(await original<typeof import("node:child_process")>()),
+  spawn: spawnExternal,
+}));
+
+async function expectRetiredProvider(response: Response) {
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({
+    error:
+      "[agent-host-providers] external agent claude is disabled by the host",
+    code: "provider_down",
+    provider_id: "claude",
+  });
+}
+
 // Inject a deterministic fake model-run fn: the run loop + registry +
 // recorder run for real; only the upstream model call is faked. See
 // AgentRuntimeDeps.runAgent — `runAgent` and `AgentRuntime` share a
@@ -61,6 +81,7 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
   let app: Hono;
 
   beforeEach(async () => {
+    spawnExternal.mockClear();
     baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "grida-agent-route-"));
     const auth = new AuthStore(baseDir);
     secrets = new SecretsStore(auth);
@@ -78,7 +99,6 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
       streams: streamRegistry,
       run_agent: fakeRunAgent,
       scratch_base: path.join(baseDir, "scratch-base"),
-      external_agent_execution: "sandboxed",
       // Shrink the inter-drain cooldown so the core-drain test runs fast.
       drain_cooldown_ms: 20,
     });
@@ -175,56 +195,28 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     expect(invalid.status).toBe(400);
   });
 
-  it("GRIDA-SEC-004: reports an external agent unavailable without an enforced sandbox", async () => {
-    const response = await app.request("/agent/run", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        model_id: "claude-acp",
-        messages: [{ id: "u-acp", role: "user", content: "hello" }],
-      }),
-    });
+  it.each(["claude-acp", "claude-acp/older-model"])(
+    "refuses a retired model %s before reserving a turn or creating a session",
+    async (modelId) => {
+      const create = vi.spyOn(sessionsStore, "create");
+      const run = vi.spyOn(streamRegistry, "create");
+      const response = await app.request("/agent/run", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          model_id: modelId,
+          provider_id: "openrouter",
+          messages: [{ id: "u-acp", role: "user", content: "hello" }],
+        }),
+      });
 
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({
-      error:
-        "[agent-host-providers] external agent claude requires an enforced OS sandbox",
-      code: "provider_down",
-      provider_id: "claude",
-    });
-  });
-
-  it("GRIDA-SEC-004: omission defaults external-agent execution to disabled", async () => {
-    runtime.dispose();
-    streamRegistry = new StreamRegistry();
-    runtime = new AgentRuntime({
-      secrets,
-      workspace_registry: workspaceRegistry,
-      sessions_store: sessionsStore,
-      streams: streamRegistry,
-      run_agent: fakeRunAgent,
-      sandbox_enforced: true,
-    });
-    app = new Hono();
-    registerAgentRoutes(app, runtime);
-
-    const response = await app.request("/agent/run", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        model_id: "claude-acp",
-        messages: [{ id: "u-acp-disabled", role: "user", content: "hello" }],
-      }),
-    });
-
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({
-      error:
-        "[agent-host-providers] external agent claude is disabled by the host",
-      code: "provider_down",
-      provider_id: "claude",
-    });
-  });
+      await expectRetiredProvider(response);
+      expect(create).not.toHaveBeenCalled();
+      expect(run).not.toHaveBeenCalled();
+      expect(spawnExternal).not.toHaveBeenCalled();
+      expect((await sessionsStore.list()).items).toEqual([]);
+    }
+  );
 
   it("stages exact image bytes while preserving provider-native perception", async () => {
     const workspaceDir = path.join(baseDir, "workspace");
@@ -1767,7 +1759,6 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
           return await fakeRunAgent();
         },
         scratch_base: path.join(baseDir, "scratch-base"),
-        external_agent_execution: "sandboxed",
         drain_cooldown_ms: 20,
       });
       app = new Hono();
@@ -1874,7 +1865,6 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
           return await fakeRunAgent();
         },
         scratch_base: path.join(baseDir, "scratch-base"),
-        external_agent_execution: "sandboxed",
         drain_cooldown_ms: 20,
       });
       app = new Hono();
@@ -2188,7 +2178,6 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
         return await fakeRunAgent();
       },
       scratch_base: path.join(baseDir, "scratch-base"),
-      external_agent_execution: "sandboxed",
       drain_cooldown_ms: 20,
     });
     app = new Hono();
@@ -2297,50 +2286,86 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     ).toEqual(expect.any(Number));
   });
 
-  it("resolves a persisted agent-provider model for a queued drain", async () => {
-    runtime.dispose();
-    streamRegistry = new StreamRegistry();
-    runtime = new AgentRuntime({
-      secrets,
-      workspace_registry: workspaceRegistry,
-      sessions_store: sessionsStore,
-      streams: streamRegistry,
-      run_agent: fakeRunAgent,
-      scratch_base: path.join(baseDir, "scratch-base"),
-      external_agent_execution: "enabled",
-      drain_cooldown_ms: 20,
-    });
-    app = new Hono();
-    registerAgentRoutes(app, runtime);
+  it.each([
+    { modelId: "claude-acp", providerId: "claude" },
+    { modelId: "claude-acp/older-model", providerId: "openrouter" },
+  ])(
+    "preserves retained sessions and queued work for $modelId",
+    async ({ modelId, providerId }) => {
+      const created = await sessionsStore.create({
+        agent: AGENT_SESSION_AGENT,
+        model: { provider_id: providerId, tier: "pro", model_id: modelId },
+        metadata: {
+          agent_provider: { session_id: "historical-provider-chat" },
+        },
+      });
+      await sessionsStore.appendQueuedMessage(created.id, {
+        id: "queued-agent-provider",
+        text: "Keep this queued.",
+        queued_at: 7,
+      });
+      const retained = await sessionsStore.get(created.id);
+      const queued = await sessionsStore.listQueuedMessages(created.id);
+      const claim = vi.spyOn(sessionsStore, "claimQueuedMessage");
+      const reserve = vi.spyOn(streamRegistry, "create");
+      const response = await app.request("/agent/run", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          session_id: created.id,
+          messages: [{ id: "resume-acp", role: "user", content: "Continue." }],
+        }),
+      });
+      await expectRetiredProvider(response);
+      await expectRetiredProvider(await runtime.compact(created.id));
 
+      const released = vi.spyOn(streamRegistry, "releaseAdmission");
+      await runtime.retryQueuedSessions();
+      await vi.waitFor(() => expect(released).toHaveBeenCalledTimes(1));
+
+      expect(claim).not.toHaveBeenCalled();
+      expect(reserve).not.toHaveBeenCalled();
+      expect(spawnExternal).not.toHaveBeenCalled();
+      expect(await sessionsStore.get(created.id)).toEqual(retained);
+      expect(await sessionsStore.listQueuedMessages(created.id)).toEqual(
+        queued
+      );
+      expect(await sessionsStore.listVisibleMessages(created.id)).toEqual([]);
+    }
+  );
+
+  it("allows an explicit supported model change in a retained external-agent chat", async () => {
     const created = await sessionsStore.create({
       agent: AGENT_SESSION_AGENT,
-      model: {
-        provider_id: "claude",
-        tier: "pro",
-        model_id: "claude-acp",
-      },
+      title: "Retained chat",
+      model: { provider_id: "claude", tier: "pro", model_id: "claude-acp" },
     });
-    await sessionsStore.appendQueuedMessage(created.id, {
-      id: "queued-agent-provider",
-      text: "run in the external agent",
-      queued_at: 7,
+    const modelId = "anthropic/claude-opus-5";
+    const response = await app.request("/agent/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        session_id: created.id,
+        model_id: modelId,
+        provider_id: "openrouter",
+        messages: [
+          { id: "replacement-model", role: "user", content: "Continue." },
+        ],
+      }),
     });
-    const createSpy = vi
-      .spyOn(streamRegistry, "create")
-      .mockImplementation(() => {
-        throw new Error("stop before spawning the external agent");
-      });
-
-    try {
-      await runtime.retryQueuedSessions();
-      await vi.waitFor(() => expect(createSpy).toHaveBeenCalled());
-      expect(
-        (await sessionsStore.listQueuedMessages(created.id)).map((m) => m.id)
-      ).toEqual(["queued-agent-provider"]);
-    } finally {
-      createSpy.mockRestore();
-    }
+    expect(response.status).toBe(200);
+    expect(sessionIdFromSse(await response.text())).toBe(created.id);
+    expect((await sessionsStore.get(created.id))?.model).toMatchObject({
+      model_id: modelId,
+      provider_id: "openrouter",
+    });
+    await vi.waitFor(async () => {
+      const messages = await sessionsStore.listVisibleMessages(created.id);
+      expect(messages.at(-1)?.parts).toContainEqual(
+        expect.objectContaining({ data: { type: "text", text: "hi" } })
+      );
+    });
+    expect(spawnExternal).not.toHaveBeenCalled();
   });
 
   it("restores a claimed row when synchronous stream creation fails", async () => {
@@ -2392,7 +2417,6 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
         return await fakeRunAgent();
       },
       scratch_base: path.join(baseDir, "scratch-base"),
-      external_agent_execution: "sandboxed",
       drain_cooldown_ms: 20,
     });
     app = new Hono();
@@ -2696,7 +2720,6 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
         return await fakeRunAgent();
       },
       scratch_base: path.join(baseDir, "scratch-base"),
-      external_agent_execution: "sandboxed",
       drain_cooldown_ms: 20,
     });
     app = new Hono();
@@ -2810,7 +2833,6 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
           return await secondModel;
         },
         scratch_base: path.join(baseDir, "scratch-base"),
-        external_agent_execution: "sandboxed",
         drain_cooldown_ms: 20,
       });
       app = new Hono();

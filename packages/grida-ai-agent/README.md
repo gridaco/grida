@@ -337,35 +337,16 @@ crosses one of these is the wrong tool, not a missing feature.
   contract — hosts read and render them directly. There is no hidden
   intermediate representation rebuilt on load.
 
-## Agent-provider class (experimental — issue #813)
+## External agents
 
-A **second provider class**, distinct from the model-provider kinds above: an
-**external agent owns the loop**. Grida acts as an
-[ACP](https://agentclientprotocol.com) **consumer** driving Claude on the
-user's own subscription (`src/agent-provider/`, spawning the ACP-team bridge
-`@agentclientprotocol/claude-agent-acp` over stdio). The runtime branches on
-this kind _before_ provider resolution and streams from the external agent, so
-no `ModelFactory` is ever called — it does **not** make the package a
-model-provider router (the anti-goal above stands). Synthetic `claude-acp/*`
-model ids (`agent-provider/types.ts`) select it; continuity rides ACP
-`session/resume`. Because that subprocess owns its own tools and network stack,
-the construction-time `external_agent_execution` disposition is explicit:
-`"enabled"` is host-authorized execution with no containment claim,
-`"sandboxed"` requires `sandbox_enforced: true`, and
-`"disabled"` withholds the capability and is the omission default.
-`allow_unsandboxed_shell` governs only Grida's locked shell and does not affect
-this independent process authority.
+The experimental external-agent opt-in for TypeScript daemon hosts has been
+retired. The daemon refuses historical `claude-acp` and `claude-acp/*` model
+selections before provider resolution. The refusal preserves the saved model
+and queued work. To continue, explicitly select a supported model.
 
-This is a spike, and the class **forks every host feature** (each one needs an
-agent-provider branch alongside the model-provider one). Whether it earns that
-permanent cost is an open decision — see
-[acp-provider.md](../../docs/wg/ai/agent/acp-provider.md). User-outcome
-("jobs to be done") tests exercise selected bridge contracts with a fake ACP
-agent (`testing/fake-acp-agent.ts`, `agent-provider/jtbd.test.ts`). The gated
-`agent-provider/run.live.test.ts` exercises real-provider streaming and recall.
-The [feature catalog](../../docs/agent/features.md) owns current availability,
-intended outcomes, and caveats. The tests supply evidence within their exercised
-scope.
+The source-only ACP harness in `src/agent-provider/consume.bin.ts` still runs
+independently for development. The [feature catalog](../../docs/agent/features.md)
+records availability for the separately confined native Local agent.
 
 ## Package Docs
 

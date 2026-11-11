@@ -55,7 +55,6 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
         image_model_id: "img/model",
         shell_executor,
         sandbox_enforced: true,
-        external_agent_execution: "disabled",
         allow_unsandboxed_shell: false,
         interactive: true,
         library: true,
@@ -70,7 +69,6 @@ describe("agentTenantOptionsFromDaemon — no host field is silently dropped", (
     expect(out.image_model_id).toBe("img/model");
     expect(out.shell_executor).toBe(shell_executor);
     expect(out.sandbox_enforced).toBe(true);
-    expect(out.external_agent_execution).toBe("disabled");
     expect(out.interactive).toBe(true);
     expect(out.library).toBe(true);
     expect(out.provider_http).toBe(provider_http);

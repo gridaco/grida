@@ -25,17 +25,9 @@ import { AGENT_SESSION_AGENT } from "../protocol/run";
 import { AGENT_DEFAULT_MODE } from "../protocol/mode";
 import {
   resolveProvider,
-  makeAgentProvider,
   ProviderUnavailableError,
   type ResolveDeps,
 } from "../providers";
-import {
-  AGENT_PROVIDER_MODELS,
-  agentProviderModel,
-  isAgentProviderModel,
-  type AgentProviderId,
-} from "../agent-provider/types";
-import { runAgentProviderTurn } from "./agent-provider-run";
 import { createRecorderConsumer } from "../session/recorder";
 import { titler } from "../session/titler";
 import {
@@ -83,7 +75,6 @@ import { AGENT_DEFAULT_TIER } from "../tiers";
 import {
   applyApprovalAnswer,
   extractFirstUserText,
-  extractLastUserText,
   extractTailUserMessageId,
   findIncomingHumanInputResults,
   fillIncomingToolResults,
@@ -101,7 +92,7 @@ import {
   removeScratch,
   writeScratchFile,
 } from "../session/scratch";
-import { buildModelMessages, type ModelUIMessage } from "./message-view";
+import { buildModelMessages } from "./message-view";
 import { buildReplayPrefix } from "./replay-prefix";
 import type { ChatMessageWithParts } from "../session/rows";
 import { buildConsumerResponse, pumpResponseIntoRegistry } from "./sse";
@@ -226,19 +217,6 @@ export type AgentRuntimeDeps = ResolveDeps & {
    * executor; explicit unsandboxed hosts inject the raw runner.
    */
   shell_executor?: ShellExecutor;
-  /**
-   * GRIDA-SEC-004 — whether the whole process tree is confined by an OS
-   * sandbox. This is an attestation consumed by the external-agent
-   * `"sandboxed"` mode; `"enabled"` makes no containment claim.
-   */
-  sandbox_enforced?: boolean;
-  /**
-   * GRIDA-SEC-004 — whether this constructed runtime may spawn external ACP
-   * agents. `"enabled"` is host-authorized process execution with no
-   * containment claim; `"sandboxed"` requires {@link sandbox_enforced};
-   * `"disabled"` withholds the capability and is the omission default.
-   */
-  external_agent_execution?: "enabled" | "sandboxed" | "disabled";
   /**
    * Base directory for per-session scratch areas (WG `scratch.md`). The host
    * injects it (filesystem location is host-owned I/O); the default is resolved
@@ -377,11 +355,6 @@ type StartTurnOptions = {
    * results.
    */
   human_input_continuation?: HumanInputContinuation;
-  /**
-   * Set only when `provider.kind === "agent-provider"`: the single prompt
-   * string handed to the external agent for this turn (issue #813).
-   */
-  agent_prompt?: string;
 };
 
 async function prepareScratchForTurn(
@@ -441,31 +414,6 @@ async function rollbackScratchSeeds(created: readonly string[]): Promise<void> {
   }
 }
 
-function promptFromLatestUserModelMessage(
-  messages: ModelUIMessage[],
-  fallback: string
-): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role !== "user") continue;
-    const text = m.parts
-      .map((p) =>
-        typeof p === "object" &&
-        p !== null &&
-        "type" in p &&
-        (p as { type?: unknown }).type === "text" &&
-        "text" in p &&
-        typeof (p as { text?: unknown }).text === "string"
-          ? (p as { text: string }).text
-          : null
-      )
-      .filter((p): p is string => p !== null && p.length > 0)
-      .join("\n\n");
-    if (text.length > 0) return text;
-  }
-  return fallback;
-}
-
 export class AgentRuntime {
   /** In-flight run registry. Owned here; `AgentHost.streams` aliases it. */
   readonly streams: StreamRegistry;
@@ -506,11 +454,6 @@ export class AgentRuntime {
   private readonly compaction_enabled: boolean;
   private readonly compaction_config: CompactionConfig;
   private readonly compaction_summarize?: compactor.Summarize;
-  /** Resolved once: omission must never become process authority downstream. */
-  private readonly external_agent_execution: NonNullable<
-    AgentRuntimeDeps["external_agent_execution"]
-  >;
-
   constructor(private readonly deps: AgentRuntimeDeps) {
     this.streams = deps.streams ?? new StreamRegistry();
     this.run_agent_fn = deps.run_agent ?? runAgent;
@@ -518,7 +461,6 @@ export class AgentRuntime {
     this.compaction_config =
       deps.compaction?.config ?? DEFAULT_COMPACTION_CONFIG;
     this.compaction_summarize = deps.compaction?.summarize;
-    this.external_agent_execution = deps.external_agent_execution ?? "disabled";
 
     // Run-state machine: owns SessionStatus + the serial drain. Its drain is a
     // one-way dependency back into this runtime (fires a turn via startTurn);
@@ -683,24 +625,11 @@ export class AgentRuntime {
       const session = await this.deps.sessions_store.get(sessionId);
       if (!session) return false;
       // Provider-down throws before claim, so the durable row remains queued.
-      let provider: ResolvedProvider;
-      if (isAgentProviderModel(session.model?.model_id)) {
-        const providerId = AGENT_PROVIDER_MODELS[session.model.model_id].id;
-        if (
-          this.external_agent_execution === "disabled" ||
-          (this.external_agent_execution === "sandboxed" &&
-            this.deps.sandbox_enforced !== true)
-        ) {
-          throw new ProviderUnavailableError(providerId);
-        }
-        provider = makeAgentProvider(providerId);
-      } else {
-        provider = await resolveProvider(this.deps, {
-          explicit: session.model?.provider_id,
-          model_id: session.model?.model_id ?? undefined,
-          tier: session.model?.tier,
-        });
-      }
+      const provider = await resolveProvider(this.deps, {
+        explicit: session.model?.provider_id,
+        model_id: session.model?.model_id ?? undefined,
+        tier: session.model?.tier,
+      });
       const workspaceRoot =
         (await this.deps.sessions_store.getWorkspaceRoot(sessionId)) ??
         undefined;
@@ -1044,60 +973,26 @@ export class AgentRuntime {
       // Resolve provider before opening the stream so a 4xx stays a proper
       // HTTP error instead of a half-opened SSE.
       let provider: ResolvedProvider;
-      if (isAgentProviderModel(effectiveReq.model_id)) {
-        // Agent-provider class (issue #813): an external agent owns its own
-        // loop. No BYOK/endpoint resolution, no model factory — the runtime
-        // streams from the agent-provider consumer in startTurn. GRIDA-SEC-004:
-        // external process authority is explicit and independent of the locked
-        // shell's disposition.
-        const providerId = AGENT_PROVIDER_MODELS[effectiveReq.model_id].id;
-        const externalAgentExecution = this.external_agent_execution;
-        if (externalAgentExecution === "disabled") {
+      try {
+        provider = await resolveProvider(this.deps, {
+          explicit: explicitProviderId,
+          model_id: effectiveReq.model_id,
+          tier: effectiveReq.tier,
+        });
+      } catch (err) {
+        if (err instanceof ProviderUnavailableError) {
           return Response.json(
-            {
-              error: `[agent-host-providers] external agent ${providerId} is disabled by the host`,
-              code: "provider_down",
-              provider_id: providerId,
-            },
+            err.provider_id
+              ? {
+                  error: err.message,
+                  code: err.code,
+                  provider_id: err.provider_id,
+                }
+              : { error: err.message, code: err.code },
             { status: 409 }
           );
         }
-        if (
-          externalAgentExecution === "sandboxed" &&
-          this.deps.sandbox_enforced !== true
-        ) {
-          return Response.json(
-            {
-              error: `[agent-host-providers] external agent ${providerId} requires an enforced OS sandbox`,
-              code: "provider_down",
-              provider_id: providerId,
-            },
-            { status: 409 }
-          );
-        }
-        provider = makeAgentProvider(providerId);
-      } else {
-        try {
-          provider = await resolveProvider(this.deps, {
-            explicit: explicitProviderId,
-            model_id: effectiveReq.model_id,
-            tier: effectiveReq.tier,
-          });
-        } catch (err) {
-          if (err instanceof ProviderUnavailableError) {
-            return Response.json(
-              err.provider_id
-                ? {
-                    error: err.message,
-                    code: err.code,
-                    provider_id: err.provider_id,
-                  }
-                : { error: err.message, code: err.code },
-              { status: 409 }
-            );
-          }
-          throw err;
-        }
+        throw err;
       }
 
       const runId = crypto.randomUUID();
@@ -1453,12 +1348,6 @@ export class AgentRuntime {
                   run_id: runId,
                 }
               : undefined),
-          // Agent-provider turns take a single prompt string (the external
-          // agent owns history); the tail user message is this turn's prompt.
-          agent_prompt:
-            provider.kind === "agent-provider"
-              ? extractLastUserText(messages)
-              : undefined,
         });
       } catch (err) {
         if (
@@ -1512,8 +1401,7 @@ export class AgentRuntime {
       // succeeds. It writes only while the default sentinel remains, so a user
       // rename always wins; failures are intentionally swallowed.
       const firstUserText = extractFirstUserText(messages);
-      // Titling runs a model-provider; skip it for agent-providers (no factory).
-      if (provider.kind !== "agent-provider" && firstUserText.length > 0) {
+      if (firstUserText.length > 0) {
         void titler
           .maybeGenerate({
             store: this.deps.sessions_store,
@@ -1779,67 +1667,6 @@ export class AgentRuntime {
         const availableScratchAttachmentPaths = scratchDir
           ? await listScratchFilePaths(scratchDir)
           : new Set<string>();
-
-        // Agent-provider class (issue #813): the external agent owns the loop.
-        // Skip compaction/model-factory/tool-injection entirely — just run one
-        // turn and push its mapped chunks into the registry. The recorder
-        // (attached above) persists the assistant message from those chunks;
-        // `streams.finish` flushes it, same as the normal terminal edge.
-        if (provider.kind === "agent-provider") {
-          const visible =
-            snapshotVisible ??
-            (await sessionsStore.listVisibleMessages(sessionId));
-          const preparedMessages = buildModelMessages(visible, {
-            // External agents do not receive our structured fs binding. A
-            // durable historical descriptor remains inspectable but inert.
-            availableDirectoryScopeIds: new Set(),
-            availableScratchAttachmentPaths: new Set(),
-          });
-          // Continuity (issue #813): resume the external agent's prior session
-          // so it keeps the conversation. Read the id stored last turn, pass it
-          // in, and persist the id observed this turn for the NEXT turn.
-          const priorRow = await sessionsStore.get(sessionId);
-          const resumeSessionId = (
-            priorRow?.metadata?.agent_provider as
-              | { session_id?: string }
-              | undefined
-          )?.session_id;
-          // The picker's synthetic model_id selects the vendor model (issue
-          // #813). Derived from opts.model_id so it works on BOTH the HTTP run
-          // and the queue-drain path.
-          const agentModel = isAgentProviderModel(opts.model_id)
-            ? agentProviderModel(opts.model_id)
-            : undefined;
-          const result = await runAgentProviderTurn({
-            provider_id: provider.provider_id as AgentProviderId,
-            // Defense in depth at the spawn seam. Direct runs are preflighted
-            // before session creation; this also protects non-HTTP turn paths.
-            sandbox_enforced: this.deps.sandbox_enforced === true,
-            external_agent_execution: this.external_agent_execution,
-            prompt: promptFromLatestUserModelMessage(
-              preparedMessages,
-              opts.agent_prompt ?? ""
-            ),
-            cwd: workspaceRoot,
-            resume_session_id: resumeSessionId,
-            model: agentModel,
-            signal: entry.model_abort.signal,
-            emit: (chunk) => streams.pushEntry(entry, JSON.stringify(chunk)),
-          });
-          if (
-            result.providerSessionId &&
-            result.providerSessionId !== resumeSessionId
-          ) {
-            await sessionsStore
-              .setAgentProviderSessionId(sessionId, result.providerSessionId)
-              .catch(() => undefined);
-          }
-          // Deterministic recorder flush — mirror the normal success path.
-          // The helper keeps this detached phase inside terminal settlement,
-          // so an abort cannot publish idle while persistence is still open.
-          await this.finishSuccessfulTurn(entry, recorder, detachRecorder);
-          return;
-        }
 
         // Auto-compaction (RFC `session / compaction`): if the session is
         // at/over its usable context, block this turn on the summarizer.

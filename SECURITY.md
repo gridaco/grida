@@ -540,23 +540,13 @@ cap), never proxied raw. The host transport permits an eligible local endpoint
 only through that explicit exact-origin grant; it does not turn endpoint
 config into a generic proxy.
 
-**Agent providers (external agents, #813).** The reusable agent package can
-drive an
-EXTERNAL agent that owns its own loop (Claude Code via
-`@anthropic-ai/claude-agent-sdk`), that agent makes its own outbound auth +
-inference calls to its vendor. Those vendor hosts (Anthropic:
-`api.anthropic.com` incl. `/api/oauth/claude_cli/*`, `*.anthropic.com`,
-`claude.ai`) are added to the same enumerated `allowed_domains` allowlist as
-the BYOK provider hosts (`sandbox/policy.ts` `AGENT_PROVIDER_NETWORK_HOSTS`) —
-NOT a `*` opening. Desktop explicitly sets `external_agent_execution:
-"disabled"`: the ACP subprocess cannot consume the host-routed provider
-transport or prove system-route compatibility, so it is unavailable even on a
-sandboxed macOS/Linux launch. Reusable-package hosts choose an explicit
-`external_agent_execution` posture: `"sandboxed"` requires
-`sandbox_enforced === true` at HTTP preflight and immediately before spawn;
-`"enabled"` makes no containment claim; and `"disabled"` withholds ACP.
-Omission resolves to `"disabled"`, so reusable hosts must explicitly select
-`"enabled"` or `"sandboxed"` to permit external-agent execution.
+**External agents.** The TypeScript daemon has no external-agent subprocess
+activation. Its request parser and provider resolver refuse historical
+`claude-acp` model selections before catalogue refresh, credential lookup,
+provider fallback, or a queue claim. Direct runs return `provider_down` and
+retained queue items remain in place. The source-only ACP harness runs
+independently of daemon admission. Native Local agent execution uses its own
+reviewed profile and process confinement described below.
 
 **Electron-side hardening (mandatory; see the
 [Electron security checklist](https://www.electronjs.org/docs/latest/tutorial/security)).**

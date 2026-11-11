@@ -63,40 +63,17 @@ import { ChatGptProvider, type ChatGptProviderRuntime } from "./chatgpt";
 export { EndpointProvidersStore } from "./endpoints";
 
 export type ResolvedProvider = {
-  /** A native, BYOK, hosted, endpoint, or external-agent provider id. */
+  /** A native, BYOK, hosted, or configured endpoint provider id. */
   provider_id: string;
   /**
    * `chatgpt`/`byok`/`gg`/`endpoint` are MODEL providers (the host owns the
    * loop, calls `model_factory`). `gg` is the hosted "included"
    * provider (GRIDA-SEC-006) — credential is the pushed session token,
-   * not a stored key. `agent-provider` is an EXTERNAL agent that owns
-   * its own loop (issue #813); `model_factory` is never called — the
-   * runtime branches on this kind and streams from the agent-provider
-   * consumer instead.
+   * not a stored key.
    */
-  kind: "byok" | "gg" | "chatgpt" | "endpoint" | "agent-provider";
+  kind: "byok" | "gg" | "chatgpt" | "endpoint";
   model_factory: ModelFactory;
 };
-
-/**
- * Build a `ResolvedProvider` for the agent-provider class. Agent-providers run
- * an EXTERNAL loop (no model factory), so — by design, not as a shortcut — the
- * runtime identifies them up front (`isAgentProviderModel`) and constructs them
- * here directly; `resolveProvider` deliberately handles only the model-provider
- * kinds (BYOK + endpoint) and never returns one. The `model_factory` throws as a
- * guard — nothing in the agent-provider path may call it.
- */
-export function makeAgentProvider(providerId: string): ResolvedProvider {
-  return {
-    provider_id: providerId,
-    kind: "agent-provider",
-    model_factory: () => {
-      throw new Error(
-        "[agent-host-providers] agent-provider runs an external loop; model_factory must not be called"
-      );
-    },
-  };
-}
 
 /**
  * Single error class for both "no provider configured" and "you picked
@@ -105,13 +82,30 @@ export function makeAgentProvider(providerId: string): ResolvedProvider {
  */
 export class ProviderUnavailableError extends Error {
   readonly code = "provider_down" as const;
-  constructor(public readonly provider_id?: string) {
+  constructor(
+    public readonly provider_id?: string,
+    message?: string
+  ) {
     super(
-      provider_id
-        ? `[agent-host-providers] explicit provider not available: ${provider_id}`
-        : "[agent-host-providers] no provider available"
+      message ??
+        (provider_id
+          ? `[agent-host-providers] explicit provider not available: ${provider_id}`
+          : "[agent-host-providers] no provider available")
     );
     this.name = "ProviderUnavailableError";
+  }
+}
+
+/** Historical external-agent model selections are never routed to another provider. */
+export function retiredAgentProviderError(modelId: unknown) {
+  if (
+    typeof modelId === "string" &&
+    (modelId === "claude-acp" || modelId.startsWith("claude-acp/"))
+  ) {
+    return new ProviderUnavailableError(
+      "claude",
+      "[agent-host-providers] external agent claude is disabled by the host"
+    );
   }
 }
 
@@ -162,6 +156,8 @@ export async function resolveProvider(
   deps: ResolveDeps,
   options: ResolveOptions = {}
 ): Promise<ResolvedProvider> {
+  const retired = retiredAgentProviderError(options.model_id);
+  if (retired) throw retired;
   if (options.explicit) {
     return await resolveExplicit(
       options.explicit,

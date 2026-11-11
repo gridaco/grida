@@ -170,12 +170,7 @@ describe("a model published after this binary shipped", () => {
     store.dispose();
   });
 
-  it("costs nothing on ids that could never be catalogue ids", async () => {
-    // The refresh is the gate's LAST resort, not its first question.
-    // Agent-provider ids (#813) and endpoint-registered ids (#806) are
-    // admitted by their own tables and are never catalogue keys, so asking
-    // the network first would make every run on one of them wait on an
-    // awaited HTTPS GET that could not have answered yes.
+  it("refuses a retired external model without a catalogue refresh", async () => {
     const fetchImpl = vi.fn<typeof fetch>(
       async () =>
         new Response(JSON.stringify(publishedCatalogue()), { status: 200 })
@@ -185,7 +180,12 @@ describe("a model published after this binary shipped", () => {
       fetch: fetchImpl,
     });
     const result = await runGate("claude-acp/opus-5", runDeps(store));
-    expect(result).not.toBeInstanceOf(Response);
+    if (!(result instanceof Response)) throw new Error("Expected a refusal");
+    expect(result.status).toBe(409);
+    expect(await result.json()).toMatchObject({
+      code: "provider_down",
+      provider_id: "claude",
+    });
     expect(fetchImpl).not.toHaveBeenCalled();
     store.dispose();
   });

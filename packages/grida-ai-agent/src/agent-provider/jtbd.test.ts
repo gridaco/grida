@@ -5,7 +5,7 @@
  * tests assert ONLY the user-visible outcome — "what does the user get?" —
  * against a deterministic in-memory fake agent (`testing/fake-acp-agent`). They
  * pin WHAT must hold regardless of HOW the spike implements it, run in CI with
- * no real Claude, and complement the gated end-to-end `run.live.test.ts`.
+ * no real Claude. The standalone source harness exercises the real bridge.
  *
  * This is the PROOF SLICE: streaming + continuity (passing), and one
  * gap-pinning skip (cancel). The full JTBD table lives in

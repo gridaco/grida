@@ -35,6 +35,7 @@ import {
   isKnownProviderId,
   type EndpointProvidersStore,
 } from "../providers/endpoints";
+import { retiredAgentProviderError } from "../providers";
 import {
   byokProvidersFor,
   isByokProviderId,
@@ -55,8 +56,6 @@ import {
 } from "../protocol/context";
 import { HUMAN_INPUT_PART_TYPES } from "../tools/names";
 import { isValidHumanInputResultPart } from "../tools/human-input-result";
-// Neutral (no node/SDK) import — just the synthetic-model-id contract.
-import { isAgentProviderModel } from "../agent-provider/types";
 import { AgentSurface } from "../surface";
 
 const ALLOWED_TIERS = new Set<string>(AGENT_TIERS);
@@ -220,20 +219,25 @@ export async function parseRunBody(
       : AGENT_DEFAULT_TIER;
   let modelId: AgentModelId | undefined;
   if (b.model_id !== undefined) {
+    const retired = retiredAgentProviderError(b.model_id);
+    if (retired) {
+      return Response.json(
+        {
+          error: retired.message,
+          code: retired.code,
+          provider_id: retired.provider_id,
+        },
+        { status: 409 }
+      );
+    }
     // Allowed model ids = this host's catalogue ∪ user-registered
     // endpoint models (the open-registry seam, issue #806). Still a
     // closed gate: an id neither table knows 400s.
     //
-    // ORDER MATTERS: every test here is local except the last, which may
-    // fetch the published catalogue. Agent-provider ids (#813) and
-    // endpoint-registered ids (#806) are never catalogue ids, so asking
-    // the network first would make every run on one of those pay a
-    // refresh — awaited, on the gate — to answer a question it could
-    // never answer yes to.
+    // Check registered endpoints before any catalogue refresh.
     const allowed =
       typeof b.model_id === "string" &&
       (catalogView(deps.catalog).has(b.model_id) ||
-        isAgentProviderModel(b.model_id) || // issue #813 agent-provider class
         (deps.chatgpt !== undefined &&
           isChatGptSubscriptionModelId(b.model_id)) ||
         (await isRegisteredModelId(b.model_id, deps)) ||
@@ -301,15 +305,6 @@ export async function parseRunBody(
     }
     workspaceId = b.workspace_id;
     workspaceRoot = ws.root;
-  }
-  if (directoryReferences.value && modelId && isAgentProviderModel(modelId)) {
-    return Response.json(
-      {
-        error: "directory references are not supported by external agents",
-        code: "directory-references-unsupported-provider",
-      },
-      { status: 409 }
-    );
   }
   return {
     messages,
@@ -668,25 +663,6 @@ export async function hasUnpersistedCallerMessage(
 
 export function extractFirstUserText(msgs: NormalizedMessage[]): string {
   for (const m of msgs) {
-    if (m.role !== "user") continue;
-    const text = m.parts
-      .filter((p) => p.type === "text")
-      .map((p) => p.text)
-      .join("\n")
-      .trim();
-    if (text.length > 0) return text;
-  }
-  return "";
-}
-
-/**
- * The latest user message's text — the prompt for an agent-provider turn
- * (issue #813). The client resends full history; the tail user message is the
- * new turn. Mirrors {@link extractFirstUserText} but walks from the end.
- */
-export function extractLastUserText(msgs: NormalizedMessage[]): string {
-  for (let i = msgs.length - 1; i >= 0; i -= 1) {
-    const m = msgs[i];
     if (m.role !== "user") continue;
     const text = m.parts
       .filter((p) => p.type === "text")
