@@ -5,7 +5,9 @@ import {
   type EndpointProviderConfig,
 } from "@grida/agent";
 import { catalog } from "@grida/ai/catalogue";
+import { ProviderCredentialStore } from "@grida/auth/providers";
 import fs from "node:fs/promises";
+import { timingSafeEqual } from "node:crypto";
 import { isIPv4 } from "node:net";
 import path from "node:path";
 import type { NativeAgentLaunch } from "./native-agent-process";
@@ -67,6 +69,7 @@ export namespace NativeProviderSelection {
     const home = await checkedCredentialHome(settings.credentialHome);
     if (!(await settings.hasKey(providerId)))
       throw new Error("native_provider_byok_key_missing");
+    const custody = await capturedCredential(home, providerId, true);
     const endpoint = builtInEndpoints[providerId];
     const target = `${endpoint}/chat/completions`;
     const network = await settings.network();
@@ -87,7 +90,7 @@ export namespace NativeProviderSelection {
         prepare: (url, headers) =>
           url === target &&
           /^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
-            ? network.prepare(url, headers)
+            ? custody.prepare(network, url, headers)
             : null,
       },
     };
@@ -136,6 +139,9 @@ export namespace NativeProviderSelection {
     const credentialHome = hasKey
       ? await checkedCredentialHome(settings.credentialHome)
       : undefined;
+    const custody = credentialHome
+      ? await capturedCredential(credentialHome, config.id, false)
+      : undefined;
     const network = await settings.network(config.id, endpoint);
     target.pathname = `${target.pathname.replace(/\/$/, "")}/chat/completions`;
     const countTarget = llamaCppInputCount
@@ -156,8 +162,63 @@ export namespace NativeProviderSelection {
           (hasKey
             ? /^Bearer [!-~]+$/.test(headers.get("authorization") ?? "")
             : !headers.has("authorization"))
-            ? network.prepare(url, headers)
+            ? custody
+              ? custody.prepare(network, url, headers)
+              : network.prepare(url, headers)
             : null,
+      },
+    };
+  }
+
+  async function capturedCredential(
+    home: string,
+    provider: string,
+    trim: boolean
+  ) {
+    const store = new ProviderCredentialStore({ home });
+    const key = await store.read(provider);
+    if (key === null) throw new Error("native_provider_byok_key_missing");
+    const wireKey = trim ? key.trim() : key;
+    if (
+      !wireKey ||
+      [...wireKey].some((character) => {
+        const point = character.codePointAt(0)!;
+        return point < 32 || point > 126;
+      })
+    )
+      throw new Error("native_provider_credential_unavailable");
+    // Headers strips trailing ASCII spaces; never include key bytes in errors.
+    const bearer = Buffer.from(`Bearer ${wireKey}`.replace(/ +$/, ""));
+    return {
+      prepare(network: NativeProviderNetwork, url: string, headers: Headers) {
+        const provided = Buffer.from(headers.get("authorization") ?? "");
+        if (
+          provided.length !== bearer.length ||
+          !timingSafeEqual(provided, bearer)
+        )
+          return null;
+        return async (body: Buffer, signal: AbortSignal) => {
+          let attempted = false;
+          let pending: Promise<Response | null> | undefined;
+          try {
+            const admitted = await store.admit(provider, key, () => {
+              if (signal.aborted) return false;
+              const dispatch = network.prepare(url, headers);
+              if (!dispatch || signal.aborted) return false;
+              attempted = true;
+              pending = dispatch(body, signal);
+              void pending.catch(() => {});
+              return true;
+            });
+            if (!admitted) return null;
+            if (!pending)
+              throw new Error("native_provider_dispatch_unavailable");
+            return await pending;
+          } catch (error) {
+            if (attempted) throw error;
+            return null;
+          }
+        };
       },
     };
   }

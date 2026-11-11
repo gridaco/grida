@@ -924,6 +924,10 @@ lazy reads, read-only mutation, and symlink escape refusal.
   built-in key identities. The broker pipe carries key bytes only in the
   provider request header. The child rechecks captured credential custody
   after the broker buffers the request and before dispatch.
+  Main also compares its captured stored value under the shared credential
+  lock, rechecks network authority, and starts the request before releasing
+  that lock. A failure after initiation is reported as uncertain. This checks
+  observed values and does not detect an unobserved change away and back.
   [Main's grant owner](desktop/src/main/agent-network-authority.ts)
   rotates the captured grant when the approved base changes, including a path
   change on the same origin. Retained launch profiles cannot use the new grant.

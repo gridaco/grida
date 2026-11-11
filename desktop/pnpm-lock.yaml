@@ -10,6 +10,7 @@ overrides:
   '@grida/daemon': link:../packages/grida-daemon
   '@grida/desktop-bridge': link:../packages/grida-desktop-bridge
   '@grida/ai': link:../packages/grida-ai
+  '@grida/auth': link:../packages/grida-auth
   '@grida/home': link:../packages/grida-home
 
 importers:
@@ -77,6 +78,9 @@ importers:
       '@grida/ai':
         specifier: link:../packages/grida-ai
         version: link:../packages/grida-ai
+      '@grida/auth':
+        specifier: link:../packages/grida-auth
+        version: link:../packages/grida-auth
       '@grida/daemon':
         specifier: link:../packages/grida-daemon
         version: link:../packages/grida-daemon

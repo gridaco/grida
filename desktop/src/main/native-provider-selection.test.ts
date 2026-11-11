@@ -1,5 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — native provider admission and custody.
 import { AuthStore, SecretsStore } from "@grida/daemon/server";
+import { ProviderCredentialStore } from "@grida/auth/providers";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -191,11 +192,33 @@ it.each([
 });
 
 it.runIf(sharedCustody)(
+  "refuses a non-ASCII saved key without exposing it",
+  async () => {
+    const home = await privateHome();
+    const owner = settings();
+    try {
+      await new ProviderCredentialStore({ home }).set("local", "fixture-⚡");
+      owner.hasKey.mockResolvedValue(true);
+      await expect(
+        NativeProviderSelection.configuredEndpoint("local", undefined, {
+          ...owner,
+          credentialHome: home,
+        })
+      ).rejects.toThrow(/^native_provider_credential_unavailable$/);
+      expect(owner.network).not.toHaveBeenCalled();
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  }
+);
+
+it.runIf(sharedCustody)(
   "binds a custom key to its exact route and never selects a reserved vendor key",
   async () => {
     const home = await privateHome();
     const owner = settings();
     try {
+      await new ProviderCredentialStore({ home }).set("local", "fixture");
       owner.hasKey.mockResolvedValue(true);
       const selected = await NativeProviderSelection.configuredEndpoint(
         "local",
@@ -214,9 +237,12 @@ it.runIf(sharedCustody)(
         selected.providerNetwork.prepare(target + "?other=1", headers)
       ).toBeNull();
       expect(owner.prepare).not.toHaveBeenCalled();
-      expect(selected.providerNetwork.prepare(target, headers)).toBe(
-        owner.dispatch
+      owner.dispatch.mockResolvedValue(new Response());
+      await selected.providerNetwork.prepare(target, headers)!(
+        Buffer.from("{}"),
+        new AbortController().signal
       );
+      expect(owner.prepare).toHaveBeenCalledExactlyOnceWith(target, headers);
       owner.list.mockResolvedValue([{ ...config, id: "openai" }]);
       await expect(
         NativeProviderSelection.configuredEndpoint("openai", undefined, {
@@ -236,12 +262,119 @@ const byokProviders = [
   ["vercel", "https://ai-gateway.vercel.sh/v1"],
 ] as const;
 
+it.runIf(sharedCustody).each([...byokProviders, ["local", base]] as const)(
+  "rechecks %s custody and grants before network admission",
+  async (provider, endpoint) => {
+    const home = await privateHome();
+    const store = new ProviderCredentialStore({ home });
+    const owner = settings();
+    const custom = provider === "local";
+    const raw = custom ? "fixture-key " : " fixture-key ";
+    let finish!: (response: Response) => void;
+    const response = new Promise<Response>((resolve) => {
+      finish = resolve;
+    });
+    owner.dispatch.mockReturnValue(response);
+    try {
+      await store.set(provider, raw);
+      owner.hasKey.mockResolvedValue(true);
+      const profile = custom
+        ? await NativeProviderSelection.configuredEndpoint(
+            provider,
+            undefined,
+            { ...owner, credentialHome: home }
+          )
+        : await NativeProviderSelection.builtInByok(provider, byokModel, {
+            credentialHome: home,
+            hasKey: owner.hasKey,
+            network: () => owner.network(provider, endpoint),
+          });
+      const route = `${endpoint}/chat/completions`;
+      const headers = new Headers({ authorization: "Bearer fixture-key" });
+      expect(
+        profile.providerNetwork.prepare(
+          route,
+          new Headers({ authorization: "Bearer other" })
+        )
+      ).toBeNull();
+      const send = profile.providerNetwork.prepare(route, headers)!;
+      const signal = new AbortController();
+      const cancelled = new AbortController();
+      cancelled.abort();
+      expect(await send(Buffer.from("{}"), cancelled.signal)).toBeNull();
+      expect(owner.prepare).not.toHaveBeenCalled();
+      await store.set(provider, "rotated-key");
+      expect(await send(Buffer.from("{}"), signal.signal)).toBeNull();
+      expect(owner.prepare).not.toHaveBeenCalled();
+      await store.set(provider, raw);
+      owner.prepare.mockReturnValueOnce(null);
+      expect(await send(Buffer.from("{}"), signal.signal)).toBeNull();
+      expect(owner.dispatch).not.toHaveBeenCalled();
+      const running = send(Buffer.from("{}"), signal.signal);
+      await vi.waitFor(() => expect(owner.dispatch).toHaveBeenCalledOnce());
+      // The provider response remains pending while a writer acquires custody.
+      await store.remove(provider);
+      finish(new Response("ok"));
+      expect((await running)?.status).toBe(200);
+      expect(await send(Buffer.from("{}"), signal.signal)).toBeNull();
+      expect(owner.dispatch).toHaveBeenCalledOnce();
+    } finally {
+      finish?.(new Response());
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  }
+);
+
+it.runIf(sharedCustody)(
+  "keeps a post-initiation custody error uncertain",
+  async () => {
+    const home = await privateHome();
+    const store = new ProviderCredentialStore({ home });
+    const owner = settings();
+    try {
+      await store.set("openrouter", "fixture-key");
+      owner.hasKey.mockResolvedValue(true);
+      owner.dispatch.mockResolvedValue(new Response());
+      const profile = await NativeProviderSelection.builtInByok(
+        "openrouter",
+        byokModel,
+        {
+          credentialHome: home,
+          hasKey: owner.hasKey,
+          network: () => owner.network("openrouter", byokProviders[0][1]),
+        }
+      );
+      const failure = vi
+        .spyOn(ProviderCredentialStore.prototype, "admit")
+        .mockImplementationOnce(async (_provider, _key, action) => {
+          expect(action()).toBe(true);
+          throw new Error("synthetic custody release failure");
+        });
+      try {
+        const send = profile.providerNetwork.prepare(
+          `${byokProviders[0][1]}/chat/completions`,
+          new Headers({ authorization: "Bearer fixture-key" })
+        )!;
+        await expect(
+          send(Buffer.from("{}"), new AbortController().signal)
+        ).rejects.toThrow("synthetic custody release failure");
+        expect(owner.dispatch).toHaveBeenCalledOnce();
+      } finally {
+        failure.mockRestore();
+      }
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  }
+);
+
 it.runIf(sharedCustody).each(byokProviders)(
   "binds the selected %s key to its own exact generation route",
   async (provider, endpoint) => {
     const home = await privateHome();
     const owner = settings();
     try {
+      await new ProviderCredentialStore({ home }).set(provider, "fixture");
       owner.hasKey.mockResolvedValue(true);
       const selected = await NativeProviderSelection.builtInByok(
         provider,
@@ -273,8 +406,10 @@ it.runIf(sharedCustody).each(byokProviders)(
         expect(selected.providerNetwork.prepare(refused, headers)).toBeNull();
       expect(selected.providerNetwork.prepare(route, new Headers())).toBeNull();
       expect(owner.prepare).not.toHaveBeenCalled();
-      expect(selected.providerNetwork.prepare(route, headers)).toBe(
-        owner.dispatch
+      owner.dispatch.mockResolvedValue(new Response());
+      await selected.providerNetwork.prepare(route, headers)!(
+        Buffer.from("{}"),
+        new AbortController().signal
       );
       expect(owner.prepare).toHaveBeenCalledExactlyOnceWith(route, headers);
     } finally {
@@ -355,7 +490,7 @@ it
     let restoreExchange: (() => void) | undefined;
     try {
       await fs.mkdir(cwd, { mode: 0o700 });
-      await store.set(provider, custom ? key : ` ${key} `);
+      await store.set(provider, custom ? `${key} ` : ` ${key} `);
       const settings = {
         credentialHome,
         hasKey: (id: string) => store.has(id),
@@ -401,28 +536,33 @@ it
       const transcript = JSON.stringify(await chat.transcript(session));
       expect(transcript).toContain("BYOK fixture answer");
       expect(transcript).not.toContain(key);
-      let rotatedDuringUpload = false;
-      if (custom) {
-        const exchange = NativeProviderEgress.prototype.exchange;
-        const spy = vi
-          .spyOn(NativeProviderEgress.prototype, "exchange")
-          .mockImplementation(
-            async function (this: NativeProviderEgress, request) {
-              const reply = await exchange.call(this, request);
-              if (
-                (request as { action?: string })?.action === "append" &&
-                !rotatedDuringUpload
-              ) {
-                await store.set(provider, `rotated-${key}`);
-                rotatedDuringUpload = true;
-              }
-              return reply;
+      let rotated = false;
+      const exchange = NativeProviderEgress.prototype.exchange;
+      const spy = vi
+        .spyOn(NativeProviderEgress.prototype, "exchange")
+        .mockImplementation(
+          async function (this: NativeProviderEgress, request) {
+            if (
+              !custom &&
+              (request as { action?: string })?.action === "dispatch" &&
+              !rotated
+            ) {
+              await store.set(provider, `rotated-${key}`);
+              rotated = true;
             }
-          );
-        restoreExchange = () => spy.mockRestore();
-      } else {
-        await store.set(provider, key);
-      }
+            const reply = await exchange.call(this, request);
+            if (
+              custom &&
+              (request as { action?: string })?.action === "append" &&
+              !rotated
+            ) {
+              await store.set(provider, `rotated-${key}`);
+              rotated = true;
+            }
+            return reply;
+          }
+        );
+      restoreExchange = () => spy.mockRestore();
       const second = await chat.submit(
         session,
         "byok-fixture-second",
@@ -437,7 +577,7 @@ it
         },
         { timeout: 4000 }
       );
-      expect(rotatedDuringUpload).toBe(custom);
+      expect(rotated).toBe(true);
       expect(dispatch).toHaveBeenCalledTimes(1);
       await chat.close();
       expect(
