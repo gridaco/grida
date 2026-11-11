@@ -245,6 +245,8 @@ struct Active {
     turn: TurnId,
     admitted: bool,
     handle: AbortHandle,
+    pending_stop: Option<TurnId>,
+    missed_stop: bool,
 }
 
 struct WorkerLifetime {
@@ -1284,7 +1286,7 @@ impl Host {
             waiting.session() != &session
                 || matches!(
                     waiting,
-                    ReadyWork::Answered { .. } | ReadyWork::Sponsored(_)
+                    ReadyWork::Answered { .. } | ReadyWork::Sponsored(_) | ReadyWork::Stop(..)
                 )
         });
         work.active.insert(
@@ -1293,6 +1295,8 @@ impl Host {
                 turn,
                 admitted: false,
                 handle: handle.abort_handle(),
+                pending_stop: None,
+                missed_stop: false,
             },
         );
         Ok(LaunchTicket {
@@ -2645,7 +2649,14 @@ impl Host {
         {
             let mut work = self.work.lock().await;
             work.unverified |= unverified;
-            work.active.remove(session);
+            if let Some(active) = work.active.remove(session)
+                && !work.closed
+            {
+                if let Some(turn) = active.pending_stop {
+                    work.defer(ReadyWork::Stop(session.clone(), turn));
+                }
+                work.missed_stops |= active.missed_stop;
+            }
             if let Some((turn, through)) = remove_answered {
                 work.ready.retain(|ready| {
                     !(ready.wakes_answer(session, turn) && matches!(ready, ReadyWork::Answered { position, .. } if *position <= through))

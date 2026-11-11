@@ -5,6 +5,8 @@ use super::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agent_kit_core::messages::OutcomeStatus;
+    use agent_kit_core::turn::{JournalAction, JournalChange};
 
     #[test]
     fn queue_readiness_coalesces_recovery_without_restricting_ordinary_wakes() {
@@ -28,6 +30,151 @@ mod tests {
             work.ready.front(),
             Some(ReadyWork::Queue(_, None))
         ));
+    }
+
+    #[tokio::test]
+    async fn stop_recovery_survives_pre_admission_worker_handoff() {
+        let root = tempfile::tempdir().unwrap();
+        let host = Host::open(
+            &root.path().join("state"),
+            Some(ProviderOptions {
+                endpoint: "http://127.0.0.1:9/v1".into(),
+                protocol: ProviderProtocol::OpenAiCompatible,
+                model: ModelId::new("fixture").unwrap(),
+                credential_env: None,
+                credential_home: None,
+                max_output_tokens: 1024,
+                compatible_output_limit_field: None,
+                llama_cpp_input_count: false,
+            }),
+        )
+        .unwrap();
+        let session = host
+            .new_session(root.path().canonicalize().unwrap())
+            .await
+            .unwrap();
+        let prompt = |id| PromptRequest {
+            id: ChangeId::new(id).unwrap(),
+            session: session.clone(),
+            parts: vec![PromptPart::Text {
+                text: "Fixture".into(),
+            }],
+            questions: false,
+            configuration_permission: crate::ConfigurationPermission::Disabled,
+            operating_regime: None,
+            effort: None,
+        };
+        let view = host.store.inspect(session.clone()).await.unwrap();
+        let original = prompt("original");
+        let policy = host.submission_policy(&original, false).unwrap();
+        let captured = host
+            .capture_input(&view, original.id, original.parts, policy)
+            .await
+            .unwrap();
+        let input = captured.id.clone();
+        host.store.submit(session.clone(), captured).await.unwrap();
+        let view = host.store.inspect(session.clone()).await.unwrap();
+        let turn = TurnId::new("original-turn").unwrap();
+        let claim = new_claim(session.clone(), turn.clone(), view.revision, vec![input]).unwrap();
+        let ClaimOutcome::Acquired(owner) = host.store.claim(claim).await.unwrap() else {
+            panic!("expected original turn lease")
+        };
+        let state = owner.lease.journal().load().await.unwrap();
+        owner
+            .lease
+            .journal()
+            .commit(
+                JournalChange::new(
+                    change_id().unwrap(),
+                    state.binding().clone(),
+                    state.position(),
+                    state.controls().revision,
+                    vec![JournalAction::Suspend],
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        drop(owner);
+
+        let view = host.store.inspect(session.clone()).await.unwrap();
+        let current = view.current.unwrap();
+        assert_eq!(current.disposition, TurnDisposition::Suspended);
+        let stop_request = ChangeId::new("stop-original").unwrap();
+        let stop = || {
+            host.stop(
+                session.clone(),
+                turn.clone(),
+                stop_request.clone(),
+                view.revision,
+                current.controls.revision,
+            )
+        };
+
+        // The admission lock holds a real worker before it can inspect the
+        // store. The drain lock lets a second registration win the handoff.
+        let drain = host.wake_lock.lock().await;
+        let mut admission = host.configuration_admission.lock().await;
+        let competing = prompt("competing");
+        let policy = host.submission_policy(&competing, false).unwrap();
+        let first = host
+            .register_prompt(competing, false, policy)
+            .await
+            .unwrap();
+        let receipt = stop().await.unwrap();
+        assert_eq!(receipt.turn.as_ref().unwrap().record().binding.turn, turn);
+        {
+            let work = host.work.lock().await;
+            let active = work.active.get(&session).unwrap();
+            assert!(!active.admitted);
+            assert_ne!(active.turn, turn);
+            assert_eq!(active.pending_stop.as_ref(), Some(&turn));
+        }
+        drop(admission);
+        assert_eq!(
+            first.admission.await.unwrap().err().unwrap().code,
+            "session_admission_paused"
+        );
+
+        admission = host.configuration_admission.lock().await;
+        let another = prompt("another");
+        let policy = host.submission_policy(&another, false).unwrap();
+        let second = host.register_prompt(another, false, policy).await.unwrap();
+        {
+            let work = host.work.lock().await;
+            assert!(work.ready.iter().any(|ready| matches!(ready, ReadyWork::Stop(owner, target) if owner == &session && target == &turn)));
+        }
+        drop(admission);
+        assert_eq!(
+            second.admission.await.unwrap().err().unwrap().code,
+            "session_admission_paused"
+        );
+        drop(drain);
+
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let settled = host
+                    .store
+                    .inspect_turn_with(session.clone(), turn.clone(), |state| {
+                        assert!(state.operations().is_empty());
+                        Ok(state.outcome().map(|outcome| outcome.status))
+                    })
+                    .await
+                    .unwrap();
+                if let Some(status) = settled {
+                    assert_eq!(status, OutcomeStatus::Cancelled);
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(stop().await.unwrap(), receipt);
+        let settled = host.store.inspect(session.clone()).await.unwrap();
+        assert!(settled.current.is_none() && settled.queued.is_empty());
+        assert_eq!(settled.latest.unwrap().binding.turn, turn);
+        host.shutdown().await.unwrap();
     }
 }
 
@@ -537,7 +684,18 @@ impl Host {
             expected_epoch: view.binding.epoch,
         };
         let mut work = self.work.lock().await;
-        if work.closed || work.active.contains_key(&session) {
+        if work.closed {
+            return;
+        }
+        if let Some(active) = work.active.get_mut(&session) {
+            match &active.pending_stop {
+                None => active.pending_stop = Some(turn),
+                Some(pending) if pending != &turn => {
+                    // Revisit other durable stops after this worker releases.
+                    active.missed_stop = true;
+                }
+                Some(_) => {}
+            }
             return;
         }
         if work.active.len() >= MAX_ACTIVE_RUNS {
