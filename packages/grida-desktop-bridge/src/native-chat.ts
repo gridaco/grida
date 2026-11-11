@@ -532,8 +532,8 @@ export type NativeChatNotificationFocus = Readonly<{
 
 /** Available for a native chat in the exact scope selected by Main. */
 export type DesktopNativeChat = Partial<NativeSubagentClient> & {
-  /** This launch offers chat in the workspace workbench only. */
-  readonly workspaceOnly?: true;
+  /** This launch cannot provide native chat for an independently opened file. */
+  readonly documentUnavailable?: true;
   /** This host also accepts native chat requests from an admitted root deck. */
   readonly deck?: true;
   /** This host also offers native chat for the exact selected nested deck. */

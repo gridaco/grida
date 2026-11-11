@@ -33,7 +33,10 @@ import type { NativeImagePlacement } from "./native-image-placement";
 import type { ImageReferenceReview } from "./native-image-generation";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
 import { NativeProviderSelection } from "./native-provider-selection";
-import type { NativeNestedDeckGrant } from "./native-workspace-catalog";
+import {
+  NativeDeckGrant,
+  type NativeNestedDeckGrant,
+} from "./native-workspace-catalog";
 import { NativeWorkspaceAgents } from "./native-workspace-agents";
 import type { WorkspaceMediaGrant } from "./workspace-media-registry";
 import type { NativeChatLifecycle } from "./native-agent-chat";
@@ -284,6 +287,48 @@ export class NativeDesktopAgent {
   currentNestedDeck(parentWorkspaceId: string, key: string) {
     if (this.workspaceActivity.get(parentWorkspaceId)?.retired) return null;
     return this.owners?.currentNestedDeck(key) ?? null;
+  }
+
+  async rootDeck(workspaceId: string): Promise<WorkspaceMediaGrant> {
+    return this.withWorkspace(
+      workspaceId,
+      async (workspace, requireCurrent) => {
+        if (!workspace.identity)
+          throw new Error("native_workspace_root_changed");
+        const grant = await NativeDeckGrant.root({
+          workspaceId: workspace.id,
+          root: workspace.root,
+          identity: workspace.identity,
+          protected: this.cutover.protectedPaths,
+        });
+        requireCurrent();
+        return grant;
+      }
+    );
+  }
+
+  async nestedDeck(
+    workspaceId: string,
+    relativePath: string
+  ): Promise<NativeNestedDeckGrant> {
+    return this.withWorkspace(
+      workspaceId,
+      async (workspace, requireCurrent) => {
+        if (!workspace.identity)
+          throw new Error("native_workspace_root_changed");
+        const grant = await NativeDeckGrant.nested(
+          {
+            workspaceId: workspace.id,
+            root: workspace.root,
+            identity: workspace.identity,
+            protected: this.cutover.protectedPaths,
+          },
+          relativePath
+        );
+        requireCurrent();
+        return grant;
+      }
+    );
   }
 
   closeNestedDeck(key: string): Promise<void> {

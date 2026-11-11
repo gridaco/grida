@@ -956,14 +956,23 @@ app.on("ready", async () => {
       ensure_native_chat: (workspaceId) => native.ensure(workspaceId),
       forget_native_workspace: (workspaceId) =>
         native.forgetWorkspace(workspaceId),
-      resolve_native_deck: workspaceCatalog?.rootDeck.bind(workspaceCatalog),
-      native_nested_deck_chat: workspaceCatalog && {
-        grant: workspaceCatalog.nestedDeck.bind(workspaceCatalog),
-        current: (parent, key) => native.currentNestedDeck(parent, key),
-        ensure: (grant, requireCurrent) =>
-          native.ensureNestedDeck(grant, requireCurrent),
-        close: (key) => native.closeNestedDeck(key),
-      },
+      resolve_native_deck: workspaceCatalog
+        ? workspaceCatalog.rootDeck.bind(workspaceCatalog)
+        : ordinaryNativeChat
+          ? native.rootDeck.bind(native)
+          : undefined,
+      native_nested_deck_chat:
+        workspaceCatalog || ordinaryNativeChat
+          ? {
+              grant: workspaceCatalog
+                ? workspaceCatalog.nestedDeck.bind(workspaceCatalog)
+                : native.nestedDeck.bind(native),
+              current: (parent, key) => native.currentNestedDeck(parent, key),
+              ensure: (grant, requireCurrent) =>
+                native.ensureNestedDeck(grant, requireCurrent),
+              close: (key) => native.closeNestedDeck(key),
+            }
+          : undefined,
       native_document_chat: {
         current: (key) => native.currentDocument(key),
         ensure: (key, requireCurrent) =>

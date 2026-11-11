@@ -526,14 +526,12 @@ const bridge: DesktopBridge = {
   },
 
   nativeChat: {
+    deck: true,
+    nestedDeck: true,
+    deckSvgText: true,
     ...(nativeWorkspaceChatOnly
-      ? { workspaceOnly: true as const }
-      : {
-          deck: true as const,
-          nestedDeck: true as const,
-          deckSvgText: true as const,
-          ...(selectedDocumentChatRoute() && { document: true as const }),
-        }),
+      ? { documentUnavailable: true as const }
+      : selectedDocumentChatRoute() && { document: true as const }),
     available: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE),
     status: (start) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),

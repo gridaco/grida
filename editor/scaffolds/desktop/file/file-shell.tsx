@@ -159,7 +159,7 @@ export function DesktopFileShell({
           maxSize={SIDEBAR_MAX_SIZE}
         >
           <aside className="flex h-full w-full flex-col">
-            {nativeChat?.workspaceOnly ? (
+            {mode === "doc" && nativeChat?.documentUnavailable ? (
               <p
                 role="status"
                 className="px-3 py-2 text-xs text-muted-foreground"

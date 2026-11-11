@@ -67,6 +67,7 @@ const OTHER_PNG =
 
 beforeEach(() => {
   vi.resetModules();
+  sidecar.nativeAgentSubscriptionSettings.mockClear();
   sidecar.nativeAgentGatewayConnection.mockClear();
   sidecar.listGatewayModels.mockResolvedValue([]);
 });
@@ -166,6 +167,102 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
       await fs.rm(base, { recursive: true, force: true });
     }
   }
+);
+
+it.runIf(Boolean(resources) && process.platform === "darwin")(
+  "opens root and nested decks from the retained workspace owner",
+  async () => {
+    const base = await fs.mkdtemp(
+      path.join(await fs.realpath(os.tmpdir()), "grida-ordinary-deck-")
+    );
+    const root = path.join(base, "workspace");
+    const nested = path.join(root, "slides.canvas");
+    const source = {
+      userDataPath: path.join(base, "agent"),
+      desktopUserDataPath: path.join(base, "desktop"),
+      scratchBase: path.join(base, "scratch"),
+      providerHome: path.join(base, "providers"),
+      mediaRoot: path.join(base, "media"),
+    };
+    const workspace = {
+      id: "work",
+      root,
+      name: "Workspace",
+      opened_at: Date.now(),
+      pinned: false,
+    };
+    const network = { prepare: () => null };
+    const origin = "https://editor.example.test";
+    let agent: import("./native-desktop-agent").NativeDesktopAgent | undefined;
+    try {
+      await Promise.all(
+        [nested, ...Object.values(source)].map((directory) =>
+          fs.mkdir(directory, { recursive: true, mode: 0o700 })
+        )
+      );
+      await fs.writeFile(path.join(root, ".canvas.json"), "{}");
+      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.nativeAgentSubscriptionSettings.mockResolvedValue({
+        userDataPath: source.userDataPath,
+        network,
+      });
+      sidecar.nativeAgentGatewayConnection.mockImplementation((account) =>
+        NativeGatewayConnection.open({ origin, account, network })
+      );
+      sidecar.findWorkspace.mockResolvedValue(workspace);
+      const { NativeDesktopAgent } = await import("./native-desktop-agent");
+      agent = await NativeDesktopAgent.prepareOrdinary(
+        new DesktopAccountSession({
+          base_url: origin,
+          fetch: async () =>
+            Response.json({
+              token: "fixture.gg.key",
+              account_subject: "fixture-user",
+              expires_at: new Date(Date.now() + 120_000).toISOString(),
+              organization: { id: 1 },
+            }),
+        }),
+        resources!,
+        [source.userDataPath],
+        { openExternal: async () => {} }
+      );
+      const parent = await agent.rootDeck(workspace.id);
+      const child = await agent.nestedDeck(workspace.id, "slides.canvas");
+      expect(parent.root).toBe(root);
+      expect(child.root).toBe(nested);
+      expect(child.parentIdentity).toEqual(parent.identity);
+      await expect(
+        agent.nestedDeck(workspace.id, "../outside.canvas")
+      ).rejects.toThrow("workspace_not_registered");
+      await agent.ensure(workspace.id);
+      await agent.ensureNestedDeck(child, () => {});
+      expect(agent.current(workspace.id)?.directoryIdentity).toEqual(
+        parent.identity
+      );
+      expect(
+        agent.currentNestedDeck(workspace.id, child.workspaceId)
+          ?.directoryIdentity
+      ).toEqual(child.identity);
+      const session = await agent
+        .currentNestedDeck(workspace.id, child.workspaceId)!
+        .chat.create();
+      await agent.closeNestedDeck(child.workspaceId);
+      await agent.ensureNestedDeck(child, () => {});
+      expect(
+        await agent
+          .currentNestedDeck(workspace.id, child.workspaceId)!
+          .chat.load(session.id)
+      ).toEqual({ id: session.id });
+      await fs.rename(nested, nested + "-old");
+      await fs.mkdir(nested, { mode: 0o700 });
+      const replacement = await agent.nestedDeck(workspace.id, "slides.canvas");
+      expect(replacement.workspaceId).not.toBe(child.workspaceId);
+    } finally {
+      await agent?.close();
+      await fs.rm(base, { recursive: true, force: true });
+    }
+  },
+  20_000
 );
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(

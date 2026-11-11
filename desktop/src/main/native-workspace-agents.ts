@@ -113,6 +113,17 @@ export class NativeWorkspaceAgents {
           ? nestedDeckSlot(id)
           : slotKey(id, profile?.id)
         : documentSlot(id);
+    if ("root" in workspace) {
+      for (const slot of this.slots.values()) {
+        if (
+          "root" in slot.workspace &&
+          slot.workspace.id === id &&
+          !slot.owner?.active.chat.hasExited &&
+          !sameProject(slot.workspace, workspace, false)
+        )
+          throw new Error("native_workspace_root_changed");
+      }
+    }
     const existing = this.slots.get(key);
     if (existing) {
       const chat = existing.owner?.active.chat;

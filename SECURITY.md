@@ -974,7 +974,9 @@ lazy reads, read-only mutation, and symlink escape refusal.
   The ordinary workspace-only launch uses a separate native chat store and
   leaves the previous chat data in place. It refuses existing handoff markers,
   applies the established home-secret exclusions to native workspace grants,
-  and captures and rechecks the registered directory identity. The retained
+  and captures and rechecks the registered directory identity across all live
+  or starting connection workers. Ordinary root and nested Deck requests use
+  the same path and frame validation as catalog-backed workspaces. The retained
   service sandbox denies native chat and legacy chat/scratch paths while keeping
   the ordinary Media owner available. Other editions can still write their own
   legacy data or shared settings; this launch does not assert exclusive custody.

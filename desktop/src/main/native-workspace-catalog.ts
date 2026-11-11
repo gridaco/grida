@@ -224,63 +224,16 @@ export class NativeWorkspaceCatalog {
 
   /** Resolve a root deck through the committed native workspace catalog. */
   rootDeck(id: string): Promise<WorkspaceMediaGrant> {
-    return this.run(async () => {
-      const grant = await this.resolveFileGrant(id);
-      await requireDeck(
-        grant.root,
-        grant.identity,
-        path.extname(grant.root).toLowerCase() === ".canvas"
-      );
-      return grant;
-    });
+    return this.run(async () =>
+      NativeDeckGrant.root(await this.resolveFileGrant(id))
+    );
   }
 
   /** Resolve a nested bundle without granting the workspace which contains it. */
   nestedDeck(id: string, relativePath: string): Promise<NativeNestedDeckGrant> {
-    return this.run(async () => {
-      if (
-        Buffer.byteLength(relativePath) > 4096 ||
-        relativePath.includes("\0") ||
-        /[\\\uD800-\uDFFF]/u.test(relativePath) ||
-        relativePath
-          .split("/")
-          .some((part) => !part || part === "." || part === "..") ||
-        !relativePath.toLowerCase().endsWith(".canvas")
-      )
-        throw unavailable();
-      const parent = await this.resolveFileGrant(id);
-      const root = path.join(parent.root, relativePath);
-      if (this.ordinaryDenials.overlaps(root)) throw unavailable();
-      const metadata = await fs.lstat(root, { bigint: true }).catch(() => {
-        throw unavailable();
-      });
-      const identity = {
-        device: String(metadata.dev),
-        inode: String(metadata.ino),
-        birthTimeNs: String(metadata.birthtimeNs),
-      };
-      if (
-        !metadata.isDirectory() ||
-        identity.device !== parent.identity.device ||
-        identity.birthTimeNs === "0"
-      )
-        throw unavailable();
-      await requireDeck(root, identity, true);
-      const checked = await fs.lstat(parent.root, { bigint: true });
-      if (!checked.isDirectory() || !matchesIdentity(checked, parent.identity))
-        throw unavailable();
-      const digest = createHash("sha256")
-        .update(JSON.stringify([id, parent.identity, relativePath, identity]))
-        .digest("hex");
-      return {
-        workspaceId: `deck-${digest}`,
-        parentWorkspaceId: id,
-        parentIdentity: parent.identity,
-        root,
-        identity,
-        protected: parent.protected,
-      };
-    });
+    return this.run(async () =>
+      NativeDeckGrant.nested(await this.resolveFileGrant(id), relativePath)
+    );
   }
 
   /** Hold catalog publication until the admitted writer has settled. */
@@ -381,6 +334,75 @@ export class NativeWorkspaceCatalog {
       this.registry = this.newRegistry();
       throw error;
     }
+  }
+}
+
+/** Validate deck scopes from an already admitted Main-owned workspace grant. */
+export namespace NativeDeckGrant {
+  export async function root(
+    grant: WorkspaceMediaGrant
+  ): Promise<WorkspaceMediaGrant> {
+    await requireDeck(
+      grant.root,
+      grant.identity,
+      path.extname(grant.root).toLowerCase() === ".canvas"
+    );
+    return grant;
+  }
+
+  export async function nested(
+    parent: WorkspaceMediaGrant,
+    relativePath: string
+  ): Promise<NativeNestedDeckGrant> {
+    if (
+      Buffer.byteLength(relativePath) > 4096 ||
+      relativePath.includes("\0") ||
+      /[\\\uD800-\uDFFF]/u.test(relativePath) ||
+      relativePath
+        .split("/")
+        .some((part) => !part || part === "." || part === "..") ||
+      !relativePath.toLowerCase().endsWith(".canvas")
+    )
+      throw unavailable();
+    const root = path.join(parent.root, relativePath);
+    if (new ProtectedRoots(parent.protected).overlaps(root))
+      throw unavailable();
+    const metadata = await fs.lstat(root, { bigint: true }).catch(() => {
+      throw unavailable();
+    });
+    const identity = {
+      device: String(metadata.dev),
+      inode: String(metadata.ino),
+      birthTimeNs: String(metadata.birthtimeNs),
+    };
+    if (
+      !metadata.isDirectory() ||
+      identity.device !== parent.identity.device ||
+      identity.birthTimeNs === "0"
+    )
+      throw unavailable();
+    await requireDeck(root, identity, true);
+    const checked = await fs.lstat(parent.root, { bigint: true });
+    if (!checked.isDirectory() || !matchesIdentity(checked, parent.identity))
+      throw unavailable();
+    const digest = createHash("sha256")
+      .update(
+        JSON.stringify([
+          parent.workspaceId,
+          parent.identity,
+          relativePath,
+          identity,
+        ])
+      )
+      .digest("hex");
+    return {
+      workspaceId: `deck-${digest}`,
+      parentWorkspaceId: parent.workspaceId,
+      parentIdentity: parent.identity,
+      root,
+      identity,
+      protected: parent.protected,
+    };
   }
 }
 

@@ -161,6 +161,73 @@ it("keeps a live native worker bound to its selected directory generation", asyn
   }
 });
 
+it("keeps all live provider profiles on the same workspace generation", async () => {
+  const { launch, workspace, owners } = fixture();
+  const identity = { device: "1", inode: "2", birthTimeNs: "3" };
+  const otherIdentity = { ...identity, inode: "4" };
+  const first = child(1, { closeOnEof: true });
+  const second = child(1, { closeOnEof: true });
+  const saved = {
+    id: "saved",
+    prepare: vi.fn<() => Promise<{ launch: typeof launch }>>(async () => ({
+      launch,
+    })),
+  };
+  spawn.mockReturnValueOnce(first.handle).mockReturnValueOnce(second.handle);
+  try {
+    await owners.open({ ...workspace, identity });
+    await expect(
+      owners.open({ ...workspace, identity: otherIdentity }, saved)
+    ).rejects.toThrow("native_workspace_root_changed");
+    expect(saved.prepare).not.toHaveBeenCalled();
+    expect(spawn).toHaveBeenCalledTimes(1);
+    await owners.open({ ...workspace, identity }, saved);
+    expect(saved.prepare).toHaveBeenCalledOnce();
+    expect(spawn).toHaveBeenCalledTimes(2);
+  } finally {
+    await owners.close();
+  }
+});
+
+it("rejects a different workspace generation while another profile is starting", async () => {
+  const { launch, workspace, owners } = fixture();
+  const identity = { device: "1", inode: "2", birthTimeNs: "3" };
+  const preparing = Promise.withResolvers<void>();
+  const prepared = Promise.withResolvers<{ launch: typeof launch }>();
+  const first = {
+    id: "first",
+    prepare: () => {
+      preparing.resolve();
+      return prepared.promise;
+    },
+  };
+  const second = {
+    id: "second",
+    prepare: vi.fn<() => Promise<{ launch: typeof launch }>>(async () => ({
+      launch,
+    })),
+  };
+  spawn.mockReturnValueOnce(child(1, { closeOnEof: true }).handle);
+  try {
+    const opening = owners.open({ ...workspace, identity }, first);
+    await preparing.promise;
+    await expect(
+      owners.open(
+        { ...workspace, identity: { ...identity, inode: "4" } },
+        second
+      )
+    ).rejects.toThrow("native_workspace_root_changed");
+    expect(second.prepare).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
+    prepared.resolve({ launch });
+    await opening;
+    expect(spawn).toHaveBeenCalledOnce();
+  } finally {
+    prepared.resolve({ launch });
+    await owners.close();
+  }
+});
+
 it("drains a forgotten workspace's default and saved workers without touching other workspaces", async () => {
   const { launch, workspace, owners } = fixture();
   const ordinary = child(1);
