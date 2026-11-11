@@ -133,39 +133,161 @@ describe("AgentNetworkHost", () => {
     expect(harness.fatal).not.toHaveBeenCalled();
   });
 
-  it("reuses one nonpersistent Chromium network context across restarts", async () => {
-    const setProxy = vi.fn<(config: unknown) => Promise<void>>(
-      async () => undefined
-    );
+  it("bootstraps and updates control while authorized provider session setup is pending", async () => {
+    const pending = Promise.withResolvers<void>();
+    const setProxy = vi.fn<() => Promise<void>>(() => pending.promise);
     vi.mocked(session.fromPartition).mockReturnValue({ setProxy } as never);
-    const authority = new AgentNetworkAuthority("https://grida.co");
-
-    const first = await AgentNetworkHost.create({
-      input: new PassThrough(),
-      output: new PassThrough(),
-      authority,
-      onFatal: vi.fn<(error: Error) => void>(),
-    });
-    const second = await AgentNetworkHost.create({
-      input: new PassThrough(),
-      output: new PassThrough(),
-      authority,
-      onFatal: vi.fn<(error: Error) => void>(),
-    });
-
+    mockEmptyProviderResponse();
+    const harness = await createElectronHarness();
+    expect(session.fromPartition).not.toHaveBeenCalled();
+    await harness.start();
+    await harness.request("denied", "https://untrusted.invalid");
+    expect((await harness.untilFrame("response.error")).code).toBe("denied");
+    expect(session.fromPartition).not.toHaveBeenCalled();
+    await harness.request("authorized");
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(session.fromPartition).toHaveBeenNthCalledWith(
       1,
       "grida-agent-provider",
       { cache: false }
     );
-    expect(session.fromPartition).toHaveBeenNthCalledWith(
-      2,
-      "grida-agent-provider",
-      { cache: false }
+    expect(setProxy).toHaveBeenCalledWith({ mode: "system" });
+    expect(net.request).not.toHaveBeenCalled();
+    const updated = harness.host.updateGrants();
+    const grant = await harness.untilFrame("grant.update");
+    await harness.sidecar.write({
+      v: 1,
+      type: "grant.applied",
+      revision: grant.revision,
+    });
+    await updated;
+    expect(net.request).not.toHaveBeenCalled();
+    pending.resolve();
+    await harness.untilFrame("response.end");
+    await harness.request("second");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(net.request).toHaveBeenCalledTimes(2);
+    expect(setProxy).toHaveBeenCalledTimes(1);
+    expect(harness.fatal).not.toHaveBeenCalled();
+    harness.host.close();
+  });
+
+  it("reports failed provider setup without breaking control and retries the next authorized request", async () => {
+    const pending = Promise.withResolvers<void>();
+    let attempt = 0;
+    const setProxy = vi.fn<() => Promise<void>>(() =>
+      attempt++ === 0 ? pending.promise : Promise.resolve()
     );
+    vi.mocked(session.fromPartition).mockReturnValue({ setProxy } as never);
+    mockEmptyProviderResponse();
+    const harness = await createElectronHarness();
+    await harness.start();
+    await harness.request("first");
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    pending.reject(new Error("private system proxy setup failure"));
+    expect(await harness.untilFrame("response.error")).toMatchObject({
+      requestId: "first",
+      code: "network",
+      message: "provider network request failed",
+    });
+    expect(net.request).not.toHaveBeenCalled();
+    expect(harness.fatal).not.toHaveBeenCalled();
+    await harness.request("retry");
+    await harness.untilFrame("response.end");
     expect(setProxy).toHaveBeenCalledTimes(2);
-    first.close();
-    second.close();
+    expect(net.request).toHaveBeenCalledTimes(1);
+    harness.host.close();
+  });
+
+  it("reuses the same nonpersistent Chromium context after a channel restart", async () => {
+    const setProxy = vi.fn<() => Promise<void>>(async () => undefined);
+    vi.mocked(session.fromPartition).mockReturnValue({ setProxy } as never);
+    mockEmptyProviderResponse();
+    for (let restart = 0; restart < 2; restart++) {
+      const harness = await createElectronHarness();
+      await harness.start();
+      await harness.request("provider");
+      await harness.untilFrame("response.end");
+      harness.host.close();
+    }
+    expect(vi.mocked(session.fromPartition).mock.calls).toEqual([
+      ["grida-agent-provider", { cache: false }],
+      ["grida-agent-provider", { cache: false }],
+    ]);
+  });
+
+  it("re-authorizes a provider grant revoked while system proxy setup was pending", async () => {
+    const pending = Promise.withResolvers<void>();
+    vi.mocked(session.fromPartition).mockReturnValue({
+      setProxy: vi.fn<() => Promise<void>>(() => pending.promise),
+    } as never);
+    const harness = await createElectronHarness();
+    const endpoint = "http://127.0.0.1:11434/v1";
+    harness.authority.approveCustomEndpoint("fixture", endpoint);
+    const grant = harness.authority.approvedEndpointGrant("fixture", endpoint)!;
+    await harness.start();
+    await harness.request("revoked", endpoint + "/models", grant);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    harness.authority.revokeCustomEndpoint("fixture");
+    pending.resolve();
+    expect(await harness.untilFrame("response.error")).toMatchObject({
+      requestId: "revoked",
+      code: "denied",
+    });
+    expect(net.request).not.toHaveBeenCalled();
+    expect(harness.fatal).not.toHaveBeenCalled();
+    harness.host.close();
+  });
+
+  it.each(["resolve", "reject"] as const)(
+    "does not dispatch or write after close when pending provider setup later %ss",
+    async (outcome) => {
+      const pending = Promise.withResolvers<void>();
+      vi.mocked(session.fromPartition).mockReturnValue({
+        setProxy: vi.fn<() => Promise<void>>(() => pending.promise),
+      } as never);
+      const harness = await createElectronHarness();
+      await harness.start();
+      await harness.request("pending");
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      harness.host.close();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      const count = harness.frames.length;
+      if (outcome === "resolve") pending.resolve();
+      else pending.reject(new Error("late private setup failure"));
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(net.request).not.toHaveBeenCalled();
+      expect(harness.frames).toHaveLength(count);
+      expect(harness.fatal).not.toHaveBeenCalled();
+    }
+  );
+
+  it("cancels a request during provider setup without cancelling setup shared by another request", async () => {
+    const pending = Promise.withResolvers<void>();
+    const setProxy = vi.fn<() => Promise<void>>(() => pending.promise);
+    vi.mocked(session.fromPartition).mockReturnValue({ setProxy } as never);
+    mockEmptyProviderResponse();
+    const harness = await createElectronHarness();
+    await harness.start();
+    await harness.request("cancelled");
+    await harness.request("remaining");
+    await harness.sidecar.write({
+      v: 1,
+      type: "request.abort",
+      requestId: "cancelled",
+    });
+    pending.resolve();
+    expect(await harness.untilFrame("response.end")).toMatchObject({
+      requestId: "remaining",
+    });
+    expect(setProxy).toHaveBeenCalledTimes(1);
+    expect(net.request).toHaveBeenCalledTimes(1);
+    expect(
+      harness.frames.some(
+        (frame) => "requestId" in frame && frame.requestId === "cancelled"
+      )
+    ).toBe(false);
+    harness.host.close();
   });
 
   it("safely observes ready rejection when bootstrap output fails first", async () => {
@@ -1374,6 +1496,52 @@ function createHarness(adapter: {
     adapter.commandExecutor,
     adapter.prepareProviderCustody
   );
+  return observeHarness(host, sidecarOutput, sidecarInput, authority, fatal);
+}
+
+async function createElectronHarness() {
+  const sidecarOutput = new PassThrough();
+  const sidecarInput = new PassThrough();
+  const authority = new AgentNetworkAuthority("https://grida.co");
+  const fatal = vi.fn<(error: Error) => void>();
+  const host = await AgentNetworkHost.create({
+    input: sidecarOutput,
+    output: sidecarInput,
+    authority,
+    onFatal: fatal,
+  });
+  return observeHarness(host, sidecarOutput, sidecarInput, authority, fatal);
+}
+
+function mockEmptyProviderResponse() {
+  vi.mocked(net.request).mockImplementation(() => {
+    const request = Object.assign(new EventEmitter(), {
+      abort: vi.fn<() => void>(),
+      setHeader: vi.fn<(name: string, value: string) => void>(),
+      end: () => {
+        queueMicrotask(() =>
+          request.emit(
+            "response",
+            Object.assign(Readable.from([]), {
+              rawHeaders: [],
+              statusCode: 204,
+              statusMessage: "No Content",
+            })
+          )
+        );
+      },
+    });
+    return request as never;
+  });
+}
+
+function observeHarness(
+  host: AgentNetworkHost,
+  sidecarOutput: PassThrough,
+  sidecarInput: PassThrough,
+  authority: AgentNetworkAuthority,
+  fatal: ReturnType<typeof vi.fn<(error: Error) => void>>
+) {
   const sidecar = new AgentSidecarChannel.Writer(sidecarOutput);
   const decoder = new AgentSidecarChannel.Decoder();
   const frames: AgentSidecarChannel.HostToSidecarFrame[] = [];
@@ -1388,6 +1556,28 @@ function createHarness(adapter: {
     fatal,
     sidecar,
     frames,
+    async request(
+      requestId: string,
+      url = "https://openrouter.ai/api/v1/models",
+      grantId = "provider:built-in"
+    ) {
+      await sidecar.write({
+        v: 1,
+        type: "request.start",
+        requestId,
+        grantId,
+        method: "GET",
+        url,
+        headers: [],
+        hasBody: false,
+      });
+      await sidecar.write({
+        v: 1,
+        type: "request.end",
+        requestId,
+        sequence: 0,
+      });
+    },
     async start() {
       const ready = host.waitForReady();
       await host.bootstrap("a-secure-spawn-password", 43123);

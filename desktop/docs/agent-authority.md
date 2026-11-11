@@ -10,6 +10,12 @@ to supervisor-owned per-command confinement.
 
 ## Current enforcement
 
+Private sidecar bootstrap and local service readiness are independent of provider
+network configuration. Chromium's system-proxy setup runs only for an authorized
+provider request. While it is pending, control and shutdown remain available;
+failure never selects a direct or unconfined network fallback. The request must
+still hold its current destination grant when dispatch becomes possible.
+
 Ordinary macOS and Linux Desktop chat runs in the Rust host over private ACP
 pipes. The shared master owns conversation behavior and durable execution.
 Electron owns user presence, editor tool hosting, provider networking and worker

@@ -875,6 +875,15 @@ responses. `directory-scopes.test.ts`, `run-input.test.ts`,
 descriptor/session ownership, claim-before-persistence, no-path-persistence,
 lazy reads, read-only mutation, and symlink escape refusal.
 
+The [private network host](desktop/src/main/agent-network-host.ts) establishes
+bootstrap and control before provider-network initialization. Only an authorized
+provider request starts the memory-only Chromium session; it still waits for
+successful system-proxy configuration. Cancellation and shutdown settle pending
+requests without dispatch. After that wait, the host rechecks the exact current
+destination grant before Chromium receives the request. Initialization failure
+has no direct-network fallback. [Boundary tests](desktop/src/main/agent-network-host.test.ts)
+cover delayed/failed setup, revoked grants and late completion after shutdown.
+
 **Files bound by this id.** Run `grep -rn GRIDA-SEC-004 .` to enumerate.
 
 - The [development resource preparer](desktop/scripts/prepare-dev-native-agent.mjs)

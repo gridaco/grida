@@ -31,7 +31,7 @@ const MAX_CONCURRENT_COMMANDS = 4;
 const MAX_TERMINAL_COMMAND_TOMBSTONES = 32;
 
 type NetworkAdapter = Readonly<{
-  fetch: (url: string, init: RequestInit) => Promise<Response>;
+  fetch: (url: string, init: RequestInit, grantId: string) => Promise<Response>;
 }>;
 
 type IncomingRequest = {
@@ -60,9 +60,8 @@ type ActiveResponse = {
  * GRIDA-SEC-004 — Electron-main implementation of trusted sidecar
  * capabilities.
  *
- * It owns provider HTTP grant validation and delegates finite commands to the
- * per-command sandbox host while the sidecar remains inside its coarse outer
- * SRT sandbox. There is no listener, renderer IPC method, environment token,
+ * It owns provider HTTP grant validation over the retained sidecar's private
+ * capability channel. There is no listener, renderer IPC method, environment token,
  * or general-purpose proxy: only the inherited stdio pair can speak the strict
  * capability protocol.
  */
@@ -139,12 +138,11 @@ export class AgentNetworkHost {
     commandExecutor?: ShellExecutor;
     prepareProviderCustody?: () => Promise<void>;
   }): Promise<AgentNetworkHost> {
-    const networkSession = await AgentNetworkHost.networkSession();
     return new AgentNetworkHost(
       args.input,
       args.output,
       args.authority,
-      AgentNetworkHost.electronAdapter(networkSession),
+      AgentNetworkHost.electronAdapter(args.authority),
       args.onFatal,
       MAX_BUFFERED_REQUEST_BODY_BYTES,
       args.commandExecutor,
@@ -353,14 +351,48 @@ export class AgentNetworkHost {
     return this.custodyWork ?? Promise.resolve();
   }
 
-  private static electronAdapter(networkSession: Session): NetworkAdapter {
+  private static electronAdapter(
+    authority: AgentNetworkAuthority
+  ): NetworkAdapter {
+    let initialization: Promise<Session> | undefined;
     return {
       // `Session.fetch({ redirect: "manual" })` rejects when Chromium sees a
       // redirect instead of returning the 3xx response. `net.request` exposes
       // that redirect synchronously, which lets the host re-authorize it
       // before any follow-up request carries provider credentials.
-      fetch: async (url, init) =>
-        await requestThroughSession(networkSession, url, init),
+      fetch: async (url, init, grantId) => {
+        if (init.signal?.aborted) throw abortError(init.signal.reason);
+        if (!initialization) {
+          const pending = AgentNetworkHost.networkSession();
+          initialization = pending;
+          void pending.catch(() => {
+            if (initialization === pending) initialization = undefined;
+          });
+        }
+        // Private bootstrap and control never depend on Chromium/system proxy
+        // startup. Only an authorized provider request initializes and waits
+        // for that session; cancellation still settles while it is pending.
+        const networkSession = await sessionWhenReady(
+          initialization,
+          init.signal
+        );
+        let current: AgentNetworkPolicy.AuthorizedRequest;
+        try {
+          current = AgentNetworkPolicy.authorize(authority.grants(), {
+            grant_id: grantId,
+            method: init.method ?? "GET",
+            url,
+            headers: [...new Headers(init.headers).entries()],
+          });
+        } catch {
+          throw deniedError();
+        }
+        return await requestThroughSession(networkSession, current.url.href, {
+          ...init,
+          method: current.method,
+          headers: current.headers,
+        });
+      },
     };
   }
 
@@ -937,21 +969,25 @@ export class AgentNetworkHost {
       if (this.authority.isCustomGrant(current.grant.id)) {
         await this.assertCustomEndpointRoute(current.url);
       }
-      const response = await this.adapter.fetch(current.url.toString(), {
-        method: current.method,
-        headers: current.headers,
-        body:
-          currentBody.length > 0 &&
-          current.method !== "GET" &&
-          current.method !== "HEAD"
-            ? Uint8Array.from(currentBody).buffer
-            : undefined,
-        signal,
-        redirect: "manual",
-        credentials: "omit",
-        cache: "no-store",
-        referrerPolicy: "no-referrer",
-      });
+      const response = await this.adapter.fetch(
+        current.url.toString(),
+        {
+          method: current.method,
+          headers: current.headers,
+          body:
+            currentBody.length > 0 &&
+            current.method !== "GET" &&
+            current.method !== "HEAD"
+              ? Uint8Array.from(currentBody).buffer
+              : undefined,
+          signal,
+          redirect: "manual",
+          credentials: "omit",
+          cache: "no-store",
+          referrerPolicy: "no-referrer",
+        },
+        current.grant.id
+      );
       const location = response.headers.get("location");
       if (!isRedirect(response.status) || !location) return response;
       await response.body?.cancel().catch(() => undefined);
@@ -1215,6 +1251,34 @@ function utf8Prefix(
     end += scalar.length;
   }
   return { value, bytes, truncated: false };
+}
+
+function sessionWhenReady(
+  initialization: Promise<Session>,
+  signal?: AbortSignal | null
+): Promise<Session> {
+  if (!signal) return initialization;
+  return new Promise<Session>((resolve, reject) => {
+    const abort = () => {
+      signal.removeEventListener("abort", abort);
+      reject(abortError(signal.reason));
+    };
+    if (signal.aborted) {
+      abort();
+      return;
+    }
+    signal.addEventListener("abort", abort, { once: true });
+    void initialization.then(
+      (networkSession) => {
+        signal.removeEventListener("abort", abort);
+        resolve(networkSession);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", abort);
+        reject(error);
+      }
+    );
+  });
 }
 
 function utf8Chunks(value: string, maxBytes: number): string[] {
