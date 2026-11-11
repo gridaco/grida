@@ -256,20 +256,23 @@ impl Host {
         if !view.queued.is_empty() {
             return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
         }
-        let context = self
+        let prefix = self
             .store
-            .context_history_with(session.clone(), None, grida_agent_master::history::project)
+            .context_prefix_with(session.clone(), grida_agent_master::history::project)
             .await?;
-        let expected_revision = context.session_revision;
+        let expected_revision = prefix.history.session_revision;
         let defaults = self.with_configuration(Configuration::snapshot).await?;
-        let plan = compaction_plan_for(
+        let mut plan = compaction_plan_for(
             execution,
             &execution.config,
             defaults.defaults.context.max_input_tokens,
-            context,
+            prefix.history,
             CompactionTrigger::Manual,
         )?
         .ok_or_else(|| problem(ErrorKind::InvalidInput, "compaction_nothing_to_do"))?;
+        // A partial projection can replace only the complete prefix it covered.
+        // The summary policy may choose an earlier boundary within that prefix.
+        plan.covered_through = plan.covered_through.or(prefix.unprojected_suffix_after);
         let claim = self
             .store
             .claim_unprompted(UnpromptedClaim {

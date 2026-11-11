@@ -836,6 +836,13 @@ transcript remains available. If compaction fails or its result is uncertain,
 the host keeps the previous context. Pause and Stop apply while the summary
 runs. An identified request can inspect the retained attempt after reconnecting.
 
+For a history too large to load as one context, manual compaction can summarize
+a bounded prefix while keeping later complete turns. More than one compaction
+may be needed before another message fits. Resolve or remove queued input first;
+the command requires an idle chat with an empty queue. If an individual turn or
+the retained history exceeds the recovery limits, compaction reports an error
+and leaves the transcript available.
+
 ### Work toward a persistent goal
 
 In the native Desktop workspace pane, **Add goal** opens the goal form.

@@ -615,6 +615,172 @@ async fn oversized_history_compacts_complete_early_turns_and_keeps_the_exact_suf
     endpoint.done().await;
 }
 
+#[tokio::test]
+async fn manual_compaction_recovers_a_chat_beyond_the_context_projection_limit() {
+    use agent_kit_core::history::HistoryRecord;
+    use agent_kit_core::messages::{
+        Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role,
+    };
+    use agent_kit_core::turn::{JournalAction, JournalChange, TurnOutcome};
+    use agent_kit_core::{ChangeId, Envelope, MessageId, SchemaId, SessionId, TurnId};
+    use agent_kit_sessions::ClaimOutcome;
+    use agent_kit_store_sqlite::SqliteStore;
+    use agent_kit_store_sqlite::context::UnpromptedClaim;
+
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    let summary = "The earliest retained decisions.";
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished(summary),
+        Reply::Finished("Continued after compaction."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    let session = create(&mut socket, workspace.path()).await;
+    drop(socket);
+    terminate_shared_server(host).await;
+
+    // Seed through the journal so the live ACP path starts with retained
+    // history beyond the request projection limit without 4,098 wire updates
+    // during fixture setup. The first two turns fit that record projection,
+    // but only the first fits the bounded summary input.
+    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let session_id = SessionId::new(session.clone()).unwrap();
+    let mut original = Vec::new();
+    for (turn, count, padding) in [
+        ("older", 2_000, 96),
+        ("middle", 2_000, 32),
+        ("recent", 98, 0),
+    ] {
+        let mut records = Vec::with_capacity(count);
+        for index in 0..count {
+            let id = format!("{turn}-{index}");
+            let text = format!("Original {id}. {}", "x".repeat(padding));
+            original.push(text.clone());
+            records.push(HistoryRecord::Message(Message {
+                id: MessageId::new(id).unwrap(),
+                role: if index % 2 == 0 {
+                    Role::User
+                } else {
+                    Role::Assistant
+                },
+                phase: None,
+                content: vec![Content::Text(text)],
+                provenance: Provenance {
+                    source: "fixture".into(),
+                    kind: ProvenanceKind::Supplied,
+                    fingerprint: None,
+                },
+            }));
+        }
+        let context = store
+            .context_history_with(session_id.clone(), None, |_| Vec::new())
+            .await
+            .unwrap();
+        let ClaimOutcome::Acquired(claim) = store
+            .claim_unprompted(UnpromptedClaim {
+                session: session_id.clone(),
+                turn: TurnId::new(turn).unwrap(),
+                request: ChangeId::new(format!("retain-{turn}")).unwrap(),
+                expected_revision: context.session_revision,
+                expected_context: context.basis,
+                checkpoint: Envelope::new(SchemaId::new("fixture.history").unwrap(), 1, Vec::new())
+                    .unwrap(),
+            })
+            .await
+            .unwrap()
+        else {
+            panic!("expected fixture turn ownership");
+        };
+        let journal = claim.lease.journal();
+        let snapshot = journal.load().await.unwrap();
+        journal
+            .commit(
+                JournalChange::new(
+                    ChangeId::new("retain-history").unwrap(),
+                    snapshot.binding().clone(),
+                    snapshot.position(),
+                    snapshot.controls().revision,
+                    vec![
+                        JournalAction::AppendHistory(records),
+                        JournalAction::Settle(TurnOutcome {
+                            status: OutcomeStatus::Succeeded,
+                            account: None,
+                            evidence: Vec::new(),
+                        }),
+                    ],
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+    }
+    drop(store);
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    assert_eq!(
+        load(&mut socket, &session, workspace.path()).await,
+        original
+    );
+    let overflow = prompt(&mut socket, 3, &session, "Cannot send this before repair.").await;
+    assert_eq!(
+        overflow["error"]["data"], "history_projection_limit",
+        "{overflow}"
+    );
+    assert!(endpoint.requests.try_recv().is_err());
+
+    let compact_request = compact(&session, "repair-context");
+    let repaired = ws_rpc(
+        &mut socket,
+        4,
+        "_co.grida/session/compact",
+        compact_request.clone(),
+    )
+    .await;
+    assert_eq!(repaired["result"]["status"], "installed", "{repaired}");
+    assert_eq!(repaired["result"]["coveredRecords"], 2_000);
+    let helper = endpoint.request().await;
+    let source = helper["messages"][1]["content"].as_str().unwrap();
+    assert!(source.contains(&original[0]));
+    assert!(source.contains(&original[1_999]));
+    assert!(!source.contains(&original[2_000]));
+    assert!(!source.contains(&original[4_000]));
+    drop(socket);
+    terminate_shared_server(host).await;
+
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url).await;
+    assert_eq!(
+        load(&mut socket, &session, workspace.path()).await,
+        original
+    );
+    let retried = ws_rpc(&mut socket, 5, "_co.grida/session/compact", compact_request).await;
+    assert_eq!(retried["result"], repaired["result"]);
+    assert!(endpoint.requests.try_recv().is_err());
+
+    let followup = "Continue with the repaired context.";
+    let next = prompt(&mut socket, 6, &session, followup).await;
+    assert_eq!(next["result"]["stopReason"], "end_turn", "{next}");
+    let next = endpoint.request().await;
+    let messages = next["messages"].as_array().unwrap();
+    let mut contents = messages
+        .iter()
+        .rev()
+        .map(|message| message["content"].as_str().unwrap());
+    assert_eq!(contents.next(), Some(followup));
+    for text in original[2_000..].iter().rev() {
+        assert_eq!(contents.next(), Some(text.as_str()));
+    }
+    assert!(contents.next().unwrap().contains(summary));
+    assert!(!next.to_string().contains("Original older-"));
+    drop(socket);
+    terminate_shared_server(host).await;
+    endpoint.done().await;
+}
+
 async fn compact_on_peer(
     url: &str,
     session: &str,
