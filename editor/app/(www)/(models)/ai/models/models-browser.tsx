@@ -43,6 +43,7 @@ import {
 } from "@/lib/gg/public-models/catalogue";
 import { ModelFilters } from "./model-filters";
 import { ModelDetails } from "./model-details";
+import { CostPreview, MediaCostHelp } from "./cost-preview";
 import { LabLogo } from "./lab-logo";
 import {
   modelPricing,
@@ -176,7 +177,8 @@ const ModelRow = memo(function ModelRow({
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
   const pricing = modelPricing(model);
-  const toggle = () => setExpanded(!expanded);
+  const illustrations = gg.illustrative_costs ?? [];
+  const toggle = () => setExpanded((value) => !value);
   return (
     <>
       <TableRow data-state={expanded ? "selected" : undefined}>
@@ -190,6 +192,18 @@ const ModelRow = memo(function ModelRow({
               </code>
             </div>
           </div>
+        </TableCell>
+        <TableCell className="min-w-36">
+          {illustrations[0] ? (
+            <CostPreview examples={illustrations} modelLabel={gg.card.label} />
+          ) : (
+            <span
+              className="text-muted-foreground"
+              title="No estimate available."
+            >
+              —
+            </span>
+          )}
         </TableCell>
         <PriceCell
           lines={pricing.input}
@@ -276,7 +290,7 @@ const ModelRow = memo(function ModelRow({
       </TableRow>
       {expanded ? (
         <TableRow id={detailsId} className="bg-muted/20 hover:bg-muted/20">
-          <TableCell colSpan={6} className="py-5 pl-16 pr-5 whitespace-normal">
+          <TableCell colSpan={7} className="py-5 pl-16 pr-5 whitespace-normal">
             <ModelDetails
               model={model}
               pricing={pricing}
@@ -512,13 +526,19 @@ export function ModelsBrowser({
         <div className="overflow-hidden rounded-lg border">
           <Table>
             <caption className="sr-only">
-              Models available through Grida AI Gateway, with capabilities and
-              usage pricing.
+              Models available through Grida AI Gateway, with capabilities,
+              estimated costs and usage pricing.
             </caption>
             <TableHeader className="bg-muted/30">
               <TableRow className="hover:bg-transparent">
                 <TableHead scope="col" className="pl-5">
                   Model
+                </TableHead>
+                <TableHead scope="col">
+                  <span className="inline-flex items-center gap-1">
+                    Media cost
+                    <MediaCostHelp />
+                  </span>
                 </TableHead>
                 <TableHead scope="col">
                   Input{" "}
