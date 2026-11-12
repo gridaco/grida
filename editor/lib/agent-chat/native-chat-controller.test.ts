@@ -20,7 +20,7 @@ import type {
   NativeEditorSurfaceOpen,
   NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
-import { NativeChatController } from "./native-chat-controller";
+import { NEW_CHAT_TITLE, NativeChatController } from "./native-chat-controller";
 import {
   ComposerDrafts,
   type ComposerDraftAttachment,
@@ -3545,14 +3545,24 @@ it("picks up the title the host writes for an untitled chat as its turn settles"
     await vi.waitFor(() =>
       expect(controller.read().catalogEntry).toMatchObject({ title: null })
     );
-    // The fallback is the first request's first line.
-    expect(controller.chatTitle("chat-a")).toBe("Plan the spring launch kit.");
+    // Until the host titles it, the chat is a new chat.
+    expect(controller.chatTitle("chat-a")).toBe(NEW_CHAT_TITLE);
+    expect(controller.read().titleArrived).toBeNull();
+    // Renaming starts from the shown label; leaving it unchanged keeps the
+    // chat untitled for its generated title.
+    controller.beginRename();
+    expect(controller.read().catalogDraft?.text).toBe(NEW_CHAT_TITLE);
+    await controller.saveTitle();
+    expect(controller.read().catalogDraft).toBeNull();
+    expect(controller.read().catalogEntry?.title).toBeNull();
     entry = { ...entry, revision: 1, title: "Spring launch kit" };
     running.delete("chat-a");
     await vi.waitFor(
       () => expect(controller.chatTitle("chat-a")).toBe("Spring launch kit"),
       { timeout: 3_000 }
     );
+    // The arrival is marked so the header can reveal it.
+    expect(controller.read().titleArrived).toBe("chat-a");
     // A rename in progress is never replaced by the background title.
     controller.beginRename();
     controller.changeTitle("Mine");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   NativeChatEffort,
   NativeChatProfileCatalog,
@@ -46,9 +46,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@app/ui/components/dropdown-menu";
-import type {
-  NativeChatController,
-  NativeChatView,
+import {
+  NEW_CHAT_TITLE,
+  type NativeChatController,
+  type NativeChatView,
 } from "@/lib/agent-chat/native-chat-controller";
 
 export function NativeChatHeader({
@@ -60,9 +61,10 @@ export function NativeChatHeader({
 }) {
   const [open, setOpen] = useState(false);
   const renaming = useRef(false);
+  const titleInput = useRef<HTMLInputElement>(null);
   const title = state.selected
     ? controller.chatTitle(state.selected)
-    : "New chat";
+    : NEW_CHAT_TITLE;
   return (
     <header
       data-testid="native-chat-header"
@@ -156,6 +158,8 @@ export function NativeChatHeader({
       </Popover>
       {state.catalogDraft ? (
         <ChatTitleInput
+          inputRef={titleInput}
+          focusOnMount={!renaming.current}
           value={state.catalogDraft.text}
           disabled={state.catalogChanging}
           onChange={(text) => controller.changeTitle(text)}
@@ -168,7 +172,11 @@ export function NativeChatHeader({
           title={title}
           onDoubleClick={() => controller.beginRename()}
         >
-          {title}
+          <ChatTitleText
+            key={state.selected ?? "new"}
+            text={title}
+            reveal={!!state.selected && state.titleArrived === state.selected}
+          />
           {state.catalogEntry?.archived && " · Archived"}
         </span>
       )}
@@ -199,8 +207,13 @@ export function NativeChatHeader({
           align="end"
           className="w-52"
           onCloseAutoFocus={(e) => {
-            // Keep focus in the title field a rename just opened.
-            if (renaming.current) e.preventDefault();
+            // Hand focus to the title field a rename just opened, with the
+            // whole title selected.
+            if (renaming.current) {
+              e.preventDefault();
+              selectAll(titleInput.current);
+              requestAnimationFrame(() => selectAll(titleInput.current));
+            }
             renaming.current = false;
           }}
         >
@@ -519,12 +532,17 @@ function ConnectionIcon({ connection }: { connection?: string }) {
  * in the same type. Enter or leaving the field saves; Escape cancels.
  */
 function ChatTitleInput({
+  inputRef,
+  focusOnMount,
   value,
   disabled,
   onChange,
   onCommit,
   onCancel,
 }: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  /** False when a closing menu hands focus over instead. */
+  focusOnMount: boolean;
   value: string;
   disabled: boolean;
   onChange: (text: string) => void;
@@ -532,19 +550,18 @@ function ChatTitleInput({
   onCancel: () => void;
 }) {
   const cancelled = useRef(false);
+  const focus = useRef(focusOnMount);
+  useEffect(() => {
+    if (focus.current) selectAll(inputRef.current);
+  }, [inputRef]);
   return (
     <input
-      ref={(input) => {
-        if (input && document.activeElement !== input) {
-          input.focus();
-          input.select();
-        }
-      }}
+      ref={inputRef}
       aria-label="Chat title"
       maxLength={256}
       value={value}
       disabled={disabled}
-      placeholder="Untitled"
+      placeholder={NEW_CHAT_TITLE}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === "Enter" && !e.nativeEvent.isComposing) {
@@ -559,7 +576,58 @@ function ChatTitleInput({
       onBlur={() => {
         if (!cancelled.current) onCommit();
       }}
-      className="min-w-0 flex-1 truncate border-0 bg-transparent p-0 text-xs font-medium text-foreground outline-none"
+      // Outlined so editing reads differently from selected text; the
+      // negative margin keeps the text where the title was.
+      className="-mx-1 min-w-0 flex-1 truncate rounded-sm border-0 bg-transparent px-1 py-0.5 text-xs font-medium text-foreground outline-none ring-1 ring-ring"
     />
+  );
+}
+
+function selectAll(input: HTMLInputElement | null) {
+  if (!input) return;
+  input.focus();
+  input.select();
+}
+
+/** How long a newly arrived title takes to type in. */
+const TITLE_REVEAL_MS = 600;
+
+/**
+ * A chat title. When `reveal` turns on, the title types in from the left so
+ * the person notices it replace the new-chat label; it appears at once when
+ * they prefer reduced motion.
+ */
+function ChatTitleText({ text, reveal }: { text: string; reveal: boolean }) {
+  const characters = Array.from(text);
+  const [shown, setShown] = useState(characters.length);
+  useEffect(() => {
+    const total = Array.from(text).length;
+    if (
+      !reveal ||
+      total === 0 ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      setShown(total);
+      return;
+    }
+    setShown(0);
+    const started = performance.now();
+    let frame = requestAnimationFrame(function step(now) {
+      const next = Math.ceil(
+        (Math.min(now - started, TITLE_REVEAL_MS) / TITLE_REVEAL_MS) * total
+      );
+      setShown(next);
+      if (next < total) frame = requestAnimationFrame(step);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [text, reveal]);
+  if (shown >= characters.length) return <>{text}</>;
+  return (
+    <span aria-label={text}>
+      <span aria-hidden>{characters.slice(0, shown).join("")}</span>
+      <span aria-hidden className="animate-pulse text-foreground/40">
+        {shown > 0 ? "▍" : ""}
+      </span>
+    </span>
   );
 }

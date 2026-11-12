@@ -71,6 +71,8 @@ export function NativeTurnActivity({
           item.kind === "commentary" ? (
             <ChatMessageView
               key={item.message.messageId}
+              // A turn's actions sit under its final answer only.
+              actions={{ hidden: true }}
               message={{
                 id: item.message.messageId,
                 role: item.message.role,

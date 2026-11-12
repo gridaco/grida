@@ -70,6 +70,8 @@ const POLL_MS = 500;
 const RECENTS_LIMIT = 12;
 const MAX_LIVE_ACTIVITY = 64;
 const EMPTY_TURNS: readonly NativeChatTurnRecord[] = [];
+/** The title of a chat the host has not titled yet. */
+export const NEW_CHAT_TITLE = "New chat";
 /** A second look for a background chat title after a turn progresses. */
 const TITLE_RECHECK_MS = 6_000;
 const MAX_LIVE_BYTES = 1024 * 1024;
@@ -132,6 +134,11 @@ export type NativeChatView = Readonly<{
   turnRecords: readonly NativeChatTurnRecord[];
   /** Older pages exist above the loaded messages. */
   canReadEarlier: boolean;
+  /**
+   * The chat whose generated title just arrived, so the title can be revealed
+   * as it replaces the new-chat label. Never set by the person's own rename.
+   */
+  titleArrived: string | null;
   readingEarlier: boolean;
   earlierError: string | null;
   sideChat: NativeSideChatController | null;
@@ -300,6 +307,7 @@ const EMPTY: NativeChatView = Object.freeze({
   messages: [],
   turnRecords: [],
   canReadEarlier: false,
+  titleArrived: null,
   readingEarlier: false,
   earlierError: null,
   sideChat: null,
@@ -807,6 +815,7 @@ export class NativeChatController {
       messages: retained?.messages ?? [],
       turnRecords: retained?.turnRecords ?? [],
       canReadEarlier: false,
+      titleArrived: null,
       readingEarlier: false,
       earlierError: null,
       sideChat: null,
@@ -1406,21 +1415,16 @@ export class NativeChatController {
         ? selected.title
         : this.catalog?.titles?.find((entry) => entry.sessionId === sessionId)
             ?.title;
-    const firstInput =
-      this.view.selected === sessionId
-        ? this.view.messages.find((message) => message.role === "user")?.text
-        : undefined;
-    return (
-      title ??
-      (firstInput?.trim().split("\n")[0].slice(0, 64) || "Untitled chat")
-    );
+    // The host titles a new chat in the background; until then it is new.
+    return title ?? NEW_CHAT_TITLE;
   }
 
   beginRename(): void {
     const basis = this.view.catalogEntry;
     if (basis && !this.view.catalogChanging)
       this.update({
-        catalogDraft: { text: basis.title ?? "", basis },
+        // Start from the title the person sees, so it can be selected whole.
+        catalogDraft: { text: basis.title ?? NEW_CHAT_TITLE, basis },
         catalogEntryError: null,
       });
   }
@@ -1440,8 +1444,12 @@ export class NativeChatController {
     const draft = this.view.catalogDraft;
     if (!draft) return;
     const text = draft.text.trim();
-    // Leaving the field without a change is not a rename.
-    if ((text || null) === (draft.basis.title ?? null)) {
+    // Leaving the field without a change is not a rename; an untitled chat
+    // keeps waiting for its generated title.
+    if (
+      (text || null) === (draft.basis.title ?? null) ||
+      (draft.basis.title === null && text === NEW_CHAT_TITLE)
+    ) {
       this.cancelRename();
       return;
     }
@@ -3715,6 +3723,7 @@ export class NativeChatController {
         )
           return;
         this.installCatalogEntry(entry);
+        this.update({ titleArrived: entry.sessionId });
         void this.listChats();
       } catch {
         // The title stays as it is; a later turn or reopening reads it again.

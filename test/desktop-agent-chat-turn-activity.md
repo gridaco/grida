@@ -44,12 +44,13 @@ details panel; images the latest turn produced appear below its answer.
    order. Select the activity line and confirm each call and its outcome.
    Collapse it again.
 3. Send a second task that uses tools. Confirm both turns show their own
-   collapsed header and answer.
+   collapsed header and answer. Expand one and hover each message inside it:
+   only the final answer shows Copy and its time, once the turn has finished.
 4. Start a long task, pause it with the composer's main button, then send a new
    message. Confirm the paused turn's header reads **You stopped** and its
    partial text stays in view, not collapsed.
 5. Send a request the model service rejects. Confirm a **Failed** header.
 6. Quit and reopen Desktop, then reopen the chat. Confirm every turn keeps its
-   header and collapsed state. Choose **Earlier messages** in a long chat and
-   confirm earlier turns are grouped the same way.
+   header and collapsed state. Scroll up in a long chat and confirm earlier
+   turns load grouped the same way.
 7. Confirm none of steps 2, 6 sent a new model request.

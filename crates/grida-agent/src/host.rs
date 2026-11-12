@@ -130,7 +130,9 @@ const PROVIDER_LIMITS: StreamLimits = StreamLimits {
     max_request_bytes: 1024 * 1024,
     max_response_bytes: 4 * 1024 * 1024,
     max_event_bytes: 256 * 1024,
-    max_tool_calls: 8,
+    // Models read or search many files at once; more calls than this in one
+    // reply is a runaway, not ordinary parallel work.
+    max_tool_calls: 64,
     max_tool_argument_bytes: 64 * 1024,
 };
 
