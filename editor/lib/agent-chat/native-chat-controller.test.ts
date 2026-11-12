@@ -21,6 +21,10 @@ import type {
   NativeEditorSurfaceSnapshot,
 } from "@grida/desktop-bridge";
 import { NativeChatController } from "./native-chat-controller";
+import {
+  ComposerDrafts,
+  type ComposerDraftAttachment,
+} from "./composer-drafts";
 
 function fixture() {
   const updates = new Map<string, (update: NativeChatUpdate) => void>();
@@ -2755,6 +2759,47 @@ it("reads a listed PNG on demand and discards its bytes after switching chats", 
   lateSave.resolve("saved");
   await expect(preview).rejects.toThrow("native_chat_artifact_unavailable");
   await expect(saving).rejects.toThrow("native_chat_artifact_unavailable");
+  controller.disconnect();
+});
+
+it("keeps Plan and an attachment with each chat's draft across reattachment", async () => {
+  const { bridge, controller } = fixture();
+  bridge.acceptsPng = async () => true;
+  bridge.submitImage = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>();
+  bridge.submitInRegime =
+    vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
+  const blobs = new Map<string, ComposerDraftAttachment>();
+  const drafts = new ComposerDrafts(null, {
+    get: async (key) => blobs.get(key) ?? null,
+    put: async (key, value) => void blobs.set(key, value),
+    delete: async (key) => void blobs.delete(key),
+  });
+  controller.keepDrafts(drafts, "workspace");
+  await controller.select("chat-a");
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]).buffer;
+  await controller.pickAttachment(controller.read().scope, "png", {
+    name: "sketch.png",
+    size: png.byteLength,
+    arrayBuffer: async () => png,
+  });
+  controller.selectOperatingRegime("plan");
+  await vi.waitFor(() => expect(blobs.has("workspace:chat-a")).toBe(true));
+
+  // Another chat starts from its own, empty draft.
+  await controller.select("chat-b");
+  await vi.waitFor(() => expect(controller.read().loading).toBe(false));
+  expect(controller.read().attachmentDraft).toBeNull();
+
+  // Returning restores exactly what was left.
+  await controller.select("chat-a");
+  await vi.waitFor(() =>
+    expect(controller.read().attachmentDraft?.name).toBe("sketch.png")
+  );
+  expect(controller.read().operatingRegime).toBe("plan");
+
+  // Removing it is the person's choice and forgets it.
+  controller.removeAttachment(controller.read().scope);
+  await vi.waitFor(() => expect(blobs.has("workspace:chat-a")).toBe(false));
   controller.disconnect();
 });
 

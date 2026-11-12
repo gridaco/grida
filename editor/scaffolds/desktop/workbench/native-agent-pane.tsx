@@ -53,6 +53,7 @@ import {
 } from "../shared/agent-composer-input";
 import { useWorkspaceFileMentions } from "../shared/use-workspace-composer-catalog";
 import { NativeComposerTray } from "./native-composer-tray";
+import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { ContextMeter } from "../shared/context-meter";
 import { computeContextUsage } from "@/lib/agent-chat";
 import { cn } from "@app/ui/lib/utils";
@@ -103,6 +104,9 @@ const selectionMemory = {
   setItem: (key: string, value: string) =>
     window.localStorage.setItem(key, value),
 };
+
+/** One store per window, so a draft outlives any composer instance. */
+const COMPOSER_DRAFTS = new ComposerDrafts();
 
 export function NativeAgentPaneGate({
   bridge,
@@ -225,17 +229,17 @@ export function NativeAgentPane({
   startNewChat?: boolean;
   editorSurfaces?: NativeChatEditorSurfaces;
 }) {
-  const controller = useMemo(
-    () =>
-      new NativeChatController(
-        bridge,
-        selectionMemory,
-        selectionKey && `grida.nativeChat.${selectionKey}`,
-        editorSurfaces,
-        !!workspaceId
-      ),
-    [bridge, selectionKey, editorSurfaces, workspaceId]
-  );
+  const controller = useMemo(() => {
+    const created = new NativeChatController(
+      bridge,
+      selectionMemory,
+      selectionKey && `grida.nativeChat.${selectionKey}`,
+      editorSurfaces,
+      !!workspaceId
+    );
+    created.keepDrafts(COMPOSER_DRAFTS, workspaceId ?? "standalone");
+    return created;
+  }, [bridge, selectionKey, editorSurfaces, workspaceId]);
   const state = useSyncExternalStore(
     controller.subscribe,
     controller.read,
@@ -815,6 +819,10 @@ export function NativeAgentPane({
         />
         <AgentComposerInput
           key={state.scope}
+          draft={{
+            key: controller.draftKey() ?? "",
+            store: COMPOSER_DRAFTS,
+          }}
           catalog={catalog}
           className="@container"
           commandActions={[

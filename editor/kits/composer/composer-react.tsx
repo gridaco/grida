@@ -1,5 +1,7 @@
 "use client";
 
+import type { JSONContent } from "@tiptap/core";
+
 import { cn } from "@app/ui/lib/utils";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import {
@@ -50,6 +52,10 @@ export type ComposerController = {
   removeAttachment: ComposerCore["removeAttachment"];
   setContexts: ComposerCore["setContexts"];
   clear: () => void;
+  /** The editor's document, or null when it is empty. */
+  readDocument: () => unknown | null;
+  /** Restore a saved document into an empty editor. False when not applied. */
+  restoreDocument: (doc: unknown) => boolean;
   appendText: (text: string, maxBytes: number) => boolean;
   insertFileReference: (reference: ComposerFileReference) => boolean;
   setTriggerIndex: (index: number) => void;
@@ -133,6 +139,21 @@ export function useComposer() {
       clear() {
         editor?.commands.clearContent(true);
         core.clear();
+      },
+      readDocument() {
+        return editor && !editor.isEmpty ? editor.getJSON() : null;
+      },
+      restoreDocument(doc) {
+        if (!editor || !editor.isEmpty) return false;
+        try {
+          editor.commands.setContent(doc as JSONContent, true);
+          // Continue typing at the end of the restored text.
+          editor.commands.setTextSelection(editor.state.doc.content.size);
+        } catch {
+          return false;
+        }
+        ComposerTiptap.syncCore(core, editor);
+        return true;
       },
       appendText(text, maxBytes) {
         return !!editor && ComposerTiptap.appendText(editor, text, maxBytes);

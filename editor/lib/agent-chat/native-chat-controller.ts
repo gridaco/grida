@@ -51,6 +51,7 @@ import type {
   NativeSubagentClient,
 } from "@grida/desktop-bridge";
 import { GoalSpending } from "./goal-spending";
+import type { ComposerDrafts } from "./composer-drafts";
 import { isSupportedImageType } from "./image-attachment";
 import { NativeSideChatController } from "./native-side-chat-controller";
 import { NativeSubagentController } from "./native-subagent-controller";
@@ -374,6 +375,63 @@ export class NativeChatController {
     private readonly editorSurfaces?: NativeChatEditorSurfaces,
     private readonly libraryPicker = false
   ) {}
+
+  private drafts?: { store: ComposerDrafts; workspace: string };
+
+  /**
+   * Keep Plan, Goal and an attachment with each chat's unsent draft. The
+   * composer keeps the text in the same store under the same key.
+   */
+  keepDrafts(store: ComposerDrafts, workspace: string): void {
+    this.drafts = { store, workspace };
+  }
+
+  /** The draft key the composer uses for the selected chat. */
+  draftKey(): string | null {
+    return this.drafts
+      ? `${this.drafts.workspace}:${this.view.selected ?? "new"}`
+      : null;
+  }
+
+  private saveDraftModes(key = this.draftKey()): void {
+    if (!key || !this.drafts) return;
+    this.drafts.store.writeModes(key, {
+      ...(this.view.operatingRegime === "plan" && { plan: true }),
+      ...(this.view.goalIntent && { goal: true }),
+    });
+  }
+
+  private saveDraftAttachment(
+    attachment: SelectedAttachment | null,
+    key = this.draftKey()
+  ): void {
+    if (key && this.drafts)
+      void this.drafts.store.writeAttachment(key, attachment);
+  }
+
+  /** Bring back what the person left in this chat's composer. */
+  private async restoreDraft(scope: Scope): Promise<void> {
+    const drafts = this.drafts;
+    const key = this.draftKey();
+    if (!drafts || !key || !this.owns(scope)) return;
+    const modes = drafts.store.readModes(key);
+    if (modes.plan && this.bridge.submitInRegime)
+      this.update({ operatingRegime: "plan" });
+    if (modes.goal && this.bridge.startGoal) this.update({ goalIntent: true });
+    const attachment = await drafts.store.readAttachment(key);
+    if (!attachment || !this.owns(scope) || scope.selectedAttachment) return;
+    if (!this.canAttach(attachment.kind)) {
+      // Never dropped: it stays with the draft for a model that accepts it.
+      this.update({
+        attachmentNotice: `${attachment.name} is kept with this draft. Choose a model that accepts it to send it.`,
+      });
+      return;
+    }
+    await this.readAttachment(scope.id, attachment.kind, {
+      kind: "file",
+      file: new File([attachment.bytes], attachment.name),
+    });
+  }
 
   static watchReadiness(
     bridge: DesktopNativeChat,
@@ -796,7 +854,9 @@ export class NativeChatController {
     void this.readEffortCapability(scope);
     void this.readWakeupCapability(scope);
     if (sessionId === null) {
-      void this.readInputCapabilities(scope);
+      void this.readInputCapabilities(scope).then(() =>
+        this.restoreDraft(scope)
+      );
       this.save();
       return;
     }
@@ -811,7 +871,10 @@ export class NativeChatController {
           this.update({ error: describe(error, "Couldn't open this chat.") });
       }
     } finally {
-      if (this.owns(scope)) this.update({ loading: false });
+      if (this.owns(scope)) {
+        this.update({ loading: false });
+        void this.restoreDraft(scope);
+      }
     }
   }
 
@@ -970,6 +1033,7 @@ export class NativeChatController {
         if (scope.pending?.attachment) scope.pending = undefined;
       } else scope.selectedAttachment = original;
       this.update({ attachmentDraft: { kind, name, size: bytes.byteLength } });
+      this.saveDraftAttachment(scope.selectedAttachment);
     } catch (error) {
       if (ownsRead()) {
         if (source.kind === "library") {
@@ -1008,6 +1072,7 @@ export class NativeChatController {
     scope.attachmentRead = undefined;
     scope.selectedAttachment = undefined;
     if (scope.pending?.attachment) scope.pending = undefined;
+    this.saveDraftAttachment(null);
     this.update({
       attachmentDraft: null,
       attachmentReading: false,
@@ -1948,7 +2013,11 @@ export class NativeChatController {
   }
 
   selectOperatingRegime(operatingRegime: NativeChatOperatingRegime): void {
-    if (this.bridge.submitInRegime && !this.view.acting && !this.view.steering)
+    if (
+      this.bridge.submitInRegime &&
+      !this.view.acting &&
+      !this.view.steering
+    ) {
       this.update({
         operatingRegime,
         ...(operatingRegime === "plan" && {
@@ -1956,6 +2025,8 @@ export class NativeChatController {
           allowWakeup: false,
         }),
       });
+      this.saveDraftModes();
+    }
   }
 
   selectGoalIntent(enabled: boolean): void {
@@ -1967,8 +2038,10 @@ export class NativeChatController {
       });
       return;
     }
-    if (!enabled || this.canStartGoal)
+    if (!enabled || this.canStartGoal) {
       this.update({ goalIntent: enabled, error: null });
+      this.saveDraftModes();
+    }
   }
 
   selectEffort(effort: NativeChatEffort): void {
@@ -2012,6 +2085,7 @@ export class NativeChatController {
     const next = !this.view.steering && !!this.pausedTurn;
     if (next) await this.endPausedTurn(scope);
     if (this.view.goalIntent) {
+      const goalFrom = this.draftKey();
       if (this.view.attachmentDraft || this.view.reviewConfiguration)
         throw new Error(
           "Remove the attachment or settings review before starting a goal."
@@ -2033,10 +2107,14 @@ export class NativeChatController {
       if (!accepted)
         throw new Error(this.view.error ?? "Couldn't start the goal.");
       if (this.owns(scope)) this.update({ goalIntent: false });
+      this.drafts?.store.writeModes(goalFrom ?? "", {
+        ...(this.view.operatingRegime === "plan" && { plan: true }),
+      });
       if (next) await this.playNext(scope, null);
       return;
     }
     if (this.view.steering) return this.submitSteering(scope, text);
+    const sentFrom = this.draftKey();
     const mode = this.needsQueue ? "enqueue" : "submit";
     const selectedAttachment = scope.selectedAttachment;
     const allowWakeup = this.view.allowWakeup;
@@ -2250,6 +2328,7 @@ export class NativeChatController {
           scope.selectedAttachment = undefined;
           this.update({ attachmentDraft: null, attachmentNotice: null });
         }
+        if (pending.attachment) this.saveDraftAttachment(null, sentFrom);
         scope.awaitingTurn = accepted.turnId ?? undefined;
         scope.replay = true;
         await this.refresh(scope);

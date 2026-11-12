@@ -38,6 +38,19 @@ If the connection fails before acceptance is confirmed, the request shows that
 confirmation is pending. Reconnecting or retrying resolves the same submission
 without starting duplicate work.
 
+### Keep what the person is writing
+
+Unsent text is the person's work. The product never discards a draft on its
+own. It survives changing the model or effort, reconnecting or reopening the
+chat, a failed send, an error, switching to another chat and back, and
+restarting the application. Each chat keeps its own draft as the person left
+it: the text with inline references, Plan or Goal, and an attached file. Only
+two things remove part of it: the person removing it, or a send the agent has
+accepted. A send that fails or is still unconfirmed keeps the draft. An
+attachment the selected model cannot use stays with the draft, and the
+composer says so, until the person removes it or chooses a model that accepts
+it.
+
 The agent follows the requested outcome and constraints. It makes reasonable,
 reversible decisions where the request leaves room for judgment. It asks a
 focused question when the missing answer would materially change the result or

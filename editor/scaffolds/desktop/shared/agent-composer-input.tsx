@@ -35,6 +35,7 @@ import {
   UploadIcon,
 } from "lucide-react";
 import type { FileUIPart } from "ai";
+import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { Button } from "@app/ui/components/button";
 import {
   DropdownMenu,
@@ -130,6 +131,11 @@ export type AgentComposerInputProps = {
    * Stop for a running turn. Typing turns it back into Send.
    */
   emptyAction?: { label: string; icon: ReactNode; onClick: () => void };
+  /**
+   * Where unsent text is kept, keyed by chat. The draft survives remounting,
+   * reconnection and restarts; only deleting it or an accepted send clears it.
+   */
+  draft?: { key: string; store: ComposerDrafts };
   placeholder?: string;
   autofocus?: boolean;
   /**
@@ -225,6 +231,7 @@ function AgentComposerInner({
   draftRef,
   onStop,
   emptyAction,
+  draft,
   placeholder = "Ask anything…",
   autofocus,
   providerFileMimes = NO_PROVIDER_FILE_MIMES,
@@ -245,7 +252,25 @@ function AgentComposerInner({
   // Fall back to `isStreaming` if the host doesn't pass `busy`.
   const isBusy = busy ?? isStreaming;
   const composer = useComposer();
-  const { addAttachment } = composer;
+  const { addAttachment, readDocument, restoreDocument } = composer;
+  // Restore this chat's unsent draft once the editor exists, then keep every
+  // change. A different chat starts from its own draft.
+  const draftKey = draft?.key;
+  const draftStore = draft?.store;
+  const restoredDraft = useRef<string | null>(null);
+  useEffect(() => {
+    if (!draftKey || !draftStore || restoredDraft.current === draftKey) return;
+    const saved = draftStore.read(draftKey);
+    if (restoredDraft.current !== null) composer.clear();
+    if (saved === null || restoreDocument(saved))
+      restoredDraft.current = draftKey;
+    // composer.clear is stable for a given editor, like restoreDocument.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, draftStore, restoreDocument]);
+  useEffect(() => {
+    if (!draftKey || !draftStore || restoredDraft.current !== draftKey) return;
+    draftStore.write(draftKey, readDocument());
+  }, [composer.snapshot, draftKey, draftStore, readDocument]);
   useImperativeHandle(draftRef, () => ({ appendText: composer.appendText }), [
     composer.appendText,
   ]);
@@ -626,8 +651,20 @@ function AgentComposerInner({
       const lease = queueSubmitGuard.begin(submissionScope);
       if (!lease) return;
       setQueueingLease(lease);
+      // The chat this draft belongs to can change while the send is confirmed,
+      // e.g. when a new chat is created. Clear exactly the draft that was sent.
+      const sentDraft = draftKey && {
+        key: draftKey,
+        doc: JSON.stringify(readDocument()),
+      };
       try {
         await onSubmit(...submitArgs);
+        if (
+          sentDraft &&
+          draftStore &&
+          JSON.stringify(draftStore.read(sentDraft.key)) === sentDraft.doc
+        )
+          draftStore.write(sentDraft.key, null);
         if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
           // The editor remains usable while the bridge acknowledges enqueue.
           // Re-read it now: a user edit or session switch may have produced a
