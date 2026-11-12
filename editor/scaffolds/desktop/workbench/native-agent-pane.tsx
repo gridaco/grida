@@ -319,19 +319,6 @@ export function NativeAgentPane({
   const queued = snapshot?.queuedInputs ?? 0;
   const streamingControlsOnly = running && !bridge.enqueue;
   const error = state.error ?? state.approvalError ?? state.questionError;
-  // One short state line. Questions, approvals, the queue and each turn's
-  // header already show their own state in the conversation.
-  const status = state.loading
-    ? null
-    : turn?.cancelled
-      ? "Stopping…"
-      : canResume || turn?.paused
-        ? "Paused"
-        : turn?.disposition === "interrupted"
-          ? "Interrupted"
-          : running || state.repairing
-            ? "Working…"
-            : null;
 
   const selectedProfile =
     state.profiles?.saved.find((p) => p.id === state.profiles?.active) ??
@@ -551,18 +538,6 @@ export function NativeAgentPane({
             )
           }
         />
-      )}
-      {status && (
-        <div role="status" className="px-3 pt-2 text-xs text-muted-foreground">
-          {status}
-          {turn && queued > 0 && (
-            <>
-              {" "}
-              ·{" "}
-              {queued === 1 ? "1 message queued" : `${queued} messages queued`}
-            </>
-          )}
-        </div>
       )}
       {error && (
         <div

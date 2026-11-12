@@ -1548,6 +1548,7 @@ it("sending while a turn is paused stops it and plays the new message next", asy
   });
   bridge.control = async (id, input) => {
     calls.push(`control:${input.action}`);
+    if (input.action === "resume") throw new Error("fixture only");
     if (input.action === "stop") state = "stopped";
     return {
       action: input.action,
