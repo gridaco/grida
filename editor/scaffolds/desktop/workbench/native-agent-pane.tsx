@@ -394,10 +394,13 @@ export function NativeAgentPane({
         actions={
           message.role === "user"
             ? {
-                ...(editHistory && {
-                  onEdit: (messageId: string) =>
-                    void controller.prepareRevision(messageId),
-                }),
+                // Only plain-text requests can be edited; a request with an
+                // attachment cannot be resubmitted.
+                ...(editHistory &&
+                  !message.attachments?.length && {
+                    onEdit: (messageId: string) =>
+                      void controller.prepareRevision(messageId),
+                  }),
                 sentAtMs: record?.startedAtMs,
                 note: goalStart ? (
                   <>
