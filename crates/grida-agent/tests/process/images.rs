@@ -1017,8 +1017,31 @@ async fn supervised_gateway_sends_only_the_selected_png_and_reopens_its_scope() 
     foreign.close().await;
 
     let mut reopened = gateway_stdio(&state, &scope).await;
-    let loaded = reopened.request("session/load", load).await;
-    assert!(loaded["result"].is_object(), "{loaded}");
+    let id = reopened.send("session/load", load).await;
+    let mut attachments = Vec::new();
+    loop {
+        let frame = reopened.read_frame().await;
+        if frame["id"] == id {
+            assert!(frame["result"].is_object(), "{frame}");
+            break;
+        }
+        let update = &frame["params"]["update"];
+        if update["sessionUpdate"] == "user_message_chunk" {
+            assert!(!frame.to_string().contains(&data));
+            assert!(!frame.to_string().contains("Retained PNG"), "{frame}");
+            if update["content"]["type"] == "resource_link" {
+                attachments.push(update["content"].clone());
+            }
+        }
+    }
+    // The replayed request shows the image as an attachment, not as text.
+    assert_eq!(attachments.len(), 1, "{attachments:?}");
+    assert_eq!(attachments[0]["name"], "image.png");
+    assert_eq!(attachments[0]["mimeType"], "image/png");
+    assert_eq!(
+        attachments[0]["size"],
+        STANDARD.decode(&data).unwrap().len()
+    );
     let retained = reopened
         .request(
             "_co.grida/session/input",

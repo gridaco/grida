@@ -66,6 +66,7 @@ import { NativeAttachmentCard } from "./native-attachment-card";
 import { NativeEarlierMessages } from "./native-earlier-messages";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
+import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
 import { NativeSubagentsPanel } from "./native-subagents-panel";
 
@@ -416,7 +417,7 @@ export function NativeAgentPane({
         message={{
           id: message.messageId,
           role: message.role,
-          parts: [{ type: "text", text: message.text }],
+          parts: native_message_parts.of(message),
         }}
       />
     );

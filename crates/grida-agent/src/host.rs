@@ -38,7 +38,7 @@ pub(crate) use image_tools::{CropArtifact, CropArtifacts};
 pub use images::ImageUpload;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(crate) use images::MAX_IMAGE_BYTES;
-pub(crate) use images::is_retained_image;
+pub(crate) use images::{is_retained_image, retained_image_size};
 pub use lifecycle::{InputInspection, InputSettings, QueueEdit, TurnControl};
 pub use lifecycle_hooks::HookInspection;
 pub use permissions::{Approvals, PendingApproval};

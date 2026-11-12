@@ -28,6 +28,7 @@ import type {
   NativeChatImageArtifact,
   NativeChatActivity,
   NativeChatMessage,
+  NativeChatMessageAttachment,
   NativeChatTranscriptPage,
   NativeChatTurnRecord,
   NativeChatOperatingRegime,
@@ -159,6 +160,8 @@ const MAX_GATEWAY_CHILD_ASSIGNMENTS = 16;
 const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 const MAX_TRANSCRIPT_MESSAGES = 1024;
 const MAX_MESSAGE_ACTIVITY = 64;
+const MAX_MESSAGE_ATTACHMENTS = 64;
+const MAX_ATTACHMENT_NAME_BYTES = 256;
 const ACTIVITY_KINDS: ReadonlySet<NativeChatActivity["kind"]> = new Set([
   "read",
   "search",
@@ -1952,6 +1955,20 @@ export class NativeAgentChat {
             : null;
       if (!role) return;
       const content = object(update.content);
+      if (content.type === "resource_link") {
+        // A person's attachment, named in a transcript page.
+        const replay = metadata?.[TRANSCRIPT_WINDOW];
+        if (role !== "user" || replay === undefined) return;
+        const attribution = object(replay);
+        if (capture && capture.requestId === identity(attribution.requestId))
+          captureAttachment(
+            capture,
+            identity(update.messageId),
+            optionalIdentity(attribution.turnId),
+            attachment(content)
+          );
+        return;
+      }
       if (
         content.type !== "text" ||
         typeof content.text !== "string" ||
@@ -2184,6 +2201,56 @@ function captureText(
     messageId,
     role,
     text: (previous?.text ?? "") + text,
+  });
+}
+
+function captureAttachment(
+  capture: TranscriptCapture,
+  messageId: string,
+  turnId: string | undefined,
+  entry: NativeChatMessageAttachment
+): void {
+  if (capture.overflow) return;
+  const previous = capture.messages.get(messageId);
+  if (previous && previous.role !== "user") throw invalidResponse();
+  const recorded = previous?.attachments ?? [];
+  if (
+    recorded.length >= MAX_MESSAGE_ATTACHMENTS ||
+    (!previous && capture.messages.size >= MAX_TRANSCRIPT_MESSAGES)
+  ) {
+    capture.overflow = true;
+    capture.messages.clear();
+    return;
+  }
+  capture.messages.set(messageId, {
+    messageId,
+    role: "user",
+    text: "",
+    ...previous,
+    ...(turnId && { turnId }),
+    attachments: [...recorded, entry],
+  });
+}
+
+/** Validate one attachment link. Its URI names a host-held asset and is not kept. */
+function attachment(
+  content: Record<string, unknown>
+): NativeChatMessageAttachment {
+  const { name, mimeType, size } = content;
+  if (
+    typeof name !== "string" ||
+    !name ||
+    Buffer.byteLength(name) > MAX_ATTACHMENT_NAME_BYTES ||
+    (mimeType !== undefined &&
+      mimeType !== null &&
+      (typeof mimeType !== "string" ||
+        !/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/.test(mimeType)))
+  )
+    throw invalidResponse();
+  return Object.freeze({
+    name,
+    ...(typeof mimeType === "string" && { mimeType }),
+    ...(size !== undefined && size !== null && { size: revision(size) }),
   });
 }
 

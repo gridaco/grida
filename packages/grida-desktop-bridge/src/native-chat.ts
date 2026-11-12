@@ -426,6 +426,16 @@ export type NativeChatMessage = Readonly<{
    */
   phase?: "answer" | "progress";
   activity?: readonly NativeChatActivity[];
+  /** Files the person attached to this message. Their bytes stay with the host. */
+  attachments?: readonly NativeChatMessageAttachment[];
+}>;
+
+/** A file attached to a person's message, named for display. */
+export type NativeChatMessageAttachment = Readonly<{
+  name: string;
+  mimeType?: string;
+  /** Bytes, when the host recorded the size. */
+  size?: number;
 }>;
 
 /** Recorded outcome and wall-clock interval of a turn in a transcript page. */

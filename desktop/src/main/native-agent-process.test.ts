@@ -409,6 +409,9 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
         update:{sessionUpdate:'tool_call',toolCallId:'call-live',title:'run_command',kind:'execute',status:'in_progress'}}});
       send({method:'session/update',params:{sessionId:'chat',_meta:meta({}),
         update:{sessionUpdate:'user_message_chunk',messageId:'ask',content:{type:'text',text:'Check it'}}}});
+      send({method:'session/update',params:{sessionId:'chat',_meta:meta({}),
+        update:{sessionUpdate:'user_message_chunk',messageId:'ask',content:{type:'resource_link',
+          name:'image.png',uri:'urn:grida:retained-attachment:image-1',mimeType:'image/png',size:179}}}});
       send({method:'session/update',params:{sessionId:'chat',_meta:meta({phase:'progress'}),
         update:{sessionUpdate:'agent_message_chunk',messageId:'work',content:{type:'text',text:'Reading.'}}}});
       send({method:'session/update',params:{sessionId:'chat',
@@ -469,6 +472,10 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
               role: "user",
               text: "Check it",
               turnId: "turn-1",
+              // The attachment is named for display; its host URI is not kept.
+              attachments: [
+                { name: "image.png", mimeType: "image/png", size: 179 },
+              ],
             },
             {
               messageId: "work",

@@ -4,8 +4,8 @@ use super::transport::Delivery;
 use super::unavailable;
 use agent_client_protocol::v1::ConnectionTo;
 use agent_client_protocol::v1::schema::{
-    ContentChunk, SessionId, SessionNotification, SessionUpdate, ToolCall as AcpToolCall,
-    ToolCallStatus, ToolKind,
+    ContentBlock, ContentChunk, ResourceLink, SessionId, SessionNotification, SessionUpdate,
+    ToolCall as AcpToolCall, ToolCallStatus, ToolKind,
 };
 use agent_client_protocol::{Client, Result};
 use agent_kit_core::history::HistoryRecord;
@@ -137,6 +137,8 @@ impl Projection {
                 &meta,
             )
             .await?;
+            self.attachments(connection, delivery, &message, Some(&meta))
+                .await?;
             let settled = turn
                 .as_ref()
                 .and_then(|turn| facts.get(turn))
@@ -216,7 +218,43 @@ impl Projection {
             &text
         };
         self.chunk(connection, delivery, message.role, &message.id, suffix)
+            .await?;
+        let meta = self
+            .replay_id
+            .as_ref()
+            .map(|request_id| json!({"requestId": request_id}));
+        self.attachments(connection, delivery, &message, meta.as_ref())
             .await
+    }
+
+    /// A person's retained attachments, each as a link to the held asset. The
+    /// link names the attachment for display; it never carries its bytes.
+    async fn attachments(
+        &self,
+        connection: &ConnectionTo<Client>,
+        delivery: &Delivery,
+        message: &Message,
+        meta: Option<&Value>,
+    ) -> Result<()> {
+        if message.role != Role::User {
+            return Ok(());
+        }
+        for link in attachment_links(message) {
+            let chunk =
+                ContentChunk::new(ContentBlock::ResourceLink(link)).message_id(message.id.as_str());
+            let mut notification = SessionNotification::new(
+                self.session.clone(),
+                SessionUpdate::UserMessageChunk(chunk),
+            );
+            if let Some(meta) = meta {
+                notification = notification.meta(serde_json::Map::from_iter([(
+                    TRANSCRIPT_WINDOW.into(),
+                    meta.clone(),
+                )]));
+            }
+            delivery.send(connection, notification).await?;
+        }
+        Ok(())
     }
 
     async fn chunk_with(
@@ -292,7 +330,9 @@ pub(super) fn visible_record_bytes(record: &HistoryRecord) -> usize {
             _ => false,
         })
         .count();
-    visible_parts(message).map(|part| part.len()).sum::<usize>() + activity * ACTIVITY_RECORD_BYTES
+    let attachments = attachment_links(message).count();
+    visible_parts(message).map(|part| part.len()).sum::<usize>()
+        + (activity + attachments) * ACTIVITY_RECORD_BYTES
 }
 
 /// Recorded outcome and wall-clock interval for a replayed turn.
@@ -447,6 +487,8 @@ fn shorten(text: &str, maximum: usize) -> (String, bool) {
     )
 }
 
+/// A message's readable text. A person's attachments are not text; they are
+/// presented as links (`attachment_links`).
 fn visible_parts(message: &Message) -> impl Iterator<Item = Cow<'_, str>> {
     message.content.iter().filter_map(|content| {
         if !matches!(message.role, Role::User | Role::Assistant) {
@@ -454,14 +496,34 @@ fn visible_parts(message: &Message) -> impl Iterator<Item = Cow<'_, str>> {
         }
         match content {
             Content::Text(text) => Some(Cow::Borrowed(text.as_str())),
-            Content::Media(media) if crate::host::is_retained_image(media) => {
-                Some(Cow::Borrowed(crate::host::RETAINED_IMAGE_LABEL))
-            }
-            Content::Media(media) => {
-                grida_agent_master::retained_file::display(media).map(Cow::Owned)
-            }
             _ => None,
         }
+    })
+}
+
+/// URI scheme naming an attachment the host retains for a chat. Clients
+/// cannot resolve it; it identifies the attachment within the transcript.
+const RETAINED_ATTACHMENT_URI: &str = "urn:grida:retained-attachment:";
+
+fn attachment_links(message: &Message) -> impl Iterator<Item = ResourceLink> + '_ {
+    message.content.iter().filter_map(move |content| {
+        let Content::Media(media) = content else {
+            return None;
+        };
+        if message.role != Role::User {
+            return None;
+        }
+        let uri = format!("{RETAINED_ATTACHMENT_URI}{}", media.id);
+        if crate::host::is_retained_image(media) {
+            let size =
+                crate::host::retained_image_size(media).and_then(|size| i64::try_from(size).ok());
+            return Some(
+                ResourceLink::new("image.png", uri)
+                    .mime_type("image/png".to_owned())
+                    .size(size),
+            );
+        }
+        grida_agent_master::retained_file::name(media).map(|name| ResourceLink::new(name, uri))
     })
 }
 
@@ -536,5 +598,80 @@ mod compaction_fact_tests {
                 .is_none(),
             "a failed compaction has no summary to show"
         );
+    }
+}
+
+#[cfg(test)]
+mod attachment_tests {
+    use super::*;
+    use agent_kit_core::messages::{MediaRef, Provenance, ProvenanceKind, Retention};
+    use agent_kit_core::{ArtifactId, BindingId};
+
+    fn media(id: &str, media_type: &str, locator: &str) -> Content {
+        Content::Media(MediaRef {
+            id: ArtifactId::new(id).unwrap(),
+            media_type: media_type.into(),
+            locator: locator.into(),
+            access_scope: BindingId::new("retained-input/chat").unwrap(),
+            retention: Retention::Retained,
+        })
+    }
+
+    fn message(role: Role, content: Vec<Content>) -> Message {
+        Message {
+            id: MessageId::new("message").unwrap(),
+            role,
+            phase: None,
+            content,
+            provenance: Provenance {
+                source: "test".into(),
+                kind: ProvenanceKind::Supplied,
+                fingerprint: None,
+            },
+        }
+    }
+
+    #[test]
+    fn a_persons_attachments_are_links_not_text() {
+        let asked = message(
+            Role::User,
+            vec![
+                Content::Text("What colour is it?".into()),
+                media("image-1", "image/png", "retained-input:{}"),
+                media(
+                    "file-1",
+                    grida_agent_master::retained_file::MEDIA_TYPE,
+                    "retained-file-name:brief.md",
+                ),
+            ],
+        );
+        let text: String = visible_parts(&asked).collect();
+        assert_eq!(text, "What colour is it?");
+        let links: Vec<_> = attachment_links(&asked).collect();
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].name, "image.png");
+        assert_eq!(links[0].mime_type.as_deref(), Some("image/png"));
+        assert_eq!(links[0].uri, "urn:grida:retained-attachment:image-1");
+        assert_eq!(links[1].name, "brief.md");
+        assert_eq!(links[1].uri, "urn:grida:retained-attachment:file-1");
+        let record = HistoryRecord::Message(asked);
+        assert_eq!(
+            visible_record_bytes(&record),
+            "What colour is it?".len() + 2 * ACTIVITY_RECORD_BYTES
+        );
+    }
+
+    #[test]
+    fn unrecognized_or_assistant_media_is_not_linked() {
+        let foreign = message(
+            Role::User,
+            vec![media("other", "image/jpeg", "elsewhere:x")],
+        );
+        assert_eq!(attachment_links(&foreign).count(), 0);
+        let answered = message(
+            Role::Assistant,
+            vec![media("image-1", "image/png", "retained-input:{}")],
+        );
+        assert_eq!(attachment_links(&answered).count(), 0);
     }
 }

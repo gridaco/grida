@@ -99,6 +99,11 @@ pub(super) fn media(asset: &AssetRef) -> Result<MediaRef> {
     })
 }
 
+/// The byte size of a retained image, when its asset identity is intact.
+pub(crate) fn retained_image_size(media: &MediaRef) -> Option<u64> {
+    asset_ref(media).ok().map(|asset| asset.size())
+}
+
 pub(crate) fn is_retained_image(media: &MediaRef) -> bool {
     media.media_type == MIME
         && media.retention == Retention::Retained

@@ -7,10 +7,16 @@ pub const LOCATOR_PREFIX: &str = "retained-file-name:";
 pub const MAX_NAME_BYTES: usize = 100;
 
 pub fn display(media: &MediaRef) -> Option<String> {
+    display_name(name(media)?)
+}
+
+/// The attachment's file name, when `media` is a retained file attachment.
+pub fn name(media: &MediaRef) -> Option<&str> {
     if media.media_type != MEDIA_TYPE || media.retention != Retention::Retained {
         return None;
     }
-    display_name(media.locator.strip_prefix(LOCATOR_PREFIX)?)
+    let name = media.locator.strip_prefix(LOCATOR_PREFIX)?;
+    display_name(name).map(|_| name)
 }
 
 pub fn display_name(name: &str) -> Option<String> {
