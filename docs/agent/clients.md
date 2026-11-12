@@ -329,7 +329,9 @@ While a turn is active, the native workspace composer queues text as a
 follow-up. You can edit, move, or remove waiting messages. Choose **Steer**
 on a waiting message when it should guide that turn at its next decision. If
 the turn cannot accept it, the text returns to the composer.
-**Stop** holds the queue. Choose **Resume** on the queue to let waiting messages run.
+The main button pauses the active turn; ▶ resumes it. Sending while a turn is
+paused ends it as stopped and runs the new message next. A held queue shows
+**Resume** to let waiting messages run.
 
 Text and resource-link descriptors are accepted as prompt content. A resource
 link supplies context about a resource. File access follows a separately granted

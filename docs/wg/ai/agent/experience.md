@@ -340,6 +340,12 @@ allowance. Already accepted external jobs retain their visible status.
 still need an answer or reconciliation of an external operation. Resuming does
 not invent that answer or repeat completed work.
 
+A paused task is stopped unless the person resumes it. Sending a new request
+while a task is paused ends that task as stopped and runs the new request
+next, ahead of requests already waiting; those follow it. Pause is therefore
+the product's primary interruption: it costs nothing over Stop and keeps the
+option to continue the same task.
+
 **Stop** requests an end to the current task and pauses automatic execution of
 waiting requests. The queue remains available for inspection, editing, and
 resumption. This queue pause survives an execution restart. **Resume queue** is

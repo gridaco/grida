@@ -26,12 +26,21 @@ If the current turn asks a question, use its answer control. A separate
 queued message leaves the question open. Review an access request through
 its approval controls. [Understand agent permissions](./permissions.md)
 
-## End the current turn
+## Pause, resume, or move on
 
-- Choose **Stop** to end the current task and hold the queue. The queue shows
-  **Queue paused because you interrupted**; choose **Resume** there, or the
-  play button in an empty composer, when the waiting messages should start.
-- A turn paused by a Goal or another client shows **Resume** to continue it.
+While the agent works, the composer's main button pauses it. The turn stops
+after its current step and keeps its place. From there:
+
+- Choose ▶ in the empty composer to **Resume** the same turn where it paused.
+  Nothing is sent again; the agent continues its plan.
+- Or send a new message. The paused turn ends as stopped, and your message
+  runs next, ahead of anything already waiting. Waiting messages follow it.
+
+Like a music player: pause, then play to continue the same track, or pick
+the next one. A turn paused by a Goal or another client also shows ▶.
+
+If waiting messages are held after a turn ends, the queue shows
+**Queue paused because you interrupted** with **Resume**.
 
 After a full Desktop restart, reopening a chat only loads its retained work.
 If messages are waiting in an idle queue, choose **Resume** to start them.

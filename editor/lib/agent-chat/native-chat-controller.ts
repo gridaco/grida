@@ -2003,6 +2003,10 @@ export class NativeChatController {
       return this.runCommand(literal === "/compact" ? "compact" : "fork");
     if (!this.canSubmit || !text.trim())
       throw new Error("native_chat_not_ready");
+    // Sending while a turn is paused moves on: that turn ends as stopped and
+    // this message runs next. See "Pause, resume, and stop deliberately".
+    const next = !this.view.steering && !!this.pausedTurn;
+    if (next) await this.endPausedTurn(scope);
     if (this.view.goalIntent) {
       if (this.view.attachmentDraft || this.view.reviewConfiguration)
         throw new Error(
@@ -2025,6 +2029,7 @@ export class NativeChatController {
       if (!accepted)
         throw new Error(this.view.error ?? "Couldn't start the goal.");
       if (this.owns(scope)) this.update({ goalIntent: false });
+      if (next) await this.playNext(scope, null);
       return;
     }
     if (this.view.steering) return this.submitSteering(scope, text);
@@ -2244,6 +2249,7 @@ export class NativeChatController {
         scope.awaitingTurn = accepted.turnId ?? undefined;
         scope.replay = true;
         await this.refresh(scope);
+        if (next) await this.playNext(scope, pending.inputId);
       }
     } catch (error) {
       const reviewDeclined =
@@ -2722,6 +2728,94 @@ export class NativeChatController {
       if (this.owns(scope)) {
         await this.refresh(scope);
         if (this.owns(scope)) this.update({ acting: false });
+      }
+    }
+  }
+
+  /** The current turn when it is confirmed paused. */
+  private get pausedTurn() {
+    const turn = this.view.observation?.snapshot.current;
+    return turn?.disposition === "suspended" && turn.paused && !turn.cancelled
+      ? turn
+      : undefined;
+  }
+
+  /**
+   * Ends a paused turn as stopped and waits until it has settled, so a new
+   * message can run next. Throws while it cannot, leaving the draft unsent.
+   */
+  private async endPausedTurn(scope: Scope): Promise<void> {
+    const observation = scope.observation;
+    if (!observation || !this.bridge.control)
+      throw new Error("native_chat_not_ready");
+    this.update({ acting: true, error: null });
+    try {
+      await this.bridge.control(this.attachment(scope).attachmentId, {
+        action: "stop",
+        observationId: observation.observationId,
+        requestId: crypto.randomUUID(),
+      });
+      for (let attempt = 0; attempt < 100; attempt++) {
+        await this.refresh(scope);
+        if (!scope.observation?.snapshot.current) return;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      throw new Error("native_chat_paused_turn_not_settled");
+    } catch (error) {
+      if (this.owns(scope))
+        this.update({
+          error:
+            "Couldn't move on from the paused turn. Your draft is still here.",
+        });
+      throw error;
+    } finally {
+      if (this.owns(scope)) this.update({ acting: false });
+    }
+  }
+
+  /**
+   * Runs a message that was sent while a turn was paused before anything that
+   * was already waiting. A failure leaves it visible in the held queue.
+   */
+  private async playNext(scope: Scope, inputId: string | null): Promise<void> {
+    const attachment = scope.attachment;
+    if (!attachment || !this.bridge.editQueue || !this.owns(scope)) return;
+    try {
+      const snapshot = scope.observation?.snapshot;
+      if (inputId && snapshot && snapshot.queuedInputs > 1) {
+        await this.refreshQueue(scope, 0);
+        const basis = scope.queueBasis;
+        if (basis && this.view.queue?.items[0]?.inputId !== inputId) {
+          await this.bridge.editQueue(attachment.attachmentId, {
+            action: "place",
+            inputId,
+            index: 0,
+            observationId: basis.observationId,
+            requestId: crypto.randomUUID(),
+          });
+          await this.refresh(scope);
+        }
+      }
+      const observation = scope.observation;
+      if (
+        observation &&
+        !observation.snapshot.current &&
+        (observation.snapshot.admissionPaused ||
+          observation.snapshot.idleQueueResumeAvailable)
+      ) {
+        await this.bridge.editQueue(attachment.attachmentId, {
+          action: "resume",
+          observationId: observation.observationId,
+          requestId: crypto.randomUUID(),
+        });
+        await this.refresh(scope);
+      }
+    } catch {
+      if (this.owns(scope)) {
+        this.update({
+          error: "Your message is queued. Choose Resume to start it.",
+        });
+        await this.refresh(scope);
       }
     }
   }

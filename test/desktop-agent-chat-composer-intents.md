@@ -51,17 +51,23 @@ A connection must finish starting before its commands become available.
    Save changes the strip's objective. Reopen the chat: **Sent as goal**
    remains on the same message.
 8. While a turn runs with an empty composer, the single primary button is
-   a square Stop. Type text: it becomes Send and queues the message above the
+   a square Pause. Type text: it becomes Send and queues the message above the
    composer. The queued row offers **Steer**, a trash button and a “…” menu
    with Edit, Move up and Move down. Steer: the row leaves the queue and the
    text appears in the running turn. There is no separate “Send to current
    turn” toggle.
-9. Queue three messages, then Stop. The queue shows **Queue paused because
-   you interrupted** with **Resume**, and the empty composer's primary button
-   is a play button. Hover a row: a grip appears at its left; drag the last
+   8a. Pause a running turn with an empty composer. It settles as paused and the
+   primary button becomes ▶. Choose ▶: the same turn continues (no new user
+   message). Pause again, then type and send a message instead: the paused
+   turn shows **Stopped after …** and the new message starts right away,
+   ahead of any queued messages, which run after it.
+9. Queue three messages while a turn runs. Hover a row: a grip appears at its left; drag the last
    row to the top and the order sticks after the queue refreshes. Choose
    **…** → **Edit**: the row becomes an editable text box; Enter saves,
-   Escape cancels. Resume starts the messages in the new order.
+   Escape cancels. The messages run in the new order. When a queue is held
+   with no turn running (for example after a restart), it shows **Queue paused
+   because you interrupted** with **Resume**, and the empty composer's primary
+   button is ▶.
 10. The ring beside the model picker shows context use once the model's window
     is known; hover for the percentage, click for the breakdown. Scrolling the
     chat fades content at the top and bottom edges. No **Execution details**

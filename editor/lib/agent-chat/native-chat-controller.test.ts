@@ -1516,6 +1516,86 @@ it("retries steering exactly after a lost reply and never falls through to the q
   controller.disconnect();
 });
 
+it("sending while a turn is paused stops it and plays the new message next", async () => {
+  const { bridge, controller } = fixture();
+  // A paused turn with one message already waiting behind it.
+  let state: "paused" | "stopped" | "running" = "paused";
+  let queue = ["earlier"];
+  const calls: string[] = [];
+  bridge.observe = async (id) => ({
+    observationId: `observation-${id}-${calls.length}`,
+    snapshot: {
+      sessionId: id,
+      sessionRevision: 2 + calls.length,
+      queuedInputs: queue.length,
+      admissionPaused: state === "stopped",
+      current:
+        state === "stopped"
+          ? null
+          : {
+              turnId: `turn-${state}`,
+              epoch: 1,
+              journalPosition: 1,
+              historyPosition: 1,
+              controlRevision: 1,
+              paused: state === "paused",
+              cancelled: false,
+              disposition: state === "paused" ? "suspended" : "running",
+              status: null,
+            },
+      latest: null,
+    },
+  });
+  bridge.control = async (id, input) => {
+    calls.push(`control:${input.action}`);
+    if (input.action === "stop") state = "stopped";
+    return {
+      action: input.action,
+      receipt: {
+        sessionId: id,
+        turnId: "turn-paused",
+        requestId: input.requestId,
+        sessionRevision: 3,
+        journalPosition: 1,
+      },
+    };
+  };
+  bridge.enqueue = async (id, inputId) => {
+    calls.push("enqueue");
+    queue = [...queue, inputId];
+    return {
+      sessionId: id,
+      inputId,
+      disposition: "queued",
+      inputPosition: 2,
+      turnId: null,
+    };
+  };
+  bridge.queue = async () => ({
+    items: queue.map((inputId) => ({ inputId, preview: inputId })),
+    offset: 0,
+    previousOffset: null,
+    nextOffset: null,
+  });
+  bridge.editQueue = async (id, change) => {
+    calls.push(
+      change.action === "place" ? `place:${change.index}` : change.action
+    );
+    if (change.action === "place")
+      queue = [change.inputId, ...queue.filter((i) => i !== change.inputId)];
+    if (change.action === "resume") state = "running";
+    return { sessionId: id, requestId: change.requestId, sessionRevision: 9 };
+  };
+  await controller.select("chat-a");
+  await vi.waitFor(() =>
+    expect(controller.read().observation?.snapshot.current?.paused).toBe(true)
+  );
+  await controller.submit("Try the other layout");
+  expect(calls).toEqual(["control:stop", "enqueue", "place:0", "resume"]);
+  expect(queue[1]).toBe("earlier");
+  controller.disconnect();
+});
+
 it("steers with a queued message only after it leaves the queue, and returns its text if the turn refuses", async () => {
   const { bridge, controller, running } = fixture();
   running.add("chat-a");

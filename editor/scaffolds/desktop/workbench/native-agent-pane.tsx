@@ -303,9 +303,11 @@ export function NativeAgentPane({
     !turn.cancelled &&
     (wakeup.status === "waiting" || wakeup.status === "cancelled");
   const canContinue = suspendedCheckIn && wakeup.status === "cancelled";
-  const canStop = !!turn && !turn.cancelled;
   const goalTurn =
     !!turn && state.goal?.goal?.reservation?.turnId === turn.turnId;
+  // A paused turn resumes from the composer; a Goal's own pause resumes from
+  // its strip.
+  const resumable = canResume && !(goalTurn && state.goal?.goal?.paused);
   const approval =
     turn?.disposition === "suspended" && !turn.paused && !turn.cancelled
       ? state.approvals[0]
@@ -900,20 +902,28 @@ export function NativeAgentPane({
           busy={!!turn}
           isStreaming={streamingControlsOnly}
           emptyAction={
-            canStop && !state.acting
-              ? {
-                  label: "Stop",
-                  icon: <SquareIcon className="size-3.5" />,
-                  onClick: () => void controller.control("stop"),
-                }
-              : controller.canResumeQueue && queued > 0 && !state.acting
+            state.acting
+              ? undefined
+              : resumable
                 ? {
-                    label: "Resume queue",
+                    label: "Resume",
                     icon: <PlayIcon className="size-3.5 fill-current" />,
-                    onClick: () =>
-                      void controller.editQueue({ action: "resume" }),
+                    onClick: () => void controller.control("resume"),
                   }
-                : undefined
+                : running && !turn?.paused
+                  ? {
+                      label: "Pause",
+                      icon: <SquareIcon className="size-3.5" />,
+                      onClick: () => void controller.control("pause"),
+                    }
+                  : controller.canResumeQueue && queued > 0 && !state.acting
+                    ? {
+                        label: "Resume queue",
+                        icon: <PlayIcon className="size-3.5 fill-current" />,
+                        onClick: () =>
+                          void controller.editQueue({ action: "resume" }),
+                      }
+                    : undefined
           }
           placeholder={
             connectionRequired && !state.scope
@@ -1068,22 +1078,19 @@ export function NativeAgentPane({
                   onRemove={() => controller.selectGoalIntent(false)}
                 />
               )}
-              {(canResume && (!goalTurn || !state.goal?.goal?.paused)) ||
-              canContinue ? (
+              {canContinue ? (
                 <Button
                   type="button"
                   variant="ghost"
                   size="xs"
                   disabled={state.acting}
-                  aria-label={canContinue ? "Continue" : "Resume"}
-                  title={canContinue ? "Continue" : "Resume"}
+                  aria-label="Continue"
+                  title="Continue"
                   className="shrink-0"
                   onClick={() => void controller.control("resume")}
                 >
                   <PlayIcon className="size-3.5" />
-                  <span className="hidden @md:inline">
-                    {canContinue ? "Continue" : "Resume"}
-                  </span>
+                  <span className="hidden @md:inline">Continue</span>
                 </Button>
               ) : null}
             </>
