@@ -165,6 +165,16 @@ describe("vector_measurement_operands — segment target", () => {
 });
 
 describe("vector_measurement_operands — nothing to measure", () => {
+  it("skips a selected segment as the target", () => {
+    expect(
+      vector_measurement_operands(
+        CURVE,
+        { vertices: [], segments: [0] },
+        { kind: "segment", segment: 0, t: 0.5 }
+      )
+    ).toBeNull();
+  });
+
   it("returns null without a vertex or segment selection", () => {
     expect(
       vector_measurement_operands(CHAIN, none, { kind: "vertex", vertex: 2 })

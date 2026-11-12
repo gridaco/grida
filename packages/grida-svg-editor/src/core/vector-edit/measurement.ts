@@ -58,8 +58,9 @@ export type VectorMeasurementOperands = {
  *
  *   - the sub-selection has no vertices and no segments (a tangent-only
  *     selection has no point to measure from);
- *   - the target vertex is selected, or is an endpoint of a selected segment
- *     (measuring the selection against part of itself);
+ *   - the target vertex is selected, or is an endpoint of a selected segment,
+ *     or the target segment is itself selected (measuring the selection
+ *     against part of itself);
  *   - an index is out of range for `snapshot` (stale hover).
  *
  * Source A is the selected vertices when there are any, otherwise the
@@ -83,6 +84,7 @@ export function vector_measurement_operands(
     }
     b = [v[0], v[1]];
   } else {
+    if (source.segments.includes(target.segment)) return null;
     const s = segments[target.segment];
     if (!s) return null;
     const va = vertices[s.a];
