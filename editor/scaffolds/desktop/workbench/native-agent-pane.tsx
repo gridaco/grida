@@ -143,13 +143,8 @@ export function NativeAgentPaneGate({
       : undefined;
   if (readiness === "legacy") return legacy;
   if (readiness === undefined || readiness === "native-starting")
-    return (
-      <div role="status" className="px-3 py-2 text-xs text-muted-foreground">
-        {readiness === "native-starting"
-          ? "Starting native chat…"
-          : "Checking chat availability…"}
-      </div>
-    );
+    // Startup is brief; keep the pane quiet instead of narrating it.
+    return <div aria-busy="true" className="flex min-h-0 flex-1" />;
   // Without a usable default connection the pane still opens; its composer
   // asks for a model, and choosing one continues in the same pane.
   const connectionRequired =
@@ -330,7 +325,7 @@ export function NativeAgentPane({
   const queueDisabled = !controller.queueCurrent || state.acting;
   const error = state.error ?? state.approvalError ?? state.questionError;
   const status = state.loading
-    ? "Opening chat…"
+    ? null
     : state.repairing
       ? "Refreshing messages…"
       : turn?.cancelled
