@@ -101,7 +101,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
-use tokio::sync::{Mutex, Notify, Semaphore, broadcast, oneshot};
+use tokio::sync::{Mutex, MutexGuard, Notify, Semaphore, broadcast, oneshot};
 use tokio::task::AbortHandle;
 
 const SESSION_SCHEMA: &str = "grida.agent.native.session";
@@ -125,6 +125,8 @@ const MAX_TURN_OPERATIONS: usize = 1024;
 const CORE_INSTRUCTIONS: &str = include_str!("prompts/core.md");
 const UPDATE_CAPACITY: usize = 128;
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(8);
+/// How long a new request waits for a settled turn's worker to finish.
+const SETTLING_WORKER_WAIT: Duration = Duration::from_secs(10);
 const MODEL_TIMEOUT: Duration = Duration::from_secs(120);
 const PROVIDER_LIMITS: StreamLimits = StreamLimits {
     max_request_bytes: 1024 * 1024,
@@ -1154,8 +1156,31 @@ impl Host {
                 publish_text: identified,
             }
         };
-        let mut work = self.work.lock().await;
+        let mut work = self.settled_work(&session).await?;
         self.register(&mut work, session, TurnId::new(uuid())?, launch)
+    }
+
+    /// The work table, once a session's settled turn has released its worker.
+    /// A turn is recorded as settled before its worker finishes, so a request
+    /// sent right after the answer could otherwise find the session still
+    /// running. A turn that has not settled is still refused at registration.
+    async fn settled_work(&self, session: &SessionId) -> Result<MutexGuard<'_, Work>> {
+        let deadline = tokio::time::Instant::now() + SETTLING_WORKER_WAIT;
+        loop {
+            let released = self.changed.notified();
+            tokio::pin!(released);
+            released.as_mut().enable();
+            let work = self.work.lock().await;
+            if !work.active.contains_key(session) {
+                return Ok(work);
+            }
+            drop(work);
+            if self.store.inspect(session.clone()).await?.current.is_some()
+                || tokio::time::timeout_at(deadline, released).await.is_err()
+            {
+                return Ok(self.work.lock().await);
+            }
+        }
     }
 
     fn register(
