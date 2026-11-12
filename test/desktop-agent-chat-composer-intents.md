@@ -65,10 +65,12 @@ A connection must finish starting before its commands become available.
 9. Queue three messages while a turn runs. Hover a row: a grip appears at its left; drag the last
    row to the top and the order sticks after the queue refreshes. Choose
    **…** → **Edit**: the row becomes an editable text box; Enter saves,
-   Escape cancels. The messages run in the new order. When a queue is held
-   with no turn running (for example after a restart), it shows **Queue paused
-   because you interrupted** with **Resume**, and the empty composer's primary
-   button is ▶.
+   Escape cancels. The messages run in the new order. When an interruption
+   holds the queue with no turn running, it shows **Queue paused because you
+   interrupted** with **Resume**, and the empty composer's primary button is ▶.
+   A queue left waiting with nothing paused (for example after a restart)
+   shows **Queued messages are waiting** instead. Starting a goal in a new chat
+   shows only the goal's **Starting goal** row, never a paused queue.
 10. The ring beside the model picker shows context use once the model's window
     is known; hover for the percentage, click for the breakdown. Scrolling the
     chat fades content at the top and bottom edges. No **Execution details**

@@ -78,7 +78,13 @@ export function NativeComposerTray({
   const pendingGoal = !!view.observation?.snapshot.pendingGoalId;
   const showGoal = pendingGoal || (!!goal && goal.state.status !== "cleared");
   const items = queue?.items ?? [];
-  const held = items.length > 0 && controller.canResumeQueue;
+  // An interrupted turn pauses the queue. An idle queue can also wait with
+  // nothing paused (after a restart); a goal that is starting is its own row.
+  const interrupted = !!view.observation?.snapshot.admissionPaused;
+  const held =
+    items.length > 0 &&
+    controller.canResumeQueue &&
+    (interrupted || !pendingGoal);
   if (!items.length && !showGoal) return null;
   return (
     <div
@@ -89,7 +95,9 @@ export function NativeComposerTray({
         <div className="flex items-center gap-2 py-1 pr-1.5 pl-3">
           <PauseIcon className="text-muted-foreground size-4 shrink-0" />
           <span className="text-muted-foreground min-w-0 flex-1 truncate">
-            Queue paused because you interrupted
+            {interrupted
+              ? "Queue paused because you interrupted"
+              : "Queued messages are waiting"}
           </span>
           <Button
             type="button"
