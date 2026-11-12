@@ -271,3 +271,35 @@ describe("turn_activity compaction notes", () => {
     });
   });
 });
+
+describe("turn_activity.measuredContext", () => {
+  it("uses the latest turn's reported size and resets after a compaction", () => {
+    expect(
+      turn_activity.measuredContext([
+        { turnId: "a", status: "succeeded", contextTokens: 30_000 },
+        { turnId: "b", status: "succeeded", contextTokens: 42_000 },
+      ])
+    ).toBe(42_000);
+    expect(
+      turn_activity.measuredContext([
+        { turnId: "a", status: "succeeded", contextTokens: 42_000 },
+        {
+          turnId: "c",
+          status: "succeeded",
+          contextTokens: 872,
+          compaction: { summary: "s", automatic: false },
+        },
+      ])
+    ).toBeUndefined();
+    expect(
+      turn_activity.measuredContext([
+        {
+          turnId: "c",
+          status: "succeeded",
+          compaction: { summary: "s", automatic: false },
+        },
+        { turnId: "d", status: "succeeded", contextTokens: 18_000 },
+      ])
+    ).toBe(18_000);
+  });
+});

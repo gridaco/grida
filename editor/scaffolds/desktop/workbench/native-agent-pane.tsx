@@ -354,10 +354,7 @@ export function NativeAgentPane({
     (state.profiles?.active === null
       ? state.profiles.defaultContextWindow
       : undefined);
-  // The latest turn's provider-reported context size, when recorded.
-  const measuredContext = state.turnRecords.findLast(
-    (record) => record.contextTokens !== undefined
-  )?.contextTokens;
+  const measuredContext = turn_activity.measuredContext(state.turnRecords);
   const contextUsage = computeContextUsage(
     state.messages.map((message) => ({
       role: message.role,

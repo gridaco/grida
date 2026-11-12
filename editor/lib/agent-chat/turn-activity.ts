@@ -136,6 +136,23 @@ export namespace turn_activity {
     return blocks;
   }
 
+  /**
+   * The context size the provider reported for the latest turn, when known.
+   * A compaction's own model call summarizes the chat and says nothing about
+   * the context after it, so a later compaction leaves the size unknown until
+   * the next turn reports.
+   */
+  export function measuredContext(
+    records: readonly NativeChatTurnRecord[]
+  ): number | undefined {
+    for (let index = records.length - 1; index >= 0; index--) {
+      const record = records[index];
+      if (record.compaction) return undefined;
+      if (record.contextTokens !== undefined) return record.contextTokens;
+    }
+    return undefined;
+  }
+
   /** Commentary in order, with consecutive tool calls joined into one line. */
   export function items(messages: readonly NativeChatMessage[]): Item[] {
     const result: Item[] = [];
