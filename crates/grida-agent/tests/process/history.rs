@@ -809,3 +809,57 @@ async fn a_pending_question_survives_fork_and_requires_stop_before_revision() {
     terminate_shared_server(host).await;
     endpoint.done().await;
 }
+
+#[tokio::test]
+async fn a_reply_may_make_many_parallel_tool_calls() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("state");
+    let workspace = TempDir::new().unwrap();
+    // More parallel calls in one reply than the former cap of eight.
+    let calls: Vec<Value> = (0..12)
+        .map(|index| {
+            json!({"index":index,"id":format!("call-{index}"),"type":"function",
+                "function":{"name":"config_inspect","arguments":"{}"}})
+        })
+        .collect();
+    let delta = json!({"id":"fixture-response","choices":[{"index":0,"delta":{
+        "role":"assistant","tool_calls":calls},"finish_reason":null}]});
+    let finish = json!({"id":"fixture-response","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]});
+    let body = format!("data: {delta}\n\ndata: {finish}\n\ndata: [DONE]\n\n");
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    let mut endpoint = Endpoint::start(vec![
+        Reply::RawHttp(response),
+        Reply::Finished("Inspected twelve times."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = client(&url, true).await;
+    let session = create(&mut socket, workspace.path()).await;
+    let started = ws_rpc(
+        &mut socket,
+        3,
+        "_co.grida/session/submit",
+        prompt_request(&session, "inspect", "Inspect the settings."),
+    )
+    .await;
+    assert!(started.get("result").is_some(), "{started}");
+    endpoint.request().await;
+    let with_results = endpoint.request().await;
+    let results = with_results["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|message| message["role"] == "tool")
+        .count();
+    assert_eq!(results, 12, "{with_results}");
+    let settled = wait_for_snapshot(&mut socket, &session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    assert_eq!(settled["latest"]["status"], "succeeded", "{settled}");
+    endpoint.done().await;
+    terminate_shared_server(host).await;
+}
