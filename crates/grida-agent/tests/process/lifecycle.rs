@@ -357,7 +357,7 @@ async fn paused_task_resumes_after_restart_with_retained_input_and_steering() {
         request["messages"].as_array().unwrap().last().unwrap()["content"],
         "Apply this correction"
     );
-    // The reply cut off by the pause is replaced by the interruption note.
+    // The reply cut off by the pause is replaced by the resumption note.
     let messages = request["messages"].as_array().unwrap();
     assert!(
         !messages
@@ -366,7 +366,7 @@ async fn paused_task_resumes_after_restart_with_retained_input_and_steering() {
         "{request}"
     );
     assert!(
-        is_interruption_note(&messages[messages.len() - 2]),
+        is_resumption_note(&messages[messages.len() - 2]),
         "{request}"
     );
     release.send(()).unwrap();
@@ -382,13 +382,18 @@ async fn paused_task_resumes_after_restart_with_retained_input_and_steering() {
 }
 
 const INTERRUPTED_GUIDANCE: &str = grida_agent_master::history::INTERRUPTED_GUIDANCE;
+const RESUMED_GUIDANCE: &str = grida_agent_master::history::RESUMED_GUIDANCE;
 
 fn is_interruption_note(message: &Value) -> bool {
     message["role"] == "user" && message["content"] == INTERRUPTED_GUIDANCE
 }
 
+fn is_resumption_note(message: &Value) -> bool {
+    message["role"] == "user" && message["content"] == RESUMED_GUIDANCE
+}
+
 #[tokio::test]
-async fn resuming_a_paused_reply_replaces_its_cut_off_text_with_an_interruption_note() {
+async fn resuming_a_paused_reply_asks_the_model_to_continue_instead_of_its_cut_off_text() {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("agent-state");
     let workspace = TempDir::new().unwrap();
@@ -425,15 +430,17 @@ async fn resuming_a_paused_reply_replaces_its_cut_off_text_with_an_interruption_
     assert!(resumed.get("result").is_some(), "{resumed}");
     let request = endpoint.request().await;
     let messages = request["messages"].as_array().unwrap();
-    // The unfinished reply is not model context; the model learns the person
-    // interrupted it and answers the request again.
+    // The unfinished reply is not model context. The turn continues, so the
+    // last message asks the model to carry on; a bare interruption note there
+    // reads as the person's latest request and the model answers it instead.
     assert!(
         !messages
             .iter()
             .any(|message| message["role"] == "assistant"),
         "{request}"
     );
-    assert!(is_interruption_note(messages.last().unwrap()), "{request}");
+    assert!(is_resumption_note(messages.last().unwrap()), "{request}");
+    assert!(!messages.iter().any(is_interruption_note), "{request}");
     wait_for_snapshot(&mut socket, session, |snapshot| {
         snapshot["current"].is_null()
     })

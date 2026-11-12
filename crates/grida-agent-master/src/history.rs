@@ -12,9 +12,15 @@ use std::collections::{BTreeMap, BTreeSet};
 /// unfinished response is not part of model context.
 pub const INTERRUPTED_GUIDANCE: &str = "The user interrupted the previous response on purpose. If any tools or commands were aborted, they may have partially executed.";
 
+/// Told to the model in place of a response cut off by a pause that the
+/// person then resumed. The turn continues, so the note asks the model to carry
+/// on rather than treat the interruption as the person's latest request.
+pub const RESUMED_GUIDANCE: &str = "The user paused the previous response and then resumed it. Continue the task from where it stopped, taking any later messages into account. If any tools or commands were aborted, they may have partially executed.";
+
 /// The history a model reads for one turn. It differs from the transcript in
 /// one way: a response the person interrupted (by pausing or stopping) is
-/// replaced by [`INTERRUPTED_GUIDANCE`], and a stopped turn ends with it.
+/// replaced by a note. Within a turn that continued after a pause, the note is
+/// [`RESUMED_GUIDANCE`]; a stopped turn ends with [`INTERRUPTED_GUIDANCE`].
 /// The transcript keeps showing the interrupted text.
 pub fn model_context(state: &TurnState) -> Vec<HistoryRecord> {
     let records = project(state);
@@ -41,7 +47,9 @@ pub fn model_context(state: &TurnState) -> Vec<HistoryRecord> {
     for record in records {
         let item = message(&record);
         if item.role == Role::Assistant && interrupted.contains(&item.id) {
-            if !previous_dropped && let Some(note) = interruption_note(state, output.len()) {
+            if !previous_dropped
+                && let Some(note) = interruption_note(state, output.len(), RESUMED_GUIDANCE)
+            {
                 output.push(note);
             }
             previous_dropped = true;
@@ -53,18 +61,24 @@ pub fn model_context(state: &TurnState) -> Vec<HistoryRecord> {
     let stopped = state
         .outcome()
         .is_some_and(|outcome| outcome.status == OutcomeStatus::Cancelled);
-    if stopped
-        && !matches!(output.last(), Some(record) if message(record).id.as_str().starts_with(NOTE_PREFIX))
-        && let Some(note) = interruption_note(state, output.len())
-    {
-        output.push(note);
+    if stopped {
+        let at = match output.last() {
+            Some(record) if message(record).id.as_str().starts_with(NOTE_PREFIX) => {
+                output.len() - 1
+            }
+            _ => output.len(),
+        };
+        if let Some(note) = interruption_note(state, at, INTERRUPTED_GUIDANCE) {
+            output.truncate(at);
+            output.push(note);
+        }
     }
     output
 }
 
 const NOTE_PREFIX: &str = "interrupted/";
 
-fn interruption_note(state: &TurnState, at: usize) -> Option<HistoryRecord> {
+fn interruption_note(state: &TurnState, at: usize, text: &str) -> Option<HistoryRecord> {
     let id = MessageId::new(format!(
         "{NOTE_PREFIX}{}/{at}",
         state.binding().turn.as_str()
@@ -74,7 +88,7 @@ fn interruption_note(state: &TurnState, at: usize) -> Option<HistoryRecord> {
         id,
         role: Role::User,
         phase: None,
-        content: vec![Content::Text(INTERRUPTED_GUIDANCE.into())],
+        content: vec![Content::Text(text.into())],
         provenance: Provenance {
             source: "product-instructions".into(),
             kind: ProvenanceKind::Supplied,

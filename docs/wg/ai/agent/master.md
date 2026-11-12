@@ -683,14 +683,23 @@ The [experience](./experience.md#read-each-finished-turn) defines the result.
 
 When the person interrupts work, by pausing or stopping, the response being
 generated is cut off. The transcript keeps showing that partial text; model
-context does not. In its place the model reads a short note that the person
-interrupted the previous response on purpose, and that an aborted tool or
-command may have partially executed. A stopped turn ends with the same note.
+context does not. In its place the model reads a short note, and the note
+depends on what the person did next:
+
+- **Resumed.** The turn continues, so the note says the person paused and
+  resumed the response and asks the model to continue the task from where it
+  stopped. A note that only reports an interruption must not be the last thing
+  a continuing turn reads: the model takes it as the person's newest request
+  and answers it instead of the task.
+- **Stopped.** The turn ends with a note that the person interrupted the
+  previous response on purpose.
+
+Both notes say that an aborted tool or command may have partially executed.
 
 | Situation                                  | What the model reads next                                                             |
 | ------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Pause, then Resume                         | The turn's completed steps, then the note. It answers the request again.              |
-| Pause or Stop, then a new message          | The earlier turn's completed steps and the note, then the new message.                |
+| Pause, then Resume                         | The turn's completed steps, then the resumed note. It continues the task.             |
+| Pause or Stop, then a new message          | The earlier turn's completed steps and the stopped note, then the new message.        |
 | Interrupted while a tool step was complete | The completed tool calls and results are kept; only the cut-off response is replaced. |
 
 Completed responses, tool calls, and their results are never repeated or
