@@ -58,7 +58,14 @@ export class NativeAgentGoals {
     const effort =
       input.effort === undefined
         ? undefined
-        : member(input.effort, ["standard", "ultra"] as const);
+        : member(input.effort, [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "ultra",
+            "standard",
+          ] as const);
     const allowWakeup = input.allowWakeup === true;
     const maxCostMills =
       input.maxCostMills === undefined

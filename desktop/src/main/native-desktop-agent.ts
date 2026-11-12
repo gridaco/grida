@@ -930,8 +930,21 @@ export class NativeDesktopAgent {
   }
 }
 
-function publicProfile({ id, connection, model }: NativeChatProfiles.Saved) {
-  return { id, connection, model };
+function publicProfile({
+  id,
+  connection,
+  model,
+  providerId,
+  modelId,
+}: NativeChatProfiles.Saved) {
+  return {
+    id,
+    connection,
+    model,
+    ...(NativeChatProfiles.reasons(providerId, modelId) && {
+      reasoning: true as const,
+    }),
+  };
 }
 
 function ordinaryDirectoryIdentity(root: string): WorkspaceDirectoryIdentity {

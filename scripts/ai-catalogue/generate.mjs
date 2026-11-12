@@ -83,6 +83,7 @@ function textCard(card) {
     image_input_mimes: "imageInputMimes",
     context_window: "contextWindow",
     output_limit: "outputLimit",
+    reasoning_providers: "reasoningProviders",
   });
   if (result.cost) {
     result.cost = fields(result.cost, {

@@ -72,6 +72,8 @@ export type NativeAgentLaunch = {
   maxOutputTokens?: number;
   compatibleOutputLimitField?: "max-tokens";
   llamaCppInputCount?: true;
+  /** The selected model accepts a reasoning level for each turn. */
+  reasoning?: true;
   credentialHome?: string;
   configuredEndpointKey?: string;
   workspaceConfiguration?: Readonly<{ directory: string; epoch: string }>;
@@ -483,6 +485,7 @@ export class NativeAgentProcess {
       args.push("--credential-home", options.credentialHome);
     if (providerEgress) args.push("--supervised-provider");
     if (options.llamaCppInputCount) args.push("--llama-cpp-input-count");
+    if (options.reasoning) args.push("--reasoning");
     if (imageGeneration)
       args.push("--desktop-image-generation", imageGeneration.binding);
     if (options.workspaceConfiguration) {

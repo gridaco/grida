@@ -2951,9 +2951,18 @@ function operatingRegime(
   throw new Error("native_chat_operating_regime_invalid");
 }
 
+const EFFORTS: ReadonlySet<unknown> = new Set([
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "ultra",
+  "standard",
+]);
+
 function agentEffort(value: unknown): NativeChatEffort | undefined {
-  if (value === undefined || value === "standard" || value === "ultra")
-    return value;
+  if (value === undefined || EFFORTS.has(value))
+    return value as NativeChatEffort | undefined;
   throw new Error("native_chat_effort_invalid");
 }
 

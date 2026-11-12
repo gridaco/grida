@@ -20,9 +20,15 @@ effort remain separate choices.
 
 ## Choose how much effort to use
 
-Open the model picker at the bottom of the composer. When effort is available,
-choose **Standard** for the ordinary work allowance or **Ultra** for work that
-may benefit from an independent review. Either effort can be used with Plan or Act. Ultra can
+Open the model picker at the bottom of the composer and drag the **Effort**
+slider: **Low**, **Medium**, **High**, **Extra high** and, on supported
+connections, **Ultra**. Medium is the default; the reset button returns to it.
+Low through Extra high set how much the model reasons before answering, for
+models whose provider supports a reasoning setting. Other models keep their own
+reasoning and the picker says so. **Ultra** uses the highest reasoning level and
+also gives the work a larger allowance that may include an independent review.
+Any effort can be used with Plan or Act, and changing it affects the next
+request. Ultra can
 give one reviewer a separate text assignment while the main agent continues.
 For a new ordinary review, the reviewer can read the primary workspace if it is
 already allowed. It does not automatically receive the parent chat or additional

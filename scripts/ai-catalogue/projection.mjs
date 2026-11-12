@@ -300,7 +300,14 @@ export function projectFacts(source, presets) {
         if (!original || original.id !== id)
           throw Error(`Unknown public model: ${family}:${id}`);
         const card = pick(original, keys);
-        if (family === "text.catalog") card.cost = textCost(original);
+        if (family === "text.catalog") {
+          card.cost = textCost(original);
+          // Reasoning is a fact of each provider binding, not of the model alone.
+          card.reasoning_providers = Object.entries(original.providers ?? {})
+            .filter(([, binding]) => binding?.capabilities?.reasoning === true)
+            .map(([provider]) => provider)
+            .sort();
+        }
         if (family === "image.models" || family === "video.models")
           card.providers = mediaProviders(original, family);
         if (family === "embedding.models") {

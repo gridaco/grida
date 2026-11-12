@@ -3126,7 +3126,7 @@ it("captures effort separately from Plan or Act and preserves it across a lost s
   await expect(controller.submit("Review this plan.")).rejects.toThrow(
     "fixture lost send"
   );
-  controller.selectEffort("standard");
+  controller.selectEffort("medium");
   await expect(controller.submit("Review this plan.")).rejects.toThrow(
     "native_chat_pending_effort_changed"
   );
@@ -3146,7 +3146,7 @@ it("captures effort separately from Plan or Act and preserves it across a lost s
   controller.selectEffort("ultra");
   expect(controller.read()).toMatchObject({
     effortAvailable: false,
-    effort: "standard",
+    effort: "medium",
   });
   await controller.submit("Send on the earlier connection.");
   expect(send.mock.calls[2]).toEqual([
@@ -3155,6 +3155,18 @@ it("captures effort separately from Plan or Act and preserves it across a lost s
     expect.any(String),
     "Send on the earlier connection.",
     "act",
+  ]);
+  // Reasoning levels need no extended harness.
+  controller.selectEffort("high");
+  expect(controller.read().effort).toBe("high");
+  await controller.submit("Think harder.");
+  expect(send.mock.calls[3]).toEqual([
+    "submit",
+    "chat-b",
+    expect.any(String),
+    "Think harder.",
+    "act",
+    "high",
   ]);
   controller.disconnect();
 });

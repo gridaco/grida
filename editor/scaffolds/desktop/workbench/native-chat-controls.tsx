@@ -2,12 +2,16 @@
 
 import { useState } from "react";
 import type {
+  NativeChatEffort,
   NativeChatProfileCatalog,
   NativeChatProfileSelection,
 } from "@grida/desktop-bridge";
 import {
   CheckIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  RotateCcwIcon,
   EllipsisVerticalIcon,
   ListIcon,
   PlusIcon,
@@ -24,6 +28,7 @@ import {
 } from "@grida/react-icons/logos";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
+import { Slider } from "@app/ui/components/slider";
 import {
   Popover,
   PopoverContent,
@@ -295,6 +300,22 @@ export function NativeChatHeader({
   );
 }
 
+/** Effort stops from least to most, as shown on the slider. */
+const EFFORT_STOPS = ["low", "medium", "high", "xhigh", "ultra"] as const;
+type EffortStop = (typeof EFFORT_STOPS)[number];
+const EFFORT_LABEL: Record<EffortStop, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra high",
+  ultra: "Ultra",
+};
+const DEFAULT_EFFORT: EffortStop = "medium";
+
+function effortStop(effort: NativeChatEffort | undefined): EffortStop {
+  return !effort || effort === "standard" ? DEFAULT_EFFORT : effort;
+}
+
 export function NativeModelPicker({
   profiles,
   busy,
@@ -302,18 +323,24 @@ export function NativeModelPicker({
   onRefresh,
   effort,
   onEffort,
+  ultraAvailable = false,
   defaultUnavailable,
 }: {
   profiles: NativeChatProfileCatalog | null;
   busy: boolean;
-  /** The default connection cannot run; ask for an explicit choice. */
-  defaultUnavailable?: boolean;
   onSelect: (selection: NativeChatProfileSelection) => void;
   onRefresh: () => void;
-  effort?: "standard" | "ultra";
-  onEffort?: (effort: "standard" | "ultra") => void;
+  effort?: NativeChatEffort;
+  onEffort?: (effort: NativeChatEffort) => void;
+  /** The connection offers the extended Ultra harness. */
+  ultraAvailable?: boolean;
+  /** The default connection cannot run; ask for an explicit choice. */
+  defaultUnavailable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState<"effort" | "models">("effort");
+  const stop = effortStop(effort);
+  const stops = ultraAvailable ? EFFORT_STOPS : EFFORT_STOPS.slice(0, -1);
   const selected =
     profiles?.saved.find((p) => p.id === profiles.active) ??
     profiles?.choices.find((p) => p.id === profiles.active);
@@ -335,10 +362,18 @@ export function NativeModelPicker({
   ];
   const choose = (selection: NativeChatProfileSelection) => {
     onSelect(selection);
-    setOpen(false);
+    setView("effort");
+    if (!onEffort) setOpen(false);
   };
+  const showModels = !onEffort || view === "models";
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) setView("effort");
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -355,8 +390,8 @@ export function NativeModelPicker({
         >
           <ConnectionIcon connection={selected?.connection} />
           <span className="truncate">{label}</span>
-          {effort === "ultra" && (
-            <span className="text-muted-foreground">Ultra</span>
+          {onEffort && stop !== DEFAULT_EFFORT && (
+            <span className="text-muted-foreground">{EFFORT_LABEL[stop]}</span>
           )}
           <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" />
         </Button>
@@ -366,59 +401,111 @@ export function NativeModelPicker({
         side="top"
         className="w-72 max-w-[calc(100vw-2rem)] p-0"
       >
-        <Command>
-          <CommandInput placeholder="Search models…" />
-          <CommandList className="max-h-[min(45vh,20rem)]">
-            <CommandEmpty>
-              No models found. Add a provider in Settings.
-            </CommandEmpty>
-            <CommandGroup heading="Models">
-              <CommandItem
-                value="Default model"
-                onSelect={() => choose({ kind: "default" })}
-              >
-                <GridaLogo className="size-3.5" />
-                Default model
-                {profiles?.active === null && !defaultUnavailable && (
-                  <CheckIcon className="ml-auto size-3.5" />
-                )}
-              </CommandItem>
-              {models.map((p) => (
-                <CommandItem
-                  key={p.id}
-                  value={`${p.connection} ${p.model} ${p.id}`}
-                  disabled={!p.available}
-                  onSelect={() =>
-                    choose({ kind: p.saved ? "saved" : "new", id: p.id })
-                  }
+        {!showModels && onEffort && (
+          <div
+            data-testid="native-effort-panel"
+            className="flex flex-col gap-3 p-3"
+          >
+            <div className="flex items-start gap-2">
+              <div className="flex min-w-0 flex-1 flex-col items-center gap-0.5">
+                <span className="text-sm font-medium text-primary">
+                  {EFFORT_LABEL[stop]}
+                </span>
+                <button
+                  type="button"
+                  className="flex max-w-full items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setView("models")}
                 >
-                  <ConnectionIcon connection={p.connection} />
-                  <span className="min-w-0 flex-1 truncate">{p.model}</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {p.available ? p.connection : "Unavailable"}
-                  </span>
-                  {profiles?.active === p.id && (
-                    <CheckIcon className="size-3.5" />
+                  <span className="truncate">{label}</span>
+                  <ChevronRightIcon className="size-3 shrink-0" />
+                </button>
+              </div>
+              <Button
+                type="button"
+                size="icon-xs"
+                variant="ghost"
+                aria-label="Reset effort"
+                title="Reset effort"
+                disabled={stop === DEFAULT_EFFORT}
+                onClick={() => onEffort(DEFAULT_EFFORT)}
+              >
+                <RotateCcwIcon className="size-3.5 text-muted-foreground" />
+              </Button>
+            </div>
+            <Slider
+              aria-label="Effort"
+              min={0}
+              max={stops.length - 1}
+              step={1}
+              value={[Math.min(stops.indexOf(stop), stops.length - 1)]}
+              onValueChange={([index]) => {
+                const next = stops[index ?? 0];
+                if (next && next !== stop) onEffort(next);
+              }}
+            />
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              {stops.map((value) => (
+                <span key={value}>{EFFORT_LABEL[value]}</span>
+              ))}
+            </div>
+            {selected && !selected.reasoning && (
+              <p className="text-[11px] text-muted-foreground">
+                This model uses its own reasoning level.
+                {ultraAvailable && " Ultra still extends the work."}
+              </p>
+            )}
+          </div>
+        )}
+        {showModels && (
+          <Command>
+            {onEffort && (
+              <button
+                type="button"
+                className="flex items-center gap-1 border-b px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setView("effort")}
+              >
+                <ChevronLeftIcon className="size-3" />
+                Effort
+              </button>
+            )}
+            <CommandInput placeholder="Search models…" />
+            <CommandList className="max-h-[min(45vh,20rem)]">
+              <CommandEmpty>
+                No models found. Add a provider in Settings.
+              </CommandEmpty>
+              <CommandGroup heading="Models">
+                <CommandItem
+                  value="Default model"
+                  onSelect={() => choose({ kind: "default" })}
+                >
+                  <GridaLogo className="size-3.5" />
+                  Default model
+                  {profiles?.active === null && !defaultUnavailable && (
+                    <CheckIcon className="ml-auto size-3.5" />
                   )}
                 </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-        {onEffort && effort && (
-          <div className="flex items-center gap-1 border-t px-2 py-1.5 text-xs">
-            <span className="mr-auto text-muted-foreground">Effort</span>
-            {(["standard", "ultra"] as const).map((value) => (
-              <Button
-                key={value}
-                size="xs"
-                variant={effort === value ? "secondary" : "ghost"}
-                onClick={() => onEffort(value)}
-              >
-                {value === "standard" ? "Standard" : "Ultra"}
-              </Button>
-            ))}
-          </div>
+                {models.map((p) => (
+                  <CommandItem
+                    key={p.id}
+                    value={`${p.connection} ${p.model} ${p.id}`}
+                    disabled={!p.available}
+                    onSelect={() =>
+                      choose({ kind: p.saved ? "saved" : "new", id: p.id })
+                    }
+                  >
+                    <ConnectionIcon connection={p.connection} />
+                    <span className="min-w-0 flex-1 truncate">{p.model}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {p.available ? p.connection : "Unavailable"}
+                    </span>
+                    {profiles?.active === p.id && (
+                      <CheckIcon className="size-3.5" />
+                    )}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
         )}
         <div className="border-t p-1">
           <Button

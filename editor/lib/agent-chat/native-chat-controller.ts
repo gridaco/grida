@@ -330,7 +330,7 @@ const EMPTY: NativeChatView = Object.freeze({
   queueDraft: null,
   steering: false,
   operatingRegime: "act",
-  effort: "standard",
+  effort: "medium",
   effortAvailable: false,
   goalEffortAvailable: false,
   goal: null,
@@ -778,7 +778,7 @@ export class NativeChatController {
       queueLoading: false,
       queueDraft: null,
       steering: false,
-      effort: "standard",
+      effort: "medium",
       effortAvailable: false,
       goalEffortAvailable: false,
       goal: null,
@@ -1050,7 +1050,7 @@ export class NativeChatController {
       goalEffortAvailable: goalSupported === true,
       ...(supported !== true &&
         this.view.effort === "ultra" && {
-          effort: "standard",
+          effort: "xhigh",
           error: "Ultra effort is unavailable on this connection.",
         }),
     });
@@ -1934,7 +1934,11 @@ export class NativeChatController {
   }
 
   selectEffort(effort: NativeChatEffort): void {
-    if (this.view.effortAvailable && !this.view.acting && !this.view.steering)
+    if (
+      (effort !== "ultra" || this.view.effortAvailable) &&
+      !this.view.acting &&
+      !this.view.steering
+    )
       this.update({ effort });
   }
 
@@ -2027,7 +2031,13 @@ export class NativeChatController {
       this.bridge.submitInRegime
         ? this.view.operatingRegime
         : undefined;
-    const effort = this.view.effortAvailable ? this.view.effort : undefined;
+    // Medium is the default stop and leaves the model's default in place.
+    // Ultra also needs its extended harness.
+    const effort =
+      this.view.effort === "medium" ||
+      (this.view.effort === "ultra" && !this.view.effortAvailable)
+        ? undefined
+        : this.view.effort;
     const svgTarget =
       !retained &&
       mode === "submit" &&
@@ -2478,9 +2488,10 @@ export class NativeChatController {
       this.update({ error: "Ultra effort is unavailable on this connection." });
       return;
     }
-    const effort = this.view.effortAvailable
-      ? (draft.effort ?? "standard")
-      : undefined;
+    const effort =
+      draft.effort === "ultra" && this.view.effortAvailable
+        ? draft.effort
+        : undefined;
     const input = (scope.pendingRevision ??= {
       reviewId: draft.reviewId,
       text: draft.text,

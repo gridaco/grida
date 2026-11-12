@@ -12,7 +12,18 @@ export type NativeChatAttachment = Readonly<{
 }>;
 
 export type NativeChatOperatingRegime = "act" | "plan";
-export type NativeChatEffort = "standard" | "ultra";
+/**
+ * Effort for one request, from least to most. `low` through `xhigh` set the
+ * model's reasoning; `ultra` also adds the extended harness. `standard` is the
+ * earlier name for `medium`.
+ */
+export type NativeChatEffort =
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "ultra"
+  | "standard";
 
 export type NativeHookEvent =
   | "session_start"
@@ -126,6 +137,8 @@ export type NativeChatProfileChoice = Readonly<{
   id: string;
   connection: string;
   model: string;
+  /** The model accepts a reasoning level, so every effort stop applies. */
+  reasoning?: true;
 }>;
 
 export type NativeChatProfileCatalog = Readonly<{

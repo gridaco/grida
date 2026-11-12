@@ -112,6 +112,15 @@ export namespace NativeChatProfiles {
       }));
   }
 
+  /** Whether this provider's binding of the model accepts a reasoning level. */
+  export function reasons(providerId: string, modelId: string): boolean {
+    return (
+      catalog.text.catalog[
+        modelId as keyof typeof catalog.text.catalog
+      ]?.reasoningProviders?.includes(providerId) === true
+    );
+  }
+
   export async function builtInChoices(
     resolve: (providerId: string, modelId: string) => Promise<Launch>
   ): Promise<Saved[]> {

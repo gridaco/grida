@@ -106,7 +106,13 @@ remain available without starting a persistent goal.
 ## Agent effort
 
 **Agent effort** controls the work the agent undertakes across the whole task.
-The proposed presets are **Standard** and **Ultra**.
+The person chooses it on one scale: **Low**, **Medium**, **High**, **Extra high**
+and **Ultra**. Medium is the default. Low through Extra high set how much the
+model reasons before answering, where its provider supports that setting; a
+model without the setting keeps its own reasoning, and the product says so.
+**Ultra** combines the highest reasoning level with the extended work described
+below. The table compares the extended work with the ordinary allowance, which
+the lower levels share as **Standard**.
 
 | Agent effort | What the person should expect                                                                                                       |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------- |

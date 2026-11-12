@@ -1431,6 +1431,18 @@ export namespace catalog {
         if (typeof v.deprecated !== "boolean") return undefined;
         spec.deprecated = v.deprecated;
       }
+      if (v.reasoningProviders !== undefined) {
+        if (
+          !Array.isArray(v.reasoningProviders) ||
+          v.reasoningProviders.length > 16 ||
+          !v.reasoningProviders.every(
+            (provider) =>
+              typeof provider === "string" && /^[a-z0-9-]{1,32}$/.test(provider)
+          )
+        )
+          return undefined;
+        return { ...spec, reasoningProviders: [...v.reasoningProviders] };
+      }
       return spec;
     }
 

@@ -886,7 +886,7 @@ export class NativeAgentChat {
     const effort =
       input.effort === undefined
         ? undefined
-        : choice(input.effort, ["standard", "ultra"] as const);
+        : choice(input.effort, EFFORT_CHOICES);
     if (
       Object.keys(input).length !== (effort ? 6 : 5) ||
       typeof input.text !== "string"
@@ -912,7 +912,7 @@ export class NativeAgentChat {
     const effort =
       input.effort === undefined
         ? undefined
-        : choice(input.effort, ["standard", "ultra"] as const);
+        : choice(input.effort, EFFORT_CHOICES);
     if (
       Object.keys(input).length !== (effort ? 7 : 6) ||
       typeof input.text !== "string"
@@ -955,7 +955,7 @@ export class NativeAgentChat {
       editorSurfaces,
       effort,
     } = options;
-    if (effort !== undefined && !this.acceptsEffort)
+    if (effort === "ultra" && !this.acceptsEffort)
       throw new Error("native_chat_effort_unavailable");
     return acceptance(
       await this.process.request(`_co.grida/session/${mode}`, {
@@ -964,7 +964,7 @@ export class NativeAgentChat {
         prompt: [...textPrompt(text), ...(image ? [image] : [])],
         ...(file && { selectedFile: file }),
         ...(operatingRegime && { operatingRegime }),
-        ...(effort && { effort }),
+        ...hostEffort(effort),
         ...(allowConfigurationChanges && { allowConfigurationChanges }),
         ...(allowWakeups && { allowWakeups }),
         ...(allowLibrarySelection && { allowLibrarySelection }),
@@ -1062,7 +1062,7 @@ export class NativeAgentChat {
       if (
         settings.configurationPermission !== "change" ||
         settings.operatingRegime !== "act" ||
-        (settings.effort ?? "standard") !== (input.effort ?? "standard") ||
+        (settings.effort === "ultra") !== (input.effort === "ultra") ||
         part?.type !== "text" ||
         part.text !== input.text
       )
@@ -2761,4 +2761,33 @@ function invalidResponse(): Error {
 
 function isCatalogCursor(value: unknown): value is string {
   return typeof value === "string" && CATALOG_CURSOR.test(value);
+}
+
+const EFFORT_CHOICES = [
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "ultra",
+  "standard",
+] as const;
+
+/**
+ * The host keeps reasoning and the extended harness as separate facts. Ultra
+ * selects both the highest reasoning level and the extended harness.
+ */
+function hostEffort(effort: NativeChatEffort | undefined): {
+  effort?: "ultra";
+  reasoning?: "low" | "medium" | "high" | "xhigh";
+} {
+  switch (effort) {
+    case undefined:
+      return {};
+    case "ultra":
+      return { effort: "ultra", reasoning: "xhigh" };
+    case "standard":
+      return { reasoning: "medium" };
+    default:
+      return { reasoning: effort };
+  }
 }

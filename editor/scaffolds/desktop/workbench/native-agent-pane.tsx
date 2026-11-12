@@ -1343,12 +1343,9 @@ export function NativeAgentPane({
                   void controller.selectProfile(selection)
                 }
                 onRefresh={() => void controller.readProfiles()}
-                effort={state.effortAvailable ? state.effort : undefined}
-                onEffort={
-                  state.effortAvailable
-                    ? (effort) => controller.selectEffort(effort)
-                    : undefined
-                }
+                effort={state.effort}
+                ultraAvailable={state.effortAvailable}
+                onEffort={(effort) => controller.selectEffort(effort)}
               />
               {!streamingControlsOnly && canStop && (
                 <Button

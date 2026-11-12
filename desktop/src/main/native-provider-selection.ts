@@ -81,12 +81,18 @@ export namespace NativeProviderSelection {
           settings.imageRequest
         )
       : undefined;
+    // Reasoning is a published fact of this provider's binding of the model.
+    const reasoning =
+      catalog.text.catalog[
+        model as keyof typeof catalog.text.catalog
+      ]?.reasoningProviders?.includes(providerId) === true;
     return {
       provider: "openai-compatible",
       endpoint,
       model,
       credentialHome: home,
       subagents: true,
+      ...(reasoning && { reasoning: true as const }),
       ...(imageGeneration && { imageGeneration }),
       providerNetwork: {
         prepare: (url, headers) =>
