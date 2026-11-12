@@ -193,7 +193,8 @@ export function ComposerAttachmentCards({
   );
 }
 
-function ComposerAttachmentCard({
+/** One attachment card: a thumbnail or icon, the name and type, and remove. */
+export function ComposerAttachmentCard({
   attachment,
   onRemove,
 }: {

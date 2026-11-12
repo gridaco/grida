@@ -183,6 +183,11 @@ export type AgentComposerInputProps = {
    * Hosts that give an empty submission its own action should describe it here.
    */
   emptySubmitLabel?: string;
+  /**
+   * Attachments the host stages itself, shown in the composer like the
+   * built-in attachment cards.
+   */
+  attachments?: ReactNode;
   /** Footer content grouped with the attachment button. */
   toolbarStart?: ReactNode;
   /** Footer content right-aligned before the submit/stop button. */
@@ -243,6 +248,7 @@ function AgentComposerInner({
   scratchReservation = ScratchSeedBudget.NONE,
   allowEmptySubmit = false,
   emptySubmitLabel,
+  attachments,
   toolbarStart,
   toolbarEnd,
   className,
@@ -725,6 +731,11 @@ function AgentComposerInner({
           preparedResources.current.remove(attachment.id)
         }
       />
+      {attachments && (
+        <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2">
+          {attachments}
+        </div>
+      )}
       <ComposerContent
         autofocus={autofocus}
         onSubmitRequest={submit}

@@ -61,6 +61,7 @@ import { cn } from "@app/ui/lib/utils";
 import styles from "./agent-pane.module.css";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
 import { NativeTurnArtifacts } from "./native-turn-summary";
+import { NativeAttachmentCard } from "./native-attachment-card";
 import { NativeEarlierMessages } from "./native-earlier-messages";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
@@ -256,6 +257,11 @@ export function NativeAgentPane({
     controller.subscribe,
     controller.read,
     controller.read
+  );
+  // One preview per staged draft; a new draft object means a new attachment.
+  const attachmentPreview = useMemo(
+    () => (state.attachmentDraft ? controller.attachmentPreview() : null),
+    [controller, state.attachmentDraft]
   );
   const mentions = useWorkspaceFileMentions(workspaceId);
   const catalog = useMemo(
@@ -725,25 +731,10 @@ export function NativeAgentPane({
             }}
           />
         )}
-        {(state.attachmentDraft || state.attachmentReading) && (
-          <div className="flex items-center gap-2 px-1 pb-1 text-xs">
-            <span className="min-w-0 flex-1 truncate">
-              {state.attachmentReading
-                ? "Reading attachment…"
-                : state.attachmentDraft?.name}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              disabled={state.acting}
-              onClick={() => controller.removeAttachment(state.scope)}
-            >
-              {state.attachmentDraft?.kind === "png"
-                ? "Remove PNG"
-                : "Remove file"}
-            </Button>
-          </div>
+        {state.attachmentReading && (
+          <p role="status" className="text-muted-foreground px-1 pb-1 text-xs">
+            Reading attachment…
+          </p>
         )}
         {state.attachmentDraft &&
           (state.attachmentDraft.error ||
@@ -852,6 +843,18 @@ export function NativeAgentPane({
             return false;
           }}
           attach={false}
+          attachments={
+            state.attachmentDraft &&
+            !state.attachmentReading && (
+              <NativeAttachmentCard
+                name={state.attachmentDraft.name}
+                size={state.attachmentDraft.size}
+                png={state.attachmentDraft.kind === "png"}
+                preview={attachmentPreview}
+                onRemove={() => controller.removeAttachment(state.scope)}
+              />
+            )
+          }
           onAttachmentTransfer={({ resources }) =>
             void controller.pickTransferredAttachment(state.scope, resources)
           }

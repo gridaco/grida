@@ -1081,6 +1081,14 @@ export class NativeChatController {
     }
   }
 
+  /** The staged PNG's bytes, for a preview. Null for a file or no draft. */
+  attachmentPreview(): Blob | null {
+    const attachment = this.scope?.selectedAttachment;
+    return attachment?.kind === "png"
+      ? new Blob([attachment.bytes], { type: "image/png" })
+      : null;
+  }
+
   removeAttachment(scopeId: number): void {
     const scope = this.scope;
     if (!scope || scope.id !== scopeId || this.view.acting) return;
