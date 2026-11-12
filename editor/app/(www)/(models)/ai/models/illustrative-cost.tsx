@@ -1,6 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import type { PublicIllustrativeCost } from "@/lib/gg/public-models/catalogue";
-import { formatIllustrativeAmount } from "@/lib/gg/public-models/pricing";
+import { formatIllustrativeCost } from "@/lib/gg/public-models/pricing";
 
 export function IllustrativeCost({
   example,
@@ -12,7 +12,7 @@ export function IllustrativeCost({
   return (
     <div className="space-y-2">
       <p className="break-all font-mono text-sm font-medium tabular-nums text-foreground">
-        {formatIllustrativeAmount(example.amount)}
+        {formatIllustrativeCost(example)}
       </p>
       <p className="text-xs leading-5">{example.scenario}</p>
       <p className="text-xs leading-5 text-muted-foreground">

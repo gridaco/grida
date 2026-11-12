@@ -35,13 +35,23 @@ conversion or maintain its own model-specific price list.
 Optional `gg.illustrative_costs` supplies GG's own example amounts separately from
 usage rates. Every item has an advertised `operation_id`, exact decimal USD
 `amount`, `scenario`, `coverage`, and manual provenance (`description`,
-`reviewed_on`, optional HTTPS `source_urls`). The page labels these “Estimated cost”
-and shows a compact clickable
-amount and an additional-example count. Expanding it reveals every example's
-complete scenario, coverage, operation and provenance. Amounts apply only to the
-stated scenario and included charges; they are not unit rates or guaranteed request totals. USD strings are
+`reviewed_on`, optional HTTPS `source_urls`). The “Media cost” column shows a compact
+amount and an additional-example count. Hovering, focusing or clicking it opens a
+small Configuration/Cost table, using an optional authored `label` or the original
+scenario. The row's details chevron reveals complete scenarios, coverage,
+operations and provenance. Amounts apply only to the stated scenario and included
+charges; they are not unit rates or guaranteed request totals. USD strings are
 formatted without floating-point conversion or rounding. There is no fallback to
 another provider's examples or a model-specific local price list.
+
+Optional `unit` and `per_quantity` occur together and describe the amount's selected
+quantity, such as `image`/`1` or `character`/`500`. The amount is the total for that
+quantity; the page never divides it into another rate. Exact-one quantities display
+as `/image` for the known image unit; other quantities remain verbatim. Unfamiliar
+bounded unit tokens retain their raw spelling without invented pluralization.
+The page never infers a denominator or configuration label from model kind or
+English prose. An absent or unsupported pair leaves a bare amount; an unsupported
+label falls back to the scenario without discarding the cost.
 
 Older feeds without this field remain valid. Unsupported or malformed optional
 examples, including unknown operation IDs or unsafe source links, are omitted

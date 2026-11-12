@@ -43,10 +43,10 @@ import {
 } from "@/lib/gg/public-models/catalogue";
 import { ModelFilters } from "./model-filters";
 import { ModelDetails } from "./model-details";
+import { CostPreview, MediaCostHelp } from "./cost-preview";
 import { LabLogo } from "./lab-logo";
 import {
   modelPricing,
-  formatIllustrativeAmount,
   type PriceSummaryLine,
 } from "@/lib/gg/public-models/pricing";
 import type { CatalogueView } from "@/lib/gg/public-models/cache";
@@ -195,23 +195,7 @@ const ModelRow = memo(function ModelRow({
         </TableCell>
         <TableCell className="min-w-36">
           {illustrations[0] ? (
-            <button
-              type="button"
-              aria-label={`${expanded ? "Hide" : "Show"} estimated cost details for ${gg.card.label}`}
-              aria-expanded={expanded}
-              aria-controls={detailsId}
-              onClick={toggle}
-              className="rounded-sm text-left text-xs focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
-            >
-              <span className="font-mono tabular-nums underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 hover:decoration-foreground">
-                {formatIllustrativeAmount(illustrations[0].amount)}
-              </span>
-              {illustrations.length > 1 ? (
-                <span className="mt-1 block text-muted-foreground">
-                  +{illustrations.length - 1} more
-                </span>
-              ) : null}
-            </button>
+            <CostPreview examples={illustrations} modelLabel={gg.card.label} />
           ) : (
             <span
               className="text-muted-foreground"
@@ -550,7 +534,12 @@ export function ModelsBrowser({
                 <TableHead scope="col" className="pl-5">
                   Model
                 </TableHead>
-                <TableHead scope="col">Estimated cost</TableHead>
+                <TableHead scope="col">
+                  <span className="inline-flex items-center gap-1">
+                    Media cost
+                    <MediaCostHelp />
+                  </span>
+                </TableHead>
                 <TableHead scope="col">
                   Input{" "}
                   <span className="ml-1 text-xs font-normal text-muted-foreground">

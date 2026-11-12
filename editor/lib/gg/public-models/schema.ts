@@ -9,6 +9,9 @@ const decimal = z
   .regex(/^\d+(\.\d+)?$/)
   .refine((value) => value === value.trim());
 const positiveDecimal = decimal.refine((v) => /[1-9]/.test(v));
+const canonicalDecimal = decimal.refine((value) =>
+  /^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value)
+);
 const httpURL = z
   .string()
   .max(2048)
@@ -24,28 +27,46 @@ const nonblankText = (maximum: number) =>
     .string()
     .max(maximum)
     .refine((value) => /\S/u.test(value));
-const illustrativeCost = z.object({
-  operation_id: id,
-  amount: decimal.refine((value) => /^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value)),
-  currency: z.literal("USD"),
-  scenario: nonblankText(2048),
-  coverage: nonblankText(4096),
-  provenance: z.object({
-    maintenance: z.literal("manual"),
-    description: nonblankText(8192),
-    reviewed_on: z.iso.date(),
-    source_urls: z
-      .array(
-        z
-          .string()
-          .refine((value) => !/\s/u.test(value))
-          .pipe(httpURL)
-      )
-      .min(1)
-      .max(16)
-      .optional(),
-  }),
-});
+const illustrativeCost = z
+  .object({
+    operation_id: id,
+    amount: canonicalDecimal,
+    currency: z.literal("USD"),
+    label: nonblankText(256).optional().catch(undefined),
+    unit: z
+      .string()
+      .max(64)
+      .regex(/^[a-z][a-z0-9_]*$/)
+      .refine((value) => value === value.trim())
+      .optional()
+      .catch(undefined),
+    per_quantity: canonicalDecimal
+      .refine((value) => /[1-9]/.test(value))
+      .optional()
+      .catch(undefined),
+    scenario: nonblankText(2048),
+    coverage: nonblankText(4096),
+    provenance: z.object({
+      maintenance: z.literal("manual"),
+      description: nonblankText(8192),
+      reviewed_on: z.iso.date(),
+      source_urls: z
+        .array(
+          z
+            .string()
+            .refine((value) => !/\s/u.test(value))
+            .pipe(httpURL)
+        )
+        .min(1)
+        .max(16)
+        .optional(),
+    }),
+  })
+  .transform((example) =>
+    example.unit !== undefined && example.per_quantity !== undefined
+      ? example
+      : { ...example, unit: undefined, per_quantity: undefined }
+  );
 // Optional display metadata must not hide valid models or weaken their tariff checks.
 const illustrativeCosts = z
   .array(z.unknown())

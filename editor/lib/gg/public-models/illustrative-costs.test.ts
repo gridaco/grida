@@ -4,9 +4,14 @@ import { describe, expect, it } from "vitest";
 import { catalogueFixture, futureCatalogueFixture } from "./fixtures";
 import { catalogueSchema } from "./schema";
 import { emptyFilters } from "./catalogue";
-import { formatIllustrativeAmount, modelPricing } from "./pricing";
+import {
+  formatIllustrativeAmount,
+  formatIllustrativeCost,
+  modelPricing,
+} from "./pricing";
 import { ModelDetails } from "../../../app/(www)/(models)/ai/models/model-details";
 import { ModelsBrowser } from "../../../app/(www)/(models)/ai/models/models-browser";
+import { CostConfigurations } from "../../../app/(www)/(models)/ai/models/cost-preview";
 
 const example = {
   operation_id: "image.generate",
@@ -128,6 +133,118 @@ describe("GG illustrative costs", () => {
     }
   );
 
+  it.each([
+    ["image", "1", "$0.0969/image"],
+    ["image", "1.0", "$0.0969/image"],
+    ["image", "2", "$0.0969/2 images"],
+    ["video", "1", "$0.0969/video"],
+    ["generation", "1", "$0.0969/generation"],
+    ["task", "1", "$0.0969/task"],
+    ["character", "500", "$0.0969/500 characters"],
+    ["second", "10", "$0.0969/10 seconds"],
+    ["second", "0.50", "$0.0969/0.50 seconds"],
+    ["audio_frame", "3", "$0.0969/3 audio_frame"],
+    ["constructor", "2", "$0.0969/2 constructor"],
+  ])(
+    "displays the authored %s/%s denominator without dividing the total",
+    (unit, per_quantity, expected) => {
+      const parsed = catalogueSchema.parse(
+        withExamples([{ ...example, unit, per_quantity }])
+      );
+      const cost = parsed.data[0].gg.illustrative_costs![0];
+      expect(cost.per_quantity).toBe(per_quantity);
+      expect(formatIllustrativeCost(cost)).toBe(expected);
+    }
+  );
+
+  it.each([
+    {},
+    { unit: "image" },
+    { per_quantity: "1" },
+    { unit: "IMAGE", per_quantity: "1" },
+    { unit: "image\n", per_quantity: "1" },
+    { unit: "image", per_quantity: "0" },
+    { unit: "image", per_quantity: "0.00" },
+    { unit: "image", per_quantity: "01" },
+    { unit: "image", per_quantity: "1e3" },
+    { unit: "image", per_quantity: "1\n" },
+    { unit: "image", per_quantity: "1".repeat(65) },
+    { unit: "a".repeat(65), per_quantity: "1" },
+    { unit: 1, per_quantity: "1" },
+    { unit: "image", per_quantity: 1 },
+  ])(
+    "keeps a valid cost when an optional denominator is absent or unsupported",
+    (pair) => {
+      const parsed = catalogueSchema.parse(
+        withExamples([{ ...example, ...pair }])
+      );
+      expect(parsed.data).toHaveLength(4);
+      const cost = parsed.data[0].gg.illustrative_costs![0];
+      expect(cost.unit).toBeUndefined();
+      expect(cost.per_quantity).toBeUndefined();
+      expect(formatIllustrativeCost(cost)).toBe("$0.0969");
+    }
+  );
+
+  it.each(["", " \n", "a".repeat(257), null, 12])(
+    "falls back to the original scenario for an unsupported optional label",
+    (label) => {
+      const parsed = catalogueSchema.parse(
+        withExamples([{ ...example, label }])
+      );
+      const cost = parsed.data[0].gg.illustrative_costs![0];
+      expect(cost.label).toBeUndefined();
+      const html = renderToStaticMarkup(
+        createElement(CostConfigurations, { examples: [cost] })
+      );
+      expect(html).toContain(example.scenario);
+    }
+  );
+
+  it("renders the compact configuration table using authored labels and exact totals", () => {
+    const parsed = catalogueSchema.parse(
+      withExamples([
+        {
+          ...example,
+          label: "1024×1024 · Medium",
+          unit: "image",
+          per_quantity: "1",
+        },
+        { ...example, amount: "0.1234", unit: "image", per_quantity: "2" },
+      ])
+    );
+    const html = renderToStaticMarkup(
+      createElement(CostConfigurations, {
+        examples: parsed.data[0].gg.illustrative_costs!,
+      })
+    );
+    for (const text of [
+      "Configuration",
+      "Cost",
+      "1024×1024 · Medium",
+      example.scenario,
+      "$0.0969/image",
+      "$0.1234/2 images",
+    ])
+      expect(html).toContain(text);
+    expect(html).not.toContain("$0.0617/image");
+    expect(html).not.toContain(example.coverage);
+    expect(html).not.toContain(example.provenance.description);
+  });
+
+  it("escapes authored configuration labels without treating them as HTML", () => {
+    const parsed = catalogueSchema.parse(
+      withExamples([{ ...example, label: "<script>untrusted</script>" }])
+    );
+    const html = renderToStaticMarkup(
+      createElement(CostConfigurations, {
+        examples: parsed.data[0].gg.illustrative_costs!,
+      })
+    );
+    expect(html).toContain("&lt;script&gt;untrusted&lt;/script&gt;");
+    expect(html).not.toContain("<script>untrusted");
+  });
+
   it.each([null, {}, "unsupported", Array(65).fill(example)])(
     "omits unsupported optional arrays without hiding models",
     (invalid) => {
@@ -162,6 +279,9 @@ describe("GG illustrative costs", () => {
       withExamples([
         {
           ...example,
+          label: "1024×1024 · Medium",
+          unit: "image",
+          per_quantity: "1",
           provenance: {
             ...example.provenance,
             source_urls: ["https://gateway.example/docs/pricing"],
@@ -190,10 +310,12 @@ describe("GG illustrative costs", () => {
       })
     );
     for (const text of [
-      "Estimated cost",
-      "$0.0969",
+      "Media cost",
+      "$0.0969/image",
       "+1 more",
-      `aria-label="Show estimated cost details for ${model.gg.card.label}"`,
+      `aria-label="Media cost configurations for ${model.gg.card.label}"`,
+      'aria-haspopup="dialog"',
+      'aria-label="About media cost estimates"',
     ])
       expect(html).toContain(text);
     for (const text of [
@@ -201,6 +323,7 @@ describe("GG illustrative costs", () => {
       example.coverage,
       "image.generate",
       "About this estimate",
+      "1024×1024 · Medium",
     ])
       expect(html).not.toContain(text);
     expect(html).not.toContain("$0.1234");
