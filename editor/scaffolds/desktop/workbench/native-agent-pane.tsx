@@ -140,19 +140,20 @@ export function NativeAgentPaneGate({
       ? selection.readiness
       : undefined;
   if (readiness === "legacy") return legacy;
-  if (readiness === undefined || readiness === "native-starting")
-    // Startup is brief; keep the pane quiet instead of narrating it.
-    return <div aria-busy="true" className="flex min-h-0 flex-1" />;
+  // While the agent starts, the ordinary pane is shown; it connects and
+  // accepts sends once startup finishes.
+  const starting = readiness === undefined || readiness === "native-starting";
   // Without a usable default connection the pane still opens; its composer
   // asks for a model, and choosing one continues in the same pane.
   const connectionRequired =
+    !starting &&
     readiness !== "native-ready" &&
     readiness !== null &&
     readiness !== "native-unavailable" &&
     !!workspaceId &&
     !!bridge.profiles &&
     !!bridge.selectProfile;
-  if (readiness !== "native-ready" && !connectionRequired)
+  if (!starting && readiness !== "native-ready" && !connectionRequired)
     return (
       <div className="flex flex-col gap-2 px-3 py-2 text-xs">
         <span role="alert" className="text-destructive">
@@ -175,6 +176,7 @@ export function NativeAgentPaneGate({
     <NativeAgentPane
       key={initialSession}
       bridge={bridge}
+      starting={starting}
       connectionRequired={connectionRequired}
       connectionNote={
         connectionRequired && readiness
@@ -203,6 +205,7 @@ const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
 
 export function NativeAgentPane({
   bridge,
+  starting = false,
   connectionRequired = false,
   connectionNote,
   selectionKey,
@@ -213,6 +216,8 @@ export function NativeAgentPane({
   editorSurfaces,
 }: {
   bridge: DesktopNativeChat;
+  /** The agent is still starting; the pane shows but does not connect yet. */
+  starting?: boolean;
   /** No connection can run yet; the composer's model picker starts the chat. */
   connectionRequired?: boolean;
   connectionNote?: string;
@@ -264,6 +269,7 @@ export function NativeAgentPane({
       (workspaceId && initialSession
         ? new URLSearchParams(window.location.hash.slice(1)).get("chat-profile")
         : null);
+    if (starting) return;
     if (connectionRequired) controller.connectForSelection();
     else controller.connect(initialSession, profile, startNewChat);
     const stopFocus =
@@ -286,6 +292,7 @@ export function NativeAgentPane({
     startNewChat,
     workspaceId,
     connectionRequired,
+    starting,
   ]);
   const snapshot = state.observation?.snapshot;
   const editHistory = controller.canReviseHistory && !state.revisionDraft;

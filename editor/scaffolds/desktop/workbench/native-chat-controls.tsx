@@ -326,9 +326,11 @@ export function NativeModelPicker({
     profiles?.choices.find((p) => p.id === profiles.active);
   const label =
     selected?.model ??
-    (profiles?.active === null && !defaultUnavailable
-      ? "Default model"
-      : "Choose model");
+    (!profiles
+      ? "Model"
+      : profiles.active === null && !defaultUnavailable
+        ? "Default model"
+        : "Choose model");
   // One list of models. A previously used connection keeps its saved identity.
   const models = [
     ...(profiles?.choices ?? []).map((p) => ({
