@@ -352,6 +352,7 @@ describe("public models projection and local query", () => {
         })
       );
     expect(render("openai")).toContain("<svg");
+    expect(render("elevenlabs")).toContain("<svg");
     expect(render("constructor")).toContain(">T</span>");
     expect(render("unknown")).not.toContain("<svg");
   });
