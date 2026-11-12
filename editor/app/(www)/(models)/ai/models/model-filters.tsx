@@ -12,7 +12,8 @@ import {
 import { ArrowLeft, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import {
   emptyFilters,
-  kindLabels,
+  kindLabel,
+  modalityLabel,
   kinds,
   modalities,
   type Filters,
@@ -26,14 +27,6 @@ type FilterGroup = {
   label: string;
   hint: string;
   options: FilterOption[];
-};
-export const modalityLabels: Record<string, string> = {
-  text: "Text",
-  json: "JSON",
-  image: "Image",
-  video: "Video",
-  audio: "Audio",
-  "three-d": "3D",
 };
 
 function FilterPicker({
@@ -245,7 +238,12 @@ export function ModelFilters({
         key: "kinds",
         label: "Type",
         hint: "Matches any selected type.",
-        options: kinds.map((value) => ({ value, label: kindLabels[value] })),
+        options: [
+          ...new Set([
+            ...kinds,
+            ...models.map((model) => model.gg.kind).sort(),
+          ]),
+        ].map((value) => ({ value, label: kindLabel(value) })),
       },
       {
         key: "labs",
@@ -266,19 +264,23 @@ export function ModelFilters({
         key: "input",
         label: "Input",
         hint: "Supports every selected input type. Exact combinations depend on the operation.",
-        options: modalities.map((value) => ({
-          value,
-          label: modalityLabels[value],
-        })),
+        options: [
+          ...new Set([
+            ...modalities,
+            ...models.flatMap((model) => model.gg.input_modalities).sort(),
+          ]),
+        ].map((value) => ({ value, label: modalityLabel(value) })),
       },
       {
         key: "output",
         label: "Output",
         hint: "Matches any selected output type.",
-        options: modalities.map((value) => ({
-          value,
-          label: modalityLabels[value],
-        })),
+        options: [
+          ...new Set([
+            ...modalities,
+            ...models.flatMap((model) => model.gg.output_modalities).sort(),
+          ]),
+        ].map((value) => ({ value, label: modalityLabel(value) })),
       },
     ],
     [models]

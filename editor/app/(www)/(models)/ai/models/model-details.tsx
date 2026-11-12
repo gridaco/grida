@@ -159,6 +159,12 @@ export function ModelDetails({
               Rates are selected by operation and input.
             </p>
           ) : null}
+          {gg.pricing_context !== "input" &&
+          gg.pricing_context !== "operation_input" ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Pricing context: <code>{gg.pricing_context}</code>
+            </p>
+          ) : null}
         </div>
       </div>
 

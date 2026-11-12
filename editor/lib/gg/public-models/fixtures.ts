@@ -149,3 +149,55 @@ export function speechCatalogueFixture(): Catalogue {
   catalogue.data.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   return catalogue;
 }
+
+/** A future additive vocabulary, without teaching the consumer those values. */
+export function futureCatalogueFixture() {
+  const catalogue = catalogueFixture();
+  const model = structuredClone(catalogue.data[0]);
+  model.id = "future/audio-analysis";
+  model.gg.kind = "audio-analysis";
+  model.gg.input_modalities = ["constructor", "pdf", "text"];
+  model.gg.output_modalities = ["audio", "spatial"];
+  model.gg.pricing_context = "session_input";
+  model.gg.card.release = {
+    date: "2026-11-12",
+    source_url: "https://example.com/release",
+    basis: "provider_revision",
+  };
+  model.gg.pricing.components = [
+    {
+      id: "session_input_frames",
+      meter: "session_input_frames",
+      unit: "audio_frame",
+      rate_mills: "12.500",
+      per_quantity: "3",
+      quantity_rounding: { mode: "none", increment: null },
+      when: {},
+      description: "Measured frame usage.",
+    },
+  ];
+  return {
+    ...catalogue,
+    data: [
+      ...catalogue.data,
+      {
+        ...model,
+        gg: {
+          ...model.gg,
+          future_metadata: { ignored: true },
+          card: {
+            ...model.gg.card,
+            lab: {
+              ...model.gg.card.lab,
+              logo: {
+                url: "https://example.com/animated.avif",
+                media_type: "image/avif",
+                kind: "animated",
+              },
+            },
+          },
+        },
+      },
+    ],
+  };
+}

@@ -33,14 +33,15 @@ import {
 } from "lucide-react";
 import {
   filterModels,
-  kindLabels,
+  kindLabel,
+  modalityLabel,
   emptyFilters,
   serializeFilters,
   parseFilters,
   type Filters,
   type PublicModel,
 } from "@/lib/gg/public-models/catalogue";
-import { ModelFilters, modalityLabels } from "./model-filters";
+import { ModelFilters } from "./model-filters";
 import { ModelDetails } from "./model-details";
 import { LabLogo } from "./lab-logo";
 import {
@@ -147,11 +148,18 @@ function ModalityIcons({
   values: PublicModel["gg"]["input_modalities"];
 }) {
   return values.map((value) => {
-    const Icon = modalityIcons[value];
+    const label = modalityLabel(value);
+    const Icon = Object.hasOwn(modalityIcons, value)
+      ? modalityIcons[value as keyof typeof modalityIcons]
+      : null;
     return (
-      <span key={value} title={modalityLabels[value]}>
-        <Icon className="size-3.5" aria-hidden="true" />
-        <span className="sr-only">{modalityLabels[value]}</span>
+      <span key={value} title={label}>
+        {Icon ? (
+          <Icon className="size-3.5" aria-hidden="true" />
+        ) : (
+          <span className="text-xs">{label}</span>
+        )}
+        {Icon ? <span className="sr-only">{label}</span> : null}
       </span>
     );
   });
@@ -202,11 +210,11 @@ const ModelRow = memo(function ModelRow({
         />
         <TableCell>
           <Badge variant="secondary" className="font-normal">
-            {kindLabels[gg.kind]}
+            {kindLabel(gg.kind)}
           </Badge>
           <div
             className="mt-2 flex items-center gap-1.5 text-muted-foreground"
-            aria-label={`Input: ${gg.input_modalities.map((m) => modalityLabels[m]).join(", ") || "none"}. Output: ${gg.output_modalities.map((m) => modalityLabels[m]).join(", ")}`}
+            aria-label={`Input: ${gg.input_modalities.map(modalityLabel).join(", ") || "none"}. Output: ${gg.output_modalities.map(modalityLabel).join(", ")}`}
           >
             <ModalityIcons values={gg.input_modalities} />
             <span aria-hidden="true" className="mx-0.5 text-xs">
@@ -225,7 +233,9 @@ const ModelRow = memo(function ModelRow({
               title={
                 gg.card.release.basis === "provider_endpoint"
                   ? "Provider endpoint release; the model may have been released earlier."
-                  : "Model release"
+                  : gg.card.release.basis === "model"
+                    ? "Model release"
+                    : `Release basis: ${gg.card.release.basis}`
               }
             >
               <time dateTime={gg.card.release.date}>
@@ -235,6 +245,12 @@ const ModelRow = memo(function ModelRow({
               </time>
               {gg.card.release.basis === "provider_endpoint" ? (
                 <span className="mt-1 block text-[10px]">Endpoint release</span>
+              ) : null}
+              {gg.card.release.basis !== "model" &&
+              gg.card.release.basis !== "provider_endpoint" ? (
+                <span className="mt-1 block text-[10px]">
+                  Release basis: {gg.card.release.basis}
+                </span>
               ) : null}
             </a>
           ) : (
