@@ -71,6 +71,7 @@ fn capabilities() -> ModelCapabilities {
         json_tools: true,
         text_tools: true,
         max_output_tokens: Some(1024),
+        reasoning: Default::default(),
     }
 }
 
@@ -81,6 +82,7 @@ fn request() -> InferenceRequest {
         tools: vec![],
         max_output_tokens: Some(32),
         extension: None,
+        reasoning: Default::default(),
     }
 }
 

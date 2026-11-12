@@ -34,6 +34,7 @@ fn capabilities() -> ModelCapabilities {
         json_tools: true,
         text_tools: false,
         max_output_tokens: Some(1024),
+        reasoning: Default::default(),
     }
 }
 

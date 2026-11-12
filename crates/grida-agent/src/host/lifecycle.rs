@@ -46,6 +46,7 @@ mod tests {
                 max_output_tokens: 1024,
                 compatible_output_limit_field: None,
                 llama_cpp_input_count: false,
+                reasoning: Default::default(),
             }),
         )
         .unwrap();
@@ -63,6 +64,7 @@ mod tests {
             configuration_permission: crate::ConfigurationPermission::Disabled,
             operating_regime: None,
             effort: None,
+            reasoning: Default::default(),
         };
         let view = host.store.inspect(session.clone()).await.unwrap();
         let original = prompt("original");
@@ -558,6 +560,7 @@ impl Host {
                                 operating_regime,
                                 subagent: None,
                                 effort,
+                                reasoning: Default::default(),
                             },
                         )
                         .await?;

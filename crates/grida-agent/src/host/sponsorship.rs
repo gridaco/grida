@@ -1518,6 +1518,7 @@ mod tests {
                     operating_regime: regime,
                     subagent: None,
                     effort: effort.clone(),
+                    reasoning: Default::default(),
                 },
             )
             .await
@@ -1740,6 +1741,7 @@ mod tests {
             credential_home: Some(home.clone()),
             compatible_output_limit_field: None,
             llama_cpp_input_count: false,
+            reasoning: Default::default(),
         };
         let host = Host::open(&state, Some(options()))
             .unwrap()
@@ -1870,6 +1872,7 @@ mod tests {
                 credential_home: None,
                 compatible_output_limit_field: None,
                 llama_cpp_input_count: false,
+                reasoning: Default::default(),
             }),
         )
         .unwrap()
@@ -1941,6 +1944,7 @@ mod tests {
             credential_home: None,
             compatible_output_limit_field: None,
             llama_cpp_input_count: false,
+            reasoning: Default::default(),
         };
         let host = Host::open(&state, Some(options()))
             .unwrap()
@@ -2076,6 +2080,7 @@ mod tests {
                 credential_home: None,
                 compatible_output_limit_field: None,
                 llama_cpp_input_count: false,
+                reasoning: Default::default(),
             }),
         )
         .unwrap()
@@ -2150,6 +2155,7 @@ mod tests {
                 credential_home: None,
                 compatible_output_limit_field: Some(CompatibleOutputLimitField::MaxTokens),
                 llama_cpp_input_count: false,
+                reasoning: Default::default(),
             }),
         )
         .unwrap()
@@ -2238,6 +2244,7 @@ mod tests {
                 credential_home: None,
                 compatible_output_limit_field: None,
                 llama_cpp_input_count: false,
+                reasoning: Default::default(),
             }),
         )
         .unwrap()

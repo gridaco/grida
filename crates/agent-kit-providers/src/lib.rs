@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 pub use anthropic::Anthropic;
 pub use gemini::{Gemini, GeminiProfile};
-pub use openai::{ModelProfile, OpenAiCompatible, OutputLimitField};
+pub use openai::{ModelProfile, OpenAiCompatible, OutputLimitField, ReasoningField};
 pub use responses::{ReasoningEffort, Responses, ResponsesEndpoint, ResponsesProfile};
 
 /// Resolve a host-authorized, immutable image reference to its exact bytes.

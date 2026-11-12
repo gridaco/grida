@@ -413,6 +413,12 @@ fn launch(command: Command) -> Command {
                 .help("Use the llama.cpp text request counter on a direct numeric-loopback /v1 endpoint"),
         )
         .arg(
+            Arg::new("reasoning")
+                .long("reasoning")
+                .action(ArgAction::SetTrue)
+                .help("The selected model accepts a reasoning level for each turn"),
+        )
+        .arg(
             Arg::new("max-output-tokens")
                 .long("max-output-tokens")
                 .value_name("TOKENS")
@@ -514,6 +520,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         max_output_tokens: *args
             .get_one::<u64>("max-output-tokens")
             .expect("output default"),
+        reasoning: args.get_flag("reasoning"),
     };
     let listener = if name == "serve" {
         args.get_one::<String>("listen")

@@ -50,6 +50,7 @@ impl Provider for ScriptProvider {
             json_tools: true,
             text_tools: false,
             max_output_tokens: Some(1024),
+            reasoning: Default::default(),
         })
     }
 
@@ -261,6 +262,7 @@ impl Fixture {
                 instructions: "Complete the task and incorporate user answers.".into(),
                 max_steps: 5,
                 max_output_tokens: Some(1024),
+                reasoning: Default::default(),
             },
             self.provider.clone(),
             tools,
@@ -565,6 +567,7 @@ async fn reopened_turn_reconciles_existing_registration_and_leaves_missing_evide
                     tools: offers,
                     max_output_tokens: Some(1024),
                     extension: None,
+                    reasoning: Default::default(),
                 })
                 .unwrap();
             let worker = tokio::spawn(async move {

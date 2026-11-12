@@ -247,6 +247,7 @@ impl Host {
                     operating_regime: OperatingRegime::Act,
                     subagent: Some(Assignment::new(parent_turn.clone())),
                     effort: None,
+                    reasoning: Default::default(),
                 },
             )
             .await?;

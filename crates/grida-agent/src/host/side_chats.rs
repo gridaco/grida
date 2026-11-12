@@ -154,6 +154,7 @@ impl SideChat {
                 configuration_permission: crate::ConfigurationPermission::Disabled,
                 operating_regime: None,
                 effort: None,
+                reasoning: Default::default(),
             })
             .await?;
         let mut completion = run.completion;

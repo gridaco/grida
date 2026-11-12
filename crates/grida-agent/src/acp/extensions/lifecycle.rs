@@ -38,6 +38,8 @@ struct Enqueue {
     allow_configuration_changes: bool,
     operating_regime: Option<crate::OperatingRegime>,
     effort: Option<crate::EffortPreset>,
+    #[serde(default)]
+    reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -210,6 +212,7 @@ pub(super) fn handlers(
                                 request.operating_regime,
                             )?,
                             effort: effort(&enqueue.1, request.effort)?,
+                            reasoning: request.reasoning,
                         })
                         .await
                         .map_err(host_error)?;

@@ -579,6 +579,7 @@ async fn serve_connection(
                             configuration_permission: crate::ConfigurationPermission::Disabled,
                             operating_regime: None,
                             effort: None,
+                            reasoning: Default::default(),
                         })
                         .await
                         .map_err(host_error)

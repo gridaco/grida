@@ -537,6 +537,7 @@ impl Fixture {
                 json_tools: true,
                 text_tools: true,
                 max_output_tokens: Some(4096),
+                reasoning: Default::default(),
             }),
             prepare_failure: Mutex::new(None),
         });
@@ -638,6 +639,7 @@ impl Fixture {
             instructions: instructions.into(),
             max_steps: steps,
             max_output_tokens: Some(1024),
+            reasoning: Default::default(),
         };
         regime.apply(&mut config);
         Master::new(

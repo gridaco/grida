@@ -228,3 +228,58 @@ async fn requested_tool_calls_stream_their_activity_and_recorded_outcome() {
     let _ = child.kill().await;
     endpoint.done().await;
 }
+
+#[tokio::test]
+async fn a_submitted_reasoning_level_reaches_only_a_reasoning_model() {
+    for supported in [true, false] {
+        let temp = TempDir::new().unwrap();
+        let workspace = TempDir::new().unwrap();
+        let mut endpoint = Endpoint::start(vec![Reply::Finished("Reasoned.")]).await;
+        let mut command = executable();
+        command.args(["serve", "--stdio"]);
+        configured(&mut command, &temp.path().join("state"), &endpoint.url);
+        if supported {
+            command.arg("--reasoning");
+        }
+        let mut child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut observer = Observer {
+            input: child.stdin.take().unwrap(),
+            output: BufReader::new(child.stdout.take().unwrap()),
+            next: 0,
+            updates: vec![],
+        };
+        observer.request("initialize", extension_initialize()).await;
+        let session = observer
+            .request(
+                "session/new",
+                json!({"cwd":workspace.path(),"mcpServers":[]}),
+            )
+            .await["sessionId"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        observer
+            .request(
+                "_co.grida/session/submit",
+                json!({
+                    "sessionId":session,"inputId":"reasoning-input","reasoning":"high",
+                    "prompt":[{"type":"text","text":"Think it through"}]
+                }),
+            )
+            .await;
+        let body = endpoint.request().await;
+        assert_eq!(
+            body.get("reasoning_effort"),
+            supported.then(|| json!("high")).as_ref(),
+            "{body}"
+        );
+        drop(observer);
+        let _ = child.kill().await;
+        endpoint.done().await;
+    }
+}

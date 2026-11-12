@@ -1004,6 +1004,7 @@ mod tests {
             configuration_permission: ConfigurationPermission::Disabled,
             operating_regime: None,
             effort: None,
+            reasoning: Default::default(),
         };
         let png = || PromptPart::Image {
             image: ImageUpload::read_selected_png(&selected).unwrap(),
@@ -1178,6 +1179,7 @@ mod tests {
                     tools: vec![],
                     max_output_tokens: None,
                     extension: None,
+                    reasoning: Default::default(),
                 },
                 gateway.binding.clone(),
                 ModelCapabilities {
@@ -1186,6 +1188,7 @@ mod tests {
                     json_tools: false,
                     text_tools: false,
                     max_output_tokens: None,
+                    reasoning: Default::default(),
                 },
             )
             .unwrap();

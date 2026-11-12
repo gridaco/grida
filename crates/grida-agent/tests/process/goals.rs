@@ -31,6 +31,7 @@ fn options(endpoint: &Endpoint) -> ProviderOptions {
         max_output_tokens: 1024,
         compatible_output_limit_field: None,
         llama_cpp_input_count: false,
+        reasoning: Default::default(),
     }
 }
 
@@ -59,6 +60,7 @@ fn request(session: &SessionId, id: &str, text: &str) -> PromptRequest {
         configuration_permission: ConfigurationPermission::Disabled,
         operating_regime: None,
         effort: None,
+        reasoning: Default::default(),
     }
 }
 

@@ -74,6 +74,9 @@ pub struct MasterConfig {
     /// None selects the provider's own output allowance.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_output_tokens: Option<u64>,
+    /// None selects the provider's own reasoning default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1185,6 +1188,7 @@ impl Master {
             tools: self.tools.offers()?,
             max_output_tokens: self.config.max_output_tokens,
             extension: None,
+            reasoning: self.config.reasoning,
         })?;
         match self.input_limit {
             Some(limit) => request.with_input_limit(limit),

@@ -2377,6 +2377,7 @@ async fn older_reconciliation_invalidates_a_cut_without_moving_its_tail() {
             tools: vec![],
             max_output_tokens: None,
             extension: None,
+            reasoning: Default::default(),
         },
         ProviderBinding {
             provider: ProviderId::new("fixture-provider").unwrap(),
@@ -2388,6 +2389,7 @@ async fn older_reconciliation_invalidates_a_cut_without_moving_its_tail() {
             json_tools: false,
             text_tools: false,
             max_output_tokens: None,
+            reasoning: Default::default(),
         },
     )
     .unwrap();

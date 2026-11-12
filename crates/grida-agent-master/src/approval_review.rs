@@ -158,6 +158,7 @@ impl ReadProfile {
             tools: Vec::new(),
             max_output_tokens: Some(output_limit.min(MAX_OUTPUT_TOKENS)),
             extension: None,
+            reasoning: Default::default(),
         }))
     }
 }
@@ -316,6 +317,7 @@ mod tests {
             tools: Vec::new(),
             max_output_tokens: Some(256),
             extension: None,
+            reasoning: Default::default(),
         }
     }
 
@@ -465,6 +467,7 @@ mod tests {
                     json_tools: true,
                     text_tools: false,
                     max_output_tokens: Some(256),
+                    reasoning: Default::default(),
                 },
             )
             .unwrap()

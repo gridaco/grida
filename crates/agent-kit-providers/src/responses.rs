@@ -255,7 +255,9 @@ impl Responses {
         if !tools.is_empty() {
             body["tools"] = tools.into();
         }
-        if let Some(effort) = profile.reasoning_effort {
+        if let Some(level) = request.reasoning {
+            body["reasoning"] = json!({"effort": level.as_str()});
+        } else if let Some(effort) = profile.reasoning_effort {
             body["reasoning"] = json!({"effort": effort});
         }
         Ok((body, names))

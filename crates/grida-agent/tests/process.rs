@@ -1117,6 +1117,7 @@ async fn dropping_admission_waiter_leaves_the_worker_under_host_ownership() {
             model: ModelId::new("fixture-model").unwrap(),
             credential_env: None,
             max_output_tokens: 1024,
+            reasoning: Default::default(),
         }),
     )
     .unwrap();
@@ -1132,6 +1133,7 @@ async fn dropping_admission_waiter_leaves_the_worker_under_host_ownership() {
             configuration_permission: grida_agent::ConfigurationPermission::Disabled,
             operating_regime: None,
             effort: None,
+            reasoning: Default::default(),
         }));
         // The current-thread executor cannot run the registered worker during
         // this poll. Drop the request before its first durable admission step.
@@ -1689,6 +1691,7 @@ async fn retry_reports_a_previously_accepted_unclaimed_input_without_starting_it
         model: ModelId::new("fixture-model").unwrap(),
         credential_env: None,
         max_output_tokens: 1024,
+        reasoning: Default::default(),
     };
     let host = Host::open(&state, Some(options())).unwrap();
     let session = host.new_session(workspace.path().into()).await.unwrap();
@@ -1735,6 +1738,7 @@ async fn retry_reports_a_previously_accepted_unclaimed_input_without_starting_it
             configuration_permission: grida_agent::ConfigurationPermission::Disabled,
             operating_regime: None,
             effort: None,
+            reasoning: Default::default(),
         })
         .await
         .unwrap();
@@ -2192,6 +2196,7 @@ async fn an_idle_chat_follows_a_changed_local_route_between_turns() {
         credential_home: None,
         compatible_output_limit_field: None,
         llama_cpp_input_count: false,
+        reasoning: Default::default(),
     };
     let host = Host::open(&state, Some(options("http://127.0.0.1:1/v1"))).unwrap();
     let session = host.new_session(workspace.path().into()).await.unwrap();
@@ -2208,6 +2213,7 @@ async fn an_idle_chat_follows_a_changed_local_route_between_turns() {
             configuration_permission: grida_agent::ConfigurationPermission::Disabled,
             operating_regime: None,
             effort: None,
+            reasoning: Default::default(),
         })
         .await;
     // The same local credential owner selected another route for the next

@@ -96,6 +96,7 @@ fn start_inference(state: &mut TurnState, id: &str, inputs: &[HistoryRecord]) ->
             tools: vec![],
             max_output_tokens: None,
             extension: None,
+            reasoning: Default::default(),
         },
         ProviderBinding {
             provider: ProviderId::new("fixture").unwrap(),
@@ -107,6 +108,7 @@ fn start_inference(state: &mut TurnState, id: &str, inputs: &[HistoryRecord]) ->
             json_tools: true,
             text_tools: false,
             max_output_tokens: None,
+            reasoning: Default::default(),
         },
     )
     .unwrap();

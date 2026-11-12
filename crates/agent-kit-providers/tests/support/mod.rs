@@ -77,6 +77,7 @@ pub(super) fn request() -> InferenceRequest {
         tools: vec![],
         max_output_tokens: Some(32),
         extension: None,
+        reasoning: Default::default(),
     }
 }
 

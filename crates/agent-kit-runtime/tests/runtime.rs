@@ -183,6 +183,7 @@ impl Provider for ScriptedProvider {
             json_tools: true,
             text_tools: false,
             max_output_tokens: Some(1024),
+            reasoning: Default::default(),
         })
     }
 
@@ -351,6 +352,7 @@ fn request(
             tools: tools.offers().unwrap(),
             max_output_tokens: Some(256),
             extension: None,
+            reasoning: Default::default(),
         })
         .unwrap()
 }
@@ -1866,6 +1868,7 @@ async fn master_can_order_captured_tool_declarations() {
             tools: offered,
             max_output_tokens: Some(256),
             extension: None,
+            reasoning: Default::default(),
         })
         .unwrap();
     let runtime = runtime(provider, &first, Arc::new(Allow), Authority::allowed());

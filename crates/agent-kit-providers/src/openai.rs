@@ -33,6 +33,17 @@ pub struct ModelProfile {
     pub capabilities: ModelCapabilities,
     pub output_limit: OutputLimitField,
     pub include_usage: bool,
+    /// Where this endpoint reads a requested reasoning level.
+    pub reasoning_field: ReasoningField,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ReasoningField {
+    /// Top-level `reasoning_effort`, as in OpenAI Chat Completions.
+    #[default]
+    Effort,
+    /// `reasoning.effort`, as in OpenRouter.
+    Object,
 }
 
 pub struct OpenAiCompatible {
@@ -232,6 +243,12 @@ impl OpenAiCompatible {
         }
         if model.include_usage {
             body["stream_options"] = json!({ "include_usage": true });
+        }
+        if let Some(level) = request.reasoning {
+            match model.reasoning_field {
+                ReasoningField::Effort => body["reasoning_effort"] = level.as_str().into(),
+                ReasoningField::Object => body["reasoning"] = json!({"effort": level.as_str()}),
+            }
         }
         if let Some(maximum) = request.max_output_tokens {
             let field = match model.output_limit {

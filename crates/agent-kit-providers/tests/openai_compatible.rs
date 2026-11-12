@@ -43,9 +43,11 @@ fn profile() -> ModelProfile {
             json_tools: true,
             text_tools: false,
             max_output_tokens: Some(1024),
+            reasoning: Default::default(),
         },
         output_limit: OutputLimitField::CompletionTokens,
         include_usage: true,
+        reasoning_field: Default::default(),
     }
 }
 
@@ -1567,4 +1569,53 @@ async fn cancellation_preserves_observed_request_receipt_and_partial_text() {
             .cancellation
             .is_cancelled()
     );
+}
+
+#[tokio::test]
+async fn a_requested_reasoning_level_uses_the_endpoint_field_and_needs_support() {
+    use agent_kit_core::inference::ReasoningEffort;
+    use agent_kit_providers::ReasoningField;
+
+    let unsupported = adapter(FixtureTransport::new([]));
+    let mut asked = request();
+    asked.reasoning = Some(ReasoningEffort::High);
+    assert_eq!(
+        unsupported.prepare(asked.clone()).unwrap_err().code,
+        "reasoning_unsupported"
+    );
+
+    for (field, expected) in [
+        (ReasoningField::Effort, json!({"reasoning_effort": "high"})),
+        (
+            ReasoningField::Object,
+            json!({"reasoning": {"effort": "high"}}),
+        ),
+    ] {
+        let mut model = profile();
+        model.capabilities.reasoning = ReasoningEffort::ALL.into_iter().collect();
+        model.reasoning_field = field;
+        let transport = FixtureTransport::new([Ok(response(text_response("ok"), false))]);
+        let provider = configured(transport.clone(), model, limits());
+        execute(&provider, asked.clone(), "reasoning").await;
+        let body: Value =
+            serde_json::from_slice(&transport.requests.lock().unwrap()[0].0.body).unwrap();
+        for (key, value) in expected.as_object().unwrap() {
+            assert_eq!(&body[key], value, "{body}");
+        }
+        assert!(body.get("reasoning_effort").is_none() || field == ReasoningField::Effort);
+    }
+
+    // Without a requested level the body carries no reasoning field.
+    let mut model = profile();
+    model.capabilities.reasoning = ReasoningEffort::ALL.into_iter().collect();
+    let transport = FixtureTransport::new([Ok(response(text_response("ok"), false))]);
+    execute(
+        &configured(transport.clone(), model, limits()),
+        request(),
+        "default",
+    )
+    .await;
+    let body: Value =
+        serde_json::from_slice(&transport.requests.lock().unwrap()[0].0.body).unwrap();
+    assert!(body.get("reasoning_effort").is_none() && body.get("reasoning").is_none());
 }

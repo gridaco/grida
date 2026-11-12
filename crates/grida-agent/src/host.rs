@@ -309,6 +309,8 @@ pub struct PromptRequest {
     pub configuration_permission: crate::ConfigurationPermission,
     pub operating_regime: Option<OperatingRegime>,
     pub effort: Option<EffortPreset>,
+    /// The person's reasoning level for this request's turn.
+    pub reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
 }
 
 pub struct AcceptedRun {
@@ -351,6 +353,8 @@ struct StoredPrompt {
     max_steps: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     effort: Option<EffortPolicy>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
     model: Option<agent_kit_core::ModelId>,
     authority: Option<CapturedAuthority>,
     #[serde(default, skip_serializing_if = "OperatingRegime::is_act")]
@@ -419,6 +423,7 @@ struct SubmissionPolicy {
     operating_regime: OperatingRegime,
     subagent: Option<grida_agent_master::subagents::Assignment>,
     effort: Option<EffortPolicy>,
+    reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
 }
 
 enum InputAuthority {
@@ -2098,6 +2103,7 @@ impl Host {
             operating_regime,
             subagent: None,
             effort: self.capture_effort(request.effort.unwrap_or(self.effort))?,
+            reasoning: request.reasoning,
         })
     }
 
@@ -2122,6 +2128,7 @@ impl Host {
             operating_regime,
             subagent,
             effort,
+            reasoning,
         } = policy;
         if !operating_regime.is_act() && allow_wakeups {
             return Err(problem(ErrorKind::Unsupported, "plan_wakeups_unavailable"));
@@ -2249,6 +2256,7 @@ impl Host {
                     execution.config.max_steps
                 }),
                 effort,
+                reasoning,
                 model: Some(execution.config.model.clone()),
                 authority: Some(CapturedAuthority {
                     principal: execution.authority.inference.authority.principal.clone(),
@@ -2596,6 +2604,10 @@ impl Host {
                 }
                 config.max_steps = stored.max_steps.unwrap_or(1);
                 config.max_output_tokens = stored.max_output_tokens.or(config.max_output_tokens);
+                // A level the current model cannot take falls back to its default.
+                config.reasoning = stored
+                    .reasoning
+                    .filter(|level| execution.supports_reasoning(*level));
                 let messages = if matches!(&stored.goal, Some(goals::GoalInput::Continue(_))) {
                     if !stored.parts.is_empty() {
                         return Err(problem(
@@ -3200,6 +3212,12 @@ impl From<TurnLinkCursor> for GatewayChildBillingRef {
 }
 
 impl Execution {
+    fn supports_reasoning(&self, level: agent_kit_core::inference::ReasoningEffort) -> bool {
+        self.provider
+            .capabilities(&self.config.model)
+            .is_ok_and(|capabilities| capabilities.reasoning.contains(&level))
+    }
+
     fn new(
         state_dir: &Path,
         options: ProviderOptions,
@@ -3211,6 +3229,11 @@ impl Execution {
         let configuration = transport.selection();
         let binding = transport.binding().clone();
         let mut capabilities = text_capabilities(options.protocol.as_str())?;
+        if options.reasoning {
+            capabilities.reasoning = agent_kit_core::inference::ReasoningEffort::ALL
+                .into_iter()
+                .collect();
+        }
         let compatible_png = transport.accepts_compatible_png(&options.model);
         let gemini_flash = transport.is_reviewed_gemini_flash();
         let image_profile = if options.protocol == ProviderProtocol::Responses
@@ -3256,6 +3279,11 @@ impl Execution {
                                 }
                             },
                             include_usage: true,
+                            reasoning_field: if transport.reasoning_object() {
+                                agent_kit_providers::ReasoningField::Object
+                            } else {
+                                agent_kit_providers::ReasoningField::Effort
+                            },
                         },
                     )]),
                     transport.clone(),
@@ -3356,6 +3384,7 @@ impl Execution {
             capabilities,
             output_limit: OutputLimitField::CompletionTokens,
             include_usage: true,
+            reasoning_field: Default::default(),
         };
         let spending_profile = Arc::new(spending::ProviderProfile {
             binding: binding.clone(),
@@ -3404,7 +3433,12 @@ impl Execution {
             BTreeMap::from([(
                 model.clone(),
                 ResponsesProfile {
-                    capabilities: text_capabilities("chatgpt-subscription")?,
+                    capabilities: ModelCapabilities {
+                        reasoning: agent_kit_core::inference::ReasoningEffort::ALL
+                            .into_iter()
+                            .collect(),
+                        ..text_capabilities("chatgpt-subscription")?
+                    },
                     wire_model: connection.wire_model.clone(),
                     reasoning_effort: Some(agent_kit_providers::ReasoningEffort::Medium),
                 },
@@ -3478,6 +3512,7 @@ impl Execution {
                 instructions: "You are Grida Agent, a helpful assistant.".into(),
                 max_steps: MAX_TURN_STEPS,
                 max_output_tokens,
+                reasoning: Default::default(),
             },
             provider,
             spending_profile: None,
@@ -3504,6 +3539,7 @@ fn text_capabilities(protocol: &str) -> Result<ModelCapabilities> {
         json_tools: true,
         text_tools: false,
         max_output_tokens: None,
+        reasoning: Default::default(),
     })
 }
 

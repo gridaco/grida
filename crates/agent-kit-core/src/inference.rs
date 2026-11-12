@@ -47,6 +47,34 @@ pub struct ModelCapabilities {
     pub json_tools: bool,
     pub text_tools: bool,
     pub max_output_tokens: Option<u64>,
+    /// Reasoning levels the model accepts. Empty when the model does not
+    /// take a reasoning setting.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub reasoning: BTreeSet<ReasoningEffort>,
+}
+
+/// How much the model reasons before answering, from least to most.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReasoningEffort {
+    Low,
+    Medium,
+    High,
+    #[serde(rename = "xhigh")]
+    XHigh,
+}
+
+impl ReasoningEffort {
+    pub const ALL: [Self; 4] = [Self::Low, Self::Medium, Self::High, Self::XHigh];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::XHigh => "xhigh",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -56,6 +84,9 @@ pub struct InferenceRequest {
     pub tools: Vec<ToolOffer>,
     pub max_output_tokens: Option<u64>,
     pub extension: Option<Envelope>,
+    /// Absent selects the provider's default reasoning.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<ReasoningEffort>,
 }
 
 impl InferenceRequest {
@@ -67,6 +98,12 @@ impl InferenceRequest {
                 .is_some_and(|(n, maximum)| n > maximum)
         {
             return Err(Error::new(ErrorKind::LimitExceeded, "output_token_limit"));
+        }
+        if self
+            .reasoning
+            .is_some_and(|level| !capabilities.reasoning.contains(&level))
+        {
+            return Err(Error::new(ErrorKind::Unsupported, "reasoning_unsupported"));
         }
         crate::history::validate_exchanges(&self.messages, false)?;
         let mut names = BTreeSet::new();

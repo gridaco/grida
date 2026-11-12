@@ -52,6 +52,7 @@ impl Provider for FixtureProvider {
             json_tools: true,
             text_tools: false,
             max_output_tokens: Some(1024),
+            reasoning: Default::default(),
         })
     }
 
@@ -286,6 +287,7 @@ impl Fixture {
                 instructions: "Finish the task.".into(),
                 max_steps: 4,
                 max_output_tokens: Some(1024),
+                reasoning: Default::default(),
             },
             self.provider.clone(),
             inventory.snapshot(&[id]).unwrap(),

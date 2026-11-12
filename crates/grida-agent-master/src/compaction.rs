@@ -182,6 +182,7 @@ pub fn summary_request(
         tools: Vec::new(),
         max_output_tokens: output_limit.map(|limit| limit.min(MAX_SUMMARY_TOKENS)),
         extension: None,
+        reasoning: Default::default(),
     };
     Ok(Some(SummaryRequest {
         inference,

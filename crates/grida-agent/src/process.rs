@@ -301,6 +301,7 @@ async fn admit_run(
         configuration_permission: crate::ConfigurationPermission::Disabled,
         operating_regime: None,
         effort: None,
+        reasoning: Default::default(),
     })
     .await
 }

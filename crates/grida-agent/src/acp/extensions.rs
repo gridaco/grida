@@ -177,6 +177,8 @@ struct Submit {
     allow_library_selection: bool,
     operating_regime: Option<crate::OperatingRegime>,
     effort: Option<crate::EffortPreset>,
+    #[serde(default)]
+    reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
     editor_endpoint_id: Option<BindingId>,
     #[serde(default)]
     editor_presentation: bool,
@@ -522,6 +524,7 @@ pub(super) fn handlers(
                                     request.operating_regime,
                                 )?,
                                 effort: effort(&submit_sessions, request.effort)?,
+                                reasoning: request.reasoning,
                             },
                             SubmissionContext {
                                 allow_wakeups: request.allow_wakeups,

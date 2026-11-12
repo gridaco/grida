@@ -341,6 +341,7 @@ mod tests {
                 credential_home: None,
                 compatible_output_limit_field: None,
                 llama_cpp_input_count: false,
+                reasoning: Default::default(),
             }),
         )
         .unwrap()

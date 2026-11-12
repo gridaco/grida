@@ -182,6 +182,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                                     request.operating_regime,
                                 )?,
                                 effort: effort(&sessions, request.effort)?,
+                                reasoning: Default::default(),
                             },
                         )
                         .await

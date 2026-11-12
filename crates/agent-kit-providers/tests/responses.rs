@@ -57,6 +57,7 @@ fn make_adapter(
                 json_tools: true,
                 text_tools: false,
                 max_output_tokens: None,
+                reasoning: Default::default(),
             },
         },
     )]

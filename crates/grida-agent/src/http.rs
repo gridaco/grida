@@ -90,6 +90,9 @@ pub struct ProviderOptions {
     pub compatible_output_limit_field: Option<CompatibleOutputLimitField>,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub llama_cpp_input_count: bool,
+    /// The selected model accepts a reasoning level for each turn.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reasoning: bool,
 }
 
 impl ProviderOptions {
@@ -252,6 +255,13 @@ impl HttpTransport {
             return None;
         }
         responses_context_window(&self.target, model)
+    }
+
+    /// OpenRouter reads `reasoning.effort`; other compatible endpoints read
+    /// the top-level `reasoning_effort`.
+    pub(crate) fn reasoning_object(&self) -> bool {
+        self.protocol == ProviderProtocol::OpenAiCompatible
+            && self.target.as_str() == "https://openrouter.ai/api/v1/chat/completions"
     }
 
     pub(crate) fn accepts_compatible_png(&self, model: &ModelId) -> bool {
@@ -704,6 +714,7 @@ mod tests {
             credential_home: None,
             compatible_output_limit_field: None,
             llama_cpp_input_count: false,
+            reasoning: Default::default(),
         }
     }
 

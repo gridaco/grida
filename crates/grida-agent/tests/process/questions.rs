@@ -481,6 +481,7 @@ async fn answer_before_a_deferred_step_suspends_keeps_its_resume_wake() {
             compatible_output_limit_field: None,
             llama_cpp_input_count: false,
             max_output_tokens: 1024,
+            reasoning: Default::default(),
         }),
     )
     .unwrap();
@@ -496,6 +497,7 @@ async fn answer_before_a_deferred_step_suspends_keeps_its_resume_wake() {
             configuration_permission: grida_agent::ConfigurationPermission::Disabled,
             operating_regime: None,
             effort: None,
+            reasoning: Default::default(),
         })
         .await
         .unwrap();

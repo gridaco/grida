@@ -399,6 +399,7 @@ mod tests {
                 max_output_tokens: 128,
                 compatible_output_limit_field: None,
                 llama_cpp_input_count: false,
+                reasoning: Default::default(),
             }),
         )
         .unwrap();
