@@ -161,6 +161,42 @@ mod stored {
         }
     }
 
+    /// A headless run with a stored key reaches dispatch instead of failing
+    /// while reading serve-only options.
+    #[test]
+    fn a_headless_run_with_a_stored_key_starts() {
+        let (_temp, home, store) = home();
+        store.set("openrouter", "fixture-key").unwrap();
+        let state = tempfile::tempdir().unwrap();
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_grida-agent"))
+            .args([
+                "run",
+                "--endpoint",
+                "https://openrouter.ai/api/v1",
+                "--model",
+                "fixture",
+                "--prompt",
+                "hello",
+                "--credential-home",
+            ])
+            .arg(&home)
+            .arg("--state-dir")
+            .arg(state.path().join("state"))
+            .arg("--cwd")
+            .arg(state.path())
+            // Keep the attempt offline: dispatch fails at an unreachable proxy.
+            .env("HTTPS_PROXY", "http://127.0.0.1:1")
+            .env_remove("NO_PROXY")
+            .output()
+            .unwrap();
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(!stderr.contains("panicked"), "{stderr}");
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains("\"kind\":\"accepted\""),
+            "{stderr}"
+        );
+    }
+
     #[tokio::test]
     async fn desktop_byok_trims_bearer_only_and_compares_exact_stored_bytes() {
         let (_temp, home, store) = home();

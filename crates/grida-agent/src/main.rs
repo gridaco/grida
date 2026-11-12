@@ -580,10 +580,12 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
         None
     };
     let subagents = name == "serve" && args.get_flag("subagents");
+    // Only `serve` defines the supervised options; `run` has none to read.
     let stored_subagents = provider.permits_stored_subagents()
-        && args
-            .get_one::<String>("supervised-configured-endpoint-key")
-            .is_none();
+        && (name != "serve"
+            || args
+                .get_one::<String>("supervised-configured-endpoint-key")
+                .is_none());
     if subagents
         && supervisor.is_some()
         && (chatgpt_scope.is_some() || (gateway_scope.is_none() && !stored_subagents))
