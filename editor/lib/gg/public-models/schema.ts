@@ -29,6 +29,7 @@ const rate = z
       "provider_credit",
       "provider_unit",
       "mill",
+      "character",
     ]),
     rate_mills: decimal,
     per_quantity: positiveDecimal,

@@ -9,7 +9,7 @@ import {
   parsePageFilters,
   serializeFilters,
 } from "./catalogue";
-import { catalogueFixture } from "./fixtures";
+import { catalogueFixture, speechCatalogueFixture } from "./fixtures";
 import { catalogueSchema } from "./schema";
 import { ModelDetails } from "../../../app/(www)/(models)/ai/models/model-details";
 import { LabLogo } from "../../../app/(www)/(models)/ai/models/lab-logo";
@@ -17,6 +17,54 @@ import { modelPricing } from "./pricing";
 import { ModelsBrowser } from "../../../app/(www)/(models)/ai/models/models-browser";
 
 describe("public models projection and local query", () => {
+  it("keeps mixed speech/character and sound-effect/second offerings valid, filterable and renderable", () => {
+    const catalogue = catalogueSchema.parse(speechCatalogueFixture());
+    expect(catalogue.data).toHaveLength(6);
+    const filters = parseFilters(new URLSearchParams("kind=speech"));
+    expect(filters.kinds).toEqual(["speech"]);
+    const speech = filterModels(catalogue.data, filters);
+    expect(speech.map((model) => model.id)).toEqual([
+      "eleven_text_to_sound_v3",
+      "eleven_v4",
+      "eleven_v4_turbo",
+    ]);
+    expect(
+      filterModels(catalogue.data, parseFilters(new URLSearchParams()))
+    ).toHaveLength(6);
+    const html = renderToStaticMarkup(
+      createElement(ModelsBrowser, {
+        initial: {
+          state: "fresh",
+          catalogue,
+          served_at: 0,
+          validated_at: 0,
+          refresh_at: 60000,
+          expires_at: 300000,
+        },
+        initialFilters: filters,
+        gatewayOrigin: "https://gateway.example",
+      })
+    );
+    expect(html).toContain("Speech");
+    expect(html).not.toContain("Models are temporarily unavailable");
+    expect(html).not.toContain("alpha/Éclair");
+    for (const model of speech) expect(html).toContain(model.id);
+    for (const [id, price] of [
+      ["eleven_v4", "$0.00008 / character"],
+      ["eleven_v4_turbo", "$0.00004 / character"],
+      ["eleven_text_to_sound_v3", "$0.002 / second"],
+    ]) {
+      const model = speech.find((item) => item.id === id)!;
+      const details = renderToStaticMarkup(
+        createElement(ModelDetails, {
+          model,
+          pricing: modelPricing(model),
+          gatewayOrigin: "https://gateway.example",
+        })
+      );
+      expect(details).toContain(price);
+    }
+  });
   it("validates a complete snapshot, strips unused wire data and rejects inconsistent retirement/order", () => {
     const fixture = catalogueFixture();
     const projected = catalogueSchema.parse({

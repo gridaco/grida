@@ -7,6 +7,7 @@ export const kinds = [
   "image",
   "video",
   "music",
+  "speech",
   "three-d",
 ] as const;
 export const modalities = [
@@ -23,6 +24,7 @@ export const kindLabels: Record<(typeof kinds)[number], string> = {
   image: "Image",
   video: "Video",
   music: "Music",
+  speech: "Speech",
   "three-d": "3D",
 };
 export type PublicModel = z.infer<typeof modelSchema>;

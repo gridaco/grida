@@ -81,3 +81,71 @@ export function catalogueFixture(): Catalogue {
     ],
   };
 }
+
+/** Mixed snapshot covering additive speech kinds and their measured price units. */
+export function speechCatalogueFixture(): Catalogue {
+  const catalogue = catalogueFixture();
+  const speech = (
+    id: string,
+    operation: string,
+    unit: "character" | "second",
+    rate_mills: string
+  ): PublicModel => {
+    const model = structuredClone(catalogue.data[0]);
+    const tts = unit === "character";
+    model.id = id;
+    model.owned_by = "elevenlabs";
+    model.gg.kind = "speech";
+    model.gg.input_modalities = ["text"];
+    model.gg.output_modalities = ["audio"];
+    model.gg.operation_ids = [operation];
+    model.gg.interfaces = ["endpoints"];
+    model.gg.capabilities = {
+      streaming: false,
+      speech_generation: tts,
+      sound_effects_generation: !tts,
+    };
+    model.gg.card.label = id;
+    model.gg.card.lab = {
+      id: "elevenlabs",
+      name: "ElevenLabs",
+      url: "https://example.com",
+      logo: null,
+    };
+    model.gg.pricing.components = [
+      {
+        id: tts ? "speech_characters" : "audio_seconds",
+        meter: tts ? "speech_characters" : "audio_seconds",
+        unit,
+        rate_mills,
+        per_quantity: "1",
+        quantity_rounding: { mode: "none", increment: null },
+        when: {},
+        description: "Original measured usage.",
+      },
+    ];
+    return model;
+  };
+  catalogue.data.push(
+    speech(
+      "eleven_v4",
+      "speech.elevenlabs.eleven-v4.generate",
+      "character",
+      "0.08"
+    ),
+    speech(
+      "eleven_v4_turbo",
+      "speech.elevenlabs.eleven-v4-turbo.generate",
+      "character",
+      "0.04"
+    ),
+    speech(
+      "eleven_text_to_sound_v3",
+      "speech.elevenlabs.sound-effects-v3.generate",
+      "second",
+      "2"
+    )
+  );
+  catalogue.data.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return catalogue;
+}
