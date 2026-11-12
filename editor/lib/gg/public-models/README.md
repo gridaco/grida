@@ -10,7 +10,17 @@ validated origin. `ggConfig.publicModels()` in `../config.ts` is the only
 environment reader; it is separate from signing/workload credential settings.
 
 `schema.ts` validates and projects only the page's supported fields; its Zod
-validator stays out of the browser bundle. `catalogue.ts` owns local query
+validator stays out of the browser bundle. Additive display values (model kinds,
+modalities, component units, pricing contexts and release bases) use bounded
+opaque tokens. Known values get friendly labels/icons; unfamiliar ones retain
+raw text and can be filtered from the observed snapshot. Unused unsupported logo
+metadata is omitted. Additional object fields are stripped. Unknown units keep
+their exact unit, quantity and rate without inferred conversions or pluralization.
+Essential structure, USD/mill denomination, decimals/divisors, rounding, safe
+clickable URLs, ordering and validity deadlines remain strict: incompatible
+changes to those contracts require a coordinated consumer update.
+
+`catalogue.ts` owns local query
 filter parsing and exact decimal formatting. `pricing.ts` groups the published
 rates into input, output and ancillary schedules for the table. Different meters
 remain separate: cached input is not the ordinary input price, and additive

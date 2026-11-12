@@ -27,6 +27,45 @@ export const kindLabels: Record<(typeof kinds)[number], string> = {
   speech: "Speech",
   "three-d": "3D",
 };
+// Display vocabularies can grow independently of this application's labels.
+export const maxDisplayValues = 64;
+export function isDisplayValue(value: string): boolean {
+  return (
+    value.length > 0 &&
+    value.length <= 64 &&
+    /^[A-Za-z0-9]/.test(value) &&
+    !/[^A-Za-z0-9_.:-]/.test(value)
+  );
+}
+export const modalityLabels: Record<string, string> = {
+  text: "Text",
+  json: "JSON",
+  image: "Image",
+  video: "Video",
+  audio: "Audio",
+  "three-d": "3D",
+};
+function displayLabel(
+  labels: Readonly<Record<string, string>>,
+  value: string
+): string {
+  return Object.hasOwn(labels, value) ? labels[value] : value;
+}
+export const kindLabel = (value: string): string =>
+  displayLabel(kindLabels, value);
+export const modalityLabel = (value: string): string =>
+  displayLabel(modalityLabels, value);
+const knownUnits = new Set([
+  "token",
+  "image",
+  "megapixel",
+  "second",
+  "generation",
+  "provider_credit",
+  "provider_unit",
+  "mill",
+  "character",
+]);
 export type PublicModel = z.infer<typeof modelSchema>;
 export type Catalogue = z.infer<typeof catalogueSchema>;
 export type Filters = {
@@ -66,16 +105,12 @@ function normalizeFilters(filter: Filters): Filters {
     if (length++ === 128) break;
     q += point;
   }
-  const knownKind = (value: string) =>
-    (kinds as readonly string[]).includes(value);
-  const knownModality = (value: string) =>
-    (modalities as readonly string[]).includes(value);
   return {
     q,
-    kinds: normalizeList(filter.kinds, knownKind, kinds.length),
+    kinds: normalizeList(filter.kinds, isDisplayValue, maxDisplayValues),
     labs: normalizeList(filter.labs, validLab, maxLabFilters),
-    input: normalizeList(filter.input, knownModality, modalities.length),
-    output: normalizeList(filter.output, knownModality, modalities.length),
+    input: normalizeList(filter.input, isDisplayValue, maxDisplayValues),
+    output: normalizeList(filter.output, isDisplayValue, maxDisplayValues),
   };
 }
 /** Page-only CSV filters: the public API still accepts a single kind and lab. */
@@ -174,6 +209,7 @@ export function formatRate(
     per = "1000000";
   }
   const quantity = per === "1000000" ? "1M" : per;
-  const unit = component.unit.replaceAll("_", " ");
-  return `${millsToUSD(amount)} / ${quantity === "1" ? "" : `${quantity} `}${unit}${quantity === "1" ? "" : "s"}`;
+  const knownUnit = knownUnits.has(component.unit);
+  const unit = knownUnit ? component.unit.replaceAll("_", " ") : component.unit;
+  return `${millsToUSD(amount)} / ${quantity === "1" ? "" : `${quantity} `}${unit}${quantity !== "1" && knownUnit ? "s" : ""}`;
 }

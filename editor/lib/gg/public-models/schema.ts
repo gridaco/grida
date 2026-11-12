@@ -1,10 +1,13 @@
 import { z } from "zod";
-import { kinds, modalities } from "./catalogue";
+import { isDisplayValue, maxDisplayValues } from "./catalogue";
+
+const displayValue = z.string().refine(isDisplayValue);
 
 const decimal = z
   .string()
   .max(64)
-  .regex(/^\d+(\.\d+)?$/);
+  .regex(/^\d+(\.\d+)?$/)
+  .refine((value) => value === value.trim());
 const positiveDecimal = decimal.refine((v) => /[1-9]/.test(v));
 const httpURL = z
   .string()
@@ -20,17 +23,7 @@ const rate = z
   .object({
     id: z.string().min(1).max(321),
     meter: id,
-    unit: z.enum([
-      "token",
-      "image",
-      "megapixel",
-      "second",
-      "generation",
-      "provider_credit",
-      "provider_unit",
-      "mill",
-      "character",
-    ]),
+    unit: displayValue,
     rate_mills: decimal,
     per_quantity: positiveDecimal,
     quantity_rounding: z.object({
@@ -63,11 +56,11 @@ export const modelSchema = z.object({
   created: z.number().int().nonnegative(),
   owned_by: z.string().max(160),
   gg: z.object({
-    kind: z.enum(kinds),
-    input_modalities: z.array(z.enum(modalities)).max(6),
-    output_modalities: z.array(z.enum(modalities)).min(1).max(6),
+    kind: displayValue,
+    input_modalities: z.array(displayValue).max(maxDisplayValues),
+    output_modalities: z.array(displayValue).min(1).max(maxDisplayValues),
     operation_ids: z.array(id).max(2048),
-    pricing_context: z.enum(["input", "operation_input"]),
+    pricing_context: displayValue,
     interfaces: z.array(z.string().max(160)).min(1).max(16),
     capabilities: z.record(z.string(), z.boolean()),
     limits: z.record(z.string(), z.number().nonnegative()),
@@ -88,12 +81,13 @@ export const modelSchema = z.object({
           .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
         name: z.string().min(1).max(256),
         url: httpURL,
-        logo: logo.nullable(),
+        // Unused upstream artwork metadata must not hide an otherwise valid model.
+        logo: logo.nullable().catch(null),
       }),
       release: z.object({
         date: z.iso.date().nullable(),
         source_url: httpURL,
-        basis: z.enum(["model", "provider_endpoint"]),
+        basis: displayValue,
       }),
     }),
     availability_ends_on: z.iso.date().nullable().optional(),

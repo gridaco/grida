@@ -143,7 +143,7 @@ export function modelPricing(model: PublicModel): ModelPricing {
       key,
       label: Object.hasOwn(labels, first.meter)
         ? labels[first.meter]
-        : first.meter.replaceAll("_", " "),
+        : first.meter,
       price: `${from ? "From " : ""}${displayRate(first)}`,
       conditional: hasConditions,
       from,
