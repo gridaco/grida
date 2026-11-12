@@ -339,8 +339,9 @@ allowance. Already accepted external jobs retain their visible status.
 **Resume task** continues that unfinished task from its recorded state. It can
 still need an answer or reconciliation of an external operation. Resuming does
 not invent that answer or repeat completed work. A reply cut off by the pause
-is kept, and the agent continues it from where it stopped instead of starting
-it over.
+stays visible, but the agent does not see it: it learns that the person
+interrupted the response and writes it again. Completed tool work is kept.
+[Interrupted responses](./master.md#interrupted-responses-in-model-context)
 
 A paused task is stopped unless the person resumes it. Sending a new request
 while a task is paused ends that task as stopped and runs the new request

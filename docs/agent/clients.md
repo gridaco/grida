@@ -687,7 +687,7 @@ beneath a header such as **Worked for 1m 12s**, and the final answer stays
 visible below it. Select the header to show the recorded commentary and actions
 in order. Consecutive actions appear on one line, such as “Read files, ran
 commands”; select that line to list each call and its outcome. A stopped or
-failed turn shows **Stopped after …** or **Failed after …** instead. A stopped
+failed turn shows **You stopped** or **Failed after …** instead. A stopped
 turn is not collapsed: its partial work stays in view. A turn
 that only answered, without tools or commentary, shows just its answer.
 

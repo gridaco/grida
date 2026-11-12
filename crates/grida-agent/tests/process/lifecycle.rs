@@ -357,12 +357,17 @@ async fn paused_task_resumes_after_restart_with_retained_input_and_steering() {
         request["messages"].as_array().unwrap().last().unwrap()["content"],
         "Apply this correction"
     );
+    // The reply cut off by the pause is replaced by the interruption note.
+    let messages = request["messages"].as_array().unwrap();
     assert!(
-        request["messages"]
-            .as_array()
-            .unwrap()
+        !messages
             .iter()
-            .any(|message| message["role"] == "assistant" && message["content"] == "Before pause.")
+            .any(|message| message["role"] == "assistant" && message["content"] == "Before pause."),
+        "{request}"
+    );
+    assert!(
+        is_interruption_note(&messages[messages.len() - 2]),
+        "{request}"
     );
     release.send(()).unwrap();
     let settled = wait_for_snapshot(&mut second, session, |snapshot| {
@@ -376,14 +381,20 @@ async fn paused_task_resumes_after_restart_with_retained_input_and_steering() {
     terminate_shared_server(second_host).await;
 }
 
+const INTERRUPTED_GUIDANCE: &str = grida_agent_master::history::INTERRUPTED_GUIDANCE;
+
+fn is_interruption_note(message: &Value) -> bool {
+    message["role"] == "user" && message["content"] == INTERRUPTED_GUIDANCE
+}
+
 #[tokio::test]
-async fn resuming_a_paused_reply_asks_the_model_to_continue_it() {
+async fn resuming_a_paused_reply_replaces_its_cut_off_text_with_an_interruption_note() {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("agent-state");
     let workspace = TempDir::new().unwrap();
     let mut endpoint = Endpoint::start(vec![
         Reply::Hold("Before pause."),
-        Reply::Finished(" After resume."),
+        Reply::Finished("A complete reply."),
     ])
     .await;
     let (host, url) = shared_server(&state, &endpoint.url).await;
@@ -414,20 +425,89 @@ async fn resuming_a_paused_reply_asks_the_model_to_continue_it() {
     assert!(resumed.get("result").is_some(), "{resumed}");
     let request = endpoint.request().await;
     let messages = request["messages"].as_array().unwrap();
-    // The cut-off reply is kept and the model is told to continue it.
-    let kept = messages
-        .iter()
-        .position(|message| message["role"] == "assistant" && message["content"] == "Before pause.")
-        .expect("the partial reply is part of the resumed request");
-    let last = messages.last().unwrap();
-    assert_eq!(last["role"], "user");
+    // The unfinished reply is not model context; the model learns the person
+    // interrupted it and answers the request again.
     assert!(
-        last["content"]
-            .as_str()
-            .is_some_and(|text| text.contains("Continue exactly where the reply above stops")),
-        "{last}"
+        !messages
+            .iter()
+            .any(|message| message["role"] == "assistant"),
+        "{request}"
     );
-    assert_eq!(kept, messages.len() - 2);
+    assert!(is_interruption_note(messages.last().unwrap()), "{request}");
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    endpoint.done().await;
+    drop(socket);
+    terminate_shared_server(host).await;
+}
+
+#[tokio::test]
+async fn a_stopped_reply_leaves_an_interruption_note_for_the_next_turn() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Hold("Before pause."),
+        Reply::Finished("Next answer."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = initialized_shared_socket(&url).await;
+    let created = ws_rpc(
+        &mut socket,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    wait_for_partial_prompt(&mut socket, session).await;
+    endpoint.request().await;
+    let current = session_snapshot(&mut socket, session).await;
+    ws_rpc(
+        &mut socket,
+        4,
+        "_co.grida/session/stop",
+        task_basis(&current, session, "stop-reply"),
+    )
+    .await;
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    ws_rpc(
+        &mut socket,
+        5,
+        "_co.grida/session/enqueue",
+        prompt_request(session, "next", "Next request"),
+    )
+    .await;
+    let held = session_snapshot(&mut socket, session).await;
+    ws_rpc(
+        &mut socket,
+        6,
+        "_co.grida/session/resume-queue",
+        queue_basis(&held, session, "release-next"),
+    )
+    .await;
+    let request = endpoint.request().await;
+    let messages = request["messages"].as_array().unwrap();
+    let texts: Vec<_> = messages
+        .iter()
+        .filter(|message| message["role"] != "system")
+        .collect();
+    assert!(
+        !texts.iter().any(|message| message["role"] == "assistant"),
+        "{request}"
+    );
+    let note = texts
+        .iter()
+        .position(|message| is_interruption_note(message))
+        .expect("the next turn is told about the interruption");
+    assert_eq!(texts[note - 1]["content"], "Initial request");
+    assert_eq!(texts[note + 1]["content"], "Next request");
     wait_for_snapshot(&mut socket, session, |snapshot| {
         snapshot["current"].is_null()
     })

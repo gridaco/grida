@@ -679,6 +679,26 @@ Clients group commentary and activity beneath each turn's header and keep the
 final answer visible. The grouping and disclosure state belong to the client.
 The [experience](./experience.md#read-each-finished-turn) defines the result.
 
+### Interrupted responses in model context
+
+When the person interrupts work, by pausing or stopping, the response being
+generated is cut off. The transcript keeps showing that partial text; model
+context does not. In its place the model reads a short note that the person
+interrupted the previous response on purpose, and that an aborted tool or
+command may have partially executed. A stopped turn ends with the same note.
+
+| Situation                                  | What the model reads next                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Pause, then Resume                         | The turn's completed steps, then the note. It answers the request again.              |
+| Pause or Stop, then a new message          | The earlier turn's completed steps and the note, then the new message.                |
+| Interrupted while a tool step was complete | The completed tool calls and results are kept; only the cut-off response is replaced. |
+
+Completed responses, tool calls, and their results are never repeated or
+dropped by an interruption. Only a response that a person interrupted is
+replaced; a provider failure or a retry is not an interruption and adds no
+note. The rule matches the established convention for interactive coding
+agents, so behavior after an interruption is familiar.
+
 ## Performance is a product claim
 
 The master is evaluated on representative tasks with stated success criteria.

@@ -193,7 +193,7 @@ export namespace turn_activity {
     const elapsed = durationMs === null ? null : duration(durationMs);
     switch (outcome) {
       case "cancelled":
-        return elapsed ? `Stopped after ${elapsed}` : "Stopped";
+        return "You stopped";
       case "failed":
         return elapsed ? `Failed after ${elapsed}` : "Failed";
       case "uncertain":

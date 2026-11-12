@@ -129,7 +129,7 @@ describe("turn_activity.group", () => {
   });
 
   it("labels stopped and failed turns and omits unrecorded durations", () => {
-    expect(turn_activity.header("cancelled", 3_000)).toBe("Stopped after 3s");
+    expect(turn_activity.header("cancelled", 3_000)).toBe("You stopped");
     expect(turn_activity.header("failed", null)).toBe("Failed");
     expect(turn_activity.header("succeeded", null)).toBe("Worked");
     expect(turn_activity.header("uncertain", 61_000)).toBe(

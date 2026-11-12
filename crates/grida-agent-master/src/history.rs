@@ -1,9 +1,87 @@
 //! Causal ordering for model input assembled from committed turn history.
 
+use agent_kit_core::MessageId;
 use agent_kit_core::history::HistoryRecord;
-use agent_kit_core::messages::{Content, Message, Role};
+use agent_kit_core::inference::{FailureKind, InferenceStatus};
+use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnState};
 use std::collections::{BTreeMap, BTreeSet};
+
+/// Told to the model after the person interrupts work, in place of the
+/// response that was cut off. Mirrors the established agent convention: the
+/// unfinished response is not part of model context.
+pub const INTERRUPTED_GUIDANCE: &str = "The user interrupted the previous response on purpose. If any tools or commands were aborted, they may have partially executed.";
+
+/// The history a model reads for one turn. It differs from the transcript in
+/// one way: a response the person interrupted (by pausing or stopping) is
+/// replaced by [`INTERRUPTED_GUIDANCE`], and a stopped turn ends with it.
+/// The transcript keeps showing the interrupted text.
+pub fn model_context(state: &TurnState) -> Vec<HistoryRecord> {
+    let records = project(state);
+    let mut interrupted = BTreeSet::new();
+    for operation in state.operations().values() {
+        if let Some(OperationOutcome::Inference(outcome)) = operation.outcome()
+            && outcome.status == InferenceStatus::Interrupted
+            && outcome
+                .failure
+                .as_ref()
+                .is_some_and(|failure| failure.kind == FailureKind::Cancelled)
+        {
+            interrupted.extend(
+                outcome
+                    .messages
+                    .iter()
+                    .filter(|item| item.role == Role::Assistant)
+                    .map(|item| item.id.clone()),
+            );
+        }
+    }
+    let mut output = Vec::with_capacity(records.len() + 1);
+    let mut previous_dropped = false;
+    for record in records {
+        let item = message(&record);
+        if item.role == Role::Assistant && interrupted.contains(&item.id) {
+            if !previous_dropped && let Some(note) = interruption_note(state, output.len()) {
+                output.push(note);
+            }
+            previous_dropped = true;
+            continue;
+        }
+        previous_dropped = false;
+        output.push(record);
+    }
+    let stopped = state
+        .outcome()
+        .is_some_and(|outcome| outcome.status == OutcomeStatus::Cancelled);
+    if stopped
+        && !matches!(output.last(), Some(record) if message(record).id.as_str().starts_with(NOTE_PREFIX))
+        && let Some(note) = interruption_note(state, output.len())
+    {
+        output.push(note);
+    }
+    output
+}
+
+const NOTE_PREFIX: &str = "interrupted/";
+
+fn interruption_note(state: &TurnState, at: usize) -> Option<HistoryRecord> {
+    let id = MessageId::new(format!(
+        "{NOTE_PREFIX}{}/{at}",
+        state.binding().turn.as_str()
+    ))
+    .ok()?;
+    Some(HistoryRecord::Message(Message {
+        id,
+        role: Role::User,
+        phase: None,
+        content: vec![Content::Text(INTERRUPTED_GUIDANCE.into())],
+        provenance: Provenance {
+            source: "product-instructions".into(),
+            kind: ProvenanceKind::Supplied,
+            fingerprint: None,
+        },
+    }))
+}
 
 /// Keep the contents of published history and present responses before any
 /// later user inputs that were absent from their recorded requests.

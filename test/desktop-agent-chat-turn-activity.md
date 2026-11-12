@@ -24,7 +24,7 @@ happen. When it finishes, that work collapses beneath one header such as
 header shows the recorded commentary and actions in their original order;
 consecutive actions read as one line such as “Read files, searched”, which
 expands to each call and its outcome. A turn that finished normally with only
-its answer shows no header or divider. A stopped turn shows **Stopped after …**
+its answer shows no header or divider. A stopped turn shows **You stopped**
 with its partial work in view and nothing to expand.
 
 Every turn with recorded work keeps its own header, including after reopening the chat and on
@@ -45,8 +45,9 @@ details panel; images the latest turn produced appear below its answer.
    Collapse it again.
 3. Send a second task that uses tools. Confirm both turns show their own
    collapsed header and answer.
-4. Start a long task and choose **Stop**. Confirm its header reads
-   **Stopped after …** and its partial work remains expandable.
+4. Start a long task, pause it with the composer's main button, then send a new
+   message. Confirm the paused turn's header reads **You stopped** and its
+   partial text stays in view, not collapsed.
 5. Send a request the model service rejects. Confirm a **Failed** header.
 6. Quit and reopen Desktop, then reopen the chat. Confirm every turn keeps its
    header and collapsed state. Choose **Earlier messages** in a long chat and

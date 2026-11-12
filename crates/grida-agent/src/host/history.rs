@@ -11,7 +11,7 @@ use grida_agent_master::conversation_seed::{
     ConversationAnchor, ConversationCut, ConversationSeed, ConversationSource, SeedEntry,
     SeedOmissions, is_editable_user,
 };
-use grida_agent_master::history::project;
+use grida_agent_master::history::{model_context, project};
 use std::borrow::Cow;
 
 const HISTORY_PAGE: usize = 128;
@@ -151,7 +151,7 @@ impl Host {
     ) -> Result<PriorContext> {
         let retained = self
             .store
-            .context_history_with(session, before_turn, project)
+            .context_history_with(session, before_turn, model_context)
             .await?;
         let (mut messages, omissions, _) = context_material(retained)?;
         if let Some(context) = &self.side_context {
