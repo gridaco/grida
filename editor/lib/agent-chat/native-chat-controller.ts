@@ -537,8 +537,30 @@ export class NativeChatController {
         });
       return;
     }
+    if (saved.profileId) {
+      void this.restoreProfile(saved.profileId, initial ?? saved.selected);
+      return;
+    }
     void this.listChats();
     void this.select(initial ?? saved.selected);
+  }
+
+  /**
+   * Reopen the workspace with the model chosen there before, as the person
+   * left it. A choice that can no longer run is forgotten and the workspace
+   * opens with the default connection.
+   */
+  private async restoreProfile(
+    id: string,
+    sessionId: string | null
+  ): Promise<void> {
+    const connection = this.catalogConnection;
+    await this.selectProfile({ kind: "saved", id }, sessionId ?? undefined);
+    if (this.profileId === id || this.catalogConnection !== connection) return;
+    this.update({ profileError: null });
+    this.save();
+    void this.listChats();
+    void this.select(sessionId);
   }
 
   disconnect(): void {
@@ -734,6 +756,7 @@ export class NativeChatController {
       if (!(await this.commitProfile(selection, connection))) return;
       if (this.catalogConnection !== connection) return;
       this.profileId = selection.kind === "default" ? null : selection.id;
+      this.save();
       this.catalogConnection = {};
       this.catalog = null;
       const saved = this.restore();
@@ -4478,7 +4501,11 @@ export class NativeChatController {
     void this.listChats();
   }
 
-  private restore(): { selected: string | null; sessions: string[] } {
+  private restore(): {
+    selected: string | null;
+    sessions: string[];
+    profileId: string | null;
+  } {
     const key = this.selectionMemoryKey();
     try {
       const value = JSON.parse(
@@ -4494,12 +4521,17 @@ export class NativeChatController {
         return {
           sessions,
           selected: sessions.includes(value.selected) ? value.selected : null,
+          profileId:
+            typeof value.profileId === "string" &&
+            /^[a-f0-9]{64}$/.test(value.profileId)
+              ? value.profileId
+              : null,
         };
       }
     } catch {
       /* Browser storage may be disabled. */
     }
-    return { selected: null, sessions: [] };
+    return { selected: null, sessions: [], profileId: null };
   }
 
   private save(): void {
@@ -4511,6 +4543,8 @@ export class NativeChatController {
           JSON.stringify({
             selected: this.view.selected,
             sessions: this.recents,
+            // The model chosen for this workspace; the default when absent.
+            ...(this.profileId && { profileId: this.profileId }),
           })
         );
     } catch {

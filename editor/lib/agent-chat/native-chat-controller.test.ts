@@ -223,6 +223,72 @@ it.each([false, true])(
   }
 );
 
+it.each([true, false])(
+  "reopens a workspace with the model chosen there before (still available: %s)",
+  async (available) => {
+    const { bridge } = fixture();
+    const id = "e".repeat(64);
+    const stored = new Map([
+      [
+        "project",
+        JSON.stringify({
+          selected: "old-default",
+          sessions: ["old-default"],
+          profileId: id,
+        }),
+      ],
+    ]);
+    const memory = {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => void stored.set(key, value),
+    };
+    const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+      async () => {
+        if (!available) throw new Error("native_chat_profile_unavailable");
+      }
+    );
+    bridge.selectProfile = choose;
+    const controller = new NativeChatController(bridge, memory, "project");
+    try {
+      controller.connect(null, null);
+      await vi.waitFor(() =>
+        expect(controller.read().selected).toBe("old-default")
+      );
+      expect(choose).toHaveBeenCalledExactlyOnceWith({ kind: "saved", id });
+      // A choice that can no longer run is forgotten without an error; the
+      // workspace opens with the default connection.
+      expect(controller.read().profileError).toBeNull();
+      expect(JSON.parse(stored.get("project")!).profileId).toBe(
+        available ? id : undefined
+      );
+    } finally {
+      controller.disconnect();
+    }
+  }
+);
+
+it("remembers the model chosen for the workspace", async () => {
+  const { bridge } = fixture();
+  const stored = new Map<string, string>();
+  const memory = {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => void stored.set(key, value),
+  };
+  bridge.selectProfile = async () => {};
+  const controller = new NativeChatController(bridge, memory, "project");
+  const id = "f".repeat(64);
+  try {
+    controller.connect(null, null);
+    await vi.waitFor(() => expect(controller.read().scope).toBeGreaterThan(0));
+    await controller.selectProfile({ kind: "new", id });
+    expect(JSON.parse(stored.get("project")!).profileId).toBe(id);
+    await controller.selectProfile({ kind: "default" });
+    expect(JSON.parse(stored.get("project")!).profileId).toBeUndefined();
+  } finally {
+    controller.disconnect();
+  }
+});
+
 it("inspects the current chat's hooks and removes only an observed saved revision", async () => {
   const f = fixture();
   const hook = {
@@ -3533,7 +3599,9 @@ it("picks up the title the host writes for an untitled chat as its turn settles"
     title: null,
     archived: false,
   };
-  const read = vi.fn(async () => entry);
+  const read = vi.fn<NonNullable<DesktopNativeChat["catalogEntry"]>>(
+    async () => entry
+  );
   bridge.catalogEntry = read;
   bridge.organize = async (sessionId, change) => ({ sessionId, ...change });
   bridge.listArchived = async () => ({ sessionIds: [], nextCursor: null });

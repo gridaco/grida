@@ -26,6 +26,9 @@ a model under **Models**. You can change the model between turns: the chat and
 its history stay in place, and your next message uses the new model with the
 earlier turns as context. A turn that is already running finishes with the
 model that started it; wait for it or choose **Stop** before changing models.
+Desktop reopens a workspace with the model you chose there last, including
+after a restart. If that model can no longer run, the workspace opens with the
+default connection.
 
 If the default Gateway connection cannot start, Desktop continues with a saved
 OpenRouter or Vercel AI Gateway key, using Grida's default model when that key
