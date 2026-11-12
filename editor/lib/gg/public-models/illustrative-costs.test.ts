@@ -56,7 +56,7 @@ describe("GG illustrative costs", () => {
       })
     );
     expect(html).toContain("Usage pricing");
-    expect(html).not.toContain("Illustrative costs");
+    expect(html).not.toContain("Cost estimates");
   });
 
   it("preserves safe manual examples without URLs and strips unfamiliar optional fields", () => {
@@ -190,17 +190,17 @@ describe("GG illustrative costs", () => {
       })
     );
     for (const text of [
-      "Illustrative cost",
+      "Estimated cost",
       "$0.0969",
       "+1 more",
-      `aria-label="Show illustrative cost details for ${model.gg.card.label}"`,
+      `aria-label="Show estimated cost details for ${model.gg.card.label}"`,
     ])
       expect(html).toContain(text);
     for (const text of [
       example.scenario,
       example.coverage,
       "image.generate",
-      "About this illustration",
+      "About this estimate",
     ])
       expect(html).not.toContain(text);
     expect(html).not.toContain("$0.1234");
@@ -219,7 +219,7 @@ describe("GG illustrative costs", () => {
       example.scenario,
       example.coverage,
       "image.generate",
-      "About this illustration",
+      "About this estimate",
       example.provenance.description,
       "Maintained manually",
       'dateTime="2026-11-13"',

@@ -24,7 +24,7 @@ export function IllustrativeCost({
       {showProvenance ? (
         <details className="border-t pt-2 text-xs text-muted-foreground">
           <summary className="w-fit cursor-pointer hover:text-foreground">
-            About this illustration
+            About this estimate
           </summary>
           <p className="mt-2 leading-5">{example.provenance.description}</p>
           <p className="mt-2">
@@ -34,7 +34,7 @@ export function IllustrativeCost({
             </time>
           </p>
           {example.provenance.source_urls?.length ? (
-            <ul className="mt-2 space-y-1" aria-label="Illustration sources">
+            <ul className="mt-2 space-y-1" aria-label="Estimate sources">
               {example.provenance.source_urls.map((url, index) => (
                 <li key={`${url}/${index}`}>
                   <a

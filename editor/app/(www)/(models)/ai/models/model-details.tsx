@@ -32,8 +32,8 @@ export function ModelDetails({
   return (
     <div className="space-y-5">
       {illustrations.length ? (
-        <section aria-label="Illustrative costs" className="space-y-3">
-          <h3 className="text-sm font-medium">Illustrative costs</h3>
+        <section aria-label="Cost estimates" className="space-y-3">
+          <h3 className="text-sm font-medium">Cost estimates</h3>
           <div className="grid gap-3 lg:grid-cols-2">
             {illustrations.map((example, index) => (
               <div

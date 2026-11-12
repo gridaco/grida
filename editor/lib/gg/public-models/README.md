@@ -35,7 +35,8 @@ conversion or maintain its own model-specific price list.
 Optional `gg.illustrative_costs` supplies GG's own example amounts separately from
 usage rates. Every item has an advertised `operation_id`, exact decimal USD
 `amount`, `scenario`, `coverage`, and manual provenance (`description`,
-`reviewed_on`, optional HTTPS `source_urls`). The table shows a compact clickable
+`reviewed_on`, optional HTTPS `source_urls`). The page labels these “Estimated cost”
+and shows a compact clickable
 amount and an additional-example count. Expanding it reveals every example's
 complete scenario, coverage, operation and provenance. Amounts apply only to the
 stated scenario and included charges; they are not unit rates or guaranteed request totals. USD strings are

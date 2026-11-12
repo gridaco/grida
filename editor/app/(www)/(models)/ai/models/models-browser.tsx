@@ -197,7 +197,7 @@ const ModelRow = memo(function ModelRow({
           {illustrations[0] ? (
             <button
               type="button"
-              aria-label={`${expanded ? "Hide" : "Show"} illustrative cost details for ${gg.card.label}`}
+              aria-label={`${expanded ? "Hide" : "Show"} estimated cost details for ${gg.card.label}`}
               aria-expanded={expanded}
               aria-controls={detailsId}
               onClick={toggle}
@@ -215,7 +215,7 @@ const ModelRow = memo(function ModelRow({
           ) : (
             <span
               className="text-muted-foreground"
-              title="No illustrative cost is published."
+              title="No estimate available."
             >
               —
             </span>
@@ -543,14 +543,14 @@ export function ModelsBrowser({
           <Table>
             <caption className="sr-only">
               Models available through Grida AI Gateway, with capabilities,
-              illustrative costs and usage pricing.
+              estimated costs and usage pricing.
             </caption>
             <TableHeader className="bg-muted/30">
               <TableRow className="hover:bg-transparent">
                 <TableHead scope="col" className="pl-5">
                   Model
                 </TableHead>
-                <TableHead scope="col">Illustrative cost</TableHead>
+                <TableHead scope="col">Estimated cost</TableHead>
                 <TableHead scope="col">
                   Input{" "}
                   <span className="ml-1 text-xs font-normal text-muted-foreground">
