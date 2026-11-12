@@ -596,9 +596,10 @@ directory and permission profile to process the image without a project.
 Direct Google Gemini `gemini-3.8-flash` also supports PNG prompts on this host.
 Image edits use a retained working copy. [Run locally with a PNG](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-locally)
 
-On macOS and Linux, the isolated native Desktop preview supports PNG input
-with **GPT-5.6 Terra** and a saved OpenRouter key. Select it at launch with
-`--native-chat-provider=openrouter --native-chat-model=openai/gpt-5.6-terra`.
+On macOS and Linux, the native Desktop chat supports PNG input with a saved
+OpenRouter key on any listed model that takes images, such as **GPT-6.1
+Terra**. Select one at launch with
+`--native-chat-provider=openrouter --native-chat-model=openai/gpt-6.1-terra`.
 The default Gateway connection also accepts a selected PNG. ChatGPT subscription,
 Vercel, and custom endpoint profiles offer text input. The selected provider
 receives the retained PNG when the conversation uses it.

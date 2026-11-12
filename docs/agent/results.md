@@ -26,11 +26,11 @@ one image from text and can honor an explicit background where the connection
 supports it. The selected connection uses your saved provider key for the
 request.
 
-On the reviewed OpenRouter image connection, you can ask the agent to use a
+On an OpenRouter connection whose model takes images, you can ask the agent to use a
 Library reference. Choose one image when prompted. The generator receives the
 PNG from that choice in the same turn. [Choose a reference](./clients.md#choose-a-reference-the-agent-asks-for)
 
-On the reviewed OpenRouter connection, you can also attach one PNG and ask
+On such an OpenRouter connection, you can also attach one PNG and ask
 in **Act** to generate an image using it. Desktop asks before sending the
 attachment to OpenRouter for generation. If you cancel, that generation
 request sends nothing to the image provider. Attach the PNG again to use

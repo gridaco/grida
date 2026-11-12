@@ -1198,7 +1198,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
     model: "openai/gpt-5.5",
     unavailable: "native_provider_byok_key_missing",
     keyed: true,
-    png: false,
+    png: true,
   },
   {
     selection: {

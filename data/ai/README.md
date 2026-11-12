@@ -46,9 +46,10 @@ The generator also projects context windows for exact OpenAI model bindings used
 by the native Responses profile. The host uses them only for the canonical
 OpenAI route.
 
-The generator verifies the reviewed OpenRouter PNG model against the listed
-product model and its exact public binding. Native image input also requires the
-canonical OpenRouter route and stored OpenRouter key.
+The generator lists the OpenRouter models that take PNG input: listed product
+models whose exact public OpenRouter binding declares tool calls and PNG input.
+Native image input also requires the canonical OpenRouter route and stored
+OpenRouter key.
 
 The hosted renderer feature-detects the discovery bridge. Released Desktop binaries
 without that method retain their existing finite native choices and server-validated
