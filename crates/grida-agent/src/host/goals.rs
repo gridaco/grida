@@ -288,6 +288,9 @@ impl Host {
                 "goal_child_allowance_unavailable",
             ));
         }
+        // A chat started as a goal is titled from its objective, like any
+        // other first request.
+        let title = self.title_candidate(&view, &request.parts);
         let mut input = self
             .capture_input(&view, request.id, request.parts, policy)
             .await?;
@@ -308,6 +311,7 @@ impl Host {
                 )
             })?;
         }
+        self.start_title(title);
         self.kick_queue(accepted.session.clone()).await;
         Ok(DurableSubmission {
             session: accepted.session,

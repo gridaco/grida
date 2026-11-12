@@ -981,3 +981,48 @@ async fn shared_connections_cannot_opt_into_scheduled_provider_work() {
     terminate_shared_server(child).await;
     endpoint.done().await;
 }
+
+/// A chat started as a goal is titled from its objective, like any other chat's
+/// first request.
+#[tokio::test]
+async fn a_chat_started_as_a_goal_is_titled_from_its_objective() {
+    let temp = TempDir::new().unwrap();
+    let workspace = TempDir::new().unwrap();
+    let state = temp.path().join("state");
+    // Spare replies keep the endpoint open for the title request, which the
+    // host sends once the goal's first step has its answer.
+    let mut endpoint = Endpoint::start(
+        (0..4)
+            .map(|_| Reply::Finished("Checked the export."))
+            .collect(),
+    )
+    .await;
+    let mut command = executable();
+    command.args(["serve", "--stdio", "--chat-titles"]);
+    configured(&mut command, &state, &endpoint.url);
+    let child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut client = StdioClient::from_child(child);
+    let ready = client.request("initialize", initialize()).await;
+    assert!(ready["result"].is_object(), "{ready}");
+    let session = new_chat(&mut client, workspace.path()).await;
+    let started = client
+        .request(GOAL_START, goal_input(&session, false))
+        .await;
+    assert_eq!(
+        started["result"]["inputId"], "goal-with-checkin",
+        "{started}"
+    );
+    let title = endpoint.title_request().await;
+    assert!(
+        title
+            .to_string()
+            .contains("Verify the export and check back"),
+        "the title reads the goal's request: {title}"
+    );
+    client.close().await;
+}
