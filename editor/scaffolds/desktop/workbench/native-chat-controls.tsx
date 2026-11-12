@@ -303,9 +303,12 @@ export function NativeModelPicker({
   onRefresh,
   effort,
   onEffort,
+  defaultUnavailable,
 }: {
   profiles: NativeChatProfileCatalog | null;
   busy: boolean;
+  /** The default connection cannot run; ask for an explicit choice. */
+  defaultUnavailable?: boolean;
   onSelect: (selection: NativeChatProfileSelection) => void;
   onRefresh: () => void;
   effort?: "standard" | "ultra";
@@ -317,7 +320,9 @@ export function NativeModelPicker({
     profiles?.choices.find((p) => p.id === profiles.active);
   const label =
     selected?.model ??
-    (profiles?.active === null ? "Default model" : "Choose model");
+    (profiles?.active === null && !defaultUnavailable
+      ? "Default model"
+      : "Choose model");
   const choose = (selection: NativeChatProfileSelection) => {
     onSelect(selection);
     setOpen(false);

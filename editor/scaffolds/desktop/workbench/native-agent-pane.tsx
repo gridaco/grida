@@ -153,13 +153,32 @@ export function NativeAgentPaneGate({
           : "Checking chat availability…"}
       </div>
     );
+  if (
+    readiness !== "native-ready" &&
+    readiness !== null &&
+    readiness !== "native-unavailable" &&
+    workspaceId &&
+    bridge.profiles &&
+    bridge.selectProfile
+  )
+    return (
+      <NativeConnectionRecovery
+        bridge={bridge}
+        note={nativeChatConnectionNote[readiness]}
+        onConnected={(selection) => {
+          setRecovered({ bridge, workspaceId, selection });
+          setAttempt((current) => current + 1);
+        }}
+      />
+    );
   if (readiness !== "native-ready")
     return (
       <div className="flex flex-col gap-2 px-3 py-2 text-xs">
         <span role="alert" className="text-destructive">
           {readiness === null
             ? "Couldn't check chat availability."
-            : nativeChatUnavailableMessage[readiness]}
+            : (nativeChatConnectionNote[readiness] ??
+              "Native chat is unavailable.")}
         </span>
         <Button
           type="button"
@@ -169,15 +188,6 @@ export function NativeAgentPaneGate({
         >
           Retry
         </Button>
-        {workspaceId && bridge.profiles && bridge.selectProfile && (
-          <NativeConnectionRecovery
-            bridge={bridge}
-            onConnected={(selection) => {
-              setRecovered({ bridge, workspaceId, selection });
-              setAttempt((current) => current + 1);
-            }}
-          />
-        )}
       </div>
     );
   const recovery =
@@ -200,18 +210,17 @@ export function NativeAgentPaneGate({
   );
 }
 
-const nativeChatUnavailableMessage = {
-  "native-unavailable": "Native chat is unavailable.",
-  "native-gateway-unavailable": "Choose a model connection to start chatting.",
+/** Shown only when the person must act outside the chat before choosing. */
+const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
   "native-provider-key-required":
-    "Add an API key for the selected provider in Desktop settings, then retry.",
+    "Add an API key for the selected provider in Desktop settings, or choose another model.",
   "native-provider-model-unavailable":
-    "The selected model is unavailable. Check the model configured for this Desktop profile.",
+    "The selected model is unavailable. Choose another model.",
   "native-provider-endpoint-https-required":
-    "Native chat requires HTTPS for an endpoint on another device. Update the saved endpoint in Desktop settings, approve its new address, then retry.",
+    "Native chat requires HTTPS for an endpoint on another device. Update the saved endpoint in Desktop settings, or choose another model.",
   "native-provider-endpoint-approval-required":
-    "Save the selected endpoint in Desktop settings and approve its address, then retry.",
-} as const;
+    "Save the selected endpoint in Desktop settings and approve its address, or choose another model.",
+};
 
 export function NativeAgentPane({
   bridge,
