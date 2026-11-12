@@ -202,6 +202,7 @@ export namespace catalog {
           "openai/gpt-5.6-sol": { status: "listed" },
           "openai/gpt-5.6-terra": { status: "listed" },
           "openai/gpt-5.6-luna": { status: "listed" },
+          "openai/gpt-6.1-terra": { status: "listed" },
           "openai/gpt-6-astra": { status: "listed" },
           "anthropic/claude-sonnet-5": { status: "listed" },
           "anthropic/claude-fable-5.1": { status: "listed" },

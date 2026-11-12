@@ -364,6 +364,37 @@ export namespace models {
           },
           reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
         },
+        "openai/gpt-6.1-terra": {
+          id: "openai/gpt-6.1-terra",
+          label: "GPT-6.1 Terra",
+          release: {
+            date: "2026-10-26",
+            basis: "model",
+            source_url: "https://developers.openai.com/api/docs/changelog",
+          },
+          multimodal: true,
+          imageInputMimes: [
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/gif",
+          ],
+          tool_call: true,
+          contextWindow: 1050000,
+          outputLimit: 128000,
+          cost: {
+            input: 1,
+            output: 5,
+            cacheRead: 0.05,
+            cacheWrite: 1.25,
+            longContext: {
+              inputTokensAbove: 272000,
+              inputMultiplier: 2,
+              outputMultiplier: 1.5,
+            },
+          },
+          reasoningProviders: ["grida", "openai", "openrouter", "vercel"],
+        },
         "openai/gpt-6-astra": {
           id: "openai/gpt-6-astra",
           label: "GPT-6 Astra",

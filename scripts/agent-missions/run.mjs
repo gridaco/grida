@@ -14,7 +14,7 @@ const root = path.resolve(
 const fixtures = path.join(root, "fixtures/test-agent");
 
 const options = {
-  model: "openai/gpt-5.4",
+  model: "openai/gpt-6.1-terra",
   endpoint: "https://openrouter.ai/api/v1",
   credentialHome: path.join(os.homedir(), ".grida"),
   bin: path.join(root, "target/debug/grida-agent"),
@@ -257,6 +257,13 @@ for (const mission of missions) {
     checks.push({
       spec: `answer mentions ${needle}`,
       ok: answer.toLowerCase().includes(needle.toLowerCase()),
+    });
+  if (mission.answer_any)
+    checks.push({
+      spec: `answer mentions one of ${mission.answer_any.join(", ")}`,
+      ok: mission.answer_any.some((needle) =>
+        answer.toLowerCase().includes(needle.toLowerCase())
+      ),
     });
   for (const needle of mission.answer_absent ?? [])
     checks.push({

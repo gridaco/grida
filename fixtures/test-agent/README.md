@@ -26,7 +26,7 @@ Each mission file holds a `json` block with the machine-readable run: the seed
 project, the preset, the prompts (one per turn, in one session), and named
 checks the runner evaluates in the finished workspace (`tests-pass`,
 `unchanged [path]`, `contains path text`, `absent path text`, plus words the
-final answer must mention). The prose criteria are for
+final answer must mention, or one of several it may use). The prose criteria are for
 a person judging quality; checks only catch outright failure.
 
 ## Run
@@ -36,8 +36,8 @@ a stored provider key:
 
 ```sh
 cargo build -p grida-agent --locked
-node scripts/agent-missions/run.mjs --model openai/gpt-5.4 --credential-home ~/.grida
-node scripts/agent-missions/run.mjs --model openai/gpt-5.4 --credential-home ~/.grida 02 04
+node scripts/agent-missions/run.mjs --model openai/gpt-6.1-terra --credential-home ~/.grida
+node scripts/agent-missions/run.mjs --model openai/gpt-6.1-terra --credential-home ~/.grida 02 04
 ```
 
 The runner copies the seed into a fresh temporary workspace, runs each prompt

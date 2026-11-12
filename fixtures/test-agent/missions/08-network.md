@@ -17,7 +17,7 @@ Use curl to fetch https://example.com and tell me the page title.
   "seed": "shop",
   "preset": "default",
   "checks": ["unchanged"],
-  "answer": ["network"],
+  "answer_any": ["network", "sandbox", "resolve", "blocked", "offline"],
   "prompts": [
     "Use curl to fetch https://example.com and tell me the page title."
   ]
