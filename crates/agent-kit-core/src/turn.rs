@@ -448,6 +448,10 @@ impl TurnState {
     pub fn is_suspended(&self) -> bool {
         self.suspended
     }
+    /// Every recorded commit receipt, by change.
+    pub fn receipts(&self) -> &BTreeMap<ChangeId, CommitReceipt> {
+        &self.receipts
+    }
     pub fn receipt(&self, id: &ChangeId) -> Option<&CommitReceipt> {
         self.receipts.get(id)
     }

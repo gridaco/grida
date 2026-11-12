@@ -232,7 +232,7 @@ impl SqliteStore {
                 };
                 let mut query = connection
                     .prepare(
-                        "SELECT t.ordinal,t.id,t.snapshot,tt.started_ms,tt.settled_ms FROM turns t
+                        "SELECT t.ordinal,t.id,t.snapshot,tt.started_ms,tt.settled_ms,COALESCE(t.bytes,length(t.snapshot)) FROM turns t
                          LEFT JOIN turn_times tt ON tt.session=t.session AND tt.turn=t.id
                          WHERE t.session=?1 AND t.ordinal>?2 AND t.ordinal<=?3
                          ORDER BY t.ordinal DESC LIMIT ?4",
@@ -255,14 +255,15 @@ impl SqliteStore {
                         .map_err(database_error)?
                         .as_blob()
                         .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
+                    let stored = stored_bytes(row.get(5).map_err(database_error)?)?;
                     if scanned_turns == REPLAY_PAGE_TURNS
-                        || (scanned_turns > 0 && scanned_bytes + snapshot.len() > MAX_HISTORY_BYTES)
+                        || (scanned_turns > 0 && scanned_bytes + stored > MAX_HISTORY_BYTES)
                     {
                         return Ok(window
                             .finish(view.id, Some(ReplayBoundary::Turn { ordinal, cut: None })));
                     }
                     let turn = TurnId::new(row.get::<_, String>(1).map_err(database_error)?)?;
-                    let state = decode_turn(snapshot, &session, &turn)?;
+                    let state = decode_turn(connection, snapshot, &session, &turn)?;
                     let position = state.position();
                     let records = project(&state);
                     let silent_account = records
@@ -300,7 +301,7 @@ impl SqliteStore {
                         ));
                     }
                     scanned_turns += 1;
-                    scanned_bytes += snapshot.len();
+                    scanned_bytes += stored;
                 }
                 if cut.is_some() {
                     return Err(replay_changed());
@@ -728,7 +729,7 @@ fn read_replay_page(
     load_session(connection, session)?;
     let mut query = connection
         .prepare(
-            "SELECT ordinal,id,snapshot FROM turns WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
+            "SELECT ordinal,id,snapshot,COALESCE(bytes,length(snapshot)) FROM turns WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
              ORDER BY ordinal LIMIT ?4",
         )
         .map_err(database_error)?;
@@ -746,15 +747,16 @@ fn read_replay_page(
             .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
         // A single durable turn may exceed the target page size. Never split
         // its projection or accumulate it alongside other large snapshots.
-        if scanned_turns != 0 && scanned_bytes + snapshot.len() > MAX_HISTORY_BYTES {
+        let stored = stored_bytes(row.get(3).map_err(database_error)?)?;
+        if scanned_turns != 0 && scanned_bytes + stored > MAX_HISTORY_BYTES {
             return Ok((after, records));
         }
         let turn = TurnId::new(row.get::<_, String>(1).map_err(database_error)?)?;
-        let state = decode_turn(snapshot, session, &turn)?;
+        let state = decode_turn(connection, snapshot, session, &turn)?;
         records.extend(project(&state));
         after = row.get(0).map_err(database_error)?;
         scanned_turns += 1;
-        scanned_bytes += snapshot.len();
+        scanned_bytes += stored;
     }
     if scanned_turns < REPLAY_PAGE_TURNS {
         after = end;
@@ -803,7 +805,7 @@ pub(super) fn read_view_projection(
     allow_prefix: bool,
 ) -> Result<(RetainedHistory, Option<TurnId>)> {
     let mut query = connection.prepare(
-        "SELECT ordinal,id,snapshot FROM turns
+        "SELECT ordinal,id,snapshot,COALESCE(bytes,length(snapshot)) FROM turns
          WHERE session=?1 AND ordinal>?2 AND (?3 IS NULL OR ordinal<=?3) AND (?4 IS NULL OR ordinal<?4)
          ORDER BY ordinal LIMIT ?5",
     ).map_err(database_error)?;
@@ -834,11 +836,11 @@ pub(super) fn read_view_projection(
             .as_blob()
             .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
         scanned_turns += 1;
-        scanned_bytes += snapshot.len();
+        scanned_bytes += stored_bytes(row.get(3).map_err(database_error)?)?;
         if scanned_turns > MAX_HISTORY_TURNS || scanned_bytes > MAX_HISTORY_SCAN_BYTES {
             return Err(projection_limit());
         }
-        let state = decode_turn(snapshot, session, &turn)?;
+        let state = decode_turn(connection, snapshot, session, &turn)?;
         let position = state.position();
         if unprojected_suffix_after.is_none() {
             let projected = project(&state);
@@ -918,4 +920,10 @@ fn context_tokens(state: &TurnState) -> Option<u64> {
             _ => None,
         })
         .max()
+}
+
+/// A turn's stored size: its head, parts and distinct messages, or the whole
+/// snapshot of a turn written before that layout.
+pub(crate) fn stored_bytes(value: i64) -> Result<usize> {
+    usize::try_from(value).map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))
 }

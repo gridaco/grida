@@ -10,9 +10,21 @@ shared execution journal. It accepts an explicit database path in an existing
 application-owned directory.
 
 The adapter uses WAL with synchronous FULL commits. Session metadata, immutable
-submissions, request receipts, and individual turn snapshots have separate
-records. A turn commit updates its snapshot and any terminal session disposition
-in the same transaction. Earlier turns are retained independently.
+submissions, request receipts, and individual turns have separate records. A
+turn commit updates that turn and any terminal session disposition in the same
+transaction. Earlier turns are retained independently.
+
+A turn is stored as a small head row, one row per operation, history record and
+commit receipt, and each conversation message once per session under its digest.
+A model call's request and outcome refer to those messages rather than repeating
+them, so a turn's stored size grows with what it adds rather than with the
+square of its length. A commit encodes and writes only the parts that differ
+from this process's previous write of the turn. That previous state is trusted
+only while the turn's stored generation token and head still match it; a newly
+opened store, a rolled-back write or any other change reads the stored rows.
+Reading assembles the same state, so recovery, identity and evidence checks are
+unchanged. A turn written before this layout is read as it was and converts on
+its next commit.
 
 One opened database holds an exclusive operating-system lock for its lifetime.
 Store clones and bound journal handles share that owner. Another process or store
@@ -108,8 +120,9 @@ contracts in one memory-only database. Its state lasts only as long as a
 store clone or bound journal remains alive.
 
 A session admits at most 256 queued inputs and 32 MiB of encoded pending payloads.
-Each input uses the core's bounded versioned envelope. A single turn snapshot is
-limited to 64 MiB. An over-limit write is rejected before its transaction commits.
+Each input uses the core's bounded versioned envelope. A single turn's stored rows
+are limited to 64 MiB, and the state a reader assembles from them to 512 MiB.
+An over-limit write is rejected before its transaction commits.
 These bounds are storage admission limits. Retention and cleanup policy belong to
 the host.
 

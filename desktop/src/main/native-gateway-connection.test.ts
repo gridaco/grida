@@ -305,13 +305,19 @@ it.skipIf(!resourcesPath)(
       try {
         const rows = db
           .prepare(
-            "SELECT CAST(snapshot AS TEXT) AS snapshot FROM turns WHERE session = ? ORDER BY ordinal"
+            "SELECT id, CAST(snapshot AS TEXT) AS snapshot FROM turns WHERE session = ? ORDER BY ordinal"
           )
           .all(session);
-        return rows.map(({ snapshot }) => {
+        // Each operation is its own row beside the turn's head.
+        const parts = db.prepare(
+          "SELECT CAST(body AS TEXT) AS body FROM turn_parts WHERE session = ? AND turn = ? AND key LIKE 'o/%' ORDER BY key"
+        );
+        return rows.map(({ id, snapshot }) => {
           const turn = JSON.parse(String(snapshot));
           type Receipt = { schema: string; bytes: number[] };
-          const operations = Object.values(turn.operations) as Array<{
+          const operations = parts
+            .all(session, String(id))
+            .map(({ body }) => JSON.parse(String(body))) as Array<{
             record: { id: string };
             attempts: Array<{
               id: string;

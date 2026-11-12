@@ -168,6 +168,8 @@ async fn removes_only_owned_rows_and_replays_exact_receipt_after_reopen() {
         "SELECT count(*) FROM submissions WHERE session=?1",
         "SELECT count(*) FROM requests WHERE session=?1",
         "SELECT count(*) FROM turns WHERE session=?1",
+        "SELECT count(*) FROM turn_parts WHERE session=?1",
+        "SELECT count(*) FROM turn_messages WHERE session=?1",
         "SELECT count(*) FROM sessions WHERE id=?1",
         "SELECT count(*) FROM session_catalog WHERE session=?1",
     ] {

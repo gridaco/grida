@@ -7,6 +7,7 @@ pub mod deletion;
 pub mod driver;
 pub mod history;
 mod resume;
+mod turn_layout;
 pub mod turn_links;
 
 pub use control_pair::{OperationPairControl, OperationPairReceipt, OperationRelatedControl};
@@ -39,7 +40,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
-const SCHEMA_VERSION: i64 = 12;
+const SCHEMA_VERSION: i64 = 13;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -327,6 +328,10 @@ impl SqliteStore {
         let database = open_private_file(&path)?;
         drop(database);
         let connection = Connection::open(&path).map_err(database_error)?;
+        // A newly opened store reads stored turns rather than earlier writes.
+        if let Some(opened) = connection.path() {
+            turn_layout::forget(opened);
+        }
         Self::initialize(Some(lock), connection, catalog, turn_links)
     }
 
@@ -382,13 +387,14 @@ impl SqliteStore {
                 transaction
                     .execute_batch(TURN_TIMES)
                     .map_err(database_error)?;
+                turn_layout::install(&transaction)?;
                 transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(database_error)?;
                 transaction.commit().map_err(database_error)?;
             }
             SCHEMA_VERSION => {}
-            1..=11 => {
+            1..=12 => {
                 let transaction = connection.transaction().map_err(database_error)?;
                 if version == 1 {
                     transaction
@@ -443,6 +449,8 @@ impl SqliteStore {
                 transaction
                     .execute_batch(TURN_TIMES)
                     .map_err(database_error)?;
+                // Earlier turns stay as written and convert on their next commit.
+                turn_layout::install(&transaction)?;
                 transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(database_error)?;
@@ -1022,16 +1030,9 @@ fn prepare_pending_claim(
                 }
                 selected.push(input.input);
             }
-            transaction
-                .execute(
-                    "INSERT INTO turns(session,id,snapshot) VALUES(?1,?2,?3)",
-                    params![
-                        request.session.as_str(),
-                        turn.as_str(),
-                        encode_snapshot(&state)?
-                    ],
-                )
-                .map_err(database_error)?;
+            if !turn_layout::write(transaction, &state, true)? {
+                return Err(error(ErrorKind::Conflict, "turn_exists"));
+            }
             record_turn_start(transaction, &request.session, turn)?;
             for (order, id) in inputs.iter().enumerate() {
                 transaction.execute(
@@ -2055,44 +2056,22 @@ fn turn_inputs(
 }
 
 fn load_turn(connection: &Connection, session: &SessionId, turn: &TurnId) -> Result<TurnState> {
-    let bytes: Vec<u8> = connection
-        .query_row(
-            "SELECT snapshot FROM turns WHERE session=?1 AND id=?2",
-            params![session.as_str(), turn.as_str()],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(database_error)?
-        .ok_or_else(|| error(ErrorKind::InvalidInput, "turn_missing"))?;
-    decode_turn(&bytes, session, turn)
+    turn_layout::load(connection, session, turn)
 }
 
-fn decode_turn(bytes: &[u8], session: &SessionId, turn: &TurnId) -> Result<TurnState> {
-    if bytes.len() > MAX_SNAPSHOT_BYTES {
-        return Err(error(ErrorKind::LimitExceeded, "turn_snapshot_too_large"));
-    }
-    let state: TurnState = decode(bytes)?;
-    if &state.binding().session != session || &state.binding().turn != turn {
-        return Err(error(
-            ErrorKind::InvalidState,
-            "stored_turn_binding_mismatch",
-        ));
-    }
-    Ok(state)
+/// Assemble a turn from its `turns.snapshot` head; see `turn_layout`.
+fn decode_turn(
+    connection: &Connection,
+    head: &[u8],
+    session: &SessionId,
+    turn: &TurnId,
+) -> Result<TurnState> {
+    turn_layout::read(connection, head, session, turn)
 }
 
 fn save_turn(transaction: &Transaction<'_>, state: &TurnState) -> Result<()> {
     let binding = state.binding();
-    transaction
-        .execute(
-            "UPDATE turns SET snapshot=?3 WHERE session=?1 AND id=?2",
-            params![
-                binding.session.as_str(),
-                binding.turn.as_str(),
-                encode_snapshot(state)?
-            ],
-        )
-        .map_err(database_error)?;
+    turn_layout::write(transaction, state, false)?;
     if state.outcome().is_some() {
         // The first settlement is the recorded finish. A clock that moved
         // backwards cannot produce a negative duration.
@@ -2286,13 +2265,6 @@ fn encode(value: &impl Serialize) -> Result<Vec<u8>> {
 }
 fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
     serde_json::from_slice(bytes).map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))
-}
-fn encode_snapshot(state: &TurnState) -> Result<Vec<u8>> {
-    let bytes = encode(state)?;
-    if bytes.len() > MAX_SNAPSHOT_BYTES {
-        return Err(error(ErrorKind::LimitExceeded, "turn_snapshot_too_large"));
-    }
-    Ok(bytes)
 }
 fn error(kind: ErrorKind, code: &str) -> Error {
     Error::new(kind, code)

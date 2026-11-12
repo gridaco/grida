@@ -2344,7 +2344,7 @@ async fn version_two_upgrades_with_original_history_view() {
     let version: i64 = reopened
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 12);
+    assert_eq!(version, 13);
 }
 
 #[tokio::test]

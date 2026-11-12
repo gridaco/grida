@@ -6,9 +6,9 @@ use super::history::{
 };
 use super::{
     Acquired, ClaimRecord, MAX_HISTORY_BYTES, PreparedClaim, SqliteStore, bump_revision,
-    commit_error, database_error, decode, encode, encode_snapshot, error, execute, finish_claim,
-    load_session, load_turn, lookup_request, record_turn_start, register_owner, require_revision,
-    save_request, save_session, sql_number, turn_view,
+    commit_error, database_error, decode, encode, error, execute, finish_claim, load_session,
+    load_turn, lookup_request, record_turn_start, register_owner, require_revision, save_request,
+    save_session, sql_number, turn_layout, turn_view,
 };
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::messages::OutcomeStatus;
@@ -161,12 +161,7 @@ impl SqliteStore {
                 state.controls().revision,
                 vec![JournalAction::SetCheckpoint(request.checkpoint)],
             )?)?;
-            let inserted = transaction.execute(
-                "INSERT INTO turns(session,id,snapshot) VALUES(?1,?2,?3)
-                 ON CONFLICT(session,id) DO NOTHING",
-                params![id.as_str(), request.turn.as_str(), encode_snapshot(&state)?],
-            ).map_err(database_error)?;
-            if inserted == 0 {
+            if !turn_layout::write(&transaction, &state, true)? {
                 return Err(error(ErrorKind::Conflict, "turn_exists"));
             }
             record_turn_start(&transaction, id, &request.turn)?;

@@ -116,11 +116,11 @@ const MAX_READY_SESSIONS: usize = 128;
 /// the person interrupts, or a budget they set runs out.
 const MAX_TURN_STEPS: u32 = 200;
 /// Model calls and tool calls one turn may record. A runaway guard, not a
-/// product limit (permission policy, "What a program sees"): a long creative
-/// or build turn makes around a hundred calls. The bound is also set by turn
-/// storage: each recorded model call keeps its whole request and every commit
-/// rewrites the turn, so storage grows with the square of the turn's length.
-const MAX_TURN_OPERATIONS: usize = 128;
+/// product limit (permission policy, "What a program sees"): room for every
+/// model call the step guard allows, each followed by several tool calls.
+/// Turn storage keeps each message once, so a turn's stored size grows with
+/// what it adds.
+const MAX_TURN_OPERATIONS: usize = 1024;
 /// The product's base instructions for every native agent turn.
 const CORE_INSTRUCTIONS: &str = include_str!("prompts/core.md");
 const UPDATE_CAPACITY: usize = 128;

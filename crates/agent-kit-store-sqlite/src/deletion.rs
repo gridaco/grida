@@ -300,7 +300,9 @@ fn delete_rows(
         "DELETE FROM session_history_views WHERE session=?1",
         "DELETE FROM submissions WHERE session=?1",
         "DELETE FROM requests WHERE session=?1",
+        "DELETE FROM turn_parts WHERE session=?1",
         "DELETE FROM turns WHERE session=?1",
+        "DELETE FROM turn_messages WHERE session=?1",
         "DELETE FROM sessions WHERE id=?1",
     ] {
         connection
@@ -338,7 +340,7 @@ impl RetirementScan {
         mut check: impl FnMut(&TurnState) -> Result<()>,
     ) -> Result<()> {
         let mut statement = connection
-            .prepare("SELECT id,snapshot FROM turns WHERE session=?1 ORDER BY ordinal LIMIT ?2")
+            .prepare("SELECT id,snapshot,COALESCE(bytes,length(snapshot)) FROM turns WHERE session=?1 ORDER BY ordinal LIMIT ?2")
             .map_err(database_error)?;
         let mut rows = statement
             .query(params![session.as_str(), MAX_HISTORY_TURNS + 1])
@@ -348,7 +350,7 @@ impl RetirementScan {
                 return Err(error(ErrorKind::InvalidState, "stored_data_invalid"));
             };
             self.turns += 1;
-            self.bytes += snapshot.len();
+            self.bytes += super::history::stored_bytes(row.get(2).map_err(database_error)?)?;
             if self.turns > MAX_HISTORY_TURNS || self.bytes > MAX_HISTORY_SCAN_BYTES {
                 return Err(error(
                     ErrorKind::LimitExceeded,
@@ -356,7 +358,7 @@ impl RetirementScan {
                 ));
             }
             let turn = TurnId::new(row.get::<_, String>(0).map_err(database_error)?)?;
-            let state = decode_turn(snapshot, session, &turn)?;
+            let state = decode_turn(connection, snapshot, session, &turn)?;
             if state.outcome().is_none() {
                 return Err(error(ErrorKind::Conflict, "session_deletion_requires_idle"));
             }

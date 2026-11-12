@@ -198,7 +198,7 @@ async fn historical_links_preserve_exact_assignment_and_disclose_unknown_sources
     let version: u32 = current
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 12);
+    assert_eq!(version, 13);
 }
 
 #[tokio::test]
