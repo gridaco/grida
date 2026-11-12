@@ -382,7 +382,7 @@ it("offers recovery for an unpaused saved queue only when Main advertises it", a
   }
 });
 
-it("reads bounded earlier messages and ignores a page from a previous chat", async () => {
+it("prepends earlier pages to one transcript and ignores a page from a previous chat", async () => {
   const { bridge, controller } = fixture();
   const page = (
     text: string,
@@ -395,7 +395,7 @@ it("reads bounded earlier messages and ignores a page from a previous chat", asy
   const delayed = Promise.withResolvers<NativeChatTranscriptPage>();
   const read = vi.fn<NonNullable<DesktopNativeChat["transcriptPage"]>>();
   read.mockResolvedValueOnce(page("latest-a", "older-a"));
-  read.mockResolvedValueOnce(page("earlier-a", null));
+  read.mockResolvedValueOnce(page("earlier-a", "oldest-a"));
   read.mockReturnValueOnce(delayed.promise);
   read.mockResolvedValueOnce(page("latest-b", null));
   bridge.transcriptPage = read;
@@ -403,30 +403,23 @@ it("reads bounded earlier messages and ignores a page from a previous chat", asy
   expect(controller.read()).toMatchObject({
     messages: [{ text: "latest-a" }],
     canReadEarlier: true,
-    earlierMessages: false,
   });
-  await controller.showEarlierMessages();
+  await controller.loadEarlierMessages();
   expect(read).toHaveBeenNthCalledWith(2, "chat-a", "older-a");
+  // The older page joins above the latest messages; nothing is swapped out.
   expect(controller.read()).toMatchObject({
-    messages: [{ text: "earlier-a" }],
-    canReadEarlier: false,
-    earlierMessages: true,
-  });
-  controller.showLatestMessages();
-  expect(controller.read()).toMatchObject({
-    messages: [{ text: "latest-a" }],
+    messages: [{ text: "earlier-a" }, { text: "latest-a" }],
     canReadEarlier: true,
-    earlierMessages: false,
   });
-  const waiting = controller.showEarlierMessages();
+  const waiting = controller.loadEarlierMessages();
   await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(3));
+  expect(read).toHaveBeenNthCalledWith(3, "chat-a", "oldest-a");
   await controller.select("chat-b");
   delayed.resolve(page("late-a", "other-a"));
   await waiting;
   expect(controller.read()).toMatchObject({
     messages: [{ text: "latest-b" }],
     canReadEarlier: false,
-    earlierMessages: false,
     readingEarlier: false,
   });
   controller.disconnect();
@@ -508,14 +501,16 @@ it("streams turn activity live and adopts recorded turns from each page", async 
       activity: [call("succeeded")],
     },
   ]);
-  await controller.showEarlierMessages();
+  await controller.loadEarlierMessages();
   expect(controller.read().turnRecords).toEqual(earlier.turns);
-  controller.showLatestMessages();
-  expect(controller.read().turnRecords).toEqual([]);
+  expect(controller.read().messages.map(({ messageId }) => messageId)).toEqual([
+    "old",
+    "work",
+  ]);
   controller.disconnect();
 });
 
-it("refreshes latest messages when settlement arrives during an earlier read", async () => {
+it("keeps an earlier page above latest messages that settle during its read", async () => {
   vi.useFakeTimers();
   const { bridge, controller, running } = fixture();
   running.add("chat-a");
@@ -534,7 +529,7 @@ it("refreshes latest messages when settlement arrives during an earlier read", a
   bridge.transcriptPage = read;
   try {
     await controller.select("chat-a");
-    const loading = controller.showEarlierMessages();
+    const loading = controller.loadEarlierMessages();
     await vi.advanceTimersByTimeAsync(0);
     expect(read).toHaveBeenNthCalledWith(2, "chat-a", "older-a");
 
@@ -545,10 +540,10 @@ it("refreshes latest messages when settlement arrives during an earlier read", a
 
     earlier.resolve({ view: 1, messages: [older], older: null });
     await loading;
-    expect(controller.read().messages).toEqual([older]);
+    expect(controller.read().messages).toEqual([older, prior]);
     await vi.advanceTimersByTimeAsync(0);
-    controller.showLatestMessages();
-    expect(controller.read().messages).toEqual([settled]);
+    // The settlement held back by the earlier read lands below the older page.
+    expect(controller.read().messages).toEqual([older, settled]);
     expect(read).toHaveBeenNthCalledWith(3, "chat-a");
   } finally {
     controller.disconnect();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type {
   NativeChatEffort,
   NativeChatProfileCatalog,
@@ -16,7 +16,6 @@ import {
   PlusIcon,
   RefreshCwIcon,
   SparklesIcon,
-  XIcon,
 } from "lucide-react";
 import {
   OpenRouterLogo,
@@ -26,7 +25,6 @@ import {
   OpenAILogo,
 } from "@grida/react-icons/logos";
 import { Button } from "@app/ui/components/button";
-import { Input } from "@app/ui/components/input";
 import { Slider } from "@app/ui/components/slider";
 import {
   Popover,
@@ -61,6 +59,7 @@ export function NativeChatHeader({
   state: NativeChatView;
 }) {
   const [open, setOpen] = useState(false);
+  const renaming = useRef(false);
   const title = state.selected
     ? controller.chatTitle(state.selected)
     : "New chat";
@@ -156,46 +155,18 @@ export function NativeChatHeader({
         </PopoverContent>
       </Popover>
       {state.catalogDraft ? (
-        <form
-          className="flex min-w-0 flex-1 items-center gap-1"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void controller.saveTitle();
-          }}
-        >
-          <Input
-            autoFocus
-            aria-label="Chat title"
-            maxLength={256}
-            value={state.catalogDraft.text}
-            disabled={state.catalogChanging}
-            onChange={(e) => controller.changeTitle(e.target.value)}
-            className="h-7 text-xs md:text-xs"
-          />
-          <Button
-            size="icon-xs"
-            type="submit"
-            variant="ghost"
-            disabled={state.catalogChanging}
-            aria-label="Save title"
-          >
-            <CheckIcon className="size-3.5" />
-          </Button>
-          <Button
-            size="icon-xs"
-            type="button"
-            variant="ghost"
-            disabled={state.catalogChanging}
-            aria-label="Cancel rename"
-            onClick={() => controller.cancelRename()}
-          >
-            <XIcon className="size-3.5" />
-          </Button>
-        </form>
+        <ChatTitleInput
+          value={state.catalogDraft.text}
+          disabled={state.catalogChanging}
+          onChange={(text) => controller.changeTitle(text)}
+          onCommit={() => void controller.saveTitle()}
+          onCancel={() => controller.cancelRename()}
+        />
       ) : (
         <span
           className="min-w-0 flex-1 truncate text-muted-foreground"
           title={title}
+          onDoubleClick={() => controller.beginRename()}
         >
           {title}
           {state.catalogEntry?.archived && " · Archived"}
@@ -224,12 +195,23 @@ export function NativeChatHeader({
             <EllipsisVerticalIcon className="size-3.5" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuContent
+          align="end"
+          className="w-52"
+          onCloseAutoFocus={(e) => {
+            // Keep focus in the title field a rename just opened.
+            if (renaming.current) e.preventDefault();
+            renaming.current = false;
+          }}
+        >
           {state.catalogEntry && (
             <>
               <DropdownMenuItem
                 disabled={state.catalogChanging}
-                onSelect={() => controller.beginRename()}
+                onSelect={() => {
+                  renaming.current = true;
+                  controller.beginRename();
+                }}
               >
                 Rename chat
               </DropdownMenuItem>
@@ -250,8 +232,10 @@ export function NativeChatHeader({
                   Delete chat
                 </DropdownMenuItem>
               )}
-              <DropdownMenuSeparator />
             </>
+          )}
+          {state.catalogEntry && state.catalogEntryError && (
+            <DropdownMenuSeparator />
           )}
           {state.catalogEntryError && (
             <DropdownMenuItem
@@ -528,4 +512,54 @@ function ConnectionIcon({ connection }: { connection?: string }) {
             ? OllamaLogo
             : SparklesIcon;
   return <Icon aria-hidden className="size-3.5 shrink-0" />;
+}
+
+/**
+ * Renames the chat in place: the title itself becomes editable, selected and
+ * in the same type. Enter or leaving the field saves; Escape cancels.
+ */
+function ChatTitleInput({
+  value,
+  disabled,
+  onChange,
+  onCommit,
+  onCancel,
+}: {
+  value: string;
+  disabled: boolean;
+  onChange: (text: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}) {
+  const cancelled = useRef(false);
+  return (
+    <input
+      ref={(input) => {
+        if (input && document.activeElement !== input) {
+          input.focus();
+          input.select();
+        }
+      }}
+      aria-label="Chat title"
+      maxLength={256}
+      value={value}
+      disabled={disabled}
+      placeholder="Untitled"
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+          e.preventDefault();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          cancelled.current = true;
+          onCancel();
+        }
+      }}
+      onBlur={() => {
+        if (!cancelled.current) onCommit();
+      }}
+      className="min-w-0 flex-1 truncate border-0 bg-transparent p-0 text-xs font-medium text-foreground outline-none"
+    />
+  );
 }

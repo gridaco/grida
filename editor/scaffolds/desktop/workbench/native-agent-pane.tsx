@@ -60,6 +60,7 @@ import { cn } from "@app/ui/lib/utils";
 import styles from "./agent-pane.module.css";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
 import { NativeTurnArtifacts } from "./native-turn-summary";
+import { NativeEarlierMessages } from "./native-earlier-messages";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
@@ -350,6 +351,11 @@ export function NativeAgentPane({
     turnId
       ? state.turnRecords.find((record) => record.turnId === turnId)
       : undefined;
+  // A turn's actions sit under its final answer only, once it settles.
+  const finalAnswer = new Map<string, string>();
+  for (const message of state.messages)
+    if (message.role === "assistant" && message.turnId)
+      finalAnswer.set(message.turnId, message.messageId);
   const renderMessage = (message: NativeChatMessage) => {
     const record = turnRecord(message.turnId);
     // The first user message of a goal-start turn is the one that set it.
@@ -377,9 +383,13 @@ export function NativeAgentPane({
                   </>
                 ) : undefined,
               }
-            : record?.settledAtMs !== undefined
-              ? { sentAtMs: record.settledAtMs }
-              : undefined
+            : message.turnId &&
+                (finalAnswer.get(message.turnId) !== message.messageId ||
+                  (record && record.settledAtMs === undefined))
+              ? { hidden: true }
+              : record?.settledAtMs !== undefined
+                ? { sentAtMs: record.settledAtMs }
+                : undefined
         }
         message={{
           id: message.messageId,
@@ -400,40 +410,6 @@ export function NativeAgentPane({
         <p role="alert" className="px-3 py-1 text-xs text-destructive">
           {state.profileError ?? state.catalogEntryError}
         </p>
-      )}
-      {(state.canReadEarlier ||
-        state.earlierMessages ||
-        state.earlierError) && (
-        <div className="text-muted-foreground flex shrink-0 flex-wrap items-center gap-2 px-3 py-1 text-xs">
-          {state.earlierMessages && <span>Viewing earlier messages</span>}
-          {state.canReadEarlier && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              disabled={state.readingEarlier || state.loading}
-              onClick={() => void controller.showEarlierMessages()}
-            >
-              {state.readingEarlier
-                ? "Loading earlier messages…"
-                : "Earlier messages"}
-            </Button>
-          )}
-          {state.earlierMessages && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="xs"
-              disabled={state.readingEarlier}
-              onClick={() => controller.showLatestMessages()}
-            >
-              Back to latest
-            </Button>
-          )}
-          {state.earlierError && (
-            <span role="status">{state.earlierError}</span>
-          )}
-        </div>
       )}
       {connectionRequired && !state.scope && (
         <div className="text-muted-foreground px-3 py-1 text-xs">
@@ -457,6 +433,13 @@ export function NativeAgentPane({
             "desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
           )}
         >
+          <NativeEarlierMessages
+            canLoad={state.canReadEarlier}
+            loading={state.readingEarlier}
+            error={state.earlierError}
+            count={state.messages.length}
+            onLoad={() => void controller.loadEarlierMessages()}
+          />
           {/* See test/desktop-agent-chat-turn-activity.md. */}
           {blocks.map((block) =>
             block.kind === "turn" ? (
@@ -470,14 +453,12 @@ export function NativeAgentPane({
             )
           )}
           {running &&
-            !state.earlierMessages &&
             !retrying &&
             state.messages.at(-1)?.role !== "assistant" && (
               <PendingTurnIndicator />
             )}
           {/* See test/desktop-agent-chat-transcript-history.md. */}
           {!turn &&
-            !state.earlierMessages &&
             !state.loading &&
             !state.repairing &&
             state.turnSummary &&

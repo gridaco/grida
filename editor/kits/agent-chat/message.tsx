@@ -137,6 +137,11 @@ export type ChatMessageActions = {
   sentAtMs?: number;
   /** A short, always-visible label after the actions, e.g. how it was sent. */
   note?: ReactNode;
+  /**
+   * Show no actions under an assistant message, e.g. commentary inside a turn
+   * whose final answer carries them.
+   */
+  hidden?: boolean;
 };
 
 export function ChatMessageView({
@@ -371,7 +376,7 @@ export function ChatMessageView({
       {/* Copy mirrors the user-bubble affordance but left-aligned under the
           assistant response. Shown only once the turn has settled with real
           text — never over a half-streamed or tool-only (text-less) turn. */}
-      {!isStreaming && responseText.trim().length > 0 && (
+      {!isStreaming && !actions?.hidden && responseText.trim().length > 0 && (
         <MessageActions className={revealOnHoverActions}>
           {actions?.sentAtMs !== undefined && (
             <MessageTime at={actions.sentAtMs} />

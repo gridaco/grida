@@ -128,7 +128,7 @@ export type NativeChatView = Readonly<{
   messages: readonly NativeChatMessage[];
   /** Recorded outcome and timing for turns in the displayed messages. */
   turnRecords: readonly NativeChatTurnRecord[];
-  earlierMessages: boolean;
+  /** Older pages exist above the loaded messages. */
   canReadEarlier: boolean;
   readingEarlier: boolean;
   earlierError: string | null;
@@ -217,7 +217,11 @@ type Scope = {
   timer?: ReturnType<typeof setTimeout>;
   durable: readonly NativeChatMessage[];
   recentWindow?: Pick<NativeChatTranscriptPage, "view" | "older" | "turns">;
-  earlierWindow?: NativeChatTranscriptPage;
+  /**
+   * Older pages loaded above the latest window, oldest first. They join the
+   * transcript as one scroll; a changed history view discards them.
+   */
+  earlierPages: NativeChatTranscriptPage[];
   earlierRead?: object;
   live: Map<string, NativeChatMessage & { turnId: string; bytes: number }>;
   gaps: Set<string>;
@@ -292,7 +296,6 @@ const EMPTY: NativeChatView = Object.freeze({
   catalogDraft: null,
   messages: [],
   turnRecords: [],
-  earlierMessages: false,
   canReadEarlier: false,
   readingEarlier: false,
   earlierError: null,
@@ -776,6 +779,7 @@ export class NativeChatController {
       id: ++this.generation,
       requested: sessionId,
       durable: [],
+      earlierPages: [],
       live: new Map(),
       gaps: new Set(),
       observation: null,
@@ -799,7 +803,6 @@ export class NativeChatController {
       catalogDraft: null,
       messages: retained?.messages ?? [],
       turnRecords: retained?.turnRecords ?? [],
-      earlierMessages: false,
       canReadEarlier: false,
       readingEarlier: false,
       earlierError: null,
@@ -1434,6 +1437,11 @@ export class NativeChatController {
     const draft = this.view.catalogDraft;
     if (!draft) return;
     const text = draft.text.trim();
+    // Leaving the field without a change is not a rename.
+    if ((text || null) === (draft.basis.title ?? null)) {
+      this.cancelRename();
+      return;
+    }
     if (/\p{Cc}/u.test(text) || utf8.encode(text).length > 256) {
       this.update({
         catalogEntryError:
@@ -2494,7 +2502,10 @@ export class NativeChatController {
       !this.bridge.prepareRevision ||
       !this.canReviseHistory ||
       this.view.revisionDraft ||
-      !(scope.earlierWindow?.messages ?? scope.durable).some(
+      ![
+        ...scope.earlierPages.flatMap((page) => page.messages),
+        ...scope.durable,
+      ].some(
         (message) => message.messageId === messageId && message.role === "user"
       )
     )
@@ -2521,7 +2532,8 @@ export class NativeChatController {
     }
   }
 
-  async showEarlierMessages(): Promise<void> {
+  /** Load the page before the oldest loaded message, above it in the scroll. */
+  async loadEarlierMessages(): Promise<void> {
     const scope = this.scope;
     const read = this.bridge.transcriptPage;
     if (!scope?.attachment || !read || this.view.readingEarlier) return;
@@ -2529,19 +2541,20 @@ export class NativeChatController {
     try {
       await scope.refreshing;
       const attachment = this.attachment(scope);
-      const previous = scope.earlierWindow ?? scope.recentWindow;
-      if (!previous?.older) return;
+      const latest = scope.recentWindow;
+      const older = (scope.earlierPages[0] ?? latest)?.older;
+      if (!latest || !older) return;
       const token = {};
       scope.earlierRead = token;
-      const page = await read.call(
-        this.bridge,
-        attachment.attachmentId,
-        previous.older
-      );
+      const page = await read.call(this.bridge, attachment.attachmentId, older);
       if (!this.owns(scope) || scope.earlierRead !== token) return;
-      if (page.view !== previous.view || page.older === previous.older)
+      if (
+        page.view !== latest.view ||
+        page.older === older ||
+        scope.recentWindow !== latest
+      )
         throw new Error("history_replay_window_changed");
-      scope.earlierWindow = page;
+      scope.earlierPages = [page, ...scope.earlierPages];
       this.publishMessages(scope);
     } catch (error) {
       if (!this.owns(scope)) return;
@@ -2551,7 +2564,7 @@ export class NativeChatController {
           error instanceof Error &&
           error.message.includes("history_replay_window_changed")
         ) {
-          scope.earlierWindow = undefined;
+          scope.earlierPages = [];
           scope.replay = true;
           this.publishMessages(scope);
         }
@@ -2569,14 +2582,6 @@ export class NativeChatController {
         if (scope.replay) void this.refresh(scope);
       }
     }
-  }
-
-  showLatestMessages(): void {
-    const scope = this.scope;
-    if (!scope || this.view.readingEarlier) return;
-    scope.earlierWindow = undefined;
-    this.update({ earlierError: null });
-    this.publishMessages(scope);
   }
 
   changeRevisionText(text: string): void {
@@ -3820,12 +3825,8 @@ export class NativeChatController {
           page?.messages ??
           (await this.bridge.transcript(attachment.attachmentId));
         if (!this.owns(scope)) return;
-        if (
-          page &&
-          scope.earlierWindow &&
-          scope.earlierWindow.view !== page.view
-        )
-          scope.earlierWindow = undefined;
+        if (page && scope.recentWindow?.view !== page.view)
+          scope.earlierPages = [];
         scope.recentWindow = page && {
           view: page.view,
           older: page.older,
@@ -4324,15 +4325,24 @@ export class NativeChatController {
   }
 
   private publishMessages(scope: Scope, repairing = scope.gaps.size > 0): void {
+    const pages = scope.earlierPages;
+    const seen = new Set<string>();
+    const messages = [
+      ...pages.flatMap((page) => page.messages),
+      ...scope.durable,
+      ...scope.live.values(),
+    ].filter((message) => {
+      if (seen.has(message.messageId)) return false;
+      seen.add(message.messageId);
+      return true;
+    });
+    const turns = new Map<string, NativeChatTurnRecord>();
+    for (const page of [...pages, scope.recentWindow])
+      for (const turn of page?.turns ?? []) turns.set(turn.turnId, turn);
     this.update({
-      messages: scope.earlierWindow?.messages ?? [
-        ...scope.durable,
-        ...scope.live.values(),
-      ],
-      turnRecords:
-        (scope.earlierWindow ?? scope.recentWindow)?.turns ?? EMPTY_TURNS,
-      earlierMessages: !!scope.earlierWindow,
-      canReadEarlier: !!(scope.earlierWindow ?? scope.recentWindow)?.older,
+      messages,
+      turnRecords: turns.size ? [...turns.values()] : EMPTY_TURNS,
+      canReadEarlier: !!(pages[0] ?? scope.recentWindow)?.older,
       repairing,
     });
   }
