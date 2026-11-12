@@ -19,6 +19,7 @@ import type { PublicIllustrativeCost } from "@/lib/gg/public-models/catalogue";
 import { formatIllustrativeCost } from "@/lib/gg/public-models/pricing";
 export function MediaCostHelp() {
   const [open, setOpen] = useState(false);
+  const helpId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -56,6 +57,7 @@ export function MediaCostHelp() {
           ref={trigger}
           type="button"
           aria-label="About media cost estimates"
+          aria-describedby={open ? helpId : undefined}
           onFocus={show}
           onBlur={scheduleClose}
           onPointerEnter={(event) => {
@@ -75,6 +77,7 @@ export function MediaCostHelp() {
       </PopoverTrigger>
       <PopoverContent
         ref={content}
+        id={helpId}
         aria-label="About media cost estimates"
         align="start"
         className="max-w-[calc(100vw-2rem)] p-3 text-xs leading-5"
@@ -178,7 +181,7 @@ export function CostPreview({
         <button
           ref={trigger}
           type="button"
-          aria-label={`Media cost configurations for ${modelLabel}`}
+          aria-label={`${formatIllustrativeCost(examples[0])}${examples.length > 1 ? `, +${examples.length - 1} more` : ""}. Media cost configurations for ${modelLabel}`}
           aria-describedby={open ? configurationsId : undefined}
           onFocus={show}
           onBlur={scheduleClose}

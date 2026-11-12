@@ -313,7 +313,7 @@ describe("GG illustrative costs", () => {
       "Media cost",
       "$0.0969/image",
       "+1 more",
-      `aria-label="Media cost configurations for ${model.gg.card.label}"`,
+      `aria-label="$0.0969/image, +1 more. Media cost configurations for ${model.gg.card.label}"`,
       'aria-haspopup="dialog"',
       'aria-label="About media cost estimates"',
     ])
