@@ -1,6 +1,7 @@
 export {
   ChatMessageView,
   CompactingIndicator,
+  CompactionNotice,
   ForkedNotice,
   PendingTurnIndicator,
   ToolCallGroupView,

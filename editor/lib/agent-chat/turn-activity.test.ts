@@ -207,3 +207,67 @@ describe("turn_activity.group", () => {
     expect(block).toMatchObject({ kind: "turn", requests: [], finished: true });
   });
 });
+
+describe("turn_activity compaction notes", () => {
+  it("places a compaction note between the turns around it", () => {
+    const message = (
+      id: string,
+      turnId: string,
+      role: "user" | "assistant"
+    ) => ({
+      messageId: id,
+      role,
+      text: id,
+      turnId,
+      ...(role === "assistant" && { phase: "answer" as const }),
+    });
+    const blocks = turn_activity.group(
+      [
+        message("ask-1", "t1", "user"),
+        message("reply-1", "t1", "assistant"),
+        message("ask-2", "t3", "user"),
+        message("reply-2", "t3", "assistant"),
+      ],
+      [
+        { turnId: "t1", status: "succeeded" },
+        {
+          turnId: "t2",
+          status: "succeeded",
+          compaction: { summary: "Earlier work on the cart.", automatic: true },
+        },
+        { turnId: "t3", status: "succeeded" },
+      ],
+      null,
+      null
+    );
+    expect(blocks.map((block) => block.kind)).toEqual([
+      "turn",
+      "compaction",
+      "turn",
+    ]);
+    expect(blocks[1]).toMatchObject({
+      summary: "Earlier work on the cart.",
+      automatic: true,
+    });
+  });
+
+  it("ends the transcript with a compaction after the last turn", () => {
+    const blocks = turn_activity.group(
+      [{ messageId: "ask", role: "user", text: "ask", turnId: "t1" }],
+      [
+        { turnId: "t1", status: "succeeded" },
+        {
+          turnId: "t2",
+          status: "succeeded",
+          compaction: { summary: "Summary.", automatic: false },
+        },
+      ],
+      null,
+      null
+    );
+    expect(blocks.at(-1)).toMatchObject({
+      kind: "compaction",
+      automatic: false,
+    });
+  });
+});

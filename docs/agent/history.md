@@ -70,5 +70,8 @@ Desktop verifies the archive before opening its location.
 
 In an idle chat with an open, empty queue, send **`/compact`** on its own to
 summarize earlier material for future model requests. The transcript stays in
-the chat. Some ordinary Plan and Act text tasks compact earlier context automatically.
+the chat, and a **Conversation compacted** note marks where the summary took
+over; open it to read the summary. Some ordinary Plan and Act text tasks
+compact earlier context automatically, shown as **Conversation
+auto-compacted**.
 [Compact model context](./clients.md#compact-model-context)

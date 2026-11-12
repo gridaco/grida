@@ -3,7 +3,7 @@
 mod approval_review;
 mod before_tool;
 mod catalog;
-mod compaction;
+pub(crate) mod compaction;
 mod completion_checks;
 pub(crate) mod deletion;
 mod goals;

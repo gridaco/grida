@@ -2476,7 +2476,17 @@ export class NativeChatController {
         });
         void this.listChats();
       } else {
-        this.update({ commandNotice: COMPACTION_NOTICE[result.status] });
+        // An installed summary shows as a note in the transcript itself.
+        this.update({
+          commandNotice:
+            result.status === "installed"
+              ? null
+              : COMPACTION_NOTICE[result.status],
+        });
+        if (result.status === "installed") {
+          scope.replay = true;
+          void this.refresh(scope);
+        }
       }
     } catch (error) {
       if (this.owns(scope)) {

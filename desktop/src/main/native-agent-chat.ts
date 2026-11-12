@@ -2307,6 +2307,7 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
     if (record.goalStart !== undefined && record.goalStart !== true)
       throw invalidResponse();
     const contextTokens = time(record.contextTokens);
+    const compaction = compactionFact(record.compaction);
     return Object.freeze({
       turnId: identity(record.turnId),
       status: status as NativeChatTurnRecord["status"],
@@ -2314,8 +2315,24 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
       ...(settledAtMs !== undefined && { settledAtMs }),
       ...(record.goalStart === true && { goalStart: true as const }),
       ...(contextTokens !== undefined && { contextTokens }),
+      ...(compaction && { compaction }),
     });
   });
+}
+
+/** The longest compaction summary a turn record carries. */
+const MAX_COMPACTION_SUMMARY = 64 * 1024;
+
+function compactionFact(value: unknown): NativeChatTurnRecord["compaction"] {
+  if (value === undefined || value === null) return undefined;
+  const fact = object(value);
+  if (
+    typeof fact.summary !== "string" ||
+    fact.summary.length > MAX_COMPACTION_SUMMARY ||
+    typeof fact.automatic !== "boolean"
+  )
+    throw invalidResponse();
+  return Object.freeze({ summary: fact.summary, automatic: fact.automatic });
 }
 
 function acceptance(

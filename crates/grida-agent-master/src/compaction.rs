@@ -97,6 +97,11 @@ impl CompactionAccount {
         encode(ACCOUNT_SCHEMA, self)
     }
 
+    /// The summary that replaced earlier context, when compaction succeeded.
+    pub fn summary(&self) -> Option<&str> {
+        self.summary.as_deref()
+    }
+
     pub fn from_envelope(envelope: &Envelope) -> Result<Self> {
         decode(ACCOUNT_SCHEMA, envelope)
     }

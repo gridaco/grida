@@ -22,7 +22,7 @@ use grida_agent_master::usage::InferenceUsage;
 
 const PLAN_SCHEMA: &str = "grida.agent.native.compaction.plan";
 const MAX_PRE_DISPATCH_IDENTITIES: usize = 4;
-const AUTOMATIC_TURN_PREFIX: &str = "automatic-compact/";
+pub(crate) const AUTOMATIC_TURN_PREFIX: &str = "automatic-compact/";
 const AUTOMATIC_SOURCE_BYTES: usize = 96 * 1024;
 
 #[derive(Clone)]

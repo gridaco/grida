@@ -655,7 +655,8 @@ export function ForkedNotice() {
 // sees a one-line affordance"). A divider reading "Conversation compacted";
 // clicking the label expands the summary the model now sees in place of the
 // hidden turns.
-function CompactionNotice({
+/** A divider where earlier context was summarized, with the summary inside. */
+export function CompactionNotice({
   summary,
   auto,
 }: {

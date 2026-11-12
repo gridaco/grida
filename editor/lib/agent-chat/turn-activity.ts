@@ -28,6 +28,13 @@ export namespace turn_activity {
 
   export type Block =
     | Readonly<{ kind: "message"; message: NativeChatMessage }>
+    /** Earlier context was summarized here; the turn added no messages. */
+    | Readonly<{
+        kind: "compaction";
+        turnId: string;
+        summary: string;
+        automatic: boolean;
+      }>
     | Readonly<{
         kind: "turn";
         turnId: string;
@@ -50,11 +57,30 @@ export namespace turn_activity {
     latest?: Pick<NativeChatTurn, "turnId" | "status"> | null
   ): Block[] {
     const known = new Map(records.map((record) => [record.turnId, record]));
+    const order = new Map(records.map((record, at) => [record.turnId, at]));
+    // Compaction turns add no messages; each is placed before the first
+    // message of a later turn, in history order.
+    const compactions = records.flatMap((record, at) =>
+      record.compaction ? [{ at, record, compaction: record.compaction }] : []
+    );
     const blocks: Block[] = [];
+    const placeCompactionsBefore = (position: number) => {
+      while (compactions.length && compactions[0].at < position) {
+        const { record, compaction } = compactions.shift()!;
+        blocks.push({
+          kind: "compaction",
+          turnId: record.turnId,
+          summary: compaction.summary,
+          automatic: compaction.automatic,
+        });
+      }
+    };
     let index = 0;
     while (index < messages.length) {
       const first = messages[index];
       const turnId = first.turnId;
+      const position = turnId === undefined ? undefined : order.get(turnId);
+      if (position !== undefined) placeCompactionsBefore(position);
       if (!turnId) {
         blocks.push({ kind: "message", message: first });
         index++;
@@ -106,6 +132,7 @@ export namespace turn_activity {
         answers,
       });
     }
+    placeCompactionsBefore(Number.POSITIVE_INFINITY);
     return blocks;
   }
 

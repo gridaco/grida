@@ -160,6 +160,10 @@ pub struct ReplayTurn {
     /// The tokens the turn's context occupied at its largest model call, as
     /// the provider reported them. Absent when no call reported usage.
     pub context_tokens: Option<u64>,
+    /// The outcome account of a settled turn that added no transcript
+    /// records, such as context compaction, so a client can still show it.
+    /// Absent for turns with records.
+    pub silent_account: Option<Envelope>,
     /// The window includes the turn's newest record. False when a newer
     /// window holds the rest of the turn.
     pub tail: bool,
@@ -261,6 +265,10 @@ impl SqliteStore {
                     let state = decode_turn(snapshot, &session, &turn)?;
                     let position = state.position();
                     let records = project(&state);
+                    let silent_account = records
+                        .is_empty()
+                        .then(|| state.outcome().and_then(|outcome| outcome.account.clone()))
+                        .flatten();
                     let before = match cut.take() {
                         Some(cut) if ordinal == upper && cut.position == position => {
                             Some(cut.before)
@@ -279,6 +287,7 @@ impl SqliteStore {
                         started_ms: time(3)?,
                         settled_ms: time(4)?,
                         context_tokens: context_tokens(&state),
+                        silent_account,
                         tail: before.is_none(),
                     };
                     if let Some(before) = window.collect(Some(facts), records, before, measure)? {
@@ -558,7 +567,7 @@ impl ReverseWindow {
             });
             contributed = true;
         }
-        if let Some(turn) = turn.filter(|_| contributed) {
+        if let Some(turn) = turn.filter(|turn| contributed || turn.silent_account.is_some()) {
             self.turns.push(turn);
         }
         result

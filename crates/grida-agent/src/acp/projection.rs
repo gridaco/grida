@@ -310,6 +310,24 @@ pub(super) fn turn_facts(turn: &ReplayTurn, goal_start: bool) -> Value {
     if let Some(tokens) = turn.context_tokens {
         facts["contextTokens"] = json!(tokens);
     }
+    // A compaction turn adds no transcript messages; its summary shows as a
+    // note where earlier context was summarized.
+    if let Some(summary) = turn
+        .silent_account
+        .as_ref()
+        .and_then(|account| {
+            grida_agent_master::compaction::CompactionAccount::from_envelope(account).ok()
+        })
+        .and_then(|account| account.summary().map(str::to_owned))
+    {
+        facts["compaction"] = json!({
+            "summary": summary,
+            "automatic": turn
+                .id
+                .as_str()
+                .starts_with(crate::host::compaction::AUTOMATIC_TURN_PREFIX),
+        });
+    }
     facts
 }
 
@@ -445,4 +463,78 @@ fn visible_parts(message: &Message) -> impl Iterator<Item = Cow<'_, str>> {
             _ => None,
         }
     })
+}
+
+#[cfg(test)]
+mod compaction_fact_tests {
+    use super::*;
+    use agent_kit_core::{Envelope, TurnId};
+    use grida_agent_master::compaction::{CompactionAccount, CompactionFailure, Coverage};
+
+    fn account(summary: Option<&str>) -> Envelope {
+        let failed = CompactionAccount::failed(
+            Coverage {
+                records: 4,
+                input_bytes: 1_000,
+                omissions: Default::default(),
+            },
+            CompactionFailure::Provider,
+            Default::default(),
+        )
+        .to_envelope()
+        .unwrap();
+        let mut value: Value = serde_json::from_slice(failed.bytes()).unwrap();
+        value["failure"] = Value::Null;
+        value["summary"] = json!(summary);
+        Envelope::new(
+            failed.schema().clone(),
+            failed.version(),
+            serde_json::to_vec(&value).unwrap(),
+        )
+        .unwrap()
+    }
+
+    fn turn(id: &str, silent_account: Option<Envelope>) -> ReplayTurn {
+        ReplayTurn {
+            id: TurnId::new(id).unwrap(),
+            status: Some(OutcomeStatus::Succeeded),
+            started_ms: Some(1),
+            settled_ms: Some(2),
+            context_tokens: None,
+            silent_account,
+            tail: true,
+        }
+    }
+
+    #[test]
+    fn a_compaction_turn_carries_its_summary_for_a_transcript_note() {
+        let facts = turn_facts(
+            &turn(
+                "automatic-compact/abc",
+                Some(account(Some("Earlier cart work."))),
+            ),
+            false,
+        );
+        assert_eq!(
+            facts["compaction"],
+            json!({"summary": "Earlier cart work.", "automatic": true})
+        );
+        let manual = turn_facts(&turn("manual", Some(account(Some("Summary.")))), false);
+        assert_eq!(manual["compaction"]["automatic"], false);
+    }
+
+    #[test]
+    fn other_turns_carry_no_compaction() {
+        assert!(
+            turn_facts(&turn("t", None), false)
+                .get("compaction")
+                .is_none()
+        );
+        assert!(
+            turn_facts(&turn("t", Some(account(None))), false)
+                .get("compaction")
+                .is_none(),
+            "a failed compaction has no summary to show"
+        );
+    }
 }

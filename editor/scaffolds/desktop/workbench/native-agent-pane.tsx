@@ -36,6 +36,7 @@ import {
 } from "@app/ui/ai-elements/conversation";
 import {
   ChatMessageView,
+  CompactionNotice,
   PendingTurnIndicator,
   QuestionPrompt,
   workspace_links,
@@ -472,6 +473,12 @@ export function NativeAgentPane({
                   key={block.turnId}
                   block={block}
                   renderMessage={renderMessage}
+                />
+              ) : block.kind === "compaction" ? (
+                <CompactionNotice
+                  key={block.turnId}
+                  summary={block.summary}
+                  auto={block.automatic}
                 />
               ) : (
                 renderMessage(block.message)
