@@ -19,8 +19,9 @@ import { MessageAction } from "@app/ui/ai-elements/message";
 import { readLibraryAttachment } from "@/app/(library)/library/attachment";
 import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
 import {
+  CheckIcon,
+  HandIcon,
   CornerDownRightIcon,
-  PauseIcon,
   PlayIcon,
   SquareIcon,
   ArrowDownIcon,
@@ -29,7 +30,6 @@ import {
   LibraryIcon,
   PaperclipIcon,
   PlusIcon,
-  ShieldIcon,
   TargetIcon,
   ListChecksIcon,
   ImageIcon,
@@ -81,6 +81,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
 } from "@app/ui/components/dropdown-menu";
 import {
   Popover,
@@ -302,7 +303,6 @@ export function NativeAgentPane({
     !turn.cancelled &&
     (wakeup.status === "waiting" || wakeup.status === "cancelled");
   const canContinue = suspendedCheckIn && wakeup.status === "cancelled";
-  const waitingForCheckIn = suspendedCheckIn && wakeup.status === "waiting";
   const canStop = !!turn && !turn.cancelled;
   const goalTurn =
     !!turn && state.goal?.goal?.reservation?.turnId === turn.turnId;
@@ -321,37 +321,19 @@ export function NativeAgentPane({
   const streamingControlsOnly = running && !bridge.enqueue;
   const queueDisabled = !controller.queueCurrent || state.acting;
   const error = state.error ?? state.approvalError ?? state.questionError;
+  // One short state line. Questions, approvals, the queue and each turn's
+  // header already show their own state in the conversation.
   const status = state.loading
     ? null
-    : state.repairing
-      ? "Refreshing messages…"
-      : turn?.cancelled
-        ? "Stopping…"
-        : canResume
-          ? "Paused"
-          : turn?.paused
-            ? "Pausing…"
-            : turn?.disposition === "suspended"
-              ? canContinue
-                ? "Check-in cancelled"
-                : waitingForCheckIn
-                  ? "Waiting for check-in"
-                  : "Waiting for input"
-              : turn?.disposition === "interrupted"
-                ? "Interrupted"
-                : running
-                  ? retrying
-                    ? "Retrying after rate limit…"
-                    : "Working…"
-                  : snapshot?.admissionPaused
-                    ? "Stopped"
-                    : snapshot?.queuedInputs
-                      ? "Message queued"
-                      : snapshot?.latest?.status === "failed"
-                        ? "Task failed"
-                        : snapshot?.latest?.status === "uncertain"
-                          ? "Task result uncertain"
-                          : null;
+    : turn?.cancelled
+      ? "Stopping…"
+      : canResume || turn?.paused
+        ? "Paused"
+        : turn?.disposition === "interrupted"
+          ? "Interrupted"
+          : running || state.repairing
+            ? "Working…"
+            : null;
 
   const blocks = turn_activity.group(
     state.messages,
@@ -386,10 +368,6 @@ export function NativeAgentPane({
         controller={controller}
         state={state}
         onGoal={() => setGoalDialog({ scope: state.scope, creating: false })}
-        onSubagents={() => {
-          if (!state.subagents?.read().open) state.subagents?.toggle();
-          setSubagentsScope(state.scope);
-        }}
       />
       {(state.profileError || state.catalogEntryError) && (
         <p role="alert" className="px-3 py-1 text-xs text-destructive">
@@ -1092,55 +1070,94 @@ export function NativeAgentPane({
           onStop={() => void controller.control("stop")}
           toolbarStart={
             <>
-              {(state.imageInput || state.fileInput) && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label="Add to message"
-                      title="Add to message"
-                      className="shrink-0 rounded-full text-muted-foreground"
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Add to message"
+                    title="Add to message"
+                    className="shrink-0 rounded-full text-muted-foreground"
+                  >
+                    <PlusIcon className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="start" className="w-72">
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                    Add
+                  </DropdownMenuLabel>
+                  {state.fileInput && (
+                    <DropdownMenuItem
+                      disabled={
+                        state.goalIntent || !controller.canAttach("file")
+                      }
+                      onSelect={() => filePicker.current?.click()}
                     >
-                      <PlusIcon className="size-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent side="top" align="start">
-                    {state.fileInput && (
-                      <DropdownMenuItem
-                        disabled={
-                          state.goalIntent || !controller.canAttach("file")
-                        }
-                        onSelect={() => filePicker.current?.click()}
-                      >
-                        <PaperclipIcon className="size-4" />
-                        Add file
-                      </DropdownMenuItem>
-                    )}
-                    {state.imageInput && (
-                      <DropdownMenuItem
-                        disabled={
-                          state.goalIntent || !controller.canAttach("png")
-                        }
-                        onSelect={() => pngPicker.current?.click()}
-                      >
-                        <ImageIcon className="size-4" />
-                        Add image (PNG)
-                      </DropdownMenuItem>
-                    )}
-                    {workspaceId && state.imageInput && (
-                      <DropdownMenuItem
-                        disabled={state.acting || state.goalIntent}
-                        onSelect={() => setLibraryScope(state.scope)}
-                      >
-                        <LibraryIcon className="size-4" />
-                        Add from Library
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+                      <PaperclipIcon className="size-4" />
+                      Files
+                    </DropdownMenuItem>
+                  )}
+                  {state.imageInput && (
+                    <DropdownMenuItem
+                      disabled={
+                        state.goalIntent || !controller.canAttach("png")
+                      }
+                      onSelect={() => pngPicker.current?.click()}
+                    >
+                      <ImageIcon className="size-4" />
+                      Image
+                    </DropdownMenuItem>
+                  )}
+                  {workspaceId && state.imageInput && (
+                    <DropdownMenuItem
+                      disabled={state.acting || state.goalIntent}
+                      onSelect={() => setLibraryScope(state.scope)}
+                    >
+                      <LibraryIcon className="size-4" />
+                      Library
+                    </DropdownMenuItem>
+                  )}
+                  {bridge.startGoal && (
+                    <DropdownMenuItem
+                      disabled={state.acting || state.goalIntent}
+                      onSelect={() => {
+                        if (controller.canStartGoal)
+                          controller.selectGoalIntent(true);
+                        else
+                          setGoalDialog({
+                            scope: state.scope,
+                            creating: false,
+                          });
+                      }}
+                    >
+                      <TargetIcon className="size-4" />
+                      Goal
+                      <span className="text-muted-foreground">
+                        Set a goal to keep pursuing
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+                  {bridge.submitInRegime && (
+                    <DropdownMenuItem
+                      disabled={state.acting || state.steering}
+                      onSelect={() =>
+                        controller.selectOperatingRegime(
+                          state.operatingRegime === "plan" ? "act" : "plan"
+                        )
+                      }
+                    >
+                      <ListChecksIcon className="size-4" />
+                      Plan mode
+                      <span className="text-muted-foreground">
+                        {state.operatingRegime === "plan"
+                          ? "Turn plan mode off"
+                          : "Turn plan mode on"}
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -1148,22 +1165,33 @@ export function NativeAgentPane({
                     size="xs"
                     variant="ghost"
                     className="shrink-0 gap-1 px-1.5 text-muted-foreground"
-                    aria-label="Permissions"
+                    aria-label="Approvals: Ask for approval"
                   >
-                    <ShieldIcon className="size-3.5" />
-                    <span className="hidden @[26rem]:inline">Permissions</span>
+                    <HandIcon className="size-3.5" />
+                    <span className="hidden @[26rem]:inline">
+                      Ask for approval
+                    </span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent
                   side="top"
                   align="start"
-                  className="w-64 space-y-2 text-xs"
+                  className="w-80 p-1 text-sm"
                 >
-                  <p className="font-medium">Workspace permissions</p>
-                  <p className="text-muted-foreground">
-                    The agent works within this workspace’s granted access.
-                    Requests for additional access appear in chat for review.
+                  <p className="px-2 pt-1.5 pb-1 text-xs text-muted-foreground">
+                    How should agent actions be approved?
                   </p>
+                  <div className="flex items-start gap-2 rounded-md px-2 py-1.5">
+                    <HandIcon className="mt-0.5 size-4 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p>Ask for approval</p>
+                      <p className="text-xs text-muted-foreground">
+                        Works in this workspace; asks before using other folders
+                        or running commands.
+                      </p>
+                    </div>
+                    <CheckIcon className="mt-0.5 size-4 shrink-0" />
+                  </div>
                 </PopoverContent>
               </Popover>
               {state.operatingRegime === "plan" && (
@@ -1271,22 +1299,8 @@ export function NativeAgentPane({
                   </PopoverContent>
                 </Popover>
               )}
-              {(running || waitingForCheckIn) && !goalTurn ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  disabled={state.acting}
-                  aria-label="Pause"
-                  title="Pause"
-                  className="shrink-0"
-                  onClick={() => void controller.control("pause")}
-                >
-                  <PauseIcon className="size-3.5" />
-                  <span className="hidden @md:inline">Pause</span>
-                </Button>
-              ) : (canResume && (!goalTurn || !state.goal?.goal?.paused)) ||
-                canContinue ? (
+              {(canResume && (!goalTurn || !state.goal?.goal?.paused)) ||
+              canContinue ? (
                 <Button
                   type="button"
                   variant="ghost"

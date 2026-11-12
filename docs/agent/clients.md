@@ -537,7 +537,7 @@ See the [native host request fields](https://github.com/gridaco/grida/blob/main/
 
 ## Ask in a temporary side chat
 
-Choose **Chat options → Open side chat** in an attached native Desktop chat. Ask in its separate
+Desktop chat no longer offers a side chat; ACP clients can still open one. In a client that offers it, ask in its separate
 text composer while the parent continues. Closing the pane or switching
 parent chats discards the side conversation.
 
@@ -603,7 +603,7 @@ receives the retained PNG when the conversation uses it.
 
 ## Attach a Library image
 
-In a native workbench with image input, choose **Add from Library**, select
+In a native workbench with image input, choose **+ → Library**, select
 one image, and write a message. Grida prepares a PNG for the chat. If an image
 cannot be added, your draft and any existing attachment stay in place.
 
@@ -741,7 +741,7 @@ Opening a preview leaves the project and the conversation unchanged.
 The native Desktop workspace pane can show **Retrying after rate limit…**
 when Grida Gateway or the Responses API confirms it rejected a request before
 starting it and supplies a short retry delay. Grida can make one more attempt
-with the same model and connection. Use **Pause** or **Stop** while the retry
+with the same model and connection. Use **Stop** while the retry
 is pending.
 
 A downstream failure can leave the result uncertain. Review any partial work

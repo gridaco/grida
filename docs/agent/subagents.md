@@ -8,8 +8,8 @@ format: md
 # Work with subagents
 
 Use a named subagent when an independent investigation or second opinion
-would help. The **Subagents** panel is available in native Desktop chat
-with a supported Grida Gateway connection or a saved OpenRouter or Vercel AI
+would help. Ask for it in your message; delegated work appears in the
+turn's activity. Named subagents are available with a supported Grida Gateway connection or a saved OpenRouter or Vercel AI
 Gateway connection. Named assignments, ordinary Ultra reviews, and Goal-funded
 reviews are available on these supported connections.
 

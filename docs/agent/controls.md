@@ -25,13 +25,11 @@ If the current turn asks a question, use its answer control. A separate
 queued message leaves the question open. Review an access request through
 its approval controls. [Understand agent permissions](./permissions.md)
 
-## Pause or end the current turn
+## End the current turn
 
-- Choose **Pause** to suspend the current task. Use **Resume** to
-  continue it. A retained question or approval can still need your
-  answer before work proceeds.
 - Choose **Stop** to end the current task and hold the queue. Use
   **Resume queue** when you are ready for the waiting messages to start.
+- A turn paused by a Goal or another client shows **Resume** to continue it.
 
 After a full Desktop restart, reopening a chat only loads its retained work.
 If messages are waiting in an idle queue, choose **Resume queue** to start them.

@@ -58,12 +58,10 @@ export function NativeChatHeader({
   controller,
   state,
   onGoal,
-  onSubagents,
 }: {
   controller: NativeChatController;
   state: NativeChatView;
   onGoal: () => void;
-  onSubagents: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const title = state.selected
@@ -258,18 +256,8 @@ export function NativeChatHeader({
               <DropdownMenuSeparator />
             </>
           )}
-          {controller.canOpenSideChat && (
-            <DropdownMenuItem onSelect={() => controller.openSideChat()}>
-              Open side chat
-            </DropdownMenuItem>
-          )}
           {state.goal?.goal && (
             <DropdownMenuItem onSelect={onGoal}>Goal details</DropdownMenuItem>
-          )}
-          {state.subagents && (
-            <DropdownMenuItem onSelect={onSubagents}>
-              Subagents
-            </DropdownMenuItem>
           )}
           {controller.hasWorkspaceSettings && (
             <DropdownMenuItem
@@ -385,8 +373,10 @@ export function NativeModelPicker({
         >
           <ConnectionIcon connection={selected?.connection} />
           <span className="truncate">{label}</span>
-          {onEffort && stop !== DEFAULT_EFFORT && (
-            <span className="text-muted-foreground">{EFFORT_LABEL[stop]}</span>
+          {onEffort && (
+            <span className="shrink-0 text-muted-foreground">
+              {EFFORT_LABEL[stop]}
+            </span>
           )}
           <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" />
         </Button>
@@ -483,13 +473,18 @@ export function NativeModelPicker({
               <CommandEmpty>
                 No models found. Add a provider in Settings.
               </CommandEmpty>
-              <CommandGroup heading="Models">
+              <CommandGroup heading="Select model">
                 <CommandItem
                   value="Default model"
                   onSelect={() => choose({ kind: "default" })}
                 >
                   <GridaLogo className="size-3.5" />
-                  Default model
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span>Default</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      Recommended model
+                    </span>
+                  </span>
                   {profiles?.active === null && !defaultUnavailable && (
                     <CheckIcon className="ml-auto size-3.5" />
                   )}

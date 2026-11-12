@@ -86,7 +86,7 @@ Grida's own client identity and remain separate from browser sign-in cookies.
 
 An unavailable explicit selection leaves the workspace chat closed until
 the connection is ready. A supported rate-limit response during a turn can
-schedule one more attempt on the same connection. Use **Pause** or **Stop**
+schedule one more attempt on the same connection. Use **Stop**
 while it waits. [Follow a provider retry](./clients.md#follow-a-provider-retry)
 
 ## Read the usage for a turn
