@@ -59,48 +59,55 @@ fn owned(meta: &fs::Metadata, directory: bool) -> Result<()> {
     Ok(())
 }
 
+/// Refuse a path whose extended ACL grants any access ("allow" entries); a
+/// deny-only ACL is fine. Reads the ACL directly: spawning a listing per path
+/// component made every private open take tens of milliseconds. Any error
+/// other than "no ACL" fails closed.
 #[cfg(target_os = "macos")]
+#[allow(unsafe_code)] // Reviewed: read-only ACL query, freed once; see SAFETY notes.
 fn acl(path: &Path) -> Result<()> {
-    use std::process::{Command, Stdio};
-    let mut child = Command::new("/bin/ls")
-        .args(["-lde"])
-        .arg(path)
-        .env_clear()
-        .env("LC_ALL", "C")
-        .env("LANG", "C")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|_| failed())?;
-    let deadline = Instant::now() + Duration::from_secs(2);
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(5)),
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(failed());
-            }
+    use std::ffi::CString;
+    use std::os::raw::{c_char, c_int, c_void};
+    use std::os::unix::ffi::OsStrExt;
+
+    // <sys/acl.h>
+    const ACL_TYPE_EXTENDED: c_int = 0x0000_0100;
+    const ACL_FIRST_ENTRY: c_int = 0;
+    const ACL_NEXT_ENTRY: c_int = -1;
+    const ACL_EXTENDED_DENY: c_int = 2;
+    unsafe extern "C" {
+        fn acl_get_link_np(path: *const c_char, kind: c_int) -> *mut c_void;
+        fn acl_get_entry(acl: *mut c_void, entry_id: c_int, entry: *mut *mut c_void) -> c_int;
+        fn acl_get_tag_type(entry: *mut c_void, tag: *mut c_int) -> c_int;
+        fn acl_free(object: *mut c_void) -> c_int;
+    }
+
+    let c_path = CString::new(path.as_os_str().as_bytes()).map_err(|_| failed())?;
+    // SAFETY: a valid NUL-terminated path; the result is freed below.
+    let acl = unsafe { acl_get_link_np(c_path.as_ptr(), ACL_TYPE_EXTENDED) };
+    if acl.is_null() {
+        // ENOENT means either no ACL or no file; only an existing path passes.
+        return match std::io::Error::last_os_error().raw_os_error() {
+            Some(libc::ENOENT) if fs::symlink_metadata(path).is_ok() => Ok(()),
+            _ => Err(failed()),
+        };
+    }
+    let mut grants = false;
+    let mut entry_id = ACL_FIRST_ENTRY;
+    let mut entry = std::ptr::null_mut();
+    // SAFETY: `acl` stays valid until freed; entries borrow from it.
+    while unsafe { acl_get_entry(acl, entry_id, &mut entry) } == 0 {
+        let mut tag = 0;
+        // SAFETY: `entry` was just returned by `acl_get_entry`.
+        if unsafe { acl_get_tag_type(entry, &mut tag) } != 0 || tag != ACL_EXTENDED_DENY {
+            grants = true;
+            break;
         }
+        entry_id = ACL_NEXT_ENTRY;
     }
-    let output = child.wait_with_output().map_err(|_| failed())?;
-    if !output.status.success() || output.stdout.len() > 65_536 {
-        return Err(failed());
-    }
-    let text = std::str::from_utf8(&output.stdout).map_err(|_| failed())?;
-    if text.lines().any(|line| {
-        let line = line.trim_start();
-        line.split_once(':').is_some_and(|(index, rest)| {
-            !index.is_empty()
-                && index.chars().all(|c| c.is_ascii_digit())
-                && rest.split_whitespace().any(|word| word == "allow")
-        })
-    }) {
-        return Err(failed());
-    }
-    Ok(())
+    // SAFETY: `acl` came from `acl_get_link_np` and is freed once.
+    unsafe { acl_free(acl) };
+    if grants { Err(failed()) } else { Ok(()) }
 }
 #[cfg(all(unix, not(target_os = "macos")))]
 fn acl(_: &Path) -> Result<()> {
@@ -435,5 +442,40 @@ mod tests {
         assert!(!orphan.exists());
         assert!(unrelated.exists());
         assert!(!file.exists());
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod acl_tests {
+    use super::acl;
+    use std::process::Command;
+
+    fn chmod(args: &[&str], path: &std::path::Path) {
+        assert!(
+            Command::new("/bin/chmod")
+                .args(args)
+                .arg(path)
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+
+    #[test]
+    fn a_path_is_refused_only_when_its_acl_grants_access() {
+        let base = tempfile::tempdir().unwrap();
+        let plain = base.path().join("plain");
+        let denied = base.path().join("denied");
+        let granted = base.path().join("granted");
+        for path in [&plain, &denied, &granted] {
+            std::fs::write(path, "x").unwrap();
+        }
+        chmod(&["+a", "everyone deny delete"], &denied);
+        chmod(&["+a", "everyone allow read"], &granted);
+        assert!(acl(&plain).is_ok(), "no ACL");
+        assert!(acl(&denied).is_ok(), "a deny-only ACL grants nothing");
+        assert!(acl(&granted).is_err(), "an allow entry grants access");
+        // A path that cannot be read fails closed.
+        assert!(acl(&base.path().join("missing")).is_err());
     }
 }

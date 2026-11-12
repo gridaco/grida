@@ -40,6 +40,7 @@ import {
 } from "./main/workspace-media-protocol";
 import { notifyNativeChat } from "./main/agent-notifications";
 import type { NativeChatLifecycle } from "./main/native-agent-chat";
+import { NativeCommandProfiles } from "./main/native-agent-command-profile";
 import { protocol_router } from "./main/protocol-router";
 import { dirtyState } from "./main/dirty-state";
 import { open_handoff } from "./main/open-handoff";
@@ -653,6 +654,11 @@ app.on("ready", async () => {
     app.quit();
     return;
   }
+
+  // Agent commands run in the person's login-shell environment. Capturing it
+  // takes about a second, so start now, alongside window creation, instead of
+  // when the first chat launches its agent.
+  void NativeCommandProfiles.programEnvironment();
 
   // Keep a disposable profile on the build it was launched to exercise.
   const nativeProfile = NativeDesktopProfile.selected();
