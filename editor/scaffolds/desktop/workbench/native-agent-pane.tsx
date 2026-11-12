@@ -357,8 +357,7 @@ export function NativeAgentPane({
       ? state.turnRecords.find((record) => record.turnId === turnId)
       : undefined;
   const renderMessage = (message: NativeChatMessage) => {
-    const record =
-      message.role === "user" ? turnRecord(message.turnId) : undefined;
+    const record = turnRecord(message.turnId);
     // The first user message of a goal-start turn is the one that set it.
     const goalStart =
       record?.goalStart &&
@@ -384,7 +383,9 @@ export function NativeAgentPane({
                   </>
                 ) : undefined,
               }
-            : undefined
+            : record?.settledAtMs !== undefined
+              ? { sentAtMs: record.settledAtMs }
+              : undefined
         }
         message={{
           id: message.messageId,

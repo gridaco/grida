@@ -146,7 +146,7 @@ export function ChatMessageView({
 }: {
   message: ChatMessage;
   isStreaming?: boolean;
-  /** Per-turn affordances rendered under user bubbles. Omit to hide. */
+  /** Per-turn affordances under a message. User bubbles show copy without them. */
   actions?: ChatMessageActions;
 }) {
   // A compaction summary (synthetic assistant turn carrying a
@@ -292,15 +292,7 @@ export function ChatMessageView({
         <div className="ml-auto flex items-center gap-2">
           <MessageActions className={revealOnHoverActions}>
             {actions?.sentAtMs !== undefined && (
-              <time
-                dateTime={new Date(actions.sentAtMs).toISOString()}
-                className="text-muted-foreground px-1 text-xs tabular-nums"
-              >
-                {new Date(actions.sentAtMs).toLocaleTimeString([], {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </time>
+              <MessageTime at={actions.sentAtMs} />
             )}
             <CopyMessageAction text={text} />
             {actions?.onEdit && (
@@ -381,10 +373,28 @@ export function ChatMessageView({
           text — never over a half-streamed or tool-only (text-less) turn. */}
       {!isStreaming && responseText.trim().length > 0 && (
         <MessageActions className={revealOnHoverActions}>
+          {actions?.sentAtMs !== undefined && (
+            <MessageTime at={actions.sentAtMs} />
+          )}
           <CopyMessageAction text={responseText} />
         </MessageActions>
       )}
     </Message>
+  );
+}
+
+/** The local time a message was sent, shown with its hover actions. */
+function MessageTime({ at }: { at: number }) {
+  return (
+    <time
+      dateTime={new Date(at).toISOString()}
+      className="text-muted-foreground px-1 text-xs tabular-nums"
+    >
+      {new Date(at).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })}
+    </time>
   );
 }
 

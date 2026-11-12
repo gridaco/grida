@@ -161,6 +161,26 @@ export namespace turn_activity {
     ).length;
   }
 
+  /**
+   * Whether a finished turn shows its header. A turn that finished normally
+   * with nothing but its answer needs none; any recorded work, or an outcome
+   * other than success, keeps it.
+   */
+  export function showsHeader(
+    block: Pick<
+      Extract<Block, { kind: "turn" }>,
+      "finished" | "work" | "outcome"
+    >
+  ): boolean {
+    return (
+      block.finished &&
+      (block.work.length > 0 ||
+        block.outcome === "cancelled" ||
+        block.outcome === "failed" ||
+        block.outcome === "uncertain")
+    );
+  }
+
   export function header(
     outcome: Outcome | null,
     durationMs: number | null

@@ -23,9 +23,11 @@ happen. When it finishes, that work collapses beneath one header such as
 **Worked for 12s**, and the final answer stays visible below it. Expanding the
 header shows the recorded commentary and actions in their original order;
 consecutive actions read as one line such as “Read files, searched”, which
-expands to each call and its outcome.
+expands to each call and its outcome. A turn that finished normally with only
+its answer shows no header or divider. A stopped turn shows **Stopped after …**
+with its partial work in view and nothing to expand.
 
-Every turn keeps its own header, including after reopening the chat and on
+Every turn with recorded work keeps its own header, including after reopening the chat and on
 earlier pages. Stopped and failed turns say so in their header. A pending
 question or approval stays actionable outside the collapsed work. Expanding,
 collapsing, paging and reopening only read recorded work: none of them repeats

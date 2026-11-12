@@ -685,9 +685,11 @@ beneath a header such as **Worked for 1m 12s**, and the final answer stays
 visible below it. Select the header to show the recorded commentary and actions
 in order. Consecutive actions appear on one line, such as “Read files, ran
 commands”; select that line to list each call and its outcome. A stopped or
-failed turn shows **Stopped after …** or **Failed after …** instead.
+failed turn shows **Stopped after …** or **Failed after …** instead. A stopped
+turn is not collapsed: its partial work stays in view. A turn
+that only answered, without tools or commentary, shows just its answer.
 
-Every turn keeps its own header, including after you reopen the chat and on
+Every turn with recorded work keeps its own header, including after you reopen the chat and on
 earlier pages. Expanding or reopening a turn only reads the recorded work; it
 does not repeat actions or request another model response. Turns recorded
 before timing was kept show **Worked** without a duration. A pending question

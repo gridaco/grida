@@ -470,8 +470,11 @@ away instead of filling the conversation.
 While a turn runs, its commentary and actions appear as they happen. When it
 finishes, the work before the final answer collapses beneath a header such as
 “Worked for 2m 30s”. The final answer stays visible below that header. Each
-turn keeps its own header, including turns reopened later or read from an
-earlier page.
+turn with recorded work keeps its own header, including turns reopened later
+or read from an earlier page. A turn that only answered and finished normally
+shows its answer without a header; a stopped, failed or uncertain turn always
+says so. A stopped turn has no answer to set apart, so its partial work stays
+in view instead of collapsing.
 
 Expanding the header shows the retained commentary and work in their original
 order. Consecutive actions read as one short activity line, such as “Read files,

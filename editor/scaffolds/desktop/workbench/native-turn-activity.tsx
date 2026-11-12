@@ -28,8 +28,11 @@ export function NativeTurnActivity({
   renderMessage: (message: NativeChatMessage) => ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const open = !block.finished || expanded;
-  const hasWork = block.work.length > 0;
+  // A stopped turn shows its partial work as is; there is no answer to keep
+  // apart from it.
+  const stopped = block.outcome === "cancelled";
+  const open = !block.finished || stopped || expanded;
+  const hasWork = block.work.length > 0 && !stopped;
   return (
     <div
       data-testid="native-turn-activity"
@@ -40,7 +43,7 @@ export function NativeTurnActivity({
       className="flex flex-col gap-4"
     >
       {block.requests.map(renderMessage)}
-      {block.finished && (
+      {turn_activity.showsHeader(block) && (
         <div className="border-b pb-1">
           {hasWork ? (
             <button

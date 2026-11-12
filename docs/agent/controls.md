@@ -36,8 +36,8 @@ its approval controls. [Understand agent permissions](./permissions.md)
 After a full Desktop restart, reopening a chat only loads its retained work.
 If messages are waiting in an idle queue, choose **Resume** to start them.
 
-Changes already made can remain in the workspace. Expand the stopped turn to
-see its partial work.
+Changes already made can remain in the workspace. A stopped turn keeps its
+partial work in view under **Stopped after …**.
 An interrupted provider request can still have incurred a charge. Its final
 settlement depends on the provider's recorded result.
 [Inspect and save results](./results.md)

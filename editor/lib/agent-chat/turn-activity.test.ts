@@ -158,6 +158,20 @@ describe("turn_activity.group", () => {
     expect(turn_activity.header("failed", 2_000)).toBe("Failed after 2s");
   });
 
+  it("shows no header for a finished answer-only turn unless it ended badly", () => {
+    const base = { finished: true, work: [], outcome: "succeeded" } as const;
+    expect(turn_activity.showsHeader(base)).toBe(false);
+    for (const outcome of ["cancelled", "failed", "uncertain"] as const)
+      expect(turn_activity.showsHeader({ ...base, outcome })).toBe(true);
+    expect(
+      turn_activity.showsHeader({
+        ...base,
+        work: [{ kind: "activity", key: "a", calls: [read] }],
+      })
+    ).toBe(true);
+    expect(turn_activity.showsHeader({ ...base, finished: false })).toBe(false);
+  });
+
   it("groups an earlier page that begins inside a turn", () => {
     const [block] = turn_activity.group(
       turn("a").slice(1),
