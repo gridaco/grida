@@ -22,6 +22,12 @@ const options = {
   out: null,
   /** Use the profile Grida Desktop stages instead of the runner's own. */
   desktop: false,
+  /**
+   * Per-reply output allowance. Desktop gives an own-key launch the model's
+   * catalogue output limit, bounded at 65536; the default model's limit is
+   * larger, so the bound applies.
+   */
+  maxOutputTokens: 65_536,
 };
 const filters = [];
 const argv = process.argv.slice(2);
@@ -35,6 +41,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (arg === "--helper") options.helper = take();
   else if (arg === "--out") options.out = take();
   else if (arg === "--desktop-profile") options.desktop = true;
+  else if (arg === "--max-output-tokens") options.maxOutputTokens = take();
   else filters.push(arg);
 }
 options.out ??= fs.mkdtempSync(path.join(os.tmpdir(), "grida-missions-"));
@@ -172,6 +179,36 @@ function check(spec, workspace, before) {
         ok: !read(args[0]).includes(args.slice(1).join(" ")),
         detail: args.join(" "),
       };
+    case "exists":
+      return {
+        ok: fs.existsSync(path.join(workspace, args[0])),
+        detail: args[0],
+      };
+    case "files": {
+      // files <folder> <extension> <minimum count>
+      const folder = path.join(workspace, args[0]);
+      const count = fs.existsSync(folder)
+        ? Object.keys(snapshot(folder)).filter((file) => file.endsWith(args[1]))
+            .length
+        : 0;
+      return { ok: count >= Number(args[2]), detail: `${count} ${args[1]}` };
+    }
+    case "script": {
+      // Runs a script the agent wrote. Missions run in a disposable copy.
+      const run = spawnSync("node", [args[0]], {
+        cwd: workspace,
+        encoding: "utf8",
+        timeout: 60_000,
+      });
+      return {
+        ok: run.status === 0,
+        detail: (run.stdout + run.stderr)
+          .trim()
+          .split("\n")
+          .slice(-3)
+          .join(" | "),
+      };
+    }
     default:
       throw new Error(`unknown check ${spec}`);
   }
@@ -226,7 +263,12 @@ for (const mission of missions) {
       options.model,
       "--credential-home",
       options.credentialHome,
+      "--max-output-tokens",
+      String(options.maxOutputTokens),
       ...(mission.mode === "plan" ? ["--mode", "plan"] : []),
+      ...(mission.deadline_minutes
+        ? ["--deadline-ms", String(mission.deadline_minutes * 60_000)]
+        : []),
       ...(session ? ["--session", session] : []),
       "--prompt",
       prompt,

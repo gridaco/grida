@@ -21,12 +21,17 @@ there; Desktop only adds presentation.
 | [Protected metadata](missions/07-protected-path.md)              | Writes to version-control metadata are refused      | Default   |
 | [Network needs approval](missions/08-network.md)                 | A command needing the network is refused, explained | Default   |
 | [Context across turns](missions/09-two-turns.md)                 | A later turn uses what an earlier turn established  | Default   |
+| [New repository](missions/10-new-repository.md)                  | Start a repository; its metadata is then protected  | Default   |
+| [Launch kit from a brief](missions/11-launch-kit.md)             | A long creative turn: brand, social and web assets  | Default   |
 
 Each mission file holds a `json` block with the machine-readable run: the seed
 project, the preset, the prompts (one per turn, in one session), and named
 checks the runner evaluates in the finished workspace (`tests-pass`,
-`unchanged [path]`, `contains path text`, `absent path text`, plus words the
-final answer must mention, or one of several it may use). The prose criteria are for
+`unchanged [path]`, `contains path text`, `absent path text`, `exists path`,
+`files folder extension minimum`, `script path`, plus words the final answer
+must mention, or one of several it may use). `script` runs a Node script the
+agent wrote, in the disposable mission copy. A long mission sets
+`deadline_minutes`; the default turn deadline is two minutes. The prose criteria are for
 a person judging quality; checks only catch outright failure.
 
 ## Run
@@ -44,6 +49,12 @@ The runner copies the seed into a fresh temporary workspace, runs each prompt
 in one session, runs the checks, and writes a report with the transcript,
 final answers, checks and token usage. Paid models are billed to the selected
 key; report the model and usage with any result you share.
+
+Each reply may use up to 65536 output tokens (`--max-output-tokens`), the
+allowance Desktop gives a catalogued model with a larger limit. A smaller
+allowance cuts off long replies, such as a large file written in one call.
+`--desktop-profile` runs the Default preset under the exact permission profile
+Desktop stages.
 
 ## Add a mission
 
