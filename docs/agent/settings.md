@@ -7,17 +7,17 @@ format: md
 
 # Change agent settings
 
-Open **Context settings** (the gauge beside the model picker) in a native Desktop workspace chat to see the
+Open **Workspace settings…** from the chat options menu in a native Desktop workspace chat to see the
 default for new messages. The limit controls how much material the agent
 can send to the model as input. The current connection determines whether
 you can set a custom token limit.
 
 ## Ask the agent to change a setting
 
-1. Remove the **Plan** badge, open **Context settings**, and enable **Review settings permission on next Act send**.
+1. Remove the **Plan** badge, open **Workspace settings…**, and enable **Review settings permission on next Act send**.
 2. Ask for a specific change, such as “Set the workspace context limit to
    12,000 tokens for future messages.” Approve the request when Desktop asks.
-3. Open **Context settings** again to check the reported default.
+3. Open **Workspace settings…** again to check the reported default.
 
 The permission applies to that message and covers the context limit. The
 agent can explain what is active and what the current task already captured.

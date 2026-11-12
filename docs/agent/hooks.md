@@ -17,7 +17,7 @@ not require an existing check definition or an earlier chat.
 
 ## Register a check in Desktop
 
-1. Open a workspace chat and choose **Checks**.
+1. Open a workspace chat and choose **Workspace settings…** from the chat options menu.
 2. Choose **Import check…** and select its JSON definition. An agent can help
    prepare the definition; it cannot trust executable code for you.
 3. Review the event, exact command and arguments, workspace, deadline and

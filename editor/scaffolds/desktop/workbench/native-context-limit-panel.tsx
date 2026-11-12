@@ -18,7 +18,7 @@ export function NativeContextLimitPanel({
     <section
       data-testid="workspace-context-limit"
       aria-label="Context input limit"
-      className="flex flex-wrap items-center gap-2 border-y px-3 py-2 text-xs"
+      className="flex flex-wrap items-center gap-2 border-t px-6 py-3 text-xs"
     >
       <p className="basis-full">
         <strong>Maximum context input</strong>

@@ -7,11 +7,11 @@ format: md
 
 # Schedule a follow-up
 
-A check-in lets the agent wait and continue the same task later. In a native
-Desktop chat, open **Add to message** (+) and enable **Allow one scheduled check-in** before
-sending a text message from an idle chat in **Act**. Tell the agent what to
-check and when, for example, “Check this export in two minutes and tell me
-whether it’s ready.”
+A check-in lets the agent wait and continue the same task later. Ordinary
+native Desktop chat messages do not offer a check-in; the capability remains
+available to headless and ACP clients that request it for an idle **Act**
+message. Tell the agent what to check and when, for example, “Check this
+export in two minutes and tell me whether it’s ready.”
 
 For a **Standard** goal, select **Allow one check-in during the first goal
 turn** before choosing **Start goal**. Put the timing and purpose in the

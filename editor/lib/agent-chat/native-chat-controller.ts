@@ -1118,6 +1118,25 @@ export class NativeChatController {
     );
   }
 
+  /** Whether this workspace exposes any agent settings. */
+  get hasWorkspaceSettings(): boolean {
+    return this.hasContextLimit || this.hasHooks;
+  }
+
+  /** Open the workspace agent settings and read their current values. */
+  async openWorkspaceSettings(): Promise<void> {
+    await Promise.all([
+      this.hasContextLimit && !this.view.contextLimitOpen
+        ? this.toggleContextLimit()
+        : undefined,
+      this.hasHooks && !this.view.hooksOpen ? this.toggleHooks() : undefined,
+    ]);
+  }
+
+  closeWorkspaceSettings(): void {
+    this.update({ contextLimitOpen: false, hooksOpen: false });
+  }
+
   async toggleHooks(): Promise<void> {
     if (!this.hasHooks || this.view.hooksBusy) return;
     const hooksOpen = !this.view.hooksOpen;

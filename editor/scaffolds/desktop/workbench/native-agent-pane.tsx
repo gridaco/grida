@@ -26,7 +26,6 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   PencilIcon,
-  CircleGaugeIcon,
   LibraryIcon,
   PaperclipIcon,
   PlusIcon,
@@ -82,8 +81,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuCheckboxItem,
-  DropdownMenuSeparator,
 } from "@app/ui/components/dropdown-menu";
 import {
   Popover,
@@ -399,12 +396,29 @@ export function NativeAgentPane({
           {state.profileError ?? state.catalogEntryError}
         </p>
       )}
-      {state.contextLimitOpen && (
-        <NativeContextLimitPanel controller={controller} state={state} />
-      )}
-      {state.hooksOpen && (
-        <NativeHooksPanel controller={controller} state={state} />
-      )}
+      <Dialog
+        open={state.contextLimitOpen || state.hooksOpen}
+        onOpenChange={(open) => {
+          if (!open) controller.closeWorkspaceSettings();
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Workspace settings</DialogTitle>
+            <DialogDescription>
+              Agent settings for every chat in this workspace.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="-mx-6 flex flex-col">
+            {state.contextLimitOpen && (
+              <NativeContextLimitPanel controller={controller} state={state} />
+            )}
+            {state.hooksOpen && (
+              <NativeHooksPanel controller={controller} state={state} />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       {(state.canReadEarlier ||
         state.earlierMessages ||
         state.earlierError) && (
@@ -1078,9 +1092,7 @@ export function NativeAgentPane({
           onStop={() => void controller.control("stop")}
           toolbarStart={
             <>
-              {(state.imageInput ||
-                state.fileInput ||
-                state.wakeupsAvailable) && (
+              {(state.imageInput || state.fileInput) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -1125,23 +1137,6 @@ export function NativeAgentPane({
                         <LibraryIcon className="size-4" />
                         Add from Library
                       </DropdownMenuItem>
-                    )}
-                    {state.wakeupsAvailable && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuCheckboxItem
-                          checked={state.allowWakeup}
-                          disabled={
-                            state.acting ||
-                            (!controller.canAllowWakeup && !state.allowWakeup)
-                          }
-                          onCheckedChange={(checked) =>
-                            controller.setAllowWakeup(checked)
-                          }
-                        >
-                          Allow a scheduled check-in
-                        </DropdownMenuCheckboxItem>
-                      </>
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1276,14 +1271,6 @@ export function NativeAgentPane({
                   </PopoverContent>
                 </Popover>
               )}
-              {state.allowWakeup && (
-                <span
-                  className="shrink-0 text-xs text-muted-foreground"
-                  title="One scheduled check-in allowed"
-                >
-                  Check-in
-                </span>
-              )}
               {(running || waitingForCheckIn) && !goalTurn ? (
                 <Button
                   type="button"
@@ -1343,19 +1330,6 @@ export function NativeAgentPane({
           }
           toolbarEnd={
             <>
-              {controller.hasContextLimit && (
-                <Button
-                  type="button"
-                  size="icon-xs"
-                  variant="ghost"
-                  aria-label="Context settings"
-                  title="Context settings"
-                  disabled={state.contextLimitBusy}
-                  onClick={() => void controller.toggleContextLimit()}
-                >
-                  <CircleGaugeIcon className="size-3.5 text-muted-foreground" />
-                </Button>
-              )}
               <NativeModelPicker
                 profiles={state.profiles}
                 defaultUnavailable={connectionRequired}

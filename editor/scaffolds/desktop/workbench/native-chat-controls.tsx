@@ -271,20 +271,12 @@ export function NativeChatHeader({
               Subagents
             </DropdownMenuItem>
           )}
-          {controller.hasContextLimit && (
+          {controller.hasWorkspaceSettings && (
             <DropdownMenuItem
-              disabled={state.contextLimitBusy}
-              onSelect={() => void controller.toggleContextLimit()}
+              disabled={state.contextLimitBusy || state.hooksBusy}
+              onSelect={() => void controller.openWorkspaceSettings()}
             >
-              Context settings
-            </DropdownMenuItem>
-          )}
-          {controller.hasHooks && (
-            <DropdownMenuItem
-              disabled={state.hooksBusy}
-              onSelect={() => void controller.toggleHooks()}
-            >
-              Lifecycle checks
+              Workspace settings…
             </DropdownMenuItem>
           )}
           {state.catalogEntryError && (

@@ -16,7 +16,7 @@ export function NativeHooksPanel({
     <section
       data-testid="workspace-lifecycle-checks"
       aria-label="Lifecycle checks"
-      className="flex flex-wrap items-center gap-2 border-y px-3 py-2 text-xs"
+      className="flex flex-wrap items-center gap-2 border-t px-6 py-3 text-xs"
     >
       <p className="basis-full">
         <strong>Lifecycle checks</strong>

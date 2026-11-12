@@ -571,7 +571,7 @@ The current Gateway and ChatGPT subscription profiles can inspect the limit
 and return an existing valid override to **Automatic**.
 
 To ask the agent to change the default with a compatible provider, remove the **Plan** badge and enable
-**Review settings permission on next Act send** in **Context settings**. Write a short
+**Review settings permission on next Act send** in **Workspace settings…** (chat options menu). Write a short
 message and confirm it when Desktop asks. That permission covers the context
 input limit for this message. To change a queued message with this permission,
 withdraw it and review a new send.
