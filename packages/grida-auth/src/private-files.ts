@@ -53,7 +53,7 @@ export namespace privateFiles {
     // macOS ACL grants are independent of POSIX mode bits. Deny entries are
     // harmless; reject all additional allow entries, including inherited ones.
     // One listing covers every path given: a grant on any of them refuses.
-    const { stdout } = await execute("/bin/ls", ["-lde", "--", ...filenames], {
+    const { stdout } = await execute("/bin/ls", ["-lde", ...filenames], {
       env: { LC_ALL: "C", LANG: "C" },
       timeout: 2000,
       maxBuffer: 65_536,

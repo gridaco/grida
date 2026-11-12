@@ -77,11 +77,12 @@ for (const name of [
 ]) {
   childProcess[name] = () => forbidden("processes");
 }
-// Owner checks use a fixed macOS executable to inspect ACL metadata. This is
-// the sole process allowance; it cannot execute model-selected commands.
+// Owner checks use a fixed macOS executable to inspect ACL metadata of one
+// or more owned paths, each the fixture root, inside it, or one of its
+// ancestors. This is the sole process allowance; it cannot execute
+// model-selected commands.
 childProcess.execFile = (file, args, options, callback) => {
-  const filename = args?.[1];
-  const owned =
+  const owned = (filename) =>
     typeof filename === "string" &&
     (filename === root ||
       filename.startsWith(root + path.sep) ||
@@ -91,9 +92,10 @@ childProcess.execFile = (file, args, options, callback) => {
   if (
     !enabled() ||
     file !== "/bin/ls" ||
-    args?.length !== 2 ||
+    !Array.isArray(args) ||
+    args.length < 2 ||
     args[0] !== "-lde" ||
-    !owned ||
+    !args.slice(1).every(owned) ||
     options?.env?.LC_ALL !== "C" ||
     options?.env?.LANG !== "C" ||
     Object.keys(options.env).length !== 2
