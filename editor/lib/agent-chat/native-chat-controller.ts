@@ -20,6 +20,7 @@ import type {
   NativeChatGoalRequest,
   NativeChatLibrarySelection,
   NativeChatLibrarySelectionAnswer,
+  NativeChatActivityUpdate,
   NativeChatMessage,
   NativeChatObservation,
   NativeChatRevisionInput,
@@ -38,6 +39,7 @@ import type {
   NativeChatReadiness,
   NativeChatTextUpdate,
   NativeChatTranscriptPage,
+  NativeChatTurnRecord,
   NativeChatTurnSummary,
   NativeChatUpdate,
   NativeChatWakeup,
@@ -64,6 +66,8 @@ export type NativeChatEditorSurfaces = {
 
 const POLL_MS = 500;
 const RECENTS_LIMIT = 12;
+const MAX_LIVE_ACTIVITY = 64;
+const EMPTY_TURNS: readonly NativeChatTurnRecord[] = [];
 const MAX_LIVE_BYTES = 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 256 * 1024;
 
@@ -120,6 +124,8 @@ export type NativeChatView = Readonly<{
     basis: NativeChatCatalogEntry;
   }> | null;
   messages: readonly NativeChatMessage[];
+  /** Recorded outcome and timing for turns in the displayed messages. */
+  turnRecords: readonly NativeChatTurnRecord[];
   earlierMessages: boolean;
   canReadEarlier: boolean;
   readingEarlier: boolean;
@@ -206,7 +212,7 @@ type Scope = {
   refreshing?: Promise<void>;
   timer?: ReturnType<typeof setTimeout>;
   durable: readonly NativeChatMessage[];
-  recentWindow?: Pick<NativeChatTranscriptPage, "view" | "older">;
+  recentWindow?: Pick<NativeChatTranscriptPage, "view" | "older" | "turns">;
   earlierWindow?: NativeChatTranscriptPage;
   earlierRead?: object;
   live: Map<string, NativeChatMessage & { turnId: string; bytes: number }>;
@@ -281,6 +287,7 @@ const EMPTY: NativeChatView = Object.freeze({
   revisionSubmitting: false,
   catalogDraft: null,
   messages: [],
+  turnRecords: [],
   earlierMessages: false,
   canReadEarlier: false,
   readingEarlier: false,
@@ -712,6 +719,7 @@ export class NativeChatController {
       revisionSubmitting: false,
       catalogDraft: null,
       messages: [],
+      turnRecords: [],
       earlierMessages: false,
       canReadEarlier: false,
       readingEarlier: false,
@@ -3479,7 +3487,11 @@ export class NativeChatController {
           scope.earlierWindow.view !== page.view
         )
           scope.earlierWindow = undefined;
-        scope.recentWindow = page && { view: page.view, older: page.older };
+        scope.recentWindow = page && {
+          view: page.view,
+          older: page.older,
+          turns: page.turns,
+        };
         scope.durable = messages;
         const committed = new Set(messages.map((message) => message.messageId));
         const current = next.snapshot.current?.turnId;
@@ -3870,6 +3882,10 @@ export class NativeChatController {
       this.forgetDeletedChat(scope);
       return;
     }
+    if (update.kind === "activity") {
+      this.receiveActivity(scope, update);
+      return;
+    }
     if (update.kind !== "text") {
       scope.live.clear();
       scope.gaps.clear();
@@ -3909,6 +3925,44 @@ export class NativeChatController {
     if (!known) void this.refresh(scope);
   }
 
+  /** Merge one live tool call into its message until durable replay arrives. */
+  private receiveActivity(
+    scope: Scope,
+    update: NativeChatActivityUpdate
+  ): void {
+    const known = scope.observation?.snapshot.current;
+    if (known && known.turnId !== update.turnId) {
+      void this.refresh(scope);
+      return;
+    }
+    if (!known && scope.observation?.snapshot.latest?.turnId === update.turnId)
+      return;
+    if (scope.durable.some((message) => message.messageId === update.messageId))
+      return;
+    const previous = scope.live.get(update.messageId);
+    if (previous && previous.turnId !== update.turnId) return;
+    const recorded = previous?.activity ?? [];
+    const index = recorded.findIndex(
+      (item) => item.callId === update.activity.callId
+    );
+    if (index < 0 && recorded.length >= MAX_LIVE_ACTIVITY) return;
+    const activity =
+      index < 0
+        ? [...recorded, update.activity]
+        : recorded.map((item, at) => (at === index ? update.activity : item));
+    scope.live.set(update.messageId, {
+      messageId: update.messageId,
+      role: "assistant",
+      text: "",
+      bytes: 0,
+      ...previous,
+      turnId: update.turnId,
+      activity,
+    });
+    this.publishMessages(scope);
+    if (!known) void this.refresh(scope);
+  }
+
   private async renewSubscription(scope: Scope): Promise<void> {
     try {
       const attachment = this.attachment(scope);
@@ -3936,6 +3990,8 @@ export class NativeChatController {
         ...scope.durable,
         ...scope.live.values(),
       ],
+      turnRecords:
+        (scope.earlierWindow ?? scope.recentWindow)?.turns ?? EMPTY_TURNS,
       earlierMessages: !!scope.earlierWindow,
       canReadEarlier: !!(scope.earlierWindow ?? scope.recentWindow)?.older,
       repairing,
@@ -4169,6 +4225,9 @@ function applyText(
   | "duplicate"
   | null {
   const existing = update.replace ? undefined : previous;
+  // A replacement rewrites text only; requested tool calls stay attached.
+  const activity =
+    previous?.turnId === update.turnId ? previous.activity : undefined;
   if (
     existing &&
     (existing.turnId !== update.turnId || existing.role !== update.role)
@@ -4194,6 +4253,7 @@ function applyText(
     turnId: update.turnId,
     bytes: bytes + added.length,
     text: (existing?.text ?? "") + update.text,
+    ...(activity && { activity }),
   };
 }
 

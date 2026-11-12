@@ -1,5 +1,6 @@
 //! Bounded conversational policy composed over the reusable execution runtime.
 
+pub mod activity;
 pub mod approval_review;
 pub mod compaction;
 pub mod configuration;

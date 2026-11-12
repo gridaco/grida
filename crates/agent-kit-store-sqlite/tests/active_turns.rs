@@ -196,7 +196,7 @@ fn interrupted_additive_index_build_is_retryable_without_changing_version() {
         connection
             .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
             .unwrap(),
-        11
+        12
     );
     connection.execute_batch("DROP INDEX sessions_active_turn_scan; BEGIN IMMEDIATE; CREATE INDEX sessions_active_turn_scan ON sessions(id,active_turn) WHERE active_turn IS NOT NULL;").unwrap();
     drop(connection);
@@ -210,7 +210,7 @@ fn interrupted_additive_index_build_is_retryable_without_changing_version() {
         connection
             .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
             .unwrap(),
-        11
+        12
     );
     let query: String = connection.query_row(
         "EXPLAIN QUERY PLAN SELECT id,active_turn FROM sessions INDEXED BY sessions_active_turn_scan WHERE active_turn IS NOT NULL AND id>?1 ORDER BY id LIMIT 33",

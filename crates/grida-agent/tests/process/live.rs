@@ -157,3 +157,74 @@ async fn identified_submission_streams_visible_text_and_keeps_durable_ownership(
     );
     endpoint.done().await;
 }
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn requested_tool_calls_stream_their_activity_and_recorded_outcome() {
+    use super::approvals::Fixture;
+
+    let fixture = Fixture::new(false);
+    std::fs::write(fixture.primary.join("note.txt"), "fixture note").unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("read_file", r#"{"path":"note.txt"}"#),
+        Reply::Finished("Read it."),
+    ])
+    .await;
+    let mut child = fixture
+        .process(&endpoint.url, "serve")
+        .arg("--stdio")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut observer = Observer {
+        input: child.stdin.take().unwrap(),
+        output: BufReader::new(child.stdout.take().unwrap()),
+        next: 0,
+        updates: vec![],
+    };
+    let mut capabilities = extension_initialize();
+    capabilities["clientCapabilities"]["_meta"][LIVE] = 1.into();
+    observer.request("initialize", capabilities).await;
+    let session = observer
+        .request(
+            "session/new",
+            json!({"cwd":fixture.primary,"mcpServers":[]}),
+        )
+        .await["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let submitted = observer.request("_co.grida/session/submit", json!({
+        "sessionId":session,"inputId":"activity-input","prompt":[{"type":"text","text":"Read the note"}]
+    })).await;
+    endpoint.request().await;
+    endpoint.request().await;
+    let mut outcomes = Vec::new();
+    timeout(WAIT, async {
+        while outcomes.last() != Some(&json!("succeeded")) {
+            let frame = if observer.updates.is_empty() {
+                observer.frame().await
+            } else {
+                observer.updates.remove(0)
+            };
+            let params = &frame["params"];
+            if params["update"]["sessionUpdate"] != "tool_call" {
+                continue;
+            }
+            let meta = &params["_meta"][LIVE];
+            assert_eq!(meta["turnId"], submitted["turnId"]);
+            assert_eq!(meta["activity"], "read");
+            assert!(meta["messageId"].is_string());
+            assert_eq!(params["update"]["title"], "read_file");
+            outcomes.push(meta["outcome"].clone());
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(outcomes, [json!("running"), json!("succeeded")]);
+    drop(observer);
+    let _ = child.kill().await;
+    endpoint.done().await;
+}

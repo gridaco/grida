@@ -27,7 +27,7 @@ give one reviewer a separate text assignment while the main agent continues.
 For a new ordinary review, the reviewer can read the primary workspace if it is
 already allowed. It does not automatically receive the parent chat or additional
 folder grants; folders inside the readable primary workspace remain accessible.
-The turn summary records whether the agent collected that reviewer’s findings.
+Execution details record whether the agent collected that reviewer’s findings.
 On supported Gateway, saved OpenRouter, and saved Vercel connections, Ultra is
 available for ordinary messages and Goal-funded reviews. The work allowance
 limits inference steps. An optional Gateway spending ceiling is a separate limit.

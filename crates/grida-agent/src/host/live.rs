@@ -1,19 +1,32 @@
 //! Read-only updates from turns owned independently of an ACP prompt request.
 
 use super::RunResult;
+use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::InferenceUpdate;
-use agent_kit_core::messages::{Content, OutcomeStatus, Role};
+use agent_kit_core::messages::{Content, OutcomeStatus, Role, ToolCall};
 use agent_kit_core::turn::{OperationOutcome, TurnBinding};
-use agent_kit_core::{MessageId, SessionId, TurnId, WaitId};
+use agent_kit_core::{MessageId, SessionId, ToolCallId, TurnId, WaitId};
 use agent_kit_runtime::TurnUpdate;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
 #[derive(Clone)]
 pub(crate) enum LiveUpdate {
     Text(LiveText),
+    Activity(LiveActivity),
     Lifecycle(Lifecycle),
+}
+
+/// A tool call requested by the current turn. `status` is set once the
+/// call's recorded result is part of the turn's history.
+#[derive(Clone)]
+pub(crate) struct LiveActivity {
+    pub session: SessionId,
+    pub turn: TurnId,
+    pub message: MessageId,
+    pub call: ToolCall,
+    pub status: Option<OutcomeStatus>,
 }
 
 #[derive(Clone)]
@@ -69,6 +82,8 @@ pub(super) struct Publisher {
     sender: broadcast::Sender<LiveUpdate>,
     binding: TurnBinding,
     offsets: BTreeMap<MessageId, usize>,
+    calls: BTreeMap<ToolCallId, (MessageId, ToolCall)>,
+    finished: BTreeSet<ToolCallId>,
 }
 
 impl Publisher {
@@ -77,6 +92,8 @@ impl Publisher {
             sender,
             binding,
             offsets: BTreeMap::new(),
+            calls: BTreeMap::new(),
+            finished: BTreeSet::new(),
         }
     }
 
@@ -111,10 +128,52 @@ impl Publisher {
                     if !text.is_empty() {
                         self.publish(&message.id, 0, true, &text);
                     }
+                    for item in &message.content {
+                        if let Content::ToolCall(call) = item
+                            && !self.calls.contains_key(&call.id)
+                        {
+                            self.calls
+                                .insert(call.id.clone(), (message.id.clone(), call.clone()));
+                            self.activity(&message.id, call, None);
+                        }
+                    }
+                }
+            }
+            TurnUpdate::Snapshot(view) => {
+                for HistoryRecord::Message(message) in view.state.history().records() {
+                    if message.role != Role::Tool {
+                        continue;
+                    }
+                    for item in &message.content {
+                        let Content::ToolResult(result) = item else {
+                            continue;
+                        };
+                        if self.finished.contains(&result.call) {
+                            continue;
+                        }
+                        let Some((owner, call)) = self.calls.get(&result.call) else {
+                            continue;
+                        };
+                        self.activity(owner, call, Some(result.status));
+                        self.finished.insert(result.call.clone());
+                    }
                 }
             }
             _ => {}
         }
+    }
+
+    fn activity(&self, message: &MessageId, call: &ToolCall, status: Option<OutcomeStatus>) {
+        if self.sender.receiver_count() == 0 {
+            return;
+        }
+        let _ = self.sender.send(LiveUpdate::Activity(LiveActivity {
+            session: self.binding.session.clone(),
+            turn: self.binding.turn.clone(),
+            message: message.clone(),
+            call: call.clone(),
+            status,
+        }));
     }
 
     fn publish(&self, message: &MessageId, offset: usize, replace: bool, text: &str) {

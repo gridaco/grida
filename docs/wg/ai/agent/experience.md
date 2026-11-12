@@ -436,21 +436,49 @@ If a generation service accepted a job before the connection failed, returning
 to the task should first recover that job's result or status. The person should
 be able to distinguish recovering existing work from purchasing another attempt.
 
-## Receive a final turn summary
+## Read each finished turn
 
-Every completed, stopped, or failed turn ends with a concise, persistent summary.
 A turn is the work associated with one accepted request, including its tools,
-questions, and relevant delegated work.
+questions, and relevant delegated work. A finished conversation reads as a
+sequence of requests and answers. The work behind each answer stays one step
+away instead of filling the conversation.
 
-The summary answers the questions that apply to that turn.
+While a turn runs, its commentary and actions appear as they happen. When it
+finishes, the work before the final answer collapses beneath a header such as
+“Worked for 2m 30s”. The final answer stays visible below that header. Each
+turn keeps its own header, including turns reopened later or read from an
+earlier page.
+
+Expanding the header shows the retained commentary and work in their original
+order. Consecutive actions read as one short activity line, such as “Read files,
+ran commands, used the Docs integration”, and can be expanded to their individual
+calls and outcomes. Expanding, collapsing, or reopening only reads what was
+recorded. It never repeats an action or requests another model response.
+
+Several distinct things can appear around a turn. They keep distinct names.
+
+| Element             | What it is                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| Final answer        | The agent's concluding response to the request. It remains visible.                          |
+| Turn activity       | Commentary and actions that preceded the final answer, grouped under the turn's header.      |
+| Execution details   | Technical accounting: tool outcomes, checks, token usage, billing, and retained artifacts.   |
+| Reasoning summaries | Provider-supplied summaries of model reasoning. Hidden reasoning is never reconstructed.     |
+| Context compaction  | A replacement of older model context. It changes what the model reads, never the transcript. |
+
+The final answer is identified by the provider's explicit classification when
+it supplies one. Otherwise, it is the turn's concluding response that requested
+no further action. A stopped turn keeps its partial text with its work. Text is
+never labelled final merely because it arrived last.
+
+The answer addresses the questions that apply to the turn.
 
 - What was accomplished, and what is the result?
 - What changed, and where can I inspect or open it?
 - What checks were performed, and what did they establish?
 - What remains incomplete, uncertain, or dependent on my decision?
 
-The length follows the work. A simple answer can be its own final summary. A task
-that changes several artifacts needs direct links and a compact account of the
+The length follows the work. A simple answer is complete by itself. A task that
+changes several artifacts needs direct links and a compact account of the
 important changes. Each verification claim is limited to the checks actually
 performed.
 
@@ -458,10 +486,16 @@ For example, a design task might end with “Updated the three pricing cards and
 checked the layout at desktop and mobile widths. The revised page is ready to
 review. Publishing still needs your approval,” accompanied by the result link.
 
-Completion, interruption, and failure remain distinct visible outcomes. Partial
-work can still be opened and used. If the agent cannot generate its normal final
-response, the product provides a factual fallback from the recorded actions and
-outcomes. Recovering the same turn presents one coherent result and summary.
+Completion, interruption, and failure remain distinct visible outcomes. A
+stopped or failed turn says so in its header and keeps the work it performed.
+Partial work can still be opened and used. If the agent cannot generate its
+normal final response, the product provides a factual account from the recorded
+actions and outcomes. A question or approval that is still pending stays
+outside the collapsed work and remains actionable. Recovering the same turn
+presents one coherent result.
+
+The elapsed time comes from recorded start and finish times. A turn recorded
+without them omits the duration rather than estimating it.
 
 ## Keep useful results and history
 
@@ -595,4 +629,4 @@ method or implementation.
 | An image used by an open canvas changes                | The canvas and previews refresh. Unsaved edits survive, with any delayed refresh explained.                                                        |
 | An external operation outlives an execution restart    | The product explains the known outcome or remaining uncertainty before another attempt.                                                            |
 | A visual task reaches completion                       | The result can be inspected and the summary accurately names the visual checks performed.                                                          |
-| Final response generation fails                        | A factual turn summary still exposes the available work and remaining problem.                                                                     |
+| Final response generation fails                        | A factual account still exposes the available work and remaining problem.                                                                          |

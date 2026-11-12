@@ -39,7 +39,7 @@ use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
-const SCHEMA_VERSION: i64 = 11;
+const SCHEMA_VERSION: i64 = 12;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
 const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
@@ -145,6 +145,18 @@ ALTER TABLE submissions ADD COLUMN withdrawn INTEGER NOT NULL DEFAULT 0 CHECK(wi
 UPDATE submissions SET queue_order=position WHERE turn_id IS NULL;
 CREATE UNIQUE INDEX submission_queue_order ON submissions(session,queue_order)
 WHERE queue_order IS NOT NULL;
+";
+
+// Wall-clock facts for presentation. They never order or authorize work.
+const TURN_TIMES: &str = "
+CREATE TABLE turn_times (
+    session TEXT NOT NULL,
+    turn TEXT NOT NULL,
+    started_ms INTEGER NOT NULL CHECK(started_ms >= 0),
+    settled_ms INTEGER CHECK(settled_ms IS NULL OR settled_ms >= started_ms),
+    PRIMARY KEY(session, turn),
+    FOREIGN KEY(session, turn) REFERENCES turns(session, id) ON DELETE CASCADE
+);
 ";
 
 const HISTORY_VIEWS: &str = "
@@ -368,12 +380,15 @@ impl SqliteStore {
                     .execute_batch(turn_links::SCHEMA)
                     .map_err(database_error)?;
                 transaction
+                    .execute_batch(TURN_TIMES)
+                    .map_err(database_error)?;
+                transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(database_error)?;
                 transaction.commit().map_err(database_error)?;
             }
             SCHEMA_VERSION => {}
-            1..=10 => {
+            1..=11 => {
                 let transaction = connection.transaction().map_err(database_error)?;
                 if version == 1 {
                     transaction
@@ -420,8 +435,13 @@ impl SqliteStore {
                         .execute_batch(deletion::CLEANUP_SCHEMA)
                         .map_err(database_error)?;
                 }
+                if version <= 10 {
+                    transaction
+                        .execute_batch(turn_links::SCHEMA)
+                        .map_err(database_error)?;
+                }
                 transaction
-                    .execute_batch(turn_links::SCHEMA)
+                    .execute_batch(TURN_TIMES)
                     .map_err(database_error)?;
                 transaction
                     .pragma_update(None, "user_version", SCHEMA_VERSION)
@@ -1012,6 +1032,7 @@ fn prepare_pending_claim(
                     ],
                 )
                 .map_err(database_error)?;
+            record_turn_start(transaction, &request.session, turn)?;
             for (order, id) in inputs.iter().enumerate() {
                 transaction.execute(
                     "UPDATE submissions SET turn_id=?3,turn_order=?4,queue_order=NULL WHERE session=?1 AND id=?2",
@@ -2061,17 +2082,52 @@ fn decode_turn(bytes: &[u8], session: &SessionId, turn: &TurnId) -> Result<TurnS
 }
 
 fn save_turn(transaction: &Transaction<'_>, state: &TurnState) -> Result<()> {
+    let binding = state.binding();
     transaction
         .execute(
             "UPDATE turns SET snapshot=?3 WHERE session=?1 AND id=?2",
             params![
-                state.binding().session.as_str(),
-                state.binding().turn.as_str(),
+                binding.session.as_str(),
+                binding.turn.as_str(),
                 encode_snapshot(state)?
             ],
         )
         .map_err(database_error)?;
+    if state.outcome().is_some() {
+        // The first settlement is the recorded finish. A clock that moved
+        // backwards cannot produce a negative duration.
+        transaction
+            .execute(
+                "UPDATE turn_times SET settled_ms=MAX(started_ms,?3)
+                 WHERE session=?1 AND turn=?2 AND settled_ms IS NULL",
+                params![binding.session.as_str(), binding.turn.as_str(), now_ms()],
+            )
+            .map_err(database_error)?;
+    }
     Ok(())
+}
+
+pub(crate) fn record_turn_start(
+    transaction: &Transaction<'_>,
+    session: &SessionId,
+    turn: &TurnId,
+) -> Result<()> {
+    transaction
+        .execute(
+            "INSERT INTO turn_times(session,turn,started_ms) VALUES(?1,?2,?3)
+             ON CONFLICT(session,turn) DO NOTHING",
+            params![session.as_str(), turn.as_str(), now_ms()],
+        )
+        .map_err(database_error)?;
+    Ok(())
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| {
+            i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
+        })
 }
 
 fn lookup_request<T: DeserializeOwned>(

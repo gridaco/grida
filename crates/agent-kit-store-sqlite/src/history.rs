@@ -7,6 +7,7 @@ use super::{
     lookup_request, require_revision, save_request, save_session, sql_number, unsigned,
 };
 use agent_kit_core::history::{History, HistoryPosition, HistoryRecord};
+use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{JournalPosition, TurnState};
 use agent_kit_core::{
     ChangeId, Envelope, Error, ErrorKind, Fingerprint, Result, SessionId, TurnId,
@@ -131,8 +132,34 @@ struct ReplayCut {
 
 pub struct ReplayWindow {
     pub view: SessionRevision,
-    pub records: Vec<HistoryRecord>,
+    /// Displayed records in history order.
+    pub records: Vec<ReplayRecord>,
+    /// Turns that contributed records, in history order.
+    pub turns: Vec<ReplayTurn>,
     pub older: Option<ReplayCursor>,
+}
+
+/// A replayed record and the turn that committed it. Inherited seed records
+/// belong to no turn of this session.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReplayRecord {
+    pub turn: Option<TurnId>,
+    pub record: HistoryRecord,
+}
+
+/// Recorded facts about a turn that contributed to a replay window.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReplayTurn {
+    pub id: TurnId,
+    /// None while the turn has no terminal outcome.
+    pub status: Option<OutcomeStatus>,
+    /// Wall-clock milliseconds since the Unix epoch. Absent for turns
+    /// recorded before timing was retained.
+    pub started_ms: Option<u64>,
+    pub settled_ms: Option<u64>,
+    /// The window includes the turn's newest record. False when a newer
+    /// window holds the rest of the turn.
+    pub tail: bool,
 }
 
 /// A captured transcript interval. Settled turns are read in bounded pages;
@@ -189,43 +216,75 @@ impl SqliteStore {
                 let end = view.end.unwrap_or(i64::MAX);
                 let (upper, mut cut) = match &boundary {
                     Some(ReplayBoundary::Turn { ordinal, cut })
-                        if *ordinal > view.after && *ordinal <= end => (*ordinal, cut.clone()),
+                        if *ordinal > view.after && *ordinal <= end =>
+                    {
+                        (*ordinal, cut.clone())
+                    }
                     Some(ReplayBoundary::Turn { .. }) => return Err(replay_changed()),
                     _ => (end, None),
                 };
                 let mut query = connection
                     .prepare(
-                        "SELECT ordinal,id,snapshot FROM turns WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
-                         ORDER BY ordinal DESC LIMIT ?4",
+                        "SELECT t.ordinal,t.id,t.snapshot,tt.started_ms,tt.settled_ms FROM turns t
+                         LEFT JOIN turn_times tt ON tt.session=t.session AND tt.turn=t.id
+                         WHERE t.session=?1 AND t.ordinal>?2 AND t.ordinal<=?3
+                         ORDER BY t.ordinal DESC LIMIT ?4",
                     )
                     .map_err(database_error)?;
                 let mut rows = query
-                    .query(params![session.as_str(), view.after, upper, REPLAY_PAGE_TURNS + 1])
+                    .query(params![
+                        session.as_str(),
+                        view.after,
+                        upper,
+                        REPLAY_PAGE_TURNS + 1
+                    ])
                     .map_err(database_error)?;
                 let mut scanned_turns = 0;
                 let mut scanned_bytes = 0;
                 while let Some(row) = rows.next().map_err(database_error)? {
                     let ordinal: i64 = row.get(0).map_err(database_error)?;
-                    let snapshot = row.get_ref(2).map_err(database_error)?.as_blob()
+                    let snapshot = row
+                        .get_ref(2)
+                        .map_err(database_error)?
+                        .as_blob()
                         .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
                     if scanned_turns == REPLAY_PAGE_TURNS
                         || (scanned_turns > 0 && scanned_bytes + snapshot.len() > MAX_HISTORY_BYTES)
                     {
-                        return Ok(window.finish(view.id, Some(ReplayBoundary::Turn { ordinal, cut: None })));
+                        return Ok(window
+                            .finish(view.id, Some(ReplayBoundary::Turn { ordinal, cut: None })));
                     }
                     let turn = TurnId::new(row.get::<_, String>(1).map_err(database_error)?)?;
                     let state = decode_turn(snapshot, &session, &turn)?;
                     let position = state.position();
                     let records = project(&state);
                     let before = match cut.take() {
-                        Some(cut) if ordinal == upper && cut.position == position => Some(cut.before),
+                        Some(cut) if ordinal == upper && cut.position == position => {
+                            Some(cut.before)
+                        }
                         Some(_) => return Err(replay_changed()),
                         None => None,
                     };
-                    if let Some(before) = window.collect(records, before, measure)? {
-                        return Ok(window.finish(view.id, Some(ReplayBoundary::Turn {
-                            ordinal, cut: Some(ReplayCut { before, position }),
-                        })));
+                    let time = |index| {
+                        row.get::<_, Option<i64>>(index)
+                            .map(|value| value.and_then(|value| u64::try_from(value).ok()))
+                            .map_err(database_error)
+                    };
+                    let facts = ReplayTurn {
+                        id: turn.clone(),
+                        status: state.outcome().map(|outcome| outcome.status),
+                        started_ms: time(3)?,
+                        settled_ms: time(4)?,
+                        tail: before.is_none(),
+                    };
+                    if let Some(before) = window.collect(Some(facts), records, before, measure)? {
+                        return Ok(window.finish(
+                            view.id,
+                            Some(ReplayBoundary::Turn {
+                                ordinal,
+                                cut: Some(ReplayCut { before, position }),
+                            }),
+                        ));
                     }
                     scanned_turns += 1;
                     scanned_bytes += snapshot.len();
@@ -239,7 +298,9 @@ impl SqliteStore {
                 _ => None,
             };
             let seed = view.seed.map_or_else(Vec::new, |seed| seed.records);
-            let older = window.collect(seed, before, measure)?.map(|before| ReplayBoundary::Seed { before });
+            let older = window
+                .collect(None, seed, before, measure)?
+                .map(|before| ReplayBoundary::Seed { before });
             Ok(window.finish(view.id, older))
         })
         .await
@@ -449,13 +510,15 @@ impl SqliteStore {
 
 #[derive(Default)]
 struct ReverseWindow {
-    records: Vec<HistoryRecord>,
+    records: Vec<ReplayRecord>,
+    turns: Vec<ReplayTurn>,
     bytes: usize,
 }
 
 impl ReverseWindow {
     fn collect(
         &mut self,
+        turn: Option<ReplayTurn>,
         mut records: Vec<HistoryRecord>,
         before: Option<usize>,
         measure: fn(&HistoryRecord) -> usize,
@@ -466,6 +529,9 @@ impl ReverseWindow {
             }
             records.truncate(before);
         }
+        let id = turn.as_ref().map(|turn| turn.id.clone());
+        let mut contributed = false;
+        let mut result = Ok(None);
         while let Some(record) = records.pop() {
             let bytes = measure(&record);
             if bytes == 0 {
@@ -475,22 +541,32 @@ impl ReverseWindow {
                 && (self.records.len() == REPLAY_WINDOW_RECORDS
                     || self.bytes.saturating_add(bytes) > REPLAY_WINDOW_BYTES)
             {
-                return Ok(Some(records.len() + 1));
+                result = Ok(Some(records.len() + 1));
+                break;
             }
             if bytes > MAX_REPLAY_RECORD_BYTES {
                 return Err(projection_limit());
             }
             self.bytes += bytes;
-            self.records.push(record);
+            self.records.push(ReplayRecord {
+                turn: id.clone(),
+                record,
+            });
+            contributed = true;
         }
-        Ok(None)
+        if let Some(turn) = turn.filter(|_| contributed) {
+            self.turns.push(turn);
+        }
+        result
     }
 
     fn finish(mut self, view: SessionRevision, older: Option<ReplayBoundary>) -> ReplayWindow {
         self.records.reverse();
+        self.turns.reverse();
         ReplayWindow {
             view,
             records: self.records,
+            turns: self.turns,
             older: older.map(|boundary| ReplayCursor { view, boundary }),
         }
     }

@@ -1591,6 +1591,35 @@ async fn paged_transcript_replay_freezes_the_active_tail_without_a_lease() {
 }
 
 #[tokio::test]
+async fn upgraded_turns_replay_without_invented_timing() {
+    let (directory, store) = store().await;
+    let path = directory.path().join("sessions.sqlite");
+    let old = history_message("before-upgrade", "kept text");
+    finish_history_turn(&store, session(), "before-upgrade", vec![old.clone()]).await;
+    drop(store);
+    let previous = rusqlite::Connection::open(&path).unwrap();
+    previous
+        .execute_batch("DROP TABLE turn_times; PRAGMA user_version=11;")
+        .unwrap();
+    drop(previous);
+    let store = SqliteStore::open(&path).unwrap();
+    let new = history_message("after-upgrade", "timed text");
+    finish_history_turn(&store, session(), "after-upgrade", vec![new.clone()]).await;
+    let project = |state: &agent_kit_core::turn::TurnState| state.history().records().to_vec();
+    let window = store
+        .history_replay_window(session(), None, project, |_| 1)
+        .await
+        .unwrap();
+    assert_eq!(plain(&window.records), vec![old, new]);
+    let [before, after] = &window.turns[..] else {
+        panic!("expected two turns")
+    };
+    assert_eq!(before.status, Some(OutcomeStatus::Succeeded));
+    assert_eq!((before.started_ms, before.settled_ms), (None, None));
+    assert!(after.started_ms.unwrap() <= after.settled_ms.unwrap());
+}
+
+#[tokio::test]
 async fn earlier_replay_windows_keep_the_exact_boundary_as_new_turns_arrive() {
     let (_directory, store) = store().await;
     let mut expected = Vec::new();
@@ -1606,8 +1635,18 @@ async fn earlier_replay_windows_keep_the_exact_boundary_as_new_turns_arrive() {
         .history_replay_window(session(), None, project, measure)
         .await
         .unwrap();
-    assert_eq!(latest.records, expected[38..]);
-    let mut windows = vec![latest.records];
+    assert_eq!(plain(&latest.records), expected[38..]);
+    // Each record names its committing turn, and every contributing turn
+    // carries its recorded outcome and wall-clock interval.
+    assert_eq!(latest.turns.len(), 32);
+    for (record, turn) in latest.records.iter().zip(&latest.turns) {
+        assert_eq!(record.turn.as_ref(), Some(&turn.id));
+        assert_eq!(turn.status, Some(OutcomeStatus::Succeeded));
+        let (started, settled) = (turn.started_ms.unwrap(), turn.settled_ms.unwrap());
+        assert!(started > 0 && started <= settled);
+    }
+    assert_eq!(latest.turns[0].id.as_str(), "window-turn-38");
+    let mut windows = vec![plain(&latest.records)];
     let mut older = latest.older;
     finish_history_turn(
         &store,
@@ -1622,7 +1661,7 @@ async fn earlier_replay_windows_keep_the_exact_boundary_as_new_turns_arrive() {
             .await
             .unwrap();
         assert_eq!(page.view, latest.view);
-        windows.push(page.records);
+        windows.push(plain(&page.records));
         older = page.older;
     }
     assert_eq!(
@@ -1654,12 +1693,17 @@ async fn an_earlier_window_cannot_mix_changed_records_within_an_active_turn() {
         .history_replay_window(session(), None, project, measure)
         .await
         .unwrap();
-    assert_eq!(latest.records, records[4..]);
+    assert_eq!(plain(&latest.records), records[4..]);
+    // A running turn has a recorded start and no outcome or finish.
+    assert_eq!(latest.turns.len(), 1);
+    assert_eq!(latest.turns[0].status, None);
+    assert!(latest.turns[0].started_ms.is_some());
+    assert_eq!(latest.turns[0].settled_ms, None);
     let older = store
         .history_replay_window(session(), latest.older.clone(), project, measure)
         .await
         .unwrap();
-    assert_eq!(older.records, records[..4]);
+    assert_eq!(plain(&older.records), records[..4]);
     assert!(older.older.is_none());
     commit(
         &active,
@@ -2300,7 +2344,7 @@ async fn version_two_upgrades_with_original_history_view() {
     let version: i64 = reopened
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 11);
+    assert_eq!(version, 12);
 }
 
 #[tokio::test]
@@ -3153,4 +3197,8 @@ async fn a_derived_control_replays_original_intent_without_recomputing_new_state
             .value(),
         Some(&payload("paused driver state"))
     );
+}
+
+fn plain(records: &[agent_kit_store_sqlite::history::ReplayRecord]) -> Vec<HistoryRecord> {
+    records.iter().map(|item| item.record.clone()).collect()
 }

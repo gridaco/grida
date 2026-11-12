@@ -26,8 +26,10 @@ import type {
   NativeChatGoalReceipt,
   NativeChatGoalRequest,
   NativeChatImageArtifact,
+  NativeChatActivity,
   NativeChatMessage,
   NativeChatTranscriptPage,
+  NativeChatTurnRecord,
   NativeChatOperatingRegime,
   NativeChatPage,
   NativeChatQuestion,
@@ -156,6 +158,31 @@ const MAX_SUMMARY_CHECKS = 8;
 const MAX_GATEWAY_CHILD_ASSIGNMENTS = 16;
 const MAX_TRANSCRIPT_BYTES = 1024 * 1024;
 const MAX_TRANSCRIPT_MESSAGES = 1024;
+const MAX_MESSAGE_ACTIVITY = 64;
+const ACTIVITY_KINDS: ReadonlySet<NativeChatActivity["kind"]> = new Set([
+  "read",
+  "search",
+  "edit",
+  "execute",
+  "generate",
+  "integration",
+  "delegate",
+  "ask",
+  "other",
+]);
+const ACTIVITY_OUTCOMES: ReadonlySet<NativeChatActivity["outcome"]> = new Set([
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+  "uncertain",
+]);
+const TURN_RECORD_STATUSES: ReadonlySet<unknown> = new Set([
+  "succeeded",
+  "failed",
+  "cancelled",
+  "uncertain",
+]);
 const MAX_CATALOG_SESSIONS = 32;
 const MAX_TITLE_BYTES = 256;
 const LIFECYCLE = "co.grida/session/lifecycle";
@@ -1574,6 +1601,7 @@ export class NativeAgentChat {
       return {
         view: revision(page.view),
         messages: [...capture.messages.values()],
+        turns: turnRecords(page.turns),
         older,
       };
     } finally {
@@ -1882,6 +1910,37 @@ export class NativeAgentChat {
       const capture = this.transcripts.get(sessionId);
       if (!listeners && !capture) return;
       const update = object(notification.update);
+      if (update.sessionUpdate === "tool_call") {
+        const replay = metadata?.[TRANSCRIPT_WINDOW];
+        if (replay !== undefined) {
+          const attribution = object(replay);
+          if (capture && capture.requestId === identity(attribution.requestId))
+            captureActivity(
+              capture,
+              identity(attribution.messageId),
+              optionalIdentity(attribution.turnId),
+              activity(update, attribution)
+            );
+          return;
+        }
+        const live = metadata?.["co.grida/session/updates"];
+        if (live === undefined || !listeners) return;
+        const attribution = object(live);
+        const projected: NativeChatStreamUpdate = Object.freeze({
+          kind: "activity",
+          messageId: identity(attribution.messageId),
+          turnId: identity(attribution.turnId),
+          activity: activity(update, attribution),
+        });
+        for (const listener of listeners) {
+          try {
+            listener(projected);
+          } catch {
+            /* Observers have independent lifetimes. */
+          }
+        }
+        return;
+      }
       const role =
         update.sessionUpdate === "agent_message_chunk"
           ? "assistant"
@@ -1899,10 +1958,22 @@ export class NativeAgentChat {
       const meta = metadata?.["co.grida/session/updates"];
       if (meta === undefined) {
         const replay = metadata?.[TRANSCRIPT_WINDOW];
+        const attribution = replay === undefined ? undefined : object(replay);
         const requestId =
-          replay === undefined ? undefined : identity(object(replay).requestId);
+          attribution === undefined
+            ? undefined
+            : identity(attribution.requestId);
         if (capture && capture.requestId === requestId)
-          captureText(capture, identity(update.messageId), role, content.text);
+          captureText(
+            capture,
+            identity(update.messageId),
+            role,
+            content.text,
+            attribution && {
+              turnId: optionalIdentity(attribution.turnId),
+              phase: messagePhase(attribution.phase, role),
+            }
+          );
         return;
       }
       if (!listeners) return;
@@ -2088,7 +2159,8 @@ function captureText(
   capture: TranscriptCapture,
   messageId: string,
   role: NativeChatMessage["role"],
-  text: string
+  text: string,
+  attribution?: Pick<NativeChatMessage, "turnId" | "phase">
 ): void {
   if (capture.overflow) return;
   const previous = capture.messages.get(messageId);
@@ -2101,10 +2173,111 @@ function captureText(
     capture.messages.clear();
     return;
   }
+  if (previous && previous.role !== role) throw invalidResponse();
   capture.messages.set(messageId, {
+    ...previous,
+    ...(attribution?.turnId && { turnId: attribution.turnId }),
+    ...(attribution?.phase && { phase: attribution.phase }),
     messageId,
     role,
     text: (previous?.text ?? "") + text,
+  });
+}
+
+function captureActivity(
+  capture: TranscriptCapture,
+  messageId: string,
+  turnId: string | undefined,
+  entry: NativeChatActivity
+): void {
+  if (capture.overflow) return;
+  const previous = capture.messages.get(messageId);
+  if (previous && previous.role !== "assistant") throw invalidResponse();
+  const recorded = previous?.activity ?? [];
+  if (recorded.some((item) => item.callId === entry.callId))
+    throw invalidResponse();
+  if (
+    recorded.length >= MAX_MESSAGE_ACTIVITY ||
+    (!previous && capture.messages.size >= MAX_TRANSCRIPT_MESSAGES)
+  ) {
+    capture.overflow = true;
+    capture.messages.clear();
+    return;
+  }
+  capture.messages.set(messageId, {
+    messageId,
+    role: "assistant",
+    text: "",
+    ...previous,
+    ...(turnId && { turnId }),
+    activity: [...recorded, entry],
+  });
+}
+
+/** Validate one projected tool call. Unknown host values are refused. */
+function activity(
+  update: Record<string, unknown>,
+  attribution: Record<string, unknown>
+): NativeChatActivity {
+  const kind = attribution.activity;
+  const outcome = attribution.outcome;
+  if (
+    typeof kind !== "string" ||
+    !ACTIVITY_KINDS.has(kind as NativeChatActivity["kind"]) ||
+    typeof outcome !== "string" ||
+    !ACTIVITY_OUTCOMES.has(outcome as NativeChatActivity["outcome"])
+  )
+    throw invalidResponse();
+  const source =
+    attribution.source === undefined ? undefined : identity(attribution.source);
+  if (source !== undefined && kind !== "integration") throw invalidResponse();
+  return Object.freeze({
+    callId: identity(update.toolCallId),
+    title: identity(update.title),
+    kind: kind as NativeChatActivity["kind"],
+    ...(source !== undefined && { source }),
+    outcome: outcome as NativeChatActivity["outcome"],
+  });
+}
+
+function optionalIdentity(value: unknown): string | undefined {
+  return value === undefined ? undefined : identity(value);
+}
+
+function messagePhase(
+  value: unknown,
+  role: NativeChatMessage["role"]
+): NativeChatMessage["phase"] {
+  if (value === undefined) return undefined;
+  if (role !== "assistant" || (value !== "answer" && value !== "progress"))
+    throw invalidResponse();
+  return value;
+}
+
+function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length > MAX_TRANSCRIPT_MESSAGES)
+    throw invalidResponse();
+  return value.map((item) => {
+    const record = object(item);
+    const { status } = record;
+    if (status !== null && !TURN_RECORD_STATUSES.has(status))
+      throw invalidResponse();
+    const time = (field: unknown) =>
+      field === undefined || field === null ? undefined : revision(field);
+    const startedAtMs = time(record.startedAtMs);
+    const settledAtMs = time(record.settledAtMs);
+    if (
+      settledAtMs !== undefined &&
+      (startedAtMs === undefined || settledAtMs < startedAtMs)
+    )
+      throw invalidResponse();
+    return Object.freeze({
+      turnId: identity(record.turnId),
+      status: status as NativeChatTurnRecord["status"],
+      ...(startedAtMs !== undefined && { startedAtMs }),
+      ...(settledAtMs !== undefined && { settledAtMs }),
+    });
   });
 }
 

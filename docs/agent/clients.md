@@ -191,7 +191,7 @@ nested within the readable primary workspace remains accessible through it. The 
 see that the review is still pending or uncertain.
 The finished record identifies the reviewer and records whether its verified
 findings were collected. Desktop shows whether findings were collected in
-**Turn summary**.
+**Execution details**.
 
 Ultra is available in Plan and Act on the source-built host. It requires a
 model with JSON tool calls and a provider that supports a bounded output.
@@ -677,46 +677,62 @@ conflicts when another process has changed a workspace file. In a standalone
 window, the chat can use only the captured plain text selection from the
 editor. Plan and queued messages omit the selected-text tools.
 
-## Read a turn summary
+## Read a finished turn
+
+While a turn runs in the native Desktop workspace pane, its commentary and
+actions appear as they happen. When the turn finishes, that work collapses
+beneath a header such as **Worked for 1m 12s**, and the final answer stays
+visible below it. Select the header to show the recorded commentary and actions
+in order. Consecutive actions appear on one line, such as “Read files, ran
+commands”; select that line to list each call and its outcome. A stopped or
+failed turn shows **Stopped after …** or **Failed after …** instead.
+
+Every turn keeps its own header, including after you reopen the chat and on
+earlier pages. Expanding or reopening a turn only reads the recorded work; it
+does not repeat actions or request another model response. Turns recorded
+before timing was kept show **Worked** without a duration. A pending question
+or approval stays outside the collapsed work so you can answer it.
+
+### Read execution details
 
 For the Desktop export workflow, see [Inspect and save results](./results.md).
 
-In the native Desktop workspace pane, open **Turn summary** below the latest
-finished turn when it has additional details. It can show recorded tool
+Open **Execution details** below the latest finished turn when it has
+additional details. It can show recorded tool
 outcomes, completion checks, unresolved work, and provider-reported token
-counts. Reopening the chat restores the latest recorded summary.
+counts. Reopening the chat restores the latest recorded details.
 
 When a required completion check fails or its outcome cannot be verified,
-the summary reports that result and keeps the earlier reply and recorded
+the details report that result and keeps the earlier reply and recorded
 work available for review.
 
-If a provider response exceeds the agent's size limit, the summary explains
+If a provider response exceeds the agent's size limit, the details explain
 why the turn ended. You can send another message in the same chat.
 
 Token counts describe the model requests made during that turn. A partial
-count has incomplete coverage, and the summary identifies requests with
+count has incomplete coverage, and the details identify requests with
 unknown counts. Cached input and reasoning output can overlap other token
 counts. Context estimates and charges are separate.
 
-When Gateway billing is available, the turn summary can also list charges for
+When Gateway billing is available, execution details can also list charges for
 work assigned to named subagents. Use **More assignments** to read the next
-page, or **Reload assignments** to include work assigned since the summary was
+page, or **Reload assignments** to include work assigned since the details were
 opened. Refreshing a pending charge checks only that model request. Some
 assignments may not have enough retained information for attribution; the
-summary calls out incomplete coverage and does not treat unavailable charges
+details call out incomplete coverage and does not treat unavailable charges
 as zero.
 
 On a compatible image-enabled profile, ask the agent to crop a retained PNG
-in Act. Open **Turn summary** for the finished turn and choose **Preview cropped
+in Act. Open **Execution details** for the finished turn and choose **Preview cropped
 PNG** to inspect the image kept in private chat storage. Use **Save PNG as…**
 to choose a new file on your computer. If saving fails, choose **Retry save**
 to save the same crop. You can reopen the chat and retry while the crop is
-still available in its latest summary. Existing destination files are preserved.
+still available in its latest details. Existing destination files are preserved.
 The preview also offers **Copy image** and **Download image**.
 
-If the working copy was removed or replaced, the summary still shows the
+If the working copy was removed or replaced, the details still show the
 recorded result and the preview reports that the image is unavailable.
-The summary lists up to eight recorded PNG crops and counts any further
+The details list up to eight recorded PNG crops and counts any further
 records it leaves out.
 Opening a preview leaves the project and the conversation unchanged.
 

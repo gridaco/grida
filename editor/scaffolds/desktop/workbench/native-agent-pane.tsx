@@ -10,6 +10,7 @@ import {
 } from "react";
 import type {
   DesktopNativeChat,
+  NativeChatMessage,
   NativeChatReadiness,
   NativeChatProfileSelection,
 } from "@grida/desktop-bridge";
@@ -59,6 +60,8 @@ import { useWorkspaceFileMentions } from "../shared/use-workspace-composer-catal
 import { NativeGoalPanel } from "./native-goal-panel";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
 import { NativeTurnSummary } from "./native-turn-summary";
+import { NativeTurnActivity } from "./native-turn-activity";
+import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { NativeContextLimitPanel } from "./native-context-limit-panel";
 import { NativeHooksPanel } from "./native-hooks-panel";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
@@ -356,6 +359,30 @@ export function NativeAgentPane({
                           ? "Task result uncertain"
                           : null;
 
+  const blocks = turn_activity.group(
+    state.messages,
+    state.turnRecords,
+    snapshot?.current,
+    snapshot?.latest
+  );
+  const renderMessage = (message: NativeChatMessage) => (
+    <ChatMessageView
+      key={message.messageId}
+      actions={
+        message.role === "user" && editHistory
+          ? {
+              onEdit: (messageId) => void controller.prepareRevision(messageId),
+            }
+          : undefined
+      }
+      message={{
+        id: message.messageId,
+        role: message.role,
+        parts: [{ type: "text", text: message.text }],
+      }}
+    />
+  );
+
   return (
     <div
       data-testid="workspace-native-chat"
@@ -421,24 +448,18 @@ export function NativeAgentPane({
         resize={running ? "smooth" : "instant"}
       >
         <ConversationContent className="gap-4 px-3 py-4">
-          {state.messages.map((message) => (
-            <ChatMessageView
-              key={message.messageId}
-              actions={
-                message.role === "user" && editHistory
-                  ? {
-                      onEdit: (messageId) =>
-                        void controller.prepareRevision(messageId),
-                    }
-                  : undefined
-              }
-              message={{
-                id: message.messageId,
-                role: message.role,
-                parts: [{ type: "text", text: message.text }],
-              }}
-            />
-          ))}
+          {/* See test/desktop-agent-chat-turn-activity.md. */}
+          {blocks.map((block) =>
+            block.kind === "turn" ? (
+              <NativeTurnActivity
+                key={block.turnId}
+                block={block}
+                renderMessage={renderMessage}
+              />
+            ) : (
+              renderMessage(block.message)
+            )
+          )}
           {running &&
             !state.earlierMessages &&
             !retrying &&

@@ -32,7 +32,7 @@ message specifying the change you want. [Plan before acting](./clients.md#plan-b
 
 Reopen the chat from the workspace to see its messages and any retained
 work. Choose **Resume** once a paused turn is ready to continue. **Stop**
-ends the current turn and holds the queue. Open **Turn summary** on the
+ends the current turn and holds the queue. Open **Execution details** on the
 latest finished turn for available tool results, checks, unresolved work,
 and reported usage. [Inspect and save results](./results.md)
 

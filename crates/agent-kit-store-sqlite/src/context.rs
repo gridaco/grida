@@ -7,8 +7,8 @@ use super::history::{
 use super::{
     Acquired, ClaimRecord, MAX_HISTORY_BYTES, PreparedClaim, SqliteStore, bump_revision,
     commit_error, database_error, decode, encode, encode_snapshot, error, execute, finish_claim,
-    load_session, load_turn, lookup_request, register_owner, require_revision, save_request,
-    save_session, sql_number, turn_view,
+    load_session, load_turn, lookup_request, record_turn_start, register_owner, require_revision,
+    save_request, save_session, sql_number, turn_view,
 };
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::messages::OutcomeStatus;
@@ -169,6 +169,7 @@ impl SqliteStore {
             if inserted == 0 {
                 return Err(error(ErrorKind::Conflict, "turn_exists"));
             }
+            record_turn_start(&transaction, id, &request.turn)?;
             let owner = register_owner(inner, state.binding())?;
             session.active_turn = Some(request.turn.clone());
             bump_revision(&mut session)?;

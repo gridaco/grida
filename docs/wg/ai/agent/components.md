@@ -232,6 +232,13 @@ opaque state, or both. These operations preserve the source facts needed to
 account for external effects already performed. Reversing an external effect
 requires a separate tool operation.
 
+A durable store records when each turn starts and when it settles. Replaying a
+bounded window of history attributes every record to its turn and carries each
+turn's outcome and those times. Tool calls and their results remain in the
+replayed sequence, so a client can reconstruct chronological activity without
+rerunning work. Times recorded before this capability existed are absent, never
+estimated.
+
 Context performs pure operations over supplied data. It selects, orders,
 measures, trims, and assembles content according to explicit inputs. Its output
 carries source positions, relevant provenance, and a measurement or declared

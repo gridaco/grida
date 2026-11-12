@@ -1,5 +1,6 @@
 //! GRIDA-SEC-004 — detached observation for already attached sessions.
 
+use super::projection::{Outcome, activity_update};
 use super::{ConnectionSessions, Delivery};
 use crate::host::live::{LifecycleFact, LiveUpdate};
 use agent_client_protocol::v1::ConnectionTo;
@@ -55,6 +56,28 @@ pub(super) async fn forward(
                         replace = false;
                         text = remaining;
                     }
+                }
+                Ok(LiveUpdate::Activity(update)) => {
+                    if !text_enabled || !sessions.lock().unwrap().can_deliver(&update.session) {
+                        continue;
+                    }
+                    let outcome = update.status.map_or(Outcome::Running, Outcome::Finished);
+                    let (notification, metadata) = activity_update(
+                        &update.message,
+                        &update.call,
+                        outcome,
+                        json!({"turnId": update.turn}),
+                    );
+                    send_update(
+                        &connection,
+                        &delivery,
+                        &sessions,
+                        &update.session,
+                        notification,
+                        CAPABILITY,
+                        metadata,
+                    )
+                    .await?;
                 }
                 Ok(LiveUpdate::Lifecycle(update)) => {
                     if !lifecycle_enabled {
@@ -116,6 +139,27 @@ async fn send(
     capability: &'static str,
     metadata: Value,
 ) -> Result<()> {
+    send_update(
+        connection,
+        delivery,
+        sessions,
+        session,
+        SessionUpdate::AgentMessageChunk(chunk),
+        capability,
+        metadata,
+    )
+    .await
+}
+
+async fn send_update(
+    connection: &ConnectionTo<Client>,
+    delivery: &Delivery,
+    sessions: &Mutex<ConnectionSessions>,
+    session: &agent_kit_core::SessionId,
+    update: SessionUpdate,
+    capability: &'static str,
+    metadata: Value,
+) -> Result<()> {
     delivery
         .send_if(|| {
             let state = sessions.lock().unwrap();
@@ -123,11 +167,7 @@ async fn send(
                 return Ok(false);
             }
             connection.send_notification(
-                SessionNotification::new(
-                    session.as_str().to_owned(),
-                    SessionUpdate::AgentMessageChunk(chunk),
-                )
-                .meta(
+                SessionNotification::new(session.as_str().to_owned(), update.clone()).meta(
                     [(capability.into(), metadata)]
                         .into_iter()
                         .collect::<agent_client_protocol::v1::schema::Meta>(),

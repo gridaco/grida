@@ -385,6 +385,152 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   });
 
+  it.each([
+    { activity: "read", accepted: true },
+    { activity: "telepathy", accepted: false },
+  ])(
+    "projects turn activity and timing from a transcript page ($activity)",
+    async ({ activity, accepted }) => {
+      const test = fixture(
+        `
+      if (request.method === 'session/new') {
+        send({id:request.id,result:{sessionId:'chat'}});
+        return;
+      }
+      const capability = ${JSON.stringify(TRANSCRIPT_WINDOW)};
+      const read = request.params._meta?.[capability];
+      if (read?.kind !== 'read') {
+        send({id:request.id,result:{}});
+        return;
+      }
+      const meta = (extra) => ({[capability]:{requestId:read.requestId,turnId:'turn-1',...extra}});
+      send({method:'session/update',params:{sessionId:'chat',
+        _meta:{'co.grida/session/updates':{turnId:'turn-2',messageId:'live',activity:'execute',outcome:'running'}},
+        update:{sessionUpdate:'tool_call',toolCallId:'call-live',title:'run_command',kind:'execute',status:'in_progress'}}});
+      send({method:'session/update',params:{sessionId:'chat',_meta:meta({}),
+        update:{sessionUpdate:'user_message_chunk',messageId:'ask',content:{type:'text',text:'Check it'}}}});
+      send({method:'session/update',params:{sessionId:'chat',_meta:meta({phase:'progress'}),
+        update:{sessionUpdate:'agent_message_chunk',messageId:'work',content:{type:'text',text:'Reading.'}}}});
+      send({method:'session/update',params:{sessionId:'chat',
+        _meta:meta({messageId:'work',activity:${JSON.stringify(activity)},outcome:'succeeded'}),
+        update:{sessionUpdate:'tool_call',toolCallId:'call-1',title:'read_file',kind:'read',status:'completed'}}});
+      send({method:'session/update',params:{sessionId:'chat',
+        _meta:meta({messageId:'quiet',activity:'integration',source:'docs',outcome:'failed'}),
+        update:{sessionUpdate:'tool_call',toolCallId:'call-2',title:'mcp_docs_search',kind:'other',status:'failed'}}});
+      send({method:'session/update',params:{sessionId:'chat',_meta:meta({phase:'answer'}),
+        update:{sessionUpdate:'agent_message_chunk',messageId:'done',content:{type:'text',text:'All good.'}}}});
+      send({id:request.id,result:{_meta:{[capability]:{requestId:read.requestId,view:1,older:null,
+        turns:[{turnId:'turn-1',status:'succeeded',startedAtMs:1000,settledAtMs:4500}]}}}});
+      `,
+        1,
+        { [TRANSCRIPT_WINDOW]: 1 }
+      );
+      let chat: NativeAgentChat | undefined;
+      try {
+        chat = await NativeAgentChat.start({
+          ...test.options,
+          cwd: fs.realpathSync(test.root),
+        });
+        const session = await chat.create();
+        const live: unknown[] = [];
+        chat.subscribe(session, (update) => live.push(update));
+        const page = await chat.transcriptPage(session);
+        // Unrecognized host values never reach the renderer.
+        expect(
+          page.messages.find((item) => item.messageId === "work")?.activity
+        ).toEqual(
+          accepted
+            ? [
+                {
+                  callId: "call-1",
+                  title: "read_file",
+                  kind: "read",
+                  outcome: "succeeded",
+                },
+              ]
+            : undefined
+        );
+        if (!accepted) return;
+        expect(page).toEqual({
+          view: 1,
+          older: null,
+          turns: [
+            {
+              turnId: "turn-1",
+              status: "succeeded",
+              startedAtMs: 1000,
+              settledAtMs: 4500,
+            },
+          ],
+          messages: [
+            {
+              messageId: "ask",
+              role: "user",
+              text: "Check it",
+              turnId: "turn-1",
+            },
+            {
+              messageId: "work",
+              role: "assistant",
+              text: "Reading.",
+              turnId: "turn-1",
+              phase: "progress",
+              activity: [
+                {
+                  callId: "call-1",
+                  title: "read_file",
+                  kind: "read",
+                  outcome: "succeeded",
+                },
+              ],
+            },
+            {
+              messageId: "quiet",
+              role: "assistant",
+              text: "",
+              turnId: "turn-1",
+              activity: [
+                {
+                  callId: "call-2",
+                  title: "mcp_docs_search",
+                  kind: "integration",
+                  source: "docs",
+                  outcome: "failed",
+                },
+              ],
+            },
+            {
+              messageId: "done",
+              role: "assistant",
+              text: "All good.",
+              turnId: "turn-1",
+              phase: "answer",
+            },
+          ],
+        });
+        expect(live).toEqual([
+          {
+            kind: "activity",
+            messageId: "live",
+            turnId: "turn-2",
+            activity: {
+              callId: "call-live",
+              title: "run_command",
+              kind: "execute",
+              outcome: "running",
+            },
+          },
+        ]);
+      } finally {
+        try {
+          await chat?.close();
+        } finally {
+          test.close();
+        }
+      }
+    }
+  );
+
   it("retains bounded ownership of timed-out requests until the host answers", async () => {
     const test = fixture("");
     let agent: NativeAgentProcess | undefined;

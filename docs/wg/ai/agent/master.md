@@ -651,6 +651,25 @@ stop selects the factual fallback, so publishing the terminal outcome always
 has an available summary. A later rendering of that account is a view of
 settled facts.
 
+### Turn activity presentation
+
+The master decides how recorded work is described to the person. It classifies
+each tool into an activity kind, such as reading, searching, editing, running a
+command, generating media, or using a named integration. The classification is
+a pure function of the tool's identity. It needs no model request and does not
+change when a chat is reopened.
+
+The master also identifies a turn's final answer. An adapter's explicit answer
+or commentary classification is authoritative. Without one, the turn's
+concluding assistant response that requested no further tool work is the answer.
+A stopped turn has no inferred answer, because its last text can be an interrupted partial response. Earlier responses, and any response that requested tools, are commentary. A turn
+that ended without such a response has no final answer; its outcome and factual
+account remain visible instead.
+
+Clients group commentary and activity beneath each turn's header and keep the
+final answer visible. The grouping and disclosure state belong to the client.
+The [experience](./experience.md#read-each-finished-turn) defines the result.
+
 ## Performance is a product claim
 
 The master is evaluated on representative tasks with stated success criteria.

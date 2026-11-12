@@ -423,6 +423,89 @@ it("reads bounded earlier messages and ignores a page from a previous chat", asy
   controller.disconnect();
 });
 
+it("streams turn activity live and adopts recorded turns from each page", async () => {
+  const { bridge, controller, running, updates } = fixture();
+  running.add("chat-a");
+  const call = (outcome: "running" | "succeeded") =>
+    ({
+      callId: "call-1",
+      title: "read_file",
+      kind: "read",
+      outcome,
+    }) as const;
+  const latest: NativeChatTranscriptPage = {
+    view: 1,
+    older: "older-a",
+    messages: [],
+    turns: [],
+  };
+  const earlier: NativeChatTranscriptPage = {
+    view: 1,
+    older: null,
+    messages: [
+      {
+        messageId: "old",
+        role: "assistant",
+        text: "Earlier",
+        turnId: "t0",
+        phase: "answer",
+      },
+    ],
+    turns: [
+      { turnId: "t0", status: "succeeded", startedAtMs: 1, settledAtMs: 2 },
+    ],
+  };
+  const read = vi.fn<NonNullable<DesktopNativeChat["transcriptPage"]>>();
+  read.mockResolvedValueOnce(latest).mockResolvedValueOnce(earlier);
+  read.mockResolvedValue(latest);
+  bridge.transcriptPage = read;
+  await controller.select("chat-a");
+  const live = updates.get("chat-a")!;
+  live({
+    kind: "activity",
+    messageId: "work",
+    turnId: "turn-chat-a",
+    activity: call("running"),
+  });
+  live({
+    kind: "text",
+    role: "assistant",
+    messageId: "work",
+    turnId: "turn-chat-a",
+    text: "Reading the note.",
+    offsetBytes: 0,
+    replace: true,
+  });
+  live({
+    kind: "activity",
+    messageId: "work",
+    turnId: "turn-chat-a",
+    activity: call("succeeded"),
+  });
+  // A call from another turn is not attached to the current transcript.
+  live({
+    kind: "activity",
+    messageId: "stale",
+    turnId: "turn-other",
+    activity: call("succeeded"),
+  });
+  expect(controller.read().messages).toEqual([
+    {
+      messageId: "work",
+      role: "assistant",
+      text: "Reading the note.",
+      turnId: "turn-chat-a",
+      bytes: expect.any(Number),
+      activity: [call("succeeded")],
+    },
+  ]);
+  await controller.showEarlierMessages();
+  expect(controller.read().turnRecords).toEqual(earlier.turns);
+  controller.showLatestMessages();
+  expect(controller.read().turnRecords).toEqual([]);
+  controller.disconnect();
+});
+
 it("refreshes latest messages when settlement arrives during an earlier read", async () => {
   vi.useFakeTimers();
   const { bridge, controller, running } = fixture();

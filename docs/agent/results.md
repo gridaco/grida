@@ -7,12 +7,12 @@ format: md
 
 # Inspect and save results
 
-In native Desktop chat, open **Turn summary** to inspect the latest finished
+In native Desktop chat, open **Execution details** to inspect the latest finished
 turn’s recorded work. Supported image profiles can retain a PNG crop in the
 chat. Open **Preview cropped PNG** and choose **Save PNG as…** to save it to a
 new file. You can retry while the crop is available. A later crop of the same
 upload can replace the working copy. Save the version you want to keep as a
-separate file. [Read a turn summary](./clients.md#read-a-turn-summary)
+separate file. [Read execution details](./clients.md#read-execution-details)
 
 If the summary details are unavailable, the chat keeps the recorded turn
 status and transcript. Choose **Retry summary** to read the details for
@@ -42,7 +42,7 @@ at most 256 KiB. Desktop shows the source path before sending the
 captured PNG. If the file changes while the task is paused, continuing
 uses the captured version. Ask for a new capture to use the updated file.
 
-Check **Turn summary** for the result. Desktop keeps a retained image in
+Check **Execution details** for the result. Desktop keeps a retained image in
 **Tools → Recents**. If the provider generated the image and Desktop could
 not retain it, the summary explains what happened and the turn ends without
 another generation.
@@ -65,7 +65,7 @@ In a native workspace chat with live presentation, ask the agent to open
 an existing artifact. For example, “Open the poster when the first draft
 is ready.” The editor can open the artifact while the agent continues
 working. Switching tabs yourself takes precedence over a pending request.
-The turn summary can show an unconfirmed tool result. Check the editor tab
+Execution details can show an unconfirmed tool result. Check the editor tab
 to see what opened.
 
 ## Save a copy from Tools

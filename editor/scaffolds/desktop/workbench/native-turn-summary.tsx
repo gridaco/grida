@@ -113,7 +113,7 @@ export function NativeTurnSummary({
   return (
     <details className="rounded-md border px-3 py-2 text-xs">
       <summary className="cursor-pointer text-muted-foreground">
-        Turn summary
+        Execution details
       </summary>
       {showText && (
         <p className="mt-2 whitespace-pre-wrap break-words">

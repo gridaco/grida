@@ -355,15 +355,64 @@ export type NativeChatTurnSummary = Readonly<{
   artifactsOmitted?: number;
 }>;
 
+/** How the host classified recorded tool work for presentation. */
+export type NativeChatActivityKind =
+  | "read"
+  | "search"
+  | "edit"
+  | "execute"
+  | "generate"
+  | "integration"
+  | "delegate"
+  | "ask"
+  | "other";
+
+export type NativeChatActivityOutcome =
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "uncertain";
+
+/** One recorded tool call, in the order its message requested it. */
+export type NativeChatActivity = Readonly<{
+  callId: string;
+  /** The tool's identifier. */
+  title: string;
+  kind: NativeChatActivityKind;
+  /** The configured integration name for an integration tool. */
+  source?: string;
+  outcome: NativeChatActivityOutcome;
+}>;
+
 export type NativeChatMessage = Readonly<{
   messageId: string;
   role: "user" | "assistant";
   text: string;
+  /** The turn that committed this message. Absent for inherited history. */
+  turnId?: string;
+  /**
+   * The host's final-answer classification for an assistant message. Other
+   * assistant messages are commentary that preceded the answer.
+   */
+  phase?: "answer" | "progress";
+  activity?: readonly NativeChatActivity[];
+}>;
+
+/** Recorded outcome and wall-clock interval of a turn in a transcript page. */
+export type NativeChatTurnRecord = Readonly<{
+  turnId: string;
+  status: NonNullable<NativeChatTurn["status"]> | null;
+  /** UTC milliseconds. Absent for turns recorded before timing was kept. */
+  startedAtMs?: number;
+  settledAtMs?: number;
 }>;
 
 export type NativeChatTranscriptPage = Readonly<{
   view: number;
   messages: readonly NativeChatMessage[];
+  /** Turns that contributed messages, in history order. */
+  turns?: readonly NativeChatTurnRecord[];
   older: string | null;
 }>;
 
@@ -576,8 +625,16 @@ export type NativeChatTextUpdate = Readonly<{
   replace: boolean;
 }>;
 
+export type NativeChatActivityUpdate = Readonly<{
+  kind: "activity";
+  messageId: string;
+  turnId: string;
+  activity: NativeChatActivity;
+}>;
+
 export type NativeChatStreamUpdate =
   | NativeChatTextUpdate
+  | NativeChatActivityUpdate
   | Readonly<{ kind: "resync" }>;
 
 export type NativeChatUpdate =

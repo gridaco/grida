@@ -17,10 +17,12 @@ pub fn private_directory() -> TempDir {
 }
 
 #[allow(dead_code)]
+/// Simulate a version-10 or earlier store, which also predates turn timing.
 pub fn remove_turn_link_schema(connection: &rusqlite::Connection) {
     connection
         .execute_batch(
-            "DROP TABLE turn_submission_links;
+            "DROP TABLE turn_times;
+             DROP TABLE turn_submission_links;
              DROP INDEX submissions_pending_link;
              DROP INDEX submissions_unknown_link;
              ALTER TABLE submissions DROP COLUMN link_projected;",

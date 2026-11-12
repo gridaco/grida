@@ -113,21 +113,33 @@ async fn load_transcript(socket: &mut SharedSocket, session: &str, cwd: &Path) -
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[tokio::test]
 async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
-    use super::approvals::Stdio as PrivateStdio;
+    use super::approvals::{Fixture, Stdio as PrivateStdio};
 
     const CAPABILITY: &str = "co.grida/session/transcript-window";
     let temporary = TempDir::new().unwrap();
-    let workspace = TempDir::new().unwrap();
-    let state = temporary.path().join("state");
-    let mut endpoint = Endpoint::start(vec![Reply::Finished("Settled answer")]).await;
-    let mut plain = PrivateStdio::from_child(spawn_serve(&state, &endpoint.url));
+    let fixture = Fixture::new(false);
+    std::fs::write(fixture.primary.join("note.txt"), "fixture note").unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("read_file", r#"{"path":"note.txt"}"#),
+        Reply::Finished("Settled answer"),
+    ])
+    .await;
+    let serve = |endpoint: &str| {
+        fixture
+            .process(endpoint, "serve")
+            .arg("--stdio")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap()
+    };
+    let workspace = fixture.primary.clone();
+    let mut plain = PrivateStdio::from_child(serve(&endpoint.url));
     let ready = plain.request("initialize", extension_initialize()).await;
     assert_eq!(ready["result"]["agentCapabilities"]["_meta"][CAPABILITY], 1);
     let created = plain
-        .request(
-            "session/new",
-            json!({"cwd":workspace.path(),"mcpServers":[]}),
-        )
+        .request("session/new", json!({"cwd":workspace,"mcpServers":[]}))
         .await;
     let session = &created["result"]["sessionId"];
     let prompt = plain
@@ -138,7 +150,8 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
         .await;
     assert_eq!(prompt["result"]["stopReason"], "end_turn", "{prompt}");
     endpoint.request().await;
-    let mut load = json!({"sessionId":session,"cwd":workspace.path(),"mcpServers":[]});
+    endpoint.request().await;
+    let mut load = json!({"sessionId":session,"cwd":workspace,"mcpServers":[]});
     let attach = json!({CAPABILITY:{"kind":"attach"}});
     let read = json!({CAPABILITY:{"kind":"read","requestId":"page-1"}});
     load["_meta"] = attach.clone();
@@ -149,7 +162,7 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
     );
     plain.close().await;
 
-    let mut observer = PrivateStdio::from_child(spawn_serve(&state, &endpoint.url));
+    let mut observer = PrivateStdio::from_child(serve(&endpoint.url));
     let mut capabilities = extension_initialize();
     capabilities["clientCapabilities"]["_meta"][CAPABILITY] = 1.into();
     let ready = observer.request("initialize", capabilities).await;
@@ -187,6 +200,8 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
         }
         let id = observer.send("session/load", load.clone()).await;
         let mut messages = Vec::new();
+        let mut activity = Vec::new();
+        let mut turn = None;
         loop {
             let frame = observer.read_frame().await;
             if frame["id"] == id {
@@ -196,21 +211,49 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
                     assert_eq!(receipt["requestId"], "page-1", "{frame}");
                     assert!(receipt["view"].is_u64());
                     assert_eq!(receipt.get("older"), Some(&Value::Null));
+                    // The window names each contributing turn with its
+                    // outcome and recorded wall-clock interval.
+                    let turns = receipt["turns"].as_array().unwrap();
+                    assert_eq!(turns.len(), 1, "{receipt}");
+                    assert_eq!(Some(&turns[0]["turnId"]), turn.as_ref());
+                    assert_eq!(turns[0]["status"], "succeeded");
+                    let started = turns[0]["startedAtMs"].as_u64().unwrap();
+                    assert!(started <= turns[0]["settledAtMs"].as_u64().unwrap());
                 }
                 break;
             }
             let params = &frame["params"];
+            let meta = &params["_meta"][CAPABILITY];
+            if params["update"]["sessionUpdate"] == "tool_call" {
+                assert!(correlated, "standard replay stays text-only: {frame}");
+                assert_eq!(params["update"]["title"], "read_file");
+                assert_eq!(params["update"]["kind"], "read");
+                assert_eq!(params["update"]["status"], "completed");
+                assert_eq!(meta["outcome"], "succeeded");
+                assert_eq!(meta["activity"], "read");
+                assert_eq!(Some(&meta["turnId"]), turn.as_ref());
+                activity.push(meta["messageId"].clone());
+            }
             if let Some(text) = params["update"]["content"]["text"].as_str() {
                 assert_eq!(frame["method"], "session/update");
                 assert_eq!(params["sessionId"], *session);
-                assert_eq!(
-                    params["_meta"][CAPABILITY]["requestId"].as_str(),
-                    correlated.then_some("page-1"),
-                );
+                assert_eq!(meta["requestId"].as_str(), correlated.then_some("page-1"),);
+                if correlated {
+                    assert!(meta["turnId"].is_string(), "{frame}");
+                    turn.get_or_insert_with(|| meta["turnId"].clone());
+                    assert_eq!(Some(&meta["turnId"]), turn.as_ref());
+                    let expected = (text == "Settled answer").then_some("answer");
+                    assert_eq!(
+                        meta["phase"].as_str(),
+                        expected.or((params["update"]["sessionUpdate"] == "agent_message_chunk")
+                            .then_some("progress"))
+                    );
+                }
                 messages.push(text.to_owned());
             }
         }
         assert_eq!(messages, ["Saved question", "Settled answer"]);
+        assert_eq!(activity.len(), usize::from(correlated));
     }
     assert!(endpoint.requests.try_recv().is_err());
     observer.close().await;

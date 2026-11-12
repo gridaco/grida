@@ -17,11 +17,11 @@ Start with the compact [Agent Features](../../../agent/features.md) catalog for
 the product's features, delivery status, and scope. The documents below provide
 the detailed behavior and engineering contracts behind that catalog.
 
-| Product review order               | Defines                                                                                                       | Reader                                               |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| [User experience](./experience.md) | What a person can expect, including Agent effort presets, control over ongoing work, and a final turn summary | Anyone deciding whether the product behaves usefully |
-| [Master](./master.md)              | The product harness that selects context, tools, models, agent effort, verification, and completion           | Product designers and agent engineers                |
-| [Components](./components.md)      | Messages, inference, tools, history, context, runtime, and durable sessions                                   | Engineers implementing reusable mechanisms           |
+| Product review order               | Defines                                                                                                               | Reader                                               |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [User experience](./experience.md) | What a person can expect, including Agent effort presets, control over ongoing work, and how each finished turn reads | Anyone deciding whether the product behaves usefully |
+| [Master](./master.md)              | The product harness that selects context, tools, models, agent effort, verification, and completion                   | Product designers and agent engineers                |
+| [Components](./components.md)      | Messages, inference, tools, history, context, runtime, and durable sessions                                           | Engineers implementing reusable mechanisms           |
 
 Engineering starts with Components. Establish their responsibilities,
 dependency direction, and invariants before shaping the master around them.
