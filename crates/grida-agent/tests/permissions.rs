@@ -538,6 +538,7 @@ async fn writes_and_edits_stay_inside_the_project_and_off_metadata() {
 }
 
 #[tokio::test]
+#[ignore = "requires native confinement outside the test runner's sandbox"]
 async fn commands_write_the_project_and_shared_temp_but_not_existing_metadata() {
     let fixture = Fixture::new();
     let run = fixture.first(&fixture.profile_with(true, true), true).await;
