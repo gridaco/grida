@@ -8,7 +8,6 @@ import type {
 } from "@grida/desktop-bridge";
 import {
   CheckIcon,
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   RotateCcwIcon,
@@ -366,16 +365,14 @@ export function NativeModelPicker({
           title={
             selected ? `${selected.connection} · ${selected.model}` : label
           }
-          className="min-w-24 max-w-52 shrink gap-1.5 px-1.5 font-normal"
+          className="min-w-16 max-w-52 shrink gap-1.5 px-1.5 font-normal"
         >
-          <ConnectionIcon connection={selected?.connection} />
           <span className="truncate">{label}</span>
           {onEffort && (
             <span className="shrink-0 text-muted-foreground">
               {EFFORT_LABEL[stop]}
             </span>
           )}
-          <ChevronDownIcon className="size-3 shrink-0 text-muted-foreground" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
