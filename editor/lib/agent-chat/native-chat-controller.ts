@@ -180,6 +180,8 @@ export type NativeChatView = Readonly<{
   queueLoading: boolean;
   queueDraft: Readonly<{ inputId: string; text: string }> | null;
   steering: boolean;
+  /** The turn a pause was requested for; it may still be settling. */
+  pausing: string | null;
   operatingRegime: NativeChatOperatingRegime;
   effort: NativeChatEffort;
   effortAvailable: boolean;
@@ -330,6 +332,7 @@ const EMPTY: NativeChatView = Object.freeze({
   queueLoading: false,
   queueDraft: null,
   steering: false,
+  pausing: null,
   operatingRegime: "act",
   effort: "medium",
   effortAvailable: false,
@@ -779,6 +782,7 @@ export class NativeChatController {
       queueLoading: false,
       queueDraft: null,
       steering: false,
+      pausing: null,
       effort: "medium",
       effortAvailable: false,
       goalEffortAvailable: false,
@@ -2899,6 +2903,24 @@ export class NativeChatController {
     }
   }
 
+  /**
+   * Resumes the paused turn. A pause that is still settling is awaited first,
+   * so the person can choose Resume as soon as they pause.
+   */
+  async resumeTurn(): Promise<void> {
+    const scope = this.scope;
+    if (!scope) return;
+    for (let attempt = 0; attempt < 100 && this.owns(scope); attempt++) {
+      const turn = scope.observation?.snapshot.current;
+      if (!turn || turn.cancelled) break;
+      if (turn.disposition === "suspended" && turn.paused && !this.view.acting)
+        return this.control("resume");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await this.refresh(scope);
+    }
+    if (this.owns(scope)) this.update({ pausing: null });
+  }
+
   async control(action: NativeChatControl["action"]): Promise<void> {
     const scope = this.scope;
     if (
@@ -2909,6 +2931,7 @@ export class NativeChatController {
       return;
     const observationId = scope.observation.observationId;
     const turn = scope.observation.snapshot.current;
+    this.update({ pausing: action === "pause" ? turn.turnId : null });
     const wakeup = this.view.scheduledWakeup;
     const cancelledWakeupId =
       action === "resume" &&
@@ -2938,6 +2961,8 @@ export class NativeChatController {
       if (cancelledWakeupId !== undefined)
         scope.pendingWakeupContinue = undefined;
     } catch (error) {
+      if (this.owns(scope) && action === "pause")
+        this.update({ pausing: null });
       if (this.owns(scope))
         this.update({
           error: describe(

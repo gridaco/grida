@@ -84,9 +84,14 @@ export namespace turn_activity {
         record?.status ??
         (latest?.turnId === turnId ? (latest.status ?? null) : null);
       const finished = current?.turnId !== turnId && outcome !== null;
-      const answers = rest.filter(
-        (message) => message.role === "assistant" && message.phase === "answer"
-      );
+      // A running turn reads in order: a reply kept from before a pause must
+      // not jump below the text streaming after it.
+      const answers = finished
+        ? rest.filter(
+            (message) =>
+              message.role === "assistant" && message.phase === "answer"
+          )
+        : [];
       blocks.push({
         kind: "turn",
         turnId,

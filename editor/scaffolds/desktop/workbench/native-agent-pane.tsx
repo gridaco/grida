@@ -308,6 +308,9 @@ export function NativeAgentPane({
   // A paused turn resumes from the composer; a Goal's own pause resumes from
   // its strip.
   const resumable = canResume && !(goalTurn && state.goal?.goal?.paused);
+  // Show Resume as soon as Pause is chosen; it waits for the pause to settle.
+  const pausing =
+    !!turn && !turn.cancelled && (state.pausing === turn.turnId || turn.paused);
   const approval =
     turn?.disposition === "suspended" && !turn.paused && !turn.cancelled
       ? state.approvals[0]
@@ -877,14 +880,14 @@ export function NativeAgentPane({
           busy={!!turn}
           isStreaming={streamingControlsOnly}
           emptyAction={
-            state.acting
-              ? undefined
-              : resumable
-                ? {
-                    label: "Resume",
-                    icon: <PlayIcon className="size-3.5 fill-current" />,
-                    onClick: () => void controller.control("resume"),
-                  }
+            resumable || (pausing && !(goalTurn && state.goal?.goal?.paused))
+              ? {
+                  label: "Resume",
+                  icon: <PlayIcon className="size-3.5 fill-current" />,
+                  onClick: () => void controller.resumeTurn(),
+                }
+              : state.acting
+                ? undefined
                 : running && !turn?.paused
                   ? {
                       label: "Pause",

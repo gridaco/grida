@@ -56,9 +56,10 @@ A connection must finish starting before its commands become available.
    with Edit, Move up and Move down. Steer: the row leaves the queue and the
    text appears in the running turn. There is no separate “Send to current
    turn” toggle.
-   8a. Pause a running turn with an empty composer. It settles as paused and the
-   primary button becomes ▶. Choose ▶: the same turn continues (no new user
-   message). Pause again, then type and send a message instead: the paused
+   8a. Pause a running turn with an empty composer. The primary button becomes ▶
+   at once, before the pause has settled. Choose ▶ immediately: the same turn
+   continues (no new user message), and its new reply streams below anything
+   it said before the pause. Pause again, then type and send a message instead: the paused
    turn shows **Stopped after …** and the new message starts right away,
    ahead of any queued messages, which run after it.
 9. Queue three messages while a turn runs. Hover a row: a grip appears at its left; drag the last

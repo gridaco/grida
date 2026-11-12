@@ -102,6 +102,32 @@ describe("turn_activity.group", () => {
     });
   });
 
+  it("keeps a running turn in order, even after a resumed reply follows an answer", () => {
+    const messages: NativeChatMessage[] = [
+      { messageId: "ask", role: "user", text: "Ask", turnId: "a" },
+      {
+        messageId: "before-pause",
+        role: "assistant",
+        text: "Starting",
+        turnId: "a",
+        phase: "answer",
+      },
+      { messageId: "streaming", role: "assistant", text: "Again", turnId: "a" },
+    ];
+    const [block] = turn_activity.group(
+      messages,
+      [{ turnId: "a", status: null }],
+      { turnId: "a" }
+    );
+    if (block.kind !== "turn") throw new Error("expected a turn");
+    expect(block.answers).toEqual([]);
+    expect(
+      block.work.map((item) =>
+        item.kind === "commentary" ? item.message.messageId : item.key
+      )
+    ).toEqual(["before-pause", "streaming"]);
+  });
+
   it("labels stopped and failed turns and omits unrecorded durations", () => {
     expect(turn_activity.header("cancelled", 3_000)).toBe("Stopped after 3s");
     expect(turn_activity.header("failed", null)).toBe("Failed");
