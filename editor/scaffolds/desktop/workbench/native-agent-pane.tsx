@@ -20,7 +20,7 @@ import { readLibraryAttachment } from "@/app/(library)/library/attachment";
 import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
 import {
   CheckIcon,
-  HandIcon,
+  FolderIcon,
   CornerDownRightIcon,
   PlayIcon,
   SquareIcon,
@@ -1172,12 +1172,10 @@ export function NativeAgentPane({
                     size="xs"
                     variant="ghost"
                     className="shrink-0 gap-1 px-1.5 text-muted-foreground"
-                    aria-label="Approvals: Ask for approval"
+                    aria-label="Access: This project"
                   >
-                    <HandIcon className="size-3.5" />
-                    <span className="hidden @[26rem]:inline">
-                      Ask for approval
-                    </span>
+                    <FolderIcon className="size-3.5" />
+                    <span className="hidden @[26rem]:inline">This project</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent
@@ -1186,15 +1184,15 @@ export function NativeAgentPane({
                   className="w-80 p-1 text-sm"
                 >
                   <p className="px-2 pt-1.5 pb-1 text-xs text-muted-foreground">
-                    How should agent actions be approved?
+                    What can the agent access?
                   </p>
                   <div className="flex items-start gap-2 rounded-md px-2 py-1.5">
-                    <HandIcon className="mt-0.5 size-4 shrink-0" />
+                    <FolderIcon className="mt-0.5 size-4 shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p>Ask for approval</p>
+                      <p>This project</p>
                       <p className="text-xs text-muted-foreground">
-                        Works in this workspace; asks before using other folders
-                        or running commands.
+                        Reads files in this project and edits through the open
+                        editor. No other folders, commands or internet.
                       </p>
                     </div>
                     <CheckIcon className="mt-0.5 size-4 shrink-0" />
