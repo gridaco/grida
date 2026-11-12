@@ -78,6 +78,14 @@ Protected paths under a writable root: version-control metadata, agent
 configuration directories, cloud credential directories, and the host's own
 state and credential stores. They stay readable where the level allows reads.
 
+Protection is decided when a program starts. Version-control metadata, the
+shared agent directory and cloud credential directories are protected once they
+exist, so a program can initialize a new repository but a later program cannot
+rewrite it. The agent's own configuration directories are protected even before
+they exist, so creating one always needs the person's approval. The host's own
+stores are always protected. The agent's file tools never write any of these
+names.
+
 ## What a program sees
 
 A program the agent runs should behave as it does in the person's terminal,
@@ -150,7 +158,9 @@ individual fields.
 | Situation                                            | Default preset                                      |
 | ---------------------------------------------------- | --------------------------------------------------- |
 | Edit a file in the project                           | Runs.                                               |
-| Write inside version-control metadata                | Refused by the sandbox; may ask to retry.           |
+| Initialize a repository in a project without one     | Runs, confined.                                     |
+| Write inside existing version-control metadata       | Refused by the sandbox; may ask to retry.           |
+| Create the agent's configuration directory           | Refused by the sandbox; may ask to retry.           |
 | Run a build or test command in the project           | Runs, confined.                                     |
 | A command needs the network                          | Refused by the sandbox; asks to retry with network. |
 | Read or write a path outside the project             | Asks.                                               |

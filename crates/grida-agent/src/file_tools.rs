@@ -23,6 +23,10 @@ const MAX_TEXT_BYTES: usize = 64 * 1024;
 const MAX_MUTATION_INPUT_BYTES: usize = 2 * MAX_TEXT_BYTES + MAX_INPUT_BYTES;
 /// Top-level names that stay read-only under a writable root.
 pub(crate) const PROTECTED_METADATA: [&str; 5] = [".git", ".agents", ".grida", ".codex", ".aws"];
+/// Agent configuration names that commands may not create either. The other
+/// names are protected for commands only once they exist, so a command can
+/// start a new repository (permission policy, protected paths).
+pub(crate) const PROTECTED_WHEN_MISSING: [&str; 2] = [".grida", ".codex"];
 const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 const WORKERS: usize = 2;
 const TIME_LIMIT: Duration = Duration::from_secs(3);

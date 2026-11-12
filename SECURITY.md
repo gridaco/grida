@@ -604,9 +604,13 @@ with. The host's state, the profile file, the credential home,
 reaches them; the sandbox expresses each as an exclusion of every grant rather
 than relying on rule order. Version-control and agent metadata (`.git`,
 `.agents`, `.grida`, `.codex`, `.aws`) directly under a writable root stay
-read-only. A protected path inside a granted location is carved out of it; one
+read-only once it exists when the command starts; agent configuration
+(`.grida`, `.codex`) is protected even before it exists. A command can
+therefore initialize a new repository, and the next command cannot change it.
+A protected path inside a granted location is carved out of it; one
 that contains a granted location still refuses the scope. Platform services
-toolchains need (system information, the user database, semaphores and
+toolchains need (system information, the user database, the per-user cache
+and temporary directory lookup, logging, certificate trust, semaphores and
 pseudo-terminals) are allowed; they grant no file or network access. The
 [permission policy](docs/wg/ai/agent/permissions.md) owns these defaults.
 

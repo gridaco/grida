@@ -5,7 +5,7 @@ use crate::command::{
 };
 use crate::file_tools::{
     CAPTURE_IMAGE_REFERENCE, FileAuthority, FileTools, ImageCapture, PROTECTED_METADATA,
-    VIEW_IMAGE, read_request, write_request,
+    PROTECTED_WHEN_MISSING, VIEW_IMAGE, read_request, write_request,
 };
 use crate::goal_verification::ReadVerification;
 use crate::workspace::{DirectoryBinding, DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
@@ -585,11 +585,26 @@ impl PermissionProfile {
         let mut protected = self.command_denials.clone();
         if access == CommandAccess::ReadWrite {
             // Version-control and agent metadata stay read-only inside a
-            // writable root. See the permission policy's protected paths.
-            protected.extend(PROTECTED_METADATA.iter().map(|name| ProtectedPath {
-                path: root.join(name),
-                access: DeniedAccess::Write,
-            }));
+            // writable root. Metadata that does not exist yet when the command
+            // starts is protected only for agent configuration, so a command
+            // can create a repository. See the permission policy's protected
+            // paths.
+            protected.extend(
+                PROTECTED_METADATA
+                    .iter()
+                    .map(|name| root.join(name))
+                    .filter(|path| {
+                        path.symlink_metadata().is_ok()
+                            || path
+                                .file_name()
+                                .and_then(|name| name.to_str())
+                                .is_some_and(|name| PROTECTED_WHEN_MISSING.contains(&name))
+                    })
+                    .map(|path| ProtectedPath {
+                        path,
+                        access: DeniedAccess::Write,
+                    }),
+            );
         }
         let (read, write) = match access {
             CommandAccess::Read => (vec![root], Vec::new()),

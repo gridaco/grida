@@ -106,7 +106,11 @@ impl Fixture {
                             } else {
                                 AccessRule::Deny
                             },
-                            command_read_write: AccessRule::Deny,
+                            command_read_write: if command && write {
+                                AccessRule::Allow
+                            } else {
+                                AccessRule::Deny
+                            },
                         },
                     ),
                     (
@@ -531,6 +535,54 @@ async fn writes_and_edits_stay_inside_the_project_and_off_metadata() {
     );
     assert_eq!(elsewhere.status, OutcomeStatus::Failed, "{elsewhere:?}");
     assert!(!fixture.additional.join("note").exists());
+}
+
+#[tokio::test]
+async fn commands_can_start_a_repository_but_not_change_existing_metadata() {
+    let fixture = Fixture::new();
+    let run = fixture.first(&fixture.profile_with(true, true), true).await;
+    let command = |script: &str| {
+        json!({
+            "access": "read_write", "program": "/bin/sh", "cwd": fixture.default,
+            "args": ["-c", script],
+        })
+    };
+
+    // Missing repository metadata may be created, as `git init` does.
+    let init = completed(
+        run.invoke(
+            "init",
+            "run_command",
+            command("mkdir .git && printf ref > .git/HEAD"),
+        )
+        .await,
+    );
+    assert_eq!(init.status, OutcomeStatus::Succeeded, "{init:?}");
+    assert_eq!(fs::read(fixture.default.join(".git/HEAD")).unwrap(), b"ref");
+
+    // Once it exists, a later command cannot change it.
+    let changed = completed(
+        run.invoke("config", "run_command", command("printf x > .git/config"))
+            .await,
+    );
+    assert_eq!(changed.status, OutcomeStatus::Failed, "{changed:?}");
+    assert!(!fixture.default.join(".git/config").exists());
+
+    // Agent configuration stays off limits even before it exists.
+    let configured = completed(
+        run.invoke("agent-config", "run_command", command("mkdir .grida"))
+            .await,
+    );
+    assert_eq!(configured.status, OutcomeStatus::Failed, "{configured:?}");
+    assert!(!fixture.default.join(".grida").exists());
+
+    // Ordinary project files stay writable.
+    let written = completed(
+        run.invoke("file", "run_command", command("printf ok > note"))
+            .await,
+    );
+    assert_eq!(written.status, OutcomeStatus::Succeeded, "{written:?}");
+    assert_eq!(fs::read(fixture.default.join("note")).unwrap(), b"ok");
 }
 
 #[tokio::test]

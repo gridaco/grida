@@ -105,6 +105,15 @@ const PLATFORM_DEFAULTS: &str = r#"(allow sysctl-read
   (sysctl-name "vm.loadavg") (sysctl-name-prefix "kern.proc.pgrp.") (sysctl-name-prefix "kern.proc.pid."))
 (allow sysctl-write (sysctl-name "kern.grade_cputype"))
 (allow mach-lookup (global-name "com.apple.system.opendirectoryd.libinfo"))
+(allow mach-lookup
+  (global-name "com.apple.analyticsd") (global-name "com.apple.analyticsd.messagetracer")
+  (global-name "com.apple.appsleep") (global-name "com.apple.bsd.dirhelper")
+  (global-name "com.apple.diagnosticd") (global-name "com.apple.dt.automationmode.reader")
+  (global-name "com.apple.espd") (global-name "com.apple.logd") (global-name "com.apple.logd.events")
+  (global-name "com.apple.secinitd") (global-name "com.apple.system.DirectoryService.libinfo_v1")
+  (global-name "com.apple.system.logger") (global-name "com.apple.system.notification_center")
+  (global-name "com.apple.system.opendirectoryd.membership") (global-name "com.apple.trustd")
+  (global-name "com.apple.trustd.agent") (global-name "com.apple.xpc.activity.unmanaged"))
 (allow ipc-posix-sem)
 (allow pseudo-tty)
 (allow file-read* file-write* file-ioctl (literal "/dev/ptmx"))
@@ -123,8 +132,9 @@ fn command(prepared: &Prepared, status: i32) -> Command {
          (allow sysctl-read (sysctl-name \"hw.pagesize\") (sysctl-name \"hw.pagesize_compat\"))\n",
     );
     // Platform services ordinary toolchains need: system information, the
-    // user database, semaphores and pseudo-terminals. None grants file or
-    // network access.
+    // user database, the per-user cache and temporary directory lookup,
+    // logging, certificate trust, semaphores and pseudo-terminals. None grants
+    // file or network access.
     profile.push_str(PLATFORM_DEFAULTS);
     let mut locations: Vec<_> = prepared
         .locations
