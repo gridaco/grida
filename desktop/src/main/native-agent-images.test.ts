@@ -241,9 +241,12 @@ it.runIf(
           selected.inputId
         )
       ).toEqual(finished);
-      expect(
-        JSON.stringify(await reopened.transcript(event, loaded.attachmentId))
-      ).toContain("Attached file selected.txt.");
+      // The transcript names the attachment instead of describing it in text.
+      const replayed = JSON.stringify(
+        await reopened.transcript(event, loaded.attachmentId)
+      );
+      expect(replayed).toContain('"attachments":[{"name":"selected.txt"}]');
+      expect(replayed).not.toContain("Attached file");
       expect(fixture.requests).toHaveLength(3);
     } finally {
       await chat?.close();
@@ -404,9 +407,13 @@ it.runIf(
         expect(latest.snapshot.current).toBeNull();
         expect(latest.snapshot.queuedInputs).toBe(0);
       });
-      expect(
-        JSON.stringify(await ipc.transcript(event, attachmentId))
-      ).toContain("[Retained PNG image]");
+      const replayed = JSON.stringify(
+        await ipc.transcript(event, attachmentId)
+      );
+      expect(replayed).toMatch(
+        /"attachments":\[\{"name":"image\.png","mimeType":"image\/png","size":\d+\}\]/
+      );
+      expect(replayed).not.toContain("[Retained PNG image]");
       const next: NativeChatImageInput = {
         ...input,
         action: "submit",

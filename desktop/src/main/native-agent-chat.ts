@@ -1956,15 +1956,24 @@ export class NativeAgentChat {
       if (!role) return;
       const content = object(update.content);
       if (content.type === "resource_link") {
-        // A person's attachment, named in a transcript page.
+        // A person's attachment, named in a replayed transcript. Like text,
+        // it belongs to the capture its replay request identifies.
+        if (
+          role !== "user" ||
+          metadata?.["co.grida/session/updates"] !== undefined
+        )
+          return;
         const replay = metadata?.[TRANSCRIPT_WINDOW];
-        if (role !== "user" || replay === undefined) return;
-        const attribution = object(replay);
-        if (capture && capture.requestId === identity(attribution.requestId))
+        const attribution = replay === undefined ? undefined : object(replay);
+        const requestId =
+          attribution === undefined
+            ? undefined
+            : identity(attribution.requestId);
+        if (capture && capture.requestId === requestId)
           captureAttachment(
             capture,
             identity(update.messageId),
-            optionalIdentity(attribution.turnId),
+            optionalIdentity(attribution?.turnId),
             attachment(content)
           );
         return;
