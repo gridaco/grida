@@ -212,6 +212,10 @@ pub struct InputSettings {
     pub operating_regime: OperatingRegime,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<EffortPreset>,
+    /// The reasoning level the input was accepted with. Part of the input's
+    /// identity on retry; not published with its settings.
+    #[serde(skip)]
+    pub reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
     pub max_input_tokens: Option<u64>,
     pub max_output_tokens: Option<u64>,
     #[serde(default)]
@@ -239,8 +243,16 @@ pub struct InputInspection {
 }
 
 impl InputSettings {
-    pub(super) fn require_effort(&self, selection: Option<EffortPreset>) -> Result<()> {
-        if selection.is_some_and(|selected| selected != self.effort.unwrap_or_default()) {
+    /// A retried input must carry the effort it was accepted with: its preset
+    /// and its reasoning level, when the retry names them.
+    pub(super) fn require_effort(
+        &self,
+        selection: Option<EffortPreset>,
+        reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
+    ) -> Result<()> {
+        if selection.is_some_and(|selected| selected != self.effort.unwrap_or_default())
+            || reasoning.is_some_and(|level| Some(level) != self.reasoning)
+        {
             return Err(problem(ErrorKind::Conflict, "submission_effort_changed"));
         }
         Ok(())
@@ -270,6 +282,7 @@ impl InputSettings {
                     model: stored.model,
                     operating_regime: stored.operating_regime,
                     effort: stored.effort.map(|policy| policy.preset()),
+                    reasoning: stored.reasoning,
                     max_input_tokens: stored
                         .configuration
                         .defaults

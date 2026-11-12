@@ -2960,7 +2960,7 @@ impl Host {
         };
         lifecycle::check_input(&view.input, &request.parts)?;
         let settings = InputSettings::for_input(&view.input)?;
-        settings.require_effort(request.effort)?;
+        settings.require_effort(request.effort, request.reasoning)?;
         if request
             .operating_regime
             .is_some_and(|regime| regime != settings.operating_regime)

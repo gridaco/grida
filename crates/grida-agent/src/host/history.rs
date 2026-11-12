@@ -465,7 +465,7 @@ impl Host {
                         "history_revision_library_selection_unavailable",
                     ));
                 }
-                settings.require_effort(replacement.effort)?;
+                settings.require_effort(replacement.effort, replacement.reasoning)?;
                 previous.input
             } else {
                 {

@@ -468,9 +468,14 @@ mod negotiated {
             exact["result"]["inputPosition"],
             started["result"]["inputPosition"]
         );
-        let mut changed = original;
+        let mut changed = original.clone();
         changed["effort"] = "ultra".into();
         let conflict = first.request("_co.grida/session/submit", changed).await;
+        assert_eq!(conflict["error"]["data"], "submission_effort_changed");
+        // A retry naming another reasoning level is another request, too.
+        let mut reasoned = original;
+        reasoned["reasoning"] = "high".into();
+        let conflict = first.request("_co.grida/session/submit", reasoned).await;
         assert_eq!(conflict["error"]["data"], "submission_effort_changed");
 
         let queued = first
