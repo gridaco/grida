@@ -29,7 +29,7 @@ stays available while you remove or replace the PNG.
 [Attach a PNG to a message](./clients.md#attach-a-png-to-a-message)
 
 On a profile with image editing, a crop uses a private working copy.
-Open **Execution details** to inspect and save a result the chat retained.
+Its result appears below the turn's answer, where you can preview and save it.
 [Inspect and save results](./results.md)
 
 If the chat offers **Attach file**, select a file up to 256 KiB and ask

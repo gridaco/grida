@@ -126,10 +126,10 @@ export type AgentComposerInputProps = {
   draftRef?: Ref<Pick<ComposerController, "appendText">>;
   onStop: () => void;
   /**
-   * Turn the single primary button into Stop while the draft is empty. Typing
-   * turns it back into Send, which queues behind the running turn.
+   * What the single primary button does while the draft is empty, such as
+   * Stop for a running turn. Typing turns it back into Send.
    */
-  stopWhenEmpty?: boolean;
+  emptyAction?: { label: string; icon: ReactNode; onClick: () => void };
   placeholder?: string;
   autofocus?: boolean;
   /**
@@ -224,7 +224,7 @@ function AgentComposerInner({
   submissionScope,
   draftRef,
   onStop,
-  stopWhenEmpty = false,
+  emptyAction,
   placeholder = "Ask anything…",
   autofocus,
   providerFileMimes = NO_PROVIDER_FILE_MIMES,
@@ -751,10 +751,20 @@ function AgentComposerInner({
           </div>
         </div>
         <div className="shrink-0">
-          {isStreaming ||
-          (stopWhenEmpty &&
-            !composer.snapshot.text.trim() &&
-            composer.snapshot.attachments.length === 0) ? (
+          {emptyAction &&
+          !isStreaming &&
+          !composer.snapshot.text.trim() &&
+          composer.snapshot.attachments.length === 0 ? (
+            <Button
+              type="button"
+              size="icon-xs"
+              className="size-7 rounded-full"
+              onClick={emptyAction.onClick}
+              aria-label={emptyAction.label}
+            >
+              {emptyAction.icon}
+            </Button>
+          ) : isStreaming ? (
             <Button
               type="button"
               size="icon-xs"

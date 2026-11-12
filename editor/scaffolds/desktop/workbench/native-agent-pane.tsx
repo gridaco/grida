@@ -14,13 +14,13 @@ import type {
   NativeChatReadiness,
 } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
-import { Textarea } from "@app/ui/components/textarea";
 import { readLibraryAttachment } from "@/app/(library)/library/attachment";
 import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
 import {
   CheckIcon,
   FolderIcon,
   PlayIcon,
+  SquareIcon,
   LibraryIcon,
   PaperclipIcon,
   PlusIcon,
@@ -53,8 +53,12 @@ import {
 } from "../shared/agent-composer-input";
 import { useWorkspaceFileMentions } from "../shared/use-workspace-composer-catalog";
 import { NativeComposerTray } from "./native-composer-tray";
+import { ContextMeter } from "../shared/context-meter";
+import { computeContextUsage } from "@/lib/agent-chat";
+import { cn } from "@app/ui/lib/utils";
+import styles from "./agent-pane.module.css";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
-import { NativeTurnSummary } from "./native-turn-summary";
+import { NativeTurnArtifacts } from "./native-turn-summary";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { NativeContextLimitPanel } from "./native-context-limit-panel";
@@ -327,6 +331,21 @@ export function NativeAgentPane({
             ? "Working…"
             : null;
 
+  const selectedProfile =
+    state.profiles?.saved.find((p) => p.id === state.profiles?.active) ??
+    state.profiles?.choices.find((p) => p.id === state.profiles?.active);
+  const contextWindow =
+    selectedProfile?.contextWindow ??
+    (state.profiles?.active === null
+      ? state.profiles.defaultContextWindow
+      : undefined);
+  const contextUsage = computeContextUsage(
+    state.messages.map((message) => ({
+      role: message.role,
+      parts: [{ type: "text", text: message.text }],
+    })),
+    contextWindow
+  );
   const blocks = turn_activity.group(
     state.messages,
     state.turnRecords,
@@ -459,7 +478,13 @@ export function NativeAgentPane({
         initial="instant"
         resize={running ? "smooth" : "instant"}
       >
-        <ConversationContent className="gap-4 px-3 py-4">
+        <ConversationContent
+          className="gap-4 px-3 py-4"
+          scrollClassName={cn(
+            styles.chatScroll,
+            "desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
+          )}
+        >
           {/* See test/desktop-agent-chat-turn-activity.md. */}
           {blocks.map((block) =>
             block.kind === "turn" ? (
@@ -484,25 +509,12 @@ export function NativeAgentPane({
             !state.loading &&
             !state.repairing &&
             state.turnSummary &&
-            state.turnSummary.turnId === snapshot?.latest?.turnId && (
-              <NativeTurnSummary
+            state.turnSummary.turnId === snapshot?.latest?.turnId &&
+            bridge.readArtifact && (
+              <NativeTurnArtifacts
                 key={state.turnSummary.turnId}
                 summary={state.turnSummary}
-                messages={state.messages}
-                previewController={bridge.readArtifact ? controller : undefined}
-                billingRefresh={state.gatewayBillingRefresh}
-                childPage={state.gatewayChildPage}
-                onReadChildBilling={(turnId, destination) =>
-                  void controller.readGatewayChildBilling(turnId, destination)
-                }
-                onRefreshGatewayBilling={(turnId, attempt) =>
-                  void controller.refreshGatewayBilling(turnId, attempt)
-                }
-                onRetry={
-                  state.turnSummary.detailsUnavailable
-                    ? () => controller.retryTurnSummary()
-                    : undefined
-                }
+                controller={controller}
               />
             )}
         </ConversationContent>
@@ -562,50 +574,6 @@ export function NativeAgentPane({
             onClick={() => void controller.repair()}
           >
             Refresh
-          </Button>
-        </div>
-      )}
-      {state.queueDraft && (
-        <div className="shrink-0 space-y-2 px-3 py-2">
-          <Textarea
-            aria-label="Edit queued message"
-            value={state.queueDraft.text}
-            disabled={state.acting}
-            onChange={(event) =>
-              controller.changeQueueDraft(event.currentTarget.value)
-            }
-          />
-          <div className="flex justify-end gap-2">
-            <Button
-              size="xs"
-              variant="ghost"
-              type="button"
-              disabled={state.acting}
-              onClick={() => controller.closeQueueDraft()}
-            >
-              Cancel edit
-            </Button>
-            <Button
-              size="xs"
-              type="button"
-              disabled={state.acting || !state.queueDraft.text.trim()}
-              onClick={() => void controller.saveQueueDraft()}
-            >
-              Save changes
-            </Button>
-          </div>
-        </div>
-      )}
-      {controller.canResumeQueue && (
-        <div className="px-3 py-2">
-          <Button
-            type="button"
-            size="xs"
-            variant="outline"
-            disabled={state.acting}
-            onClick={() => void controller.editQueue({ action: "resume" })}
-          >
-            Resume queue
           </Button>
         </div>
       )}
@@ -930,7 +898,22 @@ export function NativeAgentPane({
           }
           busy={!!turn}
           isStreaming={streamingControlsOnly}
-          stopWhenEmpty={canStop && !state.acting}
+          emptyAction={
+            canStop && !state.acting
+              ? {
+                  label: "Stop",
+                  icon: <SquareIcon className="size-3.5" />,
+                  onClick: () => void controller.control("stop"),
+                }
+              : controller.canResumeQueue && queued > 0 && !state.acting
+                ? {
+                    label: "Resume queue",
+                    icon: <PlayIcon className="size-3.5 fill-current" />,
+                    onClick: () =>
+                      void controller.editQueue({ action: "resume" }),
+                  }
+                : undefined
+          }
           placeholder={
             connectionRequired && !state.scope
               ? "Choose a model to start chatting…"
@@ -1106,6 +1089,7 @@ export function NativeAgentPane({
           }
           toolbarEnd={
             <>
+              <ContextMeter usage={contextUsage} />
               <NativeModelPicker
                 profiles={state.profiles}
                 defaultUnavailable={connectionRequired}

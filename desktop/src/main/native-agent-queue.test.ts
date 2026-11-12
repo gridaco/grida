@@ -243,6 +243,31 @@ it.runIf(Boolean(packaged)).each([false, true])(
         "c",
         prior.replacementInputId,
       ]);
+      // Dragging places a message at any position, not just one step.
+      await ipc.editQueue(event, attachmentId, {
+        action: "place",
+        inputId: prior.replacementInputId!,
+        index: 0,
+        observationId: (await snapshot()).observationId,
+        requestId: "place-beta",
+      });
+      expect((await page()).items.map((item) => item.inputId)).toEqual([
+        prior.replacementInputId,
+        "a",
+        "c",
+      ]);
+      await ipc.editQueue(event, attachmentId, {
+        action: "place",
+        inputId: prior.replacementInputId!,
+        index: 2,
+        observationId: (await snapshot()).observationId,
+        requestId: "place-beta-back",
+      });
+      expect((await page()).items.map((item) => item.inputId)).toEqual([
+        "a",
+        "c",
+        prior.replacementInputId,
+      ]);
       await ipc.editQueue(event, attachmentId, {
         action: "withdraw",
         inputId: "a",

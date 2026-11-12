@@ -89,25 +89,18 @@ the connection is ready. A supported rate-limit response during a turn can
 schedule one more attempt on the same connection. Use **Stop**
 while it waits. [Follow a provider retry](./clients.md#follow-a-provider-retry)
 
-## Read the usage for a turn
+## See how full the context is
 
-Open **Execution details** after a turn ends to see the token counts reported
-by the provider. A partial count covers only the requests with known usage.
-Cached input and reasoning output can overlap other counts.
-[Read execution details](./clients.md#read-execution-details)
+The ring beside the model picker estimates how much of the selected model's
+context window the visible conversation uses. Hover it for the percentage and
+token count; open it for a breakdown by user, assistant, tools and other
+content. The ring appears once the model's window is known.
 
-For Grida Gateway, the summary can also show exact charges in mills for
-individual model requests from that turn. A funded independent review appears
-separately when its recorded charges belong to the same connection. The
-summary can also list [assigned subagent work](./clients.md#read-execution-details),
-with a notice when attribution is incomplete. Pending or
-unavailable amounts stay unknown. Use **Refresh billing** when offered to check
-that request's current settlement. Reopening the chat shows the original recorded
-evidence and leaves refresh to you. Use the connection's billing record for
-totals and for charges from other providers or work outside the displayed turn.
+Desktop does not show per-request charges in the chat. Use the connection's
+billing record for totals and individual charges.
 
 Supported Gateway Goals can also have a maximum spend. The Goal panel shows
 charged, held and remaining amounts, including funded child work. An uncertain
 request keeps its hold until its settlement is known; stopping work does not
-refund a request. This is separate from the reported usage in execution details.
+refund a request.
 [Set a maximum spend](./effort-and-goals.md#set-a-maximum-spend)

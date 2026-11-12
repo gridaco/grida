@@ -82,16 +82,28 @@ export function DesktopContextMeter({
         ?.contextWindow,
     [modelId, providerId, endpoints, ggModels]
   );
-  const {
-    usedTokens,
-    maxTokens,
-    percent: ratio,
-    breakdown,
-  } = useMemo(
+  const usage = useMemo(
     () => computeContextUsage(messages, contextWindow),
     [messages, contextWindow]
   );
+  return <ContextMeter usage={usage} costUsd={costUsd} />;
+}
 
+/**
+ * The ring and its breakdown for an already computed usage. Renders nothing
+ * until both the window and the transcript size are known.
+ */
+export function ContextMeter({
+  usage,
+  costUsd,
+}: {
+  usage: Pick<
+    ReturnType<typeof computeContextUsage>,
+    "usedTokens" | "maxTokens" | "percent" | "breakdown"
+  >;
+  costUsd?: number;
+}) {
+  const { usedTokens, maxTokens, percent: ratio, breakdown } = usage;
   if (maxTokens === 0 || usedTokens === 0) return null;
 
   const pct = percent.format(ratio);

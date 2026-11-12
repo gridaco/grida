@@ -1,7 +1,32 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import type { NativeChatGoal } from "@grida/desktop-bridge";
+import type {
+  NativeChatGoal,
+  NativeChatQueueItem,
+} from "@grida/desktop-bridge";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import {
+  restrictToParentElement,
+  restrictToVerticalAxis,
+} from "@dnd-kit/modifiers";
+import { CSS } from "@dnd-kit/utilities";
+import { cn } from "@app/ui/lib/utils";
 import { Button } from "@app/ui/components/button";
 import { Textarea } from "@app/ui/components/textarea";
 import {
@@ -21,6 +46,7 @@ import {
   CornerDownRightIcon,
   EllipsisIcon,
   GoalIcon,
+  GripVerticalIcon,
   ListEndIcon,
   PauseIcon,
   PencilIcon,
@@ -34,8 +60,8 @@ import type {
 } from "@/lib/agent-chat/native-chat-controller";
 
 /**
- * The stack attached above the composer: waiting messages, then the chat's
- * goal. Each row offers only its direct actions.
+ * The stack attached above the composer: a held-queue notice, waiting
+ * messages, then the chat's goal. Each row offers only its direct actions.
  */
 export function NativeComposerTray({
   controller,
@@ -51,54 +77,39 @@ export function NativeComposerTray({
   const goal = view.goal?.goal;
   const pendingGoal = !!view.observation?.snapshot.pendingGoalId;
   const showGoal = pendingGoal || (!!goal && goal.state.status !== "cleared");
-  if (!queue?.items.length && !showGoal) return null;
+  const items = queue?.items ?? [];
+  const held = items.length > 0 && controller.canResumeQueue;
+  if (!items.length && !showGoal) return null;
   return (
     <div
       data-testid="workspace-composer-tray"
       className="mx-2 divide-y overflow-hidden rounded-t-xl border border-b-0 bg-background text-sm"
     >
-      {queue && queue.items.length > 0 && (
-        <div className="max-h-40 overflow-y-auto">
-          {queue.items.map((item, index) => (
-            <QueueRow
-              key={item.inputId}
-              controller={controller}
-              view={view}
-              index={index}
-              onReturnedText={onReturnedText}
-            />
-          ))}
-          {(queue.previousOffset !== null || queue.nextOffset !== null) && (
-            <div className="flex gap-1 px-2 py-1">
-              {queue.previousOffset !== null && (
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  type="button"
-                  disabled={view.queueLoading || view.acting}
-                  onClick={() =>
-                    void controller.showQueuePage(queue.previousOffset!)
-                  }
-                >
-                  Earlier in queue
-                </Button>
-              )}
-              {queue.nextOffset !== null && (
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  type="button"
-                  disabled={view.queueLoading || view.acting}
-                  onClick={() =>
-                    void controller.showQueuePage(queue.nextOffset!)
-                  }
-                >
-                  Later in queue
-                </Button>
-              )}
-            </div>
-          )}
+      {held && (
+        <div className="flex items-center gap-2 py-1 pr-1.5 pl-3">
+          <PauseIcon className="text-muted-foreground size-4 shrink-0" />
+          <span className="text-muted-foreground min-w-0 flex-1 truncate">
+            Queue paused because you interrupted
+          </span>
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            className="text-muted-foreground shrink-0"
+            disabled={view.acting}
+            onClick={() => void controller.editQueue({ action: "resume" })}
+          >
+            <PlayIcon className="size-3.5" />
+            Resume
+          </Button>
         </div>
+      )}
+      {queue && items.length > 0 && (
+        <QueueList
+          controller={controller}
+          view={view}
+          onReturnedText={onReturnedText}
+        />
       )}
       {showGoal && (
         <GoalStrip controller={controller} view={view} goal={goal ?? null} />
@@ -107,22 +118,127 @@ export function NativeComposerTray({
   );
 }
 
-function QueueRow({
+function QueueList({
   controller,
   view,
-  index,
   onReturnedText,
 }: {
   controller: NativeChatController;
   view: NativeChatView;
-  index: number;
   onReturnedText: (text: string) => void;
 }) {
   const queue = view.queue!;
-  const item = queue.items[index];
-  const position = queue.offset + index;
+  const ids = queue.items.map((item) => item.inputId);
+  // Show a drop immediately; the next queue page replaces it.
+  const [order, setOrder] = useState<{
+    basis: readonly string[];
+    ids: string[];
+  } | null>(null);
+  const shown =
+    order && order.basis.join("\n") === ids.join("\n") ? order.ids : ids;
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+  const locked = view.acting || !controller.queueCurrent;
+  const drop = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const from = shown.indexOf(String(active.id));
+    const to = shown.indexOf(String(over.id));
+    if (from < 0 || to < 0) return;
+    setOrder({ basis: ids, ids: arrayMove(shown, from, to) });
+    void controller.editQueue({
+      action: "place",
+      inputId: String(active.id),
+      index: queue.offset + to,
+    });
+  };
+  return (
+    <div className="max-h-48 overflow-y-auto">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+        onDragEnd={drop}
+      >
+        <SortableContext items={shown} strategy={verticalListSortingStrategy}>
+          {shown.map((inputId) => {
+            const item = queue.items.find((row) => row.inputId === inputId)!;
+            return (
+              <QueueRow
+                key={inputId}
+                controller={controller}
+                view={view}
+                item={item}
+                position={queue.offset + queue.items.indexOf(item)}
+                sortable={!locked && shown.length > 1}
+                onReturnedText={onReturnedText}
+              />
+            );
+          })}
+        </SortableContext>
+      </DndContext>
+      {(queue.previousOffset !== null || queue.nextOffset !== null) && (
+        <div className="flex gap-1 px-2 py-1">
+          {queue.previousOffset !== null && (
+            <Button
+              size="xs"
+              variant="ghost"
+              type="button"
+              disabled={view.queueLoading || view.acting}
+              onClick={() =>
+                void controller.showQueuePage(queue.previousOffset!)
+              }
+            >
+              Earlier in queue
+            </Button>
+          )}
+          {queue.nextOffset !== null && (
+            <Button
+              size="xs"
+              variant="ghost"
+              type="button"
+              disabled={view.queueLoading || view.acting}
+              onClick={() => void controller.showQueuePage(queue.nextOffset!)}
+            >
+              Later in queue
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QueueRow({
+  controller,
+  view,
+  item,
+  position,
+  sortable,
+  onReturnedText,
+}: {
+  controller: NativeChatController;
+  view: NativeChatView;
+  item: NativeChatQueueItem;
+  position: number;
+  sortable: boolean;
+  onReturnedText: (text: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.inputId, disabled: !sortable });
   const queued = view.observation?.snapshot.queuedInputs ?? 0;
   const locked = view.acting || !controller.queueCurrent;
+  const draft =
+    view.queueDraft?.inputId === item.inputId ? view.queueDraft : null;
   const label = item.goalStart
     ? `Goal: ${item.preview ?? item.goalStart.objective}`
     : `${item.operatingRegime === "plan" ? "Plan · " : item.allowsConfigurationChange ? "Settings permitted · " : ""}${item.effort === "ultra" ? "Ultra · " : ""}${item.preview ?? "Message with other content"}`;
@@ -132,8 +248,81 @@ function QueueRow({
     !item.goalStart &&
     !item.allowsConfigurationChange &&
     item.preview !== null;
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+  };
+
+  if (draft)
+    return (
+      <form
+        ref={setNodeRef}
+        style={style}
+        aria-label="Edit queued message"
+        className="space-y-1 p-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void controller.saveQueueDraft();
+        }}
+      >
+        <Textarea
+          aria-label="Queued message"
+          autoFocus
+          value={draft.text}
+          disabled={view.acting}
+          className="min-h-12 resize-none border-0 bg-transparent p-1 shadow-none focus-visible:ring-0"
+          onChange={(event) =>
+            controller.changeQueueDraft(event.currentTarget.value)
+          }
+          onKeyDown={(event) => {
+            if (event.key === "Escape") controller.closeQueueDraft();
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              event.currentTarget.form?.requestSubmit();
+            }
+          }}
+        />
+        <div className="flex justify-end gap-1">
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            disabled={view.acting}
+            onClick={() => controller.closeQueueDraft()}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            size="xs"
+            disabled={view.acting || !draft.text.trim()}
+          >
+            Save
+          </Button>
+        </div>
+      </form>
+    );
+
   return (
-    <div className="group flex items-center gap-2 py-1 pr-1.5 pl-3">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "group/row relative flex items-center gap-2 bg-background py-1 pr-1.5 pl-3",
+        isDragging && "z-10 shadow-sm"
+      )}
+    >
+      {sortable && (
+        <button
+          type="button"
+          aria-label="Reorder queued message"
+          className="text-muted-foreground absolute left-0 hidden h-full w-3 cursor-grab items-center justify-center group-hover/row:flex active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVerticalIcon className="size-3" />
+        </button>
+      )}
       <ListEndIcon className="text-muted-foreground size-4 shrink-0" />
       <span className="min-w-0 flex-1 truncate" title={label}>
         {label}

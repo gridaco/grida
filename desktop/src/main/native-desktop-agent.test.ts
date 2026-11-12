@@ -910,9 +910,16 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       const originalSession = await original.create();
       const { choices } = await agent.profiles(workspace.id);
       expect(choices).toEqual([
-        { id: expect.any(String), connection: "Grida", model: model.label },
+        {
+          id: expect.any(String),
+          connection: "Grida",
+          model: model.label,
+          contextWindow: 8192,
+          ultra: true,
+        },
       ]);
       expect(await agent.profiles(workspace.id)).toEqual({
+        defaultContextWindow: expect.any(Number),
         choices,
         saved: [],
       });
@@ -1695,6 +1702,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       agent = await launch();
       const desktop = agent;
       expect(await desktop.profiles(workspace.id)).toEqual({
+        defaultContextWindow: expect.any(Number),
         choices: [],
         saved: [],
       });

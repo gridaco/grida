@@ -3092,6 +3092,13 @@ function queueChange(input: unknown): NativeChatQueueChange {
         (change.direction === "up" || change.direction === "down")
       )
         return { ...basis, action, inputId, direction: change.direction };
+      if (
+        action === "place" &&
+        count === 5 &&
+        Number.isSafeInteger(change.index) &&
+        (change.index as number) >= 0
+      )
+        return { ...basis, action, inputId, index: change.index as number };
     }
   }
   throw new Error("native_chat_queue_change_invalid");

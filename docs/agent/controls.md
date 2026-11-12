@@ -19,8 +19,8 @@ deck.
 Send an ordinary follow-up while a turn is running or waiting to put it
 in the queue. For example, “When the deck is ready, describe the changes”
 can run as its own turn. Each waiting text message keeps the options
-selected when you sent it. You can edit, move, or remove eligible queued
-messages before they start.
+selected when you sent it. Before they start, drag a waiting message to
+reorder it, choose **…** → **Edit** to change its text in place, or remove it.
 
 If the current turn asks a question, use its answer control. A separate
 queued message leaves the question open. Review an access request through
@@ -28,15 +28,16 @@ its approval controls. [Understand agent permissions](./permissions.md)
 
 ## End the current turn
 
-- Choose **Stop** to end the current task and hold the queue. Use
-  **Resume queue** when you are ready for the waiting messages to start.
+- Choose **Stop** to end the current task and hold the queue. The queue shows
+  **Queue paused because you interrupted**; choose **Resume** there, or the
+  play button in an empty composer, when the waiting messages should start.
 - A turn paused by a Goal or another client shows **Resume** to continue it.
 
 After a full Desktop restart, reopening a chat only loads its retained work.
-If messages are waiting in an idle queue, choose **Resume queue** to start them.
+If messages are waiting in an idle queue, choose **Resume** to start them.
 
-Changes already made can remain in the workspace. Check **Execution details**
-for the outcome, any partial work, and items that need review.
+Changes already made can remain in the workspace. Expand the stopped turn to
+see its partial work.
 An interrupted provider request can still have incurred a charge. Its final
 settlement depends on the provider's recorded result.
 [Inspect and save results](./results.md)

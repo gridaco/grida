@@ -433,12 +433,24 @@ export class NativeDesktopAgent {
         requireCurrent();
         const available = new Set(choices.map(({ id }) => id));
         const earlier = new Set(previousIds);
+        const defaultWindow = NativeChatProfiles.contextWindow(
+          DEFAULT_GATEWAY_MODEL
+        );
         return {
+          ...(defaultWindow !== undefined && {
+            defaultContextWindow: defaultWindow,
+          }),
           choices: choices.map(publicProfile),
           saved: saved.map((profile) => {
             const previous = earlier.has(profile.id);
+            // A saved receipt keeps only identity; window facts come from
+            // the current choice for the same binding.
+            const current = choices.find(({ id }) => id === profile.id);
             return {
-              ...publicProfile(profile),
+              ...publicProfile({
+                ...profile,
+                contextWindow: current?.contextWindow,
+              }),
               ...(previous && {
                 connection: `${profile.connection} (earlier chats)`,
               }),
@@ -953,11 +965,14 @@ function publicProfile({
   model,
   providerId,
   modelId,
+  contextWindow,
 }: NativeChatProfiles.Saved) {
+  const window = contextWindow ?? NativeChatProfiles.contextWindow(modelId);
   return {
     id,
     connection,
     model,
+    ...(window !== undefined && { contextWindow: window }),
     ...(NativeChatProfiles.reasons(providerId, modelId) && {
       reasoning: true as const,
     }),

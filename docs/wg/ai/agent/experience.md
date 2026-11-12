@@ -485,7 +485,7 @@ Several distinct things can appear around a turn. They keep distinct names.
 | ------------------- | -------------------------------------------------------------------------------------------- |
 | Final answer        | The agent's concluding response to the request. It remains visible.                          |
 | Turn activity       | Commentary and actions that preceded the final answer, grouped under the turn's header.      |
-| Execution details   | Technical accounting: tool outcomes, checks, token usage, billing, and retained artifacts.   |
+| Retained results    | Images and files the turn produced, shown with its answer. Accounting stays out of the chat. |
 | Reasoning summaries | Provider-supplied summaries of model reasoning. Hidden reasoning is never reconstructed.     |
 | Context compaction  | A replacement of older model context. It changes what the model reads, never the transcript. |
 

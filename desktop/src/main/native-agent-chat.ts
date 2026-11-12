@@ -1429,10 +1429,13 @@ export class NativeAgentChat {
         });
       } else {
         const ids = queue.map((row) => row.inputId);
-        const other = index + (change.direction === "up" ? -1 : 1);
-        if (other < 0 || other >= ids.length)
+        const other =
+          change.action === "place"
+            ? change.index
+            : index + (change.direction === "up" ? -1 : 1);
+        if (other < 0 || other >= ids.length || other === index)
           throw new Error("native_chat_queue_move_unavailable");
-        [ids[index], ids[other]] = [ids[other], ids[index]];
+        ids.splice(other, 0, ...ids.splice(index, 1));
         result = await this.process.request("_co.grida/session/reorder", {
           queue: basis,
           inputIds: ids,

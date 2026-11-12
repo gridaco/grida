@@ -29,8 +29,8 @@ Every turn keeps its own header, including after reopening the chat and on
 earlier pages. Stopped and failed turns say so in their header. A pending
 question or approval stays actionable outside the collapsed work. Expanding,
 collapsing, paging and reopening only read recorded work: none of them repeats
-an action or requests another model response. **Execution details** remains a
-separately named panel for the latest turn's accounting.
+an action or requests another model response. There is no separate execution
+details panel; images the latest turn produced appear below its answer.
 
 ## Steps
 

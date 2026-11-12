@@ -141,10 +141,14 @@ export type NativeChatProfileChoice = Readonly<{
   reasoning?: true;
   /** The connection can run Ultra's extended work and independent review. */
   ultra?: true;
+  /** The model's context window in tokens, when known. */
+  contextWindow?: number;
 }>;
 
 export type NativeChatProfileCatalog = Readonly<{
   active: string | null;
+  /** Context window of the default model, when known. */
+  defaultContextWindow?: number;
   choices: readonly NativeChatProfileChoice[];
   saved: readonly (NativeChatProfileChoice & { available: boolean })[];
 }>;
@@ -469,6 +473,8 @@ export type NativeChatQueueAction =
   | { action: "replace"; inputId: string; text: string }
   | { action: "withdraw"; inputId: string }
   | { action: "move"; inputId: string; direction: "up" | "down" }
+  /** Place a waiting message at a position in the whole queue (0 is next). */
+  | { action: "place"; inputId: string; index: number }
   | { action: "resume" };
 
 export type NativeChatQueueChange = NativeChatQueueAction & {

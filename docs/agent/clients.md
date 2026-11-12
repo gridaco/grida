@@ -190,8 +190,7 @@ additional folder grants, command execution, writes, or delegation. A folder
 nested within the readable primary workspace remains accessible through it. The agent can collect a verified finding or
 see that the review is still pending or uncertain.
 The finished record identifies the reviewer and records whether its verified
-findings were collected. Desktop shows whether findings were collected in
-**Execution details**.
+findings were collected.
 
 Ultra is available in Plan and Act on the source-built host. It requires a
 model with JSON tool calls and a provider that supports a bounded output.
@@ -330,7 +329,7 @@ While a turn is active, the native workspace composer queues text as a
 follow-up. You can edit, move, or remove waiting messages. Choose **Steer**
 on a waiting message when it should guide that turn at its next decision. If
 the turn cannot accept it, the text returns to the composer.
-**Stop** holds the queue. Choose **Resume queue** to let waiting messages run.
+**Stop** holds the queue. Choose **Resume** on the queue to let waiting messages run.
 
 Text and resource-link descriptors are accepted as prompt content. A resource
 link supplies context about a resource. File access follows a separately granted
@@ -694,48 +693,28 @@ does not repeat actions or request another model response. Turns recorded
 before timing was kept show **Worked** without a duration. A pending question
 or approval stays outside the collapsed work so you can answer it.
 
-### Read execution details
+### Read a finished turn's results
 
-For the Desktop export workflow, see [Inspect and save results](./results.md).
+Expand a finished turn to see its recorded tool activity. Images the
+latest turn produced appear below its answer, including after reopening the
+chat. The ring beside the model picker estimates how much of the model's
+context window the visible conversation uses; open it for a breakdown.
 
-Open **Execution details** below the latest finished turn when it has
-additional details. It can show recorded tool
-outcomes, completion checks, unresolved work, and provider-reported token
-counts. Reopening the chat restores the latest recorded details.
-
-When a required completion check fails or its outcome cannot be verified,
-the details report that result and keeps the earlier reply and recorded
-work available for review.
-
-If a provider response exceeds the agent's size limit, the details explain
-why the turn ended. You can send another message in the same chat.
-
-Token counts describe the model requests made during that turn. A partial
-count has incomplete coverage, and the details identify requests with
-unknown counts. Cached input and reasoning output can overlap other token
-counts. Context estimates and charges are separate.
-
-When Gateway billing is available, execution details can also list charges for
-work assigned to named subagents. Use **More assignments** to read the next
-page, or **Reload assignments** to include work assigned since the details were
-opened. Refreshing a pending charge checks only that model request. Some
-assignments may not have enough retained information for attribution; the
-details call out incomplete coverage and does not treat unavailable charges
-as zero.
+Desktop does not show token counts, completion checks or Gateway charges in
+the chat. The host still records them with each turn; native clients can read
+them through the turn summary. Use the connection's billing record for
+charges.
 
 On a compatible image-enabled profile, ask the agent to crop a retained PNG
-in Act. Open **Execution details** for the finished turn and choose **Preview cropped
+in Act. Below the finished turn's answer, choose **Preview cropped
 PNG** to inspect the image kept in private chat storage. Use **Save PNG as…**
 to choose a new file on your computer. If saving fails, choose **Retry save**
 to save the same crop. You can reopen the chat and retry while the crop is
-still available in its latest details. Existing destination files are preserved.
+still available. Existing destination files are preserved.
 The preview also offers **Copy image** and **Download image**.
-
-If the working copy was removed or replaced, the details still show the
-recorded result and the preview reports that the image is unavailable.
-The details list up to eight recorded PNG crops and counts any further
-records it leaves out.
-Opening a preview leaves the project and the conversation unchanged.
+If the working copy was removed or replaced, the preview reports that the
+image is unavailable. Opening a preview leaves the project and the
+conversation unchanged.
 
 ## Follow a provider retry
 

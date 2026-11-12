@@ -56,6 +56,16 @@ A connection must finish starting before its commands become available.
    with Edit, Move up and Move down. Steer: the row leaves the queue and the
    text appears in the running turn. There is no separate “Send to current
    turn” toggle.
+9. Queue three messages, then Stop. The queue shows **Queue paused because
+   you interrupted** with **Resume**, and the empty composer's primary button
+   is a play button. Hover a row: a grip appears at its left; drag the last
+   row to the top and the order sticks after the queue refreshes. Choose
+   **…** → **Edit**: the row becomes an editable text box; Enter saves,
+   Escape cancels. Resume starts the messages in the new order.
+10. The ring beside the model picker shows context use once the model's window
+    is known; hover for the percentage, click for the breakdown. Scrolling the
+    chat fades content at the top and bottom edges. No **Execution details**
+    panel appears under turns.
 
 ## Notes
 

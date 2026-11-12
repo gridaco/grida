@@ -109,7 +109,18 @@ export namespace NativeChatProfiles {
         modelId: model.id,
         connection: GG_PROVIDER_METADATA.label,
         model: label(model.label, model.id),
+        ...(positive(model.limits.context_tokens) && {
+          contextWindow: model.limits.context_tokens,
+        }),
       }));
+  }
+
+  /** The catalogue's context window for a model, when it lists one. */
+  export function contextWindow(modelId: string): number | undefined {
+    const window =
+      catalog.text.catalog[modelId as keyof typeof catalog.text.catalog]
+        ?.contextWindow;
+    return positive(window) ? window : undefined;
   }
 
   /** Whether this provider's binding of the model accepts a reasoning level. */
@@ -168,12 +179,14 @@ export namespace NativeChatProfiles {
         const launch = { ...eligible, model: model.id };
         // The previous owner remains available only through its saved receipt.
         previousIds.push(binding(endpoint.id, launch));
+        const window = model.overrides?.contextWindow ?? model.contextWindow;
         const choice = {
           id: binding(endpoint.id, configuredLaunch(launch)),
           providerId: endpoint.id,
           modelId: model.id,
           connection: label(endpoint.label, endpoint.id),
           model: label(model.label, model.id),
+          ...(positive(window) && { contextWindow: window }),
         };
         choices.push(choice);
         if (
@@ -260,7 +273,14 @@ export namespace NativeChatProfiles {
     if (entries.some(({ id }) => id === profile.id)) return;
     if (entries.length >= MAX_SAVED)
       throw new Error("native_chat_profile_limit");
-    const encoded = Buffer.from(JSON.stringify([...entries, profile]));
+    // The receipt keeps only its identity; display facts are derived again.
+    const { id, providerId, modelId, connection, model } = profile;
+    const encoded = Buffer.from(
+      JSON.stringify([
+        ...entries,
+        { id, providerId, modelId, connection, model },
+      ])
+    );
     if (encoded.length > MAX_BYTES) throw invalid();
     const target = path.join(directory, FILENAME);
     const stage = path.join(directory, `.chat-profiles-${randomUUID()}.tmp`);
@@ -338,6 +358,10 @@ function saved(value: unknown): value is NativeChatProfiles.Saved {
     modelId(entry.connection) &&
     modelId(entry.model)
   );
+}
+
+function positive(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0;
 }
 
 function invalid(): Error {
