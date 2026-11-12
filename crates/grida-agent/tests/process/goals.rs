@@ -487,6 +487,7 @@ async fn explicit_goal_uses_owned_queue_and_keeps_ordinary_work_separate() {
         .goal
         .unwrap();
     assert_eq!(current.basis.goal, accepted.input);
+    let goal_turn = current.reservation.as_ref().unwrap().turn.clone();
     assert_eq!(current.remaining.inference_steps, 0);
     assert_eq!(
         current.reservation.as_ref().unwrap().inference_steps.get(),
@@ -546,6 +547,7 @@ async fn explicit_goal_uses_owned_queue_and_keeps_ordinary_work_separate() {
     );
     assert_eq!(goal.remaining.inference_steps, 3);
     assert!(goal.reservation.is_none());
+    let ordinary_turn = settled.latest.as_ref().unwrap().binding.turn.clone();
     let ordinary_account = grida_agent_master::read_account(
         settled
             .latest
@@ -558,9 +560,24 @@ async fn explicit_goal_uses_owned_queue_and_keeps_ordinary_work_separate() {
     )
     .unwrap();
     assert!(ordinary_account.goal.is_none());
+    // Only the turn the goal's own input started is marked, before and after reopening.
+    let turns = vec![goal_turn.clone(), ordinary_turn.clone()];
+    assert_eq!(
+        host.goal_start_turns(session.clone(), turns.clone())
+            .await
+            .unwrap(),
+        vec![goal_turn.clone()]
+    );
     host.shutdown().await.unwrap();
     drop(host);
     let reopened = Host::open(&state, Some(options(&endpoint))).unwrap();
+    assert_eq!(
+        reopened
+            .goal_start_turns(session.clone(), turns)
+            .await
+            .unwrap(),
+        vec![goal_turn]
+    );
     let observed = reopened.inspect_goal(session).await.unwrap().goal.unwrap();
     assert_eq!(observed.spent, goal.spent);
     assert_eq!(observed.progress, goal.progress);

@@ -41,60 +41,46 @@ limits inference steps. An optional Gateway spending ceiling is a separate limit
 
 ## Keep an objective across turns
 
-1. In an idle chat with an empty queue, type `/goal` and select it. The
-   **Goal** badge appears without starting work. Describe the objective and
-   what success looks like, then send. The description becomes both the objective
-   and its completion criterion. Sending authorizes automatic continuation within
-   eight work turns and 64 inference steps.
-2. To set separate criteria or different limits, open the **Goal** badge and
-   choose **Customize goal…** before starting. You can turn automatic continuation
-   off in this form. Add `/plan` first for a goal that investigates and proposes;
-   later work keeps the instructions accepted when the goal started.
-3. Open the **Goal** badge or **Chat options → Goal details** to inspect progress.
-   When it is **Ready for your review**, compare the result with your criteria.
-   Choose **Confirm goal complete** when they are met. The chat keeps the proposal
-   and confirmation so you can return to them later.
+1. In an idle chat with an empty queue, type `/goal` and select it, or choose
+   **Goal** from the **+** menu. A **Goal** badge appears in the composer
+   without starting work; hover it and choose its **×** to remove it.
+2. Describe the objective in your own words and send. The message is marked
+   **Sent as goal** in the chat. The agent works from that objective and
+   continues on its own within eight work turns and 64 inference steps. The
+   effort selected in the composer applies; **Ultra** lets one independent
+   review share the goal's allowance on supported connections.
+3. While the goal exists, a strip above the composer shows its status and
+   objective, for example **Pursuing goal**, **Paused goal** or
+   **Goal complete**. Use its buttons to clear, pause or resume, and edit the
+   goal. Editing opens the objective text; saving keeps the goal's used
+   allowance and stops any current goal turn while keeping its recorded work.
+4. When the strip shows **Review goal**, compare the result with your
+   objective and choose **Confirm** when it is met. The chat keeps the
+   proposal and confirmation so you can return to them later.
 
-Goal entry uses text and workspace references. Send or remove a pending attachment
-before selecting it. Cancelling the custom form keeps the composer’s Goal intent;
-removing the intent starts no work.
+Goal entry uses text and workspace references. Send or remove a pending
+attachment before selecting it. Add `/plan` first for a goal that investigates
+and proposes; later work keeps the instructions accepted when the goal started.
 
-For example, set the goal “Find the open decisions in the project notes.”
-Ask for each decision and the section where it appears. Check the retained
-answer against the notes before confirming completion.
-[Inspect and save results](./results.md)
+For example, set the goal “Find the open decisions in the project notes and
+the section where each appears.” Check the answer against the notes before
+confirming completion. [Inspect and save results](./results.md)
 
 Pause preserves the allowance already held for the task. Stop ends the active
 turn and leaves the goal visible. [Guide and interrupt work](./controls.md)
 
-Use **Edit goal** to revise the objective or success criteria of an active
-goal. Its used and held allowance carries forward. Saving during a goal turn
-stops that turn and keeps its recorded work. For a turn with a funded review,
-use the task controls before editing.
-
-When a supported native workspace connection offers **Effort for this goal**,
-choose **Ultra** to let one independent review share the goal's inference
-allowance. Use the task's Pause, Resume, or Stop controls during the funded
-turn. If work finishes before the review can be accounted for, the goal keeps
-its held steps. Choose **Refresh held allowance** to account for any settled
-review. That control reads the recorded work and starts no new work.
-
-In **Act** with **Ultra**, supported connections let you choose an existing
-subagent under **Goal reviewer**. The Goal keeps that reviewer for eligible
-later turns. Each funded assignment shares the Goal’s review allowance and
-uses one assignment from the subagent’s own allowance. An unavailable
-reviewer leaves the review unassigned.
-
-Standard Act goals on supported connections can schedule a check-in during
-their first turn. [Schedule a follow-up](./scheduled-work.md)
+Desktop does not ask for separate success criteria, limits, a spending
+ceiling, a named reviewer or a check-in when starting a goal. Native clients
+can set those through the goal protocol.
 
 Private native clients can also use reviewed automatic verification.
 [Use goals from a native client](./clients.md#work-toward-a-persistent-goal)
 
 ## Set a maximum spend
 
-When a Gateway connection offers **Maximum spend (USD, optional)** while
-starting a Goal, enter the total amount you authorize for that Goal. Parent and
+A native client starting a Goal on a supported Gateway connection can set a
+maximum spend: the total amount you authorize for that Goal. Desktop does not
+offer this when starting a goal. Parent and
 funded subagent requests share one retained allocation. Each paid request has a
 provider-enforced ceiling; separate paid media and external-tool lanes are not
 available to capped Goal work. BYOK, custom endpoints and subscription

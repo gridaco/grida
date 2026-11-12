@@ -133,6 +133,10 @@ export type ChatMessageActions = {
   onFork?: (messageId: string) => void;
   /** Disable the actions (e.g. while a run is in flight). */
   disabled?: boolean;
+  /** When the message was sent, in UTC milliseconds. Shown with the actions. */
+  sentAtMs?: number;
+  /** A short, always-visible label after the actions, e.g. how it was sent. */
+  note?: ReactNode;
 };
 
 export function ChatMessageView({
@@ -285,36 +289,54 @@ export function ChatMessageView({
             to sit under the user bubble. Copy is always available (a pure
             clipboard action, never disabled). History controls appear only
             when the host wires them. */}
-        <MessageActions className={`ml-auto ${revealOnHoverActions}`}>
-          <CopyMessageAction text={text} />
-          {actions?.onEdit && (
-            <MessageAction
-              tooltip="Edit and resubmit"
-              disabled={actions.disabled}
-              onClick={() => actions.onEdit?.(message.id)}
-            >
-              <PencilIcon />
-            </MessageAction>
+        <div className="ml-auto flex items-center gap-2">
+          <MessageActions className={revealOnHoverActions}>
+            {actions?.sentAtMs !== undefined && (
+              <time
+                dateTime={new Date(actions.sentAtMs).toISOString()}
+                className="text-muted-foreground px-1 text-xs tabular-nums"
+              >
+                {new Date(actions.sentAtMs).toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </time>
+            )}
+            <CopyMessageAction text={text} />
+            {actions?.onEdit && (
+              <MessageAction
+                tooltip="Edit and resubmit"
+                disabled={actions.disabled}
+                onClick={() => actions.onEdit?.(message.id)}
+              >
+                <PencilIcon />
+              </MessageAction>
+            )}
+            {actions?.onRewind && (
+              <MessageAction
+                tooltip="Rewind to here"
+                disabled={actions.disabled}
+                onClick={() => actions.onRewind?.(message.id)}
+              >
+                <RotateCcwIcon />
+              </MessageAction>
+            )}
+            {actions?.onFork && (
+              <MessageAction
+                tooltip="Fork from here"
+                disabled={actions.disabled}
+                onClick={() => actions.onFork?.(message.id)}
+              >
+                <GitBranchIcon />
+              </MessageAction>
+            )}
+          </MessageActions>
+          {actions?.note && (
+            <span className="text-muted-foreground flex items-center gap-1 text-xs [&_svg]:size-3.5">
+              {actions.note}
+            </span>
           )}
-          {actions?.onRewind && (
-            <MessageAction
-              tooltip="Rewind to here"
-              disabled={actions.disabled}
-              onClick={() => actions.onRewind?.(message.id)}
-            >
-              <RotateCcwIcon />
-            </MessageAction>
-          )}
-          {actions?.onFork && (
-            <MessageAction
-              tooltip="Fork from here"
-              disabled={actions.disabled}
-              onClick={() => actions.onFork?.(message.id)}
-            >
-              <GitBranchIcon />
-            </MessageAction>
-          )}
-        </MessageActions>
+        </div>
       </Message>
     );
   }

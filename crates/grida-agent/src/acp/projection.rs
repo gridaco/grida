@@ -292,13 +292,18 @@ pub(super) fn visible_record_bytes(record: &HistoryRecord) -> usize {
 }
 
 /// Recorded outcome and wall-clock interval for a replayed turn.
-pub(super) fn turn_facts(turn: &ReplayTurn) -> Value {
-    json!({
+/// `goal_start` marks a turn whose input started a goal.
+pub(super) fn turn_facts(turn: &ReplayTurn, goal_start: bool) -> Value {
+    let mut facts = json!({
         "turnId": turn.id,
         "status": turn.status,
         "startedAtMs": turn.started_ms,
         "settledAtMs": turn.settled_ms,
-    })
+    });
+    if goal_start {
+        facts["goalStart"] = json!(true);
+    }
+    facts
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

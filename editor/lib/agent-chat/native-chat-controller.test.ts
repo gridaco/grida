@@ -1516,6 +1516,67 @@ it("retries steering exactly after a lost reply and never falls through to the q
   controller.disconnect();
 });
 
+it("steers with a queued message only after it leaves the queue, and returns its text if the turn refuses", async () => {
+  const { bridge, controller, running } = fixture();
+  running.add("chat-a");
+  let queued = [{ inputId: "queued", preview: "Use the blue palette" }];
+  bridge.queue = async () => ({
+    items: queued,
+    offset: 0,
+    previousOffset: null,
+    nextOffset: null,
+  });
+  const base = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const value = await base(id);
+    return {
+      ...value,
+      snapshot: { ...value.snapshot, queuedInputs: queued.length },
+    };
+  };
+  bridge.queuedText = async () => "Use the blue palette";
+  const order: string[] = [];
+  bridge.editQueue = vi.fn<NonNullable<DesktopNativeChat["editQueue"]>>(
+    async (sessionId, change) => {
+      order.push(change.action);
+      queued = [];
+      return { sessionId, requestId: change.requestId, sessionRevision: 3 };
+    }
+  );
+  const steer = vi.fn<NonNullable<DesktopNativeChat["steer"]>>(
+    async (sessionId, input) => {
+      order.push(`steer:${input.text}`);
+      return {
+        sessionId,
+        requestId: input.requestId,
+        turnId: "turn-chat-a",
+        sessionRevision: 4,
+        journalPosition: 2,
+      };
+    }
+  );
+  bridge.steer = steer;
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  const item = controller.read().queue!.items[0];
+  expect(controller.canSteerQueued(item)).toBe(true);
+  // Goals, Plan and Ultra messages keep their own turn.
+  expect(controller.canSteerQueued({ ...item, operatingRegime: "plan" })).toBe(
+    false
+  );
+  expect(controller.canSteerQueued({ ...item, effort: "ultra" })).toBe(false);
+  expect(await controller.steerQueued("queued")).toBeNull();
+  expect(order).toEqual(["withdraw", "steer:Use the blue palette"]);
+
+  queued = [{ inputId: "again", preview: "Use the blue palette" }];
+  await controller.showQueuePage(0);
+  await vi.waitFor(() => expect(controller.queueCurrent).toBe(true));
+  steer.mockRejectedValueOnce(new Error("turn settled"));
+  expect(await controller.steerQueued("again")).toBe("Use the blue palette");
+  expect(controller.read().error).toMatch(/back in the composer/);
+  controller.disconnect();
+});
+
 it.each(["standard", "ultra", "scheduled standard", "standard plan"] as const)(
   "starts a %s goal only on explicit acceptance and reuses its exact input on retry",
   async (effort) => {

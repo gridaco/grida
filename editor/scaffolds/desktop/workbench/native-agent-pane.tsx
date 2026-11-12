@@ -15,22 +15,16 @@ import type {
 } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
 import { Textarea } from "@app/ui/components/textarea";
-import { MessageAction } from "@app/ui/ai-elements/message";
 import { readLibraryAttachment } from "@/app/(library)/library/attachment";
 import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
 import {
   CheckIcon,
   FolderIcon,
-  CornerDownRightIcon,
   PlayIcon,
-  SquareIcon,
-  ArrowDownIcon,
-  ArrowUpIcon,
-  PencilIcon,
   LibraryIcon,
   PaperclipIcon,
   PlusIcon,
-  TargetIcon,
+  GoalIcon,
   ListChecksIcon,
   ImageIcon,
   XIcon,
@@ -57,9 +51,8 @@ import {
   AgentComposerInput,
   type ComposerCommandAction,
 } from "../shared/agent-composer-input";
-import { QueuedMessageRows } from "../shared/queued-messages";
 import { useWorkspaceFileMentions } from "../shared/use-workspace-composer-catalog";
-import { NativeGoalPanel } from "./native-goal-panel";
+import { NativeComposerTray } from "./native-composer-tray";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
 import { NativeTurnSummary } from "./native-turn-summary";
 import { NativeTurnActivity } from "./native-turn-activity";
@@ -257,10 +250,6 @@ export function NativeAgentPane({
     scope: number;
     selectionId: string;
   } | null>(null);
-  const [goalDialog, setGoalDialog] = useState<{
-    scope: number;
-    creating: boolean;
-  } | null>(null);
   const [subagentsScope, setSubagentsScope] = useState<number | null>(null);
   const side = state.sideChat;
   useEffect(() => {
@@ -322,11 +311,7 @@ export function NativeAgentPane({
   const retrying =
     running && !question && snapshot?.retryNotBeforeMs !== undefined;
   const queued = snapshot?.queuedInputs ?? 0;
-  const queue = state.queue;
-  const previousQueueOffset = queue?.previousOffset ?? null;
-  const nextQueueOffset = queue?.nextOffset ?? null;
   const streamingControlsOnly = running && !bridge.enqueue;
-  const queueDisabled = !controller.queueCurrent || state.acting;
   const error = state.error ?? state.approvalError ?? state.questionError;
   // One short state line. Questions, approvals, the queue and each turn's
   // header already show their own state in the conversation.
@@ -348,34 +333,55 @@ export function NativeAgentPane({
     snapshot?.current,
     snapshot?.latest
   );
-  const renderMessage = (message: NativeChatMessage) => (
-    <ChatMessageView
-      key={message.messageId}
-      actions={
-        message.role === "user" && editHistory
-          ? {
-              onEdit: (messageId) => void controller.prepareRevision(messageId),
-            }
-          : undefined
-      }
-      message={{
-        id: message.messageId,
-        role: message.role,
-        parts: [{ type: "text", text: message.text }],
-      }}
-    />
-  );
+  const turnRecord = (turnId: string | undefined) =>
+    turnId
+      ? state.turnRecords.find((record) => record.turnId === turnId)
+      : undefined;
+  const renderMessage = (message: NativeChatMessage) => {
+    const record =
+      message.role === "user" ? turnRecord(message.turnId) : undefined;
+    // The first user message of a goal-start turn is the one that set it.
+    const goalStart =
+      record?.goalStart &&
+      state.messages.find(
+        (candidate) =>
+          candidate.role === "user" && candidate.turnId === message.turnId
+      )?.messageId === message.messageId;
+    return (
+      <ChatMessageView
+        key={message.messageId}
+        actions={
+          message.role === "user"
+            ? {
+                ...(editHistory && {
+                  onEdit: (messageId: string) =>
+                    void controller.prepareRevision(messageId),
+                }),
+                sentAtMs: record?.startedAtMs,
+                note: goalStart ? (
+                  <>
+                    <GoalIcon />
+                    Sent as goal
+                  </>
+                ) : undefined,
+              }
+            : undefined
+        }
+        message={{
+          id: message.messageId,
+          role: message.role,
+          parts: [{ type: "text", text: message.text }],
+        }}
+      />
+    );
+  };
 
   return (
     <div
       data-testid="workspace-native-chat"
       className="flex min-h-0 flex-1 flex-col"
     >
-      <NativeChatHeader
-        controller={controller}
-        state={state}
-        onGoal={() => setGoalDialog({ scope: state.scope, creating: false })}
-      />
+      <NativeChatHeader controller={controller} state={state} />
       {(state.profileError || state.catalogEntryError) && (
         <p role="alert" className="px-3 py-1 text-xs text-destructive">
           {state.profileError ?? state.catalogEntryError}
@@ -559,110 +565,6 @@ export function NativeAgentPane({
           </Button>
         </div>
       )}
-      {queue && (
-        <div className="max-h-40 shrink-0 overflow-y-auto">
-          <QueuedMessageRows
-            plain
-            queued={queue.items.map((item) => ({
-              id: item.inputId,
-              text: item.goalStart
-                ? `Goal: ${item.preview ?? item.goalStart.objective}`
-                : `${item.operatingRegime === "plan" ? "Plan · " : item.allowsConfigurationChange ? "Settings permitted · " : ""}${item.effort === "ultra" ? "Ultra · " : ""}${item.preview ?? "Queued input with other content"}`,
-            }))}
-            actions={(inputId, index) => {
-              const position = queue.offset + index;
-              return (
-                <div className="flex shrink-0 items-center gap-0.5">
-                  <MessageAction
-                    tooltip="Edit queued message"
-                    disabled={
-                      queueDisabled ||
-                      !!state.queueDraft ||
-                      !!queue.items[index].goalStart ||
-                      !!queue.items[index].allowsConfigurationChange ||
-                      !bridge.queuedText ||
-                      !bridge.editQueue ||
-                      queue.items[index].preview === null
-                    }
-                    onClick={() => void controller.editQueuedText(inputId)}
-                  >
-                    <PencilIcon />
-                  </MessageAction>
-                  <MessageAction
-                    tooltip="Move queued message up"
-                    disabled={
-                      queueDisabled || !bridge.editQueue || position === 0
-                    }
-                    onClick={() =>
-                      void controller.editQueue({
-                        action: "move",
-                        inputId,
-                        direction: "up",
-                      })
-                    }
-                  >
-                    <ArrowUpIcon />
-                  </MessageAction>
-                  <MessageAction
-                    tooltip="Move queued message down"
-                    disabled={
-                      queueDisabled ||
-                      !bridge.editQueue ||
-                      position + 1 >= queued
-                    }
-                    onClick={() =>
-                      void controller.editQueue({
-                        action: "move",
-                        inputId,
-                        direction: "down",
-                      })
-                    }
-                  >
-                    <ArrowDownIcon />
-                  </MessageAction>
-                  <MessageAction
-                    tooltip="Remove from queue"
-                    disabled={queueDisabled || !bridge.editQueue}
-                    onClick={() =>
-                      void controller.editQueue({ action: "withdraw", inputId })
-                    }
-                  >
-                    <XIcon />
-                  </MessageAction>
-                </div>
-              );
-            }}
-          />
-          {(previousQueueOffset !== null || nextQueueOffset !== null) && (
-            <div className="flex gap-2 px-3 pb-2">
-              {previousQueueOffset !== null && (
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  type="button"
-                  disabled={state.queueLoading || state.acting}
-                  onClick={() =>
-                    void controller.showQueuePage(previousQueueOffset)
-                  }
-                >
-                  Previous queued messages
-                </Button>
-              )}
-              {nextQueueOffset !== null && (
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  type="button"
-                  disabled={state.queueLoading || state.acting}
-                  onClick={() => void controller.showQueuePage(nextQueueOffset)}
-                >
-                  Next queued messages
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
       {state.queueDraft && (
         <div className="shrink-0 space-y-2 px-3 py-2">
           <Textarea
@@ -830,34 +732,6 @@ export function NativeAgentPane({
         </div>
       )}
       <Dialog
-        open={goalDialog?.scope === state.scope}
-        onOpenChange={(open) => {
-          if (!open) setGoalDialog(null);
-        }}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {goalDialog?.creating ? "Configure goal" : "Goal details"}
-            </DialogTitle>
-            <DialogDescription>
-              Review the objective, progress and work limits for this chat.
-            </DialogDescription>
-          </DialogHeader>
-          <NativeGoalPanel
-            key={`goal-${state.scope}-${goalDialog?.creating}`}
-            controller={controller}
-            view={state}
-            creating={goalDialog?.creating}
-            onCancel={() => setGoalDialog(null)}
-            onStarted={() => {
-              controller.selectGoalIntent(false);
-              setGoalDialog(null);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-      <Dialog
         open={subagentsScope === state.scope}
         onOpenChange={(open) => {
           if (!open) setSubagentsScope(null);
@@ -983,6 +857,13 @@ export function NativeAgentPane({
             )}
           </div>
         )}
+        <NativeComposerTray
+          controller={controller}
+          view={state}
+          onReturnedText={(text) =>
+            void draft.current?.appendText(text, MAX_DRAFT_BYTES)
+          }
+        />
         <AgentComposerInput
           key={state.scope}
           catalog={catalog}
@@ -1004,7 +885,7 @@ export function NativeAgentPane({
                   },
                 ]
               : []),
-            ...(controller.canStartGoal || state.goal?.goal
+            ...(controller.canStartGoal
               ? [
                   {
                     id: "goal",
@@ -1012,13 +893,7 @@ export function NativeAgentPane({
                     description:
                       "Work toward a goal with automatic continuation",
                     standalone: true as const,
-                    run: () =>
-                      controller.canStartGoal
-                        ? controller.selectGoalIntent(true)
-                        : setGoalDialog({
-                            scope: state.scope,
-                            creating: false,
-                          }),
+                    run: () => controller.selectGoalIntent(true),
                   },
                 ]
               : []),
@@ -1038,8 +913,7 @@ export function NativeAgentPane({
               return true;
             }
             if (command.id === "goal") {
-              if (controller.canStartGoal) controller.selectGoalIntent(true);
-              else setGoalDialog({ scope: state.scope, creating: false });
+              controller.selectGoalIntent(true);
               return true;
             }
             return false;
@@ -1056,20 +930,19 @@ export function NativeAgentPane({
           }
           busy={!!turn}
           isStreaming={streamingControlsOnly}
+          stopWhenEmpty={canStop && !state.acting}
           placeholder={
             connectionRequired && !state.scope
               ? "Choose a model to start chatting…"
               : state.goalIntent
-                ? "Describe your goal and what success looks like…"
+                ? "Describe the goal…"
                 : state.operatingRegime === "plan"
                   ? "What would you like to plan?"
                   : state.attachmentDraft
                     ? "Add a message to send this attachment…"
-                    : state.steering
-                      ? "Add guidance to this turn…"
-                      : turn || snapshot?.admissionPaused || queued
-                        ? "Queue a follow-up…"
-                        : undefined
+                    : turn || snapshot?.admissionPaused || queued
+                      ? "Queue a follow-up…"
+                      : undefined
           }
           submissionScope={state.scope}
           draftRef={draft}
@@ -1127,18 +1000,14 @@ export function NativeAgentPane({
                   )}
                   {bridge.startGoal && (
                     <DropdownMenuItem
-                      disabled={state.acting || state.goalIntent}
-                      onSelect={() => {
-                        if (controller.canStartGoal)
-                          controller.selectGoalIntent(true);
-                        else
-                          setGoalDialog({
-                            scope: state.scope,
-                            creating: false,
-                          });
-                      }}
+                      disabled={
+                        state.acting ||
+                        state.goalIntent ||
+                        !controller.canStartGoal
+                      }
+                      onSelect={() => controller.selectGoalIntent(true)}
                     >
-                      <TargetIcon className="size-4" />
+                      <GoalIcon className="size-4" />
                       Goal
                       <span className="text-muted-foreground">
                         Set a goal to keep pursuing
@@ -1200,109 +1069,20 @@ export function NativeAgentPane({
                 </PopoverContent>
               </Popover>
               {state.operatingRegime === "plan" && (
-                <span className="flex shrink-0 items-center rounded-md bg-muted px-1 text-xs text-muted-foreground">
-                  <ListChecksIcon className="mr-1 size-3.5" />
-                  Plan
-                  <Button
-                    type="button"
-                    size="icon-xs"
-                    variant="ghost"
-                    aria-label="Remove planning intent"
-                    disabled={state.acting}
-                    onClick={() => controller.selectOperatingRegime("act")}
-                  >
-                    <XIcon className="size-3" />
-                  </Button>
-                </span>
+                <IntentChip
+                  icon={<ListChecksIcon />}
+                  label="Plan"
+                  disabled={state.acting}
+                  onRemove={() => controller.selectOperatingRegime("act")}
+                />
               )}
-              {(state.goalIntent ||
-                snapshot?.pendingGoalId ||
-                (state.goal?.goal &&
-                  state.goal.goal.state.status !== "cleared")) && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="ghost"
-                      className="shrink-0 gap-1 px-1.5 text-muted-foreground"
-                      aria-label="Goal options"
-                    >
-                      <TargetIcon className="size-3.5" />
-                      {state.goalIntent
-                        ? "Goal"
-                        : state.goal?.goal?.review?.status === "pending"
-                          ? "Goal · Review"
-                          : state.goal?.goal?.paused
-                            ? "Goal · Paused"
-                            : state.goal?.goal?.state.status === "complete"
-                              ? "Goal · Complete"
-                              : "Goal"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    side="top"
-                    align="start"
-                    className="w-64 space-y-2 text-xs"
-                  >
-                    {state.goalIntent ? (
-                      <>
-                        <p className="font-medium">Work toward a goal</p>
-                        <p className="text-muted-foreground">
-                          Send an objective with its success criteria. The agent
-                          can continue automatically for up to{" "}
-                          {NativeChatController.goalComposerAllowance.workTurns}{" "}
-                          work turns and{" "}
-                          {
-                            NativeChatController.goalComposerAllowance
-                              .inferenceSteps
-                          }{" "}
-                          inference steps.
-                        </p>
-                        <Button
-                          type="button"
-                          size="xs"
-                          variant="ghost"
-                          onClick={() =>
-                            setGoalDialog({
-                              scope: state.scope,
-                              creating: true,
-                            })
-                          }
-                        >
-                          Customize goal…
-                        </Button>
-                        <Button
-                          type="button"
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => controller.selectGoalIntent(false)}
-                        >
-                          Remove goal intent
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <p className="line-clamp-3 text-muted-foreground">
-                          {state.goal?.goal?.objective}
-                        </p>
-                        <Button
-                          type="button"
-                          size="xs"
-                          variant="ghost"
-                          onClick={() =>
-                            setGoalDialog({
-                              scope: state.scope,
-                              creating: false,
-                            })
-                          }
-                        >
-                          View goal details
-                        </Button>
-                      </>
-                    )}
-                  </PopoverContent>
-                </Popover>
+              {state.goalIntent && (
+                <IntentChip
+                  icon={<GoalIcon />}
+                  label="Goal"
+                  disabled={state.acting}
+                  onRemove={() => controller.selectGoalIntent(false)}
+                />
               )}
               {(canResume && (!goalTurn || !state.goal?.goal?.paused)) ||
               canContinue ? (
@@ -1322,29 +1102,6 @@ export function NativeAgentPane({
                   </span>
                 </Button>
               ) : null}
-              {(controller.canSteer || state.steering) && (
-                <Button
-                  type="button"
-                  size="xs"
-                  variant={state.steering ? "secondary" : "ghost"}
-                  disabled={state.acting}
-                  aria-label={
-                    state.steering ? "Send a follow-up" : "Send to current turn"
-                  }
-                  title={
-                    state.steering ? "Send a follow-up" : "Send to current turn"
-                  }
-                  className="shrink-0"
-                  onClick={() => controller.toggleSteering()}
-                >
-                  <CornerDownRightIcon className="size-3.5" />
-                  <span className="hidden @md:inline">
-                    {state.steering
-                      ? "Send a follow-up"
-                      : "Send to current turn"}
-                  </span>
-                </Button>
-              )}
             </>
           }
           toolbarEnd={
@@ -1361,21 +1118,6 @@ export function NativeAgentPane({
                 ultraAvailable={state.effortAvailable}
                 onEffort={(effort) => controller.selectEffort(effort)}
               />
-              {!streamingControlsOnly && canStop && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  disabled={state.acting}
-                  aria-label="Stop"
-                  title="Stop"
-                  className="shrink-0"
-                  onClick={() => void controller.control("stop")}
-                >
-                  <SquareIcon className="size-3" />
-                  <span className="hidden @md:inline">Stop</span>
-                </Button>
-              )}
             </>
           }
         />
@@ -1455,5 +1197,33 @@ function reviewText(value: string): string {
   return JSON.stringify(value).replace(
     /[\u007f-\u009f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069]/g,
     (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`
+  );
+}
+
+/** A removable composer intent. The icon turns into a remove button on hover. */
+function IntentChip({
+  icon,
+  label,
+  disabled,
+  onRemove,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+  onRemove: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-label={`Remove ${label.toLowerCase()}`}
+      title={`Remove ${label.toLowerCase()}`}
+      onClick={onRemove}
+      className="group/chip flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 [&_svg]:size-3.5"
+    >
+      <span className="group-hover/chip:hidden">{icon}</span>
+      <XIcon className="hidden group-hover/chip:block" />
+      {label}
+    </button>
   );
 }

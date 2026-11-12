@@ -157,7 +157,7 @@ available for a manual answer. [Configure automatic read review](https://github.
 In the native Desktop workspace pane, select `/plan` in the composer to add
 planning instructions to the next message. Selection preserves the draft and
 starts no work. The removable **Plan** badge applies to messages you send or
-queue. **Send to current turn** keeps that turn's accepted instructions. To
+queue. Steering a queued message into the current turn keeps that turn's accepted instructions. To
 carry out a proposal, remove the badge and send a new request in the same chat.
 Planning does not change the chat’s permissions or effort.
 
@@ -327,8 +327,9 @@ skipping. The agent may continue other work while it waits. A separate message
 sent from the composer joins the queue and leaves the question open.
 
 While a turn is active, the native workspace composer queues text as a
-follow-up. You can edit, move, or remove waiting messages. Choose **Send to
-current turn** when the text should guide that turn at its next decision.
+follow-up. You can edit, move, or remove waiting messages. Choose **Steer**
+on a waiting message when it should guide that turn at its next decision. If
+the turn cannot accept it, the text returns to the composer.
 **Stop** holds the queue. Choose **Resume queue** to let waiting messages run.
 
 Text and resource-link descriptors are accepted as prompt content. A resource
@@ -895,21 +896,23 @@ and leaves the transcript available.
 
 ### Work toward a persistent goal
 
-In the native Desktop workspace pane, select `/goal` to add a **Goal** badge.
-Sending the objective starts automatic continuation within eight work turns and
-64 inference steps, using the description as its completion criterion. Selecting
-the command alone starts no work. Open the badge and choose **Customize goal…**
-for separate criteria, different limits, or manual continuation. **Start goal**
-accepts the work and the allowance entered in that form. An accepted goal waits in the
-retained queue until its first work turn is reserved. It appears as a goal
-after restart. To change it before work starts, remove it from the queue and
-start a new goal with the revised objective or allowance.
+In the native Desktop workspace pane, select `/goal` or **+ → Goal** to add a
+**Goal** badge, then send the objective. Desktop uses the objective as its
+completion criterion and starts automatic continuation within eight work turns
+and 64 inference steps. Selecting the command alone starts no work. The
+starting message is marked **Sent as goal**, including after reopening the
+chat. An accepted goal waits in the retained queue until its first work turn
+is reserved. To change it before work starts, remove it from the queue and send
+a new goal.
 
-After work starts, use **Edit goal** to change the objective or criteria
-while keeping the same goal and allowance. Editing stops any current goal
-turn and preserves its recorded work. A funded review uses the task controls
-before its goal can be edited.
+While a goal exists, the strip above the composer shows its status and
+objective with clear, pause or resume, and edit controls. Editing changes the
+objective text while keeping the same goal and allowance. Editing stops any
+current goal turn and preserves its recorded work. A funded review uses the
+task controls before its goal can be edited.
 
+Native clients can set separate criteria, allowances, manual continuation,
+named reviewers, spending ceilings and check-ins through the goal protocol.
 Start a goal in an idle chat with an empty queue. Supply an objective, its
 success criteria, and separate allowances for work turns and inference steps.
 Opt in to automatic continuation when you start the goal. The next reserved
@@ -918,8 +921,8 @@ input, runs out of allowance, or records no further progress.
 Without that opt-in, the goal reserves its first work turn only. An explicit
 Resume can authorize one more work turn within the remaining allowance; it does
 not turn on automatic continuation. Earlier queued messages go first.
-On a compatible Desktop connection, choose **Continue goal** for an active idle
-manual goal, or **Resume goal** when it is paused or blocked.
+For a manual goal started elsewhere, the Desktop goal strip's resume control
+continues one more turn.
 
 Inspect the goal to see progress, allowance used and held, and any blocker.
 Pause and Resume preserve the allowance for the same suspended turn. Revising
@@ -942,7 +945,7 @@ or a private ACP client, can select
 **Ultra** for a goal. One independent review shares its inference allowance.
 Later automatic work proceeds directly if only one or two steps remain. Use
 the task's Pause, Resume, or Stop while the funded turn is active. If the
-review finishes later, choose **Refresh held allowance** in Desktop to account
+review finishes later, choose **Refresh** on the Desktop goal strip to account
 for its settled steps. ACP clients can use the negotiated reconciliation
 control. Resume the goal explicitly to continue after reconciliation.
 
@@ -955,7 +958,7 @@ use Recover to reconsider eligible work under the original allowance and
 authorization.
 Work with an interrupted dispatch remains recorded against its existing turn.
 
-Desktop and private ACP clients can allow one check-in when starting a
+Private ACP clients can allow one check-in when starting a
 **Standard Act** goal. The check-in waits within the first reserved turn and
 uses its remaining inference allowance. After reopening, restore the schedule
 and resume the goal if it is paused. Cancelled check-ins require explicit

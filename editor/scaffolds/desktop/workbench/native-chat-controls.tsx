@@ -57,11 +57,9 @@ import type {
 export function NativeChatHeader({
   controller,
   state,
-  onGoal,
 }: {
   controller: NativeChatController;
   state: NativeChatView;
-  onGoal: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const title = state.selected
@@ -255,9 +253,6 @@ export function NativeChatHeader({
               )}
               <DropdownMenuSeparator />
             </>
-          )}
-          {state.goal?.goal && (
-            <DropdownMenuItem onSelect={onGoal}>Goal details</DropdownMenuItem>
           )}
           {controller.hasWorkspaceSettings && (
             <DropdownMenuItem

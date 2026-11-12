@@ -489,7 +489,15 @@ async fn serve_connection(
                             let mut projection = Projection::new(request.session_id);
                             projection.correlate_replay(request_id.clone());
                             projection.replay_window(&connection, &load_delivery, window.records, &window.turns).await?;
-                            let turns: Vec<_> = window.turns.iter().map(projection::turn_facts).collect();
+                            let goal_starts = load_host
+                                .goal_start_turns(id.clone(), window.turns.iter().map(|turn| turn.id.clone()).collect::<Vec<_>>())
+                                .await
+                                .map_err(host_error)?;
+                            let turns: Vec<_> = window
+                                .turns
+                                .iter()
+                                .map(|turn| projection::turn_facts(turn, goal_starts.contains(&turn.id)))
+                                .collect();
                             return Ok(LoadSessionResponse::new().meta(serde_json::Map::from_iter([(
                                 projection::TRANSCRIPT_WINDOW.into(),
                                 serde_json::json!({"requestId": request_id, "view": window.view, "older": window.older, "turns": turns}),

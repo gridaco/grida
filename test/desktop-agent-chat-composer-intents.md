@@ -35,14 +35,27 @@ A connection must finish starting before its commands become available.
    Plan badge appears; `Keep this draft` remains editable. No turn starts.
 3. Remove Plan, type `/goal`, and click its slash-menu item. Goal appears,
    the slash trigger disappears, and no turn starts.
-4. Open Goal options and Customize goal. Check the initial eight work turns
-   and 64 inference steps. Cancel: the dialog closes and Goal remains unsent.
-   Remove the intent. No message or model request has been created.
+4. Hover the Goal badge: its icon turns into ×. Click it. Goal disappears and
+   no message or model request has been created. There is no goal form.
 5. Choose Ultra in the model popover. Planning and permission choices remain
    separate. Open chat history and rename a saved chat through Chat options.
 6. Narrow the window. Send, the model picker, the attachment menu, and chat
    actions remain usable. Pending questions and access requests keep their
    own controls when present.
+
+7. Select `/goal`, type an objective and send. The message shows **Sent as
+   goal** under it, and hovering it shows its send time with Copy and Edit.
+   A strip above the composer reads **Pursuing goal** with the objective,
+   elapsed time and clear, pause, and edit buttons. Pause: it reads
+   **Paused goal** with a resume button. Edit: the objective opens as text;
+   Save changes the strip's objective. Reopen the chat: **Sent as goal**
+   remains on the same message.
+8. While a turn runs with an empty composer, the single primary button is
+   a square Stop. Type text: it becomes Send and queues the message above the
+   composer. The queued row offers **Steer**, a trash button and a “…” menu
+   with Edit, Move up and Move down. Steer: the row leaves the queue and the
+   text appears in the running turn. There is no separate “Send to current
+   turn” toggle.
 
 ## Notes
 

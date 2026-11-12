@@ -7,9 +7,10 @@ format: md
 
 # Guide and interrupt agent work
 
-In a native Desktop workspace chat, use **Send to current turn** when
-the running task should change direction. The agent can use that correction
-at its next decision. For example, “Keep the first slide and revise the
+In a native Desktop workspace chat, send your message while the agent is
+working. It joins the queue above the composer. Choose **Steer** on that queued
+message when the running task should change direction instead of waiting. The
+agent uses that correction at its next decision. For example, “Keep the first slide and revise the
 second one” belongs in the current turn if the agent is still editing the
 deck.
 

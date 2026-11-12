@@ -219,6 +219,7 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
                     assert_eq!(turns[0]["status"], "succeeded");
                     let started = turns[0]["startedAtMs"].as_u64().unwrap();
                     assert!(started <= turns[0]["settledAtMs"].as_u64().unwrap());
+                    assert!(turns[0].get("goalStart").is_none(), "{receipt}");
                 }
                 break;
             }

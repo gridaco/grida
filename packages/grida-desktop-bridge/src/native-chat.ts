@@ -421,6 +421,8 @@ export type NativeChatTurnRecord = Readonly<{
   /** UTC milliseconds. Absent for turns recorded before timing was kept. */
   startedAtMs?: number;
   settledAtMs?: number;
+  /** The turn's input started a goal. */
+  goalStart?: true;
 }>;
 
 export type NativeChatTranscriptPage = Readonly<{

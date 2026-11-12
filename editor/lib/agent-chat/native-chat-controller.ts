@@ -13,6 +13,7 @@ import type {
   NativeChatGatewayAttemptRef,
   NativeChatGatewayChildRef,
   NativeChatGoalAction,
+  NativeChatQueueItem,
   NativeChatGoalChange,
   NativeChatGoalControl,
   NativeChatGoalObjective,
@@ -2722,6 +2723,85 @@ export class NativeChatController {
         await this.refresh(scope);
         if (this.owns(scope)) this.update({ acting: false });
       }
+    }
+  }
+
+  /** Whether a waiting message can be sent into the current turn instead. */
+  canSteerQueued(item: NativeChatQueueItem): boolean {
+    return (
+      this.canSteer &&
+      this.queueCurrent &&
+      !this.view.acting &&
+      !!this.bridge.queuedText &&
+      !!this.bridge.editQueue &&
+      item.preview !== null &&
+      !item.goalStart &&
+      !item.allowsConfigurationChange &&
+      item.operatingRegime !== "plan" &&
+      item.effort !== "ultra"
+    );
+  }
+
+  /**
+   * Sends a waiting message into the current turn. The message leaves the
+   * queue first, so it can never run twice. If the turn then cannot take it,
+   * the text is returned for the composer instead of being lost.
+   */
+  async steerQueued(inputId: string): Promise<string | null> {
+    const scope = this.scope;
+    const item = this.view.queue?.items.find(
+      (candidate) => candidate.inputId === inputId
+    );
+    const basis = scope?.queueBasis;
+    if (
+      !scope?.attachment ||
+      !basis ||
+      !item ||
+      !this.canSteerQueued(item) ||
+      !this.bridge.queuedText ||
+      !this.bridge.editQueue
+    )
+      return null;
+    const attachmentId = scope.attachment.attachmentId;
+    this.update({ acting: true, error: null });
+    let text: string;
+    try {
+      text = await this.bridge.queuedText(
+        attachmentId,
+        basis.observationId,
+        inputId
+      );
+      await this.bridge.editQueue(attachmentId, {
+        action: "withdraw",
+        inputId,
+        observationId: basis.observationId,
+        requestId: crypto.randomUUID(),
+      });
+    } catch {
+      if (this.owns(scope)) {
+        this.update({
+          error: "Couldn't steer with that message. It is still queued.",
+        });
+        await this.refresh(scope);
+        if (this.owns(scope)) this.update({ acting: false });
+      }
+      return null;
+    }
+    await this.refresh(scope);
+    if (!this.owns(scope)) return text;
+    this.update({ acting: false });
+    const returned =
+      "The current turn couldn't take the message. Its text is back in the composer.";
+    if (!this.canSteer) {
+      this.update({ error: returned });
+      return text;
+    }
+    try {
+      await this.submitSteering(scope, text);
+      return null;
+    } catch {
+      if (this.owns(scope)) this.update({ error: returned });
+      return text;
     }
   }
 

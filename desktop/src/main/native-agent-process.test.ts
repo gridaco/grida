@@ -420,7 +420,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
       send({method:'session/update',params:{sessionId:'chat',_meta:meta({phase:'answer'}),
         update:{sessionUpdate:'agent_message_chunk',messageId:'done',content:{type:'text',text:'All good.'}}}});
       send({id:request.id,result:{_meta:{[capability]:{requestId:read.requestId,view:1,older:null,
-        turns:[{turnId:'turn-1',status:'succeeded',startedAtMs:1000,settledAtMs:4500}]}}}});
+        turns:[{turnId:'turn-1',status:'succeeded',startedAtMs:1000,settledAtMs:4500,goalStart:true}]}}}});
       `,
         1,
         { [TRANSCRIPT_WINDOW]: 1 }
@@ -460,6 +460,7 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
               status: "succeeded",
               startedAtMs: 1000,
               settledAtMs: 4500,
+              goalStart: true,
             },
           ],
           messages: [

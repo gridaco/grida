@@ -92,8 +92,15 @@ conditions. The agent carries it across work turns, records progress, and keeps
 working within the granted permissions and resource limits. A turn's final
 summary can report progress while the goal remains active.
 
-The person can inspect, revise, pause, resume, or clear the goal. Pauses and
-revisions survive restart. The agent reports completion only when the current
+Starting a goal is one explicit act: the person states the objective in their
+own words and sends it. The product derives the success conditions and default
+limits from that statement; the person does not fill out a configuration form
+before work can begin. The message that started the goal stays recognizable as
+a goal in the transcript, including after reopening the chat.
+
+While a goal exists, its status and objective stay visible beside the composer.
+The person can inspect, revise, pause, resume, or clear the goal from there;
+revising edits the objective text. Pauses and revisions survive restart. The agent reports completion only when the current
 objective is achieved and required work is accounted for. If progress needs an
 answer, an unavailable capability, or additional allowance, that condition is
 visible. Exhausting an allowance produces its own outcome.
@@ -297,6 +304,11 @@ permission. External agents expose the controls their backend can actually honor
 
 The product distinguishes **updating the current task** from **sending a task to
 run next**.
+
+Sending while a task is busy queues the request; the person does not choose a
+destination before sending. Each waiting request offers to send it into the
+current task instead, which is how a person steers. The request leaves the queue
+only when the current task has accepted it; if that fails, its text is kept.
 
 A queued request is immediately visible as waiting. It retains its place until
 the current task has settled and the queue is allowed to continue. The person can

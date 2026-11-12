@@ -93,6 +93,35 @@ impl Host {
             .await
     }
 
+    /// The turns among `turns` whose accepted input started a goal. A client
+    /// uses this to mark the message that set the goal, including on reopen.
+    pub async fn goal_start_turns(
+        &self,
+        session: SessionId,
+        turns: Vec<TurnId>,
+    ) -> Result<Vec<TurnId>> {
+        let mut started = Vec::new();
+        for turn in turns {
+            for input in self
+                .store
+                .turn_submissions(session.clone(), turn.clone())
+                .await?
+            {
+                if input.payload.schema().as_str() != INPUT_SCHEMA
+                    || !matches!(input.payload.version(), 2 | 3)
+                {
+                    continue;
+                }
+                let stored: StoredPrompt = decode_input(&input)?;
+                if matches!(stored.goal, Some(goals::GoalInput::Start(_))) {
+                    started.push(turn);
+                    break;
+                }
+            }
+        }
+        Ok(started)
+    }
+
     pub(crate) async fn fork_latest(
         &self,
         session: SessionId,
