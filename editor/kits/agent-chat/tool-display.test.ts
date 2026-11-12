@@ -17,6 +17,14 @@ describe("toolDisplay", () => {
     ).toBe("Edited 1 file, read 1 file, ran 1 command");
   });
 
+  it("counts a listing's folders apart from its files", () => {
+    const listing = (files: string[]) =>
+      toolDisplay.describe(tool("1", "list_files", {}, { files })).detail;
+    expect(listing(["src/", "assets/", "README.md"])).toBe("1 file, 2 folders");
+    expect(listing(["src/"])).toBe("1 folder");
+    expect(listing([])).toBe("0 files");
+  });
+
   it("uses agent-provided command descriptions before argv", () => {
     expect(
       toolDisplay.describe(

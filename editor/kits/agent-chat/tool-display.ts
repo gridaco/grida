@@ -465,9 +465,18 @@ function describeEditDetail(
 }
 
 function describeListDetail(entry: ToolCallEntry): string | undefined {
-  const files = asArray(asRecord(readToolOutput(entry)).files);
-  if (!files) return undefined;
-  return `${files.length} ${pluralize("file", files.length)}`;
+  const entries = asArray(asRecord(readToolOutput(entry)).files);
+  if (!entries) return undefined;
+  // A listing marks each folder with a trailing slash.
+  const folders = entries.filter(
+    (name) => typeof name === "string" && name.endsWith("/")
+  ).length;
+  const files = entries.length - folders;
+  const parts = [
+    ...(files || !folders ? [`${files} ${pluralize("file", files)}`] : []),
+    ...(folders ? [`${folders} ${pluralize("folder", folders)}`] : []),
+  ];
+  return parts.join(", ");
 }
 
 function describeTodosDetail(entry: ToolCallEntry): string | undefined {
