@@ -719,22 +719,31 @@ impl Goal {
                 {
                     self.state.progress = Some(summary);
                     self.state.status = Status::Complete;
+                } else if self.user_review_enabled() {
+                    // The agent claims the work is done but the claim cannot be
+                    // verified. A reviewed goal asks the person, as it would
+                    // for a ready_for_review proposal.
+                    self.propose_for_review(turn, summary);
                 } else {
                     self.state.status = Status::Blocked(Blocker::UnverifiedCompletion);
                 }
             }
             Some(Report::ReadyForReview { summary }) if self.user_review_enabled() => {
-                self.state.status = Status::Blocked(Blocker::UnverifiedCompletion);
-                self.state.review = Some(CompletionReview::Pending {
-                    candidate: ReviewCandidate {
-                        basis: self.basis().clone(),
-                        turn: turn.clone(),
-                        summary,
-                    },
-                });
+                self.propose_for_review(turn, summary);
             }
             _ => self.state.status = Status::Blocked(Blocker::NoProgress),
         }
+    }
+
+    fn propose_for_review(&mut self, turn: &TurnId, summary: String) {
+        self.state.status = Status::Blocked(Blocker::UnverifiedCompletion);
+        self.state.review = Some(CompletionReview::Pending {
+            candidate: ReviewCandidate {
+                basis: self.basis().clone(),
+                turn: turn.clone(),
+                summary,
+            },
+        });
     }
 
     fn mark_exhausted(&mut self) {

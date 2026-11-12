@@ -620,6 +620,88 @@ fn goal_report_refuses_objective_mutation_and_incomplete_criteria() {
     );
 }
 
+fn reviewed_goal(turns: u32, steps: u32) -> Goal {
+    let original = goal(turns, steps);
+    Goal::start_with_review(
+        original.basis().goal.clone(),
+        original.objective().clone(),
+        original.allowance(),
+        true,
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_report_that_describes_its_evidence_instead_of_citing_a_call_is_named() {
+    use agent_kit_core::inference::InputFormat;
+    use agent_kit_core::messages::ToolArguments;
+    use grida_agent_master::goals::tools;
+    use serde_json::json;
+
+    let mut goal = reviewed_goal(2, 4);
+    let work = turn("reported");
+    goal.reserve(&goal.basis().clone(), work.clone(), limit(2))
+        .unwrap();
+    let [_, report] = tools::for_work(&goal, &work).unwrap();
+    // A reviewed goal is finished through the person's review, and evidence
+    // cites a supplied call ID, never prose about the call.
+    let definition = report.definition();
+    assert!(definition.description.contains("use ready_for_review"));
+    let InputFormat::Json(schema) = &definition.input else {
+        panic!("json input")
+    };
+    let call = &schema["properties"]["report"]["oneOf"][2]["properties"]["evidence"]["items"]["properties"]
+        ["call"];
+    assert!(
+        call["pattern"].is_string() && call["description"].is_string(),
+        "{call}"
+    );
+    let described = ToolArguments::Json(json!({
+        "report":{"kind":"completion","summary":"All 10 tests pass.","evidence":[
+            {"criterion":1,"call":"functions.run_command: npm test, exit 0; 10 tests passed"}
+        ]}
+    }));
+    assert_eq!(
+        report.validate(&described).unwrap_err().code,
+        "goal_report_evidence_call_invalid"
+    );
+    let ready = ToolArguments::Json(json!({
+        "report":{"kind":"ready_for_review","summary":"All 10 tests pass."}
+    }));
+    report.validate(&ready).unwrap();
+}
+
+#[test]
+fn an_unverified_completion_in_a_reviewed_goal_waits_for_the_person() {
+    let mut goal = reviewed_goal(3, 6);
+    let basis = goal.basis().clone();
+    let work = turn("claimed-done");
+    goal.reserve(&basis, work.clone(), limit(2)).unwrap();
+    goal.account(
+        &work,
+        WorkOutcome::Settled {
+            inference_steps: 2,
+            report: Some(completion(&verified_checks())),
+            verified_evidence: &BTreeSet::new(),
+        },
+    )
+    .unwrap();
+    // The claim cannot be verified, so the person reviews it instead of the
+    // goal stopping as blocked.
+    assert_eq!(
+        goal.status(),
+        Status::Blocked(Blocker::UnverifiedCompletion)
+    );
+    assert!(matches!(
+        goal.completion_review(),
+        Some(CompletionReview::Pending { candidate })
+            if candidate.turn == work && candidate.summary == "Handoff is ready"
+    ));
+    goal.confirm_completion(&basis, &work, ChangeId::new("confirmed").unwrap())
+        .unwrap();
+    assert_eq!(goal.status(), Status::Complete);
+}
+
 #[test]
 fn explicitly_resuming_the_same_objective_keeps_the_existing_allocation() {
     let mut goal = goal(3, 6);

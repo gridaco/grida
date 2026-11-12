@@ -8,7 +8,7 @@ use agent_kit_core::tools::{
 };
 use agent_kit_core::turn::{OperationInput, OperationOutcome, OperationState};
 use agent_kit_core::{
-    BoxFuture, Envelope, ErrorKind, OperationId, Result, SchemaId, ToolId, TurnId,
+    BoxFuture, Envelope, ErrorKind, OperationId, Result, SchemaId, ToolCallId, ToolId, TurnId,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -124,9 +124,9 @@ impl GoalTool {
             ),
             Kind::Report => {
                 let description = if goal.user_review_enabled() {
-                    "Record progress, a blocker, evidence for verified completion, or a ready_for_review proposal. Use ready_for_review when the person should check the completed work against the goal criteria. Summarize the evidence they should inspect and mention any limitations. Call once. A proposal does not complete the goal."
+                    "Record progress, a blocker, or that the work is done. When you believe every success criterion is met, use ready_for_review: the person checks the work against the goal criteria and confirms it. Summarize the evidence they should inspect and mention any limitations. Use completion only when a system message has supplied a retained call ID for every criterion, citing exactly those IDs. Call once. A proposal does not complete the goal."
                 } else {
-                    "Record a progress, blocked, or completion proposal for this goal. Call once when this work turn has collected its evidence. For completion cite a tool call ID from this turn for each numbered success criterion. The proposal does not change the goal."
+                    "Record a progress, blocked, or completion proposal for this goal. Call once when this work turn has collected its evidence. Use completion only when a system message has supplied a retained call ID for every numbered success criterion, citing exactly those IDs; otherwise report progress. The proposal does not change the goal."
                 };
                 (
                     REPORT,
@@ -270,8 +270,10 @@ fn report_schema(user_review: bool) -> Value {
                 "properties":{"kind":{"const":"completion"},"summary":summary,
                     "evidence":{"type":"array","minItems":1,"maxItems":MAX_CRITERIA,
                         "items":{"type":"object","required":["criterion","call"],"additionalProperties":false,
-                            "properties":{"criterion":{"type":"integer","minimum":1,"maximum":MAX_CRITERIA},
-                                "call":{"type":"string","minLength":1}}}}}}
+                            "properties":{"criterion":{"type":"integer","minimum":1,"maximum":MAX_CRITERIA,
+                                    "description":"The success criterion's one-based position."},
+                                "call":{"type":"string","minLength":1,"maxLength":256,"pattern":CALL_ID_PATTERN,
+                                    "description":"A retained call ID exactly as a system message supplied it for this criterion. Not a description of the call."}}}}}}
         ]}
     }});
     if user_review {
@@ -303,8 +305,28 @@ fn invalid_receipt() -> agent_kit_core::Error {
     problem(ErrorKind::InvalidState, "goal_report_receipt_invalid")
 }
 
+/// The characters a call ID may contain; see the core identity rule.
+const CALL_ID_PATTERN: &str = "^[A-Za-z0-9_.:/@-]+$";
+
 fn parse_report(value: &Value) -> Result<Report> {
-    let arguments: ReportArguments =
-        serde_json::from_value(value.clone()).map_err(|_| invalid_arguments())?;
+    let arguments: ReportArguments = serde_json::from_value(value.clone()).map_err(|_| {
+        // Name the field a model most often fills wrongly, so it can correct
+        // the report instead of seeing a generic refusal.
+        let invalid_call = value
+            .pointer("/report/evidence")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|entry| entry.get("call"))
+            .any(|call| {
+                call.as_str()
+                    .is_none_or(|call| ToolCallId::new(call).is_err())
+            });
+        if invalid_call {
+            problem(ErrorKind::InvalidInput, "goal_report_evidence_call_invalid")
+        } else {
+            invalid_arguments()
+        }
+    })?;
     arguments.report.normalized()
 }
