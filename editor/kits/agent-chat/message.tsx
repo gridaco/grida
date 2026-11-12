@@ -93,6 +93,7 @@ import {
 } from "./design-search-widget";
 import { groupMessageParts } from "./group-parts";
 import { AnsweredQuestionSummary, isQuestionEntry } from "./question-card";
+import { workspace_links } from "./workspace-links";
 import {
   hasOpenTabsResult,
   isSurfaceToolEntry,
@@ -108,6 +109,8 @@ const markdown = {
     table: { copy: true, download: false, fullscreen: false },
   },
   plugins: { cjk, code, math, mermaid },
+  rehypePlugins: workspace_links.rehypePlugins,
+  components: workspace_links.components,
 } as const;
 
 /**
@@ -284,7 +287,11 @@ export function ChatMessageView({
               </div>
             )}
             {text.length > 0 && (
-              <MessageResponse plugins={markdown.plugins}>
+              <MessageResponse
+                plugins={markdown.plugins}
+                rehypePlugins={markdown.rehypePlugins}
+                components={markdown.components}
+              >
                 {text}
               </MessageResponse>
             )}
@@ -362,6 +369,8 @@ export function ChatMessageView({
                 className={markdown.className}
                 controls={markdown.controls}
                 plugins={markdown.plugins}
+                rehypePlugins={markdown.rehypePlugins}
+                components={markdown.components}
               >
                 {group.text}
               </MessageResponse>

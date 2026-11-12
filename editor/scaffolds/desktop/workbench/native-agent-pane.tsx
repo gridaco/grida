@@ -38,6 +38,7 @@ import {
   ChatMessageView,
   PendingTurnIndicator,
   QuestionPrompt,
+  workspace_links,
 } from "@/kits/agent-chat";
 import {
   NativeChatController,
@@ -239,6 +240,18 @@ export function NativeAgentPane({
     created.keepDrafts(COMPOSER_DRAFTS, workspaceId ?? "standalone");
     return created;
   }, [bridge, selectionKey, editorSurfaces, workspaceId]);
+  // Workspace file links in replies open in the workbench, which validates
+  // the path against the workspace before opening a tab.
+  const openWorkspaceLink = useMemo(() => {
+    const open = editorSurfaces?.open;
+    return open
+      ? (path: string) => {
+          const target = workspace_links.workspacePath(path);
+          if (target)
+            void open.call(editorSurfaces, target, () => true).catch(() => {});
+        }
+      : null;
+  }, [editorSurfaces]);
   const state = useSyncExternalStore(
     controller.subscribe,
     controller.read,
@@ -421,58 +434,60 @@ export function NativeAgentPane({
             )}
         </div>
       )}
-      <Conversation
-        className="min-h-0 flex-1"
-        initial="instant"
-        resize={running ? "smooth" : "instant"}
-      >
-        <ConversationContent
-          className="gap-4 px-3 py-4"
-          scrollClassName={cn(
-            styles.chatScroll,
-            "desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
-          )}
+      <workspace_links.Opener.Provider value={openWorkspaceLink}>
+        <Conversation
+          className="min-h-0 flex-1"
+          initial="instant"
+          resize={running ? "smooth" : "instant"}
         >
-          <NativeEarlierMessages
-            canLoad={state.canReadEarlier}
-            loading={state.readingEarlier}
-            error={state.earlierError}
-            count={state.messages.length}
-            onLoad={() => void controller.loadEarlierMessages()}
-          />
-          {/* See test/desktop-agent-chat-turn-activity.md. */}
-          {blocks.map((block) =>
-            block.kind === "turn" ? (
-              <NativeTurnActivity
-                key={block.turnId}
-                block={block}
-                renderMessage={renderMessage}
-              />
-            ) : (
-              renderMessage(block.message)
-            )
-          )}
-          {running &&
-            !retrying &&
-            state.messages.at(-1)?.role !== "assistant" && (
-              <PendingTurnIndicator />
+          <ConversationContent
+            className="gap-4 px-3 py-4"
+            scrollClassName={cn(
+              styles.chatScroll,
+              "desktop-native-drag-scroll-viewport scroll-fade-y scroll-fade-4"
             )}
-          {/* See test/desktop-agent-chat-transcript-history.md. */}
-          {!turn &&
-            !state.loading &&
-            !state.repairing &&
-            state.turnSummary &&
-            state.turnSummary.turnId === snapshot?.latest?.turnId &&
-            bridge.readArtifact && (
-              <NativeTurnArtifacts
-                key={state.turnSummary.turnId}
-                summary={state.turnSummary}
-                controller={controller}
-              />
+          >
+            <NativeEarlierMessages
+              canLoad={state.canReadEarlier}
+              loading={state.readingEarlier}
+              error={state.earlierError}
+              count={state.messages.length}
+              onLoad={() => void controller.loadEarlierMessages()}
+            />
+            {/* See test/desktop-agent-chat-turn-activity.md. */}
+            {blocks.map((block) =>
+              block.kind === "turn" ? (
+                <NativeTurnActivity
+                  key={block.turnId}
+                  block={block}
+                  renderMessage={renderMessage}
+                />
+              ) : (
+                renderMessage(block.message)
+              )
             )}
-        </ConversationContent>
-        <ConversationScrollButton />
-      </Conversation>
+            {running &&
+              !retrying &&
+              state.messages.at(-1)?.role !== "assistant" && (
+                <PendingTurnIndicator />
+              )}
+            {/* See test/desktop-agent-chat-transcript-history.md. */}
+            {!turn &&
+              !state.loading &&
+              !state.repairing &&
+              state.turnSummary &&
+              state.turnSummary.turnId === snapshot?.latest?.turnId &&
+              bridge.readArtifact && (
+                <NativeTurnArtifacts
+                  key={state.turnSummary.turnId}
+                  summary={state.turnSummary}
+                  controller={controller}
+                />
+              )}
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
+      </workspace_links.Opener.Provider>
       {state.revisionDraft ? (
         <NativeMessageRevisionPanel
           draft={state.revisionDraft}
