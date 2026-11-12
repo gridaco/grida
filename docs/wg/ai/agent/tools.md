@@ -121,6 +121,10 @@ content can be deleted.
 
 ## Permissions at the tool boundary
 
+A tool declares the effect of each action; it does not decide whether the
+action may run. The [permission policy](./permissions.md) owns that decision,
+the presets and the defaults.
+
 The host owns authority, revocation, and policy configuration. The master and
 host authorization adapter choose which eligible operations require approval,
 who reviews them, and how failures are handled. Runtime checks current authority
