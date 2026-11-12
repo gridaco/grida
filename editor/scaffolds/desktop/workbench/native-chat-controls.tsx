@@ -389,7 +389,7 @@ export function NativeModelPicker({
           title={
             selected ? `${selected.connection} · ${selected.model}` : label
           }
-          className="min-w-0 max-w-52 gap-1.5 px-1.5 font-normal"
+          className="min-w-24 max-w-52 shrink gap-1.5 px-1.5 font-normal"
         >
           <ConnectionIcon connection={selected?.connection} />
           <span className="truncate">{label}</span>

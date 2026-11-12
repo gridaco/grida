@@ -19,6 +19,10 @@ import { MessageAction } from "@app/ui/ai-elements/message";
 import { readLibraryAttachment } from "@/app/(library)/library/attachment";
 import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
 import {
+  CornerDownRightIcon,
+  PauseIcon,
+  PlayIcon,
+  SquareIcon,
   ArrowDownIcon,
   ArrowUpIcon,
   PencilIcon,
@@ -1291,9 +1295,13 @@ export function NativeAgentPane({
                   variant="ghost"
                   size="xs"
                   disabled={state.acting}
+                  aria-label="Pause"
+                  title="Pause"
+                  className="shrink-0"
                   onClick={() => void controller.control("pause")}
                 >
-                  Pause
+                  <PauseIcon className="size-3.5" />
+                  <span className="hidden @md:inline">Pause</span>
                 </Button>
               ) : (canResume && (!goalTurn || !state.goal?.goal?.paused)) ||
                 canContinue ? (
@@ -1302,9 +1310,15 @@ export function NativeAgentPane({
                   variant="ghost"
                   size="xs"
                   disabled={state.acting}
+                  aria-label={canContinue ? "Continue" : "Resume"}
+                  title={canContinue ? "Continue" : "Resume"}
+                  className="shrink-0"
                   onClick={() => void controller.control("resume")}
                 >
-                  {canContinue ? "Continue" : "Resume"}
+                  <PlayIcon className="size-3.5" />
+                  <span className="hidden @md:inline">
+                    {canContinue ? "Continue" : "Resume"}
+                  </span>
                 </Button>
               ) : null}
               {(controller.canSteer || state.steering) && (
@@ -1313,9 +1327,21 @@ export function NativeAgentPane({
                   size="xs"
                   variant={state.steering ? "secondary" : "ghost"}
                   disabled={state.acting}
+                  aria-label={
+                    state.steering ? "Send a follow-up" : "Send to current turn"
+                  }
+                  title={
+                    state.steering ? "Send a follow-up" : "Send to current turn"
+                  }
+                  className="shrink-0"
                   onClick={() => controller.toggleSteering()}
                 >
-                  {state.steering ? "Send a follow-up" : "Send to current turn"}
+                  <CornerDownRightIcon className="size-3.5" />
+                  <span className="hidden @md:inline">
+                    {state.steering
+                      ? "Send a follow-up"
+                      : "Send to current turn"}
+                  </span>
                 </Button>
               )}
             </>
@@ -1353,9 +1379,13 @@ export function NativeAgentPane({
                   variant="ghost"
                   size="xs"
                   disabled={state.acting}
+                  aria-label="Stop"
+                  title="Stop"
+                  className="shrink-0"
                   onClick={() => void controller.control("stop")}
                 >
-                  Stop
+                  <SquareIcon className="size-3" />
+                  <span className="hidden @md:inline">Stop</span>
                 </Button>
               )}
             </>
