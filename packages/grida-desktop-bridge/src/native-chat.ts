@@ -427,6 +427,12 @@ export type NativeChatTurnRecord = Readonly<{
   settledAtMs?: number;
   /** The turn's input started a goal. */
   goalStart?: true;
+  /**
+   * The tokens the turn's context occupied at its largest model call, as the
+   * provider reported them: the whole prompt (instructions, tools, history)
+   * plus the reply. Absent when no call reported usage.
+   */
+  contextTokens?: number;
 }>;
 
 export type NativeChatTranscriptPage = Readonly<{

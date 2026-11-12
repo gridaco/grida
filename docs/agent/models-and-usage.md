@@ -91,10 +91,14 @@ while it waits. [Follow a provider retry](./clients.md#follow-a-provider-retry)
 
 ## See how full the context is
 
-The ring beside the model picker estimates how much of the selected model's
-context window the visible conversation uses. Hover it for the percentage and
-token count; open it for a breakdown by user, assistant, tools and other
-content. The ring appears once the model's window is known.
+The ring beside the model picker shows how much of the selected model's
+context window the chat uses. After a reply, it uses the size the model's
+provider reported for the latest request: the agent's instructions, its tool
+definitions and results, and the conversation. Before then, it estimates from
+the visible conversation. Hover it for the percentage and token count; open it
+for a breakdown by user, assistant, tools and other content, where other
+covers instructions and tool work you don't see in the chat. The ring appears
+once the model's window is known.
 
 Desktop does not show per-request charges in the chat. Use the connection's
 billing record for totals and individual charges.

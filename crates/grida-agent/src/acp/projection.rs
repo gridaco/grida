@@ -303,6 +303,9 @@ pub(super) fn turn_facts(turn: &ReplayTurn, goal_start: bool) -> Value {
     if goal_start {
         facts["goalStart"] = json!(true);
     }
+    if let Some(tokens) = turn.context_tokens {
+        facts["contextTokens"] = json!(tokens);
+    }
     facts
 }
 

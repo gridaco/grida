@@ -2277,12 +2277,14 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
       throw invalidResponse();
     if (record.goalStart !== undefined && record.goalStart !== true)
       throw invalidResponse();
+    const contextTokens = time(record.contextTokens);
     return Object.freeze({
       turnId: identity(record.turnId),
       status: status as NativeChatTurnRecord["status"],
       ...(startedAtMs !== undefined && { startedAtMs }),
       ...(settledAtMs !== undefined && { settledAtMs }),
       ...(record.goalStart === true && { goalStart: true as const }),
+      ...(contextTokens !== undefined && { contextTokens }),
     });
   });
 }

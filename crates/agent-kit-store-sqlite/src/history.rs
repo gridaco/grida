@@ -157,6 +157,9 @@ pub struct ReplayTurn {
     /// recorded before timing was retained.
     pub started_ms: Option<u64>,
     pub settled_ms: Option<u64>,
+    /// The tokens the turn's context occupied at its largest model call, as
+    /// the provider reported them. Absent when no call reported usage.
+    pub context_tokens: Option<u64>,
     /// The window includes the turn's newest record. False when a newer
     /// window holds the rest of the turn.
     pub tail: bool,
@@ -275,6 +278,7 @@ impl SqliteStore {
                         status: state.outcome().map(|outcome| outcome.status),
                         started_ms: time(3)?,
                         settled_ms: time(4)?,
+                        context_tokens: context_tokens(&state),
                         tail: before.is_none(),
                     };
                     if let Some(before) = window.collect(Some(facts), records, before, measure)? {
@@ -890,4 +894,19 @@ impl HistoryBudget {
 
 fn projection_limit() -> agent_kit_core::Error {
     error(ErrorKind::LimitExceeded, "history_projection_limit")
+}
+
+/// A turn's context size: within a turn the context only grows from call to
+/// call, so its largest reported model call is its final context.
+fn context_tokens(state: &TurnState) -> Option<u64> {
+    state
+        .operations()
+        .values()
+        .filter_map(|operation| match operation.outcome() {
+            Some(agent_kit_core::turn::OperationOutcome::Inference(outcome)) => {
+                outcome.context_tokens()
+            }
+            _ => None,
+        })
+        .max()
 }

@@ -341,6 +341,40 @@ pub struct InferenceOutcome {
     pub terminal_receipt: Option<Envelope>,
 }
 
+impl InferenceOutcome {
+    /// The tokens this call's context occupied, from the provider's latest
+    /// reported values: its whole input, cached or not, plus its output. A
+    /// provider reports input either as one total or as uncached, cache-read
+    /// and cache-write parts. None when the provider reported no input.
+    pub fn context_tokens(&self) -> Option<u64> {
+        let mut latest = BTreeMap::<&str, (u64, u64)>::new();
+        for observation in &self.usage {
+            if observation.unit != "tokens" {
+                continue;
+            }
+            let entry = latest
+                .entry(observation.category.as_str())
+                .or_insert((observation.revision, observation.quantity));
+            if observation.revision >= entry.0 {
+                *entry = (observation.revision, observation.quantity);
+            }
+        }
+        let value = |category: &str| latest.get(category).map(|(_, quantity)| *quantity);
+        let input = value("input_tokens").or_else(|| {
+            let parts = [
+                value("uncached_input_tokens"),
+                value("cached_input_tokens"),
+                value("cache_creation_input_tokens"),
+            ];
+            parts
+                .iter()
+                .any(Option::is_some)
+                .then(|| parts.iter().flatten().sum())
+        })?;
+        Some(input.saturating_add(value("output_tokens").unwrap_or(0)))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InferenceFailure {
     pub kind: FailureKind,
@@ -727,4 +761,62 @@ pub fn accepts_arguments(format: &InputFormat, arguments: &ToolArguments) -> boo
         (InputFormat::Json(_), ToolArguments::Json(_))
             | (InputFormat::Text, ToolArguments::Text(_))
     )
+}
+
+#[cfg(test)]
+mod context_tokens_tests {
+    use super::*;
+
+    fn outcome(observations: &[(&str, u64, u64)]) -> InferenceOutcome {
+        InferenceOutcome {
+            status: InferenceStatus::Completed,
+            messages: Vec::new(),
+            usage: observations
+                .iter()
+                .map(|(category, revision, quantity)| UsageObservation {
+                    attempt: AttemptId::new("attempt").unwrap(),
+                    source: "fixture".into(),
+                    category: (*category).into(),
+                    unit: "tokens".into(),
+                    revision: *revision,
+                    quantity: *quantity,
+                    certainty: MeasurementKind::Exact,
+                    final_value: true,
+                })
+                .collect(),
+            failure: None,
+            receipt: None,
+            terminal_receipt: None,
+        }
+    }
+
+    #[test]
+    fn a_total_input_already_includes_cached_tokens() {
+        let call = outcome(&[
+            ("input_tokens", 1, 12_000),
+            ("cached_input_tokens", 1, 9_000),
+            ("output_tokens", 1, 400),
+            ("reasoning_output_tokens", 1, 100),
+        ]);
+        assert_eq!(call.context_tokens(), Some(12_400));
+    }
+
+    #[test]
+    fn split_input_parts_are_summed() {
+        let call = outcome(&[
+            ("uncached_input_tokens", 1, 300),
+            ("cached_input_tokens", 1, 9_000),
+            ("cache_creation_input_tokens", 1, 2_000),
+            ("output_tokens", 1, 50),
+            ("output_tokens", 2, 400),
+        ]);
+        // The latest revision of each category wins.
+        assert_eq!(call.context_tokens(), Some(11_700));
+    }
+
+    #[test]
+    fn no_reported_input_has_no_context_size() {
+        assert_eq!(outcome(&[("output_tokens", 1, 400)]).context_tokens(), None);
+        assert_eq!(outcome(&[]).context_tokens(), None);
+    }
 }
