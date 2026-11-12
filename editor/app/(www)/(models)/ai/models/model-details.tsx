@@ -15,6 +15,7 @@ import {
   priceConditions,
   type ModelPricing,
 } from "@/lib/gg/public-models/pricing";
+import { IllustrativeCost } from "./illustrative-cost";
 
 export function ModelDetails({
   model,
@@ -27,8 +28,24 @@ export function ModelDetails({
 }) {
   const { gg } = model;
   const groups = [...pricing.input, ...pricing.output, ...pricing.additional];
+  const illustrations = gg.illustrative_costs ?? [];
   return (
     <div className="space-y-5">
+      {illustrations.length ? (
+        <section aria-label="Illustrative costs" className="space-y-3">
+          <h3 className="text-sm font-medium">Illustrative costs</h3>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {illustrations.map((example, index) => (
+              <div
+                key={`${example.operation_id}/${index}`}
+                className="min-w-0 rounded-md border bg-background p-4"
+              >
+                <IllustrativeCost example={example} showProvenance />
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] lg:gap-12">
         <div className="space-y-4">
           <div>

@@ -19,6 +19,45 @@ const httpURL = z
   });
 const timestamp = z.iso.datetime({ offset: false });
 const id = z.string().min(1).max(160);
+const nonblankText = (maximum: number) =>
+  z
+    .string()
+    .max(maximum)
+    .refine((value) => /\S/u.test(value));
+const illustrativeCost = z.object({
+  operation_id: id,
+  amount: decimal.refine((value) => /^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value)),
+  currency: z.literal("USD"),
+  scenario: nonblankText(2048),
+  coverage: nonblankText(4096),
+  provenance: z.object({
+    maintenance: z.literal("manual"),
+    description: nonblankText(8192),
+    reviewed_on: z.iso.date(),
+    source_urls: z
+      .array(
+        z
+          .string()
+          .refine((value) => !/\s/u.test(value))
+          .pipe(httpURL)
+      )
+      .min(1)
+      .max(16)
+      .optional(),
+  }),
+});
+// Optional display metadata must not hide valid models or weaken their tariff checks.
+const illustrativeCosts = z
+  .array(z.unknown())
+  .max(64)
+  .transform((items) =>
+    items.flatMap((item) => {
+      const parsed = illustrativeCost.safeParse(item);
+      return parsed.success ? [parsed.data] : [];
+    })
+  )
+  .optional()
+  .catch(undefined);
 const rate = z
   .object({
     id: z.string().min(1).max(321),
@@ -55,43 +94,55 @@ export const modelSchema = z.object({
   object: z.literal("model"),
   created: z.number().int().nonnegative(),
   owned_by: z.string().max(160),
-  gg: z.object({
-    kind: displayValue,
-    input_modalities: z.array(displayValue).max(maxDisplayValues),
-    output_modalities: z.array(displayValue).min(1).max(maxDisplayValues),
-    operation_ids: z.array(id).max(2048),
-    pricing_context: displayValue,
-    interfaces: z.array(z.string().max(160)).min(1).max(16),
-    capabilities: z.record(z.string(), z.boolean()),
-    limits: z.record(z.string(), z.number().nonnegative()),
-    pricing: z.object({
-      revision: id,
-      currency: z.literal("USD"),
-      unit: z.literal("mill"),
-      components: z.array(rate).min(1).max(2048),
-      measurement: z.string().max(16384),
-    }),
-    card: z.object({
-      label: z.string().min(1).max(512),
-      description: z.string().max(16384).nullable(),
-      lab: z.object({
-        id: z
-          .string()
-          .max(64)
-          .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-        name: z.string().min(1).max(256),
-        url: httpURL,
-        // Unused upstream artwork metadata must not hide an otherwise valid model.
-        logo: logo.nullable().catch(null),
+  gg: z
+    .object({
+      kind: displayValue,
+      input_modalities: z.array(displayValue).max(maxDisplayValues),
+      output_modalities: z.array(displayValue).min(1).max(maxDisplayValues),
+      operation_ids: z.array(id).max(2048),
+      pricing_context: displayValue,
+      interfaces: z.array(z.string().max(160)).min(1).max(16),
+      capabilities: z.record(z.string(), z.boolean()),
+      limits: z.record(z.string(), z.number().nonnegative()),
+      illustrative_costs: illustrativeCosts,
+      pricing: z.object({
+        revision: id,
+        currency: z.literal("USD"),
+        unit: z.literal("mill"),
+        components: z.array(rate).min(1).max(2048),
+        measurement: z.string().max(16384),
       }),
-      release: z.object({
-        date: z.iso.date().nullable(),
-        source_url: httpURL,
-        basis: displayValue,
+      card: z.object({
+        label: z.string().min(1).max(512),
+        description: z.string().max(16384).nullable(),
+        lab: z.object({
+          id: z
+            .string()
+            .max(64)
+            .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+          name: z.string().min(1).max(256),
+          url: httpURL,
+          // Unused upstream artwork metadata must not hide an otherwise valid model.
+          logo: logo.nullable().catch(null),
+        }),
+        release: z.object({
+          date: z.iso.date().nullable(),
+          source_url: httpURL,
+          basis: displayValue,
+        }),
       }),
+      availability_ends_on: z.iso.date().nullable().optional(),
+    })
+    .transform((gg) => {
+      if (!gg.illustrative_costs) return gg;
+      const operations = new Set(gg.operation_ids);
+      return {
+        ...gg,
+        illustrative_costs: gg.illustrative_costs.filter((example) =>
+          operations.has(example.operation_id)
+        ),
+      };
     }),
-    availability_ends_on: z.iso.date().nullable().optional(),
-  }),
 });
 export const catalogueSchema = z
   .object({

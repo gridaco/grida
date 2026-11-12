@@ -1,0 +1,247 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import { catalogueFixture, futureCatalogueFixture } from "./fixtures";
+import { catalogueSchema } from "./schema";
+import { emptyFilters } from "./catalogue";
+import { formatIllustrativeAmount, modelPricing } from "./pricing";
+import { ModelDetails } from "../../../app/(www)/(models)/ai/models/model-details";
+import { ModelsBrowser } from "../../../app/(www)/(models)/ai/models/models-browser";
+
+const example = {
+  operation_id: "image.generate",
+  amount: "0.0969",
+  currency: "USD",
+  scenario: "One 1024x1024 image at medium quality.",
+  coverage: "Output component only; input and other charges excluded.",
+  provenance: {
+    maintenance: "manual",
+    description: "A manually maintained illustration for these quantities.",
+    reviewed_on: "2026-11-13",
+  },
+};
+
+function withExamples(illustrative_costs: unknown) {
+  const fixture = futureCatalogueFixture();
+  return {
+    ...fixture,
+    data: fixture.data.map((model, index) =>
+      index === 0
+        ? {
+            ...model,
+            gg: {
+              ...model.gg,
+              operation_ids: ["image.generate"],
+              illustrative_costs,
+            },
+          }
+        : model
+    ),
+  };
+}
+
+describe("GG illustrative costs", () => {
+  it("keeps old feeds valid without inventing an illustration or changing unit rates", () => {
+    const catalogue = catalogueSchema.parse(catalogueFixture());
+    expect(catalogue.data[0].gg.illustrative_costs).toBeUndefined();
+    const withCost = catalogueSchema.parse(withExamples([example]));
+    expect(modelPricing(withCost.data[0])).toEqual(
+      modelPricing(catalogue.data[0])
+    );
+    const html = renderToStaticMarkup(
+      createElement(ModelDetails, {
+        model: catalogue.data[0],
+        pricing: modelPricing(catalogue.data[0]),
+        gatewayOrigin: "https://gateway.example",
+      })
+    );
+    expect(html).toContain("Usage pricing");
+    expect(html).not.toContain("Illustrative costs");
+  });
+
+  it("preserves safe manual examples without URLs and strips unfamiliar optional fields", () => {
+    const catalogue = catalogueSchema.parse(
+      withExamples([{ ...example, future_metadata: "unused" }])
+    );
+    expect(catalogue.data[0].gg.illustrative_costs).toEqual([example]);
+    expect(catalogue.data.at(-1)!.gg.kind).toBe("audio-analysis");
+  });
+
+  it.each([
+    { ...example, amount: "NaN" },
+    { ...example, amount: 0.0969 },
+    { ...example, amount: "1e-3" },
+    { ...example, amount: "-1" },
+    { ...example, amount: "01" },
+    { ...example, amount: "1\n" },
+    { ...example, amount: "1".repeat(65) },
+    { ...example, currency: "EUR" },
+    { ...example, operation_id: "unadvertised.operation" },
+    { ...example, operation_id: undefined, operation: "image.generate" },
+    { ...example, scenario: " \n" },
+    { ...example, coverage: "" },
+    {
+      ...example,
+      provenance: { ...example.provenance, maintenance: "automatic" },
+    },
+    { ...example, provenance: { ...example.provenance, description: " " } },
+    {
+      ...example,
+      provenance: { ...example.provenance, reviewed_on: "2026-02-30" },
+    },
+    { ...example, provenance: { ...example.provenance, source_urls: [] } },
+    {
+      ...example,
+      provenance: {
+        ...example.provenance,
+        source_urls: ["javascript:alert(1)"],
+      },
+    },
+    {
+      ...example,
+      provenance: {
+        ...example.provenance,
+        source_urls: ["http://example.com"],
+      },
+    },
+    {
+      ...example,
+      provenance: {
+        ...example.provenance,
+        source_urls: ["https://user:secret@example.com"],
+      },
+    },
+    {
+      ...example,
+      provenance: {
+        ...example.provenance,
+        source_urls: ["https://example.com/\n"],
+      },
+    },
+    { ...example, provenance: null },
+  ])(
+    "omits an unsupported optional example while keeping the catalogue and supported examples",
+    (invalid) => {
+      const catalogue = catalogueSchema.parse(withExamples([invalid, example]));
+      expect(catalogue.data).toHaveLength(4);
+      expect(catalogue.data[0].gg.illustrative_costs).toEqual([example]);
+    }
+  );
+
+  it.each([null, {}, "unsupported", Array(65).fill(example)])(
+    "omits unsupported optional arrays without hiding models",
+    (invalid) => {
+      const catalogue = catalogueSchema.parse(withExamples(invalid));
+      expect(catalogue.data).toHaveLength(4);
+      expect(catalogue.data[0].gg.illustrative_costs).toBeUndefined();
+    }
+  );
+
+  it("never uses illustrations to rescue an invalid financial contract", () => {
+    const invalid = withExamples([example]);
+    invalid.data[0].gg.pricing.components[0].rate_mills = "NaN";
+    expect(catalogueSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it.each([
+    ["0", "$0.00"],
+    ["1", "$1.00"],
+    ["0.0969", "$0.0969"],
+    ["0.000000001", "$0.000000001"],
+    ["1.2300", "$1.2300"],
+    ["9007199254740993.000001", "$9007199254740993.000001"],
+  ])(
+    "formats USD strings exactly without Number conversion: %s",
+    (amount, formatted) => {
+      expect(formatIllustrativeAmount(amount)).toBe(formatted);
+    }
+  );
+
+  it("keeps the price summary compact and reveals scenario, coverage and provenance on demand", () => {
+    const catalogue = catalogueSchema.parse(
+      withExamples([
+        {
+          ...example,
+          provenance: {
+            ...example.provenance,
+            source_urls: ["https://gateway.example/docs/pricing"],
+          },
+        },
+        {
+          ...example,
+          amount: "0.1234",
+          scenario: "One 2048x2048 image at high quality.",
+        },
+      ])
+    );
+    const model = catalogue.data[0];
+    const html = renderToStaticMarkup(
+      createElement(ModelsBrowser, {
+        initial: {
+          state: "fresh",
+          catalogue,
+          served_at: 0,
+          validated_at: 0,
+          refresh_at: 60000,
+          expires_at: 300000,
+        },
+        initialFilters: emptyFilters,
+        gatewayOrigin: "https://gateway.example",
+      })
+    );
+    for (const text of [
+      "Illustrative cost",
+      "$0.0969",
+      "+1 more",
+      `aria-label="Show illustrative cost details for ${model.gg.card.label}"`,
+    ])
+      expect(html).toContain(text);
+    for (const text of [
+      example.scenario,
+      example.coverage,
+      "image.generate",
+      "About this illustration",
+    ])
+      expect(html).not.toContain(text);
+    expect(html).not.toContain("$0.1234");
+    expect(html).toContain("Input");
+    expect(html).toContain("Output");
+    const details = renderToStaticMarkup(
+      createElement(ModelDetails, {
+        model,
+        pricing: modelPricing(model),
+        gatewayOrigin: "https://gateway.example",
+      })
+    );
+    for (const text of [
+      "$0.0969",
+      "$0.1234",
+      example.scenario,
+      example.coverage,
+      "image.generate",
+      "About this illustration",
+      example.provenance.description,
+      "Maintained manually",
+      'dateTime="2026-11-13"',
+      'href="https://gateway.example/docs/pricing"',
+      "Usage pricing",
+    ])
+      expect(details).toContain(text);
+  });
+
+  it("escapes scenario/provenance text instead of interpreting markup", () => {
+    const catalogue = catalogueSchema.parse(
+      withExamples([{ ...example, scenario: "<script>untrusted</script>" }])
+    );
+    const model = catalogue.data[0];
+    const html = renderToStaticMarkup(
+      createElement(ModelDetails, {
+        model,
+        pricing: modelPricing(model),
+        gatewayOrigin: "https://gateway.example",
+      })
+    );
+    expect(html).toContain("&lt;script&gt;untrusted&lt;/script&gt;");
+    expect(html).not.toContain("<script>untrusted");
+  });
+});

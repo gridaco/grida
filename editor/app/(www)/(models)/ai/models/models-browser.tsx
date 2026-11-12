@@ -46,6 +46,7 @@ import { ModelDetails } from "./model-details";
 import { LabLogo } from "./lab-logo";
 import {
   modelPricing,
+  formatIllustrativeAmount,
   type PriceSummaryLine,
 } from "@/lib/gg/public-models/pricing";
 import type { CatalogueView } from "@/lib/gg/public-models/cache";
@@ -176,7 +177,8 @@ const ModelRow = memo(function ModelRow({
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
   const pricing = modelPricing(model);
-  const toggle = () => setExpanded(!expanded);
+  const illustrations = gg.illustrative_costs ?? [];
+  const toggle = () => setExpanded((value) => !value);
   return (
     <>
       <TableRow data-state={expanded ? "selected" : undefined}>
@@ -190,6 +192,34 @@ const ModelRow = memo(function ModelRow({
               </code>
             </div>
           </div>
+        </TableCell>
+        <TableCell className="min-w-36">
+          {illustrations[0] ? (
+            <button
+              type="button"
+              aria-label={`${expanded ? "Hide" : "Show"} illustrative cost details for ${gg.card.label}`}
+              aria-expanded={expanded}
+              aria-controls={detailsId}
+              onClick={toggle}
+              className="rounded-sm text-left text-xs focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+            >
+              <span className="font-mono tabular-nums underline decoration-muted-foreground/50 decoration-dotted underline-offset-4 hover:decoration-foreground">
+                {formatIllustrativeAmount(illustrations[0].amount)}
+              </span>
+              {illustrations.length > 1 ? (
+                <span className="mt-1 block text-muted-foreground">
+                  +{illustrations.length - 1} more
+                </span>
+              ) : null}
+            </button>
+          ) : (
+            <span
+              className="text-muted-foreground"
+              title="No illustrative cost is published."
+            >
+              —
+            </span>
+          )}
         </TableCell>
         <PriceCell
           lines={pricing.input}
@@ -276,7 +306,7 @@ const ModelRow = memo(function ModelRow({
       </TableRow>
       {expanded ? (
         <TableRow id={detailsId} className="bg-muted/20 hover:bg-muted/20">
-          <TableCell colSpan={6} className="py-5 pl-16 pr-5 whitespace-normal">
+          <TableCell colSpan={7} className="py-5 pl-16 pr-5 whitespace-normal">
             <ModelDetails
               model={model}
               pricing={pricing}
@@ -512,14 +542,15 @@ export function ModelsBrowser({
         <div className="overflow-hidden rounded-lg border">
           <Table>
             <caption className="sr-only">
-              Models available through Grida AI Gateway, with capabilities and
-              usage pricing.
+              Models available through Grida AI Gateway, with capabilities,
+              illustrative costs and usage pricing.
             </caption>
             <TableHeader className="bg-muted/30">
               <TableRow className="hover:bg-transparent">
                 <TableHead scope="col" className="pl-5">
                   Model
                 </TableHead>
+                <TableHead scope="col">Illustrative cost</TableHead>
                 <TableHead scope="col">
                   Input{" "}
                   <span className="ml-1 text-xs font-normal text-muted-foreground">

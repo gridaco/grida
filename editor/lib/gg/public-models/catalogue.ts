@@ -67,6 +67,9 @@ const knownUnits = new Set([
   "character",
 ]);
 export type PublicModel = z.infer<typeof modelSchema>;
+export type PublicIllustrativeCost = NonNullable<
+  PublicModel["gg"]["illustrative_costs"]
+>[number];
 export type Catalogue = z.infer<typeof catalogueSchema>;
 export type Filters = {
   q: string;

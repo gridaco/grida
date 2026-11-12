@@ -20,6 +20,12 @@ export type ModelPricing = {
   additional: PriceSummaryLine[];
 };
 
+/** An illustration is already in USD; preserve every decimal without meter conversion. */
+export function formatIllustrativeAmount(amount: string): string {
+  const [whole, fraction = ""] = amount.split(".");
+  return `$${whole}.${fraction.padEnd(2, "0")}`;
+}
+
 const labels: Record<string, string> = {
   input_tokens: "Input",
   output_tokens: "Output",
