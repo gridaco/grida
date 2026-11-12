@@ -609,6 +609,19 @@ that contains a granted location still refuses the scope. Platform services
 toolchains need (system information, the user database, semaphores and
 pseudo-terminals) are allowed; they grant no file or network access. The
 [permission policy](docs/wg/ai/agent/permissions.md) owns these defaults.
+
+Native text writes and edits run in the trusted host, not the sandbox, so they
+enforce the same boundary themselves. A write needs a current write grant,
+bound only after the profile's write rule admitted that exact action. The path
+is relative with normal components only; each folder is walked beneath the
+pinned root with symlinks refused and the device checked against the root, and
+the final folder is verified to still be inside the root. Missing folders are
+created beneath it. Version-control and agent metadata names are refused as
+the first component. Content goes to an exclusive temporary file in the same
+folder and is renamed into place; an edit also confirms the file is unchanged
+since it was read. Desktop grants the Default preset's write rule only for the
+selected project folder; additional folders stay read-on-request. Desktop
+supplies programs its captured login-shell environment, minus app variables.
 Preparation refusals share one tool response regardless of path existence.
 The adapter retains supervision after the runtime cancels an invocation. The
 host's cleanup barrier reports pending or unverified command identities before

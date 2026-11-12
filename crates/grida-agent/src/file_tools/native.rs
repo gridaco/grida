@@ -65,6 +65,13 @@ impl FileTools {
             Operation::View => self.view_image(directory, path, budget),
             Operation::CaptureReference => self.capture_reference(path, budget),
             Operation::List => self.list(directory, path, budget),
+            Operation::Write => self.write(
+                directory,
+                path,
+                request.content.as_deref().unwrap_or_default(),
+                budget,
+            ),
+            Operation::Edit => self.edit(directory, path, &request, budget),
             Operation::Search => self.search(
                 directory,
                 path,
@@ -164,6 +171,200 @@ impl FileTools {
         }
         budget.check()?;
         Ok(bytes)
+    }
+
+    /// Replace or create a whole text file.
+    fn write(
+        &self,
+        directory: Option<&BindingId>,
+        path: &Path,
+        content: &str,
+        budget: &Budget,
+    ) -> Result<ToolOutcome> {
+        let _serial = self.mutations.lock().map_err(|_| unavailable())?;
+        let (parent, name) = self.writable_parent(directory, path, budget)?;
+        let existing = existing_file(&parent, &name)?;
+        budget.check()?;
+        replace_file(&parent, &name, content.as_bytes(), existing.as_ref())?;
+        let verb = if existing.is_some() {
+            "Replaced"
+        } else {
+            "Created"
+        };
+        bounded_outcome(
+            ToolOutcome {
+                status: OutcomeStatus::Succeeded,
+                content: vec![ResultContent::Text(format!(
+                    "{verb} {} ({} bytes).",
+                    path.display(),
+                    content.len()
+                ))],
+                structured: Some(json!({
+                    "path": path, "bytes": content.len(), "created": existing.is_none()
+                })),
+                receipt: None,
+                truncated: false,
+            },
+            budget.output,
+        )
+    }
+
+    /// Replace exact text in the file's current content.
+    fn edit(
+        &self,
+        directory: Option<&BindingId>,
+        path: &Path,
+        request: &Request,
+        budget: &Budget,
+    ) -> Result<ToolOutcome> {
+        let invalid = || problem(ErrorKind::InvalidInput, "file_arguments_invalid");
+        let old = request.old_string.as_deref().ok_or_else(invalid)?;
+        let new = request.new_string.as_deref().ok_or_else(invalid)?;
+        let _serial = self.mutations.lock().map_err(|_| unavailable())?;
+        let (parent, name) = self.writable_parent(directory, path, budget)?;
+        let Some(before) = existing_file(&parent, &name)? else {
+            return Err(problem(ErrorKind::InvalidInput, "file_not_found"));
+        };
+        let mut file: File = unix::openat(
+            &parent,
+            name.as_str(),
+            read_flags(Kind::File),
+            Mode::empty(),
+        )
+        .map_err(open_error)?
+        .into();
+        same_inode(&before, &unix::fstat(&file).map_err(open_error)?)?;
+        let (bytes, limited) = read(&mut file, MAX_FILE_BYTES, budget)?;
+        if limited {
+            return Err(problem(ErrorKind::LimitExceeded, "file_too_large"));
+        }
+        let text = decode(bytes)?;
+        let count = text.matches(old).count();
+        if count == 0 {
+            return Ok(failed_text(
+                "edit_no_match",
+                "old_string does not match the current file. Read the file and retry with its exact text.",
+            ));
+        }
+        if count > 1 && request.replace_all != Some(true) {
+            return Ok(failed_text(
+                "edit_ambiguous",
+                &format!(
+                    "old_string matches {count} places. Add surrounding lines to make it unique, or set replace_all."
+                ),
+            ));
+        }
+        let updated = if request.replace_all == Some(true) {
+            text.replace(old, new)
+        } else {
+            text.replacen(old, new, 1)
+        };
+        if updated.len() > MAX_FILE_BYTES {
+            return Err(problem(ErrorKind::LimitExceeded, "file_too_large"));
+        }
+        // The file must still be the one that was read.
+        let current = existing_file(&parent, &name)?
+            .ok_or_else(|| problem(ErrorKind::Conflict, "file_changed"))?;
+        if current.st_ino != before.st_ino
+            || current.st_mtime != before.st_mtime
+            || current.st_mtime_nsec != before.st_mtime_nsec
+            || current.st_size != before.st_size
+        {
+            return Err(problem(ErrorKind::Conflict, "file_changed"));
+        }
+        budget.check()?;
+        replace_file(&parent, &name, updated.as_bytes(), Some(&before))?;
+        let replaced = if request.replace_all == Some(true) {
+            count
+        } else {
+            1
+        };
+        bounded_outcome(
+            ToolOutcome {
+                status: OutcomeStatus::Succeeded,
+                content: vec![ResultContent::Text(format!(
+                    "Edited {}: replaced {replaced} occurrence{}.",
+                    path.display(),
+                    if replaced == 1 { "" } else { "s" }
+                ))],
+                structured: Some(json!({"path": path, "replacements": replaced})),
+                receipt: None,
+                truncated: false,
+            },
+            budget.output,
+        )
+    }
+
+    /// The parent folder of a write target beneath a writable root, creating
+    /// missing folders. Version-control and agent metadata stay read-only.
+    fn writable_parent(
+        &self,
+        directory: Option<&BindingId>,
+        path: &Path,
+        budget: &Budget,
+    ) -> Result<(File, String)> {
+        validate_path(path)?;
+        let names: Vec<&str> = path
+            .components()
+            .map(|part| part.as_os_str().to_str())
+            .collect::<Option<_>>()
+            .ok_or_else(|| problem(ErrorKind::InvalidInput, "file_relative_path_invalid"))?;
+        let Some((name, folders)) = names.split_last() else {
+            return Err(problem(
+                ErrorKind::InvalidInput,
+                "file_relative_path_invalid",
+            ));
+        };
+        if PROTECTED_METADATA.contains(&names[0]) {
+            return Err(problem(ErrorKind::Unsupported, "file_protected_path"));
+        }
+        budget.check()?;
+        let live = (self.current)(&budget.invocation)?;
+        // Writing requires a current write grant for the directory.
+        self.captured.select(
+            directory,
+            Path::new(""),
+            FileAccess::Write,
+            &live.grants,
+            &live.protected,
+        )?;
+        let target = self.captured.select(
+            directory,
+            Path::new(""),
+            FileAccess::Read,
+            &live.grants,
+            &live.protected,
+        )?;
+        let root = target.read_root(&live.workspace, &live.grants, &live.protected)?;
+        let root_path = target.root().to_path_buf();
+        let mut parent = root.try_clone().map_err(|_| unavailable())?;
+        let root_stat = unix::fstat(&parent).map_err(open_error)?;
+        for folder in folders {
+            budget.check()?;
+            match unix::statat(&parent, *folder, AtFlags::SYMLINK_NOFOLLOW) {
+                Ok(stat) => check_kind(&stat, Kind::Directory, &root_stat)?,
+                Err(Errno::NOENT) => {
+                    match unix::mkdirat(&parent, *folder, Mode::from_raw_mode(0o755)) {
+                        Ok(()) | Err(Errno::EXIST) => {}
+                        Err(error) => return Err(open_error(error)),
+                    }
+                }
+                Err(error) => return Err(open_error(error)),
+            }
+            let prior =
+                unix::statat(&parent, *folder, AtFlags::SYMLINK_NOFOLLOW).map_err(open_error)?;
+            check_kind(&prior, Kind::Directory, &root_stat)?;
+            let next: File =
+                unix::openat(&parent, *folder, read_flags(Kind::Directory), Mode::empty())
+                    .map_err(open_error)?
+                    .into();
+            let after = unix::fstat(&next).map_err(open_error)?;
+            check_kind(&after, Kind::Directory, &root_stat)?;
+            same_inode(&prior, &after)?;
+            parent = next;
+        }
+        verify_open_path(&parent, &root_path)?;
+        Ok((parent, (*name).to_owned()))
     }
 
     fn root(&self, directory: Option<&BindingId>, budget: &Budget) -> Result<Root> {
@@ -617,5 +818,58 @@ fn page(
             Err(error) if keep == 0 => return Err(error),
             Err(_) => keep /= 2,
         }
+    }
+}
+
+/// The regular file at `name`, if any. Links, devices and folders are refused.
+fn existing_file(parent: &File, name: &str) -> Result<Option<Stat>> {
+    match unix::statat(parent, name, AtFlags::SYMLINK_NOFOLLOW) {
+        Ok(stat) => {
+            let root = unix::fstat(parent).map_err(open_error)?;
+            check_kind(&stat, Kind::File, &root)?;
+            Ok(Some(stat))
+        }
+        Err(Errno::NOENT) => Ok(None),
+        Err(error) => Err(open_error(error)),
+    }
+}
+
+/// Write to a fresh private file beside the target, then rename it into
+/// place, keeping the previous file's permission bits.
+fn replace_file(parent: &File, name: &str, bytes: &[u8], previous: Option<&Stat>) -> Result<()> {
+    use std::io::Write;
+    let mode = previous.map_or(0o644, |stat| (stat.st_mode as u32) & 0o777);
+    let temporary = format!(
+        ".{name}.grida-{}-{}.tmp",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_nanos())
+    );
+    let mut file: File = unix::openat(
+        parent,
+        temporary.as_str(),
+        OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+        Mode::from_raw_mode(mode as _),
+    )
+    .map_err(open_error)?
+    .into();
+    let written = file
+        .write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .map_err(|_| unavailable());
+    let renamed = written.and_then(|()| {
+        unix::renameat(parent, temporary.as_str(), parent, name).map_err(open_error)
+    });
+    if renamed.is_err() {
+        let _ = unix::unlinkat(parent, temporary.as_str(), AtFlags::empty());
+    }
+    renamed
+}
+
+fn failed_text(code: &str, message: &str) -> ToolOutcome {
+    ToolOutcome {
+        content: vec![ResultContent::Text(format!("{code}: {message}"))],
+        ..ToolOutcome::failed(code)
     }
 }

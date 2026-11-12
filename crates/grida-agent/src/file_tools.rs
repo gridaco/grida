@@ -1,4 +1,4 @@
-//! GRIDA-SEC-004 / GRIDA-SEC-014 — read-only tools with live workspace authority.
+//! GRIDA-SEC-004 / GRIDA-SEC-014 — file tools with live workspace authority.
 
 use crate::workspace::{DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
 use agent_kit_core::inference::InputFormat;
@@ -18,6 +18,11 @@ const MAX_PATH_BYTES: usize = 4096;
 const MAX_REFERENCE_PATH_BYTES: usize = 1024;
 const MAX_QUERY_BYTES: usize = 128;
 const MAX_INPUT_BYTES: usize = 8192;
+/// Text writes and edits share the read bound (text-file mutation contract).
+const MAX_TEXT_BYTES: usize = 64 * 1024;
+const MAX_MUTATION_INPUT_BYTES: usize = 2 * MAX_TEXT_BYTES + MAX_INPUT_BYTES;
+/// Top-level names that stay read-only under a writable root.
+pub(crate) const PROTECTED_METADATA: [&str; 5] = [".git", ".agents", ".grida", ".codex", ".aws"];
 const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 const WORKERS: usize = 2;
 const TIME_LIMIT: Duration = Duration::from_secs(3);
@@ -44,6 +49,8 @@ pub struct FileTools {
     capture_image: Option<Arc<ImageCapture>>,
     capture_reference: Option<Arc<ImageCapture>>,
     workers: Arc<Semaphore>,
+    /// Mutations are serialized so an edit always reads what it replaces.
+    mutations: std::sync::Mutex<()>,
 }
 
 impl FileTools {
@@ -74,6 +81,7 @@ impl FileTools {
             capture_image,
             capture_reference,
             workers: Arc::new(Semaphore::new(WORKERS)),
+            mutations: std::sync::Mutex::new(()),
         })
     }
 
@@ -84,6 +92,14 @@ impl FileTools {
             Arc::new(FileTool::new(self.clone(), Operation::Read)?),
             Arc::new(FileTool::new(self.clone(), Operation::List)?),
             Arc::new(FileTool::new(self.clone(), Operation::Search)?),
+        ])
+    }
+
+    /// Text writes and edits. The host offers them only with a write rule.
+    pub(crate) fn write_adapters(self: &Arc<Self>) -> Result<[Arc<dyn Tool>; 2]> {
+        Ok([
+            Arc::new(FileTool::new(self.clone(), Operation::Write)?),
+            Arc::new(FileTool::new(self.clone(), Operation::Edit)?),
         ])
     }
 
@@ -115,6 +131,8 @@ enum Operation {
     CaptureReference,
     List,
     Search,
+    Write,
+    Edit,
 }
 
 struct FileTool {
@@ -160,6 +178,33 @@ impl FileTool {
                 "List bounded direct child files and folders. Use an optional relative folder path and directory ID. Omitting the path lists the selected directory. Symlinks are omitted.",
                 vec![],
             ),
+            Operation::Write => {
+                properties.insert(
+                    "content".into(),
+                    json!({"type":"string","maxLength":MAX_TEXT_BYTES}),
+                );
+                (
+                    "write_file",
+                    "Create a UTF-8 text file, or replace a whole existing one, at a relative path. Missing folders are created. Prefer edit_file for targeted changes. Version-control and agent metadata folders are read-only.",
+                    vec!["path", "content"],
+                )
+            }
+            Operation::Edit => {
+                properties.insert(
+                    "old_string".into(),
+                    json!({"type":"string","minLength":1,"maxLength":MAX_TEXT_BYTES}),
+                );
+                properties.insert(
+                    "new_string".into(),
+                    json!({"type":"string","maxLength":MAX_TEXT_BYTES}),
+                );
+                properties.insert("replace_all".into(), json!({"type":"boolean"}));
+                (
+                    "edit_file",
+                    "Replace exact text in a UTF-8 text file at a relative path. old_string must match the file's current content exactly once, unless replace_all is true. Include enough surrounding lines to make it unique. A missing or ambiguous match changes nothing; read the file and retry.",
+                    vec!["path", "old_string", "new_string"],
+                )
+            }
             Operation::Search => {
                 properties.insert(
                     "query".into(),
@@ -185,7 +230,11 @@ impl FileTool {
                     "type": "object", "properties": properties,
                     "required": required, "additionalProperties": false
                 })),
-                max_input_bytes: MAX_INPUT_BYTES,
+                max_input_bytes: if matches!(operation, Operation::Write | Operation::Edit) {
+                    MAX_MUTATION_INPUT_BYTES
+                } else {
+                    MAX_INPUT_BYTES
+                },
                 max_output_bytes: MAX_OUTPUT_BYTES,
                 recovery: RecoveryKind::Unavailable,
             },
@@ -267,6 +316,20 @@ pub(crate) struct Request {
     pub(crate) directory: Option<BindingId>,
     pub(crate) path: Option<PathBuf>,
     pub(crate) query: Option<String>,
+    pub(crate) content: Option<String>,
+    pub(crate) old_string: Option<String>,
+    pub(crate) new_string: Option<String>,
+    pub(crate) replace_all: Option<bool>,
+}
+
+/// Parse a write or edit invocation for permission evaluation.
+pub(crate) fn write_request(invocation: &Invocation) -> Result<Request> {
+    let operation = match invocation.definition().id.as_str() {
+        "write_file" => Operation::Write,
+        "edit_file" => Operation::Edit,
+        _ => return Err(problem(ErrorKind::Unsupported, "file_tool_unavailable")),
+    };
+    operation.parse(invocation.arguments())
 }
 
 pub(crate) fn read_request(invocation: &Invocation) -> Result<Request> {
@@ -290,6 +353,11 @@ impl Operation {
         let fields = value.as_object().ok_or_else(invalid)?;
         if fields.values().any(serde_json::Value::is_null)
             || (!matches!(self, Self::Search) && fields.contains_key("query"))
+            || (!matches!(self, Self::Write) && fields.contains_key("content"))
+            || (!matches!(self, Self::Edit)
+                && ["old_string", "new_string", "replace_all"]
+                    .iter()
+                    .any(|field| fields.contains_key(*field)))
         {
             return Err(invalid());
         }
@@ -303,6 +371,22 @@ impl Operation {
                 if request.directory.is_none()
                     && path.to_str().is_some_and(workspace_reference_path) => {}
             (Self::List, _, None) => {}
+            (Self::Write, Some(path), None)
+                if !path.as_os_str().is_empty()
+                    && request
+                        .content
+                        .as_ref()
+                        .is_some_and(|text| text.len() <= MAX_TEXT_BYTES) => {}
+            (Self::Edit, Some(path), None)
+                if !path.as_os_str().is_empty()
+                    && request
+                        .old_string
+                        .as_ref()
+                        .is_some_and(|text| !text.is_empty() && text.len() <= MAX_TEXT_BYTES)
+                    && request
+                        .new_string
+                        .as_ref()
+                        .is_some_and(|text| text.len() <= MAX_TEXT_BYTES) => {}
             (Self::Search, _, Some(query))
                 if !query.is_empty()
                     && query.len() <= MAX_QUERY_BYTES

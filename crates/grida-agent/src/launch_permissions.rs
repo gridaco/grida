@@ -58,6 +58,8 @@ struct Directory {
     command_read: AccessRule,
     #[serde(default)]
     command_read_write: AccessRule,
+    #[serde(default)]
+    write: AccessRule,
 }
 
 #[derive(Deserialize)]
@@ -75,6 +77,9 @@ struct Command {
     /// Programs start from the host's environment, minus Grida's own variables.
     #[serde(default)]
     inherit_environment: bool,
+    /// Programs start from this environment instead, for a host whose own
+    /// environment is not the person's (a desktop app captures their shell's).
+    environment: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Deserialize)]
@@ -285,10 +290,10 @@ pub fn load_permission_profile_excluding(
             },
             limits: COMMAND_LIMITS,
             disk_read: command.disk_read,
-            environment: Arc::new(if command.inherit_environment {
-                inherited_environment(credential_env)
-            } else {
-                BTreeMap::new()
+            environment: Arc::new(match command.environment {
+                Some(environment) => without_host_variables(environment, credential_env)?,
+                None if command.inherit_environment => inherited_environment(credential_env),
+                None => BTreeMap::new(),
             }),
         })
     } else {
@@ -315,6 +320,7 @@ pub fn load_permission_profile_excluding(
                 read: directory.read,
                 command_read: directory.command_read,
                 command_read_write: directory.command_read_write,
+                write: directory.write,
             },
         );
         directories.push(DirectorySpec {
@@ -621,4 +627,22 @@ fn inherited_environment(credential_env: Option<&str>) -> BTreeMap<String, Strin
     std::env::vars()
         .filter(|(name, _)| !name.starts_with("GRIDA_") && Some(name.as_str()) != credential_env)
         .collect()
+}
+
+/// A supplied program environment, validated and filtered like an inherited one.
+fn without_host_variables(
+    environment: BTreeMap<String, String>,
+    credential_env: Option<&str>,
+) -> Result<BTreeMap<String, String>> {
+    if environment.len() > 512
+        || environment.iter().any(|(name, value)| {
+            name.is_empty() || name.contains(['=', '\0']) || value.contains('\0')
+        })
+    {
+        return Err(invalid());
+    }
+    Ok(environment
+        .into_iter()
+        .filter(|(name, _)| !name.starts_with("GRIDA_") && Some(name.as_str()) != credential_env)
+        .collect())
 }

@@ -4,7 +4,8 @@ use crate::command::{
     AuthorizedCommand, CommandAccess, CommandArguments, CommandLimits, CommandTool, ReviewedCommand,
 };
 use crate::file_tools::{
-    CAPTURE_IMAGE_REFERENCE, FileAuthority, FileTools, ImageCapture, VIEW_IMAGE, read_request,
+    CAPTURE_IMAGE_REFERENCE, FileAuthority, FileTools, ImageCapture, PROTECTED_METADATA,
+    VIEW_IMAGE, read_request, write_request,
 };
 use crate::goal_verification::ReadVerification;
 use crate::workspace::{DirectoryBinding, DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
@@ -35,8 +36,6 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
 const REQUEST: &str = "grida.agent.approval";
-/// Top-level names that stay read-only under any writable root.
-const PROTECTED_METADATA: [&str; 5] = [".git", ".agents", ".grida", ".codex", ".aws"];
 const ANSWER: &str = "grida.agent.approval.answer";
 const MAX_APPROVAL_BYTES: usize = 128 * 1024;
 const MAX_ACTIONS: usize = 32;
@@ -52,11 +51,21 @@ pub enum AccessRule {
     Ask,
 }
 
+impl AccessRule {
+    fn is_deny(&self) -> bool {
+        *self == Self::Deny
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Serialize)]
 pub struct DirectoryAccess {
     pub read: AccessRule,
     pub command_read: AccessRule,
     pub command_read_write: AccessRule,
+    /// Text writes and edits. Omitted from identity while denied, so profiles
+    /// captured before file writes existed keep their identity.
+    #[serde(skip_serializing_if = "AccessRule::is_deny")]
+    pub write: AccessRule,
 }
 
 /// Native installation and fixed command constraints chosen by the host.
@@ -633,6 +642,10 @@ pub enum ApprovalEffect {
         environment_names: Vec<String>,
         stdin_bytes: usize,
     },
+    Write {
+        tool: ToolId,
+        relative_path: PathBuf,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -859,9 +872,21 @@ impl TurnPermissions {
                 capture_image,
                 capture_reference.filter(|_| self.profile.supports_workspace_image_reference()),
             )?);
+            let writes = !self.primary_review
+                && self
+                    .profile
+                    .directories
+                    .values()
+                    .any(|rule| rule.write != AccessRule::Deny);
+            let write_tools = if writes {
+                files.write_adapters()?.to_vec()
+            } else {
+                Vec::new()
+            };
             for tool in files
                 .adapters()?
                 .into_iter()
+                .chain(write_tools)
                 .chain(files.view_adapter()?)
                 .chain(files.reference_adapter()?)
             {
@@ -1046,6 +1071,23 @@ impl TurnPermissions {
                 };
                 (directory, effect, None, rule)
             }
+            "write_file" | "edit_file" if admission.grants == self.files => {
+                let request = write_request(invocation)?;
+                let directory = self.captured_directory(request.directory.as_ref())?;
+                let rule = self
+                    .profile
+                    .directories
+                    .get(&directory.spec().id)
+                    .map_or(AccessRule::Deny, |rule| rule.write);
+                if rule == AccessRule::Deny || self.primary_review {
+                    return Err(denied());
+                }
+                let effect = ApprovalEffect::Write {
+                    tool: invocation.definition().id.clone(),
+                    relative_path: request.path.unwrap_or_default(),
+                };
+                (directory, effect, None, rule)
+            }
             _ => return Err(denied()),
         };
         let scope = Fingerprint::of(&(
@@ -1094,14 +1136,16 @@ impl TurnPermissions {
     fn file_authority(&self, invocation: &Invocation) -> Result<FileAuthority> {
         let state = self.state()?;
         let ready = current(&state, invocation.id(), invocation.fingerprint())?;
-        if !matches!(ready.request.effect, ApprovalEffect::Read { .. }) {
-            return Err(denied());
-        }
+        let write = match ready.request.effect {
+            ApprovalEffect::Read { .. } => false,
+            ApprovalEffect::Write { .. } => true,
+            ApprovalEffect::Command { .. } => return Err(denied()),
+        };
         let grant = DirectoryGrant::bind(
             &self.profile.workspace,
             &ready.request.directory,
             true,
-            false,
+            write,
         )?;
         Ok(FileAuthority {
             workspace: self.profile.workspace.clone(),
@@ -1221,7 +1265,7 @@ impl AuthorityValidator for TurnPermissions {
                 let state = self.state()?;
                 let ready = current(&state, &request.operation, request.action)?;
                 let selection = match ready.request.effect {
-                    ApprovalEffect::Read { .. } => &self.files,
+                    ApprovalEffect::Read { .. } | ApprovalEffect::Write { .. } => &self.files,
                     ApprovalEffect::Command { .. } => &self.commands,
                 };
                 if &request.selection != selection {

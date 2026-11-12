@@ -63,6 +63,10 @@ impl Fixture {
     }
 
     fn profile(&self, command: bool) -> Arc<PermissionProfile> {
+        self.profile_with(command, false)
+    }
+
+    fn profile_with(&self, command: bool, write: bool) -> Arc<PermissionProfile> {
         let protected = vec![
             self.protected.clone(),
             self.database.parent().unwrap().to_owned(),
@@ -91,6 +95,11 @@ impl Fixture {
                     (
                         binding("default"),
                         DirectoryAccess {
+                            write: if write {
+                                AccessRule::Allow
+                            } else {
+                                AccessRule::Deny
+                            },
                             read: AccessRule::Allow,
                             command_read: if command {
                                 AccessRule::Allow
@@ -103,6 +112,7 @@ impl Fixture {
                     (
                         binding("additional"),
                         DirectoryAccess {
+                            write: AccessRule::Deny,
                             read: AccessRule::Ask,
                             command_read: AccessRule::Deny,
                             command_read_write: if command {
@@ -413,6 +423,114 @@ async fn workspace_read_uses_existing_grant_and_additional_access_is_one_action(
         run.invoke("new-operation", "read_file", call).await,
         "permission_revoked",
     );
+}
+
+fn text(outcome: &ToolOutcome) -> String {
+    outcome
+        .content
+        .iter()
+        .map(|part| match part {
+            ResultContent::Text(text) => text.clone(),
+            _ => String::new(),
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn writes_and_edits_stay_inside_the_project_and_off_metadata() {
+    let fixture = Fixture::new();
+    let run = fixture
+        .first(&fixture.profile_with(false, true), true)
+        .await;
+    let file = fixture.default.join("src/note.txt");
+
+    // A new file in a missing folder is created.
+    let created = completed(
+        run.invoke(
+            "w1",
+            "write_file",
+            json!({"path":"src/note.txt","content":"one two two"}),
+        )
+        .await,
+    );
+    assert_eq!(created.status, OutcomeStatus::Succeeded, "{created:?}");
+    assert_eq!(fs::read_to_string(&file).unwrap(), "one two two");
+
+    // An ambiguous or missing match changes nothing.
+    let ambiguous = completed(
+        run.invoke(
+            "e1",
+            "edit_file",
+            json!({"path":"src/note.txt","old_string":"two","new_string":"2"}),
+        )
+        .await,
+    );
+    assert_eq!(ambiguous.status, OutcomeStatus::Failed);
+    assert!(text(&ambiguous).contains("edit_ambiguous"), "{ambiguous:?}");
+    let missing = completed(
+        run.invoke(
+            "e2",
+            "edit_file",
+            json!({"path":"src/note.txt","old_string":"zero","new_string":"0"}),
+        )
+        .await,
+    );
+    assert!(text(&missing).contains("edit_no_match"), "{missing:?}");
+    assert_eq!(fs::read_to_string(&file).unwrap(), "one two two");
+
+    // A unique match, then every match.
+    let edited = completed(
+        run.invoke(
+            "e3",
+            "edit_file",
+            json!({"path":"src/note.txt","old_string":"one","new_string":"1"}),
+        )
+        .await,
+    );
+    assert_eq!(edited.status, OutcomeStatus::Succeeded, "{edited:?}");
+    completed(
+        run.invoke(
+            "e4",
+            "edit_file",
+            json!({"path":"src/note.txt","old_string":"two","new_string":"2","replace_all":true}),
+        )
+        .await,
+    );
+    assert_eq!(fs::read_to_string(&file).unwrap(), "1 2 2");
+
+    // Metadata, links and folders without a write rule are refused.
+    fs::create_dir(fixture.default.join(".git")).unwrap();
+    failed(
+        run.invoke(
+            "w2",
+            "write_file",
+            json!({"path":".git/config","content":"x"}),
+        )
+        .await,
+        "file_protected_path",
+    );
+    assert!(!fixture.default.join(".git/config").exists());
+    std::os::unix::fs::symlink(
+        fixture.additional.join("target"),
+        fixture.default.join("link"),
+    )
+    .unwrap();
+    let linked = completed(
+        run.invoke("w3", "write_file", json!({"path":"link","content":"x"}))
+            .await,
+    );
+    assert_eq!(linked.status, OutcomeStatus::Failed, "{linked:?}");
+    assert!(!fixture.additional.join("target").exists());
+    let elsewhere = completed(
+        run.invoke(
+            "w4",
+            "write_file",
+            json!({"directory":"additional","path":"note","content":"x"}),
+        )
+        .await,
+    );
+    assert_eq!(elsewhere.status, OutcomeStatus::Failed, "{elsewhere:?}");
+    assert!(!fixture.additional.join("note").exists());
 }
 
 #[tokio::test]
