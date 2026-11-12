@@ -376,6 +376,67 @@ async fn paused_task_resumes_after_restart_with_retained_input_and_steering() {
     terminate_shared_server(second_host).await;
 }
 
+#[tokio::test]
+async fn resuming_a_paused_reply_asks_the_model_to_continue_it() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Hold("Before pause."),
+        Reply::Finished(" After resume."),
+    ])
+    .await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = initialized_shared_socket(&url).await;
+    let created = ws_rpc(
+        &mut socket,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    wait_for_partial_prompt(&mut socket, session).await;
+    endpoint.request().await;
+    let current = session_snapshot(&mut socket, session).await;
+    let pause = task_basis(&current, session, "pause-reply");
+    ws_rpc(&mut socket, 4, "_co.grida/session/pause", pause).await;
+    let paused = wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"]["disposition"] == "suspended"
+    })
+    .await;
+    let resume = json!({
+        "task":task_basis(&paused,session,"resume-reply"),
+        "expectedEpoch":paused["current"]["epoch"],
+        "expectedJournalPosition":paused["current"]["journalPosition"],
+    });
+    let resumed = ws_rpc(&mut socket, 5, "_co.grida/session/resume", resume).await;
+    assert!(resumed.get("result").is_some(), "{resumed}");
+    let request = endpoint.request().await;
+    let messages = request["messages"].as_array().unwrap();
+    // The cut-off reply is kept and the model is told to continue it.
+    let kept = messages
+        .iter()
+        .position(|message| message["role"] == "assistant" && message["content"] == "Before pause.")
+        .expect("the partial reply is part of the resumed request");
+    let last = messages.last().unwrap();
+    assert_eq!(last["role"], "user");
+    assert!(
+        last["content"]
+            .as_str()
+            .is_some_and(|text| text.contains("Continue exactly where the reply above stops")),
+        "{last}"
+    );
+    assert_eq!(kept, messages.len() - 2);
+    wait_for_snapshot(&mut socket, session, |snapshot| {
+        snapshot["current"].is_null()
+    })
+    .await;
+    endpoint.done().await;
+    drop(socket);
+    terminate_shared_server(host).await;
+}
+
 pub(super) async fn wait_for_partial_prompt(socket: &mut SharedSocket, session: &str) {
     use futures_util::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::Message;

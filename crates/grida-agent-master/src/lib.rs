@@ -206,6 +206,9 @@ struct Continuation {
     retry: Option<retry::AdmissionRetry>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     effort: Option<effort::Policy>,
+    /// The previous step's reply was cut off; the next request continues it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    cut_reply: bool,
 }
 
 impl Continuation {
@@ -593,7 +596,7 @@ impl Master {
             let prepared = delay.and(checked).and_then(|_| {
                 let request = match &continuation.request {
                     Some(request) => request.clone(),
-                    None => self.prepare(&input_view)?,
+                    None => self.prepare(&input_view, continuation.cut_reply)?,
                 };
                 if let Some(retry) = retry {
                     retry.verify_request(&request)?;
@@ -886,6 +889,14 @@ impl Master {
             continuation.request = None;
             continuation.request_generation = 0;
             continuation.interrupted = false;
+            continuation.cut_reply = step.inference.status == InferenceStatus::Interrupted
+                && step.tools.is_empty()
+                && step.inference.messages.iter().any(|message| {
+                    message.role == Role::Assistant
+                        && message.content.iter().any(
+                            |content| matches!(content, Content::Text(text) if !text.is_empty()),
+                        )
+                });
             continuation.outcome = outcome;
             turn.publish_continuation(
                 OperationKey::new(format!("{step_key}/result"))?,
@@ -1014,6 +1025,7 @@ impl Master {
                 hook_diagnostics: Vec::new(),
                 retry: None,
                 effort: self.effort.clone(),
+                cut_reply: false,
             }),
             Some(envelope) => {
                 let value: Continuation = decode(CONTINUATION_SCHEMA, envelope)?;
@@ -1119,7 +1131,7 @@ impl Master {
         Ok(RequestRefresh::Retired)
     }
 
-    fn prepare(&self, view: &TurnView) -> Result<PreparedRequest> {
+    fn prepare(&self, view: &TurnView, cut_reply: bool) -> Result<PreparedRequest> {
         let mut messages = Vec::new();
         if !self.config.instructions.is_empty() {
             messages.push(Message {
@@ -1171,10 +1183,33 @@ impl Master {
             }
         }
         messages.extend(self.history.iter().cloned());
-        messages.extend(history::project(&view.state).into_iter().map(|record| {
-            let HistoryRecord::Message(message) = record;
-            message
-        }));
+        let own: Vec<Message> = history::project(&view.state)
+            .into_iter()
+            .map(|record| {
+                let HistoryRecord::Message(message) = record;
+                message
+            })
+            .collect();
+        // A reply cut off by a pause or interruption is continued rather than
+        // started over, as long as it is still the latest record of the turn.
+        let cut_reply = cut_reply
+            && own
+                .last()
+                .is_some_and(|message| message.role == Role::Assistant);
+        messages.extend(own);
+        if cut_reply {
+            messages.push(Message {
+                id: MessageId::new("grida-continue-cut-reply")?,
+                role: Role::User,
+                phase: None,
+                content: vec![Content::Text(CONTINUE_CUT_REPLY.into())],
+                provenance: Provenance {
+                    source: "product-instructions".into(),
+                    kind: ProvenanceKind::Supplied,
+                    fingerprint: Some(Fingerprint::of(&CONTINUE_CUT_REPLY)?),
+                },
+            });
+        }
         for content in messages.iter_mut().flat_map(|message| &mut message.content) {
             if let Content::Media(media) = content
                 && let Some(display) = retained_file::display(media)
@@ -1574,6 +1609,10 @@ impl Master {
         }
     }
 }
+
+/// Sent after a reply that a pause or interruption cut off, so the model
+/// continues it instead of starting over.
+const CONTINUE_CUT_REPLY: &str = "Your previous reply was interrupted and has now been resumed. Continue exactly where the reply above stops. Do not repeat, restate, or summarize what you already wrote.";
 
 fn paused_before_generation(operation: &OperationState) -> bool {
     operation.attempts.is_empty()

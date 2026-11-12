@@ -32,7 +32,8 @@ While the agent works, the composer's main button pauses it. The turn stops
 after its current step and keeps its place. From there:
 
 - Choose ▶ in the empty composer to **Resume** the same turn where it paused.
-  Nothing is sent again; the agent continues its plan.
+  Nothing is sent again; the agent continues its plan, and a reply that was
+  cut off picks up where it stopped.
 - Or send a new message. The paused turn ends as stopped, and your message
   runs next, ahead of anything already waiting. Waiting messages follow it.
 
