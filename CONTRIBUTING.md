@@ -152,6 +152,46 @@ normally pairs the editor on port 3000 with the API on port 4000 and the same lo
 Supabase project. See the [Forms proof guide](scripts/forms-local/README.md) for
 disposable seeded database, Storage and HTTP verification.
 
+## Pull requests
+
+Choose a template by the effect of your change. Features and bug fixes can use
+either template:
+
+- **General** (default): changes without a user-facing effect, such as refactoring,
+  infrastructure, dependencies, or documentation. Explain what changed, why, and
+  how you verified it.
+- **[Product & UX](https://github.com/gridaco/grida/compare?expand=1&template=product-ux.md)**:
+  changes to user behavior, interactions, appearance, or visual output. Explain
+  the user problem, resulting behavior, reproduction steps, and caveats, and
+  include a working demo.
+
+For applicable Product & UX changes, outside contributors must include screenshots
+or a short demo video before the PR can be accepted. Grida's editor and visual
+features depend on small details and edge cases that code review alone cannot
+establish. Show the implementation running: screenshots suit static results such
+as layout or styling; video/GIF suits interactions such as dragging, resizing, or
+keyboard shortcuts. Explain what the demo shows, include before/after behavior
+when useful, and note relevant limitations. A simple recording is enough;
+narration is optional. If no meaningful visual demo applies, explain why in the
+PR.
+
+GitHub fills new PR descriptions with the default template. For Product & UX,
+use the link above and select your branches, or add `template=product-ux.md` to
+your PR creation URL's query parameters. With the GitHub CLI:
+
+```sh
+gh pr create --template product-ux.md --attach ./demo.mp4
+# Or attach a demo to an existing PR:
+gh pr edit <number> --attach ./demo.mp4
+```
+
+Attachments require `gh` v2.99+ and repository write access. Repeat `--attach` for
+multiple files; contributors without write access can upload through GitHub's
+web UI. See the [CLI attachment guide](https://github.blog/changelog/2026-09-01-github-cli-media-in-issues-pull-requests-and-comments/).
+When supplying `--body` or `--body-file`, read the
+[appropriate template](https://github.com/gridaco/grida/tree/main/.github) and
+preserve its sections in your description.
+
 ## Support
 
 If you have any problem running the project locally or for any further information, please contact us via Slack.
