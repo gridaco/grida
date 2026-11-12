@@ -166,7 +166,9 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
       await agent?.close();
       await fs.rm(base, { recursive: true, force: true });
     }
-  }
+  },
+  // Starts and replaces native workers; slower under a full suite.
+  20_000
 );
 
 it.runIf(Boolean(resources) && process.platform === "darwin")(

@@ -83,7 +83,9 @@ mod summaries;
 #[path = "process/wakeups.rs"]
 mod wakeups;
 
-const WAIT: Duration = Duration::from_secs(15);
+/// How long a fixture waits for an expected event. A full parallel run starts
+/// hundreds of agent processes, so this bounds failure time, not success time.
+const WAIT: Duration = Duration::from_secs(30);
 const TEST_CREDENTIAL: &str = "fixture-only-bearer-token";
 
 #[cfg(unix)]

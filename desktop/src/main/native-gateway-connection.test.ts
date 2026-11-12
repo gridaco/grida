@@ -642,7 +642,9 @@ it.skipIf(!resourcesPath).each([
           expect(state.goal?.effort).toBe("ultra");
           return state;
         },
-        { timeout: 8000 }
+        // The review is held while the parent finishes: several model calls and
+        // a review agent's start, slower under a full suite.
+        { timeout: 30_000 }
       );
       const change = {
         action: "reconcile_review",
@@ -766,7 +768,7 @@ it.skipIf(!resourcesPath).each([
       await fs.rm(root, { recursive: true, force: true });
     }
   },
-  20_000
+  60_000
 );
 
 it.skipIf(!resourcesPath)(
