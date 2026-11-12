@@ -20,7 +20,8 @@ covered_by:
 A request sent with a PNG or a file shows the attachment as a named chip above
 the request's text, with no placeholder text in the message. The attachment's
 bytes stay with the agent; the chat shows only its name. A request with an
-attachment cannot be edited and resubmitted, so it offers no Edit action.
+attachment cannot be edited and resubmitted, so it offers no Edit action; nor
+does a request that started a goal.
 
 ## Steps
 
