@@ -312,3 +312,92 @@ async fn archived_chat_keeps_its_turn_and_reopens_with_the_same_title() {
     endpoint.done().await;
     terminate_shared_server(second).await;
 }
+
+#[tokio::test]
+async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Finished("Here is a plan."),
+        Reply::Finished("Done."),
+    ])
+    .await;
+    let mut command = executable();
+    command
+        .args([
+            "serve",
+            "--listen",
+            "ws://127.0.0.1:0/acp",
+            "--server-token-env",
+            "GRIDA_AGENT_FIXTURE_SERVER_TOKEN",
+            "--chat-titles",
+        ])
+        .env("GRIDA_AGENT_FIXTURE_SERVER_TOKEN", SERVER_TOKEN)
+        .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL);
+    configured(&mut command, &state, &endpoint.url);
+    let (child, url) = spawn_shared_server(command).await;
+    let mut client = organizer(&url).await;
+    let session = new_session(&mut client, 2, workspace.path()).await;
+    let prompt = |id: u64, text: &str| {
+        (
+            id,
+            json!({"sessionId":session,"prompt":[{"type":"text","text":text}]}),
+        )
+    };
+    let (id, request) = prompt(3, "Help me plan our spring collection launch.");
+    let reply = ws_rpc(&mut client, id, "session/prompt", request).await;
+    assert_eq!(reply["result"]["stopReason"], "end_turn");
+    endpoint.request().await;
+    let title = endpoint.title_request().await;
+    assert!(
+        title.to_string().contains("spring collection launch"),
+        "the title reads the first request: {title}"
+    );
+    assert!(
+        title["tools"].as_array().is_none_or(Vec::is_empty),
+        "a title request offers no tools: {title}"
+    );
+    let mut titled = Value::Null;
+    for attempt in 0..100 {
+        titled = ws_rpc(
+            &mut client,
+            10 + attempt,
+            "_co.grida/session/catalog-entry",
+            json!({"sessionId":session}),
+        )
+        .await;
+        if !titled["result"]["title"].is_null() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(titled["result"]["title"], FIXTURE_TITLE, "{titled}");
+
+    // Later requests never retitle, so a rename stays.
+    let renamed = ws_rpc(
+        &mut client,
+        200,
+        "_co.grida/session/organize",
+        json!({
+            "sessionId":session,"revision":titled["result"]["revision"],
+            "title":"Spring launch","archived":false,
+        }),
+    )
+    .await;
+    assert_eq!(renamed["result"]["title"], "Spring launch", "{renamed}");
+    let (id, request) = prompt(201, "Now draft the announcement.");
+    let reply = ws_rpc(&mut client, id, "session/prompt", request).await;
+    assert_eq!(reply["result"]["stopReason"], "end_turn");
+    endpoint.request().await;
+    let after = ws_rpc(
+        &mut client,
+        202,
+        "_co.grida/session/catalog-entry",
+        json!({"sessionId":session}),
+    )
+    .await;
+    assert_eq!(after["result"]["title"], "Spring launch");
+    endpoint.done().await;
+    terminate_shared_server(child).await;
+}

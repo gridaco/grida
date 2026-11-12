@@ -371,10 +371,12 @@ impl Host {
             self.check_ready_capacity(&request.session).await?;
         }
         let policy = self.submission_policy(&request, false)?;
+        let title = self.title_candidate(&view, &request.parts);
         let input = self
             .capture_input(&view, request.id, request.parts, policy)
             .await?;
         let acceptance = self.store.submit(request.session, input).await?;
+        self.start_title(title);
         self.kick_queue(acceptance.session.clone()).await;
         drop(admission);
         Ok(DurableSubmission {

@@ -1607,6 +1607,13 @@ Today:
   excludes source system instructions, tool payloads, and provider continuation state.
   [Process tests](crates/grida-agent/tests/process/side_chats.rs) verify private
   scope and concurrent parent work through side-chat closure.
+- The [chat title owner](crates/grida-agent/src/host/titles.rs) titles an
+  untitled chat from its first request through the same side-context host: a
+  separate in-memory journal, only the selected inference authority, tools
+  denied, and an empty background. It writes the title only while the chat is
+  still untitled at the same catalogue revision. A client opts in at launch.
+  The [process test](crates/grida-agent/tests/process/catalog.rs) verifies a
+  tool-free title request and that a rename is never replaced.
 - [Native-provider auth routes](packages/grida-ai-agent/src/http/routes/chatgpt-auth.ts) — the dedicated native subscription host invokes the existing validated ceremony in-process. Historical full-agent route mounting remains source-only evidence; fixed paths come from their neutral protocol owner. Credential and callback mechanisms remain GRIDA-SEC-008.
 - [Desktop media startup proof](desktop/src/sidecar/media-startup.test.ts), [build fixture](desktop/src/sidecar/testing/media-startup-build.mjs), and [runtime guard](desktop/src/sidecar/testing/media-startup-guard.cjs) — actual Vite sidecar output, private framed provider/control traffic and main-transferred loopback sockets, with synthetic BYOK/GG responses and owned temporary state. Import/network tripwires and absent chat/scratch files test startup isolation; they are not an OS-sandbox, installed-app or provider integration certification.
 - The [packaged retained-media launcher](desktop/src/main/retained-media-launch.ts)

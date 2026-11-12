@@ -122,6 +122,12 @@ fn command() -> Command {
                         .help("Allow the private launcher to own bounded text-only subagents"),
                 )
                 .arg(
+                    Arg::new("chat-titles")
+                        .long("chat-titles")
+                        .action(ArgAction::SetTrue)
+                        .help("Title an untitled chat from its first request with one extra model request"),
+                )
+                .arg(
                     Arg::new("supervised-provider")
                         .long("supervised-provider")
                         .requires("stdio")
@@ -691,6 +697,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
             .is_some_and(|value| value == "ultra");
     let host = if subagents || ultra {
         host.with_subagents()
+    } else {
+        host
+    };
+    let host = if name == "serve" && args.get_flag("chat-titles") {
+        host.with_chat_titles()
     } else {
         host
     };

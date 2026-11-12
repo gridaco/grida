@@ -85,6 +85,8 @@ export type NativeAgentLaunch = {
   subscriptionScope?: string;
   /** Trusted Main opt-in for the captured Gateway or saved BYOK connection. */
   subagents?: true;
+  /** Title an untitled chat from its first request (one extra model request). */
+  chatTitles?: true;
   mcp?: NativeMcpLaunch;
   workspace?: NativeWorkspaceSelection;
   imageGeneration?: NativeImageGeneration;
@@ -513,6 +515,7 @@ export class NativeAgentProcess {
     if (options.gatewayScope)
       args.push("--supervised-gateway-scope", options.gatewayScope);
     if (options.subagents) args.push("--subagents");
+    if (options.chatTitles) args.push("--chat-titles");
     if (options.subscriptionScope)
       args.push("--supervised-chatgpt-scope", options.subscriptionScope);
     if (permissionProfile)

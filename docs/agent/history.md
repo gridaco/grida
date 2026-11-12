@@ -26,13 +26,16 @@ Its transcript and retained work are available in the original chat. Review any
 pending question, approval, or interruption before continuing.
 [Guide and interrupt work](./controls.md)
 
-Long chats open at the latest messages. Choose **Earlier messages** to step
-back through the conversation, and **Back to latest** to return to current
-work. Reading earlier messages leaves ongoing work running. If the history
-changes while you browse, start again from the latest messages. Current turn
-details appear with the latest messages.
+Long chats open at the latest messages. Scroll up to read earlier messages:
+they load above as you go, without moving what you are reading. Reading
+earlier messages leaves ongoing work running, and new replies arrive at the
+bottom.
 
-Open **Chat options** (the three-dot menu) and choose **Rename chat** to change its title. **Archive chat** moves it out of the
+A new chat gets a short title from its first request while the agent starts
+working. To change it, double-click the title, or open **Chat options** (the
+three-dot menu) and choose **Rename chat**. Type the new title and press
+Enter, or click elsewhere; Escape keeps the old one. A title you set is never
+replaced. **Archive chat** moves it out of the
 active list and lets any ongoing work continue. Open **Archived chats** to find
 it again or choose **Restore chat** to return it to the active list. When
 **Delete chat** is available, it removes the chat’s private data. Saved project

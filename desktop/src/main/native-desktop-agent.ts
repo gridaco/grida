@@ -71,6 +71,11 @@ type LaunchOptions = Readonly<{
   ) => ImageReferenceReview;
   mcp?: NativeMcpLaunch;
   selectableProfiles?: boolean;
+  /**
+   * Title untitled chats from their first request. The app always does; the
+   * option keeps scripted test providers free of the extra request.
+   */
+  chatTitles?: boolean;
   onLifecycle?: (
     workspaceId: string,
     event: NativeChatLifecycle,
@@ -110,7 +115,8 @@ export class NativeDesktopAgent {
     private readonly onLifecycle?: LaunchOptions["onLifecycle"],
     private readonly imagePlacement?: LaunchOptions["imagePlacement"],
     private readonly reviewImageReference?: LaunchOptions["reviewImageReference"],
-    private readonly ordinaryWorkspaceChat = false
+    private readonly ordinaryWorkspaceChat = false,
+    private readonly chatTitles = false
   ) {
     if (subscription) {
       const { oauth } = subscription;
@@ -172,7 +178,7 @@ export class NativeDesktopAgent {
     account: DesktopAccountSession,
     resourcesPath: string,
     protectedPaths: readonly string[],
-    options: Pick<LaunchOptions, "openExternal" | "onLifecycle">
+    options: Pick<LaunchOptions, "openExternal" | "onLifecycle" | "chatTitles">
   ) {
     return this.compose(
       await NativeAgentCutover.prepareOrdinary(protectedPaths),
@@ -228,7 +234,8 @@ export class NativeDesktopAgent {
       options?.onLifecycle,
       options?.imagePlacement,
       options?.reviewImageReference,
-      ordinaryWorkspaceChat
+      ordinaryWorkspaceChat,
+      options?.chatTitles
     );
   }
 
@@ -906,6 +913,7 @@ export class NativeDesktopAgent {
     return {
       ...provider,
       ...(maxOutputTokens !== undefined && { maxOutputTokens }),
+      ...(this.chatTitles && { chatTitles: true as const }),
       imagePlacement: imageTools
         ? this.imagePlacement?.({ workspaceId: id, root, identity })
         : undefined,

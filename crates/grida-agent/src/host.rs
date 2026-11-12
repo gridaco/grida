@@ -26,6 +26,7 @@ mod skills;
 mod spending;
 mod sponsorship;
 mod subagents;
+mod titles;
 mod wakeups;
 pub use catalog::SessionCatalog;
 pub(crate) use catalog::is_archived;
@@ -146,6 +147,8 @@ pub struct Host {
     pub(crate) editor_surfaces: crate::editor_surfaces::EditorSurfaces,
     pub(crate) desktop_image_generation: Option<image_generation::DesktopImageGeneration>,
     subagents_enabled: bool,
+    /// Title an untitled chat from its first request (see `titles`).
+    chat_titles: bool,
     sponsorship_enabled: bool,
     goal_sponsorship_enabled: bool,
     effort: EffortPreset,
@@ -746,6 +749,7 @@ impl Host {
             editor_surfaces: Default::default(),
             desktop_image_generation: None,
             subagents_enabled: false,
+            chat_titles: false,
             sponsorship_enabled: true,
             goal_sponsorship_enabled: true,
             effort: EffortPreset::Standard,
@@ -1363,11 +1367,13 @@ impl Host {
                 if !view.queued.is_empty() {
                     return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
                 }
+                let title = self.title_candidate(&view, &parts);
                 let input = self.capture_input(&view, id, parts, policy).await?;
                 let accepted = self
                     .store
                     .submit_at_revision(session.clone(), input, view.revision)
                     .await?;
+                self.start_title(title);
                 Launch::Queued(Some(accepted), None)
             }
             other => other,
@@ -1433,8 +1439,10 @@ impl Host {
                     return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));
                 }
                 let history = self.provider_history(session.clone(), None).await?;
+                let title = self.title_candidate(&view, &parts);
                 let input = self.capture_input(&view, id, parts, policy).await?;
                 let acceptance = self.store.submit(session.clone(), input.clone()).await?;
+                self.start_title(title);
                 let view = self.store.inspect(session.clone()).await?;
                 if view.queued.first().map(|head| &head.input.id) != Some(&input.id) {
                     return Err(problem(ErrorKind::Conflict, "session_queue_waiting"));

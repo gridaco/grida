@@ -3525,6 +3525,61 @@ it("uses catalog membership, retains an exact rename draft on conflict, and igno
   controller.disconnect();
 });
 
+it("picks up the title the host writes for an untitled chat as its turn settles", async () => {
+  const { bridge, running, transcripts } = fixture();
+  let entry: NativeChatCatalogEntry = {
+    sessionId: "chat-a",
+    revision: 0,
+    title: null,
+    archived: false,
+  };
+  const read = vi.fn(async () => entry);
+  bridge.catalogEntry = read;
+  bridge.organize = async (sessionId, change) => ({ sessionId, ...change });
+  bridge.listArchived = async () => ({ sessionIds: [], nextCursor: null });
+  running.add("chat-a");
+  transcripts.set("chat-a", [
+    { messageId: "first", role: "user", text: "Plan the spring launch kit." },
+  ]);
+  await controller_select(bridge, "chat-a", async (controller) => {
+    await vi.waitFor(() =>
+      expect(controller.read().catalogEntry).toMatchObject({ title: null })
+    );
+    // The fallback is the first request's first line.
+    expect(controller.chatTitle("chat-a")).toBe("Plan the spring launch kit.");
+    entry = { ...entry, revision: 1, title: "Spring launch kit" };
+    running.delete("chat-a");
+    await vi.waitFor(
+      () => expect(controller.chatTitle("chat-a")).toBe("Spring launch kit"),
+      { timeout: 3_000 }
+    );
+    // A rename in progress is never replaced by the background title.
+    controller.beginRename();
+    controller.changeTitle("Mine");
+    entry = { ...entry, revision: 2, title: "Other" };
+    expect(controller.read().catalogDraft?.text).toBe("Mine");
+  });
+});
+
+async function controller_select(
+  bridge: DesktopNativeChat,
+  sessionId: string,
+  body: (controller: NativeChatController) => Promise<void>
+) {
+  const controller = new NativeChatController(
+    bridge,
+    { getItem: () => null, setItem: () => {} },
+    "fixture"
+  );
+  controller.connect(null);
+  try {
+    await controller.select(sessionId);
+    await body(controller);
+  } finally {
+    controller.disconnect();
+  }
+}
+
 it("browses saved pages without opening a chat until it is selected", async () => {
   const { bridge } = fixture();
   const load = vi.spyOn(bridge, "load");

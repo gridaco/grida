@@ -770,6 +770,7 @@ app.on("ready", async () => {
               });
             },
           selectableProfiles: strictRetainedMedia,
+          chatTitles: true,
         };
         nativeDesktopAgent = NativeDesktopProfile.managedCutover()
           ? await NativeDesktopAgent.prepareExisting(
@@ -865,6 +866,7 @@ app.on("ready", async () => {
           {
             onLifecycle: onNativeLifecycle,
             openExternal: (url) => shell.openExternal(url),
+            chatTitles: true,
           }
         );
         nativeDocuments = ordinarySelectedSvgFiles(

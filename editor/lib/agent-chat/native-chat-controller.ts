@@ -70,6 +70,8 @@ const POLL_MS = 500;
 const RECENTS_LIMIT = 12;
 const MAX_LIVE_ACTIVITY = 64;
 const EMPTY_TURNS: readonly NativeChatTurnRecord[] = [];
+/** A second look for a background chat title after a turn progresses. */
+const TITLE_RECHECK_MS = 6_000;
 const MAX_LIVE_BYTES = 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 256 * 1024;
 
@@ -215,6 +217,7 @@ type Scope = {
   opening?: Promise<void>;
   refreshing?: Promise<void>;
   timer?: ReturnType<typeof setTimeout>;
+  titleCheck?: ReturnType<typeof setTimeout>;
   durable: readonly NativeChatMessage[];
   recentWindow?: Pick<NativeChatTranscriptPage, "view" | "older" | "turns">;
   /**
@@ -3597,6 +3600,7 @@ export class NativeChatController {
   private queueRelease(scope: Scope | undefined): void {
     if (!scope) return;
     clearTimeout(scope.timer);
+    clearTimeout(scope.titleCheck);
     scope.stopEditorSurfaceOpen?.();
     scope.stopEditorSvgText?.();
     scope.stopEditorSurfaceUpdates?.();
@@ -3681,6 +3685,44 @@ export class NativeChatController {
     } catch {
       // An older or detached owner can leave the composer without commands.
     }
+  }
+
+  /**
+   * An untitled chat is titled by the host from its first request, in the
+   * background. Pick the title up as turns progress, and once more shortly
+   * after, without surfacing errors from this background read.
+   */
+  private refreshUntitled(scope: Scope): void {
+    const read = this.bridge.catalogEntry;
+    const attachment = scope.attachment;
+    if (
+      !read ||
+      !attachment ||
+      !this.canOrganizeChats ||
+      this.view.catalogEntry?.title !== null ||
+      this.view.catalogDraft
+    )
+      return;
+    const check = async () => {
+      if (!this.owns(scope) || this.view.catalogEntry?.title !== null) return;
+      try {
+        const entry = await read.call(this.bridge, attachment.attachmentId);
+        if (
+          !this.owns(scope) ||
+          entry.sessionId !== attachment.sessionId ||
+          entry.title === null ||
+          this.view.catalogDraft
+        )
+          return;
+        this.installCatalogEntry(entry);
+        void this.listChats();
+      } catch {
+        // The title stays as it is; a later turn or reopening reads it again.
+      }
+    };
+    void check();
+    clearTimeout(scope.titleCheck);
+    scope.titleCheck = setTimeout(() => void check(), TITLE_RECHECK_MS);
   }
 
   private installCatalogEntry(
@@ -3818,6 +3860,7 @@ export class NativeChatController {
           return;
         }
         scope.replay = false;
+        this.refreshUntitled(scope);
         const page = this.bridge.transcriptPage
           ? await this.bridge.transcriptPage(attachment.attachmentId)
           : undefined;

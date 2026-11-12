@@ -93,8 +93,20 @@ mod catalog;
 struct Endpoint {
     url: String,
     requests: mpsc::UnboundedReceiver<Value>,
+    /// Chat title requests, answered by the endpoint with [`FIXTURE_TITLE`]
+    /// without taking a scripted reply.
+    titles: mpsc::UnboundedReceiver<Value>,
     task: tokio::task::JoinHandle<()>,
     wait: Duration,
+}
+
+/// The title the fixture endpoint gives every untitled chat.
+const FIXTURE_TITLE: &str = "Fixture chat";
+
+/// A host titles a chat from its first request in the background; that
+/// request carries this marker from the title prompt.
+fn is_title_request(request: &Value) -> bool {
+    request.to_string().contains("First request:")
 }
 
 enum Reply {
@@ -158,13 +170,28 @@ impl Endpoint {
         };
         let url = format!("http://{}/{version}", listener.local_addr().unwrap());
         let (sent, requests) = mpsc::unbounded_channel();
+        let (titled, titles) = mpsc::unbounded_channel();
         let task = tokio::spawn(async move {
             let mut connections = tokio::task::JoinSet::new();
-            for reply in replies {
+            let mut replies = replies.into_iter().peekable();
+            while replies.peek().is_some() {
                 let (stream, _) = timeout(wait, listener.accept()).await.unwrap().unwrap();
-                let sent = sent.clone();
+                let mut stream = BufReader::new(stream);
+                let head = read_fixture_request(&mut stream).await;
+                let title = is_title_request(&head.request);
+                let (reply, sent) = if title {
+                    // A Responses route counts the title's input first.
+                    let reply = if head.line.contains("/input_tokens") {
+                        Reply::InputCount(10)
+                    } else {
+                        Reply::Finished(FIXTURE_TITLE)
+                    };
+                    (reply, titled.clone())
+                } else {
+                    (replies.next().unwrap(), sent.clone())
+                };
                 connections.spawn(async move {
-                    fixture_request(stream, &sent, reply, protocol, credential).await;
+                    fixture_request(stream, head, &sent, reply, protocol, credential).await;
                 });
             }
             while let Some(result) = connections.join_next().await {
@@ -174,6 +201,7 @@ impl Endpoint {
         Self {
             url,
             requests,
+            titles,
             task,
             wait,
         }
@@ -186,33 +214,31 @@ impl Endpoint {
             .unwrap()
     }
 
+    /// The next chat title request the endpoint answered.
+    async fn title_request(&mut self) -> Value {
+        timeout(self.wait, self.titles.recv())
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
     async fn done(self) {
         timeout(WAIT, self.task).await.unwrap().unwrap();
     }
 }
 
-async fn fixture_request(
-    stream: TcpStream,
-    sent: &mpsc::UnboundedSender<Value>,
-    reply: Reply,
-    protocol: ProviderProtocol,
-    credential: Option<&str>,
-) {
-    let mut stream = BufReader::new(stream);
+struct FixtureHead {
+    line: String,
+    authorization: Option<(String, String)>,
+    anthropic_version: Option<String>,
+    accept: Option<String>,
+    request: Value,
+}
+
+async fn read_fixture_request(stream: &mut BufReader<TcpStream>) -> FixtureHead {
     let mut line = String::new();
     stream.read_line(&mut line).await.unwrap();
-    let count = matches!(&reply, Reply::InputCount(_) | Reply::InvalidInputCount);
-    let path = match (protocol, count) {
-        (ProviderProtocol::OpenAiCompatible, true) => "/v1/chat/completions/input_tokens",
-        (ProviderProtocol::OpenAiCompatible, false) => "/v1/chat/completions",
-        (ProviderProtocol::Responses, true) => "/v1/responses/input_tokens",
-        (ProviderProtocol::Responses, false) => "/v1/responses",
-        (ProviderProtocol::Anthropic, _) => "/v1/messages",
-        (ProviderProtocol::Gemini, _) => {
-            "/v1beta/models/fixture-model:streamGenerateContent?alt=sse"
-        }
-    };
-    assert_eq!(line, format!("POST {path} HTTP/1.1\r\n"));
+    let request_line = line.clone();
     let mut length = None;
     let mut authorization = None;
     let mut anthropic_version = None;
@@ -241,6 +267,44 @@ async fn fixture_request(
             accept = Some(value.trim().to_owned());
         }
     }
+    let mut request = vec![0; length.unwrap()];
+    stream.read_exact(&mut request).await.unwrap();
+    FixtureHead {
+        line: request_line,
+        authorization,
+        anthropic_version,
+        accept,
+        request: serde_json::from_slice(&request).unwrap(),
+    }
+}
+
+async fn fixture_request(
+    mut stream: BufReader<TcpStream>,
+    head: FixtureHead,
+    sent: &mpsc::UnboundedSender<Value>,
+    reply: Reply,
+    protocol: ProviderProtocol,
+    credential: Option<&str>,
+) {
+    let FixtureHead {
+        line,
+        authorization,
+        anthropic_version,
+        accept,
+        request,
+    } = head;
+    let count = matches!(&reply, Reply::InputCount(_) | Reply::InvalidInputCount);
+    let path = match (protocol, count) {
+        (ProviderProtocol::OpenAiCompatible, true) => "/v1/chat/completions/input_tokens",
+        (ProviderProtocol::OpenAiCompatible, false) => "/v1/chat/completions",
+        (ProviderProtocol::Responses, true) => "/v1/responses/input_tokens",
+        (ProviderProtocol::Responses, false) => "/v1/responses",
+        (ProviderProtocol::Anthropic, _) => "/v1/messages",
+        (ProviderProtocol::Gemini, _) => {
+            "/v1beta/models/fixture-model:streamGenerateContent?alt=sse"
+        }
+    };
+    assert_eq!(line, format!("POST {path} HTTP/1.1\r\n"));
     assert_eq!(
         authorization,
         credential.map(|value| match protocol {
@@ -253,9 +317,6 @@ async fn fixture_request(
     if protocol == ProviderProtocol::Anthropic {
         assert_eq!(anthropic_version.as_deref(), Some("2023-06-01"));
     }
-    let mut request = vec![0; length.unwrap()];
-    stream.read_exact(&mut request).await.unwrap();
-    let request = serde_json::from_slice(&request).unwrap();
     #[cfg(unix)]
     let reply = match reply {
         Reply::Choose(choose) => choose(&request),

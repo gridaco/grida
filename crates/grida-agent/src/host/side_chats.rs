@@ -72,6 +72,7 @@ impl Host {
             editor_surfaces: Default::default(),
             desktop_image_generation: None,
             subagents_enabled: false,
+            chat_titles: false,
             sponsorship_enabled: false,
             goal_sponsorship_enabled: false,
             effort: EffortPreset::Standard,
