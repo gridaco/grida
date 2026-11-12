@@ -8,6 +8,7 @@ import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
 import { NativeAgentCommands } from "./native-agent-commands";
+import { NativeCommandProfiles } from "./native-agent-command-profile";
 import { NativeAgentHooks } from "./native-agent-hooks";
 import { NativeAgentRevisions } from "./native-agent-revisions";
 import type { NativeMcpLaunch } from "./native-mcp-launch";
@@ -426,11 +427,19 @@ export class NativeAgentProcess {
       }
     }
     const executable = NativeAgentProcess.executable(options.resourcesPath);
+    const hooks = options.workspace
+      ? await options.hooks?.launch(options.resourcesPath, options.workspace)
+      : undefined;
     const permissionProfile = options.workspace
       ? await NativeAgentPermissions.stage(
           options.stateDirectory,
           options.workspace,
-          await options.hooks?.launch(options.resourcesPath, options.workspace)
+          hooks,
+          await NativeCommandProfiles.launch(
+            options.resourcesPath,
+            options.workspace.primary.path,
+            hooks
+          )
         )
       : undefined;
     const providerEgress = options.providerNetwork

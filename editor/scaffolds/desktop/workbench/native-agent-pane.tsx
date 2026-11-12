@@ -18,7 +18,7 @@ import { readLibraryAttachment } from "@/app/(library)/library/attachment";
 import { encodeLibraryPng } from "@/lib/agent-chat/image-attachment";
 import {
   CheckIcon,
-  FolderIcon,
+  ShieldIcon,
   PlayIcon,
   SquareIcon,
   LibraryIcon,
@@ -62,8 +62,6 @@ import { NativeSideChatPanel } from "./native-side-chat-panel";
 import { NativeTurnArtifacts } from "./native-turn-summary";
 import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
-import { NativeContextLimitPanel } from "./native-context-limit-panel";
-import { NativeHooksPanel } from "./native-hooks-panel";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
 import { NativeSubagentsPanel } from "./native-subagents-panel";
 
@@ -403,29 +401,6 @@ export function NativeAgentPane({
           {state.profileError ?? state.catalogEntryError}
         </p>
       )}
-      <Dialog
-        open={state.contextLimitOpen || state.hooksOpen}
-        onOpenChange={(open) => {
-          if (!open) controller.closeWorkspaceSettings();
-        }}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Workspace settings</DialogTitle>
-            <DialogDescription>
-              Agent settings for every chat in this workspace.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="-mx-6 flex flex-col">
-            {state.contextLimitOpen && (
-              <NativeContextLimitPanel controller={controller} state={state} />
-            )}
-            {state.hooksOpen && (
-              <NativeHooksPanel controller={controller} state={state} />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
       {(state.canReadEarlier ||
         state.earlierMessages ||
         state.earlierError) && (
@@ -1021,10 +996,10 @@ export function NativeAgentPane({
                     size="xs"
                     variant="ghost"
                     className="shrink-0 gap-1 px-1.5 text-muted-foreground"
-                    aria-label="Access: This project"
+                    aria-label="Access: Default"
                   >
-                    <FolderIcon className="size-3.5" />
-                    <span className="hidden @[26rem]:inline">This project</span>
+                    <ShieldIcon className="size-3.5" />
+                    <span className="hidden @[26rem]:inline">Default</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent
@@ -1036,12 +1011,12 @@ export function NativeAgentPane({
                     What can the agent access?
                   </p>
                   <div className="flex items-start gap-2 rounded-md px-2 py-1.5">
-                    <FolderIcon className="mt-0.5 size-4 shrink-0" />
+                    <ShieldIcon className="mt-0.5 size-4 shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p>This project</p>
+                      <p>Default</p>
                       <p className="text-xs text-muted-foreground">
-                        Reads files in this project and edits through the open
-                        editor. No other folders, commands or internet.
+                        Reads and edits files in this project and runs commands
+                        in a sandbox. Other folders and the internet are off.
                       </p>
                     </div>
                     <CheckIcon className="mt-0.5 size-4 shrink-0" />

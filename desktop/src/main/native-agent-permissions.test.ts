@@ -169,6 +169,44 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
     }
   });
 
+  it("gives the project the Default preset when commands are available", async () => {
+    const test = workspaceFixture();
+    try {
+      const command = {
+        helper: { path: "/usr/bin/true", sha256: Array(32).fill(0) },
+        runtimePaths: ["/usr/bin"],
+        temporaryParent: path.join(path.dirname(test.stateDirectory), "tmp"),
+        diskRead: true as const,
+        environment: { PATH: "/usr/bin:/bin" },
+      };
+      const { profile } = await NativeAgentPermissions.stage(
+        test.stateDirectory,
+        test.workspace,
+        undefined,
+        command
+      );
+      const selected = JSON.parse(fs.readFileSync(profile, "utf8"));
+      expect(selected.revision).toBe("default-v1");
+      expect(selected.directories[0]).toEqual(
+        expect.objectContaining({
+          id: "primary",
+          read: "allow",
+          write: "allow",
+          commandRead: "allow",
+          commandReadWrite: "allow",
+        })
+      );
+      // Additional folders still ask before any read.
+      expect(selected.directories[1]).toEqual(
+        expect.objectContaining({ id: "additional", read: "ask" })
+      );
+      expect(selected.directories[1].write).toBeUndefined();
+      expect(selected.command).toEqual(command);
+    } finally {
+      test.close();
+    }
+  });
+
   it("refuses to offer a review assembled from different control revisions", async () => {
     const request =
       vi.fn<(method: string, params: unknown) => Promise<unknown>>();

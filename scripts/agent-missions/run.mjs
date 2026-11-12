@@ -20,6 +20,8 @@ const options = {
   bin: path.join(root, "target/debug/grida-agent"),
   helper: path.join(root, "target/debug/agent-kit-sandbox-helper"),
   out: null,
+  /** Use the profile Grida Desktop stages instead of the runner's own. */
+  desktop: false,
 };
 const filters = [];
 const argv = process.argv.slice(2);
@@ -32,6 +34,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (arg === "--bin") options.bin = take();
   else if (arg === "--helper") options.helper = take();
   else if (arg === "--out") options.out = take();
+  else if (arg === "--desktop-profile") options.desktop = true;
   else filters.push(arg);
 }
 options.out ??= fs.mkdtempSync(path.join(os.tmpdir(), "grida-missions-"));
@@ -96,7 +99,7 @@ function profile(preset, workspace, privateDir) {
           generation: "g1",
           read: "allow",
           commandRead: "allow",
-          ...(write && { commandReadWrite: "allow" }),
+          ...(write && { commandReadWrite: "allow", write: "allow" }),
         },
       ],
       command: {
@@ -188,11 +191,23 @@ for (const mission of missions) {
     execFileSync("git", ["config", "user.name", "Seed"], { cwd: workspace });
   }
   const before = snapshot(workspace);
-  const permission = profile(
-    mission.preset,
-    fs.realpathSync(workspace),
-    fs.realpathSync(privateDir)
-  );
+  const permission =
+    options.desktop && mission.preset === "default"
+      ? execFileSync(
+          path.join(root, "node_modules/.bin/tsx"),
+          [
+            path.join(root, "scripts/agent-missions/desktop-profile.ts"),
+            fs.realpathSync(workspace),
+            path.join(fs.realpathSync(privateDir), "desktop-state"),
+            path.join(root, "desktop/.native-resources"),
+          ],
+          { encoding: "utf8" }
+        ).trim()
+      : profile(
+          mission.preset,
+          fs.realpathSync(workspace),
+          fs.realpathSync(privateDir)
+        );
   let session;
   const turns = [];
   const started = Date.now();

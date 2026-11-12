@@ -253,14 +253,6 @@ export function NativeChatHeader({
               <DropdownMenuSeparator />
             </>
           )}
-          {controller.hasWorkspaceSettings && (
-            <DropdownMenuItem
-              disabled={state.contextLimitBusy || state.hooksBusy}
-              onSelect={() => void controller.openWorkspaceSettings()}
-            >
-              Workspace settings…
-            </DropdownMenuItem>
-          )}
           {state.catalogEntryError && (
             <DropdownMenuItem
               onSelect={() => void controller.readChatDetails()}

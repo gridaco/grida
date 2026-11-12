@@ -8,16 +8,22 @@ format: md
 
 # Understand agent permissions
 
-In a native Desktop workspace chat, the selected project gives the agent
-access to supported workspace reads. Tools can list folders, search for text,
-and read files within that scope. **Plan** lets the agent investigate. Use
-an ordinary request without the **Plan** badge when you want it to carry out a change using the tools available in
-your connection. An editor action can depend on the file or selection you
+A native Desktop workspace chat works under the **Default** preset, shown in
+the composer. The agent reads, creates and edits files in the selected
+project and runs commands there inside a sandbox, without asking each time.
+Commands start from your login shell's environment, so your usual tools work,
+and they can read the rest of your computer except Grida's own state and
+saved credentials. They cannot write outside the project or reach the
+internet. Version-control and agent metadata such as `.git` stay read-only.
+**Plan** lets the agent investigate without changing anything. The
+[permission policy](https://grida.co/docs/wg/ai/agent/permissions) describes the
+presets and defaults. An editor action can depend on the file or selection you
 attached when you sent the message. [Edit selected SVG text](./clients.md#edit-selected-svg-text)
 
 ## Review a request for access
 
-Ask is the default for additional access. When the agent asks for a read,
+Ask is the default for access beyond the project, such as another folder.
+When the agent asks for a read,
 check the action, folder, and relative path shown in chat. Choose **Allow once**
 to approve that action or **Decline** to refuse it. An approved read may supply
 text to the model running your chat.

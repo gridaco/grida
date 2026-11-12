@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { NativeHookLaunchProfile } from "./native-agent-hooks";
+import type { NativeCommandProfile } from "./native-agent-command-profile";
 import {
   atomicWrite,
   type WorkspaceDirectoryIdentity,
@@ -75,13 +76,14 @@ export class NativeAgentPermissions {
   static async stage(
     stateDirectory: string,
     workspace: NativeWorkspaceSelection,
-    hooks?: NativeHookLaunchProfile
+    hooks?: NativeHookLaunchProfile,
+    command?: NativeCommandProfile
   ): Promise<{
     stateDirectory: string;
     profile: string;
     askRoots: ReadonlyMap<string, string>;
   }> {
-    const { data, askRoots } = await this.capture(workspace, hooks);
+    const { data, askRoots } = await this.capture(workspace, hooks, command);
     // Use a content-derived filename so competing launches with different
     // trusted selections cannot exchange profile files before either starts.
     const base = await fs.realpath(path.dirname(stateDirectory));
@@ -118,7 +120,8 @@ export class NativeAgentPermissions {
 
   private static async capture(
     workspace: NativeWorkspaceSelection,
-    hooks?: NativeHookLaunchProfile
+    hooks?: NativeHookLaunchProfile,
+    command?: NativeCommandProfile
   ): Promise<{ data: string; askRoots: ReadonlyMap<string, string> }> {
     if (process.platform !== "darwin" && process.platform !== "linux")
       throw new Error("native_agent_permissions_platform_unsupported");
@@ -129,8 +132,18 @@ export class NativeAgentPermissions {
         captureDirectory
       )
     );
+    // Default preset: read, write and run commands in the project, under the
+    // sandbox. See the permission policy.
     const directories = [
-      { ...primary, read: "allow", ...(hooks ? { commandRead: "allow" } : {}) },
+      {
+        ...primary,
+        read: "allow",
+        ...(command
+          ? { write: "allow", commandRead: "allow", commandReadWrite: "allow" }
+          : hooks
+            ? { commandRead: "allow" }
+            : {}),
+      },
       ...additional.map((directory) => ({ ...directory, read: "ask" })),
     ];
     if (
@@ -147,11 +160,12 @@ export class NativeAgentPermissions {
     const data = JSON.stringify({
       version: 1,
       workspace: workspace.id,
-      revision: "ask-me-v1",
+      revision: command ? "default-v1" : "ask-me-v1",
       primary: primary.id,
       directories,
       protectedPaths,
-      ...(hooks ? { hooks: hooks.hooks, command: hooks.command } : {}),
+      ...(hooks ? { hooks: hooks.hooks } : {}),
+      ...(command ? { command } : hooks ? { command: hooks.command } : {}),
     });
     if (Buffer.byteLength(data) > 64 * 1024) throw invalidProfile();
     return {

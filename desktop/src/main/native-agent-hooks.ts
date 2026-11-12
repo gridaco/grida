@@ -526,3 +526,6 @@ function invalid(): Error {
 function protocol(): Error {
   return new Error("native_hook_inspection_invalid");
 }
+
+/** Shared with the native command profile: same pinning and privacy rules. */
+export { pin as pinExecutable, privateDirectory as requirePrivateDirectory };
