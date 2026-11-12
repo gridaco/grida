@@ -99,7 +99,9 @@ minus the access the sandbox level withholds:
   can, except the host's own state and credential stores. Toolchains,
   interpreters and shell startup files therefore work without listing them.
 - **Writes.** Only within the writable roots allowed by the level, minus
-  protected paths, plus private temporary storage.
+  protected paths, plus private temporary storage. Under workspace-write a
+  program may also write the system's shared temporary directory, so files it
+  stages there survive into the next command, as in a terminal.
 - **Network.** Off unless the level or an approved escalation allows it.
 - **Duration.** Each program runs under a bounded deadline and can be cancelled.
 

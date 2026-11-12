@@ -608,7 +608,15 @@ impl PermissionProfile {
         }
         let (read, write) = match access {
             CommandAccess::Read => (vec![root], Vec::new()),
-            CommandAccess::ReadWrite => (Vec::new(), vec![root]),
+            // A program that may write the project may also use the shared
+            // temporary directory across commands, as in a terminal. See the
+            // permission policy's sandbox levels.
+            CommandAccess::ReadWrite => (
+                Vec::new(),
+                std::iter::once(root)
+                    .chain(shared_temporary_directory())
+                    .collect(),
+            ),
         };
         Ok(ExecutionScope {
             grants,
@@ -625,6 +633,14 @@ impl PermissionProfile {
             disk_read: command.disk_read,
         })
     }
+}
+
+/// The system's shared temporary directory, resolved through links.
+fn shared_temporary_directory() -> Option<PathBuf> {
+    Path::new("/tmp")
+        .canonicalize()
+        .ok()
+        .filter(|path| path.is_dir())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

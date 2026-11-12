@@ -114,6 +114,7 @@ const PLATFORM_DEFAULTS: &str = r#"(allow sysctl-read
   (global-name "com.apple.system.logger") (global-name "com.apple.system.notification_center")
   (global-name "com.apple.system.opendirectoryd.membership") (global-name "com.apple.trustd")
   (global-name "com.apple.trustd.agent") (global-name "com.apple.xpc.activity.unmanaged"))
+(allow file-read-metadata (literal "/tmp") (literal "/var") (literal "/etc"))
 (allow ipc-posix-sem)
 (allow pseudo-tty)
 (allow file-read* file-write* file-ioctl (literal "/dev/ptmx"))
@@ -133,8 +134,9 @@ fn command(prepared: &Prepared, status: i32) -> Command {
     );
     // Platform services ordinary toolchains need: system information, the
     // user database, the per-user cache and temporary directory lookup,
-    // logging, certificate trust, semaphores and pseudo-terminals. None grants
-    // file or network access.
+    // logging, certificate trust, semaphores, pseudo-terminals, and resolving
+    // the system's top-level links such as /tmp. None grants file contents or
+    // network access.
     profile.push_str(PLATFORM_DEFAULTS);
     let mut locations: Vec<_> = prepared
         .locations

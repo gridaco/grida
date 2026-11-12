@@ -538,7 +538,7 @@ async fn writes_and_edits_stay_inside_the_project_and_off_metadata() {
 }
 
 #[tokio::test]
-async fn commands_can_start_a_repository_but_not_change_existing_metadata() {
+async fn commands_write_the_project_and_shared_temp_but_not_existing_metadata() {
     let fixture = Fixture::new();
     let run = fixture.first(&fixture.profile_with(true, true), true).await;
     let command = |script: &str| {
@@ -583,6 +583,29 @@ async fn commands_can_start_a_repository_but_not_change_existing_metadata() {
     );
     assert_eq!(written.status, OutcomeStatus::Succeeded, "{written:?}");
     assert_eq!(fs::read(fixture.default.join("note")).unwrap(), b"ok");
+
+    // The shared temporary directory carries files between commands.
+    let scratch = format!("/tmp/grida-agent-test-{}", std::process::id());
+    let staged = completed(
+        run.invoke(
+            "tmp-write",
+            "run_command",
+            command(&format!("printf staged > {scratch}")),
+        )
+        .await,
+    );
+    assert_eq!(staged.status, OutcomeStatus::Succeeded, "{staged:?}");
+    let reread = completed(
+        run.invoke(
+            "tmp-read",
+            "run_command",
+            command(&format!("cat {scratch}")),
+        )
+        .await,
+    );
+    let _ = fs::remove_file(&scratch);
+    assert_eq!(reread.status, OutcomeStatus::Succeeded, "{reread:?}");
+    assert!(text(&reread).contains("staged"), "{reread:?}");
 }
 
 #[tokio::test]

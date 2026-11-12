@@ -607,11 +607,14 @@ than relying on rule order. Version-control and agent metadata (`.git`,
 read-only once it exists when the command starts; agent configuration
 (`.grida`, `.codex`) is protected even before it exists. A command can
 therefore initialize a new repository, and the next command cannot change it.
+A command that may write the project may also write the shared `/tmp`, as the
+policy's workspace-write level allows; the host's stores never live there.
 A protected path inside a granted location is carved out of it; one
 that contains a granted location still refuses the scope. Platform services
 toolchains need (system information, the user database, the per-user cache
-and temporary directory lookup, logging, certificate trust, semaphores and
-pseudo-terminals) are allowed; they grant no file or network access. The
+and temporary directory lookup, logging, certificate trust, semaphores,
+pseudo-terminals, and resolving top-level links such as `/tmp`) are allowed;
+they grant no file contents or network access. The
 [permission policy](docs/wg/ai/agent/permissions.md) owns these defaults.
 
 Native text writes and edits run in the trusted host, not the sandbox, so they
