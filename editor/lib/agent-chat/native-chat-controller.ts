@@ -447,9 +447,23 @@ export class NativeChatController {
     });
   }
 
+  /** The model last chosen in a workspace, as the pane's memory keeps it. */
+  static rememberedProfile(
+    memory: Pick<Storage, "getItem"> | undefined,
+    key: string | undefined
+  ): string | null {
+    return NativeChatController.readMemory(memory, key).profileId;
+  }
+
+  /**
+   * Start the workspace's native chat. With a remembered model, that model is
+   * selected first so startup opens it directly instead of opening the
+   * default and switching; if it cannot run, the default starts as usual.
+   */
   static watchReadiness(
     bridge: DesktopNativeChat,
-    publish: (state: NativeChatReadiness | null) => void
+    publish: (state: NativeChatReadiness | null) => void,
+    remembered: string | null = null
   ): () => void {
     let watching = true;
     const probe = async () => {
@@ -467,6 +481,11 @@ export class NativeChatController {
         let result: NativeChatReadiness = state;
         if (state === "native-starting" && bridge.status) {
           publish(state);
+          if (!watching) return;
+          if (remembered && bridge.selectProfile)
+            await bridge
+              .selectProfile({ kind: "saved", id: remembered })
+              .catch(() => {});
           if (!watching) return;
           result = await bridge.status(true);
         }
@@ -4501,16 +4520,23 @@ export class NativeChatController {
     void this.listChats();
   }
 
-  private restore(): {
+  private restore() {
+    return NativeChatController.readMemory(
+      this.memory,
+      this.selectionMemoryKey()
+    );
+  }
+
+  private static readMemory(
+    memory: Pick<Storage, "getItem"> | undefined,
+    key: string | undefined
+  ): {
     selected: string | null;
     sessions: string[];
     profileId: string | null;
   } {
-    const key = this.selectionMemoryKey();
     try {
-      const value = JSON.parse(
-        key ? (this.memory?.getItem(key) ?? "null") : "null"
-      );
+      const value = JSON.parse(key ? (memory?.getItem(key) ?? "null") : "null");
       if (value && Array.isArray(value.sessions)) {
         const sessions = value.sessions
           .filter(

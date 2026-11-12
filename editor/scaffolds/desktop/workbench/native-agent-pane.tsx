@@ -134,10 +134,15 @@ export function NativeAgentPaneGate({
   }>();
   useEffect(
     () =>
-      NativeChatController.watchReadiness(bridge, (readiness) =>
-        setSelection({ bridge, attempt, readiness })
+      NativeChatController.watchReadiness(
+        bridge,
+        (readiness) => setSelection({ bridge, attempt, readiness }),
+        NativeChatController.rememberedProfile(
+          selectionMemory,
+          selectionKey && `grida.nativeChat.${selectionKey}`
+        )
       ),
-    [bridge, attempt]
+    [bridge, attempt, selectionKey]
   );
   const readiness =
     selection?.bridge === bridge && selection.attempt === attempt

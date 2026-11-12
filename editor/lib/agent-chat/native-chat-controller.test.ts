@@ -3457,6 +3457,50 @@ it.each([
   }
 );
 
+it.each([true, false])(
+  "starts a workspace with its remembered model before starting the default (still available: %s)",
+  async (available) => {
+    const { bridge } = fixture();
+    const id = "a".repeat(64);
+    const memory = {
+      getItem: () =>
+        JSON.stringify({ selected: null, sessions: [], profileId: id }),
+    };
+    const remembered = NativeChatController.rememberedProfile(
+      memory,
+      "project"
+    );
+    expect(remembered).toBe(id);
+    const publish = vi.fn<(state: string | null) => void>();
+    const status = vi.fn<NonNullable<DesktopNativeChat["status"]>>();
+    status
+      .mockResolvedValueOnce("native-starting")
+      .mockResolvedValueOnce("native-ready");
+    const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+      async () => {
+        if (!available) throw new Error("native_chat_profile_unavailable");
+      }
+    );
+    const stop = NativeChatController.watchReadiness(
+      { ...bridge, status, selectProfile: choose },
+      publish,
+      remembered
+    );
+    await vi.waitFor(() =>
+      expect(publish.mock.calls).toEqual([
+        ["native-starting"],
+        ["native-ready"],
+      ])
+    );
+    expect(choose).toHaveBeenCalledExactlyOnceWith({ kind: "saved", id });
+    // The model is selected before startup, so startup opens it directly.
+    expect(choose.mock.invocationCallOrder[0]).toBeLessThan(
+      status.mock.invocationCallOrder[1]!
+    );
+    stop();
+  }
+);
+
 it("keeps the old bridge's legacy selection and drops a disposed startup reply", async () => {
   const { bridge } = fixture();
   const publish = vi.fn<(state: string | null) => void>();
