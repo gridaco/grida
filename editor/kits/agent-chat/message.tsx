@@ -102,8 +102,12 @@ import {
 
 export type { ChatMessage, ToolCallEntry };
 
+/** The size and line height of chat messages, user and agent alike. */
+const CHAT_TEXT = "text-[15px] leading-6";
+
 const markdown = {
-  className: "grida-ai-response-markdown space-y-2 text-[13px] leading-6",
+  // Chat text matches Codex's reading size; see CHAT_TEXT.
+  className: `grida-ai-response-markdown space-y-2 ${CHAT_TEXT}`,
   controls: {
     code: { copy: true, download: false },
     table: { copy: true, download: false, fullscreen: false },
@@ -191,7 +195,7 @@ export function ChatMessageView({
     );
     return (
       <Message from="user">
-        <MessageContent className="text-[13px]">
+        <MessageContent className={CHAT_TEXT}>
           <CollapsibleBubbleBody>
             {contexts.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -360,7 +364,7 @@ export function ChatMessageView({
     .join("\n\n");
   return (
     <Message from="assistant" className="w-full max-w-none">
-      <MessageContent className="w-full max-w-full text-[13px]">
+      <MessageContent className={`w-full max-w-full ${CHAT_TEXT}`}>
         {groups.map((group) => {
           if (group.type === "text") {
             return (

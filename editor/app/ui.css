@@ -51,11 +51,11 @@
 
 .grida-ai-response-markdown [data-streamdown="unordered-list"],
 .grida-ai-response-markdown [data-streamdown="ordered-list"] {
-  @apply my-1 space-y-0 pl-3 leading-4;
+  @apply my-1 space-y-0.5 pl-4 leading-6;
 }
 
 .grida-ai-response-markdown [data-streamdown="list-item"] {
-  @apply my-0 pl-0 leading-4;
+  @apply my-0 pl-0 leading-6;
 }
 
 .grida-ai-response-markdown [data-streamdown="list-item"] > p {

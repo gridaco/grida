@@ -731,7 +731,7 @@ function AgentComposerInner({
         onTransfer={onAttachmentTransfer ?? (attach ? onTransfer : undefined)}
         placeholder={placeholder}
         className="px-3 pt-2"
-        editorClassName="min-h-9 max-h-48 overflow-y-auto text-sm"
+        editorClassName="min-h-9 max-h-48 overflow-y-auto text-[15px] leading-6"
       />
       {notice && (
         <p className="px-3 pb-1 text-xs text-muted-foreground">{notice}</p>
