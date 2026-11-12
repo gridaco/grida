@@ -23,6 +23,8 @@ const MAX_BYTES = 24 * 1024;
 const MAX_CHOICES = 256;
 const MAX_ENDPOINTS = 16;
 const GATEWAY_OUTPUT_LIMIT = 4_096;
+/** The largest output allowance the native agent accepts. */
+const AGENT_OUTPUT_LIMIT = 65_536;
 type Launch = Awaited<
   ReturnType<typeof NativeProviderSelection.configuredEndpoint>
 > &
@@ -121,6 +123,19 @@ export namespace NativeChatProfiles {
       catalog.text.catalog[modelId as keyof typeof catalog.text.catalog]
         ?.contextWindow;
     return positive(window) ? window : undefined;
+  }
+
+  /**
+   * The output allowance for a launch with the person's own key or endpoint:
+   * the model's catalogue output limit, bounded by what the agent accepts.
+   * An unknown model keeps the agent's default. A small fixed allowance cuts
+   * off long replies, such as a large file written in one tool call.
+   */
+  export function outputLimit(modelId: string): number | undefined {
+    const limit =
+      catalog.text.catalog[modelId as keyof typeof catalog.text.catalog]
+        ?.outputLimit;
+    return positive(limit) ? Math.min(limit, AGENT_OUTPUT_LIMIT) : undefined;
   }
 
   /** Whether this provider's binding of the model accepts a reasoning level. */

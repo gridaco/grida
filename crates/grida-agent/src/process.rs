@@ -21,7 +21,10 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 const MAX_STDIN_BYTES: usize = 512 * 1024;
 const STOP_TIMEOUT: Duration = Duration::from_secs(8);
-const MAX_RUN_TIMEOUT: Duration = Duration::from_secs(600);
+/// The longest deadline a headless run accepts. A run is one turn, and long
+/// creative or build work can take an hour or more, so the bound only guards
+/// against a forgotten process.
+pub const MAX_RUN_TIMEOUT: Duration = Duration::from_secs(4 * 60 * 60);
 
 pub struct RunOptions {
     pub cwd: PathBuf,

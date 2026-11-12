@@ -16,7 +16,7 @@ use std::time::Duration;
 use zeroize::Zeroizing;
 
 const DEFAULT_RUN_TIMEOUT_MS: u64 = 120_000;
-const MAX_RUN_TIMEOUT_MS: u64 = 600_000;
+const MAX_RUN_TIMEOUT_MS: u64 = grida_agent::process::MAX_RUN_TIMEOUT.as_secs() * 1000;
 
 fn main() -> ExitCode {
     let matches = command().get_matches();

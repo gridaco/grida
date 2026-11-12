@@ -127,7 +127,7 @@ generation. This launch option keeps its own saved connection identity.
 `run` reads one UTF-8 prompt from stdin or `--prompt`, with a 512 KiB
 input bound. `--session SESSION_ID` continues a settled session in its
 original workspace and provider selection. A changed output allowance
-applies to the new input. `--deadline-ms` defaults to 120000. Stdout contains versioned JSON Lines, beginning with an `accepted`
+applies to the new input. `--deadline-ms` defaults to 120000 and accepts up to four hours, for long single turns. Stdout contains versioned JSON Lines, beginning with an `accepted`
 record containing the session, turn, and input IDs. A verified terminal
 result adds a `finished` record with a disposition and any completion
 account. Diagnostics use stderr. A process signal after acceptance requests

@@ -889,8 +889,23 @@ export class NativeDesktopAgent {
       provider.imageGeneration &&
       identity &&
       !nestedProtectedPaths;
+    // Gateway launches carry their own allowance; a subscription route
+    // takes none.
+    const explicit =
+      "maxOutputTokens" in provider &&
+      typeof provider.maxOutputTokens === "number"
+        ? provider.maxOutputTokens
+        : undefined;
+    const scoped =
+      ("gatewayScope" in provider && provider.gatewayScope !== undefined) ||
+      ("subscriptionScope" in provider &&
+        provider.subscriptionScope !== undefined);
+    const maxOutputTokens =
+      explicit ??
+      (scoped ? undefined : NativeChatProfiles.outputLimit(provider.model));
     return {
       ...provider,
+      ...(maxOutputTokens !== undefined && { maxOutputTokens }),
       imagePlacement: imageTools
         ? this.imagePlacement?.({ workspaceId: id, root, identity })
         : undefined,
