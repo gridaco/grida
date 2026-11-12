@@ -944,6 +944,11 @@ function publicProfile({
     ...(NativeChatProfiles.reasons(providerId, modelId) && {
       reasoning: true as const,
     }),
+    // Ultra needs a route whose worker can run the independent reviewer.
+    ...((providerId === GG_PROVIDER_ID ||
+      NativeProviderSelection.isBuiltInByok(providerId)) && {
+      ultra: true as const,
+    }),
   };
 }
 

@@ -1037,6 +1037,20 @@ export class NativeChatController {
     return { png: png === true, file: file === true };
   }
 
+  /** The running connection confirms Ultra, or the chosen model offers it. */
+  private ultraOffered(): boolean {
+    const profiles = this.view.profiles;
+    const active = profiles?.active;
+    return (
+      this.view.effortAvailable ||
+      (!!active &&
+        !!(
+          profiles?.choices.find((choice) => choice.id === active) ??
+          profiles?.saved.find((choice) => choice.id === active)
+        )?.ultra)
+    );
+  }
+
   private async readEffortCapability(scope: Scope): Promise<void> {
     const [supported, goalSupported] = await Promise.all([
       this.bridge.submitInRegime &&
@@ -1935,7 +1949,7 @@ export class NativeChatController {
 
   selectEffort(effort: NativeChatEffort): void {
     if (
-      (effort !== "ultra" || this.view.effortAvailable) &&
+      (effort !== "ultra" || this.ultraOffered()) &&
       !this.view.acting &&
       !this.view.steering
     )

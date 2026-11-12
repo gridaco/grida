@@ -139,6 +139,8 @@ export type NativeChatProfileChoice = Readonly<{
   model: string;
   /** The model accepts a reasoning level, so every effort stop applies. */
   reasoning?: true;
+  /** The connection can run Ultra's extended work and independent review. */
+  ultra?: true;
 }>;
 
 export type NativeChatProfileCatalog = Readonly<{

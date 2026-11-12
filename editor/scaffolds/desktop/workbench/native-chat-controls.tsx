@@ -340,7 +340,7 @@ export function NativeModelPicker({
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"effort" | "models">("effort");
   const stop = effortStop(effort);
-  const stops = ultraAvailable ? EFFORT_STOPS : EFFORT_STOPS.slice(0, -1);
+  const stops = EFFORT_STOPS;
   const selected =
     profiles?.saved.find((p) => p.id === profiles.active) ??
     profiles?.choices.find((p) => p.id === profiles.active);
@@ -360,6 +360,9 @@ export function NativeModelPicker({
       .filter((saved) => !profiles?.choices.some((p) => p.id === saved.id))
       .map((p) => ({ ...p, saved: true })),
   ];
+  // Ultra is a property of the chosen model's connection, known before any
+  // chat starts. The running connection can also confirm it.
+  const ultra = ultraAvailable || selected?.ultra === true;
   const choose = (selection: NativeChatProfileSelection) => {
     onSelect(selection);
     setView("effort");
@@ -440,18 +443,33 @@ export function NativeModelPicker({
               value={[Math.min(stops.indexOf(stop), stops.length - 1)]}
               onValueChange={([index]) => {
                 const next = stops[index ?? 0];
-                if (next && next !== stop) onEffort(next);
+                if (next && next !== stop && (next !== "ultra" || ultra))
+                  onEffort(next);
               }}
             />
             <div className="flex justify-between text-[10px] text-muted-foreground">
               {stops.map((value) => (
-                <span key={value}>{EFFORT_LABEL[value]}</span>
+                <span
+                  key={value}
+                  className={
+                    value === "ultra" && !ultra ? "opacity-50" : undefined
+                  }
+                >
+                  {EFFORT_LABEL[value]}
+                </span>
               ))}
             </div>
             {selected && !selected.reasoning && (
               <p className="text-[11px] text-muted-foreground">
                 This model uses its own reasoning level.
-                {ultraAvailable && " Ultra still extends the work."}
+                {ultra && " Ultra still extends the work."}
+              </p>
+            )}
+            {!ultra && (
+              <p className="text-[11px] text-muted-foreground">
+                {selected
+                  ? "Ultra needs a Grida, OpenRouter or Vercel AI Gateway model."
+                  : "Choose a model to use Ultra."}
               </p>
             )}
           </div>
