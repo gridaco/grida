@@ -402,6 +402,16 @@ export type NativeChatActivity = Readonly<{
   /** The configured integration name for an integration tool. */
   source?: string;
   outcome: NativeChatActivityOutcome;
+  /** The call's arguments for display; long values are shortened. */
+  input?: unknown;
+  /** The call's result for display, once it has one. */
+  output?: Readonly<{
+    text: string;
+    /** The tool or the display shortened the result. */
+    truncated: boolean;
+    /** The tool's structured result, when small. */
+    structured?: unknown;
+  }>;
 }>;
 
 export type NativeChatMessage = Readonly<{

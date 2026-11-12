@@ -3,6 +3,7 @@ export {
   CompactingIndicator,
   ForkedNotice,
   PendingTurnIndicator,
+  ToolCallGroupView,
 } from "./message";
 export type { ChatMessage, ChatMessageActions, ToolCallEntry } from "./message";
 export {

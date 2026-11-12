@@ -61,11 +61,15 @@ pub(super) async fn forward(
                     if !text_enabled || !sessions.lock().unwrap().can_deliver(&update.session) {
                         continue;
                     }
-                    let outcome = update.status.map_or(Outcome::Running, Outcome::Finished);
+                    let outcome = update
+                        .result
+                        .as_ref()
+                        .map_or(Outcome::Running, |result| Outcome::Finished(result.status));
                     let (notification, metadata) = activity_update(
                         &update.message,
                         &update.call,
                         outcome,
+                        update.result.as_deref(),
                         json!({"turnId": update.turn}),
                     );
                     send_update(

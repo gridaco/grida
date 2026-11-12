@@ -10,7 +10,10 @@ use agent_client_protocol::v1::schema::{
 use agent_client_protocol::{Client, Result};
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::InferenceUpdate;
-use agent_kit_core::messages::{Content, Message, MessagePhase, OutcomeStatus, Role, ToolCall};
+use agent_kit_core::messages::{
+    Content, Message, MessagePhase, OutcomeStatus, ResultContent, Role, ToolArguments, ToolCall,
+    ToolResult,
+};
 use agent_kit_core::turn::OperationOutcome;
 use agent_kit_core::{ChangeId, MessageId};
 use agent_kit_runtime::TurnUpdate;
@@ -96,7 +99,7 @@ impl Projection {
         for (_, message) in &messages {
             for part in &message.content {
                 if let Content::ToolResult(result) = part {
-                    results.insert(result.call.clone(), result.status);
+                    results.insert(result.call.clone(), result.clone());
                 }
             }
         }
@@ -142,8 +145,9 @@ impl Projection {
                 let Content::ToolCall(call) = part else {
                     continue;
                 };
-                let outcome = match results.get(&call.id) {
-                    Some(status) => Outcome::Finished(*status),
+                let result = results.get(&call.id);
+                let outcome = match result {
+                    Some(result) => Outcome::Finished(result.status),
                     None => match settled {
                         None => Outcome::Running,
                         Some(OutcomeStatus::Cancelled) => {
@@ -154,7 +158,7 @@ impl Projection {
                 };
                 let mut attribution = meta.clone();
                 attribution.as_object_mut().expect("object").remove("phase");
-                let update = activity_update(&message.id, call, outcome, attribution);
+                let update = activity_update(&message.id, call, outcome, result, attribution);
                 let notification = SessionNotification::new(self.session.clone(), update.0).meta(
                     serde_json::Map::from_iter([(TRANSCRIPT_WINDOW.into(), update.1)]),
                 );
@@ -321,6 +325,7 @@ pub(super) fn activity_update(
     message: &MessageId,
     call: &ToolCall,
     outcome: Outcome,
+    result: Option<&ToolResult>,
     mut attribution: Value,
 ) -> (SessionUpdate, Value) {
     let classified = activity::classify(&call.tool);
@@ -351,8 +356,77 @@ pub(super) fn activity_update(
     }
     let update = AcpToolCall::new(call.id.as_str().to_owned(), call.tool.as_str().to_owned())
         .kind(kind)
-        .status(status);
+        .status(status)
+        .raw_input(tool_input(&call.arguments))
+        .raw_output(result.map(tool_output));
     (SessionUpdate::ToolCall(update), attribution)
+}
+
+/// The longest string a tool call's arguments carry to a client. File
+/// contents and edits are previews, not the source of truth.
+const MAX_INPUT_TEXT: usize = 4 * 1024;
+/// The longest result text a tool call carries to a client.
+const MAX_OUTPUT_TEXT: usize = 8 * 1024;
+/// The largest structured result a tool call carries to a client.
+const MAX_STRUCTURED_BYTES: usize = 4 * 1024;
+/// The most items an argument list carries to a client.
+const MAX_INPUT_ITEMS: usize = 64;
+
+/// A tool call's arguments for display, with long values shortened.
+fn tool_input(arguments: &ToolArguments) -> Value {
+    match arguments {
+        ToolArguments::Json(value) => bounded(value),
+        ToolArguments::Text(text) => json!(shorten(text, MAX_INPUT_TEXT).0),
+    }
+}
+
+fn bounded(value: &Value) -> Value {
+    match value {
+        Value::String(text) => json!(shorten(text, MAX_INPUT_TEXT).0),
+        Value::Array(items) => {
+            Value::Array(items.iter().take(MAX_INPUT_ITEMS).map(bounded).collect())
+        }
+        Value::Object(fields) => Value::Object(
+            fields
+                .iter()
+                .take(MAX_INPUT_ITEMS)
+                .map(|(key, value)| (key.clone(), bounded(value)))
+                .collect(),
+        ),
+        other => other.clone(),
+    }
+}
+
+/// A tool result for display: its text, shortened, and its structured value
+/// when small.
+fn tool_output(result: &ToolResult) -> Value {
+    let text: String = result
+        .content
+        .iter()
+        .filter_map(|content| match content {
+            ResultContent::Text(text) => Some(text.as_str()),
+            ResultContent::Media(_) => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let (text, shortened) = shorten(&text, MAX_OUTPUT_TEXT);
+    let mut output = json!({"text": text, "truncated": result.truncated || shortened});
+    if let Some(structured) = result.structured.as_ref().filter(|value| {
+        serde_json::to_vec(value).is_ok_and(|bytes| bytes.len() <= MAX_STRUCTURED_BYTES)
+    }) {
+        output["structured"] = structured.clone();
+    }
+    output
+}
+
+fn shorten(text: &str, maximum: usize) -> (String, bool) {
+    if text.len() <= maximum {
+        return (text.to_owned(), false);
+    }
+    (
+        format!("{}…", &text[..text.floor_char_boundary(maximum)]),
+        true,
+    )
 }
 
 fn visible_parts(message: &Message) -> impl Iterator<Item = Cow<'_, str>> {

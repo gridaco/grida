@@ -3,7 +3,7 @@
 use super::RunResult;
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::InferenceUpdate;
-use agent_kit_core::messages::{Content, OutcomeStatus, Role, ToolCall};
+use agent_kit_core::messages::{Content, OutcomeStatus, Role, ToolCall, ToolResult};
 use agent_kit_core::turn::{OperationOutcome, TurnBinding};
 use agent_kit_core::{MessageId, SessionId, ToolCallId, TurnId, WaitId};
 use agent_kit_runtime::TurnUpdate;
@@ -26,7 +26,8 @@ pub(crate) struct LiveActivity {
     pub turn: TurnId,
     pub message: MessageId,
     pub call: ToolCall,
-    pub status: Option<OutcomeStatus>,
+    /// The call's result once it has one.
+    pub result: Option<Box<ToolResult>>,
 }
 
 #[derive(Clone)]
@@ -154,7 +155,7 @@ impl Publisher {
                         let Some((owner, call)) = self.calls.get(&result.call) else {
                             continue;
                         };
-                        self.activity(owner, call, Some(result.status));
+                        self.activity(owner, call, Some(Box::new(result.clone())));
                         self.finished.insert(result.call.clone());
                     }
                 }
@@ -163,7 +164,7 @@ impl Publisher {
         }
     }
 
-    fn activity(&self, message: &MessageId, call: &ToolCall, status: Option<OutcomeStatus>) {
+    fn activity(&self, message: &MessageId, call: &ToolCall, result: Option<Box<ToolResult>>) {
         if self.sender.receiver_count() == 0 {
             return;
         }
@@ -172,7 +173,7 @@ impl Publisher {
             turn: self.binding.turn.clone(),
             message: message.clone(),
             call: call.clone(),
-            status,
+            result,
         }));
     }
 

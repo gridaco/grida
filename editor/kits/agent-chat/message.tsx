@@ -681,7 +681,8 @@ function CompactionNotice({
 
 // A lone tool call renders as a single `Task` row; a run of consecutive
 // calls nests those rows inside one summary `Task`.
-function ToolCallGroupView({ entries }: { entries: ToolCallEntry[] }) {
+/** Tool calls as cards; consecutive calls collapse into one summary row. */
+export function ToolCallGroupView({ entries }: { entries: ToolCallEntry[] }) {
   if (entries.length === 1) {
     return <ToolCallView entry={entries[0]} />;
   }

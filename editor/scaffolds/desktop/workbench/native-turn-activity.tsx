@@ -1,19 +1,9 @@
 import { useState, type ReactNode } from "react";
-import { BlocksIcon, ChevronDownIcon, ChevronRightIcon } from "lucide-react";
-import type {
-  NativeChatActivity,
-  NativeChatMessage,
-} from "@grida/desktop-bridge";
-import { ChatMessageView } from "@/kits/agent-chat";
+import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
+import type { NativeChatMessage } from "@grida/desktop-bridge";
+import { ChatMessageView, ToolCallGroupView } from "@/kits/agent-chat";
+import { native_tool_parts } from "@/lib/agent-chat/native-tool-parts";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
-
-const OUTCOME_LABEL: Record<NativeChatActivity["outcome"], string> = {
-  running: "running",
-  succeeded: "done",
-  failed: "failed",
-  cancelled: "stopped",
-  uncertain: "unconfirmed",
-};
 
 /**
  * One turn of the native transcript. While the turn runs, its commentary and
@@ -80,43 +70,13 @@ export function NativeTurnActivity({
               }}
             />
           ) : (
-            <ActivityLine key={item.key} calls={item.calls} />
+            <ToolCallGroupView
+              key={item.key}
+              entries={item.calls.map(native_tool_parts.entry)}
+            />
           )
         )}
       {block.answers.map(renderMessage)}
-    </div>
-  );
-}
-
-function ActivityLine({ calls }: { calls: readonly NativeChatActivity[] }) {
-  const [open, setOpen] = useState(false);
-  const running = calls.some((call) => call.outcome === "running");
-  const unsuccessful = turn_activity.unsuccessful(calls);
-  return (
-    <div data-testid="native-turn-activity-line" className="text-xs">
-      <button
-        type="button"
-        aria-expanded={open}
-        className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 text-left"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <BlocksIcon className="size-3.5 shrink-0" />
-        <span>
-          {turn_activity.describe(calls)}
-          {running && "…"}
-          {unsuccessful > 0 && ` · ${unsuccessful} not completed`}
-        </span>
-      </button>
-      {open && (
-        <ul className="text-muted-foreground mt-1 space-y-0.5 pl-5.5">
-          {calls.map((call) => (
-            <li key={call.callId} className="flex gap-2">
-              <span className="font-mono">{call.title}</span>
-              <span>{OUTCOME_LABEL[call.outcome]}</span>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

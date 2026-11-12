@@ -233,6 +233,14 @@ async fn transcript_windows_require_opt_in_and_keep_standard_replay() {
                 assert_eq!(meta["outcome"], "succeeded");
                 assert_eq!(meta["activity"], "read");
                 assert_eq!(Some(&meta["turnId"]), turn.as_ref());
+                // The call carries its arguments and result for its card.
+                assert_eq!(params["update"]["rawInput"]["path"], "note.txt", "{frame}");
+                assert!(
+                    params["update"]["rawOutput"]["text"]
+                        .as_str()
+                        .is_some_and(|text| text.contains("fixture note")),
+                    "{frame}"
+                );
                 activity.push(meta["messageId"].clone());
             }
             if let Some(text) = params["update"]["content"]["text"].as_str() {

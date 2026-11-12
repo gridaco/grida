@@ -2234,12 +2234,41 @@ function activity(
   const source =
     attribution.source === undefined ? undefined : identity(attribution.source);
   if (source !== undefined && kind !== "integration") throw invalidResponse();
+  const input = toolDetail(update.rawInput);
+  const output = toolOutput(update.rawOutput);
   return Object.freeze({
     callId: identity(update.toolCallId),
     title: identity(update.title),
     kind: kind as NativeChatActivity["kind"],
     ...(source !== undefined && { source }),
     outcome: outcome as NativeChatActivity["outcome"],
+    ...(input !== undefined && { input }),
+    ...(output !== undefined && { output }),
+  });
+}
+
+/** The largest tool detail a call may carry; the host shortens its values. */
+const MAX_TOOL_DETAIL_BYTES = 64 * 1024;
+
+/** A tool call's display arguments, bounded. Absent or oversized is omitted. */
+function toolDetail(value: unknown): unknown {
+  if (value === undefined || value === null) return undefined;
+  const text = JSON.stringify(value);
+  if (text === undefined || text.length > MAX_TOOL_DETAIL_BYTES)
+    return undefined;
+  return JSON.parse(text);
+}
+
+function toolOutput(value: unknown): NativeChatActivity["output"] {
+  if (value === undefined || value === null) return undefined;
+  const output = object(value);
+  if (typeof output.text !== "string" || typeof output.truncated !== "boolean")
+    throw invalidResponse();
+  const structured = toolDetail(output.structured);
+  return Object.freeze({
+    text: output.text.slice(0, MAX_TOOL_DETAIL_BYTES),
+    truncated: output.truncated,
+    ...(structured !== undefined && { structured }),
   });
 }
 
