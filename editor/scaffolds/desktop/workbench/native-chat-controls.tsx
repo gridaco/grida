@@ -176,6 +176,7 @@ export function NativeChatHeader({
             key={state.selected ?? "new"}
             text={title}
             reveal={!!state.selected && state.titleArrived === state.selected}
+            onRevealed={() => controller.acknowledgeTitle()}
           />
           {state.catalogEntry?.archived && " · Archived"}
         </span>
@@ -597,9 +598,20 @@ const TITLE_REVEAL_MS = 600;
  * the person notices it replace the new-chat label; it appears at once when
  * they prefer reduced motion.
  */
-function ChatTitleText({ text, reveal }: { text: string; reveal: boolean }) {
+function ChatTitleText({
+  text,
+  reveal,
+  onRevealed,
+}: {
+  text: string;
+  reveal: boolean;
+  /** Called once the title is fully shown, so it is revealed only once. */
+  onRevealed: () => void;
+}) {
   const characters = Array.from(text);
   const [shown, setShown] = useState(characters.length);
+  const revealed = useRef(onRevealed);
+  revealed.current = onRevealed;
   useEffect(() => {
     const total = Array.from(text).length;
     if (
@@ -608,6 +620,7 @@ function ChatTitleText({ text, reveal }: { text: string; reveal: boolean }) {
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ) {
       setShown(total);
+      if (reveal) revealed.current();
       return;
     }
     setShown(0);
@@ -618,6 +631,7 @@ function ChatTitleText({ text, reveal }: { text: string; reveal: boolean }) {
       );
       setShown(next);
       if (next < total) frame = requestAnimationFrame(step);
+      else revealed.current();
     });
     return () => cancelAnimationFrame(frame);
   }, [text, reveal]);

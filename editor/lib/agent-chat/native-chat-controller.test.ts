@@ -3561,8 +3561,10 @@ it("picks up the title the host writes for an untitled chat as its turn settles"
       () => expect(controller.chatTitle("chat-a")).toBe("Spring launch kit"),
       { timeout: 3_000 }
     );
-    // The arrival is marked so the header can reveal it.
+    // The arrival is marked so the header can reveal it once.
     expect(controller.read().titleArrived).toBe("chat-a");
+    controller.acknowledgeTitle();
+    expect(controller.read().titleArrived).toBeNull();
     // A rename in progress is never replaced by the background title.
     controller.beginRename();
     controller.changeTitle("Mine");

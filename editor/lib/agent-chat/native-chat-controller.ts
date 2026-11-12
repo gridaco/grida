@@ -1425,8 +1425,14 @@ export class NativeChatController {
       this.update({
         // Start from the title the person sees, so it can be selected whole.
         catalogDraft: { text: basis.title ?? NEW_CHAT_TITLE, basis },
+        titleArrived: null,
         catalogEntryError: null,
       });
+  }
+
+  /** The arrived title was revealed; showing it again does not repeat that. */
+  acknowledgeTitle(): void {
+    if (this.view.titleArrived !== null) this.update({ titleArrived: null });
   }
 
   changeTitle(text: string): void {
