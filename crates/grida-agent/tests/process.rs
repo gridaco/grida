@@ -2175,7 +2175,7 @@ async fn reject_proxy_tunnel(proxy: TcpListener) -> String {
 }
 
 #[tokio::test]
-async fn compatible_paths_with_different_dispatch_targets_have_distinct_session_identity() {
+async fn an_idle_chat_follows_a_changed_local_route_between_turns() {
     use agent_kit_core::ModelId;
     use grida_agent::ProviderOptions;
     use grida_agent::host::{Host, PromptPart, PromptRequest, change_id};
@@ -2202,7 +2202,7 @@ async fn compatible_paths_with_different_dispatch_targets_have_distinct_session_
             id: change_id().unwrap(),
             session,
             parts: vec![PromptPart::Text {
-                text: "Do not dispatch elsewhere".into(),
+                text: "Continue under the selected route".into(),
             }],
             questions: false,
             configuration_permission: grida_agent::ConfigurationPermission::Disabled,
@@ -2210,9 +2210,11 @@ async fn compatible_paths_with_different_dispatch_targets_have_distinct_session_
             effort: None,
         })
         .await;
-    let Err(error) = result else {
-        panic!("accepted a different provider route")
-    };
-    assert_eq!(error.code, "session_execution_configuration_changed");
+    // The same local credential owner selected another route for the next
+    // turn. The idle chat continues under that route.
+    assert!(
+        result.is_ok(),
+        "an idle chat must follow the selected model"
+    );
     host.shutdown().await.unwrap();
 }

@@ -1,4 +1,4 @@
-// GRIDA-SEC-004 / GRIDA-SEC-014 — saved chat owners bind one approved model route.
+// GRIDA-SEC-004 / GRIDA-SEC-014 — each chat worker binds one approved model route; chats belong to the workspace.
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import fs from "node:fs/promises";

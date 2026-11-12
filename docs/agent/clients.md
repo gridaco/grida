@@ -37,7 +37,7 @@ before starting the Desktop shell. See the
 [authenticated local setup](https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md#authenticated-local-development).
 The Desktop development command prepares the native worker and helper before
 launch. A missing default Gateway connection can be recovered through explicit
-[model selection](./models-and-usage.md#start-a-chat-with-a-saved-model).
+[model selection](./models-and-usage.md#choose-a-model).
 
 ## Build the host
 
@@ -745,8 +745,8 @@ with the same model and connection. Use **Pause** or **Stop** while the retry
 is pending.
 
 A downstream failure can leave the result uncertain. Review any partial work
-before trying again. To use a different provider, start a new chat with that
-connection.
+before trying again. To use a different provider, choose another model for
+the next turn.
 
 ## Use durable client operations
 

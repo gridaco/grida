@@ -19,36 +19,34 @@ Use HTTPS for an endpoint on another device, even if you approved its HTTP
 address in an earlier Desktop version. The saved HTTP setting stays in Desktop
 settings, but the endpoint is unavailable for new native chats.
 
-## Start a chat with a saved model
+## Choose a model
 
-Open **Model connection** in a native workspace and choose a model under **New chat
-with…**. The connection picker also remains available when the default Gateway
-connection cannot start. Choose another configured connection, or retry the
-default once it is available. Listing choices does not open a chat or run a model.
-Grida lists its current tool-capable Gateway text models when discovery
+Open **Model connection** in the composer of a native workspace chat and choose
+a model under **Models**. You can change the model between turns: the chat and
+its history stay in place, and your next message uses the new model with the
+earlier turns as context. A turn that is already running finishes with the
+model that started it; wait for it or choose **Stop** before changing models.
+
+If the default Gateway connection cannot start, the chat still opens and its
+composer shows **Choose model**. Listing models does not open a chat or run a
+model. Grida lists its current tool-capable Gateway text models when discovery
 is available. Add an OpenRouter or Vercel AI Gateway key, or save and approve a
 compatible endpoint in Desktop settings, to see those models too. Use
 **Refresh models** after changing a connection.
 
-When you select a configured compatible endpoint under **New chat with…**,
-the request uses `max_tokens`, including for Ollama. The saved **earlier chats**
-entry keeps the previous request format.
+A configured compatible endpoint uses `max_tokens`, including for Ollama.
 
 A supported local llama.cpp endpoint can offer a separate **llama.cpp counting**
-connection. Select it for a new chat when you need a hard context input limit.
+connection. Select it when you need a hard context input limit.
 [Configure local request counting](../reference/agent-configuration.md#configure-local-request-counting)
 
-Each chat keeps its original model connection. **Saved chats by model** reopens
-the chat list for that connection, and **Default connection** returns to the default
-list. Switching lists leaves existing work and pending questions in their
-original chats. Reconnecting the pane restores its selected connection before
-opening that connection's history. All connections in the workspace share its context-limit setting.
-Send or remove any pending attachment before choosing a different model
-connection. The draft stays in its current chat until then.
-Removing a key, changing an endpoint, or losing access to the original Gateway
-organization can make its saved chats unavailable. A Gateway model must also
-remain available for chat. Restore access to the original connection to reopen
-its chats.
+Chats belong to the workspace, not to a model. All models in the workspace
+share its chat list and context-limit setting. A chat started under your Grida
+account continues with models from that account; a locally saved key or
+endpoint continues chats started with local keys. Send or remove any pending
+attachment before changing the model. Removing a key or changing an endpoint
+makes that model unavailable until you restore it; choose another model to
+continue.
 
 ## Provider availability
 

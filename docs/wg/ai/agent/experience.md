@@ -155,6 +155,12 @@ work keeps its recorded settings unless the person explicitly changes that work.
 An unsupported or invalid value has a clear explanation. Missing information
 about model capacity remains visible.
 
+The model is chosen in the composer and can change between turns. Choosing
+another model keeps the conversation and its history in place; the next request
+uses the new model with the earlier turns as context. A turn already running
+finishes with the model that started it. Without a usable default model, the
+conversation still opens and its composer asks the person to choose one.
+
 Using this feature requires no knowledge of a configuration file or field names.
 An advanced file-editing path can expose the same reviewed settings. The compact
 catalog identifies which settings and scopes the product currently supports.

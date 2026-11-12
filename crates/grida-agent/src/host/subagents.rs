@@ -874,6 +874,7 @@ mod tests {
                 &SessionConfiguration {
                     cwd: PathBuf::from("/workspace"),
                     execution: Fingerprint::of(&"execution").unwrap(),
+                    owner: None,
                     subagent: Some(profile),
                 },
             )

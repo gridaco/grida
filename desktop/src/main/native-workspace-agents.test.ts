@@ -228,10 +228,10 @@ it("rejects a different workspace generation while another profile is starting",
   }
 });
 
-it("drains a forgotten workspace's default and saved workers without touching other workspaces", async () => {
+it("keeps one worker per workspace store and drains it on Forget without touching other workspaces", async () => {
   const { launch, workspace, owners } = fixture();
   const ordinary = child(1);
-  const saved = child(1, { closeOnEof: true });
+  const saved = child(1);
   const otherChild = child(1, { closeOnEof: true });
   const replacement = child(1, { closeOnEof: true });
   spawn
@@ -243,26 +243,33 @@ it("drains a forgotten workspace's default and saved workers without touching ot
   const profile = { id: "saved", prepare: async () => ({ launch }) };
   try {
     const original = await owners.open(workspace);
-    await owners.open(workspace, profile);
+    // Choosing another connection retires the default worker before the
+    // saved route opens the same workspace store.
+    const switching = owners.open(workspace, profile);
+    await ordinary.eof;
+    expect(spawn).toHaveBeenCalledTimes(1);
+    ordinary.close();
+    const selected = await switching;
+    expect(selected).not.toBe(original);
+    expect(owners.current(workspace.id)).toBeNull();
+    expect(owners.current(workspace.id, profile.id)).toBe(selected);
     const retained = await owners.open(other);
     const forgotten = owners.closeWorkspace(workspace.id);
-    expect(owners.current(workspace.id)).toBeNull();
     expect(owners.current(workspace.id, profile.id)).toBeNull();
     expect(owners.current(other.id)).toBe(retained);
-    await ordinary.eof;
     await saved.eof;
     await expect(owners.open(workspace)).rejects.toThrow(
       "native_workspace_closing"
     );
     expect(spawn).toHaveBeenCalledTimes(3);
-    ordinary.close();
+    saved.close();
     await forgotten;
     const reopened = await owners.open(workspace);
-    expect(reopened).not.toBe(original);
     expect(owners.current(workspace.id)).toBe(reopened);
     expect(owners.current(other.id)).toBe(retained);
   } finally {
     ordinary.close();
+    saved.close();
     await owners.close();
   }
 });

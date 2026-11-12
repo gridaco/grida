@@ -651,6 +651,15 @@ stop selects the factual fallback, so publishing the terminal outcome always
 has an available summary. A later rendering of that account is a view of
 settled facts.
 
+### Model selection between turns
+
+A conversation belongs to its workspace, not to a model connection. Each turn
+runs under the route that claimed it. An idle top-level conversation follows the
+person's selection to another route held by the same credential owner. Delegated
+work keeps its parent's route, and an active Goal keeps the route its allowance
+and spending were measured against. A route held by a different account never
+continues another account's conversation.
+
 ### Turn activity presentation
 
 The master decides how recorded work is described to the person. It classifies

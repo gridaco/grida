@@ -36,7 +36,6 @@ import {
   CommandEmpty,
   CommandGroup,
   CommandItem,
-  CommandSeparator,
 } from "@app/ui/components/command";
 import {
   DropdownMenu,
@@ -323,6 +322,17 @@ export function NativeModelPicker({
     (profiles?.active === null && !defaultUnavailable
       ? "Default model"
       : "Choose model");
+  // One list of models. A previously used connection keeps its saved identity.
+  const models = [
+    ...(profiles?.choices ?? []).map((p) => ({
+      ...p,
+      saved: !!profiles?.saved.some((saved) => saved.id === p.id),
+      available: true,
+    })),
+    ...(profiles?.saved ?? [])
+      .filter((saved) => !profiles?.choices.some((p) => p.id === saved.id))
+      .map((p) => ({ ...p, saved: true })),
+  ];
   const choose = (selection: NativeChatProfileSelection) => {
     onSelect(selection);
     setOpen(false);
@@ -362,57 +372,37 @@ export function NativeModelPicker({
             <CommandEmpty>
               No models found. Add a provider in Settings.
             </CommandEmpty>
-            <CommandGroup heading="New chat with">
+            <CommandGroup heading="Models">
               <CommandItem
                 value="Default model"
                 onSelect={() => choose({ kind: "default" })}
               >
                 <GridaLogo className="size-3.5" />
                 Default model
-                {profiles?.active === null && (
+                {profiles?.active === null && !defaultUnavailable && (
                   <CheckIcon className="ml-auto size-3.5" />
                 )}
               </CommandItem>
-              {profiles?.choices.map((p) => (
+              {models.map((p) => (
                 <CommandItem
-                  key={`new:${p.id}`}
+                  key={p.id}
                   value={`${p.connection} ${p.model} ${p.id}`}
-                  onSelect={() => choose({ kind: "new", id: p.id })}
+                  disabled={!p.available}
+                  onSelect={() =>
+                    choose({ kind: p.saved ? "saved" : "new", id: p.id })
+                  }
                 >
                   <ConnectionIcon connection={p.connection} />
                   <span className="min-w-0 flex-1 truncate">{p.model}</span>
                   <span className="text-[10px] text-muted-foreground">
-                    {p.connection}
+                    {p.available ? p.connection : "Unavailable"}
                   </span>
+                  {profiles?.active === p.id && (
+                    <CheckIcon className="size-3.5" />
+                  )}
                 </CommandItem>
               ))}
             </CommandGroup>
-            {!!profiles?.saved.length && (
-              <>
-                <CommandSeparator />
-                <CommandGroup heading="Previous chats by model">
-                  {profiles.saved.map((p) => (
-                    <CommandItem
-                      key={`saved:${p.id}`}
-                      value={`Saved ${p.connection} ${p.model} ${p.id}`}
-                      disabled={!p.available}
-                      onSelect={() => choose({ kind: "saved", id: p.id })}
-                    >
-                      <ConnectionIcon connection={p.connection} />
-                      <span className="min-w-0 flex-1 truncate">{p.model}</span>
-                      {profiles.active === p.id && (
-                        <CheckIcon className="size-3.5" />
-                      )}
-                      {!p.available && (
-                        <span className="text-[10px] text-muted-foreground">
-                          Unavailable
-                        </span>
-                      )}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </>
-            )}
           </CommandList>
         </Command>
         {onEffort && effort && (

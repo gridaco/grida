@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
+  NativeChatProfileSelection,
   DesktopNativeChat,
   NativeChatCommand,
   NativeChatCommandResult,
@@ -176,7 +177,7 @@ it("ignores late connection recovery after the pane closes", async () => {
 });
 
 it.each([false, true])(
-  "activates a recovered profile before loading history (new chat: %s)",
+  "activates a recovered profile, then reopens the workspace chat (new connection: %s)",
   async (startNewChat) => {
     const { bridge } = fixture();
     const memory = {
@@ -206,8 +207,12 @@ it.each([false, true])(
         kind: startNewChat ? "new" : "saved",
         id,
       });
-      expect(controller.read().selected).toBeNull();
-      expect(load).not.toHaveBeenCalled();
+      // Chats belong to the workspace, so the remembered chat reopens under
+      // the chosen connection only after that connection is active.
+      expect(controller.read().selected).toBe("old-default");
+      expect(choose.mock.invocationCallOrder[0]).toBeLessThan(
+        load.mock.invocationCallOrder[0] ?? Infinity
+      );
     } finally {
       controller.disconnect();
     }
@@ -3458,72 +3463,55 @@ describe("Native workspace chat controller", () => {
     }
   });
 
-  it("keeps saved chats and renderer observations scoped to the selected model owner", async () => {
-    const { bridge, running, updates, controller } = fixture();
+  it("keeps the open chat and chat list when the model changes between turns", async () => {
+    const { bridge, running, controller, transcripts } = fixture();
     let profile: string | null = null;
     const id = "b".repeat(64);
-    let unavailable = false;
-    let allowSelection!: () => void;
-    const selectionReady = new Promise<void>((resolve) => {
-      allowSelection = resolve;
-    });
-    running.add("default-chat");
+    const choices: NativeChatProfileSelection[] = [];
+    transcripts.set("workspace-chat", [
+      { messageId: "kept", role: "assistant", text: "Earlier answer" },
+    ]);
     bridge.profiles = async () => ({
       active: profile,
       choices: [{ id, connection: "Local", model: "Fixture" }],
-      saved: [
-        { id, connection: "Local", model: "Fixture", available: !unavailable },
-      ],
+      saved: [{ id, connection: "Local", model: "Fixture", available: true }],
     });
     bridge.selectProfile = async (selection) => {
-      if (unavailable && selection.kind !== "default")
-        throw new Error("unavailable");
-      if (selection.kind === "new") await selectionReady;
+      choices.push(selection);
       profile = selection.kind === "default" ? null : selection.id;
     };
+    // One workspace store: every connection lists the same chats.
     bridge.list = async () => ({
-      sessionIds:
-        profile === null
-          ? ["default-chat", "background-chat"]
-          : ["alternate-chat"],
+      sessionIds: ["workspace-chat", "other-chat"],
       nextCursor: null,
     });
     try {
-      controller.connect("default-chat");
-      await vi.waitFor(() => expect(updates.has("default-chat")).toBe(true));
-      const oldUpdate = updates.get("default-chat")!;
-      const oldScope = controller.read().scope;
-      const selecting = controller.selectProfile({ kind: "new", id });
-      expect(controller.canSubmit).toBe(false);
-      await expect(controller.submit("Wrong owner", oldScope)).rejects.toThrow(
-        "native_chat_not_ready"
-      );
-      allowSelection();
-      await selecting;
-      await expect(
-        controller.submit("Late old composer", oldScope)
-      ).rejects.toThrow("native_chat_not_ready");
+      controller.connect("workspace-chat");
       await vi.waitFor(() =>
-        expect(controller.read().sessions).toEqual(["alternate-chat"])
+        expect(controller.read().messages[0]?.text).toBe("Earlier answer")
       );
-      expect(controller.read().selected).toBeNull();
-      oldUpdate(text("default-chat", "late old text", 0));
-      expect(controller.read().messages).toEqual([]);
-      await controller.select("alternate-chat");
-      expect(controller.read().selected).toBe("alternate-chat");
-      running.add("background-chat");
-      await controller.focusChat("background-chat");
-      expect(profile).toBeNull();
-      expect(controller.read().selected).toBe("background-chat");
-      expect(updates.has("background-chat")).toBe(true);
-      await vi.waitFor(() =>
-        expect(controller.read().sessions).toContain("default-chat")
-      );
-      await controller.select("default-chat");
-      unavailable = true;
       await controller.selectProfile({ kind: "saved", id });
-      expect(controller.read().selected).toBe("default-chat");
-      expect(controller.read().profileError).toMatch(/unavailable/);
+      expect(choices).toEqual([{ kind: "saved", id }]);
+      expect(controller.read().selected).toBe("workspace-chat");
+      expect(controller.read().messages[0]?.text).toBe("Earlier answer");
+      await vi.waitFor(() =>
+        expect(controller.read().sessions).toEqual([
+          "workspace-chat",
+          "other-chat",
+        ])
+      );
+      expect(controller.read().profiles?.active).toBe(id);
+
+      // A turn in progress keeps its model until it finishes or stops.
+      running.add("workspace-chat");
+      await controller.select("other-chat");
+      await controller.select("workspace-chat");
+      await vi.waitFor(() =>
+        expect(controller.read().observation?.snapshot.current).toBeTruthy()
+      );
+      await controller.selectProfile({ kind: "default" });
+      expect(choices).toHaveLength(1);
+      expect(controller.read().profileError).toMatch(/current turn/);
     } finally {
       controller.disconnect();
     }

@@ -639,6 +639,13 @@ export class NativeChatController {
     )
       return;
     this.profileRead = undefined;
+    if (this.scope?.observation?.snapshot.current) {
+      this.update({
+        profileError:
+          "Finish or stop the current turn before changing the model.",
+      });
+      return;
+    }
     if (this.view.attachmentDraft || this.view.attachmentReading) {
       this.update({
         profileError:
@@ -669,9 +676,11 @@ export class NativeChatController {
       });
       void this.listChats();
       void this.readProfiles();
-      await this.select(
-        initialSession ?? (selection.kind === "new" ? null : saved.selected)
-      );
+      // The open chat continues with the selected model on its next turn.
+      const continuing = initialSession ?? this.view.selected;
+      await this.select(continuing ?? saved.selected, {
+        reattach: !!continuing,
+      });
     } catch {
       if (this.catalogConnection === connection)
         this.update({
@@ -684,8 +693,16 @@ export class NativeChatController {
     }
   }
 
-  async select(sessionId: string | null): Promise<void> {
+  async select(
+    sessionId: string | null,
+    { reattach = false }: { reattach?: boolean } = {}
+  ): Promise<void> {
+    const retained =
+      reattach && sessionId !== null && this.view.selected === sessionId
+        ? { messages: this.view.messages, turnRecords: this.view.turnRecords }
+        : undefined;
     if (
+      !reattach &&
       this.scope &&
       (this.scope.opening || this.scope.attachment) &&
       sessionId !== null &&
@@ -718,8 +735,8 @@ export class NativeChatController {
       revisionDraft: null,
       revisionSubmitting: false,
       catalogDraft: null,
-      messages: [],
-      turnRecords: [],
+      messages: retained?.messages ?? [],
+      turnRecords: retained?.turnRecords ?? [],
       earlierMessages: false,
       canReadEarlier: false,
       readingEarlier: false,
@@ -4093,9 +4110,9 @@ export class NativeChatController {
     }
   }
 
+  /** Chats belong to the workspace; the model connection does not partition them. */
   private selectionMemoryKey(): string | undefined {
-    if (!this.memoryKey || !this.profileId) return this.memoryKey;
-    return `${this.memoryKey}.profile.${this.profileId}`;
+    return this.memoryKey;
   }
 }
 
@@ -4259,6 +4276,8 @@ function applyText(
 
 function describe(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) return fallback;
+  if (error.message.includes("session_execution_configuration_changed"))
+    return "This chat continues with models from the account that started it. Choose one of those models, or start a new chat.";
   if (error.message.includes("native_chat_transcript_too_large"))
     return "This chat is too large to restore in the workspace pane.";
   if (error.message.includes("history_replay_window_changed"))

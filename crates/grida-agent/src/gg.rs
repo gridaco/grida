@@ -60,7 +60,7 @@ pub struct GgChatRequest {
 pub struct GgConnection {
     target: Url,
     binding: ProviderBinding,
-    scope: Fingerprint,
+    pub(crate) scope: Fingerprint,
     credential: Arc<Mutex<Credential>>,
     renewal: Option<Arc<Renewal>>,
 }

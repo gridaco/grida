@@ -139,9 +139,22 @@ export class NativeWorkspaceAgents {
       throw new Error("native_workspace_capacity_reached");
     }
 
+    // One workspace store admits one worker. Choosing another model
+    // connection retires the workspace's other worker before starting.
+    const siblings =
+      "root" in workspace && !nested
+        ? [...this.slots].filter(
+            ([other, slot]) =>
+              other !== key &&
+              "root" in slot.workspace &&
+              !slot.workspace.nestedDeck &&
+              slot.workspace.id === id
+          )
+        : [];
     const stopping = new AbortController();
     const signal = AbortSignal.any([this.stopping.signal, stopping.signal]);
     const opened = Promise.resolve().then(async () => {
+      if (siblings.length) await this.drain(siblings);
       if (existing?.owner) {
         // Exit was observed by the process owner. The store will reconcile
         // retained work; replacing the connection is not a retry of a turn.

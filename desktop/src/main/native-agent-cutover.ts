@@ -308,13 +308,9 @@ export class NativeAgentCutover {
       launch.cwd,
       true
     );
-    let stateDirectory = directory;
-    if (profileId) {
-      const profiles = path.join(directory, "profiles");
-      await ensureState(profiles);
-      stateDirectory = path.join(profiles, profileId);
-    }
-    return await this.startAt(launch, stateDirectory);
+    // Chats belong to the workspace. Every model connection opens the same
+    // store; the host keeps each turn on the route that claimed it.
+    return await this.startAt(launch, directory);
   }
 
   async startDocument(

@@ -156,6 +156,7 @@ pub struct Host {
 struct Execution {
     configuration: Fingerprint,
     legacy_configuration: Fingerprint,
+    owner: Fingerprint,
     runtime: Runtime,
     config: MasterConfig,
     provider: Arc<dyn Provider>,
@@ -552,6 +553,10 @@ pub enum RunResult {
 struct SessionConfiguration {
     cwd: PathBuf,
     execution: Fingerprint,
+    /// Who holds the credential the chat runs under. A chat can change model
+    /// between turns only within the same owner. Absent on older chats.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    owner: Option<Fingerprint>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     subagent: Option<grida_agent_master::subagents::Profile>,
 }
@@ -771,6 +776,7 @@ impl Host {
         let configuration = SessionConfiguration {
             cwd: canonical_workspace(&cwd)?,
             execution: execution.configuration,
+            owner: Some(execution.owner),
             subagent: None,
         };
         let session = SessionId::new(uuid())?;
@@ -2036,13 +2042,28 @@ impl Host {
         } else {
             execution.configuration
         };
-        if session_configuration(view)?.execution != expected {
+        let configuration = session_configuration(view)?;
+        if configuration.execution != expected
+            && !(configuration.owner == Some(execution.owner)
+                && Self::route_movable(view, &configuration))
+        {
             return Err(problem(
                 ErrorKind::Conflict,
                 "session_execution_configuration_changed",
             ));
         }
         Ok(())
+    }
+
+    /// A chat follows the person's model selection between turns, within the
+    /// credential owner that created it. A turn
+    /// always finishes under the route that claimed it, delegated sessions
+    /// keep their parent's route, and an active Goal keeps the route its
+    /// allowance and spending were measured against.
+    fn route_movable(view: &SessionView, configuration: &SessionConfiguration) -> bool {
+        view.current.is_none()
+            && configuration.subagent.is_none()
+            && goals::require_resolved_goal(&view.driver_state).is_ok()
     }
 
     fn submission_policy(
@@ -3415,6 +3436,16 @@ impl Execution {
             authority: binding.authority,
             grants: Vec::new(),
         };
+        let owner = match &credential {
+            Credential::Http(_) => Fingerprint::of(&"local-credential-owner-v1")?,
+            Credential::Gg(connection) => Fingerprint::of(&("gg-owner-v1", connection.scope))?,
+            Credential::SupervisedGg(connection) => {
+                Fingerprint::of(&("gg-owner-v1", connection.scope))?
+            }
+            Credential::SupervisedChatGpt(connection) => {
+                Fingerprint::of(&("chatgpt-owner-v1", &connection.replay_binding))?
+            }
+        };
         let questions = Arc::new(questions::QuestionAccess::new()?);
         let configuration_tools = Arc::new(ConfigurationAccess::new()?);
         let authorization = Arc::new(ExecutionAuthority {
@@ -3440,6 +3471,7 @@ impl Execution {
         Ok(Self {
             configuration,
             legacy_configuration,
+            owner,
             runtime,
             config: MasterConfig {
                 model,

@@ -12,7 +12,6 @@ import type {
   DesktopNativeChat,
   NativeChatMessage,
   NativeChatReadiness,
-  NativeChatProfileSelection,
 } from "@grida/desktop-bridge";
 import { Button } from "@app/ui/components/button";
 import { Textarea } from "@app/ui/components/textarea";
@@ -66,7 +65,6 @@ import { NativeContextLimitPanel } from "./native-context-limit-panel";
 import { NativeHooksPanel } from "./native-hooks-panel";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
 import { NativeSubagentsPanel } from "./native-subagents-panel";
-import { NativeConnectionRecovery } from "./native-connection-recovery";
 
 import {
   Dialog,
@@ -123,11 +121,6 @@ export function NativeAgentPaneGate({
   legacy: ReactNode;
 }) {
   const [attempt, setAttempt] = useState(0);
-  const [recovered, setRecovered] = useState<{
-    bridge: DesktopNativeChat;
-    workspaceId: string;
-    selection: NativeChatProfileSelection;
-  }>();
   const [selection, setSelection] = useState<{
     bridge: DesktopNativeChat;
     attempt: number;
@@ -153,25 +146,16 @@ export function NativeAgentPaneGate({
           : "Checking chat availability…"}
       </div>
     );
-  if (
+  // Without a usable default connection the pane still opens; its composer
+  // asks for a model, and choosing one continues in the same pane.
+  const connectionRequired =
     readiness !== "native-ready" &&
     readiness !== null &&
     readiness !== "native-unavailable" &&
-    workspaceId &&
-    bridge.profiles &&
-    bridge.selectProfile
-  )
-    return (
-      <NativeConnectionRecovery
-        bridge={bridge}
-        note={nativeChatConnectionNote[readiness]}
-        onConnected={(selection) => {
-          setRecovered({ bridge, workspaceId, selection });
-          setAttempt((current) => current + 1);
-        }}
-      />
-    );
-  if (readiness !== "native-ready")
+    !!workspaceId &&
+    !!bridge.profiles &&
+    !!bridge.selectProfile;
+  if (readiness !== "native-ready" && !connectionRequired)
     return (
       <div className="flex flex-col gap-2 px-3 py-2 text-xs">
         <span role="alert" className="text-destructive">
@@ -190,21 +174,19 @@ export function NativeAgentPaneGate({
         </Button>
       </div>
     );
-  const recovery =
-    recovered?.bridge === bridge && recovered.workspaceId === workspaceId
-      ? recovered.selection
-      : undefined;
   return (
     <NativeAgentPane
       key={initialSession}
       bridge={bridge}
+      connectionRequired={connectionRequired}
+      connectionNote={
+        connectionRequired && readiness
+          ? nativeChatConnectionNote[readiness]
+          : undefined
+      }
       selectionKey={selectionKey}
       workspaceId={workspaceId}
-      initialSession={recovery ? null : initialSession}
-      startNewChat={recovery?.kind === "new"}
-      initialProfileId={
-        recovery && recovery.kind !== "default" ? recovery.id : undefined
-      }
+      initialSession={initialSession}
       editorSurfaces={editorSurfaces}
     />
   );
@@ -224,6 +206,8 @@ const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
 
 export function NativeAgentPane({
   bridge,
+  connectionRequired = false,
+  connectionNote,
   selectionKey,
   workspaceId,
   initialSession,
@@ -232,6 +216,9 @@ export function NativeAgentPane({
   editorSurfaces,
 }: {
   bridge: DesktopNativeChat;
+  /** No connection can run yet; the composer's model picker starts the chat. */
+  connectionRequired?: boolean;
+  connectionNote?: string;
   selectionKey?: string;
   workspaceId?: string;
   initialSession: string | null;
@@ -280,7 +267,8 @@ export function NativeAgentPane({
       (workspaceId && initialSession
         ? new URLSearchParams(window.location.hash.slice(1)).get("chat-profile")
         : null);
-    controller.connect(initialSession, profile, startNewChat);
+    if (connectionRequired) controller.connectForSelection();
+    else controller.connect(initialSession, profile, startNewChat);
     const stopFocus =
       workspaceId &&
       subscribeToNativeNotificationFocus(
@@ -300,6 +288,7 @@ export function NativeAgentPane({
     initialProfileId,
     startNewChat,
     workspaceId,
+    connectionRequired,
   ]);
   const snapshot = state.observation?.snapshot;
   const editHistory = controller.canReviseHistory && !state.revisionDraft;
@@ -449,6 +438,16 @@ export function NativeAgentPane({
           {state.earlierError && (
             <span role="status">{state.earlierError}</span>
           )}
+        </div>
+      )}
+      {connectionRequired && !state.scope && (
+        <div className="text-muted-foreground px-3 py-1 text-xs">
+          {connectionNote && <p>{connectionNote}</p>}
+          {state.profiles &&
+            state.profiles.choices.length + state.profiles.saved.length ===
+              0 && (
+              <p>Add a provider in Desktop settings, then refresh models.</p>
+            )}
         </div>
       )}
       <Conversation
@@ -1060,17 +1059,19 @@ export function NativeAgentPane({
           busy={!!turn}
           isStreaming={streamingControlsOnly}
           placeholder={
-            state.goalIntent
-              ? "Describe your goal and what success looks like…"
-              : state.operatingRegime === "plan"
-                ? "What would you like to plan?"
-                : state.attachmentDraft
-                  ? "Add a message to send this attachment…"
-                  : state.steering
-                    ? "Add guidance to this turn…"
-                    : turn || snapshot?.admissionPaused || queued
-                      ? "Queue a follow-up…"
-                      : undefined
+            connectionRequired && !state.scope
+              ? "Choose a model to start chatting…"
+              : state.goalIntent
+                ? "Describe your goal and what success looks like…"
+                : state.operatingRegime === "plan"
+                  ? "What would you like to plan?"
+                  : state.attachmentDraft
+                    ? "Add a message to send this attachment…"
+                    : state.steering
+                      ? "Add guidance to this turn…"
+                      : turn || snapshot?.admissionPaused || queued
+                        ? "Queue a follow-up…"
+                        : undefined
           }
           submissionScope={state.scope}
           draftRef={draft}
@@ -1336,6 +1337,7 @@ export function NativeAgentPane({
               )}
               <NativeModelPicker
                 profiles={state.profiles}
+                defaultUnavailable={connectionRequired}
                 busy={state.profileBusy || state.acting}
                 onSelect={(selection) =>
                   void controller.selectProfile(selection)

@@ -365,9 +365,11 @@ impl Host {
                 Ok(existing) => existing.configuration,
                 Err(error) if error.code == "session_missing" => {
                     let source_view = host.store.inspect(source.clone()).await?;
+                    let execution = host.execution()?;
                     let configuration = SessionConfiguration {
                         cwd: canonical_workspace(&session_configuration(&source_view)?.cwd)?,
-                        execution: host.execution()?.configuration,
+                        execution: execution.configuration,
+                        owner: Some(execution.owner),
                         subagent: None,
                     };
                     encode(SESSION_SCHEMA, 2, &configuration)?
