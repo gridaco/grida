@@ -111,7 +111,11 @@ pub(crate) const RETAINED_IMAGE_LABEL: &str = "\n[Retained PNG image]\n";
 const MAX_ACTIVE_RUNS: usize = 8;
 const MAX_OWNED_CONTROLS: usize = 32;
 const MAX_READY_SESSIONS: usize = 128;
-const MAX_TURN_STEPS: u32 = 8;
+/// A runaway guard, not a product limit: a turn ends when the model answers,
+/// the person interrupts, or a budget they set runs out.
+const MAX_TURN_STEPS: u32 = 200;
+/// The product's base instructions for every native agent turn.
+const CORE_INSTRUCTIONS: &str = include_str!("prompts/core.md");
 const UPDATE_CAPACITY: usize = 128;
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(8);
 const MODEL_TIMEOUT: Duration = Duration::from_secs(120);
@@ -3509,7 +3513,7 @@ impl Execution {
             runtime,
             config: MasterConfig {
                 model,
-                instructions: "You are Grida Agent, a helpful assistant.".into(),
+                instructions: CORE_INSTRUCTIONS.trim().into(),
                 max_steps: MAX_TURN_STEPS,
                 max_output_tokens,
                 reasoning: Default::default(),

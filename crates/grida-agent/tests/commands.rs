@@ -97,6 +97,7 @@ impl Fixture {
             }],
             temporary_parent: temporary.clone(),
             termination: Termination::ProcessGroup,
+            disk_read: false,
         };
         Self {
             _base: base,

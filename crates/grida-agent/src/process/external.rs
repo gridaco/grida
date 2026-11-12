@@ -401,6 +401,7 @@ fn load_driver(
                 } else {
                     Termination::ProcessGroup
                 },
+                disk_read: false,
             },
             timeout,
         },

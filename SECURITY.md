@@ -596,6 +596,19 @@ authorized execution scope after probing the installed native sandbox. A tool
 call supplies the program, arguments, working directory, environment values,
 and optional UTF-8 stdin. Filesystem grants, network denial, private temporary
 storage, and the termination guarantee come from the host and native sandbox.
+A host profile can let programs read and execute anywhere except its protected
+paths (disk read) and start from the host's environment minus Grida's own
+`GRIDA_*` variables and the provider credential variable the host was launched
+with. The host's state, the profile file, the credential home,
+`GRIDA_HOME` and `~/.grida` stay read-and-write protected, so disk read never
+reaches them; the sandbox expresses each as an exclusion of every grant rather
+than relying on rule order. Version-control and agent metadata (`.git`,
+`.agents`, `.grida`, `.codex`, `.aws`) directly under a writable root stay
+read-only. A protected path inside a granted location is carved out of it; one
+that contains a granted location still refuses the scope. Platform services
+toolchains need (system information, the user database, semaphores and
+pseudo-terminals) are allowed; they grant no file or network access. The
+[permission policy](docs/wg/ai/agent/permissions.md) owns these defaults.
 Preparation refusals share one tool response regardless of path existence.
 The adapter retains supervision after the runtime cancels an invocation. The
 host's cleanup barrier reports pending or unverified command identities before

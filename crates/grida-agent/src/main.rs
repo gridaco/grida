@@ -543,10 +543,11 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     let permissions = args
         .get_one::<PathBuf>("permission-profile")
         .map(|path| {
-            grida_agent::launch_permissions::load_permission_profile(
+            grida_agent::launch_permissions::load_permission_profile_excluding(
                 path,
                 state_dir,
                 provider.credential_home.as_deref(),
+                provider.credential_env.as_deref(),
             )
         })
         .transpose()?;

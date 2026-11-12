@@ -35,6 +35,8 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
 const REQUEST: &str = "grida.agent.approval";
+/// Top-level names that stay read-only under any writable root.
+const PROTECTED_METADATA: [&str; 5] = [".git", ".agents", ".grida", ".codex", ".aws"];
 const ANSWER: &str = "grida.agent.approval.answer";
 const MAX_APPROVAL_BYTES: usize = 128 * 1024;
 const MAX_ACTIONS: usize = 32;
@@ -64,6 +66,12 @@ pub struct CommandProfile {
     pub temporary_parent: PathBuf,
     pub termination: Termination,
     pub limits: CommandLimits,
+    /// Programs may read and execute anywhere except protected paths, as in
+    /// the person's terminal. Writes still follow the grant.
+    pub disk_read: bool,
+    /// The environment every program starts from; tool-supplied values win.
+    /// Empty when the profile does not inherit the host environment.
+    pub environment: Arc<BTreeMap<String, String>>,
 }
 
 #[derive(Clone)]
@@ -182,6 +190,8 @@ impl PermissionProfile {
                 command.limits.timeout,
                 command.limits.max_input_bytes,
                 command.limits.max_output_bytes,
+                command.disk_read,
+                !command.environment.is_empty(),
             )
         });
         let identity = Fingerprint::of(&(
@@ -563,6 +573,15 @@ impl PermissionProfile {
         access: CommandAccess,
     ) -> Result<ExecutionScope> {
         let command = self.command.as_ref().ok_or_else(command_unavailable)?;
+        let mut protected = self.command_denials.clone();
+        if access == CommandAccess::ReadWrite {
+            // Version-control and agent metadata stay read-only inside a
+            // writable root. See the permission policy's protected paths.
+            protected.extend(PROTECTED_METADATA.iter().map(|name| ProtectedPath {
+                path: root.join(name),
+                access: DeniedAccess::Write,
+            }));
+        }
         let (read, write) = match access {
             CommandAccess::Read => (vec![root], Vec::new()),
             CommandAccess::ReadWrite => (Vec::new(), vec![root]),
@@ -576,9 +595,10 @@ impl PermissionProfile {
             read,
             write,
             runtime: command.runtime_paths.clone(),
-            protected: self.command_denials.clone(),
+            protected,
             temporary_parent: command.temporary_parent.clone(),
             termination: command.termination,
+            disk_read: command.disk_read,
         })
     }
 }
@@ -989,7 +1009,11 @@ impl TurnPermissions {
                 let process = command
                     .sandbox
                     .prepare(
-                        input.into_spec(command.limits.timeout, command.limits.max_output_bytes),
+                        input.into_spec(
+                            command.limits.timeout,
+                            command.limits.max_output_bytes,
+                            &command.environment,
+                        ),
                         scope,
                     )
                     .map_err(|error| problem(error.kind, "command_preparation_refused"))?;
@@ -1103,10 +1127,17 @@ impl TurnPermissions {
             access,
         )?;
         let expected = ready.command_capture.ok_or_else(command_unavailable)?;
+        let environment = self
+            .profile
+            .command
+            .as_ref()
+            .map(|command| Arc::clone(&command.environment))
+            .unwrap_or_default();
         let owner = self.clone();
         Ok(AuthorizedCommand {
             scope,
             expected,
+            environment,
             spawn: Arc::new(move |prepared, cancellation| {
                 let mut state = owner.state()?;
                 current(&state, &operation, action)?;

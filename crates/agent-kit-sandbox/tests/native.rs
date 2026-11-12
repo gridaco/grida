@@ -94,6 +94,7 @@ impl Fixture {
             }],
             temporary_parent: self.temporary.clone(),
             termination: Termination::ProcessGroup,
+            disk_read: false,
         }
     }
 
@@ -149,9 +150,17 @@ fn unsupported_descendant_requirement_and_protected_overlap_refuse_before_launch
         .unwrap();
     assert_eq!(error.code, "sandbox_descendant_guarantee_unavailable");
 
+    // A protected path inside a granted location is carved out of it.
     let mut scope = fixture.scope();
     scope.protected.push(ProtectedPath {
         path: fixture.workspace.join("future-protected-file"),
+        access: DeniedAccess::Write,
+    });
+    assert!(sandbox.prepare(fixture.command("exit 0"), scope).is_ok());
+    // A protected path that contains a granted location cannot be.
+    let mut scope = fixture.scope();
+    scope.protected.push(ProtectedPath {
+        path: fixture.workspace.parent().unwrap().to_owned(),
         access: DeniedAccess::Write,
     });
     let error = sandbox
@@ -291,6 +300,93 @@ async fn native_scope_confines_files_ipc_network_and_environment() {
     assert!(!forbidden_write.exists());
     assert!(evidence.temporary_removed);
     assert!(fs::read_dir(&fixture.temporary).unwrap().next().is_none());
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn protected_paths_inside_a_writable_root_stay_unwritable() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let metadata = fixture.workspace.join(".git");
+    fs::create_dir(&metadata).unwrap();
+    fs::write(metadata.join("config"), "original").unwrap();
+    let mut scope = fixture.scope();
+    scope.protected.push(ProtectedPath {
+        path: metadata.clone(),
+        access: DeniedAccess::Write,
+    });
+    let evidence = sandbox
+        .prepare(
+            fixture.command(
+                r#"
+                /bin/cat .git/config >/dev/null || exit 31
+                if (printf changed > .git/config) 2>/dev/null; then exit 32; fi
+                if (printf new > .git/new) 2>/dev/null; then exit 33; fi
+                printf allowed > permitted || exit 34
+                printf complete
+                "#,
+            ),
+            scope,
+        )
+        .unwrap()
+        .spawn(CancellationToken::new())
+        .unwrap()
+        .finish()
+        .await
+        .unwrap();
+    assert_eq!(
+        evidence.completion,
+        Completion::Exited(0),
+        "stderr={:?}",
+        String::from_utf8_lossy(&evidence.stderr)
+    );
+    assert_eq!(fs::read(metadata.join("config")).unwrap(), b"original");
+    assert!(!metadata.join("new").exists());
+    assert_eq!(
+        fs::read(fixture.workspace.join("permitted")).unwrap(),
+        b"allowed"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn disk_read_reaches_outside_the_grant_but_not_protected_paths() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let elsewhere = fixture.temporary.parent().unwrap().join("elsewhere");
+    fs::create_dir(&elsewhere).unwrap();
+    fs::write(elsewhere.join("readme"), "visible").unwrap();
+    let secret = fixture.outside.join("secret");
+    fs::write(&secret, "private").unwrap();
+    let mut scope = fixture.scope();
+    scope.disk_read = true;
+    let mut spec = fixture.command(
+        r#"
+        test "$(/bin/cat "$1")" = visible || exit 31
+        if /bin/cat "$2" >/dev/null 2>&1; then exit 32; fi
+        if (printf bad > "$1") 2>/dev/null; then exit 33; fi
+        printf complete
+        "#,
+    );
+    spec.arguments.extend([
+        elsewhere.join("readme").to_string_lossy().into_owned(),
+        secret.to_string_lossy().into_owned(),
+    ]);
+    let evidence = sandbox
+        .prepare(spec, scope)
+        .unwrap()
+        .spawn(CancellationToken::new())
+        .unwrap()
+        .finish()
+        .await
+        .unwrap();
+    assert_eq!(
+        evidence.completion,
+        Completion::Exited(0),
+        "stderr={:?}",
+        String::from_utf8_lossy(&evidence.stderr)
+    );
+    assert_eq!(fs::read(elsewhere.join("readme")).unwrap(), b"visible");
 }
 
 #[tokio::test]

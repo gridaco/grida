@@ -154,6 +154,8 @@ impl Fixture {
                 max_input_bytes: 4096,
                 max_output_bytes: 4096,
             },
+            disk_read: false,
+            environment: Default::default(),
         }
     }
 

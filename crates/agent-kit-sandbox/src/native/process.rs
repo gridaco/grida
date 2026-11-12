@@ -86,6 +86,33 @@ pub(super) fn spawn(
 }
 
 #[cfg(target_os = "macos")]
+const PLATFORM_DEFAULTS: &str = r#"(allow sysctl-read
+  (sysctl-name "hw.activecpu") (sysctl-name "hw.byteorder") (sysctl-name "hw.cacheconfig")
+  (sysctl-name "hw.cachelinesize_compat") (sysctl-name "hw.cpufamily") (sysctl-name "hw.cputype")
+  (sysctl-name "hw.l1dcachesize_compat") (sysctl-name "hw.l1icachesize_compat")
+  (sysctl-name "hw.l2cachesize_compat") (sysctl-name "hw.l3cachesize_compat")
+  (sysctl-name "hw.logicalcpu_max") (sysctl-name "hw.machine") (sysctl-name "hw.model")
+  (sysctl-name "hw.memsize") (sysctl-name "hw.ncpu") (sysctl-name "hw.nperflevels")
+  (sysctl-name-prefix "hw.optional.arm.") (sysctl-name-prefix "hw.optional.armv8_")
+  (sysctl-name "hw.packages") (sysctl-name "hw.physicalcpu") (sysctl-name "hw.physicalcpu_max")
+  (sysctl-name "hw.logicalcpu") (sysctl-name "hw.cpufrequency") (sysctl-name "hw.tbfrequency_compat")
+  (sysctl-name "hw.vectorunit") (sysctl-name-prefix "hw.perflevel")
+  (sysctl-name "machdep.cpu.brand_string") (sysctl-name "kern.argmax") (sysctl-name "kern.hostname")
+  (sysctl-name "kern.maxfilesperproc") (sysctl-name "kern.maxproc") (sysctl-name "kern.osproductversion")
+  (sysctl-name "kern.osrelease") (sysctl-name "kern.ostype") (sysctl-name "kern.osvariant_status")
+  (sysctl-name "kern.osversion") (sysctl-name "kern.secure_kernel") (sysctl-name "kern.sysv.semmns")
+  (sysctl-name "kern.usrstack64") (sysctl-name "kern.version") (sysctl-name "sysctl.proc_cputype")
+  (sysctl-name "vm.loadavg") (sysctl-name-prefix "kern.proc.pgrp.") (sysctl-name-prefix "kern.proc.pid."))
+(allow sysctl-write (sysctl-name "kern.grade_cputype"))
+(allow mach-lookup (global-name "com.apple.system.opendirectoryd.libinfo"))
+(allow ipc-posix-sem)
+(allow pseudo-tty)
+(allow file-read* file-write* file-ioctl (literal "/dev/ptmx"))
+(allow file-read* file-write* (require-all (regex #"^/dev/ttys[0-9]+") (extension "com.apple.sandbox.pty")))
+(allow file-ioctl (regex #"^/dev/ttys[0-9]+"))
+"#;
+
+#[cfg(target_os = "macos")]
 fn command(prepared: &Prepared, status: i32) -> Command {
     let mut command = Command::new("/usr/bin/sandbox-exec");
     let mut profile = String::from(
@@ -95,28 +122,58 @@ fn command(prepared: &Prepared, status: i32) -> Command {
          (allow file-read* file-write-data (literal \"/dev/null\"))\n\
          (allow sysctl-read (sysctl-name \"hw.pagesize\") (sysctl-name \"hw.pagesize_compat\"))\n",
     );
+    // Platform services ordinary toolchains need: system information, the
+    // user database, semaphores and pseudo-terminals. None grants file or
+    // network access.
+    profile.push_str(PLATFORM_DEFAULTS);
     let mut locations: Vec<_> = prepared
         .locations
         .iter()
         .map(|location| (&location.bound, location.access))
         .collect();
     locations.push((&prepared.helper.bound, Access::Runtime));
+    use std::fmt::Write as _;
+    // Protected paths are excluded from every grant that contains them.
+    let mut unreadable = String::new();
+    let mut unwritable = String::new();
+    for (index, (path, access)) in prepared.protected.iter().enumerate() {
+        let name = format!("P{index}");
+        let exclusion = format!(" (require-not (subpath (param \"{name}\")))");
+        if *access == crate::DeniedAccess::ReadWrite {
+            unreadable.push_str(&exclusion);
+        }
+        unwritable.push_str(&exclusion);
+        command.arg("-D").arg(format!("{name}={}", path.display()));
+    }
+    if prepared.disk_read {
+        let _ = writeln!(
+            profile,
+            "(allow file-read* file-test-existence (require-all (subpath \"/\"){unreadable}))"
+        );
+        let _ = writeln!(
+            profile,
+            "(allow process-exec file-map-executable (require-all (subpath \"/\"){unreadable}))"
+        );
+    }
     for (index, (bound, access)) in locations.iter().enumerate() {
-        use std::fmt::Write as _;
         let name = format!("L{index}");
         let matcher = if bound.directory {
             "subpath"
         } else {
             "literal"
         };
-        let filter = format!("({matcher} (param \"{name}\"))");
+        let location = format!("({matcher} (param \"{name}\"))");
+        let filter = format!("(require-all {location}{unreadable})");
         let _ = writeln!(profile, "(allow file-read* file-test-existence {filter})");
         let _ = writeln!(
             profile,
             "(allow file-read-metadata file-test-existence (path-ancestors (param \"{name}\")))"
         );
         if *access == Access::Write {
-            let _ = writeln!(profile, "(allow file-write* {filter})");
+            let _ = writeln!(
+                profile,
+                "(allow file-write* (require-all {location}{unwritable}))"
+            );
         }
         // Any approved content can be interpreted. Exec/map is limited to
         // the same visible roots, including the explicitly selected binary.
@@ -150,11 +207,12 @@ fn command(prepared: &Prepared, status: i32) -> Command {
         "--die-with-parent",
         "--as-pid-1",
         "--clearenv",
-        "--proc",
-        "/proc",
-        "--dev",
-        "/dev",
     ]);
+    if prepared.disk_read {
+        // Everything readable first; later mounts narrow or widen it.
+        command.args(["--ro-bind", "/", "/"]);
+    }
+    command.args(["--proc", "/proc", "--dev", "/dev"]);
     let mut mounts = BTreeMap::new();
     for location in &prepared.locations {
         for destination in [location.bound.path(), location.destination.as_path()] {
@@ -172,6 +230,29 @@ fn command(prepared: &Prepared, status: i32) -> Command {
             .arg(if write { "--bind" } else { "--ro-bind" })
             .arg(source)
             .arg(destination);
+    }
+    // Carve protected paths out of the mounts above. A missing path has no
+    // mount point; under a writable grant it could then be created, so the
+    // host keeps those it relies on present.
+    for (path, access) in &prepared.protected {
+        let Ok(metadata) = std::fs::symlink_metadata(path) else {
+            continue;
+        };
+        match (access, metadata.is_dir()) {
+            (crate::DeniedAccess::ReadWrite, true) => {
+                command
+                    .arg("--tmpfs")
+                    .arg(path)
+                    .arg("--remount-ro")
+                    .arg(path);
+            }
+            (crate::DeniedAccess::ReadWrite, false) => {
+                command.arg("--ro-bind").arg("/dev/null").arg(path);
+            }
+            (crate::DeniedAccess::Write, _) => {
+                command.arg("--ro-bind").arg(path).arg(path);
+            }
+        }
     }
     command
         .arg("--ro-bind")

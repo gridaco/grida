@@ -51,9 +51,15 @@ pub struct ExecutionScope {
     pub read: Vec<PathBuf>,
     pub write: Vec<PathBuf>,
     pub runtime: Vec<PathBuf>,
+    /// Protected paths stay unreadable (`ReadWrite`) or unwritable (`Write`).
+    /// One inside a granted location is carved out of that location; one that
+    /// contains a granted location makes the scope unusable.
     pub protected: Vec<ProtectedPath>,
     pub temporary_parent: PathBuf,
     pub termination: Termination,
+    /// Read and execute anywhere the user can, except `ReadWrite`-protected
+    /// paths. Writes still come only from `write` and private temporary storage.
+    pub disk_read: bool,
 }
 
 pub struct ProcessSpec {

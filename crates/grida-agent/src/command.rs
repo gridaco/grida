@@ -90,6 +90,8 @@ pub(crate) struct AuthorizedCommand {
     pub scope: ExecutionScope,
     pub expected: Fingerprint,
     pub spawn: Arc<SpawnCommand>,
+    /// The environment the approved process was captured with.
+    pub environment: Arc<BTreeMap<String, String>>,
 }
 
 pub(crate) struct ReviewedCommand {
@@ -152,7 +154,7 @@ impl CommandTool {
             "required": ["program", "args", "cwd"],
             "additionalProperties": false
         });
-        let mut description = "Run one finite program in the granted workspace or scratch scope. Supply an absolute program path, argument array, and absolute working directory. The program receives explicit environment values, sandbox-owned temporary directory variables, and a bounded UTF-8 stdin string. Network access is denied. Output is bounded UTF-8 text with replacement characters for invalid bytes. Use an explicit interpreter when shell syntax is required.".to_owned();
+        let mut description = "Run one finite program in the granted workspace or scratch scope. Supply a program (a name found on PATH, or an absolute path), an argument array, and an absolute working directory. The program starts from the host's environment where the host allows it, overlaid with explicit environment values and sandbox-owned temporary directory variables, and receives a bounded UTF-8 stdin string. Network access is denied. Output is bounded UTF-8 text with replacement characters for invalid bytes. Use an explicit interpreter when shell syntax is required.".to_owned();
         if scoped {
             schema["properties"]["directory"] = json!({"type":"string"});
             schema["properties"]["access"] = json!({"enum":["read","read_write"]});
@@ -306,17 +308,22 @@ impl Tool for CommandTool {
             if maximum == 0 {
                 return ToolOutcome::failed("command_output_limit_unavailable");
             }
-            let (scope, admission) = match &self.scope {
-                CommandScope::Fixed(scope) => ((**scope).clone(), ProcessAdmission::Fixed),
+            let (scope, admission, environment) = match &self.scope {
+                CommandScope::Fixed(scope) => (
+                    (**scope).clone(),
+                    ProcessAdmission::Fixed,
+                    Arc::new(BTreeMap::new()),
+                ),
                 CommandScope::Authorized(resolve) => match resolve(&invocation) {
                     Ok(authority) => (
                         authority.scope,
                         ProcessAdmission::Captured(authority.expected, authority.spawn),
+                        authority.environment,
                     ),
                     Err(error) => return ToolOutcome::failed(&error.code),
                 },
             };
-            let spec = arguments.into_spec(self.timeout, maximum);
+            let spec = arguments.into_spec(self.timeout, maximum, &environment);
             self.run_process(
                 &invocation,
                 context,
@@ -385,7 +392,11 @@ impl CommandArguments {
                 "command_access_invalid",
             ));
         }
-        if !valid_path(&command.program) || !valid_path(&command.cwd) {
+        let named = command.program.components().count() == 1
+            && command.program.to_str().is_some_and(|name| {
+                !name.is_empty() && !name.contains(['/', '\0']) && name != ".." && name != "."
+            });
+        if !(named || valid_path(&command.program)) || !valid_path(&command.cwd) {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 "command_absolute_path_required",
@@ -404,17 +415,48 @@ impl CommandArguments {
         Ok(command)
     }
 
-    pub(crate) fn into_spec(self, timeout: Duration, max_output_bytes: usize) -> ProcessSpec {
+    /// The process to run: the inherited environment overlaid with the
+    /// tool's values, and a bare program name resolved on that search path.
+    pub(crate) fn into_spec(
+        self,
+        timeout: Duration,
+        max_output_bytes: usize,
+        inherited: &BTreeMap<String, String>,
+    ) -> ProcessSpec {
+        let mut environment = inherited.clone();
+        environment.extend(self.env);
+        let executable = resolve_program(&self.program, &environment);
         ProcessSpec {
-            executable: self.program,
+            executable,
             arguments: self.args,
             cwd: self.cwd,
-            environment: self.env,
+            environment,
             stdin: self.stdin.into_bytes(),
             timeout,
             max_output_bytes,
         }
     }
+}
+
+/// A bare name (no separator) is looked up on the environment's `PATH`, like
+/// a shell would. Anything else is used as given.
+fn resolve_program(program: &Path, environment: &BTreeMap<String, String>) -> PathBuf {
+    if program.is_absolute() || program.components().count() != 1 {
+        return program.to_owned();
+    }
+    environment
+        .get("PATH")
+        .into_iter()
+        .flat_map(|search| std::env::split_paths(search).collect::<Vec<_>>())
+        .filter(|directory| directory.is_absolute())
+        .map(|directory| directory.join(program))
+        .find(|candidate| {
+            use std::os::unix::fs::PermissionsExt;
+            candidate.metadata().is_ok_and(|metadata| {
+                metadata.is_file() && metadata.permissions().mode() & 0o111 != 0
+            })
+        })
+        .unwrap_or_else(|| program.to_owned())
 }
 
 fn valid_path(path: &Path) -> bool {
@@ -778,8 +820,21 @@ mod tests {
         assert!(
             CommandArguments::parse(&input(json!({"stdin":"\u{0000}café"})), 4096, false).is_ok()
         );
+        // A bare name is resolved on PATH; a relative path is still refused.
+        assert!(CommandArguments::parse(&input(json!({"program":"sh"})), 4096, false).is_ok());
+        let path = BTreeMap::from([("PATH".to_owned(), "relative:/bin".to_owned())]);
+        assert_eq!(
+            resolve_program(Path::new("sh"), &path),
+            PathBuf::from("/bin/sh")
+        );
+        assert_eq!(
+            resolve_program(Path::new("no-such-program"), &path),
+            PathBuf::from("no-such-program")
+        );
         for invalid in [
-            json!({"program":"sh"}),
+            json!({"program":"bin/sh"}),
+            json!({"program":"./sh"}),
+            json!({"program":".."}),
             json!({"cwd":"/tmp/../tmp"}),
             json!({"env":{"invalid=name":"value"}}),
             json!({"args":["\u{0000}"]}),

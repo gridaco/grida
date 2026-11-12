@@ -230,6 +230,9 @@ pub(super) struct Prepared {
     support: Support,
     grants: GrantSelection,
     revision: BindingId,
+    /// Canonical protected paths carved out of the granted locations.
+    protected: Vec<(PathBuf, DeniedAccess)>,
+    disk_read: bool,
 }
 
 impl Installation {
@@ -346,9 +349,10 @@ impl Installation {
             let cwd = Bound::new(&spec.cwd)?;
             if executable.directory
                 || !cwd.directory
-                || !locations
-                    .iter()
-                    .any(|location| location.bound.includes(executable.path()))
+                || (!scope.disk_read
+                    && !locations
+                        .iter()
+                        .any(|location| location.bound.includes(executable.path())))
                 || !locations
                     .iter()
                     .any(|location| location.bound.includes(cwd.path()))
@@ -374,7 +378,7 @@ impl Installation {
         } else {
             (Task::Probe, vec![], Duration::from_secs(5), 4096)
         };
-        self.check_locations(&locations, scope)?;
+        let protected = self.check_locations(&locations, scope)?;
         let mut roots = Vec::new();
         for location in &locations {
             roots.push(location.bound.identity.clone());
@@ -410,10 +414,16 @@ impl Installation {
             valid_until: scope.valid_until,
             grants: scope.grants.clone(),
             revision: scope.revision.clone(),
+            protected,
+            disk_read: scope.disk_read,
         })
     }
 
-    fn check_locations(&self, locations: &[Location], scope: &ExecutionScope) -> Result<()> {
+    fn check_locations(
+        &self,
+        locations: &[Location],
+        scope: &ExecutionScope,
+    ) -> Result<Vec<(PathBuf, DeniedAccess)>> {
         let mut launchers = vec![self.helper.bound.path()];
         #[cfg(target_os = "macos")]
         launchers.push(Path::new("/usr/bin/sandbox-exec"));
@@ -430,12 +440,16 @@ impl Installation {
                 "sandbox_launcher_is_writable",
             ));
         }
+        let mut carved = Vec::new();
         for protected in &scope.protected {
             let path = protected_path(&protected.path)?;
+            // A protected path inside a granted location is carved out of it.
+            // A granted location at or inside a protected path cannot be.
             let denied = locations.iter().any(|location| {
                 (protected.access == DeniedAccess::ReadWrite || location.access == Access::Write)
-                    && (overlaps(&location.bound, &path)
-                        || overlaps(&location.bound, &protected.path))
+                    && [path.as_path(), protected.path.as_path()]
+                        .into_iter()
+                        .any(|protected| location.bound.path().starts_with(protected))
             });
             if denied
                 || (protected.access == DeniedAccess::ReadWrite
@@ -443,8 +457,9 @@ impl Installation {
             {
                 return Err(refused(ErrorKind::Unsupported, "sandbox_protected_overlap"));
             }
+            carved.push((path, protected.access));
         }
-        Ok(())
+        Ok(carved)
     }
 }
 

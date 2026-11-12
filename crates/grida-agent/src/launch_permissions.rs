@@ -13,6 +13,7 @@ use agent_kit_sandbox::{
 };
 use grida_agent_master::{approval_review::ReadProfile, hooks::CheckMode};
 use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -68,6 +69,12 @@ struct Command {
     temporary_parent: PathBuf,
     #[serde(default)]
     hooks_only: bool,
+    /// Programs read and execute anywhere except protected paths.
+    #[serde(default)]
+    disk_read: bool,
+    /// Programs start from the host's environment, minus Grida's own variables.
+    #[serde(default)]
+    inherit_environment: bool,
 }
 
 #[derive(Deserialize)]
@@ -177,6 +184,17 @@ pub fn load_permission_profile(
     state_directory: &Path,
     credential_home: Option<&Path>,
 ) -> Result<Arc<PermissionProfile>> {
+    load_permission_profile_excluding(profile_file, state_directory, credential_home, None)
+}
+
+/// As [`load_permission_profile`], also keeping the named provider credential
+/// variable out of any environment programs inherit.
+pub fn load_permission_profile_excluding(
+    profile_file: &Path,
+    state_directory: &Path,
+    credential_home: Option<&Path>,
+    credential_env: Option<&str>,
+) -> Result<Arc<PermissionProfile>> {
     let bytes = read_profile(profile_file)?;
     let profile: ProfileFile = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
     if profile.version != 1 || profile.directories.is_empty() || profile.directories.len() > 32 {
@@ -266,6 +284,12 @@ pub fn load_permission_profile(
                 Termination::ProcessGroup
             },
             limits: COMMAND_LIMITS,
+            disk_read: command.disk_read,
+            environment: Arc::new(if command.inherit_environment {
+                inherited_environment(credential_env)
+            } else {
+                BTreeMap::new()
+            }),
         })
     } else {
         None
@@ -545,6 +569,14 @@ mod tests {
     }
 
     #[test]
+    fn inherited_environment_omits_the_launch_credential_variable() {
+        let inherited = inherited_environment(Some("PATH"));
+        assert!(!inherited.contains_key("PATH"));
+        assert!(inherited.keys().all(|name| !name.starts_with("GRIDA_")));
+        assert!(inherited_environment(None).contains_key("PATH"));
+    }
+
+    #[test]
     fn profile_refuses_state_custody_and_its_own_parent_as_workspace() {
         let fixture = Fixture::new();
         for directory in [
@@ -581,4 +613,12 @@ mod tests {
             "permission_profile_invalid"
         );
     }
+}
+
+/// The host's environment for programs, without Grida's internal variables
+/// or the provider credential this host was launched with.
+fn inherited_environment(credential_env: Option<&str>) -> BTreeMap<String, String> {
+    std::env::vars()
+        .filter(|(name, _)| !name.starts_with("GRIDA_") && Some(name.as_str()) != credential_env)
+        .collect()
 }
