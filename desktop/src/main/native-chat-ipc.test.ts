@@ -2351,6 +2351,72 @@ describe("native chat IPC", () => {
     expect(select).toHaveBeenCalledTimes(1);
   });
 
+  it("continues with a saved provider key when the default Gateway cannot start", async () => {
+    const { first, chat } = setup();
+    const id = "b".repeat(64);
+    let selected: NativeChatProfileSelection | undefined;
+    const account = new DesktopAccountSession({
+      base_url: ORIGIN,
+      fetch: async () =>
+        Response.json({ error: { code: "not_configured" } }, { status: 503 }),
+    });
+    const ensure = vi.fn<() => Promise<void>>(async () =>
+      account.withGatewayGrant(undefined, () => {})
+    );
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      (_sender, workspaceId, profile) =>
+        selected && profile === id ? { workspaceId, chat } : null,
+      { admits: () => true, ensure },
+      undefined,
+      undefined,
+      undefined,
+      {
+        list: async () => ({ choices: [], saved: [] }),
+        select: async (_workspace, selection, requireCurrent) => {
+          requireCurrent();
+          selected = selection;
+        },
+        fallback: async () => id,
+      }
+    );
+    await expect(ipc.status(first.event, true)).resolves.toBe("native-ready");
+    expect(selected).toEqual({ kind: "new", id });
+    await expect(ipc.profiles(first.event)).resolves.toMatchObject({
+      active: id,
+    });
+  });
+
+  it("reports an unavailable default only when no saved provider key can start", async () => {
+    const { first } = setup();
+    const account = new DesktopAccountSession({
+      base_url: ORIGIN,
+      fetch: async () =>
+        Response.json({ error: { code: "not_configured" } }, { status: 503 }),
+    });
+    const select = vi.fn<() => Promise<void>>(async () => {});
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      () => null,
+      {
+        admits: () => true,
+        ensure: async () => account.withGatewayGrant(undefined, () => {}),
+      },
+      undefined,
+      undefined,
+      undefined,
+      {
+        list: async () => ({ choices: [], saved: [] }),
+        select,
+        fallback: async () => null,
+      }
+    );
+    await expect(ipc.status(first.event, true)).resolves.toBe(
+      "native-gateway-unavailable"
+    );
+    expect(select).not.toHaveBeenCalled();
+  });
+
   it("rejects a startup reply after navigation even if the frame returns to the same URL", async () => {
     const { first, scopes, chat } = setup();
     scopes.delete(first.sender);

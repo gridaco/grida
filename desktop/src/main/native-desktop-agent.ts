@@ -400,6 +400,23 @@ export class NativeDesktopAgent {
     return activity.forgetting;
   }
 
+  /**
+   * The connection to use when the default Gateway cannot start: a saved
+   * built-in provider key with the product's default model, else that key's
+   * first listed model. Configured endpoints are never chosen implicitly.
+   */
+  async fallbackProfile(): Promise<string | null> {
+    this.requireProfiles();
+    const builtIn = await NativeChatProfiles.builtInChoices(
+      agentSidecarClient.nativeBuiltInByok
+    );
+    return (
+      builtIn.find((choice) => choice.modelId === DEFAULT_GATEWAY_MODEL)?.id ??
+      builtIn[0]?.id ??
+      null
+    );
+  }
+
   async profiles(workspaceId: string) {
     this.requireProfiles();
     return await this.withWorkspace(

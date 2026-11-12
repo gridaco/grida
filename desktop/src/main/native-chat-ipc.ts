@@ -250,6 +250,8 @@ export type NativeChatProfileOwner = Readonly<{
     selection: NativeChatProfileSelection,
     requireCurrent: () => void
   ): Promise<void>;
+  /** A usable connection when the default cannot start, if one exists. */
+  fallback?(workspaceId: string): Promise<string | null>;
 }>;
 
 type SelectedProfile = Readonly<{
@@ -703,6 +705,21 @@ export class NativeChatIpc {
             else await startup.ensure(workspaceId);
           } catch (error) {
             requireCurrent();
+            // Without the default Gateway, continue with a saved provider key
+            // before asking. Only no usable connection is a failure.
+            if (
+              error instanceof DesktopGatewayGrantUnavailable &&
+              !profile &&
+              this.profilesOwner?.fallback &&
+              (await this.startFallback(
+                this.profilesOwner,
+                { sender, frame, href, workspaceId },
+                requireCurrent
+              ))
+            )
+              return this.scope(sender, frame)
+                ? "native-ready"
+                : "native-unavailable";
             // Forward only known recovery states. Startup errors can contain
             // private provider or host details.
             if (error instanceof DesktopGatewayGrantUnavailable)
@@ -729,6 +746,63 @@ export class NativeChatIpc {
     };
     this.startups.set(sender, pending);
     return pending.result;
+  }
+
+  private async startFallback(
+    owner: NativeChatProfileOwner,
+    target: Readonly<{
+      sender: WebContents;
+      frame: WebFrameMain;
+      href: string;
+      workspaceId: string;
+    }>,
+    requireCurrent: () => void
+  ): Promise<boolean> {
+    try {
+      const id = await owner.fallback?.(target.workspaceId);
+      requireCurrent();
+      if (!id) return false;
+      await owner.select(
+        target.workspaceId,
+        { kind: "new", id },
+        requireCurrent
+      );
+      requireCurrent();
+      this.adoptProfile(
+        target.sender,
+        target.frame,
+        target.href,
+        target.workspaceId,
+        id
+      );
+      return true;
+    } catch {
+      requireCurrent();
+      return false;
+    }
+  }
+
+  private adoptProfile(
+    sender: WebContents,
+    frame: WebFrameMain,
+    href: string,
+    workspaceId: string,
+    id: string
+  ): void {
+    this.selectedProfiles.get(sender)?.release();
+    const selected: SelectedProfile = {
+      id,
+      frame,
+      href,
+      workspaceId,
+      release: () => {
+        if (this.selectedProfiles.get(sender) !== selected) return;
+        this.selectedProfiles.delete(sender);
+        stopSelected();
+      },
+    };
+    const stopSelected = ipc_sender.watchNavigation(sender, selected.release);
+    this.selectedProfiles.set(sender, selected);
   }
 
   async list(
@@ -827,19 +901,7 @@ export class NativeChatIpc {
       this.startups.get(sender)?.release();
       previous?.release();
       if (!id) return;
-      const selected: SelectedProfile = {
-        id,
-        frame,
-        href,
-        workspaceId,
-        release: () => {
-          if (this.selectedProfiles.get(sender) !== selected) return;
-          this.selectedProfiles.delete(sender);
-          stopSelected();
-        },
-      };
-      const stopSelected = ipc_sender.watchNavigation(sender, selected.release);
-      this.selectedProfiles.set(sender, selected);
+      this.adoptProfile(sender, frame, href, workspaceId, id);
     } finally {
       stopWatching();
       this.selectingProfile.delete(sender);

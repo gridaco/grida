@@ -27,8 +27,11 @@ its history stay in place, and your next message uses the new model with the
 earlier turns as context. A turn that is already running finishes with the
 model that started it; wait for it or choose **Stop** before changing models.
 
-If the default Gateway connection cannot start, the chat still opens and its
-composer shows **Choose model**. Listing models does not open a chat or run a
+If the default Gateway connection cannot start, Desktop continues with a saved
+OpenRouter or Vercel AI Gateway key, using Grida's default model when that key
+offers it. A model you chose earlier for the workspace still takes priority. Only
+when no connection can run does the composer show **Choose model** with a
+prompt to add a provider. Listing models does not open a chat or run a
 model. Grida lists its current tool-capable Gateway text models when discovery
 is available. Add an OpenRouter or Vercel AI Gateway key, or save and approve a
 compatible endpoint in Desktop settings, to see those models too. Use
