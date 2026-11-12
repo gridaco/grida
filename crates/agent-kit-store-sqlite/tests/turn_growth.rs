@@ -273,3 +273,39 @@ async fn a_turn_written_as_one_value_reads_back_and_converts_on_its_next_commit(
     let head: serde_json::Value = serde_json::from_slice(&head).unwrap();
     assert!(head.get("operations").is_none(), "{head}");
 }
+
+#[tokio::test]
+async fn a_store_written_before_this_layout_upgrades_and_reads_its_turns() {
+    let directory = private_directory();
+    let path = directory.path().join("sessions.sqlite");
+    let store = create(&path).await;
+    let (claim, states) = run_turn(&store, 2).await;
+    let original = states.last().unwrap().clone();
+    drop(claim);
+    drop(store);
+    // The previous schema: whole turns in their rows, no layout tables.
+    let connection = Connection::open(&path).unwrap();
+    connection
+        .execute(
+            "UPDATE turns SET snapshot=?1",
+            [serde_json::to_vec(&original).unwrap()],
+        )
+        .unwrap();
+    connection
+        .execute_batch(
+            "DROP TABLE turn_parts; DROP TABLE turn_messages;
+             ALTER TABLE turns DROP COLUMN bytes; ALTER TABLE turns DROP COLUMN generation;
+             PRAGMA user_version=12;",
+        )
+        .unwrap();
+    drop(connection);
+
+    let store = SqliteStore::open(&path).unwrap();
+    assert_eq!(same(&read(&store).await), same(&original));
+    drop(store);
+    let connection = Connection::open(&path).unwrap();
+    let version: i64 = connection
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .unwrap();
+    assert_eq!(version, 13);
+}

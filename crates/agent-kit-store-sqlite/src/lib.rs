@@ -446,9 +446,11 @@ impl SqliteStore {
                         .execute_batch(turn_links::SCHEMA)
                         .map_err(database_error)?;
                 }
-                transaction
-                    .execute_batch(TURN_TIMES)
-                    .map_err(database_error)?;
+                if version <= 11 {
+                    transaction
+                        .execute_batch(TURN_TIMES)
+                        .map_err(database_error)?;
+                }
                 // Earlier turns stay as written and convert on their next commit.
                 turn_layout::install(&transaction)?;
                 transaction
