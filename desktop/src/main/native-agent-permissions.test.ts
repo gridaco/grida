@@ -283,7 +283,9 @@ it.runIf(Boolean(packaged) && supported)(
       expect(provider.received[0]).not.toContain(
         "approved native fixture text"
       );
-      expect(provider.received[0]).not.toContain("run_command");
+      // Desktop runs agents under the Default preset, which includes
+      // sandboxed commands in the project.
+      expect(provider.received[0]).toContain("run_command");
       await expect(
         agent.request(NativeAgentPermissions.answerMethod, {})
       ).rejects.toThrow("native_agent_approval_requires_review");

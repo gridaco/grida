@@ -687,7 +687,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         }),
         expect.objectContaining({ id: newId, connection: "local" }),
       ]);
-      expect((await newChat.list()).sessionIds).toEqual([]);
+      // Chats belong to the workspace: the new connection lists the chat the
+      // earlier one started.
+      expect((await newChat.list()).sessionIds).toEqual([savedId]);
       const session = await newChat.create();
       await newChat.submit(
         session,
@@ -932,10 +934,11 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       await agent.selectProfile(workspace.id, { kind: "saved", id }, () => {});
       expect(agent.current(workspace.id, id)?.chat).toBe(selected);
       expect(mints).toBe(2);
-      expect(agent.current(workspace.id)?.chat).toBe(original);
-      await expect(selected.load(originalSession.id)).rejects.toThrow(
-        "session_missing"
-      );
+      // Choosing a connection retires the workspace's previous worker, and the
+      // chat the default model started stays in the shared list.
+      expect(agent.current(workspace.id)).toBeNull();
+      expect((await selected.list()).sessionIds).toEqual([originalSession.id]);
+      await selected.load(originalSession.id);
       const session = await selected.create();
       await selected.submit(session, "alternate-input", "Use this model.");
       await vi.waitFor(async () => {
@@ -987,8 +990,11 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       vi.resetModules();
       agent = await launch();
       await agent.ensure(workspace.id);
+      // A saved connection keeps its identity; its context window comes from
+      // a current choice, which an unavailable connection no longer has.
+      const { contextWindow: _window, ...identity } = choices[0]!;
       expect((await agent.profiles(workspace.id)).saved).toEqual([
-        { ...choices[0], available: false },
+        { ...identity, available: false },
       ]);
       await expect(
         agent.selectProfile(workspace.id, { kind: "saved", id }, () => {})
@@ -1733,8 +1739,21 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           () => {}
         );
         const chat = desktop.current(workspace.id, id)!.chat;
-        expect((await chat.list()).sessionIds).toEqual([]);
-        await expect(chat.load(pending.id)).rejects.toThrow("session_missing");
+        // Chats belong to the workspace: choosing a connection retires the
+        // previous worker and lists every chat. A chat started under the Grida
+        // account opens here, but a local key cannot continue it.
+        expect(desktop.current(workspace.id)).toBeNull();
+        expect((await chat.list()).sessionIds).toEqual([
+          ...[...sessions.values()].map(({ sessionId }) => sessionId).reverse(),
+          pending.id,
+        ]);
+        const gateway = await chat.load(pending.id);
+        expect((await chat.observe(gateway)).current?.disposition).toBe(
+          "suspended"
+        );
+        await expect(
+          chat.submit(gateway, `continue-${sessions.size}`, "Continue here.")
+        ).rejects.toThrow("session_execution_configuration_changed");
         const session = await chat.create();
         await chat.submit(session, "byok-input", "Use the selected model.");
         await vi.waitFor(
@@ -1749,9 +1768,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(
         new Set([...sessions.values()].map(({ profileId }) => profileId)).size
       ).toBe(2);
-      expect(desktop.current(workspace.id)?.chat).toBe(original);
-      expect((await original.observe(pending)).current?.disposition).toBe(
-        "suspended"
+      // The retired default worker is closed; its waiting turn is kept.
+      await expect(original.observe(pending)).rejects.toThrow(
+        "native_chat_closed"
       );
       expect(requested.slice(1)).toEqual(
         providers.map(([, , endpoint]) => ({
@@ -1776,7 +1795,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         openrouter.profileId
       )!.chat;
       expect((await restored.list()).sessionIds).toEqual([
+        vercel.sessionId,
         openrouter.sessionId,
+        pending.id,
       ]);
       const saved = await restored.load(openrouter.sessionId);
       expect(
@@ -1844,7 +1865,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       )!.chat;
       expect(reopenedProfile).not.toBe(restored);
       expect((await reopenedProfile.list()).sessionIds).toEqual([
+        vercel.sessionId,
         openrouter.sessionId,
+        pending.id,
       ]);
       expect(requested).toHaveLength(3);
     } finally {

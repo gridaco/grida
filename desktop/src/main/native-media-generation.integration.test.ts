@@ -332,35 +332,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       const refusal = messages.findLast((message) => message.role === "tool");
       expect(JSON.parse(refusal!.content)).toMatchObject({ status: "failed" });
 
-      await resumed.close();
-      owner = undefined;
-      const textOnly = await start(
-        "openai/gpt-5.5",
-        path.join(root, "text-state")
-      );
-      owner = textOnly;
-      expect(textOnly.acceptsLibrarySelection).toBe(false);
-      const plainSession = await textOnly.create();
-      const plain = await textOnly.submit(
-        plainSession,
-        "text-only",
-        prompt,
-        "act"
-      );
-      await vi.waitFor(async () => {
-        expect((await textOnly.observe(plainSession)).latest).toMatchObject({
-          turnId: plain.turnId,
-          status: "succeeded",
-        });
-      }, poll);
-      expect(media).toHaveBeenCalledTimes(5);
-      expect(chatRequests).toHaveLength(12);
-      expect(JSON.stringify(chatRequests[10].tools)).toContain(
-        "generate_image"
-      );
-      expect(JSON.stringify(chatRequests[10].tools)).not.toContain(
-        "library_reference_id"
-      );
+      // Every listed OpenRouter model with tools reads images, so a
+      // connection without Library selection is covered by the agent's own
+      // process tests rather than through this catalogue.
     } finally {
       try {
         await owner?.close();

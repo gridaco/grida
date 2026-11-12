@@ -920,6 +920,45 @@ fn encode_png(width: u32, height: u32, pixels: &[u8]) -> Vec<u8> {
     bytes
 }
 
+/// Library selections return images to the model, so a connection that cannot
+/// read images in tool results does not offer them.
+#[tokio::test]
+async fn a_connection_without_image_input_offers_no_library_selection() {
+    const LIST: &str = "co.grida/session/library-selections";
+    const ANSWER: &str = "co.grida/session/answer-library-selection";
+    let directory = TempDir::new().unwrap();
+    let child = executable()
+        .args(["serve", "--provider", "openai-compatible", "--state-dir"])
+        .arg(directory.path().join("state"))
+        .args([
+            "--endpoint",
+            "http://127.0.0.1:9/v1",
+            "--model",
+            "text-fixture",
+        ])
+        .args([
+            "--credential-env",
+            "GRIDA_AGENT_PROCESS_TEST_KEY",
+            "--stdio",
+        ])
+        .env("GRIDA_AGENT_PROCESS_TEST_KEY", TEST_CREDENTIAL)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut client = StdioClient::from_child(child);
+    let mut initialize = extension_initialize();
+    initialize["clientCapabilities"]["_meta"][LIST] = 1.into();
+    initialize["clientCapabilities"]["_meta"][ANSWER] = 1.into();
+    let ready = client.request("initialize", initialize).await;
+    let advertised = &ready["result"]["agentCapabilities"]["_meta"];
+    assert!(advertised.is_object(), "{ready}");
+    assert!(advertised[LIST].is_null(), "{ready}");
+    assert!(advertised[ANSWER].is_null(), "{ready}");
+    client.close().await;
+}
+
 fn server(state: &Path, endpoint: &str, model: &str) -> Command {
     let mut process = executable();
     process
