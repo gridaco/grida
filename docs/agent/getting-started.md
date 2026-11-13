@@ -1,54 +1,102 @@
 ---
 title: Start an agent task with files and folders
-description: Open a project, attach a PNG, or work with a selected file in private scratch.
-keywords: [agent workspace, PNG attachment, project files, Grida Desktop]
+description: Open a project, mention or attach files, and work with a deck, an SVG or a single file.
+keywords:
+  [
+    agent workspace,
+    PNG attachment,
+    file attachment,
+    project files,
+    Grida Desktop,
+  ]
 format: md
 ---
 
 # Start an agent task with files and folders
 
+Available in Grida Desktop on macOS and Linux, and from a source-built
+headless host. Windows Desktop has no agent chat.
+
 ## Work in a project
 
-Open a folder in Grida Desktop and open its chat pane. Type `@` to find a
-workspace file, or select relevant material in an attached editor. Select `/plan`
-to investigate; remove the **Plan** badge to carry out changes with
-the tools and access available to the chat. [Understand agent permissions](./permissions.md)
+Open a folder in Grida Desktop and open its chat pane. The **Default** access
+shown in the composer lets the agent read and edit files in this project and
+run commands in a sandbox without asking; other folders and the internet are
+off. Type `@` to mention a file, for example “Summarize @README.md and list
+the open TODOs.” A mention gives the agent the file's path; it reads the
+file's current contents when it needs them. To investigate without changing
+anything, type `/plan` or choose **+ → Plan mode** before you send.
+[Understand agent permissions](./permissions.md)
 
-On a Desktop build with native deck chat, open a `.canvas` bundle in its file
-window to start or reopen its chat. Ask about files inside the bundle by name
-while you work in the slide editor. A bundle opened from inside a project has
-its own saved chats and access to files within that bundle.
-[Edit text on the active slide](./clients.md#edit-selected-svg-text)
+On macOS and Linux, open a `.canvas` deck in its own window to start or reopen
+its chat. Ask about files inside the deck by name while you work in the slide
+editor. A deck opened from inside a project has its own saved chats and can
+reach only the files within the deck.
+[Edit selected text](#edit-selected-text-in-an-svg-or-slide)
 
 ## Attach an image
 
-If the connection offers **Add PNG**, select one PNG up to 256 KiB and
-describe what you want to do with it. The message and image enter the chat
-together. If the connection loses image support before you send, the draft
-stays available while you remove or replace the PNG.
-[Attach a PNG to a message](./clients.md#attach-a-png-to-a-message)
+Choose **+ → Image**, or drop or paste one PNG up to 256 KiB into the
+composer, then describe what you want, for example “Crop this to the
+subject.” **+ → Library** adds a Library image as a PNG. **Image** and
+**Library** appear only when the selected model accepts images, such as the
+default Grida model or an OpenRouter model that takes images.
 
-On a profile with image editing, a crop uses a private working copy.
-Its result appears below the turn's answer, where you can preview and save it.
+The message and the image enter the chat together, also when the message
+joins the queue. After you send, the message shows the attachment as a chip
+with its name; the chip does not show a preview of the image. A crop appears
+below the turn's answer, where you can preview and save it.
 [Inspect and save results](./results.md)
 
-If the chat offers **Attach file**, select a file up to 256 KiB and ask
-the agent to inspect it. For work on project files, open the folder and
-name the file in your request. Access follows the chat’s workspace grants.
-[Attach a file for inspection](./clients.md#attach-a-file-for-inspection)
+## Attach a file
+
+Choose **+ → Files**, or drop or paste one file up to 256 KiB into the
+composer, and ask the agent to inspect it. The agent can check the file's
+size and digest and read a short text excerpt; the chat keeps a private copy.
+Dropping a folder or several files shows a message and keeps your draft. To
+work on a project file instead, mention it with `@`.
+
+## Edit selected text in an SVG or slide
+
+Open an SVG or a slide in Desktop and select one plain text element. Without
+the **Plan** badge, send a message asking the agent to read or replace it, for
+example “Make this heading shorter.” The change appears in the editor and can
+be undone there; use the editor's **Save** command to write it to disk. If
+another program has changed the file, the save dialog handles the conflict.
+
+Switching tabs or slides, changing the selection, or editing the document
+before the agent acts makes the selected text unavailable; select it again
+and send a new message. Queued messages and messages with the **Plan** badge
+cannot edit the selection.
+
+## Current limits
+
+- A message with an attachment cannot be edited later; send a new message
+  instead. To change the attachment on a queued message, remove the queued
+  message and send it again.
+- Attachments are unavailable while the **Goal** badge is on. Send or remove
+  an attachment before choosing another model.
+- The agent cannot render an SVG or HTML file it wrote into an image to check
+  how it looks. Open the file in Grida to review it yourself.
 
 ## Work without a project
 
-On a Desktop build with native document chat, open an SVG directly to start a
-chat for that file. Reopen the SVG and choose its saved chat from the sidebar.
-Select plain text in the SVG to [ask the agent to edit it](./clients.md#edit-selected-svg-text).
-The chat has no access to the surrounding folder.
+On macOS, open an SVG file directly to start a chat for that file. Reopen the
+SVG and choose its saved chat from the sidebar. The chat cannot reach the
+surrounding folder.
 
-On macOS and Linux, a headless `grida-agent run` can take one explicitly
-selected PNG with `--input-png` and keep its work in private scratch.
-Omit the workspace and permission profile to work without a project grant.
-[Run locally with a PNG](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-locally)
+On macOS and Linux, a source-built `grida-agent run` can work on one PNG
+without a project. Omit `--cwd` and `--permission-profile`:
 
-Use `--input-file` to inspect a selected file in the same private setting.
-The agent can verify the file’s size and digest and read a short text excerpt.
+```sh
+target/debug/grida-agent run \
+  --state-dir /absolute/path/to/agent-state \
+  --endpoint https://api.openai.com/v1 --provider responses \
+  --model MODEL_ID --credential-env OPENAI_API_KEY \
+  --input-png ./photo.png \
+  --prompt 'Crop the image to the subject.'
+```
+
+Use `--input-file` instead of `--input-png` to inspect any file up to
+256 KiB. [Run a task from a script](./clients.md#run-a-task-from-a-script) ·
 [Inspect a local file headlessly](./clients.md#inspect-a-local-file-headlessly)

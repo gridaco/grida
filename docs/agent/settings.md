@@ -1,20 +1,23 @@
 ---
 title: Change agent settings
-description: Set the workspace context limit in its configuration file and see when changes take effect.
+description: Set a workspace's context input limit in its configuration file.
 keywords: [agent settings, context limit, configuration, Grida Desktop]
 format: md
 ---
 
 # Change agent settings
 
-The context input limit controls how much material the agent can send to the
-model as input. It is the one supported agent setting. By default the agent
-budgets input automatically.
+The context input limit caps how much material the agent sends to the model
+in one request. It is the one supported agent setting. Without it, the agent
+budgets input automatically, and the ring beside the model picker shows how
+full the context is.
+[See how full the context is](./models-and-usage.md#see-how-full-the-context-is)
 
-## Change the limit for a Desktop workspace
+Grida Desktop has no control for this setting, and a Desktop chat cannot ask
+the agent to change it. On macOS and Linux, edit the workspace's
+configuration file instead.
 
-Desktop has no control for this setting, and a Desktop chat cannot ask the
-agent to change it. Edit the workspace's configuration file instead:
+## Set the limit for a Desktop workspace
 
 1. Quit Desktop.
 2. In Desktop's application data folder, open `native-chat/workspaces/`. Each
@@ -31,19 +34,17 @@ agent to change it. Edit the workspace's configuration file instead:
    ```
 
 4. Start Desktop and open the workspace. The new limit applies to messages
-   sent from then on.
+   you send from then on; work that is already running, paused or queued
+   keeps the value it started with.
 
-The connection must be able to count its requests exactly for a hard limit. If
-it cannot, or a request is larger than the limit, the turn reports a failure
-before generation. Remove `max_input_tokens` to return to automatic budgeting.
-An invalid file prevents the workspace's chat from starting.
+A hard limit needs a connection that can count its requests exactly. If it
+cannot, or a request is larger than the limit, the turn fails before the
+model starts answering. Remove `max_input_tokens` to return to automatic
+budgeting. An invalid file prevents the workspace's chat from starting.
 
-## Check when a change applies
+## Change it from a client
 
-New defaults apply when Grida accepts a message. Active, paused and queued work
-keep the values they already captured.
-
-Headless and ACP clients can inspect, change and reload the same setting, and
-can let the agent request a reviewed change for one message. The reference
-covers supported values, scope and reloading.
+Source-built headless runs read the same file from the state directory you
+choose. ACP clients can also inspect, change and reload the limit, and can let
+the agent request a reviewed change for one message.
 [Agent configuration reference](../reference/agent-configuration.md)

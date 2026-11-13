@@ -8,9 +8,9 @@ format: md
 # Automate lifecycle checks
 
 Lifecycle checks can add project context, inspect a proposed tool action, or
-require verification before a task finishes. Native Desktop workspace chats and
-trusted headless hosts use the same recorded checks. A check cannot grant
-access that the task did not already have.
+require verification before a task finishes. They are available on macOS and
+Linux, in Grida Desktop workspace chats and in source-built headless hosts. A
+check cannot grant access that the task did not already have.
 
 New projects start with no registered checks. Creating their first chat does
 not require an existing check definition or an earlier chat.
@@ -30,7 +30,8 @@ not require an existing check definition or an earlier chat.
 Checks use a pinned canonical system executable, literal reviewed arguments,
 read-only workspace access and no network. Project-local executable programs are
 not accepted. Selecting a project or reading a definition does not execute it.
-For example, this required completion check looks for a workspace manifest:
+For example, this Desktop check definition requires a workspace manifest before
+the agent finishes:
 
 ```json
 {
@@ -53,26 +54,26 @@ on the next restart. It does not withdraw an active task's checks.
 
 ## Choose when a check runs
 
-| Event               | Observable boundary                                                                                              |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `session_start`     | Each accepted turn begins, or its explicit Pause→Resume starts execution again. This is not once per saved chat. |
-| `before_input`      | Accepted input is about to enter model/tool work.                                                                |
-| `before_tool`       | Complete validated arguments are ready, before effect admission.                                                 |
-| `after_tool`        | The actual tool outcome is recorded; its result remains intact.                                                  |
-| `before_completion` | A successful completion candidate is ready for verification.                                                     |
+| Event               | When the check runs                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| `session_start`     | Each turn begins, and again when a paused turn resumes. This is not once per saved chat.      |
+| `before_input`      | Your message is about to reach the model.                                                     |
+| `before_tool`       | The agent has prepared a tool call with complete arguments, before it runs.                   |
+| `after_tool`        | A tool call has finished; the check sees its result, and the result itself is kept unchanged. |
+| `before_completion` | The agent is about to finish successfully, so the check can verify the result.                |
 
 Tool events can name one exact `tool`, such as `read_file`. Omitting it selects
-all offered model tools. Private check execution never recursively invokes
-checks. Children that inherit workspace execution scope also inherit its checks.
-Text-only reviewers do not gain workspace execution access just to run a check;
-parent checks can still inspect the delegation arguments. Plan still withholds model commands; trusted
-read-only checks can run in either Plan or Act.
+every tool the model can use. Checks do not trigger other checks. Subagents
+that work in the project run the parent's checks too; a text-only reviewer
+does not gain project access to run one, but the parent's checks can inspect
+what it was asked to do. Read-only checks run with or without the **Plan**
+badge.
 
-A handler can allow or deny processing and contribute bounded, attributed
-context. A completion check can request further verification within the task's
-original allowance. It cannot override Stop, resume a paused task, or extend the
-allowance. Settlement and interruption remain observable lifecycle events;
-executable cleanup handlers are not offered.
+A check can allow or deny the step and add short context that names its
+source. A completion check can ask for more verification within the task's
+original allowance. It cannot override Stop, resume a paused task, or extend
+the allowance. Grida offers no check that runs when a task ends or is
+interrupted.
 
 ## Inspect outcomes and recover
 
@@ -88,10 +89,16 @@ Pause and Stop still apply. Reconnect, inspection and history reads execute no
 checks. Restart reuses recorded outcomes; an interrupted command remains
 uncertain until its existing recovery rules permit continuation. Earlier work
 and the check diagnostic stay available for review. If the old executable is no
-longer available, Stop the unfinished turn and review its replacement for future
-work; the replacement does not authorize replaying the old action.
+longer available, end the unfinished turn (in Desktop, pause it and send a new
+message) and review its replacement for future work; the replacement does not
+authorize replaying the old action.
 
-Headless hosts select the same definitions in their trusted permission profile.
-[Native hook configuration](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md)
-and [completion checks](./clients.md#require-a-completion-check) describe the
-executable contract and the retained final-text check.
+## Add a check to a headless launch
+
+Source-built headless hosts declare up to eight ordered checks in their trusted
+permission profile, pinning each system executable by path and SHA-256, and
+select it with `--permission-profile` on `run` or `serve`. The Desktop import
+format above does not apply there.
+[Configure lifecycle hooks](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#configure-lifecycle-hooks) ·
+[Check a workspace manifest](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#check-a-workspace-manifest) ·
+[Require a completion check](./clients.md#require-a-completion-check)

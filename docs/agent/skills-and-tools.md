@@ -1,7 +1,7 @@
 ---
 title: Use chat commands, skills, and tools
-description: Use native chat commands, attach a versioned skill, and choose when the agent can use local tools.
-keywords: [agent, slash commands, skills, tools, MCP]
+description: Use Desktop chat commands, give the agent project instructions and skills, and see which tools it can use.
+keywords: [agent, slash commands, skills, AGENTS.md, tools, MCP]
 format: md
 ---
 
@@ -9,55 +9,66 @@ format: md
 
 ## Use a chat command
 
-Type `/` in a native Desktop workspace chat to see the commands you can use
-now. Select one; `/fork` and `/compact` are sent on their own.
+Type `/` in a Desktop workspace chat to see the commands you can use now.
+Select one; `/fork` and `/compact` are sent on their own.
 
 - **`/plan`** adds a **Plan** badge so the next message investigates and
   proposes without changing anything. It starts no work and keeps your draft.
-  [Plan before acting](./effort-and-goals.md#decide-what-the-agent-may-do)
-- **`/goal`** adds a **Goal** badge so the next message becomes a persistent
-  objective. It needs an idle chat with an empty queue.
+  [Decide what the agent may do](./effort-and-goals.md#decide-what-the-agent-may-do)
+- **`/goal`** adds a **Goal** badge; send the objective to start a persistent
+  goal. It needs an idle chat with nothing queued.
   [Keep an objective across turns](./effort-and-goals.md#keep-an-objective-across-turns)
+- **`/fork`** starts a separate chat from the latest saved message. Your
+  current chat stays selected until you choose **Open fork**. If Desktop
+  cannot confirm the result, send the command again from the same chat.
+- **`/compact`**, in an idle chat with nothing queued, summarizes earlier
+  context. **Compacting…** shows while it runs; use the composer's main
+  button to pause it. The full transcript stays in the chat, and an uncertain
+  result leaves the previous model context in use.
 
-- **`/fork`** starts a separate chat from the latest committed message.
-  Your current chat stays selected until you choose **Open fork**. If the
-  result is unconfirmed, retry the command from the same chat.
-- **`/compact`** summarizes earlier model context while the chat is idle
-  and the queue is open and empty. Choose **Stop** to interrupt it. The
-  original transcript remains available, and an uncertain result leaves
-  the previous model context in use.
+## Give the agent project instructions and skills
 
-## Give a task a skill
+On macOS and Linux, put project instructions in `AGENTS.md` at the top of the
+project folder. Desktop workspace chats and source-built hosts follow it
+automatically. A message keeps the instructions it started with, and edits
+apply to later messages.
 
-Desktop chat has no skill picker. Add `--skill svg` to a headless
-`grida-agent run` command. Repeat
-the flag to include more skills. The bundled names are `dotcanvas`, `slides`,
-and `svg`. An attached ACP client can list skills when the host offers
-`co.grida/session/skills`, then include the returned versioned resource link
-with the prompt. [Connect an agent client](./clients.md#connect-an-acp-client)
-
-On Unix, the native host can read `AGENTS.md` in its explicitly readable
-primary project folder. It looks for a selected project skill in
-`.agents/skills/<name>/SKILL.md`, then `.claude/skills/<name>/SKILL.md`, then
-the bundled set. An accepted or queued message keeps the instructions it
-captured. New project-skill selections include the skill's workspace-relative directory so
-the agent can locate supporting files. Reading those files still requires the
-chat's existing workspace access. File changes apply to later messages. If an
-ACP skill selection is stale, refresh the catalog and select it again.
+Desktop does not offer a skill picker. From a source-built host, add
+`--skill svg` to `grida-agent run`, and repeat the flag for more skills. The
+bundled skills are `dotcanvas`, `slides` and `svg`. A project skill in
+`.agents/skills/<name>/SKILL.md` (or `.claude/skills/<name>/SKILL.md`)
+replaces a bundled skill with the same name. A selected project skill tells
+the agent where its folder is; reading supporting files there still needs the
+chat's existing access. ACP clients can list and select skills through the
+skill catalog; if a saved selection has changed, refresh the catalog and
+select it again. [Use durable client operations](./clients.md#use-durable-client-operations)
 
 ## Use the tools available to the task
 
-Skills supply guidance within the chat's current access. Choose **Plan** to
-investigate or **Act** to use eligible action tools. If an action needs
-additional access, review the exact request before choosing **Allow once**
-or **Decline**. Desktop runs commands in the project inside a sandbox; a headless
-host needs a native launch profile with a supported confinement helper.
-[Understand agent permissions](./permissions.md)
+A Desktop workspace chat on macOS and Linux runs under the **Default** access
+shown in the composer. The agent reads, creates and edits files in the project
+and runs commands there in a sandbox without asking each time; its commands
+can read elsewhere on your computer but cannot write outside the project or
+reach the internet. Turn on the **Plan** badge (**+ → Plan mode** or `/plan`)
+when you want it to investigate without changing anything. Skills add
+guidance but never add access. [Understand agent permissions](./permissions.md)
 
-The headless host can opt into an explicit list of tools from one trusted local
-MCP server. The isolated Desktop preview (development or Insiders builds) can
-bind such a server to one selected workspace on Gateway. Only Act can invoke
-those tools; Plan messages, goals and side chats have none. Retained work keeps
-its original connection, and a lost connection needs a host restart. If a call loses its reply,
-check the server for its effect before sending work that would repeat it.
-[Configure local MCP tools](./clients.md#use-tools-from-a-local-mcp-server)
+Source-built headless and ACP hosts use the permission profile you supply.
+[Work with selected folders](./clients.md#work-with-selected-folders)
+
+Current limits:
+
+- The agent cannot render the SVG or HTML it writes to an image to check how
+  it looks, so review visual results in the editor yourself.
+- If the model sends a tool request Grida cannot read, the turn ends; send a
+  follow-up message to continue.
+
+## Use tools from a local MCP server
+
+On macOS and Linux, a source-built host can let the agent use an explicit list
+of tools from one trusted MCP server on your computer. A Desktop build started
+from source or an Insiders build can do the same for one workspace through
+launch options. Only messages sent without the **Plan** badge can call those
+tools; goals and side chats have none. If a tool call loses its reply, check
+the server for its effect before sending work that would repeat it.
+[Use tools from a local MCP server](./clients.md#use-tools-from-a-local-mcp-server)

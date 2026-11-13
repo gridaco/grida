@@ -1,6 +1,6 @@
 ---
 title: Connect another agent to Grida with MCP
-description: Connect a local MCP client to the standalone Grida tool host or the isolated Desktop preview's workbench export.
+description: Connect a local MCP client to the standalone Grida tool host or to the open tabs of a Desktop workspace.
 keywords: [agent, MCP, Grida Desktop, open tabs, Streamable HTTP]
 format: md
 ---
@@ -15,6 +15,8 @@ with the dedicated token. The host supports stateless MCP revisions
 
 ## Run the standalone tool host
 
+Available in a source-built host on macOS and Linux.
+
 After [building the native host](./clients.md#build-the-host), generate a
 local token and start the listener.
 
@@ -26,16 +28,25 @@ target/debug/grida-agent serve-mcp \
   --server-token-env GRIDA_MCP_SERVER_TOKEN
 ```
 
-The standalone host offers `surface_open`. It takes a workspace path beginning
-with `/` and reports `not_interactive` because there is no editor attached.
-The call provides no file access. The same capability is available directly
-in a native headless Act launch with `--headless-surface`.
+In your MCP client, add a Streamable HTTP server with the URL
+`http://127.0.0.1:8766/mcp` and the header
+`Authorization: Bearer <the token you exported>`. The client should then list
+the `surface_open` tool.
+
+`surface_open` takes a workspace path beginning with `/`. Calling it reports
+`not_interactive`, because no editor is attached, which confirms the
+connection works. The call provides no file access. A headless run can offer
+the same tool directly with `--headless-surface`.
+[Connect a local MCP client](./clients.md#connect-a-local-mcp-client)
 
 ## Read open tabs from Desktop
 
-The isolated Desktop preview (development or Insiders builds) can export
-`surface_list_open` for one selected workspace. It is read-only; no document
-edit operations are exported yet. Prepare the isolated `--native-chat` profile and place a
+Available on macOS and Linux when you start Grida Desktop from source or use
+an Insiders build with the options below; not in the regular release.
+
+Desktop can export `surface_list_open` for one selected workspace. It is
+read-only and exports no document edits. Prepare the separate `--native-chat`
+profile and place a
 separate 64-character hexadecimal token in `native-mcp-export.bearer` under
 its `--user-data-dir`. Use mode `0600` or `0400` and omit the trailing newline.
 [Desktop launch setup](https://github.com/gridaco/grida/blob/main/desktop/README.md#distributions)
@@ -50,12 +61,11 @@ Add these options at launch.
 Connect your local client with that bearer, then open the selected workspace
 in Desktop.
 
-The first admitted workbench frame for that folder publishes the active file
-and a bounded list of open tabs as workspace-relative paths. The result
-contains no file contents. A workbench with no open files returns an empty
-view. Before it publishes, or after it navigates, closes, or signs out, the
-tool reports that the view is unavailable. Start a new explicit export to
-select a replacement frame.
+After you open the selected workspace, the tool returns the active file and
+the open tabs as workspace-relative paths, without file contents. With no
+files open it returns an empty list. Before the workspace window opens, or
+after it navigates away, closes or signs out, the tool reports that the view
+is unavailable. Restart Desktop with the same options to export it again.
 
 To give Grida's own agent tools from another local server, use the separate
-[client-side MCP setup](./skills-and-tools.md#use-the-tools-available-to-the-task).
+[client-side MCP setup](./skills-and-tools.md#use-tools-from-a-local-mcp-server).

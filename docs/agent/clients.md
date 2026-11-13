@@ -9,29 +9,26 @@ format: md
 # Connect an agent client
 
 The native Grida Agent host runs tasks from scripts and serves Agent Client
-Protocol (ACP) clients. Its entrypoints use the same conversation master and
-durable session store. For headless use, build the executable from source.
+Protocol (ACP) clients. Build it from source to use it. Scripts, ACP clients
+and Grida Desktop use the same session format and behave the same way, but
+each keeps its own saved chats: Desktop in its own workspace storage, and a
+headless host in the state directory you choose.
 
-## Use native chat in Desktop
+This guide covers headless runs and ACP clients. For Desktop chat, start from
+the [Grida Agent overview](./index.md).
 
-On macOS and Linux, Desktop chat runs on the same native host. Open a project
-or deck and start a new chat. macOS also supports standalone SVG chat. Model
-selection, questions, queued input and history use the same session service as
-headless clients. Availability still depends on the selected connection and
-the capabilities shown in that chat.
+## Where it runs
 
-Closing or restarting Desktop keeps your chats; reopening one does not submit
-another model request. If the host cannot start, Desktop reports that chat is
-unavailable. Chats from earlier Desktop versions stay in their original
-storage. On Windows, Desktop keeps file and media workflows and chat is
-unavailable.
+Grida Desktop chat runs on macOS and Linux; standalone SVG chat is macOS only.
+Grida Desktop on Windows keeps file and media tools, but agent chat is not
+available. The headless host's workspace tools, commands and attachments run
+on macOS and Linux.
 
-For development, start the local editor and its local authentication services
-before starting the Desktop shell. See the
+To work on Desktop itself, start the local editor and its local authentication
+services before starting the Desktop shell. See the
 [authenticated local setup](https://github.com/gridaco/grida/blob/main/CONTRIBUTING.md#authenticated-local-development).
 The Desktop development command prepares the native worker and helper before
-launch. A missing default Gateway connection can be recovered through explicit
-[model selection](./models-and-usage.md#choose-a-model).
+launch.
 
 ## Build the host
 
@@ -92,8 +89,13 @@ account. Diagnostics use stderr. Save the accepted identifiers when running
 from an automated client.
 
 Pass `--session SESSION_ID` to continue a settled chat with its saved history.
-Use its original project directory and provider settings. Reopening a chat for
-inspection starts no model request.
+Use its original project directory. You can choose a different model or
+endpoint for the next turn, as long as the credentials belong to the same
+owner: local keys and endpoints with local keys, a Grida account with the same
+account and organization. A running turn, queued inputs, an unresolved goal
+and delegated work keep the model they started with, and chats saved before
+this was recorded keep their original model. Reopening a chat for inspection
+starts no model request.
 
 ```sh
 target/debug/grida-agent inspect \
@@ -148,14 +150,8 @@ available for a manual answer. [Configure automatic read review](https://github.
 
 ### Plan before carrying out a task
 
-In the native Desktop workspace pane, select `/plan` in the composer to add a
-removable **Plan** badge to the next message. Selection preserves the draft and
-starts no work. A Plan message can read permitted material and ask questions;
-commands, file changes, editor tools, image generation, settings changes and
-check-ins are unavailable. The badge applies to messages you send or queue, and
-a queued Plan message waits for its own turn rather than being steered into the
-current one. To carry out a proposal, remove the badge and send a new request in
-the same chat. Planning does not change the chat’s permissions or effort.
+In Desktop, add the **Plan** badge with `/plan` or **+ → Plan mode**.
+[Decide what the agent may do](./effort-and-goals.md#decide-what-the-agent-may-do)
 
 Use `--mode plan` with `run` or `serve` to investigate and prepare a proposal.
 The agent can read permitted material and ask enabled questions. Commands,
@@ -242,9 +238,9 @@ by the response and makes no follow-up billing query.
 
 For an ACP client, use `target/debug/grida agent serve --stdio` with the same
 provider, model, organization, and state-directory options. The client supplies
-the project directory when opening a session. Keep the same model, account, and
-organization to continue a saved chat. Gateway requests use the selected
-organization's credits.
+the project directory when opening a session. Keep the same account and
+organization to continue a saved chat; you can change the model between turns.
+Gateway requests use the selected organization's credits.
 
 The host renews its short-lived Gateway grant before new model work needs it.
 Renewal uses the account and organization that opened the host. If that scope
@@ -272,8 +268,8 @@ verified turn outcome.
 
 In Zed, add a custom External Agent with the absolute path to `grida-agent`
 as the command and the arguments from the example above. Start a chat from
-the Agent Panel's new-thread menu. Zed 1.21.0 on macOS was verified opening a
-session and displaying a completed text reply through ACP stdio. [Zed custom agents](https://zed.dev/docs/ai/external-agents#custom-agents)
+the Agent Panel's new-thread menu; Grida's replies appear in that thread.
+[Zed custom agents](https://zed.dev/docs/ai/external-agents#custom-agents)
 
 Use `session/list` to discover unarchived chats for an absolute workspace `cwd`.
 Follow `nextCursor` with the same workspace to get the next page. The list
@@ -295,42 +291,9 @@ and unpublished working copies. Authored files, saved exports, and independent
 forks stay available. Retry a lost deletion reply with the original request
 ID, workspace, and revisions, even if the chat has disappeared from the list.
 
-When a native chat owner is active in Desktop, the chat list at the top left
-shows saved chats in that workspace. Use **Older chats** to browse further or
-**Archived chats** to find an archived chat. Selecting a chat opens its transcript.
-With a chat open, use **Chat options → Rename chat** and save the title. Clear the title to
-use the default name. Choose **Archive chat** to move it out of the active list
-while keeping its draft and any running work. Open it from **Archived chats**
-and choose **Restore chat** to return it to the active list.
-
-On macOS and Linux, select an eligible idle chat and choose **Delete chat**.
-Confirm in the Desktop dialog to remove the conversation and its private
-attachments and working copies. Desktop closes the deleted chat in any open
-workspace window. Project files, saved exports, and independent forks stay
-available. On supported connections, the dialog shows how many owned named
-subagents will be deleted with the chat.
-Running, paused, queued, unresolved or uncertain work, or an unfinished Goal,
-blocks deletion; Desktop explains a refusal after you confirm. You can archive
-a chat while its work continues.
-
-With the native **Ask me** profile, a read outside the current grants pauses
-for review when its folder is eligible for additional access. The pane shows
-the requested action and target. **Allow once** authorizes that action.
-**Decline** leaves the additional access denied.
-
-Answer a question in its card by selecting a choice, writing a reply, or
-skipping. The agent may continue other work while it waits. A separate message
-sent from the composer joins the queue and leaves the question open.
-
-While a turn is active, the native workspace composer queues text as a
-follow-up. You can edit, move, or remove waiting messages. Choose **Steer**
-on a waiting message when it should guide that turn at its next decision.
-Messages queued with Plan, Ultra, a goal or settings permission, and non-text
-messages, wait for their own turn and cannot be steered. If the turn cannot
-accept a steered message, its text returns to the composer as an unsent draft.
-The main button pauses the active turn; ▶ resumes it. Sending while a turn is
-paused ends it as stopped and runs the new message next. A held queue shows
-**Resume** to let waiting messages run.
+In Desktop, the chat list, rename, archive and delete are described in
+[Return to work and manage chat history](./history.md#reopen-or-organize-a-chat),
+and the queue, Steer and Pause in [Guide and interrupt work](./controls.md).
 
 Text and resource-link descriptors are accepted as prompt content. A resource
 link supplies context about a resource. File access follows a separately granted
@@ -396,9 +359,7 @@ local receipt. [Run a local ACP peer from the CLI](../cli/agent.md#run-a-local-a
 
 ### Use the Local agent preview in Desktop
 
-The installed Linux Insiders preview has been verified on Debian ARM64.
-
-The Linux Insiders preview uses a reviewed local executable and a helper
+Available in the Linux Insiders build. It uses a reviewed local executable and a helper
 provisioned by an administrator for the installed build.
 [Provision Local agent](https://github.com/gridaco/grida/blob/main/desktop/README.md#provision-local-agent-in-linux-insiders)
 
@@ -425,42 +386,15 @@ uncertainty if the host cannot verify process cleanup. [Native permission profil
 
 ## Connect a local MCP client
 
-The standalone tool host serves MCP without opening a chat or contacting a
-model provider. Generate a separate local token and launch the tool host.
+To let another agent use Grida tools over MCP, including the open tabs of a
+Desktop workspace, see
+[Connect another agent to Grida with MCP](./grida-mcp.md).
 
-```sh
-export GRIDA_MCP_SERVER_TOKEN="$(openssl rand -hex 32)"
-
-target/debug/grida-agent serve-mcp \
-  --listen http://127.0.0.1:8766/mcp \
-  --server-token-env GRIDA_MCP_SERVER_TOKEN
-```
-
-Configure your client for Streamable HTTP at the same address and send the
-token in an `Authorization: Bearer …` header. The service accepts native
-clients on the exact numeric loopback address. It supports MCP revisions
-2026-07-28 and 2025-11-25.
-
-The headless service offers `surface_open`. Its result reports that no
-presentation was requested because no editor is attached.
-Pass `--headless-surface` to native `run` or unsupervised `serve --stdio`
-to offer the same operation directly in Act. In both places it takes a
-workspace path beginning with `/` and returns the same outcome without an MCP
-connection.
-Plan leaves it unavailable. A resumed turn requires its captured tool set.
-
-### Read the live Desktop workbench
-
-The isolated Desktop preview (development or Insiders builds) can export `surface_list_open`
-for one workspace. It returns the active file and bounded open-tab list as
-workspace-relative paths. The service runs independently of the built-in chat.
-Connect with the same Streamable HTTP authentication described above, using
-the dedicated export bearer. [Desktop launch options](https://github.com/gridaco/grida/blob/main/desktop/README.md)
-
-An attached workbench with no files open returns an empty view. Before the
-selected frame publishes, or after it navigates or closes, the endpoint reports
-that the workbench is unavailable. Start a new explicit export to select a
-replacement frame.
+Pass `--headless-surface` to `run` or unsupervised `serve --stdio` to offer
+the same `surface_open` tool directly, without an MCP connection. It takes a
+workspace path beginning with `/` and reports `not_interactive` because no
+editor is attached. Messages with the **Plan** badge do not get it, and a
+resumed turn keeps the tool set it started with.
 
 ## Use tools from a local MCP server
 
@@ -477,13 +411,15 @@ target/debug/grida-agent serve --stdio \
   --mcp-source local --mcp-tool surface_open
 ```
 
-Set the named environment variable to the server's bearer token. Use a separate
+`--mcp-source` gives the server a short ID of your choice; the model sees each
+selected tool as `mcp_<source>_<tool>`. Set the
+named environment variable to the server's bearer token. Use a separate
 variable from any model credential. Repeat `--mcp-tool` for each tool you trust
 the agent to invoke in Act. A Plan-only launch skips discovery. A Plan message
 submitted to an Act host has no MCP tools.
 
-The isolated Desktop preview (development or Insiders builds) on Gateway can
-also enable one local peer for a selected workspace through
+On macOS and Linux, a Desktop build started from source or an Insiders build,
+on Gateway, can also enable one local server for a selected workspace through
 [trusted launch options](https://github.com/gridaco/grida/blob/main/desktop/README.md).
 Desktop shows no list of servers or discovery status.
 Workspace startup can discover the peer before you select Plan. Only Act can
@@ -492,15 +428,16 @@ An attached workbench in the selected workspace can use its live editor tools
 and the allowlisted MCP tools in the same Act turn. The peer receives the
 arguments supplied to its own calls.
 
-Plan messages, goals and side chats have no MCP tools. Retained work keeps its
+Plan messages, goals and side chats have no MCP tools. Saved work keeps its
 original tool connection; restart the host after a lost connection to connect
-again. If that connection closes, Stop is still available for a suspended turn. A lost reply after a tool call
-leaves an uncertain result. Reconcile it before sending new work that would
+again. If that connection closes, the turn can still be stopped. A lost reply
+after a tool call leaves an uncertain result. Reconcile it before sending new work that would
 repeat the effect.
 
 ## Assign work to a named subagent
 
-Desktop chat does not create named subagents, and the model cannot create them.
+Desktop chat does not offer named subagents, and the model cannot create them;
+Desktop's Ultra effort can start an independent review instead.
 [Work with subagents](./subagents.md)
 
 Start the host with a direct provider and private stdio.
@@ -565,7 +502,7 @@ the side chat ID. These IDs work only on the connection that opened the chat.
 
 ## Set the context input limit
 
-Desktop has no control for the context input limit; edit the workspace's
+Grida Desktop has no control for the context input limit; edit the workspace's
 `config.toml` and restart Desktop. [Change agent settings](./settings.md)
 
 An ACP client that negotiates the configuration operations can inspect, set,
@@ -576,68 +513,25 @@ and submit a new one. [Agent configuration](../reference/agent-configuration.md#
 
 ## Attach a PNG to a message
 
-When the native Desktop chat advertises image input, choose **Add PNG** or
-drop or paste one PNG up to 256 KiB into the composer. Write a message before
-sending. The text and image enter the chat together, including when the message joins the
-queue. A replacement uses the selected file even when its name matches. If
-the file cannot be read or the connection cannot use PNG input, Grida keeps
-your draft and blocks the send. Replace or remove the PNG, or use a compatible
-connection. Retrying an unconfirmed send with the same draft keeps the original
-input identity. To change a queued image, remove the queued message and submit
-a new one.
+In Desktop, choose **+ → Image** or drop or paste a PNG.
+[Attach an image](./getting-started.md#attach-an-image)
 
 On macOS and Linux, a source-built `grida-agent run` can take one local PNG
-through `--input-png` on a compatible image profile. Omit the workspace
-directory and permission profile to process the image without a project.
-Direct Google Gemini `gemini-3.8-flash` also supports PNG prompts on this host.
-Image edits use a retained working copy. [Run locally with a PNG](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-locally)
+through `--input-png` on a compatible image profile. Omit `--cwd` and
+`--permission-profile` to process the image without a project. Direct Google
+Gemini `gemini-3.8-flash` also supports PNG prompts on this host. Image edits
+use a saved working copy. [Run locally with a PNG](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-locally)
 
-On macOS and Linux, the native Desktop chat supports PNG input with a saved
-OpenRouter key on any listed model that takes images, such as **GPT-6.1
-Terra**. Select one at launch with
-`--native-chat-provider=openrouter --native-chat-model=openai/gpt-6.1-terra`.
-The default Gateway connection also accepts a selected PNG. ChatGPT subscription,
-Vercel, and custom endpoint profiles offer text input. The selected provider
-receives the retained PNG when the conversation uses it.
-
-## Attach a Library image
-
-In a native workbench with image input, choose **+ → Library**, select
-one image, and write a message. Grida prepares a PNG for the chat. If an image
-cannot be added, your draft and any existing attachment stay in place.
-
-## Choose a reference the agent asks for
-
-In a native workbench on the supported OpenRouter image connection, the agent
-can pause a text turn to request a Library image. Open **Choose reference**
-to see the suggested search. Refine the search if needed, select one image,
-and choose **Use reference**. The model receives the image in the waiting turn.
-Your composer draft stays separate.
-
-Choose **Skip** to continue without an image. Closing the picker leaves the
-request open. If Grida cannot confirm your answer, reopen it and choose
-**Retry answer**. If you paused the turn yourself, use **Resume** after
-answering.
+In Desktop, images work with the default Grida model or with a saved
+OpenRouter key on any listed model that takes images; choose one under
+**Select model** in the model picker. ChatGPT subscription, Vercel and custom
+endpoint connections take text only. The selected provider receives the saved
+PNG when the conversation uses it.
 
 ## Attach a file for inspection
 
-In a native workspace chat, choose **Attach file** or drop or paste one file
-up to 256 KiB into the composer. Send a message with it. The agent can verify
-the file’s size and digest and request a short text excerpt. Binary files
-provide integrity metadata. The chat keeps a private copy. The provider
-receives the display name and any requested excerpt.
-
-Dropping a folder or several files shows a message and keeps the current
-attachment and draft. A queued message keeps the same file. To change the
-attachment after queuing, remove the queued message and send a new one. Use
-**Add PNG** for image understanding and cropping on compatible connections.
-
-## Mention a workspace file
-
-In the native workbench, type `@` and search for a file. Choose the relative
-path you want from the suggestions. The mention gives the agent that path.
-When the agent reads it, the workspace's current files and permissions apply.
-Use **Attach file** to supply a private copy with the message.
+In Desktop, choose **+ → Files** or drop or paste a file.
+[Attach a file](./getting-started.md#attach-a-file)
 
 ## Inspect a local file headlessly
 
@@ -662,75 +556,24 @@ same image even if the source changes. Later turns keep a short description.
 Ask to view the file again when you need its current pixels.
 [Work with selected folders](#work-with-selected-folders)
 
-## Edit selected SVG text
-
-Open an SVG or a slide in a Desktop editor that offers native chat. Select one
-plain text element and send an immediate text message in **Act** asking the
-agent to read or replace it. Switching tabs or slides, changing the selection,
-or editing the document makes the captured target unavailable. Select the text
-and send a new message to work on a new target.
-
-The change appears in the SVG editor and can be undone there. Use the editor's
-normal **Save** command to write it to disk. The workspace save dialog handles
-conflicts when another process has changed a workspace file. In a standalone
-window, the chat can use only the captured plain text selection from the
-editor. Plan and queued messages omit the selected-text tools.
-
 ## Read a finished turn
 
-While a turn runs in the native Desktop workspace pane, its commentary and
-actions appear as they happen. When the turn finishes, that work collapses
-beneath a header such as **Worked for 1m 12s**, and the final answer stays
-visible below it. Select the header to show the recorded commentary and actions
-in order. Consecutive actions appear on one line, such as “Read files, ran
-commands”; select that line to list each call and its outcome. A stopped or
-failed turn shows **You stopped** or **Failed after …** instead. A turn whose
-outcome Grida could not confirm shows **· result uncertain** after its duration;
-review its partial work before retrying, because an action may already have
-happened. A stopped turn is not collapsed: its partial work stays in view. A turn
-that only answered, without tools or commentary, shows just its answer.
+In Desktop, a finished turn folds its work under a **Worked for …** header.
+[Read what a turn did](./results.md#read-what-a-turn-did)
 
-Every turn with recorded work keeps its own header, including after you reopen the chat and on
-earlier pages. Expanding or reopening a turn only reads the recorded work; it
-does not repeat actions or request another model response. Turns recorded
-before timing was kept show **Worked** without a duration. A pending question
-or approval stays outside the collapsed work so you can answer it.
-
-### Read a finished turn's results
-
-Expand a finished turn to see its recorded tool activity. Images the
-latest finished turn produced appear below its answer, including after
-reopening the chat. Once another turn starts they leave the chat; generated
-images stay in **Tools → Recents**. The ring beside the model picker estimates how much of the model's
-context window the visible conversation uses; open it for a breakdown.
-
-Desktop does not show token counts, completion checks or Gateway charges in
-the chat. The host still records them with each turn; native clients can read
-them through the turn summary. Use the connection's billing record for
-charges.
-
-On a compatible image-enabled profile, ask the agent to crop a retained PNG
-in Act. Below the finished turn's answer, choose **Preview cropped
-PNG** to inspect the image kept in private chat storage. Use **Save PNG as…**
-to choose a new file on your computer. If saving fails, choose **Retry save**
-to save the same crop. You can reopen the chat and retry while the crop is
-still available. Existing destination files are preserved.
-The preview also offers **Copy image** and **Download image**.
-If the working copy was removed or replaced, the preview reports that the
-image is unavailable. Opening a preview leaves the project and the
-conversation unchanged.
+Native clients read the same record through the turn summary operation. The
+host records reported tokens, completion checks and Gateway charges with each
+turn; Desktop does not show them in the chat.
+[Use durable client operations](#use-durable-client-operations)
 
 ## Follow a provider retry
 
-The native Desktop workspace pane can show **Retrying after rate limit…**
-when Grida Gateway or the Responses API confirms it rejected a request before
-starting it and supplies a short retry delay. Grida can make one more attempt
-with the same model and connection. Use **Stop** while the retry
-is pending.
-
-A downstream failure can leave the result uncertain. Review any partial work
-before trying again. To use a different provider, choose another model for
-the next turn.
+When Grida Gateway or the Responses API rejects a request before starting it
+and asks for a short delay, the host can make one more attempt with the same
+model and connection. The turn stays running while it waits; Pause or Stop
+apply. A downstream failure can leave the result uncertain, so review any
+partial work before trying again. To use a different provider, choose another
+model for the next turn.
 
 ## Use durable client operations
 
@@ -740,20 +583,21 @@ keys in `agentCapabilities._meta`. A custom method adds `_` before its capabilit
 key, such as `_co.grida/session/snapshot`.
 Each suffix in a grouped row uses the displayed prefix and is negotiated separately.
 
-| Capability key                                    | Operation                                                                            |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `co.grida/session/submit`                         | Accept a prompt for an idle session under a client-chosen input ID.                  |
-| `co.grida/session/snapshot`                       | Read revisions, waiting inputs in order, and the current or latest turn.             |
-| `co.grida/session/enqueue`, `input`               | Queue a prompt and read its retained content, settings, and disposition.             |
-| `co.grida/session/replace`, `withdraw`, `reorder` | Edit waiting inputs using the current queue revision.                                |
-| `co.grida/session/pause`, `resume`, `steer`       | Pause a turn, resume its verified suspension, or send a correction to that turn.     |
-| `co.grida/session/stop`, `resume-queue`           | Stop a turn and pause queue advancement, then reopen queue admission when ready.     |
-| `co.grida/session/questions`, `answer-question`   | Inspect pending questions and submit a correlated choice, free-text answer, or skip. |
-| `co.grida/session/approvals`, `answer-approval`   | Inspect requests for additional access and decide each exact action.                 |
-| `co.grida/session/history`, `fork`, `revise`      | Browse retained message anchors, branch a chat, or replace an earlier text message.  |
-| `co.grida/session/compact`                        | Summarize earlier model context and keep the original transcript available.          |
-| `co.grida/session/skills`                         | List available skills for this chat and select a versioned reference for a prompt.   |
-| `co.grida/config/inspect`, `update`, `reload`     | Inspect, change, or reload the host defaults.                                        |
+| Capability key                                                                             | Operation                                                                                                 |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `co.grida/session/submit`                                                                  | Accept a prompt for an idle session under a client-chosen input ID.                                       |
+| `co.grida/session/snapshot`                                                                | Read revisions, waiting inputs in order, and the current or latest turn.                                  |
+| `co.grida/session/enqueue`, `input`                                                        | Queue a prompt and read its retained content, settings, and disposition.                                  |
+| `co.grida/session/replace`, `withdraw`, `reorder`                                          | Edit waiting inputs using the current queue revision.                                                     |
+| `co.grida/session/pause`, `resume`, `steer`                                                | Pause a turn, resume its verified suspension, or send a correction to that turn.                          |
+| `co.grida/session/stop`, `resume-queue`                                                    | Stop a turn and pause queue advancement, then reopen queue admission when ready.                          |
+| `co.grida/session/questions`, `answer-question`                                            | Inspect pending questions and submit a correlated choice, free-text answer, or skip.                      |
+| `co.grida/session/approvals`, `answer-approval`                                            | Inspect requests for additional access and decide each exact action.                                      |
+| `co.grida/session/history`, `fork`, `revise`                                               | Browse retained message anchors, branch a chat, or replace an earlier text message.                       |
+| `co.grida/session/compact`                                                                 | Summarize earlier model context and keep the original transcript available.                               |
+| `co.grida/session/skills`                                                                  | List available skills for this chat and select a versioned reference for a prompt.                        |
+| `co.grida/config/inspect`, `update`, `reload`                                              | Inspect, change, or reload the host defaults.                                                             |
+| `co.grida/session/wakeups`, `cancel-wakeup`, `recover-wakeup`, `continue-cancelled-wakeup` | Allow one check-in on an Act submission or goal start, then inspect, cancel, restore or continue past it. |
 
 Use ordinary `session/prompt` for a streamed reply. Use durable submission or
 enqueue when your client needs acceptance separately from completion. Give each
@@ -768,8 +612,7 @@ unavailable for resumption. Stop pauses queue advancement, which you can
 reopen separately with Resume Queue. Opening a session after restart only
 loads its retained state. An ACP client that saved a Resume Queue request ID
 can retry it to recover the same unchanged queue; the retry does not start
-later inputs added after that decision. After a full Desktop restart, use the
-current queue's **Resume queue** action to explicitly start retained messages.
+later inputs added after that decision.
 
 Negotiate `co.grida/session/turn-summary` to read a settled turn by its
 `sessionId` and `turnId`. The response reports the retained answer or a status
@@ -807,30 +650,15 @@ failure before generation. [Agent configuration](../reference/agent-configuratio
 
 ### Use a chat command
 
-In the native Desktop workspace pane, type `/` to see the commands supported
-by the connected host. Select one and send it on its own.
-
-- **`/fork`** makes a separate chat from the latest committed message. The
-  source stays selected. Choose **Open fork** when you are ready to switch.
-  If Desktop cannot confirm the result, retry the same command in that chat.
-- **`/compact`** summarizes earlier model context in an idle chat with an open,
-  empty queue. Use **Stop** to interrupt it. The original transcript stays
-  available. An uncertain result also preserves the previous model context.
+An ACP client can send `/compact` as the entire prompt. For the commands
+Desktop offers, see [Use a chat command](./skills-and-tools.md#use-a-chat-command).
 
 ### Branch or revise a chat
 
-In the native Desktop workspace pane, hover or focus an earlier user message
-and choose **Edit and resubmit**. The editor opens its original text and
-shows how many later messages the edit replaces in the active chat. Use an
-idle chat with an empty queue and resolve any active Goal first. Only ordinary
-retained plain-text inputs in this chat are editable; a message that started a
-Goal or carried an attachment is not.
-
-Use **Resubmit** to accept the new input in the same chat. If its reply cannot
-be confirmed, choose **Retry edit** to check the exact request. The ordinary
-composer keeps its unsent draft. A paused queue requires **Resume queue** to
-start the replacement. The host keeps the prior view, which ACP history can
-read; Desktop does not show it yet.
+In Desktop, use `/fork` or **Edit and resubmit**.
+[Try a different direction](./history.md#try-a-different-direction) The host
+keeps the view an edit replaced; ACP history can read it, and Desktop does not
+show it.
 
 Read a history page to select a committed message and its basis. A fork creates
 a separate chat from that prefix while the source can continue running. Open
@@ -881,23 +709,11 @@ and leaves the transcript available.
 
 ### Work toward a persistent goal
 
-In the native Desktop workspace pane, select `/goal` or **+ → Goal** to add a
-**Goal** badge, then send the objective. Desktop uses the objective as its
-completion criterion and starts automatic continuation within eight work turns
-and 64 inference steps. Selecting the command alone starts no work. The
-starting message is marked **Sent as goal**, including after reopening the
-chat. An accepted goal waits in the retained queue until its first work turn
-is reserved. To change it before work starts, remove it from the queue and send
-a new goal.
+In Desktop, start a goal with `/goal` or **+ → Goal**.
+[Keep an objective across turns](./effort-and-goals.md#keep-an-objective-across-turns)
 
-While a goal exists, the strip above the composer shows its status and
-objective with clear, pause or resume, and edit controls. Editing changes the
-objective text while keeping the same goal and allowance. Editing stops any
-current goal turn and preserves its recorded work. A funded review uses the
-task controls before its goal can be edited.
-
-Native clients can set separate criteria, allowances, manual continuation,
-named reviewers, spending ceilings and check-ins through the goal protocol.
+Clients can set separate success criteria, allowances, manual continuation,
+named reviewers, a spending limit and a check-in through the goal protocol.
 Start a goal in an idle chat with an empty queue. Supply an objective, its
 success criteria, and separate allowances for work turns and inference steps.
 Opt in to automatic continuation when you start the goal. The next reserved
@@ -905,49 +721,45 @@ turn follows any prompts already in the queue. The agent waits if it needs
 input, runs out of allowance, or records no further progress.
 Without that opt-in, the goal reserves its first work turn only. An explicit
 Resume can authorize one more work turn within the remaining allowance; it does
-not turn on automatic continuation. Earlier queued messages go first.
-For a manual goal started elsewhere, the Desktop goal strip's resume control
-continues one more turn.
+not turn on automatic continuation. Earlier queued messages go first. For a
+manual goal started elsewhere, Desktop's **Resume goal** continues one more
+turn.
 
 Inspect the goal to see progress, allowance used and held, and any blocker.
 Pause and Resume preserve the allowance for the same suspended turn. Revising
-the objective or clearing the goal stops its current work. The prior
-turn's evidence and uncertainty remain available.
+the objective or clearing the goal stops its current work. The prior turn's
+evidence and uncertainty remain available.
 
-When a goal is **Ready for your review**, inspect the proposed result and
-the success criteria. Choose **Confirm goal complete** if the work meets
-them. The goal records that you confirmed completion and keeps its used
-allowance. You can confirm after the work settles even if no allowance
-remains. The agent's proposal stays tied to the work it came from, including
-after reopening the chat.
+When the agent proposes that the goal is complete, inspect the proposed result
+against the success criteria and confirm completion if the work meets them.
+The goal records your confirmation and keeps its used allowance. You can
+confirm after the work settles even if no allowance remains. The proposal
+stays tied to the work it came from, including after reopening the chat.
 
 A trusted headless launch can independently verify configured file criteria
 from the complete bytes recorded by `read_file`. The goal retains the exact
 verification from that turn. [Configure observed-file criteria](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#verify-a-goals-observed-file-bytes)
 
-A supported native Desktop Gateway, saved OpenRouter, or saved Vercel connection,
-or a private ACP client, can select
-**Ultra** for a goal. One independent review shares its inference allowance.
-Later automatic work proceeds directly if only one or two steps remain. Use
-the task's Pause, Resume, or Stop while the funded turn is active. If the
-review finishes later, choose **Refresh** on the Desktop goal strip to account
-for its settled steps. ACP clients can use the negotiated reconciliation
-control. Resume the goal explicitly to continue after reconciliation.
+A private ACP client can select **Ultra** for a goal. One independent review
+shares its inference allowance. Later automatic work proceeds directly if only
+one or two steps remain. Use the task's Pause, Resume or Stop while the funded
+turn is active. If the review finishes later, use the negotiated
+reconciliation control to account for its settled steps, then resume the goal
+explicitly.
 
-In Desktop, **Stop** ends the current turn and retains the goal's state.
 Clear an active or blocked goal before replacing an earlier message in the
 same chat. A fork starts independently.
 
 After a host restart, inspect the goal and its latest turn. An ACP client can
 use Recover to reconsider eligible work under the original allowance and
-authorization.
-Work with an interrupted dispatch remains recorded against its existing turn.
+authorization. Work with an interrupted dispatch remains recorded against its
+existing turn.
 
-Private ACP clients can allow one check-in when starting a
-non-Ultra **Act** goal. The check-in waits within the first reserved turn and
-uses its remaining inference allowance. After reopening, restore the schedule
-and resume the goal if it is paused. Cancelled check-ins require explicit
-continuation. Later automatic Goal turns receive their own permissions.
+Private ACP clients can allow one check-in when starting a goal without
+**Ultra** in Act. The check-in waits within the first reserved turn and uses
+its remaining inference allowance. After reopening, restore the schedule and
+resume the goal if it is paused. A cancelled check-in needs explicit
+continuation. Later automatic goal turns receive their own permissions.
 [Schedule a follow-up](./scheduled-work.md)
 
 Negotiate the version-1 capabilities `co.grida/goal/start`, `co.grida/goal/inspect`,
@@ -957,12 +769,39 @@ manual continuation and reports when that continuation is queued.
 The [client protocol reference](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-client-protocol.md#persistent-goal-operations)
 lists their parameters.
 
+### Set a goal's spending limit
+
+A client starting a goal on a Grida Gateway connection can set a spending
+limit: the total amount you authorize for that goal. Desktop does not offer
+one. Your own keys, custom endpoints and subscription connections have no
+spending limit; their step allowances still apply.
+
+- The goal and any subagent work it funds share the one limit. Each paid
+  request has its own ceiling, the total divided by the inference-step
+  allowance, so a large request can exceed its share even when the goal has
+  more left. Choose the limit and the step allowance together. A goal with a
+  spending limit allows at most 4,096 inference steps.
+- Paid media and external tools are unavailable to a goal with a spending
+  limit.
+- Inspecting the goal shows charged, held and available amounts separately.
+  An interrupted request or a pending billing record keeps its hold until its
+  charge is known. Refreshing billing can settle that request; it does not
+  repeat work or refund an unknown outcome.
+- Pause, restart, retry and objective edits keep the same limit. Deleting a
+  subagent does not reset it.
+- The service must support capped requests. If it does not, the request fails
+  rather than running without the limit. The amount is exact; a value with
+  unsupported precision is rejected rather than rounded.
+
 ### Ask the agent to check later
 
-Private ACP clients can opt in on a single Act submission and inspect the
-retained time, reason, status, and whether the host has armed the timer. They
-can cancel the wait, explicitly continue the task, or restore its schedule
-after restart. Desktop chat does not offer check-ins.
+Negotiate `co.grida/session/wakeups`, `cancel-wakeup` and `recover-wakeup`
+together, then set `allowWakeups` on a single Act submission to allow one
+check-in. `continue-cancelled-wakeup` lets the client continue a task after
+cancelling its check-in. The client can inspect the retained time,
+reason, status, and whether the host has armed the timer. It can cancel the
+wait, explicitly continue the task, or restore its schedule after restart.
+Desktop chat does not offer check-ins.
 [Schedule a follow-up](./scheduled-work.md)
 
 The [feature catalog](./features.md) describes the wider agent experience and

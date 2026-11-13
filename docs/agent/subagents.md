@@ -1,6 +1,6 @@
 ---
 title: Work with subagents
-description: See independent reviews in Desktop chat and give named subagents text assignments from a private ACP client.
+description: See Ultra reviews in Desktop chat and give named subagents text assignments from a private ACP client.
 keywords: [agent, subagent, assignment, delegation]
 format: md
 ---
@@ -12,20 +12,24 @@ the main agent continues.
 
 ## See independent reviews in Desktop
 
-In Desktop, choose **Ultra** effort on a supported Gateway, saved OpenRouter or
-saved Vercel AI Gateway connection to let the agent start one independent
-review. The review appears in the turn's activity, and the finished turn
-records whether the agent collected its findings. An Ultra goal can fund such a
-review from its own allowance.
+In Grida Desktop on macOS and Linux, choose **Ultra** effort in the model
+picker and send your request, for example “Compare the two layout drafts and
+tell me which assumptions matter.” Ultra work may include one independent
+reviewer, which the agent decides whether to start. The reviewer can read the
+project but does not see your chat, and its work appears in the turn's
+activity. Ultra is available on Grida Gateway, saved OpenRouter and saved
+Vercel AI Gateway models. An Ultra goal can fund such a review from its own
+allowance.
 [Choose how much effort to use](./effort-and-goals.md#choose-how-much-effort-to-use)
 
-Desktop chat does not create named subagents, and the model cannot create them
-on its own. Deleting a chat also deletes any named subagents it owns.
+Desktop does not offer named subagents that you create and assign yourself,
+and the model cannot create them on its own. Deleting a chat also deletes any
+named subagents a client created for it.
 
 ## Give a named subagent assignments
 
-A private ACP client connected to a host started with `--subagents` can create
-and manage named subagents.
+On macOS and Linux, a private ACP client connected to a source-built host
+started with `--subagents` can create and manage named subagents.
 [Assign work to a named subagent](./clients.md#assign-work-to-a-named-subagent)
 
 1. Finish an **Act** turn in the parent chat, then create a subagent with a

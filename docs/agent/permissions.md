@@ -1,6 +1,6 @@
 ---
 title: Understand agent permissions
-description: Review what Grida Agent can read or change, allow individual actions, and understand native command and automatic review limits.
+description: See what Grida Agent can read, change and run in Desktop, and how headless runs choose their own folder rules.
 keywords:
   [agent permissions, approvals, Grida Desktop, sandbox, automatic review]
 format: md
@@ -8,43 +8,53 @@ format: md
 
 # Understand agent permissions
 
-A native Desktop workspace chat works under the **Default** preset, shown in
-the composer. The agent reads, creates and edits files in the selected
-project and runs commands there inside a sandbox, without asking each time.
-Commands start from your login shell's environment, so your usual tools work,
-and they can read the rest of your computer except Grida's own state and
-saved credentials. They cannot write outside the project or reach the
-internet. Version-control and agent metadata such as `.git` stay read-only.
-**Plan** lets the agent read and ask questions without running commands or
-changing files. The
-[permission policy](https://grida.co/docs/wg/ai/agent/permissions) describes the
-presets and defaults. An editor action can depend on the file or selection you
-attached when you sent the message. [Edit selected SVG text](./clients.md#edit-selected-svg-text)
+Desktop chat runs on macOS and Linux. On Linux, the agent's sandbox needs
+bubblewrap at `/usr/bin/bwrap` with unprivileged user namespaces. Windows
+Desktop has no agent chat.
 
-## Review a request for access
+## What the agent can do in Desktop
 
-Ask is the default for access beyond the project, such as another folder.
-When the agent asks for a read,
-check the action, folder, and relative path shown in chat. Choose **Allow once**
-to approve that action or **Decline** to refuse it. An approved read may supply
-text to the model running your chat.
+Desktop chat in a project uses the **Default** access, shown in the composer.
+The agent reads and edits files in the project and runs commands there in a
+sandbox without asking. For example, ask “Run the tests and fix what fails.”
 
-A later action needs its own applicable grant. If the folder or scope changes
-before execution, Grida checks access again. A question about what you want is
-a separate interaction from an approval to perform an action.
+- Commands start from your login shell's environment, so your usual tools
+  work.
+- Commands can read elsewhere on your computer, except Grida's own data and
+  saved credentials. They can write only in the project and the system's
+  temporary folder, and they cannot reach the internet.
+- Existing version-control and agent settings folders, such as `.git`, stay
+  read-only. The agent can start a new repository but cannot commit to an
+  existing one, so run commits yourself.
+- With the **Plan** badge on, the agent only reads and asks questions; it
+  does not run commands or change files.
 
-## Use a native launch profile
+Desktop offers only this preset. The
+[permission policy](../wg/ai/agent/permissions.md) describes the full set of
+presets and their defaults.
 
-Headless clients, which you build from source, can select a trusted permission profile with a
-primary folder and additional folders. A profile can require approval for
-reads or enable bounded command execution. Native command confinement has
-been verified on macOS and Linux ARM64. An unattended run that needs your
-decision returns a retained approval so a capable client can answer it.
-[Work with selected folders](./clients.md#work-with-selected-folders) ·
+## What the agent cannot reach
+
+In Desktop, the agent's file tools work only inside the project, and its
+commands cannot reach the internet. Desktop does not ask to extend this. To
+use a file from elsewhere, copy it into the project or attach it to your
+message. [Attach an image or a file](./getting-started.md#attach-an-image)
+
+A question the agent asks about what you want is separate from access: answer
+it in its card, and it grants nothing.
+
+## Run with your own folder rules
+
+When you run the agent from a source build on macOS or Linux, a permission
+profile chooses the project folder, adds folders the agent must ask before
+reading, and allows commands. When the agent asks, the run waits with a
+request that shows the action, folder and relative path; the client answers
+with **Allow once** or **Decline**, and each approval covers that one action.
+If no one is there to answer, the request waits in the chat until a client
+answers it. [Work with selected folders](./clients.md#work-with-selected-folders) ·
 [Run a confined command](./clients.md#run-a-confined-command)
 
-An explicitly configured native profile can ask the model to review one
-eligible file read per turn. It can allow or decline only the exact read named
-by the profile. If the review cannot finish or return a valid decision, the
-approval stays open for a manual answer. Pause and Stop still apply during the
-review. [Configure automatic read review](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#review-one-configured-read)
+A profile can also let the model answer one specific file-read request per
+turn. If the model cannot decide or its review is interrupted, the request
+waits for you. Pause and Stop still apply during the review.
+[Configure automatic read review](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#review-one-configured-read)

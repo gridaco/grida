@@ -11,12 +11,20 @@ The native host reads `config.toml` from its selected state directory. The file
 holds user defaults for that host. Each accepted input retains the defaults
 that applied when it was accepted.
 
-Desktop runs one host per workspace. Its state directory is a folder under
-`native-chat/workspaces/` in Desktop's application data folder, named by a
-digest of the workspace. Desktop offers no control for these settings; edit
-that folder's `config.toml` while Desktop is closed, and the change applies
-when Desktop next starts the workspace's agent.
-[Change agent settings](../agent/settings.md)
+| Surface                                             | `config.toml`                                                                                                                                     | Managed operations and agent-requested changes |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Grida Desktop on macOS and Linux                    | One per workspace, in a digest-named folder under `native-chat/workspaces/` in Desktop's application data folder; edit it while Desktop is closed | Not offered                                    |
+| Source-built `grida-agent run`                      | In the `--state-dir` you choose; read at startup                                                                                                  | Not offered                                    |
+| Source-built `grida-agent serve` with an ACP client | In the `--state-dir` you choose                                                                                                                   | Available after negotiation                    |
+
+Desktop offers no control for these settings and does not let the agent change
+them; a change to the file applies when Desktop next starts the workspace's
+agent. [Change agent settings](../agent/settings.md)
+
+For an ACP client, start the host with your own state directory, for example
+`grida-agent serve --stdio --state-dir /absolute/path/to/agent-state` plus
+your provider options, edit `/absolute/path/to/agent-state/config.toml`, and
+call `_co.grida/config/reload`.
 
 ## Supported file
 
@@ -54,8 +62,11 @@ version. Unknown fields, unsupported versions, and invalid values are rejected.
 
 ## Configure local request counting
 
-In a managed native macOS Desktop profile, quit Desktop and set
-`"input_counting": "llama.cpp"` on the saved endpoint in
+In Grida Desktop on macOS and Linux, quit Desktop and set
+`"input_counting": "llama.cpp"` on the saved endpoint in Desktop's endpoint
+file. On most installations it is `~/.grida/agent/endpoints.json`. If Desktop
+keeps its data in `~/Library/Application Support/Grida Native/`, as some
+Apple silicon Mac installations do, the file is
 `~/Library/Application Support/Grida Native/agent/retained-settings/endpoints.json`.
 This private file holds an array of endpoint entries. An entry can look like
 this.
@@ -69,8 +80,9 @@ this.
 }
 ```
 
-Start Desktop, approve the saved endpoint origin, and choose its
-**llama.cpp counting** connection for a new chat. Use a numeric loopback
+Set the workspace's input limit in its `config.toml` as above. Start Desktop,
+approve the saved endpoint address, and choose its **llama.cpp counting**
+connection for a new chat. Use a numeric loopback
 address and the `/v1` base path on a server that supports
 `POST /v1/chat/completions/input_tokens`. Desktop uses that route only when
 the counted chat has an input limit. It sends the same prepared text and
@@ -78,8 +90,10 @@ tools that the generation request would use. A failed count or a request
 over the limit ends before generation.
 [llama.cpp token counting API](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md#post-v1chatcompletionsinput_tokens-token-counting)
 
-The ordinary endpoint choice keeps its original binding. Removing the
-declaration makes saved counted chats unavailable until it is restored.
+The ordinary endpoint choice keeps working as before. Removing the
+declaration makes chats saved on the counting connection unavailable until it
+is restored. For a headless host, launch with `--llama-cpp-input-count`
+instead.
 
 ## Scope and activation
 
