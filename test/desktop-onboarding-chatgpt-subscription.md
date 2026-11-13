@@ -54,7 +54,7 @@ Welcome.
    `/desktop/onboarding`. No second entry window is created. Closing or failing
    authentication does not expose onboarding. The artwork reaches behind the
    drag region without a titlebar divider. Authenticated onboarding is not
-   shown until the local agent sidecar is ready.
+   shown until the local services sidecar is ready.
 5. Expected: **Welcome to Grida Desktop** appears with the vivid Grida artwork
    and a centered **Continue** button. No progress indicator, badge, **Back**,
    or dialog frame is visible.

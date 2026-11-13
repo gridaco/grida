@@ -322,11 +322,12 @@ const config: ForgeConfig = {
           target: "preload",
         },
         {
-          // Agent sidecar. Runs in Electron-as-Node and constructs
-          // AgentHost. Forge emits `.vite/build/agent-sidecar.js`
+          // Services sidecar. Runs in Electron-as-Node and starts the
+          // retained media and host services. Forge emits
+          // `.vite/build/services-sidecar.js`
           // next to `main.js`. GRIDA-SEC-004.
-          entry: "src/agent-sidecar.ts",
-          config: "vite.agent-sidecar.config.ts",
+          entry: "src/services-sidecar.ts",
+          config: "vite.services-sidecar.config.ts",
           target: "main",
         },
       ],
@@ -342,7 +343,7 @@ const config: ForgeConfig = {
       version: FuseVersion.V1,
       // GRIDA-SEC-004 — must be `true` so the supervisor can
       // `child_process.spawn(process.execPath, ..., { env: {
-      // ELECTRON_RUN_AS_NODE: '1' } })` to boot the agent sidecar
+      // ELECTRON_RUN_AS_NODE: '1' } })` to boot the services sidecar
       // inside native process confinement. Residual risk: a local attacker who
       // already controls the binary can pass the same env var to
       // run arbitrary JS — but they already own the binary, so this

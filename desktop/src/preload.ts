@@ -1,7 +1,7 @@
 // GRIDA-GG: desktop — install the `gg` bridge namespace (docs/wg/platform/hosted-ai.md)
 // GRIDA-SEC-008 — expose only secret-free native-provider operations.
 /**
- * GRIDA-SEC-004 — Desktop agent-sidecar trust boundary (renderer side).
+ * GRIDA-SEC-004 — Desktop services-sidecar trust boundary (renderer side).
  *
  * Exposes `window.grida` via `contextBridge` **only when** the page
  * pathname is `/desktop` or starts with `/desktop/`. Without this scope, any XSS on
@@ -1030,7 +1030,7 @@ const bridge: DesktopBridge = {
         expectedMtime
       ),
     // Unlike its siblings, trash is a native host capability rather than
-    // an agent-sidecar operation: it routes to the main process (which
+    // a services-sidecar operation: it routes to the main process (which
     // re-validates workspace containment) and calls `shell.trashItem`.
     trash_entry: (workspaceId, relPath) =>
       ipcRenderer.invoke(IPC_CHANNELS.WORKSPACE_TRASH_ENTRY, {

@@ -16,18 +16,18 @@ import {
   create_runtime_app_icon,
 } from "./branding";
 import {
-  startAgentSidecar,
-  getAgentSidecarInfo,
-  getAgentSidecarMode,
-  stopAgentSidecar,
+  startServicesSidecar,
+  getServicesSidecarInfo,
+  getServicesSidecarMode,
+  stopServicesSidecar,
   approveAgentProviderEndpoint,
   describeAgentProviderEndpoint,
-  type AgentSidecarInfo,
-} from "./main/agent-sidecar-supervisor";
+  type ServicesSidecarInfo,
+} from "./main/services-sidecar-supervisor";
 import { registerIpcHandlers } from "./main/ipc-handlers";
 import { disposeAllTerminals } from "./main/terminal-host";
 import { disposeAllWorkspaceWatches } from "./main/workspace-watcher-host";
-import { agentSidecarClient } from "./main/agent-sidecar-client";
+import { servicesSidecarClient } from "./main/services-sidecar-client";
 import {
   registerWorkspaceMediaScheme,
   handleWorkspaceMediaProtocol,
@@ -138,7 +138,7 @@ const workspaceReview = new NativeWorkspaceReview(
 let nativeDesktopAgent: NativeDesktopAgent | undefined;
 let nativeDocuments: NativeDocumentFiles | undefined;
 let nativeFileWorkspaces: NativeWorkspaceCatalog | undefined;
-let recentFiles = agentSidecarClient.recent;
+let recentFiles = servicesSidecarClient.recent;
 let nativeQuitDrain: Promise<void> | undefined;
 let nativeEditorMcp: NativeEditorMcpExport | undefined;
 let nativeExternalRuns: NativeExternalRuns | undefined;
@@ -331,15 +331,15 @@ function nativeDocumentOwner(filePath: string) {
 
 async function openDocumentWindowForPath(filePath: string) {
   const owner = nativeDocumentOwner(filePath);
-  if (!owner && !agentSidecarInfo) {
-    console.warn("[grida] cannot open file: agent sidecar not ready");
+  if (!owner && !servicesSidecarInfo) {
+    console.warn("[grida] cannot open file: services sidecar not ready");
     return;
   }
   let docId: string;
   try {
     docId = owner
       ? await owner.register(filePath)
-      : await agentSidecarClient.registerPath(filePath);
+      : await servicesSidecarClient.registerPath(filePath);
   } catch (err) {
     // Surface, don't silently drop — a dropped open with no feedback is
     // exactly what made the "open while running" bug hard to diagnose.
@@ -415,15 +415,15 @@ async function openDocumentWindowForPath(filePath: string) {
  */
 async function openCanvasBundleForPath(dirPath: string) {
   const owner = nativeFileWorkspaces;
-  if (!owner && !getAgentSidecarInfo()) {
-    console.warn("[grida] cannot open .canvas: agent sidecar not ready");
+  if (!owner && !getServicesSidecarInfo()) {
+    console.warn("[grida] cannot open .canvas: services sidecar not ready");
     return;
   }
   let workspaceId: string;
   try {
     const workspace = owner
       ? await owner.openSelected(dirPath)
-      : await agentSidecarClient.openWorkspace(dirPath);
+      : await servicesSidecarClient.openWorkspace(dirPath);
     workspaceId = workspace.id;
   } catch (err) {
     console.error("[grida] open .canvas failed:", err);
@@ -455,7 +455,7 @@ function handleFilePath(filePath: string) {
   }
   if (
     (!(isCanvas ? nativeFileWorkspaces : nativeDocumentOwner(filePath)) &&
-      !agentSidecarInfo) ||
+      !servicesSidecarInfo) ||
     !startup_window.canDispatchLaunchIntent({
       app_ready: app.isReady(),
       entry_main: entryWindow?.isMain ?? false,
@@ -518,14 +518,14 @@ app.on("open-url", (event, url) => {
   void handleDeepLink(url);
 });
 
-// agent sidecar info is set once on ready; stays in scope for `activate`,
+// services sidecar info is set once on ready; stays in scope for `activate`,
 // menu actions, and the file-handle path. The supervisor maintains
 // the live reference internally for restart-on-crash continuity.
-let agentSidecarInfo: AgentSidecarInfo | null = null;
+let servicesSidecarInfo: ServicesSidecarInfo | null = null;
 let providerApprovalStarted = false;
 
 function approveConfiguredProviderEndpointsWhenReady(): void {
-  const mode = getAgentSidecarMode();
+  const mode = getServicesSidecarMode();
   if (
     providerApprovalStarted ||
     mode === null ||
@@ -749,7 +749,7 @@ app.on("ready", async () => {
       recentFiles = new RecentStore(app.getPath("userData"), {
         privateFile: true,
       });
-      agentSidecarClient.setWorkspaceCatalog(workspaceCatalog);
+      servicesSidecarClient.setWorkspaceCatalog(workspaceCatalog);
       if (process.argv.includes("--native-chat")) {
         const catalog = workspaceCatalog;
         nativeEditorMcp = await NativeEditorMcpExport.start(
@@ -843,7 +843,7 @@ app.on("ready", async () => {
     clear_hosted_session: async () => {
       nativeEditorMcp?.revoke();
       await Promise.all([
-        agentSidecarClient.clearGridaGatewaySession(),
+        servicesSidecarClient.clearGridaGatewaySession(),
         nativeDesktopAgent?.clearAccount(),
         nativeExternalRuns?.close().catch(() => {
           console.error(
@@ -956,9 +956,11 @@ app.on("ready", async () => {
   // approval UI—sit in front of the required Grida account entry flow.
   const sidecarStartup = (async (): Promise<boolean> => {
     try {
-      agentSidecarInfo = await startAgentSidecar(workspaceCatalog?.directory);
+      servicesSidecarInfo = await startServicesSidecar(
+        workspaceCatalog?.directory
+      );
       console.log(
-        `[grida] agent sidecar ready on 127.0.0.1:${agentSidecarInfo.port}`
+        `[grida] services sidecar ready on 127.0.0.1:${servicesSidecarInfo.port}`
       );
       // Now that the sidecar is up, serve `grida-workspace://` media requests
       // by proxying to its streamed `/workspaces/file` route (#924).
@@ -966,7 +968,7 @@ app.on("ready", async () => {
       markAuthenticatedEntryReady();
       return true;
     } catch (err) {
-      console.error("[grida] agent sidecar failed to start:", err);
+      console.error("[grida] services sidecar failed to start:", err);
       dialog.showErrorBox(
         "Grida couldn't start",
         "Grida's background service failed to start. Relaunch the app or report this issue."
@@ -1002,7 +1004,7 @@ app.on("ready", async () => {
 });
 
 async function approveConfiguredProviderEndpoints(): Promise<void> {
-  const endpoints = await agentSidecarClient.listProviderEndpoints();
+  const endpoints = await servicesSidecarClient.listProviderEndpoints();
   if (endpoints.length === 0) return;
   const rows: Array<{
     id: string;
@@ -1060,7 +1062,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("activate", () => {
-  if (!agentSidecarInfo || !entryWindow) return;
+  if (!servicesSidecarInfo || !entryWindow) return;
   void entryWindow.reconcile({ focus: true }).catch((error) => {
     console.warn("[grida] account revalidation failed:", error);
     entryWindow?.focus();
@@ -1070,7 +1072,7 @@ app.on("activate", () => {
 app.once("will-quit", () => {
   // A dirty window can cancel quit. Keep shared services available until
   // Electron confirms that all windows have closed.
-  stopAgentSidecar();
+  stopServicesSidecar();
   disposeAllTerminals();
   void disposeAllWorkspaceWatches();
 });

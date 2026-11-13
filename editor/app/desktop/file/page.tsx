@@ -12,7 +12,7 @@ import { LastWorkspaceMarker } from "@/scaffolds/desktop/shared/last-workspace-m
  * with `window.grida` present reaches it.
  *
  * Param-discriminated:
- *   - `?docId=<id>` → single-file SVG editor (the agent sidecar's opaque
+ *   - `?docId=<id>` → single-file SVG editor (the services sidecar's opaque
  *     registry; the renderer never sees the absolute path, per GRIDA-SEC-004).
  *   - `?id=<workspaceId>` (+ optional `?path=<basePath>`) → `.canvas` slides
  *     deck, read/written through the workspace bridge fs.

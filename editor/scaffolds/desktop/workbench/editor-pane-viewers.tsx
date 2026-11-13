@@ -16,7 +16,7 @@
  *     extensions still render readably.
  *
  * Each viewer owns its own load-state (`useFileText` / `useFileBytes`
- * helpers below). Errors surface inline — the agent sidecar's
+ * helpers below). Errors surface inline — the services sidecar's
  * `file-not-utf8`, `file-too-large`, etc. messages are already
  * human-readable, so we don't try to second-guess them here.
  */

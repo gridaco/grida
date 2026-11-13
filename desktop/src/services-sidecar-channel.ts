@@ -13,7 +13,7 @@ import { TextDecoder } from "node:util";
  * already-connected daemon sockets. Neither channel is a fallback for the
  * other.
  */
-export namespace AgentSidecarChannel {
+export namespace ServicesSidecarChannel {
   export const VERSION = 1 as const;
   export const MAX_FRAME_BYTES = 256 * 1024;
   export const MAX_BINARY_CHUNK_BYTES = 64 * 1024;
@@ -526,10 +526,10 @@ const RESPONSE_ERROR_CODES = new Set<unknown>([
   "aborted",
   "protocol",
   "internal",
-] satisfies AgentSidecarChannel.ResponseErrorCode[]);
+] satisfies ServicesSidecarChannel.ResponseErrorCode[]);
 
 function protocolError(message: string): Error {
-  return new Error(`agent sidecar channel protocol error: ${message}`);
+  return new Error(`services sidecar channel protocol error: ${message}`);
 }
 
 function asError(error: unknown): Error {
@@ -643,7 +643,7 @@ function expectMethod(value: unknown): asserts value is string {
 
 function expectHeaders(
   value: unknown
-): asserts value is AgentSidecarChannel.Header[] {
+): asserts value is ServicesSidecarChannel.Header[] {
   if (!Array.isArray(value) || value.length > 512) {
     throw protocolError("headers must be an array with at most 512 entries");
   }
@@ -679,7 +679,7 @@ function expectBase64Chunk(value: unknown): asserts value is string {
     value.length === 0 ||
     !BASE64.test(value) ||
     Buffer.byteLength(value, "base64") >
-      AgentSidecarChannel.MAX_BINARY_CHUNK_BYTES
+      ServicesSidecarChannel.MAX_BINARY_CHUNK_BYTES
   ) {
     throw protocolError("data must be a non-empty bounded base64 chunk");
   }
@@ -687,7 +687,7 @@ function expectBase64Chunk(value: unknown): asserts value is string {
 
 function expectGrants(
   value: unknown
-): asserts value is AgentSidecarChannel.NetworkGrant[] {
+): asserts value is ServicesSidecarChannel.NetworkGrant[] {
   if (!Array.isArray(value) || value.length > 128) {
     throw protocolError("grants must be an array with at most 128 entries");
   }

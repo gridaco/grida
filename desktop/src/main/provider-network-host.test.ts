@@ -12,16 +12,16 @@ vi.mock("electron", () => ({
   net: { request: vi.fn<(...args: unknown[]) => unknown>() },
 }));
 
-import { AgentSidecarChannel } from "../agent-sidecar-channel";
-import { AgentNetworkAuthority } from "./agent-network-authority";
+import { ServicesSidecarChannel } from "../services-sidecar-channel";
+import { ProviderNetworkAuthority } from "./provider-network-authority";
 import {
-  AgentNetworkHost,
+  ProviderNetworkHost,
   requestThroughSession,
   responseFromIncoming,
-} from "./agent-network-host";
+} from "./provider-network-host";
 import { NativeProviderEgress } from "./native-provider-egress";
 
-describe("AgentNetworkHost", () => {
+describe("ProviderNetworkHost", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("identifies native provider traffic separately from browser navigation", async () => {
@@ -31,8 +31,8 @@ describe("AgentNetworkHost", () => {
       setUserAgent,
       setProxy,
     } as never);
-    await AgentNetworkHost.nativeProviderNetwork(
-      new AgentNetworkAuthority("https://grida.co"),
+    await ProviderNetworkHost.nativeProviderNetwork(
+      new ProviderNetworkAuthority("https://grida.co"),
       "provider:built-in"
     );
     expect(session.fromPartition).toHaveBeenCalledWith("grida-agent-provider", {
@@ -226,10 +226,10 @@ describe("AgentNetworkHost", () => {
         callback(new Error("bootstrap pipe failed"));
       },
     });
-    const host = new AgentNetworkHost(
+    const host = new ProviderNetworkHost(
       new PassThrough(),
       output,
-      new AgentNetworkAuthority("https://grida.co"),
+      new ProviderNetworkAuthority("https://grida.co"),
       { fetch: vi.fn<() => Promise<Response>>() },
       vi.fn<(error: Error) => void>()
     );
@@ -246,9 +246,9 @@ describe("AgentNetworkHost", () => {
   it("times out grant publication even while its update write is blocked", async () => {
     vi.useFakeTimers();
     const output = new FirstWriteBlockedWritable();
-    const authority = new AgentNetworkAuthority("https://grida.co");
+    const authority = new ProviderNetworkAuthority("https://grida.co");
     authority.approveCustomEndpoint("ollama", "http://localhost:11434/v1");
-    const host = new AgentNetworkHost(
+    const host = new ProviderNetworkHost(
       new PassThrough(),
       output,
       authority,
@@ -299,8 +299,8 @@ describe("AgentNetworkHost", () => {
         setUserAgent: vi.fn<(value: string) => void>(),
         setProxy: vi.fn<(config: unknown) => Promise<void>>(),
       } as never);
-      const authority = new AgentNetworkAuthority("https://grida.co");
-      const network = await AgentNetworkHost.nativeProviderNetwork(
+      const authority = new ProviderNetworkAuthority("https://grida.co");
+      const network = await ProviderNetworkHost.nativeProviderNetwork(
         authority,
         "provider:built-in"
       );
@@ -450,7 +450,7 @@ describe("AgentNetworkHost", () => {
     await harness.untilFrame("response.end");
     const chunks = harness.frames
       .filter(
-        (frame): frame is AgentSidecarChannel.ResponseChunkFrame =>
+        (frame): frame is ServicesSidecarChannel.ResponseChunkFrame =>
           frame.type === "response.chunk"
       )
       .map((frame) => Buffer.from(frame.data, "base64"));
@@ -1121,9 +1121,9 @@ function createHarness(adapter: {
 }) {
   const sidecarOutput = new PassThrough();
   const sidecarInput = new PassThrough();
-  const authority = new AgentNetworkAuthority("https://grida.co");
+  const authority = new ProviderNetworkAuthority("https://grida.co");
   const fatal = vi.fn<(error: Error) => void>();
-  const host = new AgentNetworkHost(
+  const host = new ProviderNetworkHost(
     sidecarOutput,
     sidecarInput,
     authority,
@@ -1137,9 +1137,9 @@ function createHarness(adapter: {
 async function createElectronHarness() {
   const sidecarOutput = new PassThrough();
   const sidecarInput = new PassThrough();
-  const authority = new AgentNetworkAuthority("https://grida.co");
+  const authority = new ProviderNetworkAuthority("https://grida.co");
   const fatal = vi.fn<(error: Error) => void>();
-  const host = await AgentNetworkHost.create({
+  const host = await ProviderNetworkHost.create({
     input: sidecarOutput,
     output: sidecarInput,
     authority,
@@ -1171,18 +1171,18 @@ function mockEmptyProviderResponse() {
 }
 
 function observeHarness(
-  host: AgentNetworkHost,
+  host: ProviderNetworkHost,
   sidecarOutput: PassThrough,
   sidecarInput: PassThrough,
-  authority: AgentNetworkAuthority,
+  authority: ProviderNetworkAuthority,
   fatal: ReturnType<typeof vi.fn<(error: Error) => void>>
 ) {
-  const sidecar = new AgentSidecarChannel.Writer(sidecarOutput);
-  const decoder = new AgentSidecarChannel.Decoder();
-  const frames: AgentSidecarChannel.HostToSidecarFrame[] = [];
+  const sidecar = new ServicesSidecarChannel.Writer(sidecarOutput);
+  const decoder = new ServicesSidecarChannel.Decoder();
+  const frames: ServicesSidecarChannel.HostToSidecarFrame[] = [];
   sidecarInput.on("data", (chunk: Buffer) => {
     for (const frame of decoder.push(chunk)) {
-      frames.push(frame as AgentSidecarChannel.HostToSidecarFrame);
+      frames.push(frame as ServicesSidecarChannel.HostToSidecarFrame);
     }
   });
   return {
@@ -1219,14 +1219,18 @@ function observeHarness(
       await sidecar.write({ v: 1, type: "ready", port: 43123 });
       await expect(ready).resolves.toBe(43123);
     },
-    async untilFrame<T extends AgentSidecarChannel.HostToSidecarFrame["type"]>(
+    async untilFrame<
+      T extends ServicesSidecarChannel.HostToSidecarFrame["type"],
+    >(
       type: T
-    ): Promise<Extract<AgentSidecarChannel.HostToSidecarFrame, { type: T }>> {
+    ): Promise<
+      Extract<ServicesSidecarChannel.HostToSidecarFrame, { type: T }>
+    > {
       for (let attempt = 0; attempt < 200; attempt += 1) {
         const frame = frames.find((candidate) => candidate.type === type);
         if (frame) {
           return frame as Extract<
-            AgentSidecarChannel.HostToSidecarFrame,
+            ServicesSidecarChannel.HostToSidecarFrame,
             { type: T }
           >;
         }

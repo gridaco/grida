@@ -38,7 +38,7 @@ grida-agent       (crates/grida-agent — host composition, the executable)
    │                     subagents, hooks, compaction accounts
    └ agent-kit-{core,runtime,sessions,providers,sandbox,store-sqlite}
 
-Retained media sidecar (AgentSidecar) — separate child of Main, runs no chat
+Retained media sidecar (ServicesSidecar) — separate child of Main, runs no chat
    DaemonServer (@grida/daemon) + media tenant (@grida/ai-host/media-server)
 ```
 

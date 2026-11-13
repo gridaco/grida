@@ -1,7 +1,7 @@
 import { once } from "node:events";
 import net, { Socket } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AgentSidecarDaemonSockets } from "./agent-sidecar-daemon-sockets";
+import { ServicesSidecarDaemonSockets } from "./services-sidecar-daemon-sockets";
 
 const servers = new Set<net.Server>();
 
@@ -14,10 +14,10 @@ afterEach(async () => {
   servers.clear();
 });
 
-describe("AgentSidecarDaemonSockets", () => {
+describe("ServicesSidecarDaemonSockets", () => {
   it("serves HTTP on an accepted socket without owning a listener", async () => {
     const fatal = vi.fn<(error: Error) => void>();
-    const sockets = new AgentSidecarDaemonSockets(
+    const sockets = new ServicesSidecarDaemonSockets(
       async (request) => new Response(new URL(request.url).pathname),
       fatal
     );
@@ -40,7 +40,7 @@ describe("AgentSidecarDaemonSockets", () => {
 
   it("rejects malformed capabilities as fatal", () => {
     const fatal = vi.fn<(error: Error) => void>();
-    const sockets = new AgentSidecarDaemonSockets(
+    const sockets = new ServicesSidecarDaemonSockets(
       async () => new Response(null),
       fatal
     );
@@ -58,7 +58,7 @@ describe("AgentSidecarDaemonSockets", () => {
 
   it("drops capacity overflow without converting local load into a fatal", () => {
     const fatal = vi.fn<(error: Error) => void>();
-    const sockets = new AgentSidecarDaemonSockets(
+    const sockets = new ServicesSidecarDaemonSockets(
       async () => new Response(null),
       fatal
     );
@@ -75,7 +75,7 @@ describe("AgentSidecarDaemonSockets", () => {
   });
 
   it("destroys active transferred sockets on close", async () => {
-    const sockets = new AgentSidecarDaemonSockets(
+    const sockets = new ServicesSidecarDaemonSockets(
       async () => new Response(null),
       vi.fn<(error: Error) => void>()
     );

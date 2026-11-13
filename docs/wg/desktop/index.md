@@ -1,7 +1,7 @@
 ---
 title: Desktop (WG)
 description: Grida Desktop is one host implementation of the agent RFC. These docs are delta-only — every fact here depends on the Electron + macOS/Linux/Windows host shape.
-keywords: [desktop, electron, native agent host, AgentSidecar, grida-sec-004]
+keywords: [desktop, electron, native agent host, ServicesSidecar, grida-sec-004]
 format: md
 tags:
   - internal
@@ -35,7 +35,7 @@ For the user-facing app and the security boundary:
 
 | Page                                               | Covers                                                                                                                                                           |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Process model](./process-model.md)                | Electron main / native agent host / socketless `AgentSidecar` / renderer — what each owns, main-owned loopback, and provider frames.                             |
+| [Process model](./process-model.md)                | Electron main / native agent host / socketless `ServicesSidecar` / renderer — what each owns, main-owned loopback, and provider frames.                          |
 | [Renderer bridge](./renderer-bridge.md)            | URL-loaded renderer doctrine — `loadURL("grida.co/desktop/*")`, path-scoped `window.grida`, `DesktopBridgeGate`.                                                 |
 | [Resource loading](./resource-loading.md)          | How the renderer gets host-owned resource bytes — buffered (`data:`) vs streamed (privileged `grida-workspace:` scheme), Range/seeking, proxy-not-new-authority. |
 | [Agent security](./agent-security.md)              | Desktop binding of `GRIDA-SEC-004`: bridge path scope, HTTP perimeter, sandbox, and secrets discipline.                                                          |

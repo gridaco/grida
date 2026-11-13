@@ -2,7 +2,7 @@
  * GRIDA-SEC-004 — move-to-trash for a workspace entry (file or folder).
  *
  * Trash is an OS capability (`shell.trashItem`), so — unlike the workspace
- * fs reads/writes, which the agent sidecar serves and contains — this
+ * fs reads/writes, which the services sidecar serves and contains — this
  * destructive action runs in the Electron main process. The renderer can
  * only ask to trash `{workspaceId, relPath}` (never a raw absolute path);
  * main re-derives and re-validates the path here before the native call.

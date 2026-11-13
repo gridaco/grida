@@ -29,10 +29,10 @@ vi.mock("./sidecar-log", () => ({
   },
 }));
 
-import { AgentSidecarSupervisor } from "./agent-sidecar-supervisor";
+import { ServicesSidecarSupervisor } from "./services-sidecar-supervisor";
 import { app } from "electron";
-import { AgentNetworkHost } from "./agent-network-host";
-import { AgentNetworkPolicy } from "../agent-network-policy";
+import { ProviderNetworkHost } from "./provider-network-host";
+import { ProviderNetworkPolicy } from "../provider-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { DesktopMediaRoot } from "./media-root";
 import { RetainedServiceSandbox } from "./retained-service-sandbox";
@@ -41,7 +41,7 @@ import { LegacyAgentPaths } from "./legacy-agent-paths";
 const supportsNativeChat =
   process.platform === "darwin" || process.platform === "linux";
 
-describe("AgentSidecarSupervisor recovery", () => {
+describe("ServicesSidecarSupervisor recovery", () => {
   beforeEach(() => {
     vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/compatibility-agent");
     vi.useFakeTimers();
@@ -57,7 +57,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   });
 
   it("starts the media sandbox without preparing scratch or command authority", async () => {
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     const state = supervisor as unknown as {
       initSandbox(): Promise<void>;
       scratchBase: string | null;
@@ -117,7 +117,7 @@ describe("AgentSidecarSupervisor recovery", () => {
         vi.spyOn(app, "isPackaged", "get").mockReturnValue(false);
         vi.spyOn(DesktopMediaRoot, "current").mockReturnValue(media);
 
-        const supervisor = new AgentSidecarSupervisor();
+        const supervisor = new ServicesSidecarSupervisor();
         const paths = supervisor.selectNativeChat(true);
         const state = supervisor as unknown as {
           initSandbox(): Promise<void>;
@@ -166,7 +166,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   );
 
   it("forwards disabled agent startup without scratch or skill arguments", async () => {
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     // Inspect the exact native argv, then stop before spawning a real child.
     const prepare = vi
       .spyOn(RetainedServiceSandbox.prototype, "prepare")
@@ -187,10 +187,10 @@ describe("AgentSidecarSupervisor recovery", () => {
 
   it("binds native subscription settings only to the selected native chat paths", async () => {
     vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/subscription-source");
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     const network = { prepare: () => null };
     const egress = vi
-      .spyOn(AgentNetworkHost, "nativeProviderNetwork")
+      .spyOn(ProviderNetworkHost, "nativeProviderNetwork")
       .mockResolvedValue(network);
     await expect(supervisor.nativeSubscriptionSettings()).rejects.toThrow(
       "native_chatgpt_source_unavailable"
@@ -203,13 +203,13 @@ describe("AgentSidecarSupervisor recovery", () => {
     });
     expect(egress).toHaveBeenCalledExactlyOnceWith(
       expect.anything(),
-      AgentNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID
+      ProviderNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID
     );
   });
 
   it("fixes native chat paths only for the primary app before starting chat services", async () => {
     vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/native-agent");
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     vi.mocked(app.hasSingleInstanceLock).mockReturnValueOnce(false);
     expect(() => supervisor.selectNativeChat()).toThrow(
       "native_chat_selection_unavailable"
@@ -239,7 +239,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   });
 
   it("cannot select native chat after services were started", async () => {
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     vi.spyOn(
       supervisor as unknown as { initSandbox(): Promise<void> },
       "initSandbox"
@@ -256,7 +256,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   it("shares the canonical Grida home and isolates an explicit agent data override", async () => {
     vi.stubEnv("GRIDA_HOME", "/synthetic/grida-home");
     vi.stubEnv("GRIDA_AGENT_USER_DATA", undefined);
-    const shared = new AgentSidecarSupervisor() as unknown as {
+    const shared = new ServicesSidecarSupervisor() as unknown as {
       user_data_path: string;
       provider_home: string;
       stop(): void;
@@ -265,7 +265,7 @@ describe("AgentSidecarSupervisor recovery", () => {
     expect(shared.provider_home).toBe("/synthetic/grida-home");
     shared.stop();
     vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/isolated-agent");
-    const isolated = new AgentSidecarSupervisor() as unknown as {
+    const isolated = new ServicesSidecarSupervisor() as unknown as {
       user_data_path: string;
       provider_home: string;
       stop(): void;
@@ -276,7 +276,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   });
 
   it("retires and restarts when a grant snapshot is not acknowledged", async () => {
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     const child = fakeChild();
     const networkHost = {
       updateGrants: vi.fn<() => Promise<void>>(async () => {
@@ -314,7 +314,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   });
 
   it("does not let a stale generation retire or restart its replacement", () => {
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     const stale = fakeChild();
     const current = fakeChild();
     const networkHost = { close: vi.fn<() => void>() };
@@ -348,7 +348,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   });
 
   it("does not let a late grant failure retire its replacement host", async () => {
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     const stale = fakeChild();
     const current = fakeChild();
     let rejectPublication!: (error: Error) => void;
@@ -406,7 +406,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   });
 
   it("propagates temporary-endpoint validation failures", async () => {
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     const operation = vi.fn<() => Promise<string>>(async () => "never");
 
     await expect(
@@ -418,7 +418,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   });
 
   it("rolls back a temporary grant when initial publication fails", async () => {
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     const running = installRunningState(supervisor, [
       new Error("grant acknowledgement timed out"),
     ]);
@@ -438,7 +438,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   });
 
   it("revokes a temporary grant when the operation fails", async () => {
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     const running = installRunningState(supervisor, [null, null]);
 
     await expect(
@@ -456,7 +456,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   });
 
   it("keeps cleanup revocation committed when its ACK fails", async () => {
-    const supervisor = new AgentSidecarSupervisor();
+    const supervisor = new ServicesSidecarSupervisor();
     const running = installRunningState(supervisor, [
       null,
       new Error("cleanup acknowledgement timed out"),
@@ -476,7 +476,7 @@ describe("AgentSidecarSupervisor recovery", () => {
 });
 
 function installRunningState(
-  supervisor: AgentSidecarSupervisor,
+  supervisor: ServicesSidecarSupervisor,
   updateResults: Array<Error | null>
 ) {
   const child = fakeChild();
@@ -501,7 +501,7 @@ function installRunningState(
   return { child, networkHost, daemonSocketHost };
 }
 
-function customGrants(supervisor: AgentSidecarSupervisor): unknown[] {
+function customGrants(supervisor: ServicesSidecarSupervisor): unknown[] {
   const state = supervisor as unknown as {
     networkAuthority: { grants(): Array<{ id: string }> };
   };

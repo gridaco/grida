@@ -16,7 +16,7 @@ const MAX_PENDING_TRANSFERS = 64;
  * a destination. This works across SRT's Linux network namespace and lets
  * macOS run with `allowLocalBinding: false`.
  */
-export class AgentDaemonSocketHost {
+export class ServicesSidecarSocketHost {
   private server: Server | null = null;
   private portValue: number | null = null;
   private listenPromise: Promise<number> | null = null;
@@ -38,7 +38,9 @@ export class AgentDaemonSocketHost {
       handle !== undefined ||
       !isCapabilityReadyMessage(message)
     ) {
-      this.onFatal(new Error("agent sidecar sent an unexpected IPC message"));
+      this.onFatal(
+        new Error("services sidecar sent an unexpected IPC message")
+      );
       return;
     }
     this.capabilityAttested = true;
@@ -49,7 +51,9 @@ export class AgentDaemonSocketHost {
 
   private readonly onDisconnect = () => {
     if (!this.closed) {
-      const error = new Error("agent sidecar capability channel disconnected");
+      const error = new Error(
+        "services sidecar capability channel disconnected"
+      );
       this.capabilityReadyReject?.(error);
       this.capabilityReadyResolve = null;
       this.capabilityReadyReject = null;
@@ -70,20 +74,20 @@ export class AgentDaemonSocketHost {
 
   get port(): number {
     if (this.portValue === null) {
-      throw new Error("agent daemon socket host port read before listen");
+      throw new Error("services sidecar socket host port read before listen");
     }
     return this.portValue;
   }
 
   async listen(): Promise<number> {
     if (this.closed) {
-      throw new Error("agent daemon socket host is closed");
+      throw new Error("services sidecar socket host is closed");
     }
     if (this.portValue !== null) return this.portValue;
     let listening = this.listenPromise;
     if (!listening) {
       if (!this.child.send || !this.child.connected) {
-        throw new Error("agent sidecar capability channel is unavailable");
+        throw new Error("services sidecar capability channel is unavailable");
       }
       listening = this.listenOnce();
       this.listenPromise = listening;
@@ -91,7 +95,7 @@ export class AgentDaemonSocketHost {
     try {
       const port = await listening;
       if (this.closed || this.portValue !== port) {
-        throw new Error("agent daemon socket host closed while listening");
+        throw new Error("services sidecar socket host closed while listening");
       }
       return port;
     } finally {
@@ -121,7 +125,7 @@ export class AgentDaemonSocketHost {
       };
       const cancel = () =>
         failStartup(
-          new Error("agent daemon socket host closed while listening")
+          new Error("services sidecar socket host closed while listening")
         );
       this.cancelListen = cancel;
       const onError = (error: Error) => {
@@ -140,14 +144,14 @@ export class AgentDaemonSocketHost {
           }
           if (this.closed || this.server !== server) {
             failStartup(
-              new Error("agent daemon socket host closed while listening")
+              new Error("services sidecar socket host closed while listening")
             );
             return;
           }
           const address = server.address();
           if (!address || typeof address === "string") {
             failStartup(
-              new Error("agent daemon socket host did not bind a TCP port")
+              new Error("services sidecar socket host did not bind a TCP port")
             );
             return;
           }
@@ -169,7 +173,9 @@ export class AgentDaemonSocketHost {
 
   markReady(port: number): void {
     if (!this.capabilityAttested || port !== this.port || this.ready) {
-      throw new Error("agent daemon ready port does not match its host grant");
+      throw new Error(
+        "services sidecar ready port does not match its host grant"
+      );
     }
     this.ready = true;
   }
@@ -181,7 +187,9 @@ export class AgentDaemonSocketHost {
     this.child.off("message", this.onMessage);
     this.child.off("disconnect", this.onDisconnect);
     this.capabilityReadyReject?.(
-      new Error("agent daemon socket host closed before capability readiness")
+      new Error(
+        "services sidecar socket host closed before capability readiness"
+      )
     );
     this.capabilityReadyResolve = null;
     this.capabilityReadyReject = null;

@@ -20,14 +20,14 @@ import {
 } from "../bridge/contract";
 import { EDITOR_BASE_URL } from "../env";
 import { isSafeExternalUrl } from "../window";
-import { agentSidecarClient } from "./agent-sidecar-client";
+import { servicesSidecarClient } from "./services-sidecar-client";
 import {
   approveAgentProviderEndpoint,
   describeAgentProviderEndpoint,
-  getAgentSidecarInfo,
+  getServicesSidecarInfo,
   revokeAgentProviderEndpoint,
   withTemporaryAgentProviderEndpoint,
-} from "./agent-sidecar-supervisor";
+} from "./services-sidecar-supervisor";
 import { AgentProviderEndpointMutation } from "./agent-provider-endpoint-mutation";
 import {
   isValidEndpointProviderId,
@@ -133,7 +133,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       if (error) throw new Error("native folder open failed");
     },
   });
-  const recentFiles = options.recent_files ?? agentSidecarClient.recent;
+  const recentFiles = options.recent_files ?? servicesSidecarClient.recent;
   const admittedWindow = (sender: WebContents) => {
     const window = BrowserWindow.fromWebContents(sender);
     return window && options.resolve_ipc_role(window) === "main"
@@ -320,8 +320,8 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   }
 
   guarded(IPC_CHANNELS.AGENT_SERVER_INFO, () => {
-    const info = getAgentSidecarInfo();
-    if (!info) throw new Error("agent sidecar not ready");
+    const info = getServicesSidecarInfo();
+    if (!info) throw new Error("services sidecar not ready");
     return info;
   });
 
@@ -751,7 +751,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   // handlers keep the daemon bearer and the chosen absolute path on the
   // trusted side of the bridge, returning only the user-facing Workspace DTO.
   guarded(IPC_CHANNELS.ONBOARDING_WORKSPACE_DEFAULT, async () => {
-    const workspaces = await agentSidecarClient.listWorkspaces();
+    const workspaces = await servicesSidecarClient.listWorkspaces();
     return workspaces.find((workspace) => workspace.is_default) ?? null;
   });
   async function chooseWorkspace(event: IpcMainInvokeEvent) {
@@ -776,14 +776,14 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         result.filePaths.length !== 1
       )
         return null;
-      return await agentSidecarClient.openWorkspace(result.filePaths[0]);
+      return await servicesSidecarClient.openWorkspace(result.filePaths[0]);
     } finally {
       revoke();
     }
   }
   guarded(IPC_CHANNELS.ONBOARDING_WORKSPACE_CHOOSE, chooseWorkspace);
   guarded(IPC_CHANNELS.WORKSPACE_LIST, () =>
-    agentSidecarClient.listWorkspaces()
+    servicesSidecarClient.listWorkspaces()
   );
   guarded(
     IPC_CHANNELS.WORKSPACE_PUBLISH_EDITOR_SURFACES,
@@ -794,7 +794,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.WORKSPACE_REOPEN, (_event, root: unknown) => {
     if (typeof root !== "string" || !root || Buffer.byteLength(root) > 4096)
       throw new Error("workspace_root_invalid");
-    return agentSidecarClient.reopenWorkspace(root);
+    return servicesSidecarClient.reopenWorkspace(root);
   });
   guarded(IPC_CHANNELS.WORKSPACE_CREATE, (_event, name: unknown) => {
     if (
@@ -802,20 +802,20 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       (typeof name !== "string" || Buffer.byteLength(name) > 4096)
     )
       throw new Error("workspace_name_invalid");
-    return agentSidecarClient.createWorkspace(name);
+    return servicesSidecarClient.createWorkspace(name);
   });
   guarded(
     IPC_CHANNELS.WORKSPACE_PIN,
     (_event, id: unknown, pinned: unknown) => {
       if (!workspaceIdValue(id) || typeof pinned !== "boolean")
         throw new Error("workspace_pin_invalid");
-      return agentSidecarClient.pinWorkspace(id, pinned);
+      return servicesSidecarClient.pinWorkspace(id, pinned);
     }
   );
   guarded(IPC_CHANNELS.WORKSPACE_FORGET, async (_event, id: unknown) => {
     if (!workspaceIdValue(id)) throw new Error("workspace_id_invalid");
     const forget =
-      options.forget_native_workspace ?? agentSidecarClient.forgetWorkspace;
+      options.forget_native_workspace ?? servicesSidecarClient.forgetWorkspace;
     const forgotten = forget(id);
     nativeChat.revokeWorkspace(id);
     try {
@@ -839,12 +839,12 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         "workspace_read_unavailable",
         async (signal) =>
           kind === "directory"
-            ? await agentSidecarClient.readWorkspaceDirectory(
+            ? await servicesSidecarClient.readWorkspaceDirectory(
                 id,
                 relative,
                 signal
               )
-            : await agentSidecarClient.readWorkspaceFile(
+            : await servicesSidecarClient.readWorkspaceFile(
                 id,
                 relative,
                 kind,
@@ -876,7 +876,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         event,
         "workspace_write_unavailable",
         (signal, check) =>
-          agentSidecarClient.writeWorkspaceFile(
+          servicesSidecarClient.writeWorkspaceFile(
             id,
             relative,
             content,
@@ -949,7 +949,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
         // the authenticated sidecar accepts the config does main publish its
         // grant. The per-id coordinator keeps this SET atomic with DELETE and
         // replacement SET ceremonies for the same endpoint.
-        await agentSidecarClient.setProviderEndpoint(config);
+        await servicesSidecarClient.setProviderEndpoint(config);
         await approveAgentProviderEndpoint(config.id, config.base_url);
       });
     }
@@ -963,7 +963,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       await AgentProviderEndpointMutation.remove({
         revokeAuthority: async () => await revokeAgentProviderEndpoint(id),
         deleteConfiguration: async () =>
-          await agentSidecarClient.deleteProviderEndpoint(id),
+          await servicesSidecarClient.deleteProviderEndpoint(id),
       });
     });
   });
@@ -975,7 +975,7 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       await confirmProviderOrigin(event, endpoint.origin, endpoint.route);
       return await withTemporaryAgentProviderEndpoint(
         baseUrl,
-        async () => await agentSidecarClient.probeProviderEndpoint(baseUrl)
+        async () => await servicesSidecarClient.probeProviderEndpoint(baseUrl)
       );
     }
   );
@@ -1362,7 +1362,7 @@ async function confirmProviderOrigin(
     type: "warning" as const,
     message: "Allow this AI provider endpoint?",
     detail:
-      `${origin}\n${route}\n\nGrida will let the agent sidecar contact only this origin ` +
+      `${origin}\n${route}\n\nGrida will let the services sidecar contact only this origin ` +
       "for provider requests until the app closes.",
     buttons: ["Allow", "Cancel"],
     defaultId: 1,
@@ -1377,7 +1377,7 @@ async function confirmProviderOrigin(
 }
 
 async function findWorkspaceOrThrow(workspaceId: string) {
-  const workspace = await agentSidecarClient.findWorkspace(workspaceId);
+  const workspace = await servicesSidecarClient.findWorkspace(workspaceId);
   if (!workspace) throw new Error(`workspace not found: ${workspaceId}`);
   return workspace;
 }

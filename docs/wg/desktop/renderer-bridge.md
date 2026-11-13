@@ -77,15 +77,15 @@ grida.co  (one Next.js app)
 
 ## What lives where
 
-| Concern                     | Where                                        |
-| --------------------------- | -------------------------------------------- |
-| Editor UI, agent pane       | `editor/scaffolds/desktop/`                  |
-| `/desktop/*` route group    | `editor/app/desktop/`                        |
-| Typed bridge client         | `editor/lib/desktop/bridge.ts`               |
-| Desktop chat seam           | `editor/lib/agent-chat/`                     |
-| Preload + Electron main     | `desktop/src/`                               |
-| `AgentSidecar` agent server | `packages/grida-ai-host/` (`@grida/ai-host`) |
-| `window.grida` shape        | `@grida/desktop-bridge`                      |
+| Concern                        | Where                                        |
+| ------------------------------ | -------------------------------------------- |
+| Editor UI, agent pane          | `editor/scaffolds/desktop/`                  |
+| `/desktop/*` route group       | `editor/app/desktop/`                        |
+| Typed bridge client            | `editor/lib/desktop/bridge.ts`               |
+| Desktop chat seam              | `editor/lib/agent-chat/`                     |
+| Preload + Electron main        | `desktop/src/`                               |
+| `ServicesSidecar` agent server | `packages/grida-ai-host/` (`@grida/ai-host`) |
+| `window.grida` shape           | `@grida/desktop-bridge`                      |
 
 The bridge type shape lives in `@grida/desktop-bridge`. Desktop preload
 and the editor-side typed client both consume that contract — single
@@ -116,7 +116,7 @@ renderer is under `/desktop/*`, never leaking agent server credentials onto
 `window`. All native-OS calls (dialogs, file paths, deep links, Dock menus)
 — renderer asks, main answers.
 
-**`AgentSidecar`.** See [process-model](./process-model.md). Short version:
+**`ServicesSidecar`.** See [process-model](./process-model.md). Short version:
 secrets, settings and media; chat runs in the native host. Desktop preload
 delegates daemon HTTP calls to the chat-free `MediaTransport.Client`; it does
 not duplicate daemon route strings. The shell holds no business logic. The

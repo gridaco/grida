@@ -15,18 +15,20 @@ import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 
 const sidecar = vi.hoisted(() => ({
   selectNativeChat:
-    vi.fn<typeof import("./agent-sidecar-supervisor").selectNativeChat>(),
+    vi.fn<typeof import("./services-sidecar-supervisor").selectNativeChat>(),
   nativeAgentGatewayConnection:
     vi.fn<
-      typeof import("./agent-sidecar-supervisor").nativeAgentGatewayConnection
+      typeof import("./services-sidecar-supervisor").nativeAgentGatewayConnection
     >(),
   findWorkspace:
     vi.fn<
-      typeof import("./agent-sidecar-client").agentSidecarClient.findWorkspace
+      typeof import("./services-sidecar-client").servicesSidecarClient.findWorkspace
     >(),
 }));
-vi.mock("./agent-sidecar-supervisor", () => sidecar);
-vi.mock("./agent-sidecar-client", () => ({ agentSidecarClient: sidecar }));
+vi.mock("./services-sidecar-supervisor", () => sidecar);
+vi.mock("./services-sidecar-client", () => ({
+  servicesSidecarClient: sidecar,
+}));
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const token = "fixture.local.peer.bearer";

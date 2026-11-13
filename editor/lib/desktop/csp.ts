@@ -21,7 +21,7 @@ const DESKTOP_CSP_PREFIX = `default-src 'self'; script-src 'self' 'nonce-`;
 
 //   connect-src allows:
 //   - 'self'              — grida.co (prod) / localhost:3000 (dev)
-//   - http://127.0.0.1:*  — the agent sidecar
+//   - http://127.0.0.1:*  — the services sidecar
 //   - localhost/ws(s)     — Next.js dev HMR ONLY; gated out of prod so a
 //                          renderer/XSS bug can't probe arbitrary local services
 const DESKTOP_CSP_CONNECT_SRC = IS_DEV

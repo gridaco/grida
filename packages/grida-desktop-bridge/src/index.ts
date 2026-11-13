@@ -350,7 +350,7 @@ export type DesktopBridge = {
     /**
      * Move a workspace entry (file or folder) to the OS trash
      * (recoverable; a folder takes its whole subtree). Unlike the sibling
-     * fs methods — which route to the agent sidecar — this is a host
+     * fs methods — which route to the services sidecar — this is a host
      * capability: the desktop main process performs the native trash
      * after re-validating that `relPath` resolves inside the workspace
      * root (and isn't the root itself). Renderers must confirm with the
@@ -363,7 +363,7 @@ export type DesktopBridge = {
      * coalesced batches of {@link WorkspaceChangeEvent} — covering edits
      * made outside the editor, including the agent's own writes. Like
      * `trash_entry` this is a native host capability (the OS watcher lives
-     * in the desktop main process), not an agent-sidecar operation.
+     * in the desktop main process), not a services-sidecar operation.
      *
      * `subscribe_changes` registers `on_change` before the OS watch
      * starts (caller-mints-id, mirroring `terminal.create`) so an early
@@ -451,7 +451,7 @@ export type DesktopBridge = {
   /**
    * Native ChatGPT-subscription provider control surface. OAuth credentials,
    * authorization codes, PKCE material, and provider access tokens stay in
-   * Electron main + the agent sidecar; only secret-free status crosses into
+   * Electron main + the services sidecar; only secret-free status crosses into
    * the renderer. Optional because protocol-1 Desktop builds predate it.
    */
   chatgpt?: {

@@ -1,7 +1,7 @@
 /**
  * Single-file SVG editor surface for the desktop **file window** — the
  * `?docId=` (single document) mode. Extracted from the former
- * `WorkstationShell`: it loads the file via the agent sidecar's docId registry
+ * `WorkstationShell`: it loads the file via the services sidecar's docId registry
  * (`bridge.files.read/write` — opaque ids per GRIDA-SEC-004, never the absolute
  * path), renders the editor canvas, and owns Cmd+S / dirty / the
  * `set_document_edited` close-prompt signal.

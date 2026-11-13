@@ -7,11 +7,11 @@ export {};
  *   - `INSIDERS` — set in `vite.main.config.ts`
  *     (source: `process.env.INSIDERS`). Used by `env.ts` to pick the
  *     editor base URL.
- *   - `EDITOR_BASE_URL` — set in `vite.agent-sidecar.config.ts`.
+ *   - `EDITOR_BASE_URL` — set in `vite.services-sidecar.config.ts`.
  *     The desktop supervisor passes the runtime value from main over
  *     argv so dev (`localhost:3000`) and packaged (`grida.co`) cannot drift.
  *
- * Agent-sidecar uses `EDITOR_BASE_URL`; editor Supabase env remains an
+ * Services-sidecar uses `EDITOR_BASE_URL`; editor Supabase env remains an
  * editor concern and is not baked into desktop main/preload.
  */
 declare global {

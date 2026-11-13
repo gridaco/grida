@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { AgentNetworkPolicy } from "../agent-network-policy";
+import { ProviderNetworkPolicy } from "../provider-network-policy";
 
 /**
  * GRIDA-SEC-004 — main-process ownership of provider-network grants.
@@ -10,24 +10,24 @@ import { AgentNetworkPolicy } from "../agent-network-policy";
  * the sidecar or one of its descendants can rewrite it would turn endpoint
  * config into network authority.
  */
-export class AgentNetworkAuthority {
-  private readonly builtIns: AgentNetworkPolicy.Grant[];
-  private readonly mainOnly = AgentNetworkPolicy.mainOnlyGrants();
+export class ProviderNetworkAuthority {
+  private readonly builtIns: ProviderNetworkPolicy.Grant[];
+  private readonly mainOnly = ProviderNetworkPolicy.mainOnlyGrants();
   private readonly customByEndpoint = new Map<
     string,
-    { baseUrl: string; grant: AgentNetworkPolicy.Grant }
+    { baseUrl: string; grant: ProviderNetworkPolicy.Grant }
   >();
   private revisionValue = 1;
 
   constructor(ggOrigin: string) {
-    this.builtIns = AgentNetworkPolicy.builtInGrants(ggOrigin);
+    this.builtIns = ProviderNetworkPolicy.builtInGrants(ggOrigin);
   }
 
   get revision(): number {
     return this.revisionValue;
   }
 
-  grants(): AgentNetworkPolicy.Grant[] {
+  grants(): ProviderNetworkPolicy.Grant[] {
     const custom = [...this.customByEndpoint.values()].map(
       ({ grant }) => grant
     );
@@ -39,7 +39,7 @@ export class AgentNetworkAuthority {
 
   /** Grants Main may dispatch for native hosts: the published set plus the
    * Main-only grants the sidecar never receives. */
-  nativeGrants(): AgentNetworkPolicy.Grant[] {
+  nativeGrants(): ProviderNetworkPolicy.Grant[] {
     return [
       ...this.grants(),
       ...this.mainOnly.map((grant) => ({
@@ -65,7 +65,7 @@ export class AgentNetworkAuthority {
     if (!/^[a-z][a-z0-9_-]{0,63}$/.test(endpointId)) {
       throw new Error("custom endpoint id is invalid");
     }
-    const origin = AgentNetworkPolicy.canonicalOrigin(baseUrl);
+    const origin = ProviderNetworkPolicy.canonicalOrigin(baseUrl);
     const canonicalBase = new URL(baseUrl).href;
     const current = this.customByEndpoint.get(endpointId);
     if (current?.baseUrl === canonicalBase) return;

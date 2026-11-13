@@ -1,9 +1,9 @@
 import { PassThrough, Transform } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
-import { AgentSidecarChannel } from "./agent-sidecar-channel";
-import { AgentSidecarNetwork } from "./agent-sidecar-network";
+import { ServicesSidecarChannel } from "./services-sidecar-channel";
+import { ServicesSidecarNetwork } from "./services-sidecar-network";
 
-describe("AgentSidecarNetwork", () => {
+describe("ServicesSidecarNetwork", () => {
   it("admits a bounded multipart mesh upload above the ordinary provider limit", async () => {
     const harness = createHarness();
     await harness.bootstrap();
@@ -402,13 +402,13 @@ describe("AgentSidecarNetwork", () => {
 
 function createHarness(sidecarOutput: Transform = new PassThrough()) {
   const hostOutput = new PassThrough();
-  const network = new AgentSidecarNetwork(hostOutput, sidecarOutput);
-  const host = new AgentSidecarChannel.Writer(hostOutput);
-  const decoder = new AgentSidecarChannel.Decoder();
-  const frames: AgentSidecarChannel.SidecarToHostFrame[] = [];
+  const network = new ServicesSidecarNetwork(hostOutput, sidecarOutput);
+  const host = new ServicesSidecarChannel.Writer(hostOutput);
+  const decoder = new ServicesSidecarChannel.Decoder();
+  const frames: ServicesSidecarChannel.SidecarToHostFrame[] = [];
   sidecarOutput.on("data", (chunk: Buffer) => {
     for (const frame of decoder.push(chunk)) {
-      frames.push(frame as AgentSidecarChannel.SidecarToHostFrame);
+      frames.push(frame as ServicesSidecarChannel.SidecarToHostFrame);
     }
   });
   return {
@@ -442,14 +442,18 @@ function createHarness(sidecarOutput: Transform = new PassThrough()) {
         revision: 1,
       });
     },
-    async untilFrame<T extends AgentSidecarChannel.SidecarToHostFrame["type"]>(
+    async untilFrame<
+      T extends ServicesSidecarChannel.SidecarToHostFrame["type"],
+    >(
       type: T
-    ): Promise<Extract<AgentSidecarChannel.SidecarToHostFrame, { type: T }>> {
+    ): Promise<
+      Extract<ServicesSidecarChannel.SidecarToHostFrame, { type: T }>
+    > {
       for (let attempt = 0; attempt < 200; attempt += 1) {
         const frame = frames.find((candidate) => candidate.type === type);
         if (frame) {
           return frame as Extract<
-            AgentSidecarChannel.SidecarToHostFrame,
+            ServicesSidecarChannel.SidecarToHostFrame,
             { type: T }
           >;
         }
@@ -457,18 +461,20 @@ function createHarness(sidecarOutput: Transform = new PassThrough()) {
       }
       throw new Error(`frame not observed: ${type}`);
     },
-    async untilFrames<T extends AgentSidecarChannel.SidecarToHostFrame["type"]>(
+    async untilFrames<
+      T extends ServicesSidecarChannel.SidecarToHostFrame["type"],
+    >(
       type: T,
       count: number
     ): Promise<
-      Array<Extract<AgentSidecarChannel.SidecarToHostFrame, { type: T }>>
+      Array<Extract<ServicesSidecarChannel.SidecarToHostFrame, { type: T }>>
     > {
       for (let attempt = 0; attempt < 200; attempt += 1) {
         const matching = frames.filter(
           (
             frame
           ): frame is Extract<
-            AgentSidecarChannel.SidecarToHostFrame,
+            ServicesSidecarChannel.SidecarToHostFrame,
             { type: T }
           > => frame.type === type
         );

@@ -1,7 +1,8 @@
 ---
 title: Agent storage layout
 description: Which Desktop process keeps which files — the native agent host's chat state, the retained sidecar's registries and credentials, and the chat store of earlier releases.
-keywords: [desktop, native agent host, agent-sidecar, storage, sqlite, userData]
+keywords:
+  [desktop, native agent host, services-sidecar, storage, sqlite, userData]
 format: md
 tags:
   - internal

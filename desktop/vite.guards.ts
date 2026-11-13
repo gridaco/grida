@@ -25,7 +25,7 @@ import type { Plugin } from "vite";
  * EMITTED bundle and, on an offender, print to stderr directly and exit
  * hard. All verified against `pnpm package`.
  *
- * Wire it into every desktop Vite entry (main, preload, agent-sidecar).
+ * Wire it into every desktop Vite entry (main, preload, services-sidecar).
  */
 
 const WORKSPACE_SCOPE = "@grida/";

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { constants, type Stats } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { selectNativeChat } from "./agent-sidecar-supervisor";
+import { selectNativeChat } from "./services-sidecar-supervisor";
 import {
   NativeAgentChat,
   type NativeAgentChatLaunch,

@@ -125,7 +125,7 @@ describe("desktop CSP (GRIDA-SEC-004)", () => {
     });
   });
 
-  it("connect-src reaches the loopback agent sidecar", () => {
+  it("connect-src reaches the loopback services sidecar", () => {
     expect(directive("connect-src")).toContain("http://127.0.0.1:*");
   });
 

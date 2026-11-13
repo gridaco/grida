@@ -265,7 +265,7 @@ The boundary is the rule that **only requests originating from the
 desktop's privileged renderer at a `/desktop/*` path, signed with
 the per-spawn Basic Auth token, may reach the daemon, and only the
 main-owned provider transport may carry the daemon's provider HTTP outside
-its sandbox. Electron main owns the exact loopback listener; AgentSidecar
+its sandbox. Electron main owns the exact loopback listener; ServicesSidecar
 receives no listener, and the macOS/Linux sandbox grants it no generic
 bind/connect authority. Windows does not yet satisfy that containment
 clause; its current nonconformance is recorded below.**
@@ -294,7 +294,7 @@ TOML owner, with one memory-only GG session and one catalogue per composition.
 The first provider access retires legacy API entries through GRIDA-SEC-014;
 subsequent reads never use that retired source.
 
-The [supervisor](desktop/src/main/agent-sidecar-supervisor.ts) loads its
+The [supervisor](desktop/src/main/services-sidecar-supervisor.ts) loads its
 native sandbox before spawning the child. On macOS and Linux an unavailable
 sandbox refuses the launch; Windows keeps its explicitly unconfined non-agent
 services.
@@ -395,7 +395,7 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    Electron main owns the exact `127.0.0.1:<ephemeral>` listener. Each
    loopback connection is accepted paused and transferred as an
    already-connected socket over the per-spawn Node IPC descriptor.
-   AgentSidecar starts `DaemonServer` without a listener and can serve only
+   ServicesSidecar starts `DaemonServer` without a listener and can serve only
    that transferred connection: it receives no listener, destination field,
    bind operation, or connect operation. The descriptor is therefore a socket
    capability channel, not a second daemon protocol. This keeps
@@ -454,8 +454,8 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    `/v1/endpoints` and `/schemas/operations.json`, with no query or body and only
    `Accept`, `Accept-Encoding` and `User-Agent` headers. It grants no inference
    endpoint, alternate port, subdomain or download authority. The
-   [network policy](desktop/src/agent-network-policy.ts) and
-   [tests](desktop/src/agent-network-policy.test.ts) enforce that permission;
+   [network policy](desktop/src/provider-network-policy.ts) and
+   [tests](desktop/src/provider-network-policy.test.ts) enforce that permission;
    the [discovery reader](packages/grida-ai/src/gg-discovery.ts) bounds metadata
    bytes, deadlines and cache age. Public metadata never carries a scoped token
    or authorizes spending. Signed-in execution continues through the configured
@@ -691,7 +691,7 @@ no manifest, no document of any kind). This adds a new renderer-reachable
 user had already picked through the OS dialog), so it is recorded here. The
 boundary holds by three rules, none of which trust the caller for a path: (a)
 the managed root is **host-injected** — the supervisor passes
-`--projects-root=<~/Documents/Grida Projects>` (`desktop/src/main/agent-sidecar-supervisor.ts`),
+`--projects-root=<~/Documents/Grida Projects>` (`desktop/src/main/services-sidecar-supervisor.ts`),
 never derived from the request; a host that wired no root refuses with a 400.
 (b) The request's `name` is **slugified to a single filesystem segment**
 (`WorkspaceRegistry.createProject` / `slugifyProjectName`): path separators,
@@ -712,13 +712,13 @@ Rust host and sandbox helper, independently of these retained service roots.
 that the created project is empty (an unexpected `seed` body is inert), and the
 no-managed-root refusal.
 
-The [private network host](desktop/src/main/agent-network-host.ts) establishes
+The [private network host](desktop/src/main/provider-network-host.ts) establishes
 bootstrap and control before provider-network initialization. Only an authorized
 provider request starts the memory-only Chromium session; it still waits for
 successful system-proxy configuration. Cancellation and shutdown settle pending
 requests without dispatch. After that wait, the host rechecks the exact current
 destination grant before Chromium receives the request. Initialization failure
-has no direct-network fallback. [Boundary tests](desktop/src/main/agent-network-host.test.ts)
+has no direct-network fallback. [Boundary tests](desktop/src/main/provider-network-host.test.ts)
 cover delayed/failed setup, revoked grants and late completion after shutdown.
 
 The [account owner](desktop/src/main/account-session.ts) reports scoped Gateway
@@ -769,7 +769,7 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   and the [Desktop provider broker](desktop/src/main/native-provider-egress.ts)
   use a negotiated capability on the same private stdio connection. The
   broker independently checks the exact configured provider route and its
-  allowed headers. [Electron's connector](desktop/src/main/agent-network-host.ts)
+  allowed headers. [Electron's connector](desktop/src/main/provider-network-host.ts)
   rechecks the live network grant at dispatch, uses the dedicated
   memory-only Chromium session, and starts one POST without following
   redirects. Upload and pull are bounded. Cancelling the exchange or closing
@@ -791,7 +791,7 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   lock, rechecks network authority, and starts the request before releasing
   that lock. A failure after initiation is reported as uncertain. This checks
   observed values and does not detect an unobserved change away and back.
-  [Main's grant owner](desktop/src/main/agent-network-authority.ts)
+  [Main's grant owner](desktop/src/main/provider-network-authority.ts)
   rotates the captured grant when the approved base changes, including a path
   change on the same origin. Retained launch profiles cannot use the new grant.
   Built-in OpenRouter and Vercel profiles require a selected catalogue model and
@@ -1288,12 +1288,12 @@ without switching providers. These additions bind the
 [bridge contract](packages/grida-desktop-bridge/src/index.ts) and
 [contract tests](packages/grida-desktop-bridge/src/index.test.ts), plus the
 [preload](desktop/src/preload.ts) and [preload tests](desktop/src/preload-contract.test.ts).
-The [network policy](desktop/src/agent-network-policy.ts),
-[sidecar transport](desktop/src/agent-sidecar-network.ts),
-[main network host](desktop/src/main/agent-network-host.ts) and their respective
-[policy](desktop/src/agent-network-policy.test.ts),
-[sidecar](desktop/src/agent-sidecar-network.test.ts), and
-[main](desktop/src/main/agent-network-host.test.ts) tests pin the separate upload grant.
+The [network policy](desktop/src/provider-network-policy.ts),
+[sidecar transport](desktop/src/services-sidecar-network.ts),
+[main network host](desktop/src/main/provider-network-host.ts) and their respective
+[policy](desktop/src/provider-network-policy.test.ts),
+[sidecar](desktop/src/services-sidecar-network.test.ts), and
+[main](desktop/src/main/provider-network-host.test.ts) tests pin the separate upload grant.
 
 - [Windows credential compatibility tests](packages/grida-daemon/src/secrets-windows.test.ts) and [provider composition tests](packages/grida-ai-host/src/providers/windows-custody.test.ts) — platform-selected host-local custody, preserved OAuth records and keyless GG image resolution, with strict provider failures that never switch the payer to GG. These simulate platform selection with disposable files; they do not certify native Windows ACLs.
 
@@ -1303,7 +1303,7 @@ Today:
 
 - [Media server entry](packages/grida-ai-host/src/media-server.ts), [shared host composition](packages/grida-ai-host/src/media-host.ts), [media server tests](packages/grida-ai-host/src/media-server.test.ts), and [built-entry isolation tests](packages/grida-ai-host/src/media-server-isolation.test.ts) — the media composition mounts existing routes behind the daemon perimeter and receives the same narrow credential, provider-HTTP and media-persistence capabilities. It adds no query-string credential, native-provider route or command executor; endpoint-provider routes mount only when the host opts in. It is the only daemon tenant.
 - [Media tenant wiring tests](packages/grida-ai-host/src/media-tenant-wiring.test.ts) — every generation route group receives the same host media service; music receives no BYOK store and the ElevenLabs groups receive no GG authority.
-- [Desktop composition](desktop/src/sidecar/daemon.ts) and [its tests](desktop/src/sidecar/daemon.test.ts) — select retained services before loading the server; their option types admit only disabled or native-chat service modes. Native OAuth lives in its dedicated host; no command executor is supplied to the retained service. The [supervisor tests](desktop/src/main/agent-sidecar-supervisor.test.ts) pin disabled-mode argv and the absence of scratch preparation while retaining the outer network fence.
+- [Desktop composition](desktop/src/sidecar/daemon.ts) and [its tests](desktop/src/sidecar/daemon.test.ts) — select retained services before loading the server; their option types admit only disabled or native-chat service modes. Native OAuth lives in its dedicated host; no command executor is supplied to the retained service. The [supervisor tests](desktop/src/main/services-sidecar-supervisor.test.ts) pin disabled-mode argv and the absence of scratch preparation while retaining the outer network fence.
 - An admitted [native preview](desktop/src/main/native-desktop-profile.ts)
   excludes known legacy Grida homes, Desktop data and derived scratch from
   workspace and standalone document admission and the retained sidecar's read
@@ -1322,7 +1322,7 @@ Today:
   no surrounding-directory or general filesystem authority. Disabled-agent
   startup retains its file-only behavior.
 - The [native chat store](desktop/src/main/native-chat-store.ts) takes its
-  path facts from the primary app's [sidecar supervisor](desktop/src/main/agent-sidecar-supervisor.ts),
+  path facts from the primary app's [sidecar supervisor](desktop/src/main/services-sidecar-supervisor.ts),
   which fixes them before any retained service starts. Its
   [retained sidecar composition](desktop/src/sidecar/daemon.ts) provides media
   and configured endpoint settings without a chat or command tenant. The store
@@ -1505,11 +1505,11 @@ Today:
 - [packages/grida-desktop-bridge/src/index.ts](packages/grida-desktop-bridge/src/index.ts) — renderer-safe bridge protocol and DTO vocabulary, including the optional path-free media library contract.
 - `desktop/src/bridge/contract.ts` — Desktop-local IPC channel vocabulary plus re-export of the renderer-safe bridge contract.
 - `desktop/src/window.ts` — blocks exposed desktop windows from navigating outside `/desktop/*`; injects non-secret preload arguments.
-- `desktop/src/agent-sidecar.ts` — retained-service entrypoint; Main is its sole spawner, and it accepts only main-transferred daemon sockets.
-- `desktop/src/agent-sidecar-daemon-sockets.ts` — injects only validated, already-connected socket capabilities into the unbound HTTP server; it exposes no listen, bind, connect, or target-selection operation.
-- `desktop/src/agent-sidecar-channel.ts`, `agent-network-policy.ts`, and `agent-sidecar-network.ts` — strict private stdio framing, destination/header policy and the sidecar's explicit provider/provider-asset transport client. The channel carries no host command lane: `command.*` frames are unknown types, and malformed or unknown frames fail the channel.
-- `desktop/src/main/agent-daemon-socket-host.ts` — owns the exact loopback listener, pauses accepted sockets, rejects non-loopback peers, and transfers the bounded connected capability over per-spawn Node IPC.
-- `desktop/src/main/agent-network-host.ts` and `agent-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization and per-spawn built-in/custom grant state. Main executes no command for the sidecar; native model commands run in the Rust host.
+- `desktop/src/services-sidecar.ts` — retained-service entrypoint; Main is its sole spawner, and it accepts only main-transferred daemon sockets.
+- `desktop/src/services-sidecar-daemon-sockets.ts` — injects only validated, already-connected socket capabilities into the unbound HTTP server; it exposes no listen, bind, connect, or target-selection operation.
+- `desktop/src/services-sidecar-channel.ts`, `provider-network-policy.ts`, and `services-sidecar-network.ts` — strict private stdio framing, destination/header policy and the sidecar's explicit provider/provider-asset transport client. The channel carries no host command lane: `command.*` frames are unknown types, and malformed or unknown frames fail the channel.
+- `desktop/src/main/services-sidecar-socket-host.ts` — owns the exact loopback listener, pauses accepted sockets, rejects non-loopback peers, and transfers the bounded connected capability over per-spawn Node IPC.
+- `desktop/src/main/provider-network-host.ts` and `provider-network-authority.ts` — main-owned Chromium network execution, bounded response streaming, redirect/route reauthorization and per-spawn built-in/custom grant state. Main executes no command for the sidecar; native model commands run in the Rust host.
 - The native command adapter retains the authorized scope, owns cleanup across runtime cancellation, and reconciles the original attempt. [Adapter](crates/grida-agent/src/command.rs) and [tests](crates/grida-agent/tests/commands.rs).
 - The [confined ACP turn driver](crates/grida-agent/src/acp/external.rs) is
   selected only by a trusted embedding. It requires a reviewed executable and
@@ -1587,7 +1587,7 @@ Today:
 - Desktop's [bounded transcript read](desktop/src/main/native-agent-chat.ts) rechecks the frame's exact attachment through [Main IPC](desktop/src/main/native-chat-ipc.ts), correlates chunks to the current read, and caps buffered text. The [ACP handler](crates/grida-agent/src/acp.rs) requires the negotiated capability, an attached chat, and its workspace. Cursors select only the attached chat's current history view. Reading grants no execution authority.
 - `desktop/src/main/sidecar-sandbox-policy.ts` — binds Desktop's strict sandbox posture for the retained sidecar on the daemon's own policy frame: empty direct external egress (no development baseline and no agent provider hosts), host-routed provider HTTP, no generic local bind/connect authority, and an exact read/write grant for the long-lived sidecar's app-managed media root.
 - `desktop/src/main/legacy-agent-paths.ts` — names the session scratch base earlier TypeScript agent hosts derived, so Main and the sandboxes deny it without importing that earlier agent code.
-- `desktop/src/main/agent-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; captures the native retained-service scope; owns both private channels, forwards the one main-owned media-root fact, and grants no direct provider networking. Windows retains explicitly unconfined non-agent compatibility services with native chat unavailable.
+- `desktop/src/main/services-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; captures the native retained-service scope; owns both private channels, forwards the one main-owned media-root fact, and grants no direct provider networking. Windows retains explicitly unconfined non-agent compatibility services with native chat unavailable.
 - `desktop/src/main/retained-service-sandbox.ts` and its tests — shell-free Seatbelt or bubblewrap launch, executable identity recheck, literal/canonical protected paths, native-ABI seccomp, inherited IPC, denied new sockets and safe owned mask cleanup. Actual macOS and unprivileged Linux ARM64 fixtures cover filesystem denial and Main-transferred connected sockets. Native setup failure has no unconfined fallback on macOS/Linux.
 - `desktop/src/main/desktop-entry-window.ts` — owns the exact bridge-attached entry window and admits auxiliary native windows only while the authenticated main role is active. Committed quit revokes renderer admission and invalidates queued or in-flight entry reconciliation. The Grida-account transition is additionally bound by GRIDA-SEC-005.
 - `desktop/src/main/protocol-router.ts` — deep-link protocol guard; the auth callback arm is bound by GRIDA-SEC-005.
@@ -2254,7 +2254,7 @@ governs the surface, this record governs its security half.
 - [Shared video operation](packages/grida-ai/src/video-client.ts), [music operation](packages/grida-ai/src/music-client.ts) and their [video](packages/grida-ai/src/video-client.test.ts) / [music](packages/grida-ai/src/music-client.test.ts) tests — current GG JSON contracts use one scoped submission and retain its original job identity. Status reads stay on the Grida API origin; validated video/MP3 references use the bounded credential-free asset lane. Clearing custody blocks later authorized calls without recalling accepted work. No polling or download failure retries generation, mints authority or reads a BYOK credential. The [shared invocation](packages/grida-ai/src/media-request.ts) retains cancellation/deadline cleanup, and host routes retain admission, persistence and safe status mapping.
 - [packages/grida-ai-host/src/http/routes/gg-auth.ts](packages/grida-ai-host/src/http/routes/gg-auth.ts) — `/auth/gg/set|clear|status` behind the daemon perimeter; token never logged (pinned by its test).
 - The `gg` media resolver arms ([resolve-image](packages/grida-ai-host/src/providers/resolve-image.ts), [resolve-video](packages/grida-ai-host/src/providers/resolve-video.ts)) — precedence: explicit wins; implicit BYOK → `gg`. The `/secrets/*` allowlist keeps REJECTING the `gg` id (no key may be stored under it; pinned by `gg-auth.test.ts`).
-- [desktop/src/main/agent-network-host.ts](desktop/src/main/agent-network-host.ts) — destination-bound Chromium transport; transiently carries the scoped Authorization header without persistence or renderer exposure.
+- [desktop/src/main/provider-network-host.ts](desktop/src/main/provider-network-host.ts) — destination-bound Chromium transport; transiently carries the scoped Authorization header without persistence or renderer exposure.
 
 **What does NOT belong here.** An AI endpoint that accepts Supabase
 access tokens or cookies. A mint path without a live session or without
@@ -2461,7 +2461,7 @@ platform credential store is a separate hardening step.
 
 - `desktop/src/chatgpt-configuration.ts`,
   `desktop/src/main/{oauth-loopback-callback,chatgpt-oauth}.ts`,
-  `desktop/src/{agent-network-policy,agent-sidecar,preload}.ts`,
+  `desktop/src/{provider-network-policy,services-sidecar,preload}.ts`,
   `desktop/src/bridge/contract.ts`, `desktop/src/main/ipc-handlers.ts`, and
   `desktop/src/main.ts` — fixed configuration, callback/orchestration,
   exact network grants, sidecar construction, guarded bridge, and shutdown.
@@ -3743,13 +3743,13 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [producer tests](packages/grida-ai/src/provider-credentials.test.ts), and the
   [provider entry](packages/grida-ai/src/providers.ts) remain owned by the AI package
   under GRIDA-SEC-004; they add no provider awareness to the TOML storage protocol.
-- Desktop [supervisor](desktop/src/main/agent-sidecar-supervisor.ts),
+- Desktop [supervisor](desktop/src/main/services-sidecar-supervisor.ts),
   [retained-service sandbox](desktop/src/main/retained-service-sandbox.ts),
-  [sidecar](desktop/src/agent-sidecar.ts),
+  [sidecar](desktop/src/services-sidecar.ts),
   [composition](desktop/src/sidecar/daemon.ts),
   [outer policy](desktop/src/main/sidecar-sandbox-policy.ts), and
   [native permission loader](crates/grida-agent/src/launch_permissions.rs), with
-  [supervisor tests](desktop/src/main/agent-sidecar-supervisor.test.ts),
+  [supervisor tests](desktop/src/main/services-sidecar-supervisor.test.ts),
   [retained-service sandbox tests](desktop/src/main/retained-service-sandbox.test.ts),
   [composition tests](desktop/src/sidecar/daemon.test.ts),
   [outer-policy tests](desktop/src/main/sidecar-sandbox-policy.test.ts), and

@@ -10,9 +10,9 @@ import {
   type IncomingMessage,
   type Session,
 } from "electron";
-import { AgentNetworkPolicy } from "../agent-network-policy";
-import { AgentSidecarChannel } from "../agent-sidecar-channel";
-import { AgentNetworkAuthority } from "./agent-network-authority";
+import { ProviderNetworkPolicy } from "../provider-network-policy";
+import { ServicesSidecarChannel } from "../services-sidecar-channel";
+import { ProviderNetworkAuthority } from "./provider-network-authority";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 import type { NativeGatewayJobNetwork } from "./native-gateway-connection";
 
@@ -32,8 +32,8 @@ type NetworkAdapter = Readonly<{
 }>;
 
 type IncomingRequest = {
-  frame: AgentSidecarChannel.RequestStartFrame;
-  authorized: AgentNetworkPolicy.AuthorizedRequest | null;
+  frame: ServicesSidecarChannel.RequestStartFrame;
+  authorized: ProviderNetworkPolicy.AuthorizedRequest | null;
   chunks: Buffer[];
   bytes: number;
   bufferedBytes: number;
@@ -62,9 +62,9 @@ type ActiveResponse = {
  * or general-purpose proxy: only the inherited stdio pair can speak the strict
  * capability protocol.
  */
-export class AgentNetworkHost {
-  private readonly decoder = new AgentSidecarChannel.Decoder();
-  private readonly writer: AgentSidecarChannel.Writer;
+export class ProviderNetworkHost {
+  private readonly decoder = new ServicesSidecarChannel.Decoder();
+  private readonly writer: ServicesSidecarChannel.Writer;
   private readonly incoming = new Map<string, IncomingRequest>();
   private readonly active = new Map<string, ActiveResponse>();
   private readonly requestControllers = new Map<string, AbortController>();
@@ -89,12 +89,12 @@ export class AgentNetworkHost {
   constructor(
     input: Readable,
     output: Writable,
-    private readonly authority: AgentNetworkAuthority,
+    private readonly authority: ProviderNetworkAuthority,
     private readonly adapter: NetworkAdapter,
     private readonly onFatal: (error: Error) => void,
     private readonly maxBufferedRequestBodyBytes = MAX_BUFFERED_REQUEST_BODY_BYTES
   ) {
-    this.writer = new AgentSidecarChannel.Writer(output);
+    this.writer = new ServicesSidecarChannel.Writer(output);
     input.on("data", (chunk: Buffer | string) => {
       if (this.closed) return;
       try {
@@ -105,7 +105,7 @@ export class AgentNetworkHost {
       }
     });
     input.once("end", () =>
-      this.fail(new Error("agent sidecar channel closed"))
+      this.fail(new Error("services sidecar channel closed"))
     );
     input.once("error", (error) => this.fail(error));
   }
@@ -113,26 +113,26 @@ export class AgentNetworkHost {
   static async create(args: {
     input: Readable;
     output: Writable;
-    authority: AgentNetworkAuthority;
+    authority: ProviderNetworkAuthority;
     onFatal: (error: Error) => void;
-  }): Promise<AgentNetworkHost> {
-    return new AgentNetworkHost(
+  }): Promise<ProviderNetworkHost> {
+    return new ProviderNetworkHost(
       args.input,
       args.output,
       args.authority,
-      AgentNetworkHost.electronAdapter(args.authority),
+      ProviderNetworkHost.electronAdapter(args.authority),
       args.onFatal
     );
   }
 
   static async nativeProviderNetwork(
-    authority: AgentNetworkAuthority,
+    authority: ProviderNetworkAuthority,
     grantId: string
   ): Promise<NativeProviderNetwork> {
-    const networkSession = await AgentNetworkHost.networkSession();
+    const networkSession = await ProviderNetworkHost.networkSession();
     return {
       prepare: (target, headers) => {
-        const approved = AgentNetworkPolicy.authorize(
+        const approved = ProviderNetworkPolicy.authorize(
           authority.nativeGrants(),
           {
             grant_id: grantId,
@@ -159,17 +159,17 @@ export class AgentNetworkHost {
   }
 
   static async nativeGatewayJobNetwork(
-    authority: AgentNetworkAuthority,
+    authority: ProviderNetworkAuthority,
     origin: string
   ): Promise<NativeGatewayJobNetwork> {
-    const networkSession = await AgentNetworkHost.networkSession();
+    const networkSession = await ProviderNetworkHost.networkSession();
     return async (requestId, bearer, signal) => {
       if (!/^req_[A-Za-z0-9_-]{1,124}$/.test(requestId))
         throw new Error("native_gateway_job_invalid");
       const target = new URL("/api/v1/ai/jobs", origin);
       target.searchParams.set("request_id", requestId);
-      const approved = AgentNetworkPolicy.authorize(authority.grants(), {
-        grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+      const approved = ProviderNetworkPolicy.authorize(authority.grants(), {
+        grant_id: ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
         method: "GET",
         url: target.href,
         headers: [
@@ -216,7 +216,7 @@ export class AgentNetworkHost {
       const timeout = setTimeout(() => {
         this.readyResolve = null;
         this.readyReject = null;
-        reject(new Error("agent sidecar ready frame timed out"));
+        reject(new Error("services sidecar ready frame timed out"));
       }, READY_TIMEOUT_MS);
       this.readyResolve = (port) => {
         clearTimeout(timeout);
@@ -243,7 +243,7 @@ export class AgentNetworkHost {
     const acknowledged = new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.grantAcks.delete(revision);
-        reject(new Error("agent sidecar grant acknowledgement timed out"));
+        reject(new Error("services sidecar grant acknowledgement timed out"));
       }, GRANT_ACK_TIMEOUT_MS);
       this.grantAcks.set(revision, { resolve, reject, timeout });
     });
@@ -275,7 +275,7 @@ export class AgentNetworkHost {
     origin: string;
     route: string;
   }> {
-    const origin = AgentNetworkPolicy.canonicalOrigin(baseUrl);
+    const origin = ProviderNetworkPolicy.canonicalOrigin(baseUrl);
     const url = new URL(origin);
     if (isExplicitEndpointHost(url.hostname)) {
       return {
@@ -300,7 +300,7 @@ export class AgentNetworkHost {
   }
 
   private static electronAdapter(
-    authority: AgentNetworkAuthority
+    authority: ProviderNetworkAuthority
   ): NetworkAdapter {
     let initialization: Promise<Session> | undefined;
     return {
@@ -311,7 +311,7 @@ export class AgentNetworkHost {
       fetch: async (url, init, grantId) => {
         if (init.signal?.aborted) throw abortError(init.signal.reason);
         if (!initialization) {
-          const pending = AgentNetworkHost.networkSession();
+          const pending = ProviderNetworkHost.networkSession();
           initialization = pending;
           void pending.catch(() => {
             if (initialization === pending) initialization = undefined;
@@ -324,9 +324,9 @@ export class AgentNetworkHost {
           initialization,
           init.signal
         );
-        let current: AgentNetworkPolicy.AuthorizedRequest;
+        let current: ProviderNetworkPolicy.AuthorizedRequest;
         try {
-          current = AgentNetworkPolicy.authorize(authority.grants(), {
+          current = ProviderNetworkPolicy.authorize(authority.grants(), {
             grant_id: grantId,
             method: init.method ?? "GET",
             url,
@@ -344,7 +344,7 @@ export class AgentNetworkHost {
     };
   }
 
-  private onFrame(frame: AgentSidecarChannel.Frame): void {
+  private onFrame(frame: ServicesSidecarChannel.Frame): void {
     switch (frame.type) {
       case "ready": {
         if (!this.readyResolve)
@@ -384,7 +384,9 @@ export class AgentNetworkHost {
     }
   }
 
-  private onRequestStart(frame: AgentSidecarChannel.RequestStartFrame): void {
+  private onRequestStart(
+    frame: ServicesSidecarChannel.RequestStartFrame
+  ): void {
     if (
       this.incoming.has(frame.requestId) ||
       this.requestControllers.has(frame.requestId) ||
@@ -393,13 +395,13 @@ export class AgentNetworkHost {
       throw new Error("duplicate provider request");
     }
 
-    let authorized: AgentNetworkPolicy.AuthorizedRequest | null = null;
+    let authorized: ProviderNetworkPolicy.AuthorizedRequest | null = null;
     const acceptedIncoming = this.incoming.size - this.discardedIncomingCount;
     let discarded =
       acceptedIncoming + this.requestControllers.size >=
       MAX_CONCURRENT_REQUESTS;
     let terminalError: Readonly<{
-      code: AgentSidecarChannel.ResponseErrorCode;
+      code: ServicesSidecarChannel.ResponseErrorCode;
       message: string;
     }> | null = null;
     if (discarded) {
@@ -409,7 +411,7 @@ export class AgentNetworkHost {
       };
     } else {
       try {
-        authorized = AgentNetworkPolicy.authorize(this.authority.grants(), {
+        authorized = ProviderNetworkPolicy.authorize(this.authority.grants(), {
           grant_id: frame.grantId,
           method: frame.method,
           url: frame.url,
@@ -464,7 +466,9 @@ export class AgentNetworkHost {
     }
   }
 
-  private onRequestChunk(frame: AgentSidecarChannel.RequestChunkFrame): void {
+  private onRequestChunk(
+    frame: ServicesSidecarChannel.RequestChunkFrame
+  ): void {
     const request = this.requireIncoming(frame.requestId);
     if (!request.frame.hasBody || frame.sequence !== request.sequence) {
       throw new Error("invalid provider request body sequence");
@@ -473,7 +477,8 @@ export class AgentNetworkHost {
     request.bytes += chunk.length;
     request.sequence += 1;
     if (
-      request.bytes > AgentNetworkPolicy.maxRequestBodyBytes(request.authorized)
+      request.bytes >
+      ProviderNetworkPolicy.maxRequestBodyBytes(request.authorized)
     ) {
       throw new Error("provider request body exceeds host limit");
     }
@@ -497,7 +502,7 @@ export class AgentNetworkHost {
     }
   }
 
-  private onRequestEnd(frame: AgentSidecarChannel.RequestEndFrame): void {
+  private onRequestEnd(frame: ServicesSidecarChannel.RequestEndFrame): void {
     const request = this.requireIncoming(frame.requestId);
     if (frame.sequence !== request.sequence) {
       throw new Error("provider request end sequence mismatch");
@@ -512,7 +517,7 @@ export class AgentNetworkHost {
       // Authorization at request.start limits what we buffer. Re-authorizing
       // against the current authority here makes revocation effective even if
       // a compromised sidecar holds an upload open across grant.update.
-      request.authorized = AgentNetworkPolicy.authorize(
+      request.authorized = ProviderNetworkPolicy.authorize(
         this.authority.grants(),
         {
           grant_id: request.frame.grantId,
@@ -558,7 +563,7 @@ export class AgentNetworkHost {
   }
 
   private onResponseCredit(
-    frame: AgentSidecarChannel.ResponseCreditFrame
+    frame: ServicesSidecarChannel.ResponseCreditFrame
   ): void {
     const response = this.active.get(frame.requestId);
     if (!response) {
@@ -566,7 +571,7 @@ export class AgentNetworkHost {
       throw new Error("response credit names an unknown request");
     }
     response.credit = Math.min(
-      AgentSidecarChannel.MAX_RESPONSE_CREDIT_BYTES,
+      ServicesSidecarChannel.MAX_RESPONSE_CREDIT_BYTES,
       response.credit + frame.bytes
     );
     void this.pumpResponse(response).catch((error) =>
@@ -692,7 +697,7 @@ export class AgentNetworkHost {
   }
 
   private async fetchWithRedirects(
-    initial: AgentNetworkPolicy.AuthorizedRequest,
+    initial: ProviderNetworkPolicy.AuthorizedRequest,
     body: Buffer,
     signal: AbortSignal
   ): Promise<Response> {
@@ -725,7 +730,7 @@ export class AgentNetworkHost {
       if (!isRedirect(response.status) || !location) return response;
       await response.body?.cancel().catch(() => undefined);
       if (
-        current.grant.id === AgentNetworkPolicy.TRIPO_UPLOAD_GRANT_ID ||
+        current.grant.id === ProviderNetworkPolicy.TRIPO_UPLOAD_GRANT_ID ||
         redirects >= MAX_REDIRECTS
       )
         throw deniedError();
@@ -755,7 +760,7 @@ export class AgentNetworkHost {
         // a bodyless GET carrying the POST representation's stale description.
         headers = headers.filter(([name]) => !isRequestBodyHeader(name));
       }
-      current = AgentNetworkPolicy.authorize(this.authority.grants(), {
+      current = ProviderNetworkPolicy.authorize(this.authority.grants(), {
         grant_id: current.grant.id,
         method,
         url: target.toString(),
@@ -891,16 +896,16 @@ export class AgentNetworkHost {
 
   private async responseError(
     requestId: string,
-    code: AgentSidecarChannel.ResponseErrorCode,
+    code: ServicesSidecarChannel.ResponseErrorCode,
     message: string
   ): Promise<void> {
     await this.send({ v: 1, type: "response.error", requestId, code, message });
   }
 
   private async send(
-    frame: AgentSidecarChannel.HostToSidecarFrame
+    frame: ServicesSidecarChannel.HostToSidecarFrame
   ): Promise<void> {
-    if (this.closed) throw new Error("agent network host is closed");
+    if (this.closed) throw new Error("provider network host is closed");
     await this.writer.write(frame);
   }
 
@@ -1137,8 +1142,8 @@ function requestBodyBuffer(body: BodyInit | null | undefined): Buffer {
   throw new Error("agent provider request body type is unsupported");
 }
 
-function responseHeaders(headers: Headers): AgentSidecarChannel.Header[] {
-  const result: AgentSidecarChannel.Header[] = [];
+function responseHeaders(headers: Headers): ServicesSidecarChannel.Header[] {
+  const result: ServicesSidecarChannel.Header[] = [];
   let bytes = 0;
   for (const [name, value] of headers.entries()) {
     const lower = name.toLowerCase();
@@ -1211,7 +1216,7 @@ function isExplicitEndpointHost(hostname: string): boolean {
 
 function deniedError(): Error {
   const error = new Error("provider network request denied");
-  error.name = "AgentNetworkDeniedError";
+  error.name = "ProviderNetworkDeniedError";
   return error;
 }
 
@@ -1228,7 +1233,7 @@ function isProxyAuthenticationError(error: unknown): boolean {
 }
 
 function isDeniedError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AgentNetworkDeniedError";
+  return error instanceof Error && error.name === "ProviderNetworkDeniedError";
 }
 
 function abortError(reason: unknown): Error {

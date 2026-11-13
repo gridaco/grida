@@ -1,8 +1,8 @@
 ---
 title: Agent security
-description: Desktop binding of GRIDA-SEC-004 and GRIDA-SEC-008 for AgentSidecar, the renderer bridge, HTTP perimeter, sandbox, native provider OAuth, and secrets discipline.
+description: Desktop binding of GRIDA-SEC-004 and GRIDA-SEC-008 for ServicesSidecar, the renderer bridge, HTTP perimeter, sandbox, native provider OAuth, and secrets discipline.
 keywords:
-  [desktop, agent-sidecar, grida-sec-004, grida-sec-008, chatgpt, security]
+  [desktop, services-sidecar, grida-sec-004, grida-sec-008, chatgpt, security]
 format: md
 tags:
   - internal
@@ -84,7 +84,7 @@ the host-held credentials.
 Electron main binds an ephemeral port on exact `127.0.0.1` with accepted
 sockets paused. Once the sidecar is ready, main transfers only an
 already-connected loopback socket over the per-spawn Node IPC descriptor.
-AgentSidecar starts the daemon without a listener and injects that socket into
+ServicesSidecar starts the daemon without a listener and injects that socket into
 an unbound HTTP server. It receives no listener, target field, bind operation,
 or connect operation. Every request on the transferred socket must:
 
@@ -173,7 +173,7 @@ privileges.
 
 ## Host-routed provider transport
 
-AgentSidecar receives a construction-time `ProviderHttpTransport` whose only
+ServicesSidecar receives a construction-time `ProviderHttpTransport` whose only
 operations are provider request and credential-free provider-asset download.
 Requests cross the inherited stdin/stdout pair as bounded, ordered frames.
 Electron main executes them in a dedicated non-persistent Chromium `Session`
@@ -193,7 +193,7 @@ redirects fail closed. Provider-asset downloads are HTTPS/default-port only,
 carry no provider credentials, and are limited to enumerated provider-owned
 origin namespaces; there is no arbitrary-public-URL grant.
 
-AgentSidecar still owns BYOK and GG credentials and attaches them to provider
+ServicesSidecar still owns BYOK and GG credentials and attaches them to provider
 requests. Electron main can observe those credentials transiently while
 performing the request, but does not persist or log them and does not place them
 in the Chromium cookie jar. Main has transient routing authority, not durable
@@ -210,7 +210,7 @@ sidecar's static proxy/SRT route instead of the user's Chromium/system route;
 an attempt to turn endpoint configuration or a credential-free download into
 unrestricted native HTTP; or a cross-origin credential redirect.
 
-**What this does not catch.** A compromised AgentSidecar exfiltrating data to
+**What this does not catch.** A compromised ServicesSidecar exfiltrating data to
 an already granted provider origin or a trusted enterprise TLS-inspection proxy
 observing request contents. Chromium can consume OS-stored or integrated proxy
 credentials, but Desktop does not collect interactive proxy credentials; that

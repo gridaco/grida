@@ -43,14 +43,14 @@ export async function createClient() {
 }
 
 /**
- * GRIDA-SEC-004 — Desktop agent sidecar trust boundary.
+ * GRIDA-SEC-004 — Desktop services sidecar trust boundary.
  *
  * Build a Supabase client that authenticates via an `Authorization: Bearer`
  * header instead of cookies. The token authenticates the **user**; the
  * publishable key authenticates the **app**.
  *
  * Use when a route receives a request from a non-browser client (e.g. the
- * Grida Desktop AgentSidecar) that holds an access token in `auth.json`
+ * Grida Desktop ServicesSidecar) that holds an access token in `auth.json`
  * and cannot present cookies. The cookie path (`createClient()`) is
  * unchanged for browser callers.
  *

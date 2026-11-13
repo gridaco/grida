@@ -2,8 +2,8 @@
 import crypto from "node:crypto";
 import type { Readable, Writable } from "node:stream";
 import type { ProviderHttpTransport } from "@grida/ai-host/media-server";
-import { AgentNetworkPolicy } from "./agent-network-policy";
-import { AgentSidecarChannel } from "./agent-sidecar-channel";
+import { ProviderNetworkPolicy } from "./provider-network-policy";
+import { ServicesSidecarChannel } from "./services-sidecar-channel";
 
 const BOOTSTRAP_TIMEOUT_MS = 5_000;
 const REQUEST_CHUNK_BYTES = 48 * 1024;
@@ -32,14 +32,14 @@ type PendingResponse = {
  * network capability handed to `@grida/ai-host`; spawned children receive
  * neither the object nor a channel address/token in argv or environment.
  */
-export class AgentSidecarNetwork {
+export class ServicesSidecarNetwork {
   readonly providerHttp: ProviderHttpTransport;
 
-  private readonly decoder = new AgentSidecarChannel.Decoder();
-  private readonly writer: AgentSidecarChannel.Writer;
+  private readonly decoder = new ServicesSidecarChannel.Decoder();
+  private readonly writer: ServicesSidecarChannel.Writer;
   private readonly pending = new Map<string, PendingResponse>();
   private readonly cancelled = new Set<string>();
-  private grants: AgentSidecarChannel.NetworkGrant[] = [];
+  private grants: ServicesSidecarChannel.NetworkGrant[] = [];
   private revision = -1;
   private bootstrapped = false;
   private bootstrapValue: Bootstrap | null = null;
@@ -53,7 +53,7 @@ export class AgentSidecarNetwork {
   private fatalValue: Error | null = null;
 
   constructor(input: Readable, output: Writable) {
-    this.writer = new AgentSidecarChannel.Writer(output);
+    this.writer = new ServicesSidecarChannel.Writer(output);
     this.providerHttp = Object.freeze({
       request: (input, init) => this.fetch("provider", input, init),
       download: (input, init) => this.fetch("download", input, init),
@@ -67,7 +67,9 @@ export class AgentSidecarNetwork {
         this.fail(asError(error));
       }
     });
-    input.once("end", () => this.fail(new Error("agent network host closed")));
+    input.once("end", () =>
+      this.fail(new Error("provider network host closed"))
+    );
     input.once("error", (error) => this.fail(error));
     input.resume();
   }
@@ -84,7 +86,7 @@ export class AgentSidecarNetwork {
       const timeout = setTimeout(() => {
         this.bootstrapResolve = null;
         this.bootstrapReject = null;
-        reject(new Error("agent sidecar bootstrap timed out"));
+        reject(new Error("services sidecar bootstrap timed out"));
       }, BOOTSTRAP_TIMEOUT_MS);
       this.bootstrapResolve = (value) => {
         clearTimeout(timeout);
@@ -115,12 +117,12 @@ export class AgentSidecarNetwork {
     await this.send({ v: 1, type: "ready", port });
   }
 
-  close(reason = "agent network channel closed"): void {
+  close(reason = "provider network channel closed"): void {
     this.fail(new Error(reason));
   }
 
   private async fetch(
-    lane: AgentNetworkPolicy.Lane,
+    lane: ProviderNetworkPolicy.Lane,
     input: string | URL | Request,
     init?: RequestInit
   ): Promise<Response> {
@@ -131,14 +133,14 @@ export class AgentSidecarNetwork {
     const grant = this.grants.find(
       (candidate) =>
         candidate.lane === lane &&
-        AgentNetworkPolicy.grantAllowsUrl(candidate, new URL(request.url))
+        ProviderNetworkPolicy.grantAllowsUrl(candidate, new URL(request.url))
     );
     if (!grant) {
       throw new Error("provider destination has no host-issued grant");
     }
     if (request.signal.aborted) throw abortError(request.signal.reason);
 
-    const maximumBodyBytes = AgentNetworkPolicy.maxRequestBodyBytes({
+    const maximumBodyBytes = ProviderNetworkPolicy.maxRequestBodyBytes({
       grant,
       method: request.method,
       url: new URL(request.url),
@@ -260,11 +262,11 @@ export class AgentSidecarNetwork {
     return await response;
   }
 
-  private onFrame(frame: AgentSidecarChannel.Frame): void {
+  private onFrame(frame: ServicesSidecarChannel.Frame): void {
     switch (frame.type) {
       case "bootstrap": {
         if (this.bootstrapped || this.revision !== -1) {
-          throw new Error("duplicate agent sidecar bootstrap");
+          throw new Error("duplicate services sidecar bootstrap");
         }
         this.bootstrapped = true;
         this.revision = frame.revision;
@@ -325,7 +327,9 @@ export class AgentSidecarNetwork {
     }
   }
 
-  private onResponseStart(frame: AgentSidecarChannel.ResponseStartFrame): void {
+  private onResponseStart(
+    frame: ServicesSidecarChannel.ResponseStartFrame
+  ): void {
     const pending = this.requirePending(frame.requestId);
     if (pending.started) throw new Error("duplicate response.start");
     pending.started = true;
@@ -373,7 +377,9 @@ export class AgentSidecarNetwork {
     );
   }
 
-  private onResponseChunk(frame: AgentSidecarChannel.ResponseChunkFrame): void {
+  private onResponseChunk(
+    frame: ServicesSidecarChannel.ResponseChunkFrame
+  ): void {
     const pending = this.requirePending(frame.requestId);
     if (!pending.started || !pending.controller) {
       throw new Error("response.chunk arrived before a body response");
@@ -390,7 +396,7 @@ export class AgentSidecarNetwork {
     pending.controller.enqueue(chunk);
   }
 
-  private onResponseEnd(frame: AgentSidecarChannel.ResponseEndFrame): void {
+  private onResponseEnd(frame: ServicesSidecarChannel.ResponseEndFrame): void {
     const pending = this.requirePending(frame.requestId);
     if (!pending.started || frame.sequence !== pending.sequence) {
       throw new Error("response end sequence mismatch");
@@ -399,12 +405,15 @@ export class AgentSidecarNetwork {
     this.finishPending(frame.requestId);
   }
 
-  private onResponseError(frame: AgentSidecarChannel.ResponseErrorFrame): void {
+  private onResponseError(
+    frame: ServicesSidecarChannel.ResponseErrorFrame
+  ): void {
     const error = new Error(
       frame.message || `provider request failed: ${frame.code}`
     );
     if (frame.code === "aborted") error.name = "AbortError";
-    if (frame.code === "overloaded") error.name = "AgentNetworkOverloadedError";
+    if (frame.code === "overloaded")
+      error.name = "ProviderNetworkOverloadedError";
     this.rejectPending(frame.requestId, error);
   }
 
@@ -440,10 +449,10 @@ export class AgentSidecarNetwork {
 
   private ignoreCancelledResponse(
     frame:
-      | AgentSidecarChannel.ResponseStartFrame
-      | AgentSidecarChannel.ResponseChunkFrame
-      | AgentSidecarChannel.ResponseEndFrame
-      | AgentSidecarChannel.ResponseErrorFrame
+      | ServicesSidecarChannel.ResponseStartFrame
+      | ServicesSidecarChannel.ResponseChunkFrame
+      | ServicesSidecarChannel.ResponseEndFrame
+      | ServicesSidecarChannel.ResponseErrorFrame
   ): boolean {
     if (!this.cancelled.has(frame.requestId)) return false;
     if (frame.type === "response.end" || frame.type === "response.error") {
@@ -469,9 +478,9 @@ export class AgentSidecarNetwork {
   }
 
   private async send(
-    frame: AgentSidecarChannel.SidecarToHostFrame
+    frame: ServicesSidecarChannel.SidecarToHostFrame
   ): Promise<void> {
-    if (this.closed) throw new Error("agent network channel is closed");
+    if (this.closed) throw new Error("provider network channel is closed");
     await this.writer.write(frame);
   }
 

@@ -16,8 +16,8 @@ import {
   open_canvas_window,
 } from "./window";
 import { EDITOR_BASE_URL } from "./env";
-import { getAgentSidecarInfo } from "./main/agent-sidecar-supervisor";
-import { agentSidecarClient } from "./main/agent-sidecar-client";
+import { getServicesSidecarInfo } from "./main/services-sidecar-supervisor";
+import { servicesSidecarClient } from "./main/services-sidecar-client";
 import type { NativeWorkspaceCatalog } from "./main/native-workspace-catalog";
 import { focusWindowByUrl } from "./main/window-focus";
 import { IPC_CHANNELS } from "./bridge/contract";
@@ -44,7 +44,7 @@ function open_or_focus_settings(app: App, admission?: DesktopWindowAdmission) {
     return;
   }
   if (focusWindowByUrl("/desktop/settings")) return;
-  if (!getAgentSidecarInfo()) return; // pre-ready / between restarts
+  if (!getServicesSidecarInfo()) return; // pre-ready / between restarts
   const window = open_settings_window({ app, base_url: EDITOR_BASE_URL });
   admission?.register(window);
 }
@@ -80,7 +80,7 @@ async function open_picker_and_register(
     return;
   }
   if (
-    !getAgentSidecarInfo() &&
+    !getServicesSidecarInfo() &&
     !(kind !== "directory" && admission?.native_file_available?.()) &&
     !(kind !== "file" && admission?.native_workspaces?.())
   )
@@ -127,18 +127,18 @@ async function open_picker_and_register(
     return;
   }
   if (!isDirectory) {
-    if (admission?.native_file_available?.(picked) || getAgentSidecarInfo())
+    if (admission?.native_file_available?.(picked) || getServicesSidecarInfo())
       onOpenFile?.(picked);
     return;
   }
 
   const owner = admission?.native_workspaces?.();
-  if (!owner && !getAgentSidecarInfo()) return;
+  if (!owner && !getServicesSidecarInfo()) return;
   let workspace: { id: string; root: string };
   try {
     workspace = owner
       ? await owner.openSelected(picked)
-      : await agentSidecarClient.openWorkspace(picked);
+      : await servicesSidecarClient.openWorkspace(picked);
   } catch (err) {
     console.error("[grida] open workspace failed:", err);
     dialog.showErrorBox(
@@ -242,7 +242,7 @@ function route_workspace_window(
     admission.focus_entry();
     return;
   }
-  if (!admission?.native_workspaces?.() && !getAgentSidecarInfo()) return;
+  if (!admission?.native_workspaces?.() && !getServicesSidecarInfo()) return;
   const isCanvas = existsSync(join(workspace.root, ".canvas.json"));
   if (isCanvas) {
     focus_or_open_canvas_window({
@@ -269,11 +269,11 @@ async function reopen_recent_workspace(
     return;
   }
   const owner = admission?.native_workspaces?.();
-  if (!owner && !getAgentSidecarInfo()) return;
+  if (!owner && !getServicesSidecarInfo()) return;
   try {
     const reopened = owner
       ? await owner.reopen(workspace.root)
-      : await agentSidecarClient.reopenWorkspace(workspace.root);
+      : await servicesSidecarClient.reopenWorkspace(workspace.root);
     route_workspace_window(app, reopened, admission);
   } catch {
     if (admission && !admission.can_open()) return;
@@ -294,7 +294,7 @@ async function list_recent_workspaces(admission?: DesktopWindowAdmission) {
     const owner = admission?.native_workspaces?.();
     const workspaces = owner
       ? await owner.list()
-      : await agentSidecarClient.listWorkspaces();
+      : await servicesSidecarClient.listWorkspaces();
     return workspaces.slice(0, MAX_RECENT_MENU_ITEMS);
   } catch {
     // Sidecar not ready / transient — an empty Open Recent (disabled placeholder).
@@ -619,10 +619,10 @@ export default function create_menu(
               opts.windowAdmission.focus_entry();
               return;
             }
-            const agentSidecar = getAgentSidecarInfo();
+            const servicesSidecar = getServicesSidecarInfo();
             // Pre-ready or between supervisor restarts → no-op rather
-            // than open a window that can't reach the agent sidecar.
-            if (!agentSidecar) return;
+            // than open a window that can't reach the services sidecar.
+            if (!servicesSidecar) return;
             const window = open_welcome_window({
               app,
               base_url: EDITOR_BASE_URL,

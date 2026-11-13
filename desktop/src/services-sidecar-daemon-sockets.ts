@@ -11,7 +11,7 @@ const MAX_ACTIVE_CONNECTIONS = 64;
  * Consumes only already-connected loopback sockets transferred by Electron
  * main. It has no listener, target field, bind, or connect operation.
  */
-export class AgentSidecarDaemonSockets {
+export class ServicesSidecarDaemonSockets {
   private readonly server: Server;
   private readonly sockets = new Set<Socket>();
   private closed = false;

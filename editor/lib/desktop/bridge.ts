@@ -526,7 +526,7 @@ export namespace chatgpt {
 
 /**
  * BYOK image generation (#908). Desktop-only: the request resolves the user's
- * connected provider key inside the agent sidecar and returns base64 image
+ * connected provider key inside the services sidecar and returns base64 image
  * bytes — the key never crosses the bridge (GRIDA-SEC-004). Feature-detect
  * with {@link isSupported}; old binaries lack the surface.
  */

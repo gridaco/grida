@@ -40,11 +40,11 @@ vi.mock("./window", () => ({
   open_canvas_window: fixture.deck,
 }));
 vi.mock("./env", () => ({ EDITOR_BASE_URL: "https://fixture.invalid" }));
-vi.mock("./main/agent-sidecar-supervisor", () => ({
-  getAgentSidecarInfo: () => (fixture.sidecarReady ? {} : null),
+vi.mock("./main/services-sidecar-supervisor", () => ({
+  getServicesSidecarInfo: () => (fixture.sidecarReady ? {} : null),
 }));
-vi.mock("./main/agent-sidecar-client", () => ({
-  agentSidecarClient: {
+vi.mock("./main/services-sidecar-client", () => ({
+  servicesSidecarClient: {
     listWorkspaces: fixture.list,
     openWorkspace: fixture.openWorkspace,
     reopenWorkspace: fixture.reopen,

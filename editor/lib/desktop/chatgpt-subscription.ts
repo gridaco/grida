@@ -3,7 +3,7 @@
  *
  * Renderer-side, secret-free state for the native ChatGPT provider.
  *
- * OAuth and token custody live in Electron main + the agent sidecar. This
+ * OAuth and token custody live in Electron main + the services sidecar. This
  * module only caches the status DTO exposed by the narrow Desktop bridge so
  * onboarding, settings, and new-chat provider selection share one truth.
  */

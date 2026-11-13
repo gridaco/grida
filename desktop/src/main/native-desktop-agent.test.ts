@@ -18,43 +18,45 @@ import type { NativeProviderNetwork } from "./native-provider-egress";
 
 const sidecar = vi.hoisted(() => ({
   selectNativeChat:
-    vi.fn<typeof import("./agent-sidecar-supervisor").selectNativeChat>(),
+    vi.fn<typeof import("./services-sidecar-supervisor").selectNativeChat>(),
   nativeAgentSubscriptionSettings:
     vi.fn<
-      typeof import("./agent-sidecar-supervisor").nativeAgentSubscriptionSettings
+      typeof import("./services-sidecar-supervisor").nativeAgentSubscriptionSettings
     >(),
   nativeAgentGatewayConnection:
     vi.fn<
-      typeof import("./agent-sidecar-supervisor").nativeAgentGatewayConnection
+      typeof import("./services-sidecar-supervisor").nativeAgentGatewayConnection
     >(),
   findWorkspace:
     vi.fn<
-      typeof import("./agent-sidecar-client").agentSidecarClient.findWorkspace
+      typeof import("./services-sidecar-client").servicesSidecarClient.findWorkspace
     >(),
   forgetWorkspace:
     vi.fn<
-      typeof import("./agent-sidecar-client").agentSidecarClient.forgetWorkspace
+      typeof import("./services-sidecar-client").servicesSidecarClient.forgetWorkspace
     >(),
   listProviderEndpoints:
     vi.fn<
-      typeof import("./agent-sidecar-client").agentSidecarClient.listProviderEndpoints
+      typeof import("./services-sidecar-client").servicesSidecarClient.listProviderEndpoints
     >(),
   listGatewayModels:
     vi.fn<
-      typeof import("./agent-sidecar-client").agentSidecarClient.listGatewayModels
+      typeof import("./services-sidecar-client").servicesSidecarClient.listGatewayModels
     >(),
   nativeBuiltInByok:
     vi.fn<
-      typeof import("./agent-sidecar-client").agentSidecarClient.nativeBuiltInByok
+      typeof import("./services-sidecar-client").servicesSidecarClient.nativeBuiltInByok
     >(),
   nativeConfiguredEndpoint:
     vi.fn<
-      typeof import("./agent-sidecar-client").agentSidecarClient.nativeConfiguredEndpoint
+      typeof import("./services-sidecar-client").servicesSidecarClient.nativeConfiguredEndpoint
     >(),
 }));
 
-vi.mock("./agent-sidecar-supervisor", () => sidecar);
-vi.mock("./agent-sidecar-client", () => ({ agentSidecarClient: sidecar }));
+vi.mock("./services-sidecar-supervisor", () => sidecar);
+vi.mock("./services-sidecar-client", () => ({
+  servicesSidecarClient: sidecar,
+}));
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
 const PNG =

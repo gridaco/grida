@@ -17,7 +17,7 @@
 
 import { protocol } from "electron";
 import { workspaceFileResponse } from "@grida/daemon/server";
-import { agentSidecarClient } from "./agent-sidecar-client";
+import { servicesSidecarClient } from "./services-sidecar-client";
 import { nativeWorkspaceMedia } from "./workspace-media-access";
 import { WorkspaceMediaError } from "./workspace-media-registry";
 import type { NativeWorkspaceCatalog } from "./native-workspace-catalog";
@@ -90,7 +90,7 @@ export function handleWorkspaceMediaProtocol(
       // Forward the Range header so the sidecar answers 206 + Content-Range and
       // the renderer's media element can seek. The returned Response (status,
       // headers, streaming body) is passed straight through.
-      return await agentSidecarClient.fetch(`/workspaces/file${query}`, {
+      return await servicesSidecarClient.fetch(`/workspaces/file${query}`, {
         method: "GET",
         headers: range ? { range } : undefined,
       });
@@ -98,8 +98,8 @@ export function handleWorkspaceMediaProtocol(
       if (err instanceof WorkspaceMediaError) {
         return new Response(err.message, { status: err.status });
       }
-      if (err instanceof agentSidecarClient.AgentSidecarNotReadyError) {
-        return new Response("agent sidecar not ready", { status: 503 });
+      if (err instanceof servicesSidecarClient.ServicesSidecarNotReadyError) {
+        return new Response("services sidecar not ready", { status: 503 });
       }
       console.error("[grida] grida-workspace:// proxy failed:", err);
       return new Response("internal error", { status: 500 });

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { AgentNetworkPolicy } from "../agent-network-policy";
-import { AgentNetworkAuthority } from "./agent-network-authority";
+import { ProviderNetworkPolicy } from "../provider-network-policy";
+import { ProviderNetworkAuthority } from "./provider-network-authority";
 
-describe("AgentNetworkAuthority", () => {
+describe("ProviderNetworkAuthority", () => {
   it("mints exact, per-spawn custom grants and revokes them", () => {
-    const authority = new AgentNetworkAuthority("https://grida.co");
+    const authority = new ProviderNetworkAuthority("https://grida.co");
     const baseRevision = authority.revision;
     authority.approveCustomEndpoint("ollama", "http://localhost:11434/v1");
     const custom = authority
@@ -23,7 +23,7 @@ describe("AgentNetworkAuthority", () => {
   });
 
   it("does not rotate an unchanged approval", () => {
-    const authority = new AgentNetworkAuthority("https://grida.co");
+    const authority = new ProviderNetworkAuthority("https://grida.co");
     authority.approveCustomEndpoint("ollama", "http://localhost:11434/v1");
     const first = authority.grants().at(-1)?.id;
     const revision = authority.revision;
@@ -33,7 +33,7 @@ describe("AgentNetworkAuthority", () => {
   });
 
   it("invalidates a native launch when the approved base path changes", () => {
-    const authority = new AgentNetworkAuthority("https://grida.co");
+    const authority = new ProviderNetworkAuthority("https://grida.co");
     const base = "http://localhost:11434/v1";
     const next = "http://localhost:11434/other";
     authority.approveCustomEndpoint("ollama", base);
@@ -49,7 +49,7 @@ describe("AgentNetworkAuthority", () => {
   });
 
   it("rejects invalid endpoint ids and URL credentials", () => {
-    const authority = new AgentNetworkAuthority("https://grida.co");
+    const authority = new ProviderNetworkAuthority("https://grida.co");
     expect(() =>
       authority.approveCustomEndpoint("../escape", "https://example.com")
     ).toThrow(/id/);
@@ -60,8 +60,8 @@ describe("AgentNetworkAuthority", () => {
 });
 
 it("never publishes the Main-only subscription grant to the sidecar", () => {
-  const authority = new AgentNetworkAuthority("https://grida.co");
-  const id = AgentNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID;
+  const authority = new ProviderNetworkAuthority("https://grida.co");
+  const id = ProviderNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID;
   expect(authority.grants().some((grant) => grant.id === id)).toBe(false);
   expect(
     authority

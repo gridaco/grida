@@ -31,7 +31,7 @@ contents to the Trash?" for a folder, with **Move to Trash** / **Cancel**
 (default Cancel). The destructive action is always one deliberate
 confirmation away.
 
-The delete is a host capability, not an agent-sidecar one: the renderer
+The delete is a host capability, not a services-sidecar one: the renderer
 sends only `{workspaceId, relPath}` to the desktop main process, which
 re-validates that the path resolves **inside** the opened workspace root
 (rejecting `..` escapes, symlinks that leave the workspace, and the root

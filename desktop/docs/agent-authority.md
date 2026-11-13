@@ -87,7 +87,7 @@ discovery and PAC/WPAD evaluation, host routing, and platform trust behavior.
 The landed implementation uses a dedicated, non-persistent `Session` owned by
 Electron main. It does not attach the webview partition or its cookie jar.
 Moving the service into a separately confined native helper remains desirable
-if steady-state credential custody ever moves out of AgentSidecar; a bare
+if steady-state credential custody ever moves out of ServicesSidecar; a bare
 `utilityProcess` alone would be process isolation, not authority confinement.
 
 The provider context identifies requests as `Grida/<version> NativeProviderClient`,
@@ -116,7 +116,7 @@ ceremony and cancel/sign-out races are bound in
 The package exposes two construction-time operations: provider requests and
 credential-free provider-asset downloads. The service accepts one of those
 classes plus an opaque host-issued grant, validates the
-method/origin/headers/body bounds, and performs the request. AgentSidecar's
+method/origin/headers/body bounds, and performs the request. ServicesSidecar's
 provider adapter adds credentials before the private hop; the service never
 invents a credential or accepts a renderer URL. The outer native profile omits
 BYOK/GG destinations, so the injected operation is an authority boundary rather
@@ -174,8 +174,8 @@ IP literal or `.localhost` origin does not make a broader hostname grant.
 
 Grida Gateway keeps its current weak-token handoff. The signed-in webview mints
 the short-lived, `gg:ai`-audience token through its same-origin cookie session
-and transiently pushes it to AgentSidecar through the authenticated daemon
-route. AgentSidecar retains steady-state memory custody and adds the bearer to
+and transiently pushes it to ServicesSidecar through the authenticated daemon
+route. ServicesSidecar retains steady-state memory custody and adds the bearer to
 each GG request; Electron main sees it only in the in-flight private frame and
 Chromium request. The token retains the existing ≤15-minute bearer residual.
 The durable webview cookie, refresh token, and Supabase access token never enter
@@ -405,7 +405,7 @@ true in the same change set:
   main-owned user-presence ceremony and revocable ledger grant;
 - private service channels are process-bound, bounded, tied to peer/grant
   lifetime, and tolerate bounded late-frame races;
-- AgentSidecar keeps a tested filesystem/process host-containment profile;
+- ServicesSidecar keeps a tested filesystem/process host-containment profile;
 - shell execution uses a supervisor-owned grant rather than ambient parent
   inheritance or a boolean assertion;
 - external ACP and local MCP/extension processes have independently tested

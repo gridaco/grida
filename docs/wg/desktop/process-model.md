@@ -5,7 +5,7 @@ keywords:
   [
     desktop,
     native agent host,
-    AgentSidecar,
+    ServicesSidecar,
     electron,
     grida-sec-004,
     grida-sec-008,
@@ -23,12 +23,12 @@ Grida Desktop is one host of the `computer` environment from the
 [agent RFC](../ai/agent/environments.md#computer). It runs four kinds of
 process:
 
-| Process                                 | Owns                                                                                                                                                       |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Electron main                           | Windows, menus, dialogs, deep links, supervision, guarded IPC, the supervised provider transport, and the ChatGPT sign-in ceremony and credential custody. |
-| Native agent host                       | Chat: sessions, the agent loop, tools, permissions, confined commands, and their durable state. Main supervises it over private stdio.                     |
-| Retained media sidecar (`AgentSidecar`) | Media generation and its provider custody, plus the files, recents, workspaces, and secrets routes, behind the loopback daemon perimeter. It runs no chat. |
-| URL-loaded renderer                     | Presentation. It reaches host capabilities only through the typed `window.grida` bridge.                                                                   |
+| Process                                    | Owns                                                                                                                                                       |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Electron main                              | Windows, menus, dialogs, deep links, supervision, guarded IPC, the supervised provider transport, and the ChatGPT sign-in ceremony and credential custody. |
+| Native agent host                          | Chat: sessions, the agent loop, tools, permissions, confined commands, and their durable state. Main supervises it over private stdio.                     |
+| Retained media sidecar (`ServicesSidecar`) | Media generation and its provider custody, plus the files, recents, workspaces, and secrets routes, behind the loopback daemon perimeter. It runs no chat. |
+| URL-loaded renderer                        | Presentation. It reaches host capabilities only through the typed `window.grida` bridge.                                                                   |
 
 A native model provider supplies capacity to the Grida-owned loop in the
 native host. The experimental ChatGPT Subscription provider is not ACP:
@@ -59,7 +59,7 @@ clients share the same native host.
 │  │ accept paused; transfer connected socket on Node IPC fd 3   │  │
 │  └──────────────────────────────┬──────────────────────────────┘  │
 │                                 ▼                                 │
-│  ┌─ socketless AgentSidecar — DaemonServer + media routes ─────┐  │
+│  ┌─ socketless ServicesSidecar — DaemonServer + media routes ─────┐  │
 │  │ authenticated HTTP on only the transferred connection       │  │
 │  │ media / files / recents / workspaces / secrets              │  │
 │  └───────────────┬──────────────────────────────────────────────┘  │
@@ -161,7 +161,7 @@ or through main's supervised capability on its private stdio. The
 [native client protocol](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-client-protocol.md)
 defines the wire.
 
-**`AgentSidecar`.** Hold media provider credentials at runtime. Start the
+**`ServicesSidecar`.** Hold media provider credentials at runtime. Start the
 daemon without a listener and serve only main-transferred connected sockets.
 Enforce its own HTTP perimeter — Basic Auth header, `Referer` check against
 `/desktop/*`, `Origin` allowlist — as defense-in-depth under

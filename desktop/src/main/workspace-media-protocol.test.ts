@@ -26,10 +26,10 @@ vi.mock("electron", () => ({
     },
   },
 }));
-vi.mock("./agent-sidecar-client", () => ({
-  agentSidecarClient: {
+vi.mock("./services-sidecar-client", () => ({
+  servicesSidecarClient: {
     fetch: vi.fn<(path: string, init?: unknown) => Promise<Response>>(),
-    AgentSidecarNotReadyError: class extends Error {},
+    ServicesSidecarNotReadyError: class extends Error {},
   },
 }));
 vi.mock("./workspace-media-access", () => ({
@@ -51,7 +51,7 @@ vi.mock("node:child_process", async (load) => {
   };
 });
 
-import { agentSidecarClient } from "./agent-sidecar-client";
+import { servicesSidecarClient } from "./services-sidecar-client";
 import { WorkspaceFileWorkers } from "./workspace-file-worker";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import {
@@ -133,7 +133,7 @@ it("keeps the compatibility Range proxy when native media was never selected", a
   fixtures.native = undefined;
   const handler = registeredHandler();
   const response = new Response("legacy");
-  vi.mocked(agentSidecarClient.fetch).mockResolvedValueOnce(response);
+  vi.mocked(servicesSidecarClient.fetch).mockResolvedValueOnce(response);
   expect(
     await handler(
       new Request("grida-workspace://workspace/example/clip.mp4", {
@@ -141,11 +141,11 @@ it("keeps the compatibility Range proxy when native media was never selected", a
       })
     )
   ).toBe(response);
-  expect(agentSidecarClient.fetch).toHaveBeenLastCalledWith(
+  expect(servicesSidecarClient.fetch).toHaveBeenLastCalledWith(
     "/workspaces/file?workspace_id=example&rel_path=clip.mp4",
     { method: "GET", headers: { range: "bytes=2-8" } }
   );
-  vi.mocked(agentSidecarClient.fetch).mockClear();
+  vi.mocked(servicesSidecarClient.fetch).mockClear();
 });
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
@@ -189,7 +189,7 @@ describe.runIf(
         expect(await result.text()).toBe(bytes);
       }
       expect(fixtures.children).toHaveLength(4);
-      expect(agentSidecarClient.fetch).not.toHaveBeenCalled();
+      expect(servicesSidecarClient.fetch).not.toHaveBeenCalled();
     } finally {
       await fixture.close();
     }
@@ -217,7 +217,7 @@ describe.runIf(
       expect(changed.status).toBe(403);
       expect(await changed.text()).toBe("workspace_media_registration_changed");
       expect(fixtures.children).toHaveLength(1);
-      expect(agentSidecarClient.fetch).not.toHaveBeenCalled();
+      expect(servicesSidecarClient.fetch).not.toHaveBeenCalled();
       await expect(fixture.reopenRecent()).rejects.toThrow(
         "workspace_not_registered"
       );
@@ -237,7 +237,7 @@ describe.runIf(
       const result = await fixture.request(admitted.id);
       expect(result.status).toBe(404);
       expect(await result.text()).toBe("workspace_media_file_unavailable");
-      expect(agentSidecarClient.fetch).not.toHaveBeenCalled();
+      expect(servicesSidecarClient.fetch).not.toHaveBeenCalled();
     } finally {
       await fixture.close();
     }
@@ -289,7 +289,7 @@ describe.runIf(
       expect(next.status).toBe(206);
       expect(await next.arrayBuffer()).toEqual(new ArrayBuffer(2));
       await Promise.all(active.slice(1).map((result) => result.body!.cancel()));
-      expect(agentSidecarClient.fetch).not.toHaveBeenCalled();
+      expect(servicesSidecarClient.fetch).not.toHaveBeenCalled();
     } finally {
       await fixture.close();
     }
@@ -316,7 +316,7 @@ async function workspaceFixture() {
   const workers = new WorkspaceFileWorkers(resources!);
   fixtures.native = workers;
   fixtures.children.length = 0;
-  vi.mocked(agentSidecarClient.fetch).mockClear();
+  vi.mocked(servicesSidecarClient.fetch).mockClear();
   const handler = registeredHandler({ grant: (id) => catalog.grant(id) });
   return {
     workspace,

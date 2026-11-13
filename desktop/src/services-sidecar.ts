@@ -3,7 +3,7 @@
 // GRIDA-SEC-006 — the selected composition receives the scoped GG custody owner.
 // GRIDA-SEC-008 — retained services receive no subscription credential authority.
 /**
- * Agent sidecar entry point.
+ * Services sidecar entry point.
  *
  * Thin: argv parsing + daemon lifecycle + tidy shutdown. All HTTP
  * surface lives in packages. `sidecar/daemon.ts` starts retained services
@@ -48,8 +48,8 @@
  * accepted on exact loopback.
  */
 import path from "node:path";
-import { AgentSidecarNetwork } from "./agent-sidecar-network";
-import { AgentSidecarDaemonSockets } from "./agent-sidecar-daemon-sockets";
+import { ServicesSidecarNetwork } from "./services-sidecar-network";
+import { ServicesSidecarDaemonSockets } from "./services-sidecar-daemon-sockets";
 
 // Stdout is the private framed channel. Package/runtime diagnostics use
 // console.log in several places, so redirect every stdout-backed console method
@@ -76,7 +76,7 @@ function getCliArg(name: string): string | undefined {
 // production sidecar should fail loud if the host adapter contract is broken.
 const userDataPath = getCliArg("user-data");
 if (!userDataPath) {
-  console.error("[agent-sidecar] fatal: missing --user-data");
+  console.error("[services-sidecar] fatal: missing --user-data");
   process.exit(1);
 }
 const requiredUserDataPath = userDataPath;
@@ -84,7 +84,7 @@ const requiredUserDataPath = userDataPath;
 const providerHome = getCliArg("provider-home") ?? requiredUserDataPath;
 const mediaRoot = getCliArg("media-root");
 if (!mediaRoot) {
-  console.error("[agent-sidecar] fatal: missing --media-root");
+  console.error("[services-sidecar] fatal: missing --media-root");
   process.exit(1);
 }
 const requiredMediaRoot = mediaRoot;
@@ -101,7 +101,7 @@ if (
   workspaceCatalog !== undefined &&
   (!workspaceCatalog || agentMode !== "native-chat" || !sandboxEnforced)
 ) {
-  console.error("[agent-sidecar] fatal: invalid workspace catalog scope");
+  console.error("[services-sidecar] fatal: invalid workspace catalog scope");
   process.exit(1);
 }
 if (
@@ -111,7 +111,9 @@ if (
     !sandboxEnforced ||
     workspaceCatalog !== undefined)
 ) {
-  console.error("[agent-sidecar] fatal: invalid ordinary native chat services");
+  console.error(
+    "[services-sidecar] fatal: invalid ordinary native chat services"
+  );
   process.exit(1);
 }
 const protectedRootFlag = "--protected-file-root=";
@@ -129,7 +131,7 @@ if (
         Buffer.byteLength(root) > 4096
     ))
 ) {
-  console.error("[agent-sidecar] fatal: invalid protected file root");
+  console.error("[services-sidecar] fatal: invalid protected file root");
   process.exit(1);
 }
 // GRIDA-SEC-004 — host-injected managed root for auto-created projects
@@ -137,10 +139,12 @@ if (
 // absent (e.g. a future supervisor bug) means auto-create simply refuses.
 const projectsRoot = getCliArg("projects-root");
 async function main() {
-  const network = new AgentSidecarNetwork(process.stdin, process.stdout);
-  let daemonSockets: AgentSidecarDaemonSockets | null = null;
+  const network = new ServicesSidecarNetwork(process.stdin, process.stdout);
+  let daemonSockets: ServicesSidecarDaemonSockets | null = null;
   network.onFatal((error) => {
-    console.error(`[agent-sidecar] provider channel failed: ${error.message}`);
+    console.error(
+      `[services-sidecar] provider channel failed: ${error.message}`
+    );
     process.exit(1);
   });
   process.on("message", (message, handle) => {
@@ -149,7 +153,7 @@ async function main() {
         (handle as { destroy: () => void }).destroy();
       }
       console.error(
-        "[agent-sidecar] daemon socket arrived before capability setup"
+        "[services-sidecar] daemon socket arrived before capability setup"
       );
       process.exit(1);
       return;
@@ -157,12 +161,14 @@ async function main() {
     daemonSockets.accept(message, handle);
   });
   process.once("disconnect", () => {
-    console.error("[agent-sidecar] capability channel disconnected");
+    console.error("[services-sidecar] capability channel disconnected");
     process.exit(1);
   });
   const { password, daemonPort } = await network.waitForBootstrap();
   if (!password || password.length < 16) {
-    console.error("[agent-sidecar] fatal: missing or short bootstrap password");
+    console.error(
+      "[services-sidecar] fatal: missing or short bootstrap password"
+    );
     process.exit(1);
   }
   // Dynamic by design: no package top-level console output may run before
@@ -191,11 +197,11 @@ async function main() {
     // this keeps Linux's private netns reachable and lets macOS deny all raw
     // bind/connect operations.
     await host.start({ listen: false });
-    daemonSockets = new AgentSidecarDaemonSockets(
+    daemonSockets = new ServicesSidecarDaemonSockets(
       (request) => host.fetch(request),
       (error) => {
         console.error(
-          `[agent-sidecar] daemon capability failed: ${error.message}`
+          `[services-sidecar] daemon capability failed: ${error.message}`
         );
         process.exit(1);
       }
@@ -203,10 +209,10 @@ async function main() {
     await announceDaemonCapabilityReady();
     await network.ready(daemonPort);
     console.log(
-      `[agent-sidecar] serving transferred loopback sockets on host port ${daemonPort}`
+      `[services-sidecar] serving transferred loopback sockets on host port ${daemonPort}`
     );
   } catch (err) {
-    console.error("[agent-sidecar] server error:", err);
+    console.error("[services-sidecar] server error:", err);
     process.exit(1);
   }
 
@@ -214,7 +220,7 @@ async function main() {
   const shutdown = (signal: string) => {
     if (stopping) return;
     stopping = true;
-    console.log(`[agent-sidecar] shutdown (${signal})`);
+    console.log(`[services-sidecar] shutdown (${signal})`);
     daemonSockets?.close();
     const deadline = setTimeout(() => process.exit(1), 1_000);
     void host.stop().then(
@@ -224,7 +230,7 @@ async function main() {
       },
       () => {
         clearTimeout(deadline);
-        console.warn("[agent-sidecar] server close could not be verified");
+        console.warn("[services-sidecar] server close could not be verified");
         process.exit(1);
       }
     );
@@ -235,7 +241,7 @@ async function main() {
 }
 
 void main().catch((err) => {
-  console.error("[agent-sidecar] fatal:", err);
+  console.error("[services-sidecar] fatal:", err);
   process.exit(1);
 });
 

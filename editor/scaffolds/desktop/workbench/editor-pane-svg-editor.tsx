@@ -4,7 +4,7 @@
  * dirty trick with the file window's single-file surface
  * (`scaffolds/desktop/file/single-file-svg-surface.tsx`) but talks to the
  * workspace fs surface (`workspaces.readFile` / `writeFile`) rather than the
- * agent sidecar's docId registry, because workspace tabs already address by
+ * services sidecar's docId registry, because workspace tabs already address by
  * `{workspaceId, relPath}` (and so get the mtime-safe conflict path the
  * single-document window has no need for).
  *

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { DesktopMediaRoot } from "./media-root";
 
 const supervisorSource = fs.readFileSync(
-  new URL("./agent-sidecar-supervisor.ts", import.meta.url),
+  new URL("./services-sidecar-supervisor.ts", import.meta.url),
   "utf8"
 );
 const ipcHandlersSource = fs.readFileSync(
@@ -13,7 +13,7 @@ const ipcHandlersSource = fs.readFileSync(
   "utf8"
 );
 const sidecarSource = fs.readFileSync(
-  new URL("../agent-sidecar.ts", import.meta.url),
+  new URL("../services-sidecar.ts", import.meta.url),
   "utf8"
 );
 

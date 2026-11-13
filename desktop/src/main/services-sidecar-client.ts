@@ -1,5 +1,5 @@
 /**
- * GRIDA-SEC-004 — main-process client for the agent sidecar.
+ * GRIDA-SEC-004 — main-process client for the services sidecar.
  *
  * The renderer-side bridge (preload) is what the user-facing code calls.
  * This module is the **main process** equivalent — used by the open-file
@@ -10,7 +10,7 @@
  *
  *   1. Electron fires `open-file` (macOS) or argv contains the path
  *      (Win/Linux).
- *   2. Main process calls `agentSidecarClient.registerPath(path)` → agent server
+ *   2. Main process calls `servicesSidecarClient.registerPath(path)` → agent server
  *      returns a `docId`.
  *   3. Main records the path through its selected recent-file owner.
  *   4. Main process spawns a BrowserWindow loading
@@ -32,11 +32,11 @@
  */
 
 import {
-  getAgentSidecarInfo,
+  getServicesSidecarInfo,
   nativeAgentByokSettings,
   nativeAgentEndpointNetwork,
-  type AgentSidecarInfo,
-} from "./agent-sidecar-supervisor";
+  type ServicesSidecarInfo,
+} from "./services-sidecar-supervisor";
 import { app } from "electron";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { NativeProviderSelection } from "./native-provider-selection";
@@ -55,7 +55,7 @@ import type {
 const EDITOR_ORIGIN = new URL(EDITOR_BASE_URL).origin;
 const REFERER = `${EDITOR_ORIGIN}/desktop`;
 
-export namespace agentSidecarClient {
+export namespace servicesSidecarClient {
   let catalog: NativeWorkspaceCatalog | undefined;
   let nativeReads: NativeWorkspaceReads | undefined;
   let nativeWrites: NativeWorkspaceWrites | undefined;
@@ -64,10 +64,10 @@ export namespace agentSidecarClient {
     if (catalog) throw new Error("workspace_catalog_already_bound");
     catalog = owner;
   }
-  export class AgentSidecarNotReadyError extends Error {
+  export class ServicesSidecarNotReadyError extends Error {
     constructor() {
-      super("agent sidecar info not available (not started yet)");
-      this.name = "AgentSidecarNotReadyError";
+      super("services sidecar info not available (not started yet)");
+      this.name = "ServicesSidecarNotReadyError";
     }
   }
 
@@ -278,7 +278,7 @@ export namespace agentSidecarClient {
    * the `grida-workspace://` media protocol handler (#924) to proxy the
    * streamed `GET /workspaces/file` route (forwarding the renderer's Range
    * header) WITHOUT the renderer ever holding the credential. Throws
-   * {@link AgentSidecarNotReadyError} before the sidecar is up.
+   * {@link ServicesSidecarNotReadyError} before the sidecar is up.
    */
   export async function fetch(
     path: string,
@@ -293,12 +293,12 @@ export namespace agentSidecarClient {
 // agent server call from the main process. Invalidates if the supervisor
 // re-spawns under a different password (defensive — never expected).
 let cached: {
-  info: AgentSidecarInfo;
+  info: ServicesSidecarInfo;
   client: MediaTransport.Client;
 } | null = null;
 function client(): MediaTransport.Client {
-  const live = getAgentSidecarInfo();
-  if (!live) throw new agentSidecarClient.AgentSidecarNotReadyError();
+  const live = getServicesSidecarInfo();
+  if (!live) throw new servicesSidecarClient.ServicesSidecarNotReadyError();
   if (cached?.info !== live) {
     cached = {
       info: live,

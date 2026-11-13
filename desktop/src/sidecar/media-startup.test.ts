@@ -13,9 +13,9 @@ import { describe, expect, it, vi } from "vitest";
 // Only the Electron fetch adapter is replaced. The real host validates grants
 // and carries requests/responses over the same bounded channel as Desktop.
 vi.mock("electron", () => ({ net: {}, session: {} }));
-import { AgentNetworkHost } from "../main/agent-network-host";
-import { AgentNetworkAuthority } from "../main/agent-network-authority";
-import { AgentDaemonSocketHost } from "../main/agent-daemon-socket-host";
+import { ProviderNetworkHost } from "../main/provider-network-host";
+import { ProviderNetworkAuthority } from "../main/provider-network-authority";
+import { ServicesSidecarSocketHost } from "../main/services-sidecar-socket-host";
 import { DesktopMediaHost } from "../main/media-host";
 import { NativeWorkspaceCatalog } from "../main/native-workspace-catalog";
 import { SidecarSandboxPolicy } from "../main/sidecar-sandbox-policy";
@@ -595,8 +595,8 @@ type StartOptions = {
 
 class Sidecar {
   private readonly errors: Error[] = [];
-  private readonly network: AgentNetworkHost;
-  private readonly sockets: AgentDaemonSocketHost;
+  private readonly network: ProviderNetworkHost;
+  private readonly sockets: ServicesSidecarSocketHost;
   private readonly exit: Promise<{
     code: number | null;
     signal: string | null;
@@ -617,14 +617,14 @@ class Sidecar {
       this.stderr = (this.stderr + String(chunk)).slice(-64 * 1024);
     });
     const fatal = (error: Error) => this.errors.push(error);
-    this.network = new AgentNetworkHost(
+    this.network = new ProviderNetworkHost(
       child.stdout!,
       child.stdin!,
-      new AgentNetworkAuthority(origin),
+      new ProviderNetworkAuthority(origin),
       { fetch: fetchProvider },
       fatal
     );
-    this.sockets = new AgentDaemonSocketHost(child, fatal);
+    this.sockets = new ServicesSidecarSocketHost(child, fatal);
   }
   static async start(options: StartOptions): Promise<Sidecar> {
     await fs.rm(path.join(options.root, "allow-custody"), { force: true });

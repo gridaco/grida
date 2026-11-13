@@ -6,7 +6,7 @@
  * its one job is to turn an explicit grant plus request metadata into either a
  * small, canonical request or a refusal.
  */
-export namespace AgentNetworkPolicy {
+export namespace ProviderNetworkPolicy {
   export type Lane = "provider" | "download";
 
   export type Grant = Readonly<{

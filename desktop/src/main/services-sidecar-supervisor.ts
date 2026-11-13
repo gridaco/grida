@@ -16,27 +16,27 @@ import { home } from "@grida/home";
 import { ProtectedRoots } from "@grida/daemon/server";
 import { SidecarLogWriter } from "./sidecar-log";
 import { EDITOR_BASE_URL } from "../env";
-import { AgentNetworkAuthority } from "./agent-network-authority";
-import { AgentNetworkHost } from "./agent-network-host";
-import { AgentDaemonSocketHost } from "./agent-daemon-socket-host";
+import { ProviderNetworkAuthority } from "./provider-network-authority";
+import { ProviderNetworkHost } from "./provider-network-host";
+import { ServicesSidecarSocketHost } from "./services-sidecar-socket-host";
 import { SidecarSandboxPolicy } from "./sidecar-sandbox-policy";
 import { DesktopMediaRoot } from "./media-root";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 import type { DesktopAccountSession } from "./account-session";
 import { NativeGatewayConnection } from "./native-gateway-connection";
-import { AgentNetworkPolicy } from "../agent-network-policy";
+import { ProviderNetworkPolicy } from "../provider-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { RetainedServiceSandbox } from "./retained-service-sandbox";
 import { LegacyAgentPaths } from "./legacy-agent-paths";
 
-export type AgentSidecarInfo = {
+export type ServicesSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
   port: number;
   /** Per-spawn Basic-Auth password. Main process only; preload requests it over guarded IPC. */
   password: string;
 };
 
-type AgentSidecarMode = "disabled" | "native-chat";
+type ServicesSidecarMode = "disabled" | "native-chat";
 
 const STARTUP_TIMEOUT_MS = 15_000;
 const BACKOFF_INITIAL_MS = 250;
@@ -62,19 +62,19 @@ const LEGACY_CHAT_FILES = [
   "sessions.db-journal",
 ] as const;
 
-export class AgentSidecarSupervisor {
+export class ServicesSidecarSupervisor {
   private servicesStarted = false;
   private nativeChat?: NativeChatPaths;
   private ordinaryNativeChat = false;
   private child: ChildProcess | null = null;
   private activeGeneration = 0;
   private nextGeneration = 0;
-  private spawning: Promise<AgentSidecarInfo> | null = null;
-  private networkHost: AgentNetworkHost | null = null;
-  private daemonSocketHost: AgentDaemonSocketHost | null = null;
+  private spawning: Promise<ServicesSidecarInfo> | null = null;
+  private networkHost: ProviderNetworkHost | null = null;
+  private daemonSocketHost: ServicesSidecarSocketHost | null = null;
   private info: {
-    connection: AgentSidecarInfo;
-    mode: AgentSidecarMode;
+    connection: ServicesSidecarInfo;
+    mode: ServicesSidecarMode;
   } | null = null;
   private restartBackoffMs = BACKOFF_INITIAL_MS;
   private isShuttingDown = false;
@@ -84,7 +84,7 @@ export class AgentSidecarSupervisor {
   private workspaceCatalog?: string;
   private legacyStateRoots: readonly string[] = [];
   private protectedFileRoots: readonly string[] = [];
-  private readonly networkAuthority = new AgentNetworkAuthority(
+  private readonly networkAuthority = new ProviderNetworkAuthority(
     new URL(EDITOR_BASE_URL).origin
   );
 
@@ -116,7 +116,8 @@ export class AgentSidecarSupervisor {
     line: string,
     level: "log" | "warn" | "error" = "log"
   ): void {
-    const prefix = stream === "err" ? "[agent-sidecar:err]" : "[agent-sidecar]";
+    const prefix =
+      stream === "err" ? "[services-sidecar:err]" : "[services-sidecar]";
     // eslint-disable-next-line no-console
     console[level](`${prefix} ${line}`);
     this.log.write(stream, line);
@@ -133,8 +134,8 @@ export class AgentSidecarSupervisor {
     });
   }
 
-  async start(workspaceCatalog?: string): Promise<AgentSidecarInfo> {
-    if (this.isShuttingDown) throw new Error("agent_sidecar_shutting_down");
+  async start(workspaceCatalog?: string): Promise<ServicesSidecarInfo> {
+    if (this.isShuttingDown) throw new Error("services_sidecar_shutting_down");
     if (
       (workspaceCatalog &&
         (!this.nativeChat || !RetainedServiceSandbox.isSupportedPlatform())) ||
@@ -177,11 +178,11 @@ export class AgentSidecarSupervisor {
     }));
   }
 
-  getInfo(): AgentSidecarInfo | null {
+  getInfo(): ServicesSidecarInfo | null {
     return this.info?.connection ?? null;
   }
 
-  getMode(): AgentSidecarMode | null {
+  getMode(): ServicesSidecarMode | null {
     return this.info?.mode ?? null;
   }
 
@@ -217,7 +218,7 @@ export class AgentSidecarSupervisor {
   ): Promise<NativeProviderNetwork> {
     const grantId = this.networkAuthority.approvedEndpointGrant(id, baseUrl);
     if (!grantId) throw new Error("native_provider_endpoint_not_approved");
-    return await AgentNetworkHost.nativeProviderNetwork(
+    return await ProviderNetworkHost.nativeProviderNetwork(
       this.networkAuthority,
       grantId
     );
@@ -227,9 +228,9 @@ export class AgentSidecarSupervisor {
     return {
       credentialHome: this.provider_home,
       network: () =>
-        AgentNetworkHost.nativeProviderNetwork(
+        ProviderNetworkHost.nativeProviderNetwork(
           this.networkAuthority,
-          AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+          ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
         ),
     };
   }
@@ -239,9 +240,9 @@ export class AgentSidecarSupervisor {
     const paths = this.nativeChat;
     if (!paths || this.isShuttingDown)
       throw new Error("native_chatgpt_source_unavailable");
-    const network = await AgentNetworkHost.nativeProviderNetwork(
+    const network = await ProviderNetworkHost.nativeProviderNetwork(
       this.networkAuthority,
-      AgentNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID
+      ProviderNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID
     );
     if (this.isShuttingDown)
       throw new Error("native_chatgpt_source_unavailable");
@@ -255,11 +256,14 @@ export class AgentSidecarSupervisor {
   ): Promise<NativeGatewayConnection> {
     const origin = new URL(EDITOR_BASE_URL).origin;
     const [network, jobNetwork] = await Promise.all([
-      AgentNetworkHost.nativeProviderNetwork(
+      ProviderNetworkHost.nativeProviderNetwork(
         this.networkAuthority,
-        AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+        ProviderNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
       ),
-      AgentNetworkHost.nativeGatewayJobNetwork(this.networkAuthority, origin),
+      ProviderNetworkHost.nativeGatewayJobNetwork(
+        this.networkAuthority,
+        origin
+      ),
     ]);
     return await NativeGatewayConnection.open({
       origin,
@@ -341,7 +345,7 @@ export class AgentSidecarSupervisor {
       if (process.platform !== "win32")
         throw new Error("retained_service_platform_unsupported");
       console.warn(
-        "[agent-sidecar] Windows retained services have no kernel confinement"
+        "[services-sidecar] Windows retained services have no kernel confinement"
       );
       this.sandboxReady = true;
       return;
@@ -415,16 +419,16 @@ export class AgentSidecarSupervisor {
 
   /**
    * Resolve the sidecar bin path on disk. Forge's Vite plugin emits
-   * `.vite/build/agent-sidecar.js` next to `main.js`. In packaged builds
+   * `.vite/build/services-sidecar.js` next to `main.js`. In packaged builds
    * `__dirname` is inside the asar; the bundled sidecar script lives
    * alongside, and Electron's asar transparent-read serves it when
    * we `spawn` Electron-as-node with that path.
    */
   private sidecarScriptPath(): string {
-    return path.join(__dirname, "agent-sidecar.js");
+    return path.join(__dirname, "services-sidecar.js");
   }
 
-  private spawn(): Promise<AgentSidecarInfo> {
+  private spawn(): Promise<ServicesSidecarInfo> {
     if (this.info) return Promise.resolve(this.info.connection);
     if (this.spawning) return this.spawning;
     const pending = this.spawnOne();
@@ -436,7 +440,7 @@ export class AgentSidecarSupervisor {
     return pending;
   }
 
-  private async spawnOne(): Promise<AgentSidecarInfo> {
+  private async spawnOne(): Promise<ServicesSidecarInfo> {
     const generation = ++this.nextGeneration;
     const scriptPath = this.sidecarScriptPath();
     const password = crypto.randomBytes(32).toString("base64url");
@@ -444,7 +448,7 @@ export class AgentSidecarSupervisor {
     const sandbox = this.nativeSandbox;
     const supportedSandbox = sandbox !== undefined;
     if (!supportedSandbox && process.platform !== "win32")
-      throw new Error("agent_sidecar_sandbox_unavailable");
+      throw new Error("services_sidecar_sandbox_unavailable");
 
     const mode = this.nativeChat ? "native-chat" : "disabled";
     const args = [
@@ -474,21 +478,21 @@ export class AgentSidecarSupervisor {
     });
     if (generation !== this.nextGeneration || this.isShuttingDown) {
       nativePlan?.release?.();
-      throw new Error("agent sidecar startup was cancelled");
+      throw new Error("services sidecar startup was cancelled");
     }
-    return await new Promise<AgentSidecarInfo>((resolve, reject) => {
+    return await new Promise<ServicesSidecarInfo>((resolve, reject) => {
       let resolved = false;
       let child: ChildProcess;
       // Per-spawn ownership: an old child's delayed `exit` must never close or
       // clear the network host belonging to a newer generation.
-      let spawnNetworkHost: AgentNetworkHost | null = null;
-      let spawnDaemonSocketHost: AgentDaemonSocketHost | null = null;
+      let spawnNetworkHost: ProviderNetworkHost | null = null;
+      let spawnDaemonSocketHost: ServicesSidecarSocketHost | null = null;
       const timeout = setTimeout(() => {
         if (resolved) return;
         resolved = true;
         this.note("sup", "startup timed out; stopping child", "warn");
         this.retireGeneration(child, generation, true);
-        reject(new Error("agent sidecar startup timed out"));
+        reject(new Error("services sidecar startup timed out"));
       }, STARTUP_TIMEOUT_MS);
 
       // Main owns all provider HTTP. The service receives only its explicit
@@ -532,7 +536,7 @@ export class AgentSidecarSupervisor {
         resolved = true;
         clearTimeout(timeout);
         this.retireGeneration(child, generation, true);
-        reject(new Error("agent sidecar stdio channel unavailable"));
+        reject(new Error("services sidecar stdio channel unavailable"));
         return;
       }
 
@@ -545,18 +549,18 @@ export class AgentSidecarSupervisor {
         if (!resolved) {
           resolved = true;
           clearTimeout(timeout);
-          reject(new Error(`agent sidecar ${label} failed`));
+          reject(new Error(`services sidecar ${label} failed`));
         }
         this.retireGeneration(child, generation, true);
       };
       void (async () => {
-        const daemonSocketHost = new AgentDaemonSocketHost(child, (error) =>
+        const daemonSocketHost = new ServicesSidecarSocketHost(child, (error) =>
           failSpawnChannel("daemon capability channel", error)
         );
         spawnDaemonSocketHost = daemonSocketHost;
         const daemonPort = await daemonSocketHost.listen();
         const capabilityReady = daemonSocketHost.waitForCapabilityReady();
-        const host = await AgentNetworkHost.create({
+        const host = await ProviderNetworkHost.create({
           input: child.stdout!,
           output: child.stdin!,
           authority: this.networkAuthority,
@@ -622,7 +626,7 @@ export class AgentSidecarSupervisor {
           clearTimeout(timeout);
           reject(
             new Error(
-              `agent sidecar exited before readiness (code=${code} signal=${signal ?? "none"})`
+              `services sidecar exited before readiness (code=${code} signal=${signal ?? "none"})`
             )
           );
           this.scheduleRestart();
@@ -641,7 +645,7 @@ export class AgentSidecarSupervisor {
           clearTimeout(timeout);
           this.note("sup", `spawn failed: ${err.message}`, "error");
           this.retireGeneration(child, generation, true);
-          reject(new Error(`agent sidecar spawn failed: ${err.message}`));
+          reject(new Error(`services sidecar spawn failed: ${err.message}`));
         } else {
           this.note("sup", `spawn error: ${err.message}`, "error");
         }
@@ -712,15 +716,15 @@ export class AgentSidecarSupervisor {
   }
 }
 
-let supervisor: AgentSidecarSupervisor | undefined;
+let supervisor: ServicesSidecarSupervisor | undefined;
 
-function sidecar(): AgentSidecarSupervisor {
-  return (supervisor ??= new AgentSidecarSupervisor());
+function sidecar(): ServicesSidecarSupervisor {
+  return (supervisor ??= new ServicesSidecarSupervisor());
 }
 
-export function startAgentSidecar(
+export function startServicesSidecar(
   workspaceCatalog?: string
-): Promise<AgentSidecarInfo> {
+): Promise<ServicesSidecarInfo> {
   return sidecar().start(workspaceCatalog);
 }
 
@@ -728,11 +732,11 @@ export function selectNativeChat(ordinary = false): NativeChatPaths {
   return sidecar().selectNativeChat(ordinary);
 }
 
-export function getAgentSidecarInfo(): AgentSidecarInfo | null {
+export function getServicesSidecarInfo(): ServicesSidecarInfo | null {
   return supervisor?.getInfo() ?? null;
 }
 
-export function getAgentSidecarMode(): AgentSidecarMode | null {
+export function getServicesSidecarMode(): ServicesSidecarMode | null {
   return supervisor?.getMode() ?? null;
 }
 
@@ -756,7 +760,7 @@ export function nativeAgentGatewayConnection(
   return sidecar().nativeGatewayConnection(account, organizationId, signal);
 }
 
-export function stopAgentSidecar() {
+export function stopServicesSidecar() {
   supervisor?.stop();
 }
 

@@ -12,11 +12,11 @@ import {
 import type { NativeChatProfileSelection } from "@grida/desktop-bridge";
 import { CHATGPT_SUBSCRIPTION_CONFIG } from "../chatgpt-configuration";
 import type { DesktopAccountSession } from "./account-session";
-import { agentSidecarClient } from "./agent-sidecar-client";
+import { servicesSidecarClient } from "./services-sidecar-client";
 import {
   nativeAgentGatewayConnection,
   nativeAgentSubscriptionSettings,
-} from "./agent-sidecar-supervisor";
+} from "./services-sidecar-supervisor";
 import {
   createChatGptOAuthCoordinator,
   type ChatGptOAuthCoordinator,
@@ -364,7 +364,7 @@ export class NativeDesktopAgent {
     activity.forgetting = Promise.resolve()
       .then(async () => {
         await owners?.closeWorkspace(workspaceId);
-        await agentSidecarClient.forgetWorkspace(workspaceId);
+        await servicesSidecarClient.forgetWorkspace(workspaceId);
       })
       .finally(() => {
         if (this.workspaceActivity.get(workspaceId) === activity)
@@ -381,7 +381,7 @@ export class NativeDesktopAgent {
   async fallbackProfile(): Promise<string | null> {
     this.requireProfiles();
     const builtIn = await NativeChatProfiles.builtInChoices(
-      agentSidecarClient.nativeBuiltInByok
+      servicesSidecarClient.nativeBuiltInByok
     );
     return (
       builtIn.find((choice) => choice.modelId === DEFAULT_GATEWAY_MODEL)?.id ??
@@ -500,8 +500,8 @@ export class NativeDesktopAgent {
     }
     const builtIn = NativeProviderSelection.isBuiltInByok(profile.providerId);
     const launchProfile = builtIn
-      ? agentSidecarClient.nativeBuiltInByok
-      : agentSidecarClient.nativeConfiguredEndpoint;
+      ? servicesSidecarClient.nativeBuiltInByok
+      : servicesSidecarClient.nativeConfiguredEndpoint;
     const resolve = async () => {
       const launch = await launchProfile(profile.providerId, profile.modelId);
       check();
@@ -514,7 +514,7 @@ export class NativeDesktopAgent {
           profile.id
         )
           return configured;
-        const counted = await agentSidecarClient
+        const counted = await servicesSidecarClient
           .nativeConfiguredEndpoint(profile.providerId, profile.modelId, true)
           .catch(() => null);
         check();
@@ -565,7 +565,9 @@ export class NativeDesktopAgent {
   ) {
     if (this.provider !== "gateway")
       throw new Error("native_chat_profile_unavailable");
-    const models = await agentSidecarClient.listGatewayModels().catch(() => []);
+    const models = await servicesSidecarClient
+      .listGatewayModels()
+      .catch(() => []);
     const model = models.find(({ id }) => id === profile.modelId);
     const maxOutputTokens = NativeChatProfiles.gatewayOutputLimit(model);
     if (
@@ -650,13 +652,15 @@ export class NativeDesktopAgent {
 
   private async workspaceIndependentProfiles() {
     const [builtIn, configured] = await Promise.all([
-      NativeChatProfiles.builtInChoices(agentSidecarClient.nativeBuiltInByok),
-      agentSidecarClient
+      NativeChatProfiles.builtInChoices(
+        servicesSidecarClient.nativeBuiltInByok
+      ),
+      servicesSidecarClient
         .listProviderEndpoints()
         .then((endpoints) =>
           NativeChatProfiles.configuredChoices(
             endpoints,
-            agentSidecarClient.nativeConfiguredEndpoint
+            servicesSidecarClient.nativeConfiguredEndpoint
           )
         ),
     ]);
@@ -668,7 +672,7 @@ export class NativeDesktopAgent {
     const [{ builtIn, configured }, gateway] = await Promise.all([
       this.workspaceIndependentProfiles(),
       gatewayScope
-        ? agentSidecarClient
+        ? servicesSidecarClient
             .listGatewayModels()
             .then((models) =>
               NativeChatProfiles.gatewayChoices(
@@ -723,7 +727,7 @@ export class NativeDesktopAgent {
       const grant = await this.workspaceGrant?.(workspaceId);
       const workspace = grant
         ? { id: grant.workspaceId, root: grant.root, identity: grant.identity }
-        : await agentSidecarClient.findWorkspace(workspaceId);
+        : await servicesSidecarClient.findWorkspace(workspaceId);
       requireCurrent();
       if (workspace?.id !== workspaceId)
         throw new Error("native_workspace_not_registered");
@@ -950,8 +954,8 @@ export class NativeDesktopAgent {
       const { kind, id, model } = this.provider;
       const provider =
         kind === "byok"
-          ? await agentSidecarClient.nativeBuiltInByok(id, model)
-          : await agentSidecarClient.nativeConfiguredEndpoint(id, model);
+          ? await servicesSidecarClient.nativeBuiltInByok(id, model)
+          : await servicesSidecarClient.nativeConfiguredEndpoint(id, model);
       signal.throwIfAborted();
       return { provider, release: undefined };
     }

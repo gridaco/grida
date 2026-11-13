@@ -1,7 +1,7 @@
 ---
 title: Desktop agent authority
 description: The Desktop delta for host containment, native host networking, and confined raw agent execution.
-keywords: [desktop, agent-sidecar, sandbox, network, grida-sec-004]
+keywords: [desktop, services-sidecar, sandbox, network, grida-sec-004]
 format: md
 tags:
   - internal

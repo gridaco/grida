@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { workspaceFs } from "@grida/daemon/server";
 import { expect, it, vi } from "vitest";
-import { agentSidecarClient } from "./agent-sidecar-client";
+import { servicesSidecarClient } from "./services-sidecar-client";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import { NativeWorkspaceReads } from "./native-workspace-reads";
 import { WorkspaceFileWorkers } from "./workspace-file-worker";
@@ -21,8 +21,8 @@ vi.mock("./workspace-media-access", () => ({
 vi.mock("../env", () => ({
   EDITOR_BASE_URL: "https://editor.fixture.invalid",
 }));
-vi.mock("./agent-sidecar-supervisor", () => ({
-  getAgentSidecarInfo: launch.compatibility,
+vi.mock("./services-sidecar-supervisor", () => ({
+  getServicesSidecarInfo: launch.compatibility,
 }));
 
 const resources = process.env.GRIDA_DESKTOP_TEST_NATIVE_RESOURCES;
@@ -125,14 +125,18 @@ it.runIf(
       );
       // Reopen the catalog without recapturing a media grant.
       const catalog = new NativeWorkspaceCatalog(options);
-      agentSidecarClient.setWorkspaceCatalog(catalog);
+      servicesSidecarClient.setWorkspaceCatalog(catalog);
       const signal = new AbortController().signal;
       const read = (file: string, kind: "text" | "bytes") =>
-        agentSidecarClient.readWorkspaceFile(saved.id, file, kind, signal);
+        servicesSidecarClient.readWorkspaceFile(saved.id, file, kind, signal);
       const list = (directory: string) =>
-        agentSidecarClient.readWorkspaceDirectory(saved.id, directory, signal);
+        servicesSidecarClient.readWorkspaceDirectory(
+          saved.id,
+          directory,
+          signal
+        );
       const save = (file: string, content: string, expected?: number) =>
-        agentSidecarClient.writeWorkspaceFile(
+        servicesSidecarClient.writeWorkspaceFile(
           saved.id,
           file,
           content,

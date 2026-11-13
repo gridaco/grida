@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import { builtinModules } from "module";
 import { gridaBundleGuard } from "./vite.guards";
 
-// Agent sidecar, built as a third Forge/Vite entry alongside the
+// Services sidecar, built as a third Forge/Vite entry alongside the
 // Electron main process and preload. Runs in Electron-as-Node
 // (Node-only context, NO electron APIs).
 //

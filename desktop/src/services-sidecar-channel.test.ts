@@ -1,8 +1,8 @@
 import { Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
-import { AgentSidecarChannel } from "./agent-sidecar-channel";
+import { ServicesSidecarChannel } from "./services-sidecar-channel";
 
-const frames: readonly AgentSidecarChannel.Frame[] = [
+const frames: readonly ServicesSidecarChannel.Frame[] = [
   {
     v: 1,
     type: "bootstrap",
@@ -91,14 +91,14 @@ const frames: readonly AgentSidecarChannel.Frame[] = [
   { v: 1, type: "shutdown" },
 ];
 
-describe("AgentSidecarChannel.parse", () => {
+describe("ServicesSidecarChannel.parse", () => {
   it("accepts the complete v1 frame vocabulary and preserves header pairs", () => {
     for (const frame of frames) {
-      expect(AgentSidecarChannel.parse(frame)).toEqual(frame);
+      expect(ServicesSidecarChannel.parse(frame)).toEqual(frame);
     }
     const requestFrame = frames.find((frame) => frame.type === "request.start");
     expect(requestFrame).toBeDefined();
-    const request = AgentSidecarChannel.parse(requestFrame!);
+    const request = ServicesSidecarChannel.parse(requestFrame!);
     expect(request).toMatchObject({
       type: "request.start",
       headers: [
@@ -110,17 +110,17 @@ describe("AgentSidecarChannel.parse", () => {
   });
 
   it("rejects unknown versions, types, fields, and invalid frame fields", () => {
-    expect(() => AgentSidecarChannel.parse({ v: 2, type: "shutdown" })).toThrow(
-      /unsupported protocol version/
-    );
-    expect(() => AgentSidecarChannel.parse({ v: 1, type: "future" })).toThrow(
-      /unknown frame type/
-    );
     expect(() =>
-      AgentSidecarChannel.parse({ v: 1, type: "shutdown", surprise: true })
+      ServicesSidecarChannel.parse({ v: 2, type: "shutdown" })
+    ).toThrow(/unsupported protocol version/);
+    expect(() =>
+      ServicesSidecarChannel.parse({ v: 1, type: "future" })
+    ).toThrow(/unknown frame type/);
+    expect(() =>
+      ServicesSidecarChannel.parse({ v: 1, type: "shutdown", surprise: true })
     ).toThrow(/unknown frame field/);
     expect(() =>
-      AgentSidecarChannel.parse({
+      ServicesSidecarChannel.parse({
         v: 1,
         type: "response.credit",
         requestId: "req",
@@ -128,7 +128,7 @@ describe("AgentSidecarChannel.parse", () => {
       })
     ).toThrow(/bytes must be an integer/);
     expect(() =>
-      AgentSidecarChannel.parse({
+      ServicesSidecarChannel.parse({
         v: 1,
         type: "request.start",
         requestId: "req",
@@ -152,7 +152,7 @@ describe("AgentSidecarChannel.parse", () => {
     });
 
     expect(() =>
-      AgentSidecarChannel.parse(
+      ServicesSidecarChannel.parse(
         bootstrap([
           {
             id: "provider",
@@ -163,7 +163,7 @@ describe("AgentSidecarChannel.parse", () => {
       )
     ).toThrow(/canonical HTTP/);
     expect(() =>
-      AgentSidecarChannel.parse(
+      ServicesSidecarChannel.parse(
         bootstrap([
           {
             id: "provider",
@@ -174,7 +174,7 @@ describe("AgentSidecarChannel.parse", () => {
       )
     ).toThrow(/strict DNS-suffix pattern/);
     expect(() =>
-      AgentSidecarChannel.parse(
+      ServicesSidecarChannel.parse(
         bootstrap([
           {
             id: "downloads",
@@ -185,7 +185,7 @@ describe("AgentSidecarChannel.parse", () => {
       )
     ).toThrow(/network grant origin/);
     expect(() =>
-      AgentSidecarChannel.parse(
+      ServicesSidecarChannel.parse(
         bootstrap([
           {
             id: "downloads",
@@ -200,19 +200,19 @@ describe("AgentSidecarChannel.parse", () => {
   it("rejects header injection and overlarge binary chunks", () => {
     const request = {
       ...frames.find((frame) => frame.type === "request.start")!,
-    } as AgentSidecarChannel.RequestStartFrame;
+    } as ServicesSidecarChannel.RequestStartFrame;
     expect(() =>
-      AgentSidecarChannel.parse({
+      ServicesSidecarChannel.parse({
         ...request,
         headers: [["x-test", "ok\r\nx-injected: yes"]],
       })
     ).toThrow(/invalid header pair/);
 
     const data = Buffer.alloc(
-      AgentSidecarChannel.MAX_BINARY_CHUNK_BYTES + 1
+      ServicesSidecarChannel.MAX_BINARY_CHUNK_BYTES + 1
     ).toString("base64");
     expect(() =>
-      AgentSidecarChannel.parse({
+      ServicesSidecarChannel.parse({
         v: 1,
         type: "request.chunk",
         requestId: "req",
@@ -225,39 +225,39 @@ describe("AgentSidecarChannel.parse", () => {
   it("carries no host command lane", () => {
     for (const type of ["command.request", "command.output", "command.end"])
       expect(() =>
-        AgentSidecarChannel.parse({ v: 1, type, requestId: "cmd" })
+        ServicesSidecarChannel.parse({ v: 1, type, requestId: "cmd" })
       ).toThrow(`unknown frame type: ${type}`);
   });
 });
 
-describe("AgentSidecarChannel.Decoder", () => {
+describe("ServicesSidecarChannel.Decoder", () => {
   it("decodes one-byte fragmentation and multiple coalesced frames", () => {
-    const packet = Buffer.concat(frames.map(AgentSidecarChannel.encode));
-    const fragmented = new AgentSidecarChannel.Decoder();
-    const decoded: AgentSidecarChannel.Frame[] = [];
+    const packet = Buffer.concat(frames.map(ServicesSidecarChannel.encode));
+    const fragmented = new ServicesSidecarChannel.Decoder();
+    const decoded: ServicesSidecarChannel.Frame[] = [];
     for (let index = 0; index < packet.length; index += 1) {
       decoded.push(...fragmented.push(packet.subarray(index, index + 1)));
     }
     expect(decoded).toEqual(frames);
 
-    const coalesced = new AgentSidecarChannel.Decoder();
+    const coalesced = new ServicesSidecarChannel.Decoder();
     expect(coalesced.push(packet)).toEqual(frames);
   });
 
   it("decodes the largest legal binary chunk one byte at a time", () => {
-    const frame: AgentSidecarChannel.ResponseChunkFrame = {
+    const frame: ServicesSidecarChannel.ResponseChunkFrame = {
       v: 1,
       type: "response.chunk",
       requestId: "req_fragmented",
       sequence: 0,
       data: Buffer.alloc(
-        AgentSidecarChannel.MAX_BINARY_CHUNK_BYTES,
+        ServicesSidecarChannel.MAX_BINARY_CHUNK_BYTES,
         0xa5
       ).toString("base64"),
     };
-    const encoded = AgentSidecarChannel.encode(frame);
-    const decoder = new AgentSidecarChannel.Decoder();
-    const decoded: AgentSidecarChannel.Frame[] = [];
+    const encoded = ServicesSidecarChannel.encode(frame);
+    const decoder = new ServicesSidecarChannel.Decoder();
+    const decoded: ServicesSidecarChannel.Frame[] = [];
 
     for (let index = 0; index < encoded.length; index += 1) {
       decoded.push(...decoder.push(encoded.subarray(index, index + 1)));
@@ -267,11 +267,11 @@ describe("AgentSidecarChannel.Decoder", () => {
   });
 
   it("accepts a frame whose payload is exactly the 256 KiB limit", () => {
-    const headers: AgentSidecarChannel.Header[] = Array.from(
+    const headers: ServicesSidecarChannel.Header[] = Array.from(
       { length: 16 },
       (_, index) => [`x-padding-${index}`, "x".repeat(16 * 1024)]
     );
-    const candidate: AgentSidecarChannel.RequestStartFrame = {
+    const candidate: ServicesSidecarChannel.RequestStartFrame = {
       v: 1,
       type: "request.start",
       requestId: "req_exact_limit",
@@ -283,7 +283,7 @@ describe("AgentSidecarChannel.Decoder", () => {
     };
     const excess =
       Buffer.byteLength(JSON.stringify(candidate), "utf8") -
-      AgentSidecarChannel.MAX_FRAME_BYTES;
+      ServicesSidecarChannel.MAX_FRAME_BYTES;
     expect(excess).toBeGreaterThan(0);
     const [lastName, lastValue] = headers.at(-1)!;
     headers[headers.length - 1] = [
@@ -291,15 +291,17 @@ describe("AgentSidecarChannel.Decoder", () => {
       lastValue.slice(0, lastValue.length - excess),
     ];
 
-    const encoded = AgentSidecarChannel.encode(candidate);
-    expect(encoded.readUInt32BE(0)).toBe(AgentSidecarChannel.MAX_FRAME_BYTES);
-    expect(new AgentSidecarChannel.Decoder().push(encoded)).toEqual([
+    const encoded = ServicesSidecarChannel.encode(candidate);
+    expect(encoded.readUInt32BE(0)).toBe(
+      ServicesSidecarChannel.MAX_FRAME_BYTES
+    );
+    expect(new ServicesSidecarChannel.Decoder().push(encoded)).toEqual([
       candidate,
     ]);
   });
 
   it("uses an unsigned 4-byte big-endian payload length", () => {
-    const packet = AgentSidecarChannel.encode({ v: 1, type: "shutdown" });
+    const packet = ServicesSidecarChannel.encode({ v: 1, type: "shutdown" });
     expect(packet.readUInt32BE(0)).toBe(packet.length - 4);
     expect(JSON.parse(packet.subarray(4).toString("utf8"))).toEqual({
       v: 1,
@@ -309,37 +311,37 @@ describe("AgentSidecarChannel.Decoder", () => {
 
   it("rejects zero-length, oversized, malformed JSON, and invalid UTF-8", () => {
     const zero = Buffer.alloc(4);
-    expect(() => new AgentSidecarChannel.Decoder().push(zero)).toThrow(
+    expect(() => new ServicesSidecarChannel.Decoder().push(zero)).toThrow(
       /zero-length frame/
     );
 
     const oversized = Buffer.alloc(4);
-    oversized.writeUInt32BE(AgentSidecarChannel.MAX_FRAME_BYTES + 1);
-    expect(() => new AgentSidecarChannel.Decoder().push(oversized)).toThrow(
+    oversized.writeUInt32BE(ServicesSidecarChannel.MAX_FRAME_BYTES + 1);
+    expect(() => new ServicesSidecarChannel.Decoder().push(oversized)).toThrow(
       /exceeds/
     );
 
     const malformed = packet(Buffer.from("{nope", "utf8"));
-    expect(() => new AgentSidecarChannel.Decoder().push(malformed)).toThrow(
+    expect(() => new ServicesSidecarChannel.Decoder().push(malformed)).toThrow(
       /valid UTF-8 JSON/
     );
 
     const invalidUtf8 = packet(Buffer.from([0xc3, 0x28]));
-    expect(() => new AgentSidecarChannel.Decoder().push(invalidUtf8)).toThrow(
-      /valid UTF-8 JSON/
-    );
+    expect(() =>
+      new ServicesSidecarChannel.Decoder().push(invalidUtf8)
+    ).toThrow(/valid UTF-8 JSON/);
   });
 
   it("fails closed after the first protocol error", () => {
-    const decoder = new AgentSidecarChannel.Decoder();
+    const decoder = new ServicesSidecarChannel.Decoder();
     expect(() => decoder.push(Buffer.alloc(4))).toThrow(/zero-length/);
     expect(() =>
-      decoder.push(AgentSidecarChannel.encode({ v: 1, type: "shutdown" }))
+      decoder.push(ServicesSidecarChannel.encode({ v: 1, type: "shutdown" }))
     ).toThrow(/unusable after a protocol error/);
   });
 });
 
-describe("AgentSidecarChannel.Writer", () => {
+describe("ServicesSidecarChannel.Writer", () => {
   it("serializes writes and waits for callback plus drain backpressure", async () => {
     const started: Buffer[] = [];
     const callbacks: Array<(error?: Error | null) => void> = [];
@@ -350,7 +352,7 @@ describe("AgentSidecarChannel.Writer", () => {
         callbacks.push(callback);
       },
     });
-    const writer = new AgentSidecarChannel.Writer(output);
+    const writer = new ServicesSidecarChannel.Writer(output);
 
     const first = writer.write({ v: 1, type: "ready", port: 1234 });
     const second = writer.write({ v: 1, type: "shutdown" });
@@ -364,7 +366,7 @@ describe("AgentSidecarChannel.Writer", () => {
 
     callbacks.shift()?.();
     await second;
-    const decoder = new AgentSidecarChannel.Decoder();
+    const decoder = new ServicesSidecarChannel.Decoder();
     expect(decoder.push(Buffer.concat(started))).toEqual([
       { v: 1, type: "ready", port: 1234 },
       { v: 1, type: "shutdown" },
@@ -382,7 +384,7 @@ describe("AgentSidecarChannel.Writer", () => {
     // A real Writable becomes permanently errored after a callback error. Use
     // two calls only to prove the first promise observes the callback failure;
     // channel owners should tear down the failed pipe.
-    const writer = new AgentSidecarChannel.Writer(output);
+    const writer = new ServicesSidecarChannel.Writer(output);
     await expect(
       writer.write({ v: 1, type: "ready", port: 1234 })
     ).rejects.toThrow(/pipe failed/);
