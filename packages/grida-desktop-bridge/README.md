@@ -42,8 +42,7 @@ start the workspace chat. Known setup failures are fixed readiness values.
 it does not identify a worker or storage failure. `profiles()` remains available
 before startup succeeds. An explicit `selectProfile()` can open a saved or
 configured connection, with no implicit fallback or default retry.
-An unknown result after startup is unavailable. Older bridges use
-`available()`. The app issues an attachment for each
+An unknown result after startup is unavailable. The app issues an attachment for each
 renderer that creates or loads a chat. Submit keeps the caller's input ID.
 Pause, Resume, and Stop use an observation issued for that attachment.
 Streamed text carries message and turn IDs, a UTF-8 byte offset, and a

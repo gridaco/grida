@@ -629,16 +629,6 @@ export class NativeChatIpc {
     return binding;
   }
 
-  available(event: IpcMainInvokeEvent): boolean | Promise<boolean> {
-    if (this.disabled) return false;
-    if (!this.startup)
-      return this.scope(event.sender, event.senderFrame) !== null;
-    return this.status(event, true).then((state) => {
-      if (state !== "native-ready") throw new Error("native_chat_unavailable");
-      return true;
-    });
-  }
-
   async status(
     { sender, senderFrame: frame }: IpcMainInvokeEvent,
     start = false
@@ -651,7 +641,7 @@ export class NativeChatIpc {
     const href = frame.url;
     if (this.scope(sender, frame)) return "native-ready";
     const startup = this.startup;
-    if (!startup) return "legacy";
+    if (!startup) return "native-unavailable";
     if (!start) return "native-starting";
 
     const existing = this.startups.get(sender);

@@ -426,7 +426,6 @@ const bridge: DesktopBridge = {
     ...(selectedDocumentChatRoute()
       ? { document: true as const }
       : nativeWorkspaceChatOnly && { documentUnavailable: true as const }),
-    available: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE),
     status: (start) =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_STATUS, start),
     takeNotificationFocus: async () => {

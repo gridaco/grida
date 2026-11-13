@@ -495,18 +495,10 @@ export class NativeChatController {
     let watching = true;
     const probe = async () => {
       try {
-        const state = bridge.status
-          ? await bridge.status()
-          : (await bridge.available())
-            ? "native-ready"
-            : "legacy";
+        const state = await bridge.status();
         if (!watching) return;
-        if (state === "legacy") {
-          publish(state);
-          return;
-        }
         let result: NativeChatReadiness = state;
-        if (state === "native-starting" && bridge.status) {
+        if (state === "native-starting") {
           publish(state);
           if (!watching) return;
           if (remembered && bridge.selectProfile)

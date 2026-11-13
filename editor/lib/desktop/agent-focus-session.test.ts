@@ -117,14 +117,3 @@ it.each(["unmount", "navigation", "withdrawal"])(
     stop();
   }
 );
-
-it("accepts the original push format when the shell lacks the native take", () => {
-  const browser = workbench();
-  const focus = vi.fn<Focus>();
-  const stop = subscribeToNativeNotificationFocus({}, workspaceId, focus);
-  browser.wake({ session_id: "invalid", profile_id: "bad-profile" });
-  browser.wake({ session_id: target.sessionId, profile_id: profileId });
-  stop();
-  browser.wake();
-  expect(focus).toHaveBeenCalledExactlyOnceWith(target.sessionId, profileId);
-});

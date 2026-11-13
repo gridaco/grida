@@ -56,8 +56,11 @@ function fixture() {
     },
   });
   const bridge: DesktopNativeChat = {
-    async available() {
-      return true;
+    async status() {
+      return "native-ready";
+    },
+    async takeNotificationFocus() {
+      return null;
     },
     async list() {
       return { sessionIds: [], nextCursor: null };
@@ -3529,15 +3532,13 @@ it.each([
     "native-provider-endpoint-approval-required",
   ],
   ["native-workspace-capacity", "native-workspace-capacity"],
-  ["legacy", "native-unavailable"],
   ["native-future-status", "native-unavailable"],
 ] as const)(
   "keeps native mode when startup returns %s",
   async (result, expected) => {
     const { bridge } = fixture();
-    const availability = vi.spyOn(bridge, "available");
     const publish = vi.fn<(state: string | null) => void>();
-    const status = vi.fn<NonNullable<DesktopNativeChat["status"]>>();
+    const status = vi.fn<DesktopNativeChat["status"]>();
     status
       .mockResolvedValueOnce("native-starting")
       .mockResolvedValueOnce(result as Awaited<ReturnType<typeof status>>);
@@ -3549,7 +3550,6 @@ it.each([
       expect(publish.mock.calls).toEqual([["native-starting"], [expected]]);
     });
     expect(status.mock.calls).toEqual([[], [true]]);
-    expect(availability).not.toHaveBeenCalled();
     stop();
   }
 );
@@ -3569,7 +3569,7 @@ it.each([true, false])(
     );
     expect(remembered).toBe(id);
     const publish = vi.fn<(state: string | null) => void>();
-    const status = vi.fn<NonNullable<DesktopNativeChat["status"]>>();
+    const status = vi.fn<DesktopNativeChat["status"]>();
     status
       .mockResolvedValueOnce("native-starting")
       .mockResolvedValueOnce("native-ready");
@@ -3598,19 +3598,11 @@ it.each([true, false])(
   }
 );
 
-it("keeps the old bridge's legacy selection and drops a disposed startup reply", async () => {
+it("drops a disposed startup reply", async () => {
   const { bridge } = fixture();
   const publish = vi.fn<(state: string | null) => void>();
-  vi.spyOn(bridge, "available").mockResolvedValue(false);
-  const stopLegacy = NativeChatController.watchReadiness(bridge, publish);
-  await vi.waitFor(() =>
-    expect(publish).toHaveBeenCalledExactlyOnceWith("legacy")
-  );
-  stopLegacy();
-  publish.mockClear();
-
   const started = Promise.withResolvers<"native-ready">();
-  const status = vi.fn<NonNullable<DesktopNativeChat["status"]>>();
+  const status = vi.fn<DesktopNativeChat["status"]>();
   status
     .mockResolvedValueOnce("native-starting")
     .mockReturnValueOnce(started.promise);

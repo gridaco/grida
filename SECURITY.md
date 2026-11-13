@@ -943,7 +943,10 @@ cover delayed/failed setup, revoked grants and late completion after shutdown.
 The [account owner](desktop/src/main/account-session.ts) reports scoped Gateway
 mint unavailability through a typed, credential-free failure. The
 [chat IPC owner](desktop/src/main/native-chat-ipc.ts) exposes only its fixed
-readiness state; executable, storage and other startup failures remain distinct.
+readiness state through one status channel; there is no separate availability
+probe, and a launch that cannot start workspace chat reports it unavailable
+rather than selecting another chat runtime. Executable, storage and other
+startup failures remain distinct.
 Listing model connections does not start the default provider. Explicit selection
 still validates the configured binding and the current frame/workspace before
 activation; it does not authorize a funding fallback or infer permission to use

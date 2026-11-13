@@ -54,7 +54,6 @@ export const IPC_CHANNELS = {
   NATIVE_EXTERNAL_STATUS: "grida:native-external:status",
   NATIVE_EXTERNAL_START: "grida:native-external:start",
   NATIVE_EXTERNAL_STOP: "grida:native-external:stop",
-  NATIVE_CHAT_AVAILABLE: "grida:native-chat:available",
   NATIVE_CHAT_STATUS: "grida:native-chat:status",
   NATIVE_CHAT_LIST: "grida:native-chat:list",
   NATIVE_CHAT_PROFILES: "grida:native-chat:profiles",

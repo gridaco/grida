@@ -3,9 +3,9 @@
  * §click-to-attend) — a desktop notification click focused this window
  * and names the agent session to bring into view.
  *
- * Legacy shells and panes use the focus push directly. A native pane can
- * take the latest pending click once after connecting, with later pushes
- * waking the same guarded read.
+ * Legacy panes use the focus push directly. A native pane takes the latest
+ * pending click once after connecting; later pushes only wake the same
+ * guarded read.
  */
 
 import { useEffect, useRef } from "react";
@@ -47,7 +47,6 @@ export function subscribeToNativeNotificationFocus(
       duplicate === undefined
     );
   };
-  const take = bridge.takeNotificationFocus;
   const readLatest = async () => {
     // Let synchronous mount/cleanup probes finish before taking a click.
     await Promise.resolve();
@@ -55,7 +54,7 @@ export function subscribeToNativeNotificationFocus(
     while (active && requested && ownsWorkspace()) {
       requested = false;
       try {
-        const target = await take?.();
+        const target = await bridge.takeNotificationFocus();
         if (target) latest = target;
       } catch {
         // The host can withdraw admission while the workbench disconnects.
@@ -72,18 +71,11 @@ export function subscribeToNativeNotificationFocus(
     reading = true;
     void readLatest();
   };
-  const handle = (event: Event) => {
-    if (take) request();
-    else if (ownsWorkspace()) {
-      const target = pushedFocus(event);
-      if (target) focus(target.sessionId, target.profileId);
-    }
-  };
-  window.addEventListener(DESKTOP_AGENT_FOCUS_SESSION_EVENT, handle);
-  if (take) request();
+  window.addEventListener(DESKTOP_AGENT_FOCUS_SESSION_EVENT, request);
+  request();
   return () => {
     active = false;
-    window.removeEventListener(DESKTOP_AGENT_FOCUS_SESSION_EVENT, handle);
+    window.removeEventListener(DESKTOP_AGENT_FOCUS_SESSION_EVENT, request);
   };
 }
 

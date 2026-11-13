@@ -1066,12 +1066,12 @@ describe("native chat IPC", () => {
     });
   });
 
-  it("reports compatibility only for a legacy host's exact root deck route", async () => {
-    const legacy = new NativeChatIpc(ORIGIN, () => null);
+  it("reports chat unavailable for an exact root deck route when the host cannot start workspace chat", async () => {
+    const host = new NativeChatIpc(ORIGIN, () => null);
     const first = windowAt(`${ORIGIN}/desktop/file?id=eac20941e6a410aa`);
     await expect(
-      legacy.deckRequest(first.event, () => legacy.status(first.event, true))
-    ).resolves.toBe("legacy");
+      host.deckRequest(first.event, () => host.status(first.event, true))
+    ).resolves.toBe("native-unavailable");
   });
 
   it("keeps chat unavailable in managed media-only workbenches and decks", async () => {
@@ -1095,7 +1095,6 @@ describe("native chat IPC", () => {
     await expect(
       ipc.deckRequest(deck.event, () => ipc.status(deck.event, true))
     ).resolves.toBe("native-unavailable");
-    expect(ipc.available(workbench.event)).toBe(false);
     expect(resolve).not.toHaveBeenCalled();
   });
 
@@ -2191,9 +2190,11 @@ describe("native chat IPC", () => {
   });
 
   it("starts only the admitted route's workspace and shares the pending start", async () => {
-    const { first, second, scopes, chat, ipc: legacy } = setup();
+    const { first, second, scopes, chat, ipc: withoutStartup } = setup();
     scopes.delete(first.sender);
-    await expect(legacy.status(first.event, true)).resolves.toBe("legacy");
+    await expect(withoutStartup.status(first.event, true)).resolves.toBe(
+      "native-unavailable"
+    );
 
     const started = Promise.withResolvers<void>();
     const ensure = vi.fn<(id: string) => Promise<void>>(() => started.promise);
@@ -2228,14 +2229,14 @@ describe("native chat IPC", () => {
     );
     first.frame.url = WORKSPACE_URL;
     const status = ipc.status(first.event, true);
-    const compatible = ipc.available(first.event);
+    const shared = ipc.status(first.event, true);
     await vi.waitFor(() =>
       expect(ensure).toHaveBeenCalledExactlyOnceWith(WORKSPACE)
     );
     scopes.set(first.sender, { workspaceId: WORKSPACE, chat });
     started.resolve();
     await expect(status).resolves.toBe("native-ready");
-    await expect(compatible).resolves.toBe(true);
+    await expect(shared).resolves.toBe("native-ready");
     await expect(ipc.status(first.event)).resolves.toBe("native-ready");
   });
 
@@ -2260,8 +2261,8 @@ describe("native chat IPC", () => {
     await expect(ipc.status(first.event, true)).resolves.toBe(
       "native-unavailable"
     );
-    await expect(ipc.available(first.event)).rejects.toThrow(
-      "native_chat_unavailable"
+    await expect(ipc.status(first.event, true)).resolves.toBe(
+      "native-unavailable"
     );
     await expect(ipc.status(first.event, true)).resolves.toBe("native-ready");
   });
@@ -2287,9 +2288,6 @@ describe("native chat IPC", () => {
       ensure: () => Promise.reject(new Error(message)),
     });
     await expect(ipc.status(first.event, true)).resolves.toBe(readiness);
-    await expect(ipc.available(first.event)).rejects.toThrow(
-      "native_chat_unavailable"
-    );
   });
 
   it("allows explicit connection selection after unavailable Gateway access without starting the default again", async () => {
@@ -2468,18 +2466,18 @@ describe("native chat IPC", () => {
 
   it("requires a current main frame and main-owned workspace with separate sender handles", async () => {
     const { ipc, first, second } = setup();
-    expect(ipc.available(first.event)).toBe(true);
+    await expect(ipc.status(first.event)).resolves.toBe("native-ready");
     first.setLoading(true);
     await expect(ipc.create(first.event)).rejects.toThrow(
       "native_chat_unavailable"
     );
     first.setLoading(false);
-    expect(
-      ipc.available({
+    await expect(
+      ipc.status({
         ...first.event,
         senderFrame: { ...first.frame },
       } as unknown as IpcMainInvokeEvent)
-    ).toBe(false);
+    ).rejects.toThrow("native_chat_scope_changed");
     const one = await ipc.create(first.event);
     const iframe = {
       ...first.event,
@@ -2495,7 +2493,7 @@ describe("native chat IPC", () => {
       "native_chat_attachment_unavailable"
     );
     first.frame.url = `${ORIGIN}/desktop/workspace?id=other`;
-    expect(ipc.available(first.event)).toBe(false);
+    await expect(ipc.status(first.event)).resolves.toBe("native-unavailable");
     await expect(ipc.observe(first.event, one.attachmentId)).rejects.toThrow(
       "native_chat_scope_changed"
     );
@@ -2504,7 +2502,9 @@ describe("native chat IPC", () => {
       "native_chat_unavailable"
     );
     first.frame.url = WORKSPACE_URL.replace(ORIGIN, "https://other.invalid");
-    expect(ipc.available(first.event)).toBe(false);
+    await expect(ipc.status(first.event)).rejects.toThrow(
+      "native_chat_scope_changed"
+    );
   });
 
   it("keeps the exact observed control basis and rejects a copied observation from a different attachment", async () => {

@@ -368,9 +368,6 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_EXTERNAL_STOP, (event, id: unknown) =>
     externalAgent.stop(event, id)
   );
-  guarded(IPC_CHANNELS.NATIVE_CHAT_AVAILABLE, (event) =>
-    nativeChat.available(event)
-  );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_TAKE_NOTIFICATION_FOCUS,
     (event, ...args: unknown[]) => {

@@ -185,7 +185,6 @@ export type NativeChatSideAnswer = Readonly<{
 }>;
 
 export type NativeChatReadiness =
-  | "legacy"
   | "native-starting"
   | "native-ready"
   | "native-unavailable"
@@ -716,15 +715,13 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   readonly deckSvgText?: true;
   /** This native package offers chat for the exact selected standalone SVG. */
   readonly document?: true;
-  available(): Promise<boolean>;
   /**
-   * Starts the admitted workspace when requested and native mode is selected.
-   * Setup failures are fixed readiness values. Treat an unrecognized value
-   * as unavailable and keep the selected native mode.
+   * Starts the admitted workspace when requested. Setup failures are fixed
+   * readiness values. Treat an unrecognized value as unavailable.
    */
-  status?(start?: boolean): Promise<NativeChatReadiness>;
+  status(start?: boolean): Promise<NativeChatReadiness>;
   /** Take the latest notification click for this workbench once, if still current. */
-  takeNotificationFocus?(): Promise<NativeChatNotificationFocus | null>;
+  takeNotificationFocus(): Promise<NativeChatNotificationFocus | null>;
   list(cursor?: string | null): Promise<NativeChatPage>;
   profiles?(): Promise<NativeChatProfileCatalog | null>;
   /** Inspect reviewed definitions and retained results without running handlers. */
