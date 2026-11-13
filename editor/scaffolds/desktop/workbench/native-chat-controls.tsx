@@ -300,6 +300,7 @@ export function NativeModelPicker({
   onEffort,
   ultraAvailable = false,
   defaultUnavailable,
+  goal = false,
 }: {
   profiles: NativeChatProfileCatalog | null;
   busy: boolean;
@@ -315,6 +316,8 @@ export function NativeModelPicker({
   ultraAvailable?: boolean;
   /** The default connection cannot run; ask for an explicit choice. */
   defaultUnavailable?: boolean;
+  /** The next send starts a goal, whose turns keep the model's reasoning. */
+  goal?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"effort" | "models">("effort");
@@ -448,7 +451,13 @@ export function NativeModelPicker({
                 </span>
               ))}
             </div>
-            {selected && !selected.reasoning && (
+            {goal && (
+              <p className="text-[11px] text-muted-foreground">
+                Goal turns use the model&apos;s default reasoning. Ultra adds an
+                independent review.
+              </p>
+            )}
+            {!goal && selected && !selected.reasoning && (
               <p className="text-[11px] text-muted-foreground">
                 This model uses its own reasoning level.
                 {ultra && " Ultra still extends the work."}

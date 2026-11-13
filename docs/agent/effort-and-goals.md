@@ -50,7 +50,8 @@ limits inference steps. An optional Gateway spending ceiling is a separate limit
    Choose **Ultra** before sending to let one independent review share the
    goal's allowance on supported connections. Other effort levels do not yet
    change a goal's reasoning: goal turns, including Ultra ones, use the
-   model's default reasoning.
+   model's default reasoning, as the effort panel notes while the **Goal**
+   badge is on.
 3. While the goal exists, a strip above the composer shows its status and
    objective, for example **Pursuing goal**, **Paused goal** or
    **Goal complete**. Use its buttons to clear, pause or resume, and edit the

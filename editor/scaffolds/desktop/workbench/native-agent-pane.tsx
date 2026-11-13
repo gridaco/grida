@@ -1092,6 +1092,7 @@ export function NativeAgentPane({
                 onRefresh={() => void controller.readProfiles()}
                 effort={state.effort}
                 ultraAvailable={state.effortAvailable}
+                goal={state.goalIntent}
                 onEffort={(effort) => controller.selectEffort(effort)}
               />
             </>
