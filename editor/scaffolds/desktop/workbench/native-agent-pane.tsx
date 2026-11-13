@@ -324,8 +324,7 @@ export function NativeAgentPane({
   const turn = snapshot?.current;
   const running =
     turn?.disposition === "running" && !turn.paused && !turn.cancelled;
-  const canResume =
-    turn?.disposition === "suspended" && turn.paused && !turn.cancelled;
+  const canResume = controller.hasPausedTurn;
   const wakeup = state.scheduledWakeup;
   const suspendedCheckIn =
     !!wakeup &&
@@ -378,24 +377,28 @@ export function NativeAgentPane({
     snapshot?.current,
     snapshot?.latest
   );
-  const turnRecord = (turnId: string | undefined) =>
-    turnId
-      ? state.turnRecords.find((record) => record.turnId === turnId)
-      : undefined;
+  const records = new Map<string, (typeof state.turnRecords)[number]>();
+  for (const record of state.turnRecords)
+    if (!records.has(record.turnId)) records.set(record.turnId, record);
   // A turn's actions sit under its final answer only, once it settles.
   const finalAnswer = new Map<string, string>();
+  // The first user message of a goal-start turn is the one that set it.
+  const firstRequest = new Map<string, string>();
   for (const message of state.messages)
     if (message.role === "assistant" && message.turnId)
       finalAnswer.set(message.turnId, message.messageId);
+    else if (
+      message.role === "user" &&
+      message.turnId &&
+      !firstRequest.has(message.turnId)
+    )
+      firstRequest.set(message.turnId, message.messageId);
   const renderMessage = (message: NativeChatMessage) => {
-    const record = turnRecord(message.turnId);
-    // The first user message of a goal-start turn is the one that set it.
+    const record = message.turnId ? records.get(message.turnId) : undefined;
     const goalStart =
       record?.goalStart &&
-      state.messages.find(
-        (candidate) =>
-          candidate.role === "user" && candidate.turnId === message.turnId
-      )?.messageId === message.messageId;
+      !!message.turnId &&
+      firstRequest.get(message.turnId) === message.messageId;
     return (
       <ChatMessageView
         key={message.messageId}

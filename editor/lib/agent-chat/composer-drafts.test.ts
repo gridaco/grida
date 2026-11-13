@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   ComposerDrafts,
   type ComposerDraftAttachment,
@@ -85,6 +85,63 @@ describe("ComposerDrafts", () => {
     for (let index = 0; index < ComposerDrafts.maxStoredDrafts + 5; index++)
       drafts.write(`w:${index}`, doc(String(index)));
     expect(storage.length).toBe(ComposerDrafts.maxStoredDrafts);
+  });
+
+  it("rewrites a kept draft without reading the others, and drops the oldest on insert", () => {
+    vi.useFakeTimers();
+    try {
+      const storage = new MemoryStorage();
+      const drafts = new ComposerDrafts(storage);
+      for (let index = 0; index < ComposerDrafts.maxStoredDrafts; index++) {
+        vi.setSystemTime(index + 1);
+        drafts.write(`w:${index}`, doc(String(index)));
+      }
+      const read = vi.spyOn(storage, "getItem");
+      vi.setSystemTime(1000);
+      drafts.write("w:7", doc("Edited"));
+      expect(
+        read.mock.calls.filter(([key]) => key !== `${ComposerDrafts.prefix}w:7`)
+      ).toEqual([]);
+      drafts.write("w:new", doc("One more"));
+      expect(storage.length).toBe(ComposerDrafts.maxStoredDrafts);
+      expect(storage.getItem(`${ComposerDrafts.prefix}w:0`)).toBeNull();
+      expect(storage.getItem(`${ComposerDrafts.prefix}w:7`)).not.toBeNull();
+      expect(storage.getItem(`${ComposerDrafts.prefix}w:new`)).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("moves a new chat's draft to the id it was assigned", async () => {
+    const storage = new MemoryStorage();
+    const blobs = new MemoryBlobs();
+    const drafts = new ComposerDrafts(storage, blobs);
+    const png = {
+      kind: "png" as const,
+      name: "a.png",
+      bytes: new ArrayBuffer(4),
+    };
+    drafts.write("w:new", doc("A long prompt"));
+    drafts.writeModes("w:new", { plan: true });
+    await drafts.writeAttachment("w:new", png);
+    drafts.write("w:kept", doc("Already here"));
+    const moved = drafts.move("w:new", "w:chat");
+    // Memory moves before the bytes are stored.
+    expect(drafts.read("w:chat")).toEqual(doc("A long prompt"));
+    expect(await drafts.readAttachment("w:chat")).toEqual(png);
+    await moved;
+    const reopened = new ComposerDrafts(storage, blobs);
+    expect(reopened.read("w:chat")).toEqual(doc("A long prompt"));
+    expect(reopened.readModes("w:chat")).toEqual({ plan: true });
+    expect(await reopened.readAttachment("w:chat")).toEqual(png);
+    expect(reopened.read("w:new")).toBeNull();
+    expect(reopened.readModes("w:new")).toEqual({});
+    expect(await reopened.readAttachment("w:new")).toBeNull();
+
+    drafts.write("w:new", doc("Another"));
+    await drafts.move("w:new", "w:kept");
+    expect(drafts.read("w:kept")).toEqual(doc("Already here"));
+    expect(drafts.read("w:new")).toEqual(doc("Another"));
   });
 
   it("ignores unreadable stored entries", () => {

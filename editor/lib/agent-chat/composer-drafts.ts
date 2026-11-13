@@ -125,6 +125,42 @@ export class ComposerDrafts {
     this.save(key, doc);
   }
 
+  /**
+   * Carry a draft to the key its chat now has, such as a new chat that was
+   * just assigned its id. Each part a target already holds is kept; the rest
+   * moves, so nothing is lost and nothing is left behind under the old key.
+   * Memory moves at once; stored attachment bytes follow asynchronously.
+   */
+  move(from: string, to: string): Promise<void> {
+    if (from === to) return Promise.resolve();
+    const doc = this.read(from);
+    if (doc !== null && this.read(to) === null) {
+      this.write(to, doc);
+      this.write(from, null);
+    }
+    const modes = this.readModes(from);
+    const target = this.readModes(to);
+    if ((modes.plan || modes.goal) && !target.plan && !target.goal) {
+      this.writeModes(to, modes);
+      this.writeModes(from, {});
+    }
+    if (this.attachments.get(to)) return Promise.resolve();
+    const moving = this.attachments.get(from);
+    if (moving === null) return Promise.resolve();
+    if (moving)
+      // Both writes update memory before their first await.
+      return Promise.all([
+        this.writeAttachment(to, moving),
+        this.writeAttachment(from, null),
+      ]).then(() => {});
+    return (async () => {
+      const attachment = await this.readAttachment(from);
+      if (!attachment || (await this.readAttachment(to))) return;
+      await this.writeAttachment(to, attachment);
+      await this.writeAttachment(from, null);
+    })();
+  }
+
   private load(key: string): unknown | null {
     try {
       const raw = this.storage?.getItem(ComposerDrafts.prefix + key);
@@ -145,8 +181,11 @@ export class ComposerDrafts {
         storage.removeItem(ComposerDrafts.prefix + key);
         return;
       }
+      // Rewriting a kept draft cannot exceed the bound, and this runs on every
+      // keystroke, so only a new draft walks the others.
+      const added = storage.getItem(ComposerDrafts.prefix + key) === null;
       storage.setItem(ComposerDrafts.prefix + key, raw);
-      this.prune(storage);
+      if (added) this.prune(storage);
     } catch {
       // Memory still holds the draft for this session.
     }

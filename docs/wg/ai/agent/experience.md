@@ -359,7 +359,9 @@ is kept.
 
 A paused task is stopped unless the person resumes it. Sending a new request
 while a task is paused ends that task as stopped and runs the new request
-next, ahead of requests already waiting; those follow it. Pause is therefore
+next, ahead of requests already waiting; those follow it. A request that is
+refused before it can be sent, such as one over a size limit, leaves the
+paused task as it was. Pause is therefore
 the product's primary interruption: it costs nothing over Stop and keeps the
 option to continue the same task.
 

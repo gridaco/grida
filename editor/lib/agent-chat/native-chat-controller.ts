@@ -361,6 +361,27 @@ const EMPTY: NativeChatView = Object.freeze({
   error: null,
 });
 
+/** View fields that belong to the workspace, not to the selected chat. */
+const SESSION_INDEPENDENT_FIELDS = [
+  "sessions",
+  "catalogCursor",
+  "nextCatalogCursor",
+  "catalogLoading",
+  "catalogError",
+  "catalogArchived",
+  "profiles",
+  "profileBusy",
+  "profileError",
+] as const satisfies readonly (keyof NativeChatView)[];
+
+function pickSessionIndependent(
+  view: NativeChatView
+): Pick<NativeChatView, (typeof SESSION_INDEPENDENT_FIELDS)[number]> {
+  return Object.fromEntries(
+    SESSION_INDEPENDENT_FIELDS.map((field) => [field, view[field]])
+  ) as Pick<NativeChatView, (typeof SESSION_INDEPENDENT_FIELDS)[number]>;
+}
+
 /** Renderer-owned observation and text projection. Work stays in the native host. */
 export class NativeChatController {
   static readonly goalComposerAllowance = Object.freeze({
@@ -405,6 +426,12 @@ export class NativeChatController {
     return this.drafts
       ? `${this.drafts.workspace}:${this.view.selected ?? "new"}`
       : null;
+  }
+
+  /** The draft key of a chat's scope, whichever chat is selected now. */
+  private scopeDraftKey(scope: Scope): string | null {
+    const session = scope.attachment?.sessionId ?? scope.requested;
+    return this.drafts ? `${this.drafts.workspace}:${session ?? "new"}` : null;
   }
 
   private saveDraftModes(key = this.draftKey()): void {
@@ -840,74 +867,16 @@ export class NativeChatController {
       replay: true,
     };
     this.scope = scope;
+    // Every per-chat field starts empty; only what belongs to the workspace
+    // carries over to the next chat.
     this.update({
+      ...EMPTY,
+      ...pickSessionIndependent(this.view),
       scope: scope.id,
       selected: sessionId,
-      operatingRegime: "act",
-      goalIntent: false,
-      catalogEntry: null,
-      catalogEntryError: null,
-      catalogChanging: false,
-      commands: [],
-      commandRunning: null,
-      commandNotice: null,
-      commandFork: null,
-      revisionDraft: null,
-      revisionSubmitting: false,
-      catalogDraft: null,
       messages: retained?.messages ?? [],
       turnRecords: retained?.turnRecords ?? [],
-      canReadEarlier: false,
-      titleArrived: null,
-      readingEarlier: false,
-      earlierError: null,
-      sideChat: null,
-      subagents: null,
-      imageInput: false,
-      fileInput: false,
-      attachmentReading: false,
-      attachmentNotice: null,
-      attachmentDraft: null,
-      wakeupsAvailable: false,
-      allowWakeup: false,
-      scheduledWakeup: null,
-      wakeupError: null,
-      contextLimitOpen: false,
-      contextLimit: null,
-      contextLimitDraft: "",
-      contextLimitBusy: false,
-      contextLimitError: null,
-      hooksOpen: false,
-      hooks: null,
-      hooksBusy: false,
-      hooksError: null,
-      reviewConfiguration: false,
-      observation: null,
-      turnSummary: null,
-      gatewayBillingRefresh: null,
-      gatewayChildPage: { status: "idle", hasPrevious: false },
-      approvals: [],
-      approvalError: null,
-      questions: [],
-      questionReady: false,
-      questionError: null,
-      librarySelection: null,
-      librarySelectionError: null,
-      librarySelectionRetry: false,
-      queue: null,
-      queueLoading: false,
-      queueDraft: null,
-      steering: false,
-      pausing: null,
-      effort: "medium",
-      effortAvailable: false,
-      goalEffortAvailable: false,
-      goal: null,
-      goalReady: false,
       loading: sessionId !== null,
-      acting: false,
-      repairing: false,
-      error: null,
     });
     void this.readEffortCapability(scope);
     void this.readWakeupCapability(scope);
@@ -2156,68 +2125,34 @@ export class NativeChatController {
       return this.runCommand(literal === "/compact" ? "compact" : "fork");
     if (!this.canSubmit || !text.trim())
       throw new Error("native_chat_not_ready");
+    // A send that cannot go out is refused before anything changes, so a
+    // paused turn is only stopped for a message that will be sent.
+    this.refuseUnsendable(scope, text);
     // Sending while a turn is paused moves on: that turn ends as stopped and
     // this message runs next. See "Pause, resume, and stop deliberately".
     const next = !this.view.steering && !!this.pausedTurn;
     if (next) await this.endPausedTurn(scope);
     if (this.view.goalIntent) {
-      const goalFrom = this.draftKey();
-      if (this.view.attachmentDraft || this.view.reviewConfiguration)
-        throw new Error(
-          "Remove the attachment or settings review before starting a goal."
-        );
-      if (utf8.encode(text.trim()).length > 1024) {
-        const error =
-          "Use a shorter goal, or customize its objective and success criteria.";
-        this.update({ error });
-        throw new Error(error);
-      }
-      const accepted = await this.startGoal({
-        objective: text.trim(),
-        criteria: [text.trim()],
-        allowance: NativeChatController.goalComposerAllowance,
-        automatic: true,
-        ...(this.view.effort === "ultra" && { effort: "ultra" }),
-        ...(this.view.allowWakeup && { allowWakeup: true }),
-      });
+      const accepted = await this.startGoal(this.composerGoal(text));
       if (!accepted)
         throw new Error(this.view.error ?? "Couldn't start the goal.");
       if (this.owns(scope)) this.update({ goalIntent: false });
-      this.drafts?.store.writeModes(goalFrom ?? "", {
+      this.drafts?.store.writeModes(this.scopeDraftKey(scope) ?? "", {
         ...(this.view.operatingRegime === "plan" && { plan: true }),
       });
       if (next) await this.playNext(scope, null);
       return;
     }
     if (this.view.steering) return this.submitSteering(scope, text);
-    const sentFrom = this.draftKey();
     const mode = this.needsQueue ? "enqueue" : "submit";
     const selectedAttachment = scope.selectedAttachment;
     const allowWakeup = this.view.allowWakeup;
     const reviewConfiguration = this.view.reviewConfiguration;
-    const retained =
-      scope.pending?.text === text &&
-      scope.pending.attachment === selectedAttachment
-        ? scope.pending
-        : undefined;
-    if (retained && retained.allowWakeup !== allowWakeup) {
-      const error =
-        "Retry with the original check-in permission, or edit the message to send a new one.";
-      this.update({ error });
-      throw new Error(error);
-    }
+    const retained = this.retainedSend(scope, text);
+    // Depends on whether the chat is busy, so it is checked once a paused
+    // turn has settled.
     if (allowWakeup && !retained && (!this.canAllowWakeup || this.needsQueue)) {
       const error = "Allow a check-in when sending from an idle Act chat.";
-      this.update({ error });
-      throw new Error(error);
-    }
-    if (reviewConfiguration && !this.canReviewConfiguration)
-      throw new Error("native_context_limit_unavailable");
-    if (
-      reviewConfiguration &&
-      utf8.encode(text).length > MAX_CONFIGURATION_MESSAGE_BYTES
-    ) {
-      const error = "Use a message of at most 1 KiB for settings review.";
       this.update({ error });
       throw new Error(error);
     }
@@ -2404,7 +2339,8 @@ export class NativeChatController {
           scope.selectedAttachment = undefined;
           this.update({ attachmentDraft: null, attachmentNotice: null });
         }
-        if (pending.attachment) this.saveDraftAttachment(null, sentFrom);
+        if (pending.attachment)
+          this.saveDraftAttachment(null, this.scopeDraftKey(scope));
         scope.awaitingTurn = accepted.turnId ?? undefined;
         scope.replay = true;
         await this.refresh(scope);
@@ -2896,6 +2832,73 @@ export class NativeChatController {
         if (this.owns(scope)) this.update({ acting: false });
       }
     }
+  }
+
+  /** The goal the composer starts from its text. */
+  private composerGoal(
+    text: string
+  ): Omit<NativeChatGoalRequest, "operatingRegime"> {
+    return {
+      objective: text.trim(),
+      criteria: [text.trim()],
+      allowance: NativeChatController.goalComposerAllowance,
+      automatic: true,
+      ...(this.view.effort === "ultra" && { effort: "ultra" }),
+      ...(this.view.allowWakeup && { allowWakeup: true }),
+    };
+  }
+
+  /** The unconfirmed send this text and attachment would retry. */
+  private retainedSend(scope: Scope, text: string) {
+    return scope.pending?.text === text &&
+      scope.pending.attachment === scope.selectedAttachment
+      ? scope.pending
+      : undefined;
+  }
+
+  /**
+   * Throws when the composer's message cannot be sent whatever the chat is
+   * doing, before any request leaves. Checks that depend on whether the chat
+   * is busy stay with the send itself.
+   */
+  private refuseUnsendable(scope: Scope, text: string): void {
+    const refuse = (error: string): never => {
+      this.update({ error });
+      throw new Error(error);
+    };
+    if (this.view.goalIntent) {
+      if (this.view.attachmentDraft || this.view.reviewConfiguration)
+        throw new Error(
+          "Remove the attachment or settings review before starting a goal."
+        );
+      if (utf8.encode(text.trim()).length > 1024)
+        refuse(
+          "Use a shorter goal, or customize its objective and success criteria."
+        );
+      const problem = goalRequestProblem(this.composerGoal(text), this.view);
+      if (problem) refuse(problem);
+      return;
+    }
+    if (this.view.steering) return;
+    const retained = this.retainedSend(scope, text);
+    if (retained && retained.allowWakeup !== this.view.allowWakeup)
+      refuse(
+        "Retry with the original check-in permission, or edit the message to send a new one."
+      );
+    if (this.view.reviewConfiguration) {
+      if (!this.canReviewConfiguration)
+        throw new Error("native_context_limit_unavailable");
+      if (utf8.encode(text).length > MAX_CONFIGURATION_MESSAGE_BYTES)
+        refuse("Use a message of at most 1 KiB for settings review.");
+    }
+  }
+
+  /**
+   * Whether the current turn is confirmed paused: it can resume, and a sent
+   * message moves on from it.
+   */
+  get hasPausedTurn(): boolean {
+    return !!this.pausedTurn;
   }
 
   /** The current turn when it is confirmed paused. */
@@ -3656,6 +3659,14 @@ export class NativeChatController {
         attachment.sessionId,
         ...this.recents.filter((id) => id !== attachment.sessionId),
       ].slice(0, RECENTS_LIMIT);
+      // A new chat's unsent draft belongs to the chat it just became, so it
+      // stays in the composer whatever happens to the send that created it.
+      const newDraft = this.view.selected === null ? this.draftKey() : null;
+      if (newDraft && this.drafts)
+        void this.drafts.store.move(
+          newDraft,
+          `${this.drafts.workspace}:${attachment.sessionId}`
+        );
       this.update({
         selected: attachment.sessionId,
         sessions: this.sessionChoices(),

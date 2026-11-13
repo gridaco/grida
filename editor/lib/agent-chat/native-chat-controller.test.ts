@@ -1662,6 +1662,60 @@ it("sending while a turn is paused stops it and plays the new message next", asy
   controller.disconnect();
 });
 
+it("keeps a paused turn when the message sent after it cannot go out", async () => {
+  const { bridge, controller, waiting } = fixture();
+  waiting.add("chat-a");
+  const base = bridge.observe.bind(bridge);
+  bridge.observe = async (id) => {
+    const value = await base(id);
+    const current = value.snapshot.current;
+    return {
+      ...value,
+      snapshot: {
+        ...value.snapshot,
+        current: current && { ...current, paused: true },
+      },
+    };
+  };
+  const control = vi.fn<NonNullable<DesktopNativeChat["control"]>>(
+    bridge.control!.bind(bridge)
+  );
+  bridge.control = control;
+  bridge.contextLimit = async () => ({
+    reviewId: "config-basis",
+    limit: 4096,
+    exactCounting: true,
+    source: "active",
+  });
+  bridge.enqueue = (attachment, id, text) =>
+    bridge.submit(attachment, id, text);
+  bridge.saveContextLimit = async (_id, limit) => ({
+    limit,
+    disposition: "applied",
+  });
+  bridge.submitInRegime = vi.fn<
+    NonNullable<DesktopNativeChat["submitInRegime"]>
+  >(async (_mode, attachment, id, text) => bridge.submit(attachment, id, text));
+  bridge.submitWithConfigurationReview = vi.fn<
+    NonNullable<DesktopNativeChat["submitWithConfigurationReview"]>
+  >(async (attachment, input) =>
+    bridge.submit(attachment, input.inputId, input.text)
+  );
+  await controller.select("chat-a");
+  await vi.waitFor(() =>
+    expect(controller.read().observation?.snapshot.current?.paused).toBe(true)
+  );
+  await controller.toggleContextLimit();
+  controller.setConfigurationReview(true);
+  expect(controller.read().reviewConfiguration).toBe(true);
+  await expect(controller.submit("x".repeat(1025))).rejects.toThrow(
+    "Use a message of at most 1 KiB for settings review."
+  );
+  expect(control).not.toHaveBeenCalled();
+  expect(controller.read().observation?.snapshot.current?.paused).toBe(true);
+  controller.disconnect();
+});
+
 it("steers with a queued message only after it leaves the queue, and returns its text if the turn refuses", async () => {
   const { bridge, controller, running } = fixture();
   running.add("chat-a");
@@ -2861,6 +2915,51 @@ it("keeps Plan and an attachment with each chat's draft across reattachment", as
   // Removing it is the person's choice and forgets it.
   controller.removeAttachment(controller.read().scope);
   await vi.waitFor(() => expect(blobs.has("workspace:chat-a")).toBe(false));
+  controller.disconnect();
+});
+
+it("keeps a new chat's draft with the chat its refused first send created", async () => {
+  const { bridge, controller } = fixture();
+  bridge.create = async () => ({ attachmentId: "chat-n", sessionId: "chat-n" });
+  const accepts = vi.fn<NonNullable<DesktopNativeChat["acceptsPng"]>>(
+    async () => true
+  );
+  bridge.acceptsPng = accepts;
+  bridge.submitImage = vi.fn<NonNullable<DesktopNativeChat["submitImage"]>>();
+  bridge.submitInRegime =
+    vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
+  const blobs = new Map<string, ComposerDraftAttachment>();
+  const drafts = new ComposerDrafts(null, {
+    get: async (key) => blobs.get(key) ?? null,
+    put: async (key, value) => void blobs.set(key, value),
+    delete: async (key) => void blobs.delete(key),
+  });
+  controller.keepDrafts(drafts, "workspace");
+  await controller.select(null);
+  await vi.waitFor(() => expect(controller.read().imageInput).toBe(true));
+  // The composer keeps the text under the same key.
+  const text = { type: "doc", content: [] };
+  drafts.write("workspace:new", text);
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]).buffer;
+  await controller.pickAttachment(controller.read().scope, "png", {
+    name: "sketch.png",
+    size: png.byteLength,
+    arrayBuffer: async () => png,
+  });
+  await vi.waitFor(() => expect(blobs.has("workspace:new")).toBe(true));
+
+  // The model turns out not to accept images once the chat exists.
+  accepts.mockResolvedValue(false);
+  await expect(controller.submit("Describe this sketch")).rejects.toThrow(
+    "image_input_unavailable"
+  );
+  expect(controller.read().selected).toBe("chat-n");
+  expect(controller.draftKey()).toBe("workspace:chat-n");
+  expect(drafts.read("workspace:chat-n")).toEqual(text);
+  expect(drafts.read("workspace:new")).toBeNull();
+  await vi.waitFor(() => expect(blobs.has("workspace:chat-n")).toBe(true));
+  expect(blobs.has("workspace:new")).toBe(false);
+  expect(controller.read().attachmentDraft?.name).toBe("sketch.png");
   controller.disconnect();
 });
 

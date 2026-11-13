@@ -78,3 +78,32 @@ it("bounds discovery even in a wide workspace with no files", async () => {
   ).resolves.toEqual([]);
   expect(readdir).toHaveBeenCalledTimes(64);
 });
+
+it("keeps the compatibility catalog bounded by depth and file count only", async () => {
+  const folders = 100;
+  const readdir = vi.fn<WorkspaceArtifact.Readdir>(async (path) =>
+    path === ""
+      ? Array.from({ length: folders }, (_, index) =>
+          entry(`folder-${index}`, "directory")
+        )
+      : Array.from({ length: 10 }, (_, index) => entry(`${path}/${index}.txt`))
+  );
+  const signal = new AbortController().signal;
+
+  const compatibility = await WorkspaceFileMentions.list(
+    readdir,
+    signal,
+    "compatibility"
+  );
+  // Files beyond the 64th folder are listed, and the walk stops at 800 files.
+  expect(compatibility).toHaveLength(800);
+  expect(compatibility.some(({ path }) => path === "folder-79/9.txt")).toBe(
+    true
+  );
+  expect(readdir).toHaveBeenCalledTimes(81);
+
+  readdir.mockClear();
+  const native = await WorkspaceFileMentions.list(readdir, signal, "native");
+  expect(native).toHaveLength(630);
+  expect(readdir).toHaveBeenCalledTimes(64);
+});

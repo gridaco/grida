@@ -33,8 +33,10 @@ export namespace WorkspaceFileMentions {
         )
           continue;
         if (entry.kind === "directory") {
+          // The compatibility catalog keeps its original bounds: depth and
+          // file count.
           if (
-            directories.length < MAX_DIRECTORIES &&
+            (compatibility || directories.length < MAX_DIRECTORIES) &&
             directory.depth < MAX_DEPTH &&
             !entry.name.startsWith(".") &&
             !SKIP_DIRS.has(entry.name)

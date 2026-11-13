@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import type { FileUIPart } from "ai";
 import type { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
+import { ComposerDraftBinding } from "@/lib/agent-chat/composer-draft-binding";
 import { Button } from "@app/ui/components/button";
 import {
   DropdownMenu,
@@ -263,20 +264,25 @@ function AgentComposerInner({
   // change. A different chat starts from its own draft.
   const draftKey = draft?.key;
   const draftStore = draft?.store;
-  const restoredDraft = useRef<string | null>(null);
+  const [binding] = useState(() => new ComposerDraftBinding());
   useEffect(() => {
-    if (!draftKey || !draftStore || restoredDraft.current === draftKey) return;
+    if (!draftKey || !draftStore) return;
+    const meeting = binding.meet(draftKey);
+    if (meeting === "held") return;
+    if (meeting === "renamed") {
+      draftStore.write(draftKey, readDocument());
+      return;
+    }
     const saved = draftStore.read(draftKey);
-    if (restoredDraft.current !== null) composer.clear();
-    if (saved === null || restoreDocument(saved))
-      restoredDraft.current = draftKey;
+    if (binding.held !== null) composer.clear();
+    if (saved === null || restoreDocument(saved)) binding.restored(draftKey);
     // composer.clear is stable for a given editor, like restoreDocument.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey, draftStore, restoreDocument]);
+  }, [binding, draftKey, draftStore, readDocument, restoreDocument]);
   useEffect(() => {
-    if (!draftKey || !draftStore || restoredDraft.current !== draftKey) return;
+    if (!draftKey || !draftStore || binding.held !== draftKey) return;
     draftStore.write(draftKey, readDocument());
-  }, [composer.snapshot, draftKey, draftStore, readDocument]);
+  }, [binding, composer.snapshot, draftKey, draftStore, readDocument]);
   useImperativeHandle(draftRef, () => ({ appendText: composer.appendText }), [
     composer.appendText,
   ]);
@@ -663,14 +669,14 @@ function AgentComposerInner({
         key: draftKey,
         doc: JSON.stringify(readDocument()),
       };
+      if (sentDraft) binding.send(sentDraft.key);
       try {
         await onSubmit(...submitArgs);
-        if (
-          sentDraft &&
-          draftStore &&
-          JSON.stringify(draftStore.read(sentDraft.key)) === sentDraft.doc
-        )
-          draftStore.write(sentDraft.key, null);
+        // A new chat's draft is kept under the id it was assigned meanwhile.
+        if (sentDraft && draftStore)
+          for (const key of binding.settle(sentDraft.key))
+            if (JSON.stringify(draftStore.read(key)) === sentDraft.doc)
+              draftStore.write(key, null);
         if (queueSubmitGuard.owns(lease, submissionScopeRef.current)) {
           // The editor remains usable while the bridge acknowledges enqueue.
           // Re-read it now: a user edit or session switch may have produced a
@@ -698,6 +704,7 @@ function AgentComposerInner({
           );
         }
       } finally {
+        if (sentDraft) binding.settle(sentDraft.key);
         if (queueSubmitGuard.finish(lease)) {
           setQueueingLease((current) => (current === lease ? null : current));
         }
