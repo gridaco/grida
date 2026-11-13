@@ -48,7 +48,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "agent"),
       mediaRoot: path.join(base, "media"),
     };

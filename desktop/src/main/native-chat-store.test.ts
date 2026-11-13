@@ -4,9 +4,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import os from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LegacyAgentPaths } from "./legacy-agent-paths";
 import type { NativeAgentChatLaunch } from "./native-agent-chat";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type { NativeEditorSvgText } from "@grida/desktop-bridge";
@@ -55,15 +53,14 @@ async function fixture() {
     fs.mkdirSync(directory, { mode: 0o700 });
     return directory;
   };
-  const legacy = child("legacy");
+  const agentData = child("agent");
   const cwd = child("workspace");
   electron.temp = child("temp");
   electron.userData = child("desktop");
   electron.media = child("media");
-  vi.stubEnv("GRIDA_AGENT_USER_DATA", legacy);
-  const scratchBase = LegacyAgentPaths.scratchBase(legacy, electron.temp);
-  const nativeState = path.join(electron.userData, "native-chat");
-  const checkpoint = path.join(nativeState, "cutover.json");
+  vi.stubEnv("GRIDA_AGENT_USER_DATA", agentData);
+  const nativeState = path.join(electron.userData, "chats");
+  const marker = path.join(nativeState, "store.json");
   const launch: Omit<NativeAgentChatLaunch, "stateDirectory"> = {
     resourcesPath: child("missing-resources"),
     cwd,
@@ -79,98 +76,47 @@ async function fixture() {
     child,
     launch,
     nativeState,
-    checkpoint,
-    legacy,
-    scratchBase,
-    database: path.join(legacy, "sessions.db"),
+    marker,
+    agentData,
   };
-}
-
-/** Chat history an earlier TypeScript agent left in the profile. */
-function writeLegacy(database: string, scratchBase: string): void {
-  const db = new DatabaseSync(database);
-  try {
-    db.exec(`
-      CREATE TABLE chat_sessions(id TEXT PRIMARY KEY);
-      CREATE TABLE chat_parts(id TEXT PRIMARY KEY, session_id TEXT, type TEXT, data_json TEXT);
-      INSERT INTO chat_sessions VALUES ('ses_fixture');
-      INSERT INTO chat_parts VALUES
-        ('file_fixture', 'ses_fixture', 'data-user_file_attachments', '{"location":"scratch","files":[{"path":"note.txt","size":4}]}');
-      PRAGMA user_version = 3;
-    `);
-  } finally {
-    db.close();
-  }
-  const scratch = path.join(scratchBase, "sessions", "ses_fixture", "scratch");
-  fs.mkdirSync(scratch, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(path.join(scratch, "note.txt"), "four", { mode: 0o600 });
 }
 
 describe.skipIf(!supported)("Native chat store", () => {
   it.runIf(Boolean(nativeResources))(
-    "reopens a native chat after a temp-root change without touching ordinary legacy data",
+    "reopens an ordinary native chat after a temp-root change",
     async () => {
       const test = await fixture();
-      writeLegacy(test.database, test.scratchBase);
-      const legacy = new DatabaseSync(test.database);
+      const start = async () => {
+        vi.resetModules();
+        const { NativeChatStore } = await import("./native-chat-store");
+        const store = await NativeChatStore.prepareOrdinary([test.agentData]);
+        expect(store.protectedPaths).toEqual(
+          expect.arrayContaining([electron.userData, test.agentData])
+        );
+        return store.startWorkspace("work", {
+          ...test.launch,
+          resourcesPath: nativeResources!,
+        });
+      };
+      const first = await start();
+      let sessionId: string;
       try {
-        legacy.exec(
-          "PRAGMA journal_mode=WAL; INSERT INTO chat_sessions VALUES ('ses_writer');"
+        expect(path.dirname(first.stateDirectory)).toBe(
+          path.join(test.nativeState, "workspaces")
         );
-        const original = path.join(
-          test.scratchBase,
-          "sessions",
-          "ses_fixture",
-          "scratch",
-          "note.txt"
-        );
-        const files = [
-          test.database,
-          test.database + "-wal",
-          test.database + "-shm",
-          original,
-        ];
-        const before = files.map((file) => fs.readFileSync(file));
-        const start = async () => {
-          vi.resetModules();
-          const { NativeChatStore } = await import("./native-chat-store");
-          const store = await NativeChatStore.prepareOrdinary([test.legacy]);
-          expect(store.protectedPaths).toEqual(
-            expect.arrayContaining([
-              test.legacy,
-              LegacyAgentPaths.scratchBase(test.legacy, electron.temp),
-            ])
-          );
-          return store.startWorkspace("work", {
-            ...test.launch,
-            resourcesPath: nativeResources!,
-          });
-        };
-        const first = await start();
-        let sessionId: string;
-        try {
-          expect(path.dirname(first.stateDirectory)).toBe(
-            path.join(test.nativeState, "workspaces")
-          );
-          expect((await first.chat.list()).sessionIds).toHaveLength(0);
-          const session = await first.chat.create();
-          sessionId = session.id;
-          expect(sessionId).not.toBe("ses_fixture");
-        } finally {
-          await first.chat.close();
-        }
-        electron.temp = test.child("next-launch-temp");
-        const reopened = await start();
-        try {
-          expect(await reopened.chat.load(sessionId)).toEqual({
-            id: sessionId,
-          });
-        } finally {
-          await reopened.chat.close();
-        }
-        expect(files.map((file) => fs.readFileSync(file))).toEqual(before);
+        expect((await first.chat.list()).sessionIds).toHaveLength(0);
+        sessionId = (await first.chat.create()).id;
       } finally {
-        legacy.close();
+        await first.chat.close();
+      }
+      electron.temp = test.child("next-launch-temp");
+      const reopened = await start();
+      try {
+        expect(await reopened.chat.load(sessionId)).toEqual({
+          id: sessionId,
+        });
+      } finally {
+        await reopened.chat.close();
       }
     }
   );
@@ -189,17 +135,30 @@ describe.skipIf(!supported)("Native chat store", () => {
   it("refuses a store recorded for other profile paths", async () => {
     const test = await fixture();
     await test.NativeChatStore.prepareFresh();
-    expect(JSON.parse(fs.readFileSync(test.checkpoint, "utf8"))).toEqual({
+    expect(JSON.parse(fs.readFileSync(test.marker, "utf8"))).toEqual({
       version: 1,
       source: expect.stringMatching(/^[a-f0-9]{64}$/),
-      archiveId: null,
-      nativeReady: false,
     });
     vi.stubEnv("GRIDA_AGENT_USER_DATA", test.child("other-agent"));
     vi.resetModules();
     const { NativeChatStore } = await import("./native-chat-store");
     await expect(NativeChatStore.prepareFresh()).rejects.toThrow(
       "native_chat_store_source_changed"
+    );
+  });
+
+  it("refuses a store marker with fields it does not define", async () => {
+    const test = await fixture();
+    await test.NativeChatStore.prepareFresh();
+    const recorded = JSON.parse(fs.readFileSync(test.marker, "utf8"));
+    fs.writeFileSync(
+      test.marker,
+      JSON.stringify({ ...recorded, owner: "other" })
+    );
+    vi.resetModules();
+    const { NativeChatStore } = await import("./native-chat-store");
+    await expect(NativeChatStore.prepareFresh()).rejects.toThrow(
+      "native_chat_store_state_unsafe"
     );
   });
 
@@ -217,10 +176,9 @@ describe.skipIf(!supported)("Native chat store", () => {
     "persists %s selected SVG chat with a rootless native worker and live text reply",
     async (profile) => {
       const test = await fixture();
-      writeLegacy(test.database, test.scratchBase);
       const prepared =
         profile === "ordinary"
-          ? await test.NativeChatStore.prepareOrdinary([test.legacy])
+          ? await test.NativeChatStore.prepareOrdinary([test.agentData])
           : await test.NativeChatStore.prepareFresh();
       const selected = path.join(test.child("user-files"), "drawing.svg");
       const original = "<svg>Original</svg>";

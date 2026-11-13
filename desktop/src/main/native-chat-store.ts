@@ -13,24 +13,17 @@ import { NativeDesktopProfile } from "./native-desktop-profile";
 const STATE_DIRECTORY = NativeDesktopProfile.chatStateDirectory;
 const WORKSPACES_DIRECTORY = "workspaces";
 const DOCUMENTS_DIRECTORY = "documents";
-// Existing stores already hold these names.
-const CHECKPOINT = "cutover.json";
-const PENDING = ".cutover.pending";
+const MARKER = "store.json";
+const PENDING = ".store.pending";
 const DOCUMENT_KEY =
   /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
-const CHECKPOINT_BYTES = 4096;
+const MARKER_BYTES = 4096;
 const DIGEST = /^[a-f0-9]{64}$/;
 
-/**
- * The store's ownership record. `source` binds the store to the profile's
- * path facts. Earlier builds also wrote `archiveId`, always null in a store
- * this build accepts, and `nativeReady`, which nothing reads any more.
- */
-type Checkpoint = Readonly<{
+/** The store's ownership record. `source` binds the store to the profile's path facts. */
+type Marker = Readonly<{
   version: 1;
   source: string;
-  archiveId: null;
-  nativeReady: boolean;
 }>;
 
 type Ready = Readonly<{
@@ -93,12 +86,9 @@ export class NativeChatStore {
     checkDirectory(await fs.lstat(desktop), false);
     const stateDirectory = path.join(desktop, STATE_DIRECTORY);
     const separate = await Promise.all(
-      [
-        paths.userDataPath,
-        paths.legacyScratch,
-        paths.providerHome,
-        paths.mediaRoot,
-      ].map(intendedLocation)
+      [paths.userDataPath, paths.providerHome, paths.mediaRoot].map(
+        intendedLocation
+      )
     );
     if (separate.some((root) => overlaps(root, stateDirectory)))
       throw new Error("native_chat_store_state_overlap");
@@ -111,21 +101,16 @@ export class NativeChatStore {
             paths.providerHome,
             paths.mediaRoot,
           ]
-        : [paths.userDataPath, paths.legacyScratch]
+        : ["isolated-native-chat", paths.userDataPath]
     );
-    const checkpoint = await readCheckpoint(stateDirectory);
-    if (checkpoint && checkpoint.source !== sourceKey)
+    const marker = await readMarker(stateDirectory);
+    if (marker && marker.source !== sourceKey)
       throw new Error("native_chat_store_source_changed");
-    if (!checkpoint) {
+    if (!marker) {
       await ensureState(stateDirectory);
       if (!(await emptyDirectory(stateDirectory)))
         throw new Error("native_chat_store_unowned_state");
-      await writeCheckpoint(stateDirectory, {
-        version: 1,
-        source: sourceKey,
-        archiveId: null,
-        nativeReady: false,
-      });
+      await writeMarker(stateDirectory, { version: 1, source: sourceKey });
     }
     return new NativeChatStore(
       stateDirectory,
@@ -230,7 +215,7 @@ function storeSourceKey(basis: readonly string[]): string {
   return createHash("sha256").update(JSON.stringify(basis)).digest("hex");
 }
 
-async function readCheckpoint(directory: string): Promise<Checkpoint | null> {
+async function readMarker(directory: string): Promise<Marker | null> {
   const state = await statIfPresent(directory);
   if (!state) return null;
   checkDirectory(state, true);
@@ -238,41 +223,41 @@ async function readCheckpoint(directory: string): Promise<Checkpoint | null> {
   const pending = path.join(directory, PENDING);
   const staged = await statIfPresent(pending);
   if (staged) {
-    checkCheckpointFile(staged);
+    checkMarkerFile(staged);
     await fs.unlink(pending);
   }
-  const filename = path.join(directory, CHECKPOINT);
+  const filename = path.join(directory, MARKER);
   const before = await statIfPresent(filename);
   if (!before) {
     if (!(await emptyDirectory(directory)))
       throw new Error("native_chat_store_unowned_state");
     return null;
   }
-  checkCheckpointFile(before);
+  checkMarkerFile(before);
   const file = await fs.open(
     filename,
     constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
   );
   try {
     const opened = await file.stat();
-    checkCheckpointFile(opened);
+    checkMarkerFile(opened);
     if (
       opened.dev !== before.dev ||
       opened.ino !== before.ino ||
       opened.size !== before.size
     )
       throw unsafeState();
-    const bytes = Buffer.alloc(CHECKPOINT_BYTES + 1);
+    const bytes = Buffer.alloc(MARKER_BYTES + 1);
     const { bytesRead } = await file.read(bytes, 0, bytes.length, 0);
     if (bytesRead !== opened.size) throw unsafeState();
-    return parseCheckpoint(bytes.subarray(0, bytesRead));
+    return parseMarker(bytes.subarray(0, bytesRead));
   } finally {
     await file.close();
   }
 }
 
-function parseCheckpoint(bytes: Uint8Array): Checkpoint {
-  let value: Partial<Checkpoint> | null;
+function parseMarker(bytes: Uint8Array): Marker {
+  let value: Partial<Marker> | null;
   try {
     value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch {
@@ -283,16 +268,10 @@ function parseCheckpoint(bytes: Uint8Array): Checkpoint {
     value.version !== 1 ||
     typeof value.source !== "string" ||
     !DIGEST.test(value.source) ||
-    value.archiveId !== null ||
-    typeof value.nativeReady !== "boolean"
+    Object.keys(value).length !== 2
   )
     throw unsafeState();
-  return {
-    version: 1,
-    source: value.source,
-    archiveId: null,
-    nativeReady: value.nativeReady,
-  };
+  return { version: 1, source: value.source };
 }
 
 async function ensureState(directory: string): Promise<void> {
@@ -307,10 +286,7 @@ async function ensureState(directory: string): Promise<void> {
   await syncDirectory(path.dirname(directory));
 }
 
-async function writeCheckpoint(
-  directory: string,
-  record: Checkpoint
-): Promise<void> {
+async function writeMarker(directory: string, record: Marker): Promise<void> {
   const staging = path.join(directory, PENDING);
   const file = await fs.open(staging, "wx", 0o600);
   let published = false;
@@ -321,7 +297,7 @@ async function writeCheckpoint(
     } finally {
       await file.close();
     }
-    await fs.rename(staging, path.join(directory, CHECKPOINT));
+    await fs.rename(staging, path.join(directory, MARKER));
     published = true;
     await syncDirectory(directory);
   } finally {
@@ -402,13 +378,13 @@ function checkDirectory(stat: Stats, privateDirectory: boolean): void {
     throw unsafeState();
 }
 
-function checkCheckpointFile(stat: Stats): void {
+function checkMarkerFile(stat: Stats): void {
   if (
     !stat.isFile() ||
     stat.uid !== process.geteuid?.() ||
     stat.nlink !== 1 ||
     (stat.mode & 0o7777) !== 0o600 ||
-    stat.size > CHECKPOINT_BYTES
+    stat.size > MARKER_BYTES
   )
     throw unsafeState();
 }

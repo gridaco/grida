@@ -93,8 +93,8 @@ describe("Desktop daemon composition", () => {
 
   it("preserves ordinary service owners when native chat uses a separate store", async () => {
     const protected_file_roots = [
-      "/synthetic/state/sessions.db",
-      "/synthetic/scratch",
+      "/synthetic/browser/chats",
+      "/synthetic/workspace-catalog",
     ];
     await DesktopDaemon.create({
       ...common,

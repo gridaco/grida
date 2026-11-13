@@ -122,12 +122,12 @@ describe("retained service native scope", () => {
         providerHome: path.join(root, "custody"),
         media: path.join(root, "media"),
       };
-      const legacy = path.join(input.state, "sessions.db");
+      const denied = path.join(input.state, "endpoints.json");
       const view = new RetainedServiceSandbox.PrivateNamespace(
         input,
         [root],
-        [legacy],
-        [legacy]
+        [denied],
+        [denied]
       );
       const argv = view.arguments([
         `--user-data=${input.state}`,
@@ -143,10 +143,12 @@ describe("retained service native scope", () => {
         `--protected-file-root=${path.join(input.providerHome, "providers")}`
       );
       expect(argv).toContain("--protected-file-root=/retained-service");
-      expect(view.project([legacy])).toEqual([
-        "/retained-service/state/sessions.db",
+      expect(view.project([denied])).toEqual([
+        "/retained-service/state/endpoints.json",
       ]);
-      expect(view.physical("/retained-service/state/sessions.db")).toBe(legacy);
+      expect(view.physical("/retained-service/state/endpoints.json")).toBe(
+        denied
+      );
       expect(view.mounts()).toContain(input.state);
       await files.writeFile(
         path.join(input.providerHome, "providers/credentials.toml"),

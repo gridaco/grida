@@ -11,11 +11,11 @@ The native host reads `config.toml` from its selected state directory. The file
 holds user defaults for that host. Each accepted input retains the defaults
 that applied when it was accepted.
 
-| Surface                                             | `config.toml`                                                                                                                                     | Managed operations and agent-requested changes |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| Grida Desktop on macOS and Linux                    | One per workspace, in a digest-named folder under `native-chat/workspaces/` in Desktop's application data folder; edit it while Desktop is closed | Not offered                                    |
-| Source-built `grida-agent run`                      | In the `--state-dir` you choose; read at startup                                                                                                  | Not offered                                    |
-| Source-built `grida-agent serve` with an ACP client | In the `--state-dir` you choose                                                                                                                   | Available after negotiation                    |
+| Surface                                             | `config.toml`                                                                                                                               | Managed operations and agent-requested changes |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Grida Desktop on macOS and Linux                    | One per workspace, in a digest-named folder under `chats/workspaces/` in Desktop's application data folder; edit it while Desktop is closed | Not offered                                    |
+| Source-built `grida-agent run`                      | In the `--state-dir` you choose; read at startup                                                                                            | Not offered                                    |
+| Source-built `grida-agent serve` with an ACP client | In the `--state-dir` you choose                                                                                                             | Available after negotiation                    |
 
 Desktop offers no control for these settings and does not let the agent change
 them; a change to the file applies when Desktop next starts the workspace's

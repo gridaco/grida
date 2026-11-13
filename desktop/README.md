@@ -48,11 +48,10 @@ editor /desktop/*
 
 On macOS and Linux, ordinary Stable, Insiders and development launches use
 native chat. The browser profile and retained service stores keep their owners.
-Old chats and their inputs remain in place, while new chats use `native-chat/`
-beside the browser profile. This is a fresh history boundary, not an archive or
-a migration. An interrupted first launch can reopen the separate native store.
-An unavailable native executable or failed handshake never starts the old agent.
-Current builds do not distribute or start the old chat runtime.
+Chats live in `chats/` beside the browser profile. Main claims that directory
+once with a `store.json` ownership record and refuses a directory it did not
+create. An interrupted first launch can reopen the same store. An unavailable
+native executable or failed handshake leaves chat unavailable.
 Windows currently starts retained services with chat unavailable pending an
 ACL-aware native storage contract.
 
@@ -115,8 +114,8 @@ On macOS and Linux, the retained service sidecar runs under the native
 `RetainedServiceSandbox`: Seatbelt on macOS, bubblewrap with an inherited
 seccomp filter on Linux. It has no new socket, listener or direct provider
 network capability. Main transfers only accepted connections and performs
-provider HTTP. The existing home-secret exclusions, protected native/legacy
-chat state and writable file/media roots remain in force. The launcher uses
+provider HTTP. The existing home-secret exclusions, the protected chat state
+and writable file/media roots remain in force. The launcher uses
 an executable and argument array, captures executable identity and passes no
 ambient shell, proxy or provider-key environment. Linux requires an unprivileged
 bubblewrap build and working user/PID/network namespaces; setup failure stops
@@ -177,9 +176,9 @@ again before submitting or controlling work.
 
 Main fixes the native chat paths before the non-chat sidecar starts. It selects
 native workspace chat on ordinary macOS/Linux launches and
-selected SVG chat on macOS. They use a separate `native-chat` store and leave
-the previous chat database and scratch in place. Other editions can still
-modify their shared legacy data and settings. Workspace image placement and
+selected SVG chat on macOS. They use the `chats` store under the browser
+profile. Other editions can still modify their own data and shared settings.
+Workspace image placement and
 local image references are not available through this ordinary path. Native
 startup failures surface as errors; retained non-chat services keep their
 existing owners.

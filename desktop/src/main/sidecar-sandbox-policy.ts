@@ -14,7 +14,7 @@ export namespace SidecarSandboxPolicy {
     mediaRoot: string;
     desktopStateRoot?: string;
     workspaceCatalogRoot?: string;
-    legacyStateRoots?: readonly string[];
+    protectedStateRoots?: readonly string[];
     home: string;
   }) {
     const policy = buildDaemonSandboxPolicy({
@@ -33,11 +33,11 @@ export namespace SidecarSandboxPolicy {
     const providerRoot = path.resolve(
       input.providerRoot ?? path.join(input.userData, "providers")
     );
-    if (input.legacyStateRoots?.some((root) => /[*?[\]]/u.test(root)))
-      throw new Error("native_desktop_legacy_state_path_not_literal");
+    if (input.protectedStateRoots?.some((root) => /[*?[\]]/u.test(root)))
+      throw new Error("native_desktop_protected_state_path_not_literal");
     const mainOnly = [
       ...(input.desktopStateRoot ? [input.desktopStateRoot] : []),
-      ...(input.legacyStateRoots ?? []),
+      ...(input.protectedStateRoots ?? []),
     ];
     return {
       ...policy,

@@ -4,7 +4,6 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
-import { LegacyAgentPaths } from "./legacy-agent-paths";
 import {
   nativeWorkspaceMedia,
   ordinarySelectedSvgFiles,
@@ -84,14 +83,14 @@ it.runIf(
       const selected = path.join(temp, "drawing.svg");
       await fs.writeFile(selected, "<svg>Original</svg>");
       const owner = { signal: new AbortController().signal, check() {} };
-      const chatState = path.join(host.paths.get("userData")!, "native-chat");
+      const chatState = path.join(host.paths.get("userData")!, "chats");
       await fs.mkdir(chatState, { mode: 0o700 });
       const identities = path.join(chatState, "document-identities");
-      const legacyProfile = path.join(root, "Grida Insiders");
+      const insidersProfile = path.join(root, "Grida Insiders");
       const defaultGridaHome = path.join(host.paths.get("home")!, ".grida");
-      await fs.mkdir(legacyProfile);
+      await fs.mkdir(insidersProfile);
       await fs.mkdir(defaultGridaHome);
-      const protectedPaths = [legacyProfile, defaultGridaHome];
+      const protectedPaths = [insidersProfile, defaultGridaHome];
       const chatFiles = ordinarySelectedSvgFiles(identities, protectedPaths)!;
       for (const directory of protectedPaths) {
         const protectedSvg = path.join(directory, "retained.svg");
@@ -130,9 +129,7 @@ it.runIf(
       await expect(documents.chatIdentity(id, owner)).rejects.toThrow(
         "The selected document is unavailable"
       );
-      expect(await fs.readdir(host.paths.get("userData")!)).toEqual([
-        "native-chat",
-      ]);
+      expect(await fs.readdir(host.paths.get("userData")!)).toEqual(["chats"]);
       const secret = path.join(host.agent, "secret.svg");
       const alias = path.join(root, "alias.svg");
       await fs.writeFile(secret, "<svg>Protected</svg>");
@@ -140,11 +137,9 @@ it.runIf(
       await expect(documents.register(alias)).rejects.toThrow(
         "The selected document is unavailable"
       );
-      const scratch = LegacyAgentPaths.scratchBase(host.agent, temp);
-      await fs.mkdir(scratch);
-      const scratchFile = path.join(scratch, "retained.svg");
-      await fs.writeFile(scratchFile, "<svg>Retained</svg>");
-      await expect(documents.register(scratchFile)).rejects.toThrow(
+      const chatStateFile = path.join(chatState, "retained.svg");
+      await fs.writeFile(chatStateFile, "<svg>Retained</svg>");
+      await expect(documents.register(chatStateFile)).rejects.toThrow(
         "The selected document is unavailable"
       );
       documents.release(id);

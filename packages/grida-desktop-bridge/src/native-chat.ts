@@ -15,7 +15,7 @@ export type NativeChatOperatingRegime = "act" | "plan";
 /**
  * Effort for one request, from least to most. `low` through `xhigh` set the
  * model's reasoning; `ultra` also adds the extended harness. `standard` is the
- * earlier name for `medium`.
+ * standard harness at `medium` reasoning.
  */
 export type NativeChatEffort =
   | "low"

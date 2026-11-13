@@ -1,7 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — native Desktop provider lifetime fixtures.
 import { AuthStore, SecretsStore } from "@grida/daemon/server";
 import { AGENT_DEFAULT_TIER, TIER_MODEL_IDS } from "@grida/ai/catalogue";
-import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -83,7 +82,6 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "desktop"),
-      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -181,7 +179,6 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "desktop"),
-      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -461,7 +458,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
 );
 
 it.runIf(Boolean(resources) && process.platform !== "win32")(
-  "preserves earlier compatible chats and counts only the selected local profile",
+  "counts only the selected local profile and withholds a changed saved profile",
   async () => {
     const base = await fs.mkdtemp(
       path.join(await fs.realpath(os.tmpdir()), "grida-compatible-chat-")
@@ -469,7 +466,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -480,7 +476,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       models: [{ id: "fixture" }],
     };
     const countedConfig = { ...config, input_counting: "llama.cpp" as const };
-    let savedConfig: typeof config | typeof countedConfig = config;
+    let savedConfig: typeof config | typeof countedConfig = countedConfig;
     const requests: Record<string, unknown>[] = [];
     const generated: Buffer[] = [];
     const counts: Buffer[] = [];
@@ -511,18 +507,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         );
       };
     };
-    const oldId = createHash("sha256")
-      .update(
-        JSON.stringify([
-          "desktop-compatible-chat-v1",
-          config.id,
-          "openai-compatible",
-          config.base_url,
-          "anonymous",
-          "fixture",
-        ])
-      )
-      .digest("hex");
     const launch = async () => {
       const { NativeDesktopAgent } = await import("./native-desktop-agent");
       return NativeDesktopAgent.prepareFresh(
@@ -573,54 +557,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       });
       const workspace = await workspaces.openSelected(root);
       sidecar.findWorkspace.mockImplementation((id) => workspaces.find(id));
-      const { NativeChatProfiles } = await import("./native-chat-profiles");
-      const { NativeChatStore } = await import("./native-chat-store");
-      const store = await NativeChatStore.prepareFresh();
-      const directory = await store.workspaceDirectory(
-        workspace.id,
-        root,
-        true
-      );
-      await NativeChatProfiles.remember(
-        directory,
-        {
-          id: oldId,
-          providerId: config.id,
-          modelId: "fixture",
-          connection: config.id,
-          model: "fixture",
-        },
-        () => {}
-      );
-      const { chat } = await store.startWorkspace(
-        workspace.id,
-        {
-          ...(await sidecar.nativeConfiguredEndpoint(config.id)),
-          cwd: root,
-          resourcesPath: resources!,
-          workspaceConfiguration: { directory, epoch: randomUUID() },
-          workspace: {
-            id: workspace.id,
-            primary: { id: "project", name: "Project", path: root },
-            additionalReadRoots: [],
-            protectedPaths: [...store.protectedPaths],
-          },
-        },
-        oldId
-      );
-      let savedId: string;
-      try {
-        const session = await chat.create();
-        savedId = session.id;
-        await chat.submit(session, "original", "Use the local model.");
-        await vi.waitFor(async () =>
-          expect((await chat.observe(session)).latest?.status).toBe("succeeded")
-        );
-      } finally {
-        await chat.close();
-      }
-
-      savedConfig = countedConfig;
       vi.resetModules();
       agent = await launch();
       sidecar.nativeAgentGatewayConnection.mockImplementationOnce(
@@ -638,13 +574,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(agent.current(workspace.id)).toBeNull();
       expect(sidecar.nativeAgentGatewayConnection).toHaveBeenCalledTimes(1);
       const { choices, saved } = await agent.profiles(workspace.id);
-      expect(saved).toEqual([
-        expect.objectContaining({
-          id: oldId,
-          connection: "local (earlier chats)",
-          available: true,
-        }),
-      ]);
+      expect(saved).toEqual([]);
       expect(choices.map(({ connection }) => connection)).toEqual([
         "local",
         "local (llama.cpp counting)",
@@ -656,31 +586,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         choices,
       });
       const [{ id: newId }, { id: countedId }] = choices;
-      expect(newId).not.toBe(oldId);
       expect(countedId).not.toBe(newId);
-      expect(countedId).not.toBe(oldId);
-      await agent.selectProfile(
-        workspace.id,
-        { kind: "saved", id: oldId },
-        () => {}
-      );
-      const oldChat = agent.current(workspace.id, oldId)!.chat;
-      expect(sidecar.nativeAgentGatewayConnection).toHaveBeenCalledTimes(1);
-      const restored = await oldChat.load(savedId);
-      expect(
-        (await oldChat.transcript(restored)).map(({ text }) => text)
-      ).toContain("Local endpoint answered.");
-      expect(requests).toHaveLength(1);
-      await oldChat.submit(
-        restored,
-        "continued",
-        "Keep the original connection."
-      );
-      await vi.waitFor(async () =>
-        expect((await oldChat.observe(restored)).latest?.status).toBe(
-          "succeeded"
-        )
-      );
       await agent.selectProfile(
         workspace.id,
         { kind: "new", id: newId },
@@ -689,14 +595,11 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       const newChat = agent.current(workspace.id, newId)!.chat;
       expect((await agent.profiles(workspace.id)).saved).toEqual([
         expect.objectContaining({
-          id: oldId,
-          connection: "local (earlier chats)",
+          id: newId,
+          connection: "local",
+          available: true,
         }),
-        expect.objectContaining({ id: newId, connection: "local" }),
       ]);
-      // Chats belong to the workspace: the new connection lists the chat the
-      // earlier one started.
-      expect((await newChat.list()).sessionIds).toEqual([savedId]);
       const session = await newChat.create();
       await newChat.submit(
         session,
@@ -713,11 +616,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           max_completion_tokens,
           max_tokens,
         ])
-      ).toEqual([
-        [4096, undefined],
-        [4096, undefined],
-        [undefined, 4096],
-      ]);
+      ).toEqual([[undefined, 4096]]);
       expect(counts).toEqual([]);
       expect((await newChat.inspectContextLimit()).exactCounting).toBe(false);
 
@@ -727,6 +626,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         () => {}
       );
       const countedChat = agent.current(workspace.id, countedId)!.chat;
+      // Chats belong to the workspace: the counted connection lists the chat
+      // the other connection started.
+      expect((await countedChat.list()).sessionIds).toEqual([session.id]);
       const basis = await countedChat.inspectContextLimit();
       expect(basis.exactCounting).toBe(true);
       await countedChat.updateContextLimit(basis, 1000);
@@ -738,9 +640,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         )
       );
       expect(counts).toHaveLength(1);
-      expect(generated).toHaveLength(4);
-      expect(counts[0]).toEqual(generated[3]);
-      expect(requests[3]).toMatchObject({ model: "fixture", max_tokens: 4096 });
+      expect(generated).toHaveLength(2);
+      expect(counts[0]).toEqual(generated[1]);
+      expect(requests[1]).toMatchObject({ model: "fixture", max_tokens: 4096 });
 
       measuredTokens = 1001;
       const tooLarge = await countedChat.create();
@@ -755,7 +657,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         )
       );
       expect(counts).toHaveLength(2);
-      expect(generated).toHaveLength(4);
+      expect(generated).toHaveLength(2);
 
       await agent.close();
       savedConfig = config;
@@ -765,7 +667,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(after.choices.map(({ id }) => id)).toEqual([newId]);
       expect(after.saved).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ id: oldId, available: true }),
           expect.objectContaining({ id: newId, available: true }),
           expect.objectContaining({ id: countedId, available: false }),
         ])
@@ -778,7 +679,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         )
       ).rejects.toThrow("native_chat_profile_changed");
       expect(counts).toHaveLength(2);
-      expect(generated).toHaveLength(4);
+      expect(generated).toHaveLength(2);
       expect(sidecar.nativeAgentGatewayConnection).toHaveBeenCalledTimes(1);
     } finally {
       await agent?.close();
@@ -797,7 +698,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -1029,7 +929,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -1261,7 +1160,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -1427,7 +1325,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "agent"),
       mediaRoot: path.join(base, "media"),
     };
@@ -1596,7 +1493,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };

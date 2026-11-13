@@ -21,9 +21,7 @@ product behavior still needs a decision. Linked guides describe what to do;
 linked scenarios and tests record the evidence behind the described behavior.
 
 Saved LAN HTTP model endpoints stay in Desktop settings but cannot run chat; use
-an approved HTTPS endpoint or a loopback HTTP endpoint. Chats from earlier
-Desktop versions stay in their original storage and are not listed; see
-[Find chats from before an update](./history.md#find-chats-from-before-an-update).
+an approved HTTPS endpoint or a loopback HTTP endpoint.
 
 ## Feature catalog
 

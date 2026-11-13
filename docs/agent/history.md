@@ -40,11 +40,10 @@ and independent forks stay in place. A chat with running, paused, queued or
 uncertain work, or an unfinished goal, cannot be deleted; Desktop explains why
 after you confirm.
 
-## Find chats from before an update
+## Reopen chats after an update
 
 After an update, reopening a chat shows its saved messages and work without
-asking the model to repeat anything. Chats from earlier Desktop versions stay
-where they were and do not appear in the chat list.
+asking the model to repeat anything.
 
 If chat is unavailable after an update, keep your application data in place,
 reinstall the current Desktop version, and restore the chat's original model

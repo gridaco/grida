@@ -13,7 +13,6 @@ import { spawn, type ChildProcess } from "node:child_process";
 import crypto from "node:crypto";
 import path from "node:path";
 import { home } from "@grida/home";
-import { ProtectedRoots } from "@grida/daemon/server";
 import { SidecarLogWriter } from "./sidecar-log";
 import { EDITOR_BASE_URL } from "../env";
 import { ProviderNetworkAuthority } from "./provider-network-authority";
@@ -27,7 +26,6 @@ import { NativeGatewayConnection } from "./native-gateway-connection";
 import { ProviderNetworkPolicy } from "../provider-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { RetainedServiceSandbox } from "./retained-service-sandbox";
-import { LegacyAgentPaths } from "./legacy-agent-paths";
 
 export type ServicesSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
@@ -46,21 +44,11 @@ const BACKOFF_MAX_MS = 10_000;
 export type NativeChatPaths = Readonly<{
   /** Retained agent settings, the ChatGPT subscription home and service logs. */
   userDataPath: string;
-  /** Session scratch an earlier TypeScript agent may have left for this profile. */
-  legacyScratch: string;
   /** Electron's browser profile, which holds the native chat store. */
   desktopUserDataPath: string;
   providerHome: string;
   mediaRoot: string;
 }>;
-
-/** Chat files an earlier TypeScript agent may have left in its agent data directory. */
-const LEGACY_CHAT_FILES = [
-  "sessions.db",
-  "sessions.db-wal",
-  "sessions.db-shm",
-  "sessions.db-journal",
-] as const;
 
 export class ServicesSidecarSupervisor {
   private servicesStarted = false;
@@ -82,7 +70,7 @@ export class ServicesSidecarSupervisor {
   private nativeSandbox?: RetainedServiceSandbox;
   private sandboxReady = false;
   private workspaceCatalog?: string;
-  private legacyStateRoots: readonly string[] = [];
+  private protectedStateRoots: readonly string[] = [];
   private protectedFileRoots: readonly string[] = [];
   private readonly networkAuthority = new ProviderNetworkAuthority(
     new URL(EDITOR_BASE_URL).origin
@@ -168,10 +156,6 @@ export class ServicesSidecarSupervisor {
     this.ordinaryNativeChat = ordinary;
     return (this.nativeChat ??= Object.freeze({
       userDataPath: this.user_data_path,
-      legacyScratch: LegacyAgentPaths.scratchBase(
-        this.user_data_path,
-        app.getPath("temp")
-      ),
       desktopUserDataPath: app.getPath("userData"),
       providerHome: this.provider_home,
       mediaRoot: this.media_root,
@@ -350,27 +334,20 @@ export class ServicesSidecarSupervisor {
       this.sandboxReady = true;
       return;
     }
-    let legacyPolicyRoots: readonly string[] = [];
-    if (chat && this.ordinaryNativeChat) {
-      // GRIDA-SEC-004 — the retained service never reads chat history an
-      // earlier TypeScript agent left in this profile.
-      const legacyChat = new ProtectedRoots([
-        chat.legacyScratch,
-        ...LEGACY_CHAT_FILES.map((name) => path.join(chat.userDataPath, name)),
-      ]);
-      this.legacyStateRoots = legacyChat.canonicalPaths();
-      legacyPolicyRoots = [
-        ...legacyChat.metadataPaths(),
-        ...this.legacyStateRoots,
-      ];
-    } else if (chat && NativeDesktopProfile.selected()) {
-      const legacy = NativeDesktopProfile.legacyRoots(app);
-      if (legacy.overlaps(path.dirname(app.getPath("userData"))))
+    let protectedPolicyRoots: readonly string[] = [];
+    if (chat && !this.ordinaryNativeChat && NativeDesktopProfile.selected()) {
+      // GRIDA-SEC-004 — the preview profile's retained service stays out of
+      // the installed Desktop data and Grida homes.
+      const installed = NativeDesktopProfile.protectedRoots(app);
+      if (installed.overlaps(path.dirname(app.getPath("userData"))))
         throw new Error("native_desktop_profile_invalid");
       // The sidecar cannot stat the denied lexical symlink. Main resolves it
       // before confinement, while the file registry rechecks target aliases.
-      this.legacyStateRoots = legacy.canonicalPaths();
-      legacyPolicyRoots = [...legacy.metadataPaths(), ...this.legacyStateRoots];
+      this.protectedStateRoots = installed.canonicalPaths();
+      protectedPolicyRoots = [
+        ...installed.metadataPaths(),
+        ...this.protectedStateRoots,
+      ];
     }
     const nativeStateRoot =
       chat && this.ordinaryNativeChat
@@ -385,7 +362,7 @@ export class ServicesSidecarSupervisor {
           ));
     this.protectedFileRoots = [
       ...new Set([
-        ...this.legacyStateRoots,
+        ...this.protectedStateRoots,
         nativeStateRoot,
         ...(this.workspaceCatalog ? [path.dirname(this.workspaceCatalog)] : []),
       ]),
@@ -395,7 +372,7 @@ export class ServicesSidecarSupervisor {
       providerRoot: path.join(this.provider_home, "providers"),
       mediaRoot: this.media_root,
       desktopStateRoot: nativeStateRoot,
-      legacyStateRoots: legacyPolicyRoots,
+      protectedStateRoots: protectedPolicyRoots,
       workspaceCatalogRoot: this.workspaceCatalog
         ? path.dirname(this.workspaceCatalog)
         : undefined,

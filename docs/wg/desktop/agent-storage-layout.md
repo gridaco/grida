@@ -1,6 +1,6 @@
 ---
 title: Agent storage layout
-description: Which Desktop process keeps which files — the native agent host's chat state, the retained sidecar's registries and credentials, and the chat store of earlier releases.
+description: Which Desktop process keeps which files — the native agent host's chat state and the retained sidecar's registries and credentials.
 keywords:
   [desktop, native agent host, services-sidecar, storage, sqlite, userData]
 format: md
@@ -40,13 +40,15 @@ Gateway grants are memory-only and never written to disk (`GRIDA-SEC-006`).
 - **Preferences are not agent data.** `preferences.json` never contains
   account or provider credentials and is outside every agent owner above.
 
-## The earlier chat store
+## Chat-state ownership
 
-Desktop builds before native chat kept chats in a `sessions.db` beside the
-sidecar's files, with session scratch under the system temporary directory.
-Native Desktop leaves both in place and starts fresh history in its own store.
-Nothing reopens them: the retained sidecar's sandbox denies them, and no
-current build can start their writer.
+The chat-state directory is claimed once. Its first use writes a small
+ownership record that binds the directory to the profile's path facts — the
+agent home, provider home and media root it was created beside. A later launch
+opens the directory only when that record matches; a directory that holds
+anything else, or a record for other paths, is refused rather than adopted.
+A directory of another name is never consulted, so data that is not the
+current store is neither read nor changed.
 
 ## Backups
 

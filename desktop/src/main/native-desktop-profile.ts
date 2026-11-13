@@ -1,5 +1,4 @@
 // GRIDA-SEC-004 / GRIDA-SEC-005 — isolated Desktop profiles for native chat.
-import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { App } from "electron";
@@ -7,10 +6,9 @@ import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
 import { ProtectedRoots } from "@grida/daemon/server";
 import { home } from "@grida/home";
 import { isValidEndpointProviderId } from "@grida/ai-host";
-import { LegacyAgentPaths } from "./legacy-agent-paths";
 
 export namespace NativeDesktopProfile {
-  export const chatStateDirectory = "native-chat";
+  export const chatStateDirectory = "chats";
 
   export type Provider =
     | "gateway"
@@ -69,9 +67,7 @@ export namespace NativeDesktopProfile {
     });
     return [
       ...filesystem.deny_read,
-      ...new ProtectedRoots(
-        legacyCandidates(app, realpathSync.native(app.getPath("temp")))
-      ).metadataPaths(),
+      ...new ProtectedRoots(installRoots(app)).metadataPaths(),
       ...(process.resourcesPath ? [path.dirname(process.resourcesPath)] : []),
     ];
   }
@@ -83,8 +79,11 @@ export namespace NativeDesktopProfile {
       : undefined;
   }
 
-  /** Shared live path denials for this admitted preview profile. */
-  export function legacyRoots(app: Pick<App, "getPath">): ProtectedRoots {
+  /**
+   * Grida homes and installed Desktop data this admitted preview profile must
+   * not reach.
+   */
+  export function protectedRoots(app: Pick<App, "getPath">): ProtectedRoots {
     const roots = admitted.get(app);
     if (!selected() || !roots) throw invalidProfile();
     return roots;
@@ -122,10 +121,8 @@ export namespace NativeDesktopProfile {
       reserved.has(path.basename(browserData).toLowerCase())
     )
       throw invalidProfile();
-    const protectedLegacy = new ProtectedRoots(
-      legacyCandidates(app, systemTemp)
-    );
-    if (protectedLegacy.overlaps(root)) throw invalidProfile();
+    const installed = new ProtectedRoots(installRoots(app));
+    if (installed.overlaps(root)) throw invalidProfile();
     await checkDirectory(root);
     const browser = await checkDirectory(browserData);
     const occupied = new Set([`${browser.dev}:${browser.ino}`]);
@@ -149,7 +146,7 @@ export namespace NativeDesktopProfile {
     }
     app.setPath("temp", temp);
     app.setPath("documents", projects);
-    admitted.set(app, protectedLegacy);
+    admitted.set(app, installed);
     return provider;
   }
 
@@ -182,21 +179,13 @@ export namespace NativeDesktopProfile {
     return value;
   }
 
-  function legacyCandidates(
-    app: Pick<App, "getPath">,
-    systemTemp: string
-  ): string[] {
+  /** Grida homes and every Desktop edition's application data. */
+  function installRoots(app: Pick<App, "getPath">): string[] {
     const userHome = app.getPath("home");
     const appData = app.getPath("appData");
-    const gridaHomes = [
+    const roots = [
       path.join(userHome, ".grida"),
       home.dir({ home: userHome }),
-    ];
-    const roots = [
-      ...gridaHomes,
-      ...gridaHomes.map((directory) =>
-        LegacyAgentPaths.scratchBase(path.join(directory, "agent"), systemTemp)
-      ),
       ...["Grida", "Grida Insiders", "Grida (Insiders)", "desktop"].map(
         (name) => path.join(appData, name)
       ),

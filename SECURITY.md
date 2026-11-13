@@ -839,16 +839,16 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   remains unavailable to replacement. The
   [development profile](desktop/src/main/native-desktop-profile.ts) requires
   separate canonical browser and agent directories under an owner-only
-  temporary root outside every known earlier Desktop and Grida home location.
-  The ordinary workspace-only launch uses a separate native chat store and
-  leaves the previous chat data in place. It
+  temporary root outside every known installed Desktop data and Grida home
+  location. The ordinary workspace-only launch keeps chats in the Main-owned
+  chat store under the browser profile. It
   applies the established home-secret exclusions to native workspace grants,
   and captures and rechecks the registered directory identity across all live
   or starting connection workers. Ordinary root and nested Deck requests use
   the same path and frame validation as catalog-backed workspaces. The retained
-  service sandbox denies native chat and the earlier TypeScript agent's chat
-  database and session scratch while keeping the ordinary Media owner available. Other editions can still write their own
-  legacy data or shared settings; this launch does not assert exclusive custody.
+  service sandbox denies the chat store while keeping the ordinary Media owner
+  available. Other editions can still write their own data or shared settings;
+  this launch does not assert exclusive custody.
 - [Native chat IPC](desktop/src/main/native-chat-ipc.ts) is available to
   the current top-level workspace, verified deck, or selected SVG frame under
   the existing authenticated window guard. The [native workspace catalog](desktop/src/main/native-workspace-catalog.ts)
@@ -925,10 +925,9 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   frame navigated away from. The listing names no workspace, starts no worker,
   selects nothing and returns no saved receipt. The opened workspace commits the
   chosen ID through the ordinary selection above, which resolves it again.
-  Configured endpoint profiles also distinguish the captured output-limit
-  field. An existing profile reopens under its original field, and a new
-  profile keeps the same endpoint and custody checks when it uses
-  `max_tokens`.
+  A configured endpoint profile's identity captures its `max_tokens`
+  output-limit field; a saved profile reopens only when the current launch
+  reproduces that identity under the same endpoint and custody checks.
   Main rejects invalid endpoint URLs and plain HTTP outside loopback before
   looking up a key or requesting endpoint approval.
   An explicitly selected llama.cpp counting connection adds only the JSON
@@ -941,7 +940,7 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   Native startup accepts only a start flag. Main resolves the workspace from
   the admitted route and rechecks that scope before returning readiness.
   Navigation invalidates an outstanding reply. A failed native startup reports
-  unavailability and cannot select the legacy owner.
+  unavailability and cannot select another chat engine.
 - [Live editor observations](crates/grida-agent/src/editor_surfaces.rs)
   require the negotiated private Desktop stdio capability. Main issues the
   binding for an exact authorized [chat attachment](desktop/src/main/native-editor-surfaces.ts).
@@ -1305,7 +1304,7 @@ Today:
 - [Media tenant wiring tests](packages/grida-ai-host/src/media-tenant-wiring.test.ts) — every generation route group receives the same host media service; music receives no BYOK store and the ElevenLabs groups receive no GG authority.
 - [Desktop composition](desktop/src/sidecar/daemon.ts) and [its tests](desktop/src/sidecar/daemon.test.ts) — select retained services before loading the server; their option types admit only disabled or native-chat service modes. Native OAuth lives in its dedicated host; no command executor is supplied to the retained service. The [supervisor tests](desktop/src/main/services-sidecar-supervisor.test.ts) pin disabled-mode argv and the absence of scratch preparation while retaining the outer network fence.
 - An admitted [native preview](desktop/src/main/native-desktop-profile.ts)
-  excludes known legacy Grida homes, Desktop data and derived scratch from
+  excludes known Grida homes and installed Desktop data from
   workspace and standalone document admission and the retained sidecar's read
   and write scope. The [file registry](packages/grida-daemon/src/files/registry.ts)
   rechecks those exclusions for retained document IDs and refuses hard-linked
@@ -1313,8 +1312,8 @@ Today:
 - An ordinary macOS launch with the agent disabled can register
   selected SVGs through [Main's file owner](desktop/src/main/workspace-media-access.ts).
   The exact file and its parent identity constrain the native read and save
-  worker. Known agent and scratch roots, Desktop stores, and packaged resources
-  stay excluded. The file-only preload argument grants neither a native chat
+  worker. Known agent roots, Desktop stores, the media root and packaged
+  resources stay excluded. The file-only preload argument grants neither a native chat
   binding nor durable chat identity.
 - The ordinary native-chat launch uses that same selected SVG owner with
   private Main-owned document identity receipts. A selected document frame can
@@ -1326,9 +1325,10 @@ Today:
   which fixes them before any retained service starts. Its
   [retained sidecar composition](desktop/src/sidecar/daemon.ts) provides media
   and configured endpoint settings without a chat or command tenant. The store
-  lives under the browser profile apart from the agent data, provider home,
-  media root and earlier session scratch, and refuses state it did not record
-  or a store recorded for other profile paths. Each workspace store binds the
+  lives under the browser profile apart from the agent data, provider home and
+  media root. Its one ownership record binds those path facts; it refuses state
+  it did not record, a record with other fields, or a store recorded for other
+  profile paths. Each workspace store binds the
   selected workspace identity and canonical root in a private directory.
   [Fixtures](desktop/src/main/native-chat-store.test.ts) exercise refused
   state, credential overlap and workspace isolation with real native processes.
@@ -1586,7 +1586,6 @@ Today:
 - The native [history extension](crates/grida-agent/src/acp/extensions/history.rs) requires a negotiated operation and an attached source session. The [host](crates/grida-agent/src/host/history.rs) binds a derivation to committed history and keeps a fork in the source workspace. The [portable projection](crates/grida-agent-master/src/conversation_seed.rs) copies visible text with omission evidence and keeps raw tool data, provider state, and grants out of the seed. An edit target resolves the visible anchor to the exact retained text-only submission within the attached chat. Inherited context from another chat cannot authorize a source input read. [Native process tests](crates/grida-agent/tests/process/history.rs) cover attachment, source ownership, and fresh tool permissions.
 - Desktop's [bounded transcript read](desktop/src/main/native-agent-chat.ts) rechecks the frame's exact attachment through [Main IPC](desktop/src/main/native-chat-ipc.ts), correlates chunks to the current read, and caps buffered text. The [ACP handler](crates/grida-agent/src/acp.rs) requires the negotiated capability, an attached chat, and its workspace. Cursors select only the attached chat's current history view. Reading grants no execution authority.
 - `desktop/src/main/sidecar-sandbox-policy.ts` — binds Desktop's strict sandbox posture for the retained sidecar on the daemon's own policy frame: empty direct external egress (no development baseline and no agent provider hosts), host-routed provider HTTP, no generic local bind/connect authority, and an exact read/write grant for the long-lived sidecar's app-managed media root.
-- `desktop/src/main/legacy-agent-paths.ts` — names the session scratch base earlier TypeScript agent hosts derived, so Main and the sandboxes deny it without importing that earlier agent code.
 - `desktop/src/main/services-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; captures the native retained-service scope; owns both private channels, forwards the one main-owned media-root fact, and grants no direct provider networking. Windows retains explicitly unconfined non-agent compatibility services with native chat unavailable.
 - `desktop/src/main/retained-service-sandbox.ts` and its tests — shell-free Seatbelt or bubblewrap launch, executable identity recheck, literal/canonical protected paths, native-ABI seccomp, inherited IPC, denied new sockets and safe owned mask cleanup. Actual macOS and unprivileged Linux ARM64 fixtures cover filesystem denial and Main-transferred connected sockets. Native setup failure has no unconfined fallback on macOS/Linux.
 - `desktop/src/main/desktop-entry-window.ts` — owns the exact bridge-attached entry window and admits auxiliary native windows only while the authenticated main role is active. Committed quit revokes renderer admission and invalidates queued or in-flight entry reconciliation. The Grida-account transition is additionally bound by GRIDA-SEC-005.
@@ -3547,7 +3546,8 @@ durable or discard unrelated OAuth records.
    inodes are unchanged; migration state and tombstones are neither copied nor
    reset. Native clients outside the namespace keep the physical canonical home.
    File/workspace admission excludes both physical private roots and the private
-   namespace prefix; native and legacy exclusions also project into bound views.
+   namespace prefix; chat-state and preview-profile exclusions also project into
+   bound views.
    Every updated macOS/Linux OAuth mutation shares the legacy lock and rereads
    disk before changing a record. Strict legacy reads bypass test environment
    content; retirement removes API entries only and cleans validated old temporaries.

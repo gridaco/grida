@@ -1,7 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — native file and media scope selection.
 import { app } from "electron";
 import path from "node:path";
-import { LegacyAgentPaths } from "./legacy-agent-paths";
 import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
 import { home } from "@grida/home";
 import { DesktopMediaRoot } from "./media-root";
@@ -36,7 +35,6 @@ export function ordinarySelectedSvgFiles(
     user_data: agentData,
     home: userHome,
   });
-  const temp = app.getPath("temp");
   return new NativeDocumentFiles(
     [
       ...protectedPaths,
@@ -45,11 +43,6 @@ export function ordinarySelectedSvgFiles(
       agentData,
       app.getPath("userData"),
       app.getPath("sessionData"),
-      ...[
-        agentData,
-        path.join(gridaHome, "agent"),
-        path.join(userHome, ".grida", "agent"),
-      ].map((directory) => LegacyAgentPaths.scratchBase(directory, temp)),
       DesktopMediaRoot.current(),
       path.dirname(NativeDesktopProfile.resourcesPath(app)),
     ],
@@ -88,7 +81,7 @@ export function nativeWorkspaceCatalog() {
     projectsRoot: path.join(app.getPath("documents"), "Grida Projects"),
     protectedPaths: [
       ...filesystem.deny_read,
-      ...NativeDesktopProfile.legacyRoots(app).metadataPaths(),
+      ...NativeDesktopProfile.protectedRoots(app).metadataPaths(),
       agentData,
       app.getPath("temp"),
       DesktopMediaRoot.current(),

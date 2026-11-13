@@ -82,7 +82,7 @@ export namespace servicesSidecarClient {
     if (
       NativeDesktopProfile.selected() &&
       catalog &&
-      NativeDesktopProfile.legacyRoots(app).overlaps(filePath)
+      NativeDesktopProfile.protectedRoots(app).overlaps(filePath)
     )
       throw new Error("file-overlaps-protected-root");
     const data = await client().files.register(filePath);

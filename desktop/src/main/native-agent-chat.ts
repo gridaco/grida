@@ -2685,7 +2685,7 @@ function tokenUsage(value: unknown): NativeChatTokenUsage | undefined {
       attemptsWithoutCounts,
     });
   } catch {
-    // Older or invalid optional accounting must not hide the settled result.
+    // Invalid optional accounting must not hide the settled result.
     return undefined;
   }
 }

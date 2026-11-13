@@ -48,8 +48,8 @@ Desktop keeps these authority roles separate:
    receive no generic network or process primitive.
 4. **The retained service sidecar owns existing non-chat services.** Its
    authenticated interface keeps file, workspace, settings and media callers
-   available without opening the old chat database or sweeping chat scratch.
-   It keeps its existing containment until separately replaced.
+   available without opening the chat store. It keeps its existing
+   containment until separately replaced.
 
 ```text
 Desktop renderer
@@ -270,8 +270,8 @@ same files and SQLite lock inodes, not copies or replacement stores. The host's
 normal top-level entries and selected file/workspace paths stay available;
 the namespace does not take over `/media` or removable-drive paths. Both the
 physical private roots and their namespace prefix are excluded from file and
-workspace admission. Existing native/legacy exclusions also apply inside bound
-directories. Internal temporary work uses a namespace-local tmpfs.
+workspace admission. The chat-state and preview-profile exclusions also apply
+inside bound directories. Internal temporary work uses a namespace-local tmpfs.
 
 Linux bind masks for absent protected paths use exclusively created owned
 mountpoints. Concurrent generations retain them until the last child closes.
@@ -336,14 +336,12 @@ that satisfies the credential-service boundary because they do not expose
 local file or process authority to the model. Missing local-agent containment
 does not authorize those local capabilities.
 
-## Earlier chat data
+## Chat state
 
-Ordinary macOS and Linux Desktop keeps chat material from earlier releases in
-place and starts fresh native history in a separate store. The retained
-service sandbox denies the earlier chat database and session scratch. Desktop
-claims neither custody nor retirement of other installed versions. Current
-builds cannot start the earlier writer, and native startup failure never
-selects another chat engine.
+Ordinary macOS and Linux Desktop keeps chats in one Main-owned store under the
+browser profile. The retained service sandbox denies reads and writes there.
+Desktop claims no custody of other installed versions' data, and native
+startup failure never selects another chat engine.
 
 ## Retained services
 

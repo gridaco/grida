@@ -20,7 +20,7 @@ configuration file instead.
 ## Set the limit for a Desktop workspace
 
 1. Quit Desktop.
-2. In Desktop's application data folder, open `native-chat/workspaces/`. Each
+2. In Desktop's application data folder, open `chats/workspaces/`. Each
    workspace has its own folder there, named by a digest of the workspace
    rather than its path. Desktop does not show which folder belongs to which
    workspace, so pick the one used most recently by the workspace you mean.

@@ -36,7 +36,6 @@ import { ProviderNetworkPolicy } from "../provider-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { DesktopMediaRoot } from "./media-root";
 import { RetainedServiceSandbox } from "./retained-service-sandbox";
-import { LegacyAgentPaths } from "./legacy-agent-paths";
 
 const supportsNativeChat =
   process.platform === "darwin" || process.platform === "linux";
@@ -95,7 +94,7 @@ describe("ServicesSidecarSupervisor recovery", () => {
   });
 
   it.runIf(supportsNativeChat)(
-    "denies the legacy chat files and scratch while serving ordinary native-chat services",
+    "denies the chat store while serving ordinary native-chat services",
     async () => {
       const root = await fs.mkdtemp(
         path.join(await fs.realpath(os.tmpdir()), "grida-ordinary-services-")
@@ -127,15 +126,9 @@ describe("ServicesSidecarSupervisor recovery", () => {
         await state.initSandbox();
         expect(state.scratchBase).toBeUndefined();
         expect(state.commandHost).toBeUndefined();
+        expect(paths.desktopUserDataPath).toBe(browser);
         const protectedChat = [
-          paths.legacyScratch,
           path.join(browser, NativeDesktopProfile.chatStateDirectory),
-          ...[
-            "sessions.db",
-            "sessions.db-wal",
-            "sessions.db-shm",
-            "sessions.db-journal",
-          ].map((name) => path.join(data, name)),
         ];
         expect(
           (supervisor as unknown as { nativeSandbox: RetainedServiceSandbox })
@@ -218,10 +211,6 @@ describe("ServicesSidecarSupervisor recovery", () => {
     expect(paths).toEqual(
       expect.objectContaining({
         userDataPath: "/synthetic/native-agent",
-        legacyScratch: LegacyAgentPaths.scratchBase(
-          "/synthetic/native-agent",
-          app.getPath("temp")
-        ),
         desktopUserDataPath: app.getPath("userData"),
       })
     );

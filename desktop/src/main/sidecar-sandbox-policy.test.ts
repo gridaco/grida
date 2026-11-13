@@ -43,7 +43,7 @@ describe("SidecarSandboxPolicy", () => {
     expect(policy.filesystem.allow_write).not.toContain(desktopStateRoot);
   });
 
-  it("adds literal legacy-state read and write denials only when supplied", () => {
+  it("adds literal protected-state read and write denials only when supplied", () => {
     const launch = {
       userData: "/isolated/agent",
       mediaRoot: "/isolated/media",
@@ -53,7 +53,7 @@ describe("SidecarSandboxPolicy", () => {
     const ordinary = SidecarSandboxPolicy.build(launch);
     const preview = SidecarSandboxPolicy.build({
       ...launch,
-      legacyStateRoots: [root],
+      protectedStateRoots: [root],
     });
     expect(ordinary.filesystem.deny_read).not.toContain(root);
     expect(ordinary.filesystem.deny_write).not.toContain(root);
@@ -62,9 +62,9 @@ describe("SidecarSandboxPolicy", () => {
     expect(() =>
       SidecarSandboxPolicy.build({
         ...launch,
-        legacyStateRoots: [root + "[old]"],
+        protectedStateRoots: [root + "[old]"],
       })
-    ).toThrow("native_desktop_legacy_state_path_not_literal");
+    ).toThrow("native_desktop_protected_state_path_not_literal");
   });
 
   it.runIf(
@@ -78,22 +78,24 @@ describe("SidecarSandboxPolicy", () => {
       );
       const browser = path.join(root, "Application Support", "Grida");
       const mediaRoot = path.join(browser, "Media");
-      const native = path.join(browser, "native-chat");
+      const native = path.join(browser, "chats");
       const agent = path.join(root, "agent");
-      const scratch = path.join(root, "scratch");
-      const legacy = path.join(agent, "sessions.db");
+      const installed = path.join(
+        root,
+        "Application Support",
+        "Grida Insiders"
+      );
       const { RetainedServiceSandbox } =
         await import("./retained-service-sandbox");
       try {
         await Promise.all(
-          [mediaRoot, native, agent, scratch].map((directory) =>
+          [mediaRoot, native, agent, installed].map((directory) =>
             fs.mkdir(directory, { recursive: true })
           )
         );
         const protectedFiles = [
           path.join(native, "agent.sqlite"),
-          legacy,
-          path.join(scratch, "input.png"),
+          path.join(installed, "recent.json"),
         ];
         await Promise.all(
           protectedFiles.map((file) => fs.writeFile(file, "retained"))
@@ -118,7 +120,7 @@ describe("SidecarSandboxPolicy", () => {
           userData: agent,
           mediaRoot,
           desktopStateRoot: native,
-          legacyStateRoots: [legacy, scratch],
+          protectedStateRoots: [installed],
         });
         const sandbox = new RetainedServiceSandbox({
           network: {
@@ -144,7 +146,7 @@ describe("SidecarSandboxPolicy", () => {
           await Promise.all(
             protectedFiles.map((file) => fs.readFile(file, "utf8"))
           )
-        ).toEqual(["retained", "retained", "retained"]);
+        ).toEqual(["retained", "retained"]);
       } finally {
         await fs.rm(root, { recursive: true, force: true });
       }

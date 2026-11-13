@@ -132,7 +132,7 @@ it("retains ordinary connection choices at capacity when local counting is enabl
     endpoints,
     select
   );
-  expect(ordinary.choices).toHaveLength(256);
+  expect(ordinary).toHaveLength(256);
   const optedIn = [
     { ...endpoints[0], input_counting: "llama.cpp" as const },
     ...endpoints.slice(1),
@@ -162,10 +162,7 @@ it.each([
     );
     await expect(
       NativeChatProfiles.configuredChoices([saved], select)
-    ).resolves.toEqual({
-      choices: [],
-      previousIds: [],
-    });
+    ).resolves.toEqual([]);
     expect(owner.hasKey).not.toHaveBeenCalled();
     expect(owner.network).not.toHaveBeenCalled();
     expect(await owner.list()).toEqual([saved]);
