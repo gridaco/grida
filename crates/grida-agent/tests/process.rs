@@ -511,6 +511,7 @@ async fn fixture_request(
 }
 
 fn fixture_body(reply: Reply, protocol: ProviderProtocol) -> String {
+    #[cfg_attr(not(any(target_os = "linux", target_os = "macos")), allow(unused_mut))]
     let mut signed = false;
     let (text, finish) = match reply {
         Reply::Finished(text) => (text, Some("stop")),
@@ -1797,7 +1798,6 @@ async fn ws_rpc(socket: &mut SharedSocket, id: u64, method: &str, params: Value)
     .unwrap()
 }
 
-#[cfg(unix)]
 fn extension_initialize() -> Value {
     json!({
         "protocolVersion":1,
