@@ -20,8 +20,7 @@ One host process constructs the subscription host with three options:
   by that configured client profile;
 - the exact subscription Responses endpoint;
 - the configured product originator;
-- default and tier model choices from the package's closed, client-safe
-  `CHATGPT_SUBSCRIPTION_MODEL_IDS` set.
+- the default model, from the package's closed subscription model set.
 
 No client secret is accepted. The package generates PKCE verifier/challenge
 and state values for each launch-scoped attempt.

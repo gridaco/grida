@@ -20,11 +20,6 @@ const CONFIG: ChatGptProviderConfig = {
   responses_url: "https://chatgpt.example.test/backend-api/agent/responses",
   originator: "grida-test",
   default_model_id: "openai/gpt-5.6-terra",
-  tier_model_ids: {
-    nano: "openai/gpt-5.6-luna",
-    pro: "openai/gpt-5.6-terra",
-    max: "openai/gpt-5.6-sol",
-  },
 };
 
 let root: string;

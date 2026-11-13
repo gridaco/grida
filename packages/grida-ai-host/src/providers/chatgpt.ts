@@ -14,7 +14,6 @@ import {
   isChatGptSubscriptionModelId,
   type ChatGptSubscriptionModelId,
 } from "../protocol/chatgpt";
-import type { ModelTier } from "@grida/ai/catalogue";
 import {
   ChatGptCredentialError,
   type ChatGptAccessCredentials,
@@ -43,7 +42,6 @@ export type ChatGptProviderConfig = Readonly<{
   /** Host-configured product identity; the host owns the service contract. */
   originator: string;
   default_model_id: ChatGptSubscriptionModelId;
-  tier_model_ids?: Partial<Record<ModelTier, ChatGptSubscriptionModelId>>;
 }>;
 
 export type ChatGptProviderRuntime = Readonly<{
@@ -93,13 +91,6 @@ export namespace ChatGptProvider {
       throw new TypeError(
         "chatgpt default_model_id must be a supported subscription model"
       );
-    }
-    for (const modelId of Object.values(config.tier_model_ids ?? {})) {
-      if (modelId !== undefined && !isChatGptSubscriptionModelId(modelId)) {
-        throw new TypeError(
-          "every chatgpt tier_model_ids value must be a supported subscription model"
-        );
-      }
     }
   }
 
