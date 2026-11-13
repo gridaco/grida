@@ -30,6 +30,8 @@
     "node-pty": "^1.1.0"
   },
   "devDependencies": {
+    "@ai-sdk/gateway": "3.0.66",
+    "@ai-sdk/openai-compatible": "2.0.47",
     "@electron-forge/cli": "^7.11.1",
     "@electron-forge/maker-deb": "^7.11.1",
     "@electron-forge/maker-dmg": "^7.11.1",
@@ -52,6 +54,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.2",
+    "ai": "6.0.116",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
     "electron": "^42.2.0",
