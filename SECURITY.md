@@ -481,9 +481,11 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    enumerated provider-owned namespaces — there is no arbitrary public-URL
    grant.
    There is no renderer broker method, loopback proxy, socket path, or
-   environment credential. The ChatGPT-subscription lane registered by
-   GRIDA-SEC-008 adds only exact `auth.openai.com` token and `chatgpt.com`
-   Responses destinations; those grants are never eligible for the asset lane.
+   environment credential. The ChatGPT-subscription grant registered by
+   GRIDA-SEC-008 holds only exact `auth.openai.com` token and `chatgpt.com`
+   Responses destinations. It is a Main-only grant: Main dispatches it for its
+   native subscription host, it is never published to the sidecar, and it is
+   never eligible for the asset lane.
    When this transport is enabled, the outer native
    policy omits BYOK/GG destinations, so missing provider wiring cannot fall
    back to direct sidecar egress. Electron main transiently observes provider
@@ -2705,7 +2707,8 @@ trusted merely because it is “local.”
    and raw token claims have no renderer type or route. Renderer status reads
    are epoch-ordered so an old read cannot visually restore a signed-out or
    previous account.
-5. **Pinned provider traffic.** Desktop grants only the exact OpenAI token
+5. **Pinned provider traffic.** Desktop grants, through a Main-only provider
+   grant the sidecar never receives, only the exact OpenAI token
    endpoint and ChatGPT Responses endpoint to the authenticated provider lane;
    neither is a provider-asset/download grant. The model adapter rejects any
    other URL, injects bearer/account/product headers only at request time,

@@ -40,16 +40,26 @@ describe("AgentNetworkPolicy", () => {
     ).toThrow(/not granted/);
   });
 
-  it("pins ChatGPT subscription auth and inference to exact provider origins", () => {
-    // GRIDA-SEC-008 — token exchange and Responses inference use the
-    // credential-bearing provider lane, never the provider-asset lane.
+  it("pins ChatGPT subscription auth and inference to a Main-only grant", () => {
+    // GRIDA-SEC-008 — token exchange and Responses inference use a
+    // credential-bearing provider grant the sidecar never receives, never the
+    // built-in provider grant or the provider-asset lane.
+    const native = [...grants, ...AgentNetworkPolicy.mainOnlyGrants()];
     for (const url of [
       "https://auth.openai.com/oauth/token",
       "https://chatgpt.com/backend-api/codex/responses",
     ]) {
-      expect(
+      expect(() =>
         AgentNetworkPolicy.authorize(grants, {
           grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+          method: "POST",
+          url,
+          headers: [],
+        })
+      ).toThrow(/not granted/);
+      expect(
+        AgentNetworkPolicy.authorize(native, {
+          grant_id: AgentNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID,
           method: "POST",
           url,
           headers: [["authorization", "Bearer transient"]],
@@ -72,8 +82,8 @@ describe("AgentNetworkPolicy", () => {
       "https://chatgpt.com.attacker.example/backend-api/codex/responses",
     ]) {
       expect(() =>
-        AgentNetworkPolicy.authorize(grants, {
-          grant_id: AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID,
+        AgentNetworkPolicy.authorize(native, {
+          grant_id: AgentNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID,
           method: "POST",
           url,
           headers: [],

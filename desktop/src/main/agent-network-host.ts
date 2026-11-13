@@ -147,12 +147,15 @@ export class AgentNetworkHost {
     const networkSession = await AgentNetworkHost.networkSession();
     return {
       prepare: (target, headers) => {
-        const approved = AgentNetworkPolicy.authorize(authority.grants(), {
-          grant_id: grantId,
-          method: "POST",
-          url: target,
-          headers: [...headers.entries()],
-        });
+        const approved = AgentNetworkPolicy.authorize(
+          authority.nativeGrants(),
+          {
+            grant_id: grantId,
+            method: "POST",
+            url: target,
+            headers: [...headers.entries()],
+          }
+        );
         if (
           approved.grant.lane !== "provider" ||
           (authority.isCustomGrant(grantId) &&

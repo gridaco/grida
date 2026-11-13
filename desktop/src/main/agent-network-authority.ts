@@ -12,6 +12,7 @@ import { AgentNetworkPolicy } from "../agent-network-policy";
  */
 export class AgentNetworkAuthority {
   private readonly builtIns: AgentNetworkPolicy.Grant[];
+  private readonly mainOnly = AgentNetworkPolicy.mainOnlyGrants();
   private readonly customByEndpoint = new Map<
     string,
     { baseUrl: string; grant: AgentNetworkPolicy.Grant }
@@ -34,6 +35,18 @@ export class AgentNetworkAuthority {
       ...grant,
       origins: [...grant.origins],
     }));
+  }
+
+  /** Grants Main may dispatch for native hosts: the published set plus the
+   * Main-only grants the sidecar never receives. */
+  nativeGrants(): AgentNetworkPolicy.Grant[] {
+    return [
+      ...this.grants(),
+      ...this.mainOnly.map((grant) => ({
+        ...grant,
+        origins: [...grant.origins],
+      })),
+    ];
   }
 
   isCustomGrant(grantId: string): boolean {

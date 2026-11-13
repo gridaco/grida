@@ -501,7 +501,7 @@ describe("AgentSidecarSupervisor recovery", () => {
     });
     expect(egress).toHaveBeenCalledExactlyOnceWith(
       expect.anything(),
-      AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+      AgentNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID
     );
   });
 

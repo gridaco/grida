@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { AgentNetworkPolicy } from "../agent-network-policy";
 import { AgentNetworkAuthority } from "./agent-network-authority";
 
 describe("AgentNetworkAuthority", () => {
@@ -55,5 +56,22 @@ describe("AgentNetworkAuthority", () => {
     expect(() =>
       authority.approveCustomEndpoint("local", "https://u:p@example.com")
     ).toThrow(/credentials/);
+  });
+});
+
+it("never publishes the Main-only subscription grant to the sidecar", () => {
+  const authority = new AgentNetworkAuthority("https://grida.co");
+  const id = AgentNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID;
+  expect(authority.grants().some((grant) => grant.id === id)).toBe(false);
+  expect(
+    authority
+      .grants()
+      .flatMap((grant) => grant.origins)
+      .some((origin) => /openai\.com|chatgpt\.com/.test(origin))
+  ).toBe(false);
+  expect(authority.nativeGrants().find((grant) => grant.id === id)).toEqual({
+    id,
+    lane: "provider",
+    origins: ["https://auth.openai.com", "https://chatgpt.com"],
   });
 });

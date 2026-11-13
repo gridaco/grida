@@ -449,7 +449,7 @@ export class AgentSidecarSupervisor {
       this.coldStartSource,
       AgentNetworkHost.nativeProviderNetwork(
         this.networkAuthority,
-        AgentNetworkPolicy.BUILTIN_PROVIDER_GRANT_ID
+        AgentNetworkPolicy.CHATGPT_SUBSCRIPTION_GRANT_ID
       ),
     ]);
     if (this.isShuttingDown)

@@ -33,6 +33,7 @@ export namespace AgentNetworkPolicy {
   export const BUILTIN_PROVIDER_GRANT_ID = "provider:built-in";
   export const TRIPO_UPLOAD_GRANT_ID = "provider:tripo-upload";
   export const PROVIDER_ASSET_GRANT_ID = "download:provider-assets";
+  export const CHATGPT_SUBSCRIPTION_GRANT_ID = "provider:chatgpt-subscription";
 
   const GG_DISCOVERY_ORIGIN = "https://gateway.grida.ai";
   const GG_DISCOVERY_PATHS = new Set([
@@ -107,10 +108,6 @@ export namespace AgentNetworkPolicy {
       // GRIDA-SEC-004 — anonymous catalogue discovery only. authorize() below
       // confines this origin to three read-only paths and credential-free headers.
       GG_DISCOVERY_ORIGIN,
-      // GRIDA-SEC-008 — exact OAuth and inference authorities for the native
-      // ChatGPT-subscription provider. Neither origin joins the download lane.
-      "https://auth.openai.com",
-      "https://chatgpt.com",
       // ElevenLabs returns generated audio bytes on the credential-bearing
       // request itself. It is an exact provider origin and must never join the
       // credential-free provider-asset download lane.
@@ -143,6 +140,21 @@ export namespace AgentNetworkPolicy {
           "https://cdn.tripo3d.ai",
           "https://tripo-data.rg1.data.tripo3d.com",
         ].filter((origin) => origin.startsWith("https:")),
+      },
+    ];
+  }
+
+  /**
+   * GRIDA-SEC-008 — grants only Electron Main dispatches, never published to
+   * the sidecar: the exact OAuth and inference authorities of the native
+   * ChatGPT-subscription provider. Neither origin joins the download lane.
+   */
+  export function mainOnlyGrants(): Grant[] {
+    return [
+      {
+        id: CHATGPT_SUBSCRIPTION_GRANT_ID,
+        lane: "provider",
+        origins: ["https://auth.openai.com", "https://chatgpt.com"],
       },
     ];
   }
