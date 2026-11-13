@@ -1276,8 +1276,10 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   [its process fixtures](crates/grida-agent/tests/mcp.rs) bind a separate,
   explicitly enabled local service to a numeric loopback address. It checks
   the exact authority and path, rejects browser origins, and authenticates each
-  request before the SDK can route it. The bearer value is removed before
-  dispatch. The headless and live profiles each expose one reviewed capability
+  request before the SDK can route it. It shares one
+  [loopback bearer perimeter](crates/grida-agent/src/loopback_bearer.rs) with
+  the shared ACP listener, so both apply the same checks. The bearer value is
+  removed before dispatch. The headless and live profiles each expose one reviewed capability
   independently of chat, provider, and workspace storage.
   [Main's live export owner](desktop/src/main/native-editor-mcp-export.ts)
   captures a separate private bearer and the exact selected workspace. Only

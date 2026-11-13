@@ -1,5 +1,6 @@
 //! GRIDA-SEC-004 — explicitly enabled MCP tools over authenticated loopback HTTP.
 
+use crate::loopback_bearer;
 use crate::surface_tools::{OPEN_SURFACE, headless_surface};
 use crate::tool_host::{CapabilityGrant, ToolHost};
 use agent_kit_core::inference::InputFormat;
@@ -7,7 +8,7 @@ use agent_kit_core::messages::{OutcomeStatus, ResultContent};
 use agent_kit_core::{CancellationToken, Error, ErrorKind, Result, ToolId};
 use http_body_util::{BodyExt, Full, combinators::BoxBody};
 use hyper::body::{Bytes, Incoming};
-use hyper::header::{AUTHORIZATION, HOST, ORIGIN, WWW_AUTHENTICATE};
+use hyper::header::{AUTHORIZATION, WWW_AUTHENTICATE};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
@@ -29,7 +30,6 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use subtle::ConstantTimeEq;
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 use zeroize::Zeroizing;
@@ -44,7 +44,7 @@ const MAX_CONNECTION_TIME: Duration = Duration::from_secs(15);
 
 pub struct ListenOptions {
     address: SocketAddr,
-    authorization: Zeroizing<String>,
+    authorization: Zeroizing<Vec<u8>>,
 }
 
 impl ListenOptions {
@@ -55,25 +55,9 @@ impl ListenOptions {
             .and_then(|target| target.parse::<SocketAddr>().ok())
             .filter(|address| address.ip().is_loopback())
             .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "invalid_mcp_listen_address"))?;
-        if token_env.is_empty()
-            || token_env.len() > 128
-            || !token_env
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
-        {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "invalid_server_token_environment_name",
-            ));
-        }
-        let token = std::env::var(token_env)
-            .ok()
-            .map(Zeroizing::new)
-            .filter(|token| token.len() == 64 && token.bytes().all(|byte| byte.is_ascii_hexdigit()))
-            .ok_or_else(|| Error::new(ErrorKind::Unavailable, "server_token_unavailable"))?;
         Ok(Self {
             address,
-            authorization: Zeroizing::new(format!("Bearer {}", token.as_str())),
+            authorization: loopback_bearer::authorization_from_env(token_env)?,
         })
     }
 }
@@ -143,11 +127,8 @@ async fn serve_tool(
             biased;
             result = &mut shutdown => break result,
             _ = clients.join_next(), if !clients.is_empty() => {}
-            accepted = listener.accept() => {
-                let Ok((stream, peer)) = accepted else {
-                    break Err(Error::new(ErrorKind::Unavailable, "mcp_listener_accept_failed"));
-                };
-                if !peer.ip().is_loopback() || clients.len() >= MAX_CONNECTIONS {
+            stream = loopback_bearer::next_loopback("MCP", || listener.accept()) => {
+                if clients.len() >= MAX_CONNECTIONS {
                     continue;
                 }
                 let service = service.clone();
@@ -191,28 +172,9 @@ async fn serve_tool(
 fn reject(
     request: &Request<Incoming>,
     authority: &str,
-    authorization: &str,
+    authorization: &[u8],
 ) -> Option<Response<BoxBody<Bytes, Infallible>>> {
-    let uri = request.uri();
-    let headers = request.headers();
-    let status = if uri.path() != MCP_PATH || uri.query().is_some() || uri.authority().is_some() {
-        StatusCode::NOT_FOUND
-    } else if headers.contains_key(ORIGIN)
-        || headers.get_all(HOST).iter().count() != 1
-        || headers
-            .get(HOST)
-            .is_none_or(|value| value.as_bytes() != authority.as_bytes())
-    {
-        StatusCode::FORBIDDEN
-    } else if headers.get_all(AUTHORIZATION).iter().count() != 1
-        || headers
-            .get(AUTHORIZATION)
-            .is_none_or(|value| !bool::from(value.as_bytes().ct_eq(authorization.as_bytes())))
-    {
-        StatusCode::UNAUTHORIZED
-    } else {
-        return None;
-    };
+    let status = loopback_bearer::rejection(request, MCP_PATH, authority, authorization)?;
     let mut response = Response::new(Full::new(Bytes::new()).boxed());
     *response.status_mut() = status;
     if status == StatusCode::UNAUTHORIZED {

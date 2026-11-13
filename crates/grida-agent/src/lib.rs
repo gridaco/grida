@@ -13,6 +13,7 @@ mod goal_verification;
 pub mod host;
 mod http;
 pub mod launch_permissions;
+pub mod loopback_bearer;
 pub mod mcp;
 pub mod mcp_client;
 pub mod permissions;

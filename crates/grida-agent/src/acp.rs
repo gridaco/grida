@@ -196,6 +196,16 @@ async fn serve_connection(
         ))
         .on_receive_request(
             async move |request: InitializeRequest, responder, connection| {
+                // Whether the client offered an extension at version 1.
+                let offered = |key: &str| {
+                    request
+                        .client_capabilities
+                        .meta
+                        .as_ref()
+                        .and_then(|meta| meta.get(key))
+                        .and_then(serde_json::Value::as_u64)
+                        == Some(1)
+                };
                 let subagents = initialized_host.subagents_available();
                 let deletion = reviewer && initialized_host.deletion_available();
                 let effort = initialized_host.sponsorship_available();
@@ -204,18 +214,12 @@ async fn serve_connection(
                     extensions::advertised(reviewer, subagents, deletion, effort, goal_effort, files);
                 let library_selection = reviewer && initialized_host.accepts_library_selection();
                 let spending = reviewer && initialized_host.supports_goal_spending();
-                let spending_negotiated = spending && request.client_capabilities.meta.as_ref()
-                    .and_then(|meta| meta.get(extensions::GOAL_SPENDING))
-                    .and_then(serde_json::Value::as_u64) == Some(1);
+                let spending_negotiated = spending && offered(extensions::GOAL_SPENDING);
                 if spending {
                     advertised.insert(extensions::GOAL_SPENDING.into(), 1.into());
                 }
                 let library_negotiated = library_selection
-                    && extensions::library::CAPABILITIES.iter().all(|key| {
-                        request.client_capabilities.meta.as_ref()
-                            .and_then(|meta| meta.get(*key))
-                            .and_then(serde_json::Value::as_u64) == Some(1)
-                    });
+                    && extensions::library::CAPABILITIES.iter().all(|key| offered(key));
                 if library_selection {
                     advertised.extend(extensions::library::CAPABILITIES.map(|key| (key.into(), 1.into())));
                 }
@@ -225,14 +229,7 @@ async fn serve_connection(
                 }
                 if let Some(provider) = &provider {
                     let capability = crate::supervised_provider::CAPABILITY;
-                    if request
-                        .client_capabilities
-                        .meta
-                        .as_ref()
-                        .and_then(|meta| meta.get(capability))
-                        .and_then(serde_json::Value::as_u64)
-                        != Some(1)
-                    {
+                    if !offered(capability) {
                         return responder
                             .respond_with_error(unavailable("provider_supervisor_required"));
                     }
@@ -243,45 +240,29 @@ async fn serve_connection(
                     let billing = extensions::gateway_billing::CAPABILITY;
                     if reviewer
                         && initialized_host.supports_gateway_billing_status()
-                        && request.client_capabilities.meta.as_ref()
-                            .and_then(|meta| meta.get(billing))
-                            .and_then(serde_json::Value::as_u64) == Some(1)
+                        && offered(billing)
                     {
                         advertised.insert(billing.into(), 1.into());
                         let children = extensions::gateway_billing::CHILD_CAPABILITY;
-                        if request.client_capabilities.meta.as_ref()
-                            .and_then(|meta| meta.get(children))
-                            .and_then(serde_json::Value::as_u64) == Some(1)
-                        {
+                        if offered(children) {
                             advertised.insert(children.into(), 1.into());
                         }
                     }
                     let capability = crate::host::image_generation::CAPABILITY;
                     if reviewer
                         && let Some(generation) = &initialized_host.desktop_image_generation
-                        && request.client_capabilities.meta.as_ref()
-                            .and_then(|meta| meta.get(capability))
-                            .and_then(serde_json::Value::as_u64) == Some(1)
+                        && offered(capability)
                     {
                         let reference = crate::host::image_generation::REFERENCE_CAPABILITY;
-                        let references = library_negotiated
-                            && request.client_capabilities.meta.as_ref()
-                                .and_then(|meta| meta.get(reference))
-                                .and_then(serde_json::Value::as_u64) == Some(1);
+                        let references = library_negotiated && offered(reference);
                         let placement = crate::host::image_generation::PLACE_CAPABILITY;
-                        let place = request.client_capabilities.meta.as_ref()
-                            .and_then(|meta| meta.get(placement))
-                            .and_then(serde_json::Value::as_u64) == Some(1);
+                        let place = offered(placement);
                         let attachment = crate::host::image_generation::ATTACHMENT_CAPABILITY;
                         let attachments = initialized_host.supports_attachment_reference()
-                            && request.client_capabilities.meta.as_ref()
-                                .and_then(|meta| meta.get(attachment))
-                                .and_then(serde_json::Value::as_u64) == Some(1);
+                            && offered(attachment);
                         let workspace_reference = crate::host::image_generation::WORKSPACE_CAPABILITY;
                         let workspace_references = initialized_host.supports_workspace_image_reference()
-                            && request.client_capabilities.meta.as_ref()
-                                .and_then(|meta| meta.get(workspace_reference))
-                                .and_then(serde_json::Value::as_u64) == Some(1);
+                            && offered(workspace_reference);
                         generation.attach(connection.clone(), references, place, attachments, workspace_references);
                         advertised.insert(capability.into(), 1.into());
                         if references {
@@ -300,30 +281,12 @@ async fn serve_connection(
                     let capability = crate::editor_surfaces::CAPABILITY;
                     if reviewer
                         && initialized_host.supports_editor_tools()
-                        && request
-                            .client_capabilities
-                            .meta
-                            .as_ref()
-                            .and_then(|meta| meta.get(capability))
-                            .and_then(serde_json::Value::as_u64)
-                            == Some(1)
+                        && offered(capability)
                     {
                         let open = crate::editor_surfaces::OPEN_CAPABILITY;
                         let svg_text = crate::editor_surfaces::SVG_TEXT_CAPABILITY;
-                        let presentation = request
-                            .client_capabilities
-                            .meta
-                            .as_ref()
-                            .and_then(|meta| meta.get(open))
-                            .and_then(serde_json::Value::as_u64)
-                            == Some(1);
-                        let svg = request
-                            .client_capabilities
-                            .meta
-                            .as_ref()
-                            .and_then(|meta| meta.get(svg_text))
-                            .and_then(serde_json::Value::as_u64)
-                            == Some(1);
+                        let presentation = offered(open);
+                        let svg = offered(svg_text);
                         initialized_host.editor_surfaces.attach(
                             connection.clone(),
                             presentation,
@@ -361,14 +324,8 @@ async fn serve_connection(
                         .into_iter()
                         .filter(|key| advertised.contains_key(*key)),
                     );
-                    let requested = |capability| {
-                        reviewer && meta
-                            .and_then(|meta| meta.get(capability))
-                            .and_then(serde_json::Value::as_u64)
-                            == Some(1)
-                    };
-                    let text = requested(live::CAPABILITY);
-                    let lifecycle = requested(live::LIFECYCLE);
+                    let text = reviewer && offered(live::CAPABILITY);
+                    let lifecycle = reviewer && offered(live::LIFECYCLE);
                     if !sessions.live_started && (text || lifecycle) {
                         sessions.live_started = true;
                         Some((initialized_host.observe_live(), text, lifecycle))

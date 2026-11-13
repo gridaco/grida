@@ -3,21 +3,21 @@
 use super::serve_connection;
 use super::transport::{Delivery, MAX_FRAME_BYTES, WRITE_TIMEOUT, wire_error};
 use crate::host::Host;
+use crate::loopback_bearer;
 use agent_client_protocol::{Channel, Result as AcpResult};
 use agent_kit_core::{Error, ErrorKind, Result};
 use futures_util::{SinkExt, StreamExt};
-use reqwest::{Url, header};
+use reqwest::Url;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
-use subtle::ConstantTimeEq;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinSet;
 use tokio_tungstenite::accept_hdr_async_with_config;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
-use tokio_tungstenite::tungstenite::http::StatusCode;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
+use zeroize::Zeroizing;
 
 const ENDPOINT_PATH: &str = "/acp";
 const MAX_CLIENTS: usize = 16;
@@ -25,30 +25,14 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub struct ListenOptions {
     address: SocketAddr,
-    authorization: Vec<u8>,
+    authorization: Zeroizing<Vec<u8>>,
 }
 
 impl ListenOptions {
     pub fn from_environment(address: &str, token_env: &str) -> Result<Self> {
-        let address = loopback_address(address)?;
-        if token_env.is_empty()
-            || token_env.len() > 128
-            || !token_env
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
-        {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "invalid_server_token_environment_name",
-            ));
-        }
-        let token = std::env::var(token_env)
-            .ok()
-            .filter(|token| token.len() == 64 && token.bytes().all(|byte| byte.is_ascii_hexdigit()))
-            .ok_or_else(|| Error::new(ErrorKind::Unavailable, "server_token_unavailable"))?;
         Ok(Self {
-            address,
-            authorization: format!("Bearer {token}").into_bytes(),
+            address: loopback_address(address)?,
+            authorization: loopback_bearer::authorization_from_env(token_env)?,
         })
     }
 }
@@ -71,10 +55,8 @@ pub async fn serve_websocket(host: Arc<Host>, options: ListenOptions) -> Result<
                     eprintln!("grida-agent: ACP client task interrupted");
                 }
             }
-            result = listener.accept() => {
-                let (stream, peer) = result
-                    .map_err(|_| Error::new(ErrorKind::Unavailable, "acp_listener_accept_failed"))?;
-                if clients.len() >= MAX_CLIENTS || !peer.ip().is_loopback() {
+            stream = loopback_bearer::next_loopback("ACP", || listener.accept()) => {
+                if clients.len() >= MAX_CLIENTS {
                     continue;
                 }
                 let host = host.clone();
@@ -94,7 +76,7 @@ async fn serve_client(
     stream: TcpStream,
     host: Arc<Host>,
     host_header: Arc<String>,
-    authorization: Arc<Vec<u8>>,
+    authorization: Arc<Zeroizing<Vec<u8>>>,
 ) -> AcpResult<()> {
     let config = WebSocketConfig::default()
         .read_buffer_size(16 * 1024)
@@ -106,8 +88,9 @@ async fn serve_client(
         clippy::result_large_err,
         reason = "The WebSocket handshake callback returns an HTTP response"
     )]
-    let authorize = move |request: &Request, response: Response| match rejection(
+    let authorize = move |request: &Request, response: Response| match loopback_bearer::rejection(
         request,
+        ENDPOINT_PATH,
         &host_header,
         &authorization,
     ) {
@@ -167,32 +150,6 @@ async fn serve_client(
         write
     )?;
     Ok(())
-}
-
-fn rejection(request: &Request, host_header: &str, authorization: &[u8]) -> Option<StatusCode> {
-    if request.uri().path() != ENDPOINT_PATH
-        || request.uri().query().is_some()
-        || request.uri().authority().is_some()
-    {
-        return Some(StatusCode::NOT_FOUND);
-    }
-    let headers = request.headers();
-    if headers.contains_key(header::ORIGIN)
-        || headers.get_all(header::HOST).iter().count() != 1
-        || headers
-            .get(header::HOST)
-            .is_none_or(|value| value.as_bytes() != host_header.as_bytes())
-    {
-        return Some(StatusCode::FORBIDDEN);
-    }
-    if headers.get_all(header::AUTHORIZATION).iter().count() != 1
-        || headers
-            .get(header::AUTHORIZATION)
-            .is_none_or(|value| !bool::from(value.as_bytes().ct_eq(authorization)))
-    {
-        return Some(StatusCode::UNAUTHORIZED);
-    }
-    None
 }
 
 fn loopback_address(address: &str) -> Result<SocketAddr> {
