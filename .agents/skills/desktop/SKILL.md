@@ -19,8 +19,9 @@ The renderer is still the editor's Next.js app under `editor/app/desktop/`;
 Electron URL-loads it from `http://localhost:3000/desktop/*` in dev and
 `https://grida.co/desktop/*` in prod.
 
-Use [`agent-system`](../agent-system/SKILL.md) for the daemon + agent-tenant core,
-sessions, workspaces, providers, tool execution, HTTP routes, and tests in
+Use [`agent-system`](../agent-system/SKILL.md) for the native Rust agent
+(chat, sessions, tools, permissions, providers), its Main integration
+contracts, and the retained daemon and media services in
 `packages/grida-daemon` and `packages/grida-ai-agent`.
 
 > Adjacent: [`security`](../security/SKILL.md) for the GRIDA-SEC-004 trust
@@ -44,9 +45,9 @@ sessions, workspaces, providers, tool execution, HTTP routes, and tests in
   native version bump or coordinated release.
 
 Use `agent-system` to implement core agent behavior that can be tested without
-Electron: `packages/grida-daemon/**`, `packages/grida-ai-agent/**`, daemon HTTP
-routes, sessions, files/workspaces, providers, tools, runtime, skills, and
-BYOK/secrets. Also use this skill when auditing whether that work changes the
+Electron: the native agent crates, `packages/grida-daemon/**`,
+`packages/grida-ai-agent/**`, daemon HTTP routes, files/workspaces, media
+providers, and BYOK/secrets. Also use this skill when auditing whether that work changes the
 packaged Desktop payload or its compatibility with the hosted renderer.
 
 ---
