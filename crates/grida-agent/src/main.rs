@@ -770,6 +770,9 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 .map(grida_agent::skills::SkillReference::named)
                 .collect::<Result<_>>()?,
             questions: args.get_flag("questions"),
+            // Ultra pairs the extended harness with the highest reasoning
+            // level, as on every client surface.
+            reasoning: ultra.then_some(agent_kit_core::inference::ReasoningEffort::XHigh),
             timeout: Duration::from_millis(
                 args.get_one::<u64>("deadline-ms")
                     .copied()

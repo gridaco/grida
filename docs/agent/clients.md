@@ -174,16 +174,21 @@ requires an Act launch.
 
 ### Choose how much effort a task gets
 
-In a supported Gateway, saved OpenRouter, or saved Vercel chat in Desktop, choose **Standard** or **Ultra** in
-the model picker at the bottom of the composer. You can use either with **Plan** or **Act**. The
-choice applies when you send or queue a message. Steering keeps the current
+In Desktop, drag the **Effort** slider in the model picker at the bottom of the
+composer: **Low**, **Medium**, **High**, **Extra high** and, in a supported
+Gateway, saved OpenRouter, or saved Vercel chat, **Ultra**. You can use any
+level with **Plan** or **Act**. The choice applies when you send or queue a
+message. Steering keeps the current
 turn's effort. Editing a queued or earlier message keeps its original effort.
 Resubmitting an earlier Ultra message requires a connection that supports Ultra.
 
 `run --effort standard` uses the ordinary task allowance and is the default.
 Use `run --effort ultra` when an independent review could help. Ultra gives
 the main agent more room to work and can start one separate reviewer while it
-continues. The reviewer receives a text assignment and does not automatically
+continues. When the host is launched with `--reasoning` for a model that
+accepts a reasoning level, Ultra also selects the highest level; otherwise the
+model keeps its own reasoning. Headless `run` has no option for Low through
+Extra high. The reviewer receives a text assignment and does not automatically
 receive the parent's chat history. For a new ordinary review, it can inspect the
 primary workspace when that folder already permits reading. It does not receive
 additional folder grants, command execution, writes, or delegation. A folder

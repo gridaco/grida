@@ -200,6 +200,37 @@ async fn built_standard_does_not_offer_review_tools() {
     endpoint.done().await;
 }
 
+/// Headless Ultra selects the highest reasoning level when the model declares
+/// reasoning support, and otherwise leaves the model's own default.
+#[tokio::test]
+async fn headless_ultra_selects_the_highest_declared_reasoning_level() {
+    for (declared, expected) in [(true, json!("xhigh")), (false, Value::Null)] {
+        let root = TempDir::new().unwrap();
+        let workspace = TempDir::new().unwrap();
+        let mut endpoint = Endpoint::start(vec![Reply::Finished("Direct result.")]).await;
+        let mut command = executable();
+        command.arg("run");
+        configured(&mut command, &root.path().join("state"), &endpoint.url);
+        if declared {
+            command.arg("--reasoning");
+        }
+        command
+            .arg("--cwd")
+            .arg(workspace.path())
+            .args(["--effort", "ultra", "--prompt", PARENT]);
+        let output = timeout(WAIT, command.output()).await.unwrap().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let request = endpoint.request().await;
+        assert!(offers(&request, "delegate_review"));
+        assert_eq!(request["reasoning_effort"], expected, "{request}");
+        endpoint.done().await;
+    }
+}
+
 #[tokio::test]
 async fn finished_ultra_account_discloses_uncollected_review() {
     let root = TempDir::new().unwrap();

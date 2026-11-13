@@ -46,9 +46,11 @@ limits inference steps. An optional Gateway spending ceiling is a separate limit
    without starting work; hover it and choose its **×** to remove it.
 2. Describe the objective in your own words and send. The message is marked
    **Sent as goal** in the chat. The agent works from that objective and
-   continues on its own within eight work turns and 64 inference steps. The
-   effort selected in the composer applies; **Ultra** lets one independent
-   review share the goal's allowance on supported connections.
+   continues on its own within eight work turns and 64 inference steps.
+   Choose **Ultra** before sending to let one independent review share the
+   goal's allowance on supported connections. Other effort levels do not yet
+   change a goal's reasoning: goal turns, including Ultra ones, use the
+   model's default reasoning.
 3. While the goal exists, a strip above the composer shows its status and
    objective, for example **Pursuing goal**, **Paused goal** or
    **Goal complete**. Use its buttons to clear, pause or resume, and edit the

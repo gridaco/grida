@@ -33,6 +33,9 @@ pub struct RunOptions {
     pub input_png: Option<PathBuf>,
     pub skills: Vec<crate::skills::SkillReference>,
     pub questions: bool,
+    /// The reasoning level for the run's turn. The host falls back to the
+    /// model's default when the model does not declare that level.
+    pub reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
     pub timeout: Duration,
 }
 
@@ -304,7 +307,7 @@ async fn admit_run(
         configuration_permission: crate::ConfigurationPermission::Disabled,
         operating_regime: None,
         effort: None,
-        reasoning: Default::default(),
+        reasoning: options.reasoning,
     })
     .await
 }
