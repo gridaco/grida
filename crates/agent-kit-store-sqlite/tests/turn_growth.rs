@@ -10,12 +10,15 @@ use agent_kit_core::inference::{
     InferenceOutcome, InferenceRequest, InferenceStatus, Modality, ModelCapabilities,
     PreparedRequest, ProviderBinding,
 };
-use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
+use agent_kit_core::messages::{
+    Content, Message, Provenance, ProvenanceKind, Role, ToolArguments, ToolCall,
+};
 use agent_kit_core::turn::{
     JournalAction, OperationInput, OperationOutcome, OperationRecord, TurnState,
 };
 use agent_kit_core::{
     AttemptId, BindingId, MessageId, ModelId, OperationId, PrincipalId, ProviderId, ScopeId,
+    ToolCallId, ToolId,
 };
 use agent_kit_sessions::{ClaimedTurn, SessionStore};
 use agent_kit_store_sqlite::SqliteStore;
@@ -412,4 +415,47 @@ async fn an_operation_part_refers_to_every_message_it_holds() {
     drop(store);
     let reopened = SqliteStore::open(&path).unwrap();
     assert_eq!(same(&read(&reopened).await), same(&state));
+}
+
+/// A stored message reads back with the bytes it was written with, including
+/// the key order of the JSON a model wrote as tool arguments. Later model calls
+/// replay those messages, and a provider's cached prefix holds only while the
+/// replayed bytes stay the same.
+#[tokio::test]
+async fn a_stored_message_keeps_the_key_order_of_its_tool_arguments() {
+    let directory = private_directory();
+    let path = directory.path().join("sessions.sqlite");
+    let store = create(&path).await;
+    let input = submission("input", "start");
+    store.submit(session(), input.clone()).await.unwrap();
+    let claim = claim(&store, "claim", vec![input.id]).await;
+    let arguments: serde_json::Value =
+        serde_json::from_str(r#"{"zeta":1,"alpha":{"b":2,"a":3}}"#).unwrap();
+    let call = Message {
+        content: vec![Content::ToolCall(ToolCall {
+            id: ToolCallId::new("call").unwrap(),
+            tool: ToolId::new("fixture-tool").unwrap(),
+            arguments: ToolArguments::Json(arguments),
+        })],
+        ..message("tool-call", Role::Assistant)
+    };
+    commit(
+        &claim,
+        "append",
+        vec![JournalAction::AppendHistory(vec![HistoryRecord::Message(
+            call.clone(),
+        )])],
+    )
+    .await;
+    drop(claim);
+    drop(store);
+    let reopened = SqliteStore::open(&path).unwrap();
+    let state = read(&reopened).await;
+    let [HistoryRecord::Message(read)] = state.history().records() else {
+        panic!("expected the one appended message");
+    };
+    assert_eq!(
+        serde_json::to_string(read).unwrap(),
+        serde_json::to_string(&call).unwrap()
+    );
 }

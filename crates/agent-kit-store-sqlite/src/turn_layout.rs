@@ -459,6 +459,12 @@ fn to_value(value: &impl Serialize) -> Result<Value> {
 }
 
 /// Replace one message with its digest; returns its encoded size.
+///
+/// The body is the message as encoded, and the digest is SHA-256 of that body,
+/// not the message's canonical fingerprint. The canonical encoding sorts
+/// object keys, so storing it would reorder the JSON a model wrote as tool
+/// arguments, and later model calls would replay different bytes than were
+/// first sent, invalidating the provider's cached prefix.
 fn externalize(message: &mut Value, bodies: &mut BTreeMap<[u8; 32], Vec<u8>>) -> Result<usize> {
     let bytes = encode(&*message)?;
     let digest: [u8; 32] = Sha256::digest(&bytes).into();
