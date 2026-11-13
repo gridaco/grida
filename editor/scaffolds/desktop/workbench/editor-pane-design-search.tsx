@@ -14,7 +14,7 @@
 
 import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import { ArrowRightIcon, SearchIcon, XIcon } from "lucide-react";
-import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import type { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { Button } from "@app/ui/components/button";
 import { Input } from "@app/ui/components/input";
 import { DesignSearchExplorer } from "@/kits/agent-chat";
@@ -30,7 +30,7 @@ import {
   type DesignSearchSession,
 } from "./design-search-tab";
 
-type Pin = AgentDesignSearch.DesignSearchResult;
+type Pin = chat_vocabulary.DesignReference;
 
 function SelectionBar({
   pins,
@@ -153,7 +153,7 @@ function DesignSearchPicker({
     [disabled]
   );
 
-  function submit(output: AgentDesignSearch.DesignSearchOutput) {
+  function submit(output: chat_vocabulary.DesignSearchOutput) {
     if (submitted) return;
     setSubmitted(true);
     onPick(toolCallId, output);

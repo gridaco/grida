@@ -42,6 +42,13 @@ export namespace chat_vocabulary {
     height?: number;
   };
 
+  /** A design search result: the references the user picked. */
+  export type DesignSearchOutput = {
+    picked: DesignReference[];
+    /** True when the user dismissed without picking. */
+    skipped?: boolean;
+  };
+
   /**
    * The initial query of a design search call: `initial_search_query`, or
    * `query` in calls recorded before the rename. Anything else reads as empty.

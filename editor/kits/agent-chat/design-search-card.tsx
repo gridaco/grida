@@ -27,12 +27,12 @@ import {
   SearchIcon,
   XIcon,
 } from "lucide-react";
-import { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat/types";
 import { DesignSearchExplorer } from "./design-search-explorer";
 
-type Pin = AgentDesignSearch.DesignSearchResult;
-type Output = AgentDesignSearch.DesignSearchOutput;
+type Pin = chat_vocabulary.DesignReference;
+type Output = chat_vocabulary.DesignSearchOutput;
 
 export type PickReferencesHandler = (
   toolCallId: string,
@@ -42,7 +42,7 @@ export type PickReferencesHandler = (
 /** Run the library search for a query and return the result pins (app-side). */
 export type FetchReferences = (query: string) => Promise<Pin[]>;
 
-const PART_TYPE = `tool-${AgentDesignSearch.TOOL_NAME}`;
+const PART_TYPE = `tool-${chat_vocabulary.TOOL_NAMES.design_search}`;
 
 function toolCallIdOf(entry: ToolCallEntry): string {
   const e = entry as { toolCallId?: string; tool_call_id?: string };
@@ -50,7 +50,7 @@ function toolCallIdOf(entry: ToolCallEntry): string {
 }
 
 function queryOf(entry: ToolCallEntry): string {
-  return AgentDesignSearch.initialSearchQuery(
+  return chat_vocabulary.initialSearchQuery(
     "input" in entry ? entry.input : undefined
   );
 }

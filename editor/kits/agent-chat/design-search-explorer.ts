@@ -1,6 +1,6 @@
-import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import type { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 
-type Pin = AgentDesignSearch.DesignSearchResult;
+type Pin = chat_vocabulary.DesignReference;
 
 export type DesignSearchTicket = Readonly<{
   query: string;
