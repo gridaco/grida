@@ -10,8 +10,6 @@
  */
 
 import type {
-  AgentRunOptions,
-  AgentUIMessageChunk,
   ProviderId,
   EndpointProviderConfig,
   GGModelsView,
@@ -35,18 +33,9 @@ import type {
   TextToSpeechGenerateRequest,
   TextToSpeechGenerateResult,
   TextToSpeechListVoicesResult,
-  ChatMessageWithParts,
-  ChatSessionRow,
   ChatGptSubscriptionStatus,
-  CreateSessionOptions,
-  PatchSessionOptions,
-  RewindResult,
-  SessionListFilter,
-  SessionListPage,
-  SessionStatus,
   GridaGatewaySession,
   GridaGatewaySessionStatus,
-  DirectoryScopeDescriptor,
 } from "@grida/agent";
 import type {
   DaemonHandshakeResponse,
@@ -96,22 +85,6 @@ export type DesktopNativeCapabilities = {
   workspace_watch: boolean;
 };
 
-export type DesktopAgentCapabilities = {
-  /**
-   * The host accepts base64 scratch seeds (`{ path, base64 }`) on agent runs.
-   * Added after protocol 1 shipped; renderers must treat a missing/falsy value
-   * as an old host that accepts text-only scratch seeds.
-   */
-  scratch_seed_base64?: boolean;
-  /**
-   * The host exposes binary-operable tools for scratch-backed files (today,
-   * the confined `run_command` capability). Omission/false means a path-only
-   * PDF/archive/etc. would be inert, so renderers must not offer scratch-only
-   * arbitrary-byte attachments.
-   */
-  scratch_binary_tools?: boolean;
-};
-
 export type DesktopCapabilities = {
   native: DesktopNativeCapabilities;
   /** Bundled media capabilities; omission means an older Desktop binary. */
@@ -125,11 +98,6 @@ export type DesktopCapabilities = {
     /** Grida credits for eligibility and rigging, including native signed uploads. */
     rigging_gg?: boolean;
   };
-  /**
-   * TypeScript chat capabilities. Optional because protocol-1 hosts shipped
-   * before them and native-agent hosts omit them.
-   */
-  agent?: DesktopAgentCapabilities;
 };
 
 export type HandshakeResponse = DaemonHandshakeResponse;
@@ -466,10 +434,6 @@ export type DesktopBridge = {
       source: "ollama" | "openai";
       models: ProbedEndpointModel[];
     }>;
-    /** Is the user's `claude` CLI resolvable on the host (issue #813)? Cheap
-     *  filesystem probe, NOT a login check (login surfaces on the first run).
-     *  Optional — older binaries lack it; renderers feature-detect. */
-    detect_claude?: () => Promise<{ installed: boolean; path?: string }>;
   };
   /**
    * Grida hosted ("included") AI session — GRIDA-SEC-006. Push-only
@@ -552,87 +516,5 @@ export type DesktopBridge = {
         req: TextToSpeechGenerateRequest
       ) => Promise<TextToSpeechGenerateResult>;
     };
-  };
-  /**
-   * TypeScript chat runtime served by Desktop builds that predate the native
-   * agent. Builds that run the native agent omit it; renderers must treat a
-   * missing value as "no TypeScript chat".
-   */
-  agent?: {
-    /**
-     * Turn an OS-backed directory `File` from a real drop into an opaque,
-     * read-only agent scope. Optional on protocol 1: older desktop binaries and
-     * browser hosts omit it. The absolute path is resolved inside Electron's
-     * preload and never returns to renderer code.
-     */
-    attach_directory?: (file: File) => Promise<DirectoryScopeDescriptor>;
-    run: (
-      opts: AgentRunOptions,
-      onChunk: (chunk: AgentUIMessageChunk) => void
-    ) => Promise<{
-      stream_id: string;
-      session_id: string;
-      done: Promise<void>;
-    }>;
-    abort: (sessionId: string) => Promise<void>;
-    reconnect: (
-      sessionId: string,
-      lastEventId: number,
-      onChunk: (chunk: AgentUIMessageChunk) => void
-    ) => Promise<{
-      stream_id: string;
-      session_id: string;
-      done: Promise<void>;
-    } | null>;
-  };
-  /** TypeScript chat sessions; omitted with {@link DesktopBridge.agent}. */
-  sessions?: {
-    list: (filter?: SessionListFilter) => Promise<SessionListPage>;
-    get: (id: string) => Promise<ChatSessionRow | null>;
-    create: (opts: CreateSessionOptions) => Promise<ChatSessionRow>;
-    patch: (id: string, opts: PatchSessionOptions) => Promise<ChatSessionRow>;
-    delete: (id: string) => Promise<void>;
-    list_messages: (id: string) => Promise<ChatMessageWithParts[]>;
-    /** Soft-truncate to a prior message (`restore: true` un-rewinds). */
-    rewind: (
-      id: string,
-      fromMessageId: string,
-      opts?: { restore?: boolean }
-    ) => Promise<RewindResult>;
-    /** Fork the session at a message; resolves to the new forked session. */
-    fork: (
-      id: string,
-      fromMessageId: string,
-      metadata?: Record<string, unknown>
-    ) => Promise<ChatSessionRow>;
-    /** User-fired compaction. */
-    compact: (id: string) => Promise<{
-      compacted: boolean;
-      reason?: string;
-      summary_message_id?: string;
-    }>;
-    /** Queued sends: enqueue a pending user message (held out of the model
-     *  view + transcript until it fires). The caller mints the id. */
-    enqueue: (
-      id: string,
-      message: { id?: string; text: string }
-    ) => Promise<ChatMessageWithParts>;
-    /** The pending queue, FIFO by `queued_at`. */
-    list_queued: (id: string) => Promise<ChatMessageWithParts[]>;
-    /** Cancel a queued message before it fires. */
-    cancel_queued: (id: string, messageId: string) => Promise<void>;
-    /**
-     * Subscribe to the session's run-state (RFC `session` §Session status):
-     * the current status arrives first, then every idle⇄busy⇄waiting⇄error
-     * transition. Returns a `subscription_id` to later
-     * {@link unsubscribe_status}, and a `done` that settles when the
-     * subscription ends.
-     */
-    subscribe_status: (
-      id: string,
-      onStatus: (status: SessionStatus) => void
-    ) => Promise<{ subscription_id: string; done: Promise<void> }>;
-    /** Stop a status subscription started by {@link subscribe_status}. */
-    unsubscribe_status: (subscriptionId: string) => Promise<void>;
   };
 };

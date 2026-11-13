@@ -38,7 +38,6 @@ import {
   AlibabaCloudLogo,
   BlackForestLabsLogo,
   ByteDanceLogo,
-  ClaudeLogo,
   ElevenLabsLogo,
   TripoLogo,
   FalLogo,
@@ -151,7 +150,6 @@ export default function DesktopSettingsPage() {
           />
           <MediaModelsSection providerKeysRevision={providerKeysRevision} />
         </SettingsSection>
-        <AcpSection />
         <AboutSection />
       </DesktopPageContent>
     </DesktopPageShell>
@@ -856,93 +854,6 @@ function stableKind(state: RowState): "loading" | "empty" | "configured" {
     case "error":
       return state.previous;
   }
-}
-
-/* ────────────────────────────── ACP ──────────────────────────────── */
-
-type AcpDetectState = "checking" | "installed" | "missing";
-
-function AcpSection() {
-  const [claude, setClaude] = useState<AcpDetectState>("checking");
-
-  const detect = useCallback(async () => {
-    setClaude("checking");
-    try {
-      const { installed } = await providers.detectClaude();
-      setClaude(installed ? "installed" : "missing");
-    } catch {
-      setClaude("installed");
-    }
-  }, []);
-
-  useEffect(() => {
-    void detect();
-  }, [detect]);
-
-  return (
-    <SettingsSection
-      title="External Agents"
-      description="External agents connected through the Agent Client Protocol."
-    >
-      <Card>
-        <CardHeader>
-          <CardTitle>Claude Code</CardTitle>
-          <CardDescription>
-            Runs as an external agent on the user&apos;s Claude subscription.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded border bg-background">
-                <ClaudeLogo
-                  aria-hidden="true"
-                  focusable="false"
-                  className="size-5 text-foreground"
-                />
-              </span>
-              <div className="flex min-w-0 flex-col">
-                <span className="text-sm font-medium">Claude Code</span>
-                <span className="text-xs text-muted-foreground">
-                  Local CLI bridge via ACP.
-                </span>
-              </div>
-            </div>
-            {claude === "checking" ? (
-              <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
-                Checking
-              </span>
-            ) : claude === "installed" ? (
-              <span className="shrink-0 text-xs text-muted-foreground">
-                Detected
-              </span>
-            ) : (
-              <span className="shrink-0 text-xs text-muted-foreground">
-                Not found
-              </span>
-            )}
-          </div>
-
-          {claude === "missing" && (
-            <div className="flex flex-col gap-2 border-t pt-3 text-xs text-muted-foreground">
-              <code className="rounded bg-muted px-2 py-1 font-mono text-foreground">
-                npm install -g @anthropic-ai/claude-code
-              </code>
-              <Button
-                size="sm"
-                variant="outline"
-                className="self-start"
-                onClick={() => void detect()}
-              >
-                I&apos;ve installed it
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </SettingsSection>
-  );
 }
 
 /* ───────────────────────────── Models ───────────────────────────── */

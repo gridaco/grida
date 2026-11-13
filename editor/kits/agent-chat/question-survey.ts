@@ -2,7 +2,7 @@
  * `QuestionSurvey` — the pure, React-free core of the ask-user `question` tool's
  * form. It owns the per-question option selections, the free-text write-ins,
  * the per-question skip flags, the wizard step, and ALL derived semantics
- * (answer-building, validation, skip-vs-decline). The React `QuestionCard` is a
+ * (answer-building, validation, skip-vs-decline). The React `QuestionPrompt` is a
  * thin view: it holds one of these in state and swaps it for the next on each
  * transition. Immutable — every transition returns a NEW survey — so the view's
  * update is just `setSurvey(survey.next())` and the logic is testable on its own

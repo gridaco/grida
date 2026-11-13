@@ -130,7 +130,7 @@ it("opens the exact saved chat on notification click and withdraws a retired cli
   expect(host.open).toHaveBeenCalledTimes(1);
 });
 
-it("suppresses watched work and user cancellation, and sends only the chat ID when clicked", () => {
+it("suppresses watched work and user cancellation, and only wakes the pane when clicked", () => {
   const nav = navigation();
   const target = workspaceWindow();
   const { send } = target;
@@ -161,17 +161,12 @@ it("suppresses watched work and user cancellation, and sends only the chat ID wh
     body: "Waiting for your approval",
   });
   host.click!();
-  expect(send).toHaveBeenCalledExactlyOnceWith("grida:agent:focus-session", {
-    session_id: event.sessionId,
-  });
+  expect(send).toHaveBeenCalledExactlyOnceWith("grida:agent:focus-session");
   expect(host.open).not.toHaveBeenCalled();
   const profileId = "d".repeat(64);
   notifyNativeChat(workspaceId, event, nav, () => true, profileId);
   host.click!();
-  expect(send).toHaveBeenLastCalledWith("grida:agent:focus-session", {
-    session_id: event.sessionId,
-    profile_id: profileId,
-  });
+  expect(send).toHaveBeenLastCalledWith("grida:agent:focus-session");
 });
 
 it("retains only the latest click through a same-workspace load and serves it once to the exact top frame", () => {

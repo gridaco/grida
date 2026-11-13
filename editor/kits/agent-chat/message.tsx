@@ -41,7 +41,6 @@ import {
   FilePenLineIcon,
   FilePlus2Icon,
   FolderTreeIcon,
-  GitBranchIcon,
   ImageIcon,
   ImagesIcon,
   LayoutTemplateIcon,
@@ -50,7 +49,6 @@ import {
   PaperclipIcon,
   PanelsTopLeftIcon,
   PencilIcon,
-  RotateCcwIcon,
   SearchIcon,
   SparklesIcon,
   SquareTerminalIcon,
@@ -129,10 +127,6 @@ const revealOnHoverActions =
 export type ChatMessageActions = {
   /** Open an editor for this user message. */
   onEdit?: (messageId: string) => void;
-  /** Soft-truncate the conversation to this user message (RFC `rewinding`). */
-  onRewind?: (messageId: string) => void;
-  /** Fork a new session at this user message (RFC `fork`). */
-  onFork?: (messageId: string) => void;
   /** Disable the actions (e.g. while a run is in flight). */
   disabled?: boolean;
   /** When the message was sent, in UTC milliseconds. Shown with the actions. */
@@ -316,24 +310,6 @@ export function ChatMessageView({
                 onClick={() => actions.onEdit?.(message.id)}
               >
                 <PencilIcon />
-              </MessageAction>
-            )}
-            {actions?.onRewind && (
-              <MessageAction
-                tooltip="Rewind to here"
-                disabled={actions.disabled}
-                onClick={() => actions.onRewind?.(message.id)}
-              >
-                <RotateCcwIcon />
-              </MessageAction>
-            )}
-            {actions?.onFork && (
-              <MessageAction
-                tooltip="Fork from here"
-                disabled={actions.disabled}
-                onClick={() => actions.onFork?.(message.id)}
-              >
-                <GitBranchIcon />
               </MessageAction>
             )}
           </MessageActions>
@@ -547,22 +523,6 @@ function findCompactionSummary(
 }
 
 /**
- * Horizontal divider with centered content — the section break that marks a
- * compaction in the transcript. Shared by the in-flight indicator
- * ({@link CompactingIndicator}) and the settled notice
- * ({@link CompactionNotice}) so the two states sit on one consistent line.
- */
-function CompactionDivider({ children }: { children: ReactNode }) {
-  return (
-    <div className="my-3 flex w-full items-center gap-3 px-1 text-muted-foreground">
-      <span aria-hidden className="h-px flex-1 bg-border" />
-      {children}
-      <span aria-hidden className="h-px flex-1 bg-border" />
-    </div>
-  );
-}
-
-/**
  * How long an in-flight indicator runs bare before the elapsed-time counter
  * appears, in milliseconds. Below this only the shimmering label shows; at or
  * past it the "· {time}" counter is revealed.
@@ -570,9 +530,8 @@ function CompactionDivider({ children }: { children: ReactNode }) {
 const ELAPSED_REVEAL_AFTER_MS = 3000;
 
 /**
- * A shimmering label trailed by a live elapsed-time counter — the shared body
- * of the transcript's in-flight indicators ({@link CompactingIndicator},
- * {@link PendingTurnIndicator}) so they tick identically.
+ * A shimmering label trailed by a live elapsed-time counter — the body of the
+ * transcript's in-flight indicator ({@link PendingTurnIndicator}).
  *
  * The counter stays hidden for the first {@link ELAPSED_REVEAL_AFTER_MS}: a fast
  * operation settles before a timer grows, and only a wait long enough to feel
@@ -598,22 +557,6 @@ function ShimmerWithElapsed({ label }: { label: string }) {
 }
 
 /**
- * In-flight compaction (RFC `session / compaction`). A divider whose centered
- * label shimmers while the summarizer runs, trailed by a live elapsed-time
- * counter so a slow summarize reads as progress, not a hang. The host renders
- * this at the tail of the conversation while a manual `/compact` is awaiting;
- * once the summary message hydrates it is replaced by the settled
- * {@link CompactionNotice}.
- */
-export function CompactingIndicator() {
-  return (
-    <CompactionDivider>
-      <ShimmerWithElapsed label="Compacting conversation" />
-    </CompactionDivider>
-  );
-}
-
-/**
  * Pre-first-token indicator — the dead-air window between a send and the first
  * streamed chunk. The AI-SDK reducer doesn't create the assistant message until
  * the first content chunk arrives, so the per-turn "Thinking" shimmer that lives
@@ -630,22 +573,6 @@ export function PendingTurnIndicator() {
         <ShimmerWithElapsed label="Thinking" />
       </MessageContent>
     </Message>
-  );
-}
-
-/**
- * Transient confirmation that a fork happened (RFC `session / fork`). Forking
- * switches to a copy that looks identical to the source, so without this the
- * action reads as a no-op. A surface renders it while
- * `useSessionFork().justForked` is true; it auto-dismisses there.
- */
-export function ForkedNotice() {
-  return (
-    <div className="flex items-center gap-2 border-t bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-      <span className="flex-1">
-        Forked into a new session — you&apos;re now in a copy.
-      </span>
-    </div>
   );
 }
 
@@ -726,8 +653,8 @@ function approvalOf(entry: ToolCallEntry) {
 
 function ToolCallView({ entry }: { entry: ToolCallEntry }) {
   // The `question` tool's INTERACTIVE prompt is session-global (pinned above the
-  // composer by the surface — see `findPendingQuestion` / `QuestionCard`). In
-  // the transcript it's only a passive record of what was asked / answered.
+  // composer by the surface as `QuestionPrompt`). In the transcript it's only a
+  // passive record of what was asked / answered.
   if (isQuestionEntry(entry)) {
     return <QuestionToolView entry={entry} />;
   }
@@ -788,7 +715,7 @@ function ToolCallView({ entry }: { entry: ToolCallEntry }) {
 }
 
 // The `question` tool's PASSIVE transcript record. The interactive prompt is
-// session-global (the surface pins `QuestionCard` above its composer), so here
+// session-global (the surface pins `QuestionPrompt` above its composer), so here
 // we only show what was asked — a one-line header — and, once answered, the
 // read-only echo of the answer. While the run is paused on the user the header
 // points them at the prompt; `input-streaming` (partial input) shows nothing.

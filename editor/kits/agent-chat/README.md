@@ -34,70 +34,40 @@ messages.map((m, i) => (
   transcript card — see below.
 
 Transcript-level indicators (rendered by the surface around the turn list, not
-per message): `PendingTurnIndicator` (pre-first-token), `CompactingIndicator`
-(in-flight compaction), `ForkedNotice`.
+per message): `PendingTurnIndicator` (pre-first-token) and `CompactionNotice`
+(where earlier context was summarized).
 
 ## The agent's question (session-global)
 
 The locked `question` tool **asks** — the run pauses on a human. The kit models
 this like a supervised-approval bar, NOT a tool card: the surface finds the one
-open question and pins the form above its composer.
+open question and pins `QuestionPrompt` above its composer.
 
-```tsx
-const pending = findPendingQuestion(messages);
-{
-  pending && <QuestionCard entry={pending} onAnswer={onAnswerQuestion} />;
-}
-```
-
-`QuestionCard` owns its in-progress form selections (the same kind of transient
-UI state as the collapsibles); the **committed** answer leaves through `onAnswer`
-— the surface owns the `Chat` and calls `addToolResult`. The kit never touches
-the transport. `AnsweredQuestionSummary` is the read-only echo the transcript
-shows once answered.
-
-## Library reference picker
-
-`design_search` is another session-global human-input tool. The model supplies
-an initial Library query; `DesignSearchPickCard` lets the user refine it and
-retain selections across searches before committing one result. The
-framework-agnostic `DesignSearchExplorer` owns the query revision and selected
-pins so delayed search responses and multi-query selection are testable without
-React. Workbench surfaces may render the same explorer in a dedicated tab.
+`QuestionPrompt` owns its in-progress form selections (the same kind of
+transient UI state as the collapsibles); the **committed** answer leaves through
+`onSubmit` with the React-free `QuestionSurvey`, and the surface delivers it to
+the agent. The kit never touches the transport. `AnsweredQuestionSummary` is the
+read-only echo the transcript shows once answered.
 
 ## Contract (kit rules)
 
 - **Render-only / consumer-stateless**: you pass `message` + `isStreaming`; the kit
-  owns only transient UI state (collapsibles' open/close, a `QuestionCard`'s
+  owns only transient UI state (collapsibles' open/close, a `QuestionPrompt`'s
   in-progress selections). No global stores, no IPC, no route imports; committed
-  outcomes leave through callbacks (`onAnswer`).
+  outcomes leave through callbacks (`onSubmit`).
 - **Public API** (`index.ts`):
-  - `ChatMessageView` + the transcript indicators (`PendingTurnIndicator`,
-    `CompactingIndicator`, `ForkedNotice`).
-  - The session-global question prompt: `findPendingQuestion`, `QuestionCard`,
-    `AnsweredQuestionSummary`, and the `AnswerQuestionHandler` /
-    `QuestionAnswerOutput` types.
-  - The session-global Library prompt: `findPendingDesignSearch`,
-    `DesignSearchPickCard`, `DesignSearchExplorer`, and the
-    `PickReferencesHandler` type.
-  - The `ChatMessage` / `ToolCallEntry` types. `toolDisplay` (label/summary
-    formatting) is internal.
+  - `ChatMessageView`, `ToolCallGroupView` and the transcript indicators
+    (`PendingTurnIndicator`, `CompactionNotice`).
+  - The session-global question prompt: `QuestionPrompt`,
+    `AnsweredQuestionSummary`, and the `QuestionAnswerOutput` type.
+  - `workspace_links`, the Markdown link handling for workspace paths.
+  - The `ChatMessage` / `ChatMessageActions` / `ToolCallEntry` types.
+    `toolDisplay` (label/summary formatting) is internal.
 - Shared message/tool types live in `@/lib/agent-chat/types`; the kit imports
   them type-only. Tool and context-part names come from
   `@/lib/agent-chat/chat-vocabulary`.
 
-## Provenance
+## Consumers
 
-Promoted out of the desktop scaffolds (was render-mis-filed there):
-
-- `message.tsx` ← `scaffolds/desktop/ai-sidebar/chat-message.tsx`
-- `tool-display.ts` / `tool-display.test.ts` ← `lib/agent-chat/`
-
-Consumers: the native Desktop chat (`scaffolds/desktop/workbench/native-agent-pane.tsx`
-and `native-turn-activity.tsx`), and the `/ui/components/ai-chat/tools` and
-`/ui/components/ai-chat/markdown` galleries. The earlier chat
-(`scaffolds/desktop/ai-sidebar/chat.tsx` and `AgentPaneContent` in
-`scaffolds/desktop/workbench/agent-pane.tsx`), which only installed Desktop
-builds without native chat reach, also uses `QuestionCard`,
-`DesignSearchPickCard`, `CompactingIndicator`, `ForkedNotice` and the rewind
-and fork message actions.
+The native Desktop chat (`scaffolds/desktop/workbench/native-agent-pane.tsx` and
+`native-turn-activity.tsx`).

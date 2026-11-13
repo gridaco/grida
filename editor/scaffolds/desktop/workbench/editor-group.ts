@@ -1,12 +1,11 @@
 /**
  * The workbench's **editor group** — the tab model behind the editor pane,
  * modeled on VSCode's `EditorGroupModel`. It owns the ordered list of open tabs,
- * the active tab, the reopen-closed history, and the lifecycle of an *ephemeral*
- * (preview) tab bound to an external session — today the `design_search` picker.
+ * the active tab, and the reopen-closed history.
  *
  * This is load-bearing UX logic — the "which tab becomes active when I close the
- * active one" rule, the trash-a-folder-closes-its-subtree rule, the
- * rising-edge open/close of the picker tab — so per the `code-react` doctrine it
+ * active one" rule and the trash-a-folder-closes-its-subtree rule — so per the
+ * `code-react` doctrine it
  * lives in a plain class where the execution order is explicit and every rule is
  * unit-testable, NOT smeared across React effects + refs + nested state setters
  * (where a missed dep silently drops a tuned behavior with no failing test). The
@@ -33,26 +32,13 @@ const DEFAULT_HISTORY_LIMIT = 25;
 export class EditorGroup {
   private _tabs: string[] = [];
   private _active: string | null = null;
-  /** Reopen-closed stack, most-recent last. Excludes transient tabs. */
+  /** Reopen-closed stack, most-recent last. */
   private readonly closed: string[] = [];
-  /** Rising-edge tracker for the ephemeral tab: the external key it was last
-   *  opened for. A manual close leaves this set, so the same key won't reopen
-   *  it — only a new, distinct key does. */
-  private ephemeralKey: string | null = null;
   private snapshot: EditorGroupState = { tabs: [], active: null };
   private readonly listeners = new Set<() => void>();
 
-  /**
-   * @param isTransient Tabs excluded from the reopen-closed history — transient,
-   *   session-bound surfaces like the picker (Cmd/Ctrl+Shift+T must not resurrect
-   *   one). Defaults to the `virtual://` id convention.
-   * @param historyLimit Max reopen-closed depth.
-   */
-  constructor(
-    private readonly isTransient: (id: string) => boolean = (id) =>
-      id.startsWith("virtual://"),
-    private readonly historyLimit: number = DEFAULT_HISTORY_LIMIT
-  ) {}
+  /** @param historyLimit Max reopen-closed depth. */
+  constructor(private readonly historyLimit: number = DEFAULT_HISTORY_LIMIT) {}
 
   // ── snapshots ──────────────────────────────────────────────────────
   subscribe = (listener: () => void): (() => void) => {
@@ -114,8 +100,8 @@ export class EditorGroup {
 
   /**
    * Close `id`. If it was active, focus the left neighbor (else the right, else
-   * null) — VSCode's rule. Records the tab for reopen-closed unless it's
-   * transient. No-op if `id` isn't open.
+   * null) — VSCode's rule. Records the tab for reopen-closed. No-op if `id`
+   * isn't open.
    */
   close(id: string): void {
     const idx = this._tabs.indexOf(id);
@@ -125,7 +111,7 @@ export class EditorGroup {
     if (this._active === id) {
       this._active = prev[idx - 1] ?? prev[idx + 1] ?? null;
     }
-    if (!this.isTransient(id)) this.pushClosed(id);
+    this.pushClosed(id);
     this.commit();
   }
 
@@ -154,7 +140,7 @@ export class EditorGroup {
     this.commit();
   }
 
-  /** Reopen the most-recently closed non-transient tab that isn't already open
+  /** Reopen the most-recently closed tab that isn't already open
    *  (Cmd/Ctrl+Shift+T). Skips ones reopened by hand, matching VSCode. */
   reopenClosed(): void {
     while (this.closed.length > 0) {
@@ -164,25 +150,6 @@ export class EditorGroup {
       this.open(id);
       return;
     }
-  }
-
-  /**
-   * Bind an ephemeral (preview) tab to an external session key. A NEW `key`
-   * opens + focuses `id`; a null `key` closes it. The rising edge is on `key`,
-   * so once the user manually closes the tab it stays closed until the next
-   * *distinct* key — mirroring how the picker reopens only for a fresh pick.
-   * Closing goes through {@link close}, so a transient `id` skips the history.
-   */
-  syncEphemeral(id: string, key: string | null): void {
-    if (key !== null) {
-      if (key !== this.ephemeralKey) {
-        this.ephemeralKey = key;
-        this.open(id);
-      }
-      return;
-    }
-    this.ephemeralKey = null;
-    this.close(id);
   }
 
   private pushClosed(id: string): void {

@@ -2586,10 +2586,9 @@ platform credential store is a separate hardening step.
 - `packages/grida-daemon/src/auth/file.ts` and
   `packages/grida-daemon/src/http/server.ts` — shared race-safe credential
   persistence.
-- `packages/grida-desktop-bridge/src/index.ts`,
-  `editor/lib/desktop/{bridge,chatgpt-subscription}.ts`, and
-  `editor/lib/agent-chat/bridge-transport.ts` — secret-free renderer contract,
-  ordered status cache, and explicit provider carriage.
+- `packages/grida-desktop-bridge/src/index.ts` and
+  `editor/lib/desktop/{bridge,chatgpt-subscription}.ts` — secret-free renderer
+  contract and ordered status cache.
 - The adjacent `*.test.ts` files tagged with this id pin callback replay and
   bounds, authorization correlation, cancellation/sign-out races, credential
   rotation/reauth races, safe error mapping, native request shape, bridge DTOs,

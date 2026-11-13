@@ -24,9 +24,7 @@ export class WorkspaceSurfaceHost {
     private readonly group: Pick<
       EditorGroup,
       "getSnapshot" | "open" | "restore" | "subscribe"
-    >,
-    private readonly isVirtual: (id: string) => boolean = (id) =>
-      id.startsWith("virtual://")
+    >
   ) {
     this.svgText = new WorkspaceSvgText(this.group.getSnapshot);
   }
@@ -86,18 +84,15 @@ export class WorkspaceSurfaceHost {
     }
   }
 
-  /** Agent paths of the open real tabs, and the active one. */
+  /** Agent paths of the open tabs, and the active one. */
   listOpen(): { active: string | null; open: string[] } {
     const { tabs, active } = this.group.getSnapshot();
     const open = tabs.flatMap((id) => {
-      if (this.isVirtual(id)) return [];
       const path = WorkspaceArtifact.toAgentPath(id);
       return path === null ? [] : [path];
     });
     const activePath =
-      active === null || this.isVirtual(active)
-        ? null
-        : WorkspaceArtifact.toAgentPath(active);
+      active === null ? null : WorkspaceArtifact.toAgentPath(active);
     return { active: activePath, open };
   }
 
@@ -140,21 +135,18 @@ export class WorkspaceSurfaceHost {
   }
 
   /**
-   * Pick the ordered real tabs safe to persist for a later workspace restore.
+   * Pick the ordered tabs safe to persist for a later workspace restore.
    *
-   * A virtual tab can own focus while real tabs are independently closed.
-   * Persisting the old active path in that state resurrects a closed artifact,
-   * so fall back to the last still-open real tab, or clear the path when none
-   * remain.
+   * Only an active path that is still open is persisted; otherwise fall back
+   * to the last open tab, or clear the path when none remain.
    */
   rememberedTabs(): WorkspaceViewState.Tabs {
     const { tabs, active } = this.group.getSnapshot();
     const open = tabs.flatMap((id) => {
-      if (this.isVirtual(id)) return [];
       const path = WorkspaceArtifact.normalizeRelativePath(id);
       return path === null ? [] : [path];
     });
-    if (active !== null && !this.isVirtual(active)) {
+    if (active !== null) {
       const normalized = WorkspaceArtifact.normalizeRelativePath(active);
       if (normalized !== null && open.includes(normalized)) {
         return { open, active: normalized };

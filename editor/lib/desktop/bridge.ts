@@ -16,25 +16,15 @@
 
 import { useSyncExternalStore } from "react";
 import {
-  AGENT_MODES,
-  asAgentMode,
   BYOK_PROVIDER_IDS,
   BYOK_PROVIDER_METADATA,
-  AGENT_TIERS,
-  AGENT_SESSION_AGENT,
   OLLAMA_ENDPOINT_PRESET,
   mergeProbedModels,
   resolveEndpointModel,
   resolveEndpointModels,
-  type AgentMode,
-  type AgentUIMessageChunk,
-  type AgentRunOptions,
   type ByokProviderId,
   type ProviderId,
-  type ChatMessageWithParts,
   type ChatGptSubscriptionStatus,
-  type ChatSessionRow,
-  type CreateSessionOptions,
   type EndpointModelEntry,
   type EndpointModelOverrides,
   type EndpointModelSpec,
@@ -62,11 +52,6 @@ import {
   type ModelGenerationGenerateResult,
   type VideoGenerateRequest,
   type VideoGenerateResult,
-  type PatchSessionOptions,
-  type RewindResult,
-  type SessionListFilter,
-  type SessionListPage,
-  type SessionStatus,
 } from "@grida/agent";
 import type {
   DesktopBridge,
@@ -92,12 +77,8 @@ import {
 } from "@grida/desktop-bridge";
 
 export {
-  AGENT_MODES,
-  asAgentMode,
   BYOK_PROVIDER_IDS,
   BYOK_PROVIDER_METADATA,
-  AGENT_TIERS,
-  AGENT_SESSION_AGENT,
   OLLAMA_ENDPOINT_PRESET,
   mergeProbedModels,
   resolveEndpointModel,
@@ -128,26 +109,15 @@ export {
   type ModelGenerationGenerateResult,
   type VideoGenerateRequest,
   type VideoGenerateResult,
-  type AgentMode,
-  type AgentUIMessageChunk,
-  type AgentRunOptions,
   type ByokProviderId,
   type ByokProviderMetadata,
   type ProviderId,
-  type ChatMessageWithParts,
   type ChatGptSubscriptionAccount,
   type ChatGptSubscriptionStatus,
-  type ChatSessionRow,
-  type CreateSessionOptions,
-  type PatchSessionOptions,
-  type SessionListFilter,
-  type SessionListPage,
-  type SessionStatus,
 } from "@grida/agent";
 
 export type {
   ChatGptConnectResult,
-  DesktopAgentCapabilities,
   DesktopBridge,
   DesktopCapabilities,
   DesktopNativeCapabilities,
@@ -303,22 +273,6 @@ function bridgeOrThrow(): DesktopBridge {
   return b;
 }
 
-/** TypeScript chat members exist only on Desktop builds before the native
- * agent; native-agent builds omit them. */
-function legacyAgentOrThrow(
-  bridge: DesktopBridge = bridgeOrThrow()
-): NonNullable<DesktopBridge["agent"]> {
-  if (!bridge.agent) throw new Error("agent: not served by this Desktop build");
-  return bridge.agent;
-}
-
-function legacySessionsOrThrow(): NonNullable<DesktopBridge["sessions"]> {
-  const bridge = bridgeOrThrow();
-  if (!bridge.sessions)
-    throw new Error("sessions: not served by this Desktop build");
-  return bridge.sessions;
-}
-
 /* ─────────────────────── secrets namespace ───────────────────── */
 
 export const BYOK_PROVIDER_LABELS = Object.fromEntries(
@@ -460,22 +414,6 @@ export namespace providers {
     const bridge = bridgeOrThrow().providers;
     if (!bridge?.probe_endpoint) throw new DesktopBridgeMissingError();
     return await bridge.probe_endpoint(baseUrl);
-  }
-
-  /**
-   * Is the user's `claude` CLI installed where the host can find it (issue
-   * #813 zero-config onboarding)? Cheap host-side filesystem probe — does NOT
-   * verify login (the first real run is the source of truth). On an old binary
-   * that predates the surface, returns `installed: true` so onboarding doesn't
-   * block a user who likely has Claude — the run path stays the real gate.
-   */
-  export async function detectClaude(): Promise<{
-    installed: boolean;
-    path?: string;
-  }> {
-    const bridge = getDesktopBridge()?.providers;
-    if (!bridge?.detect_claude) return { installed: true };
-    return await bridge.detect_claude();
   }
 
   /**
@@ -863,258 +801,6 @@ export namespace app {
       default:
         return platform;
     }
-  }
-}
-
-/* ────────────────────────── ai namespace ────────────────────── */
-
-/**
- * The Grida agent runs behind the AgentHost,
- * against BYOK (OpenRouter / Vercel AI Gateway) directly. The renderer sends a
- * `messages` payload (plus optional `workspaceId` / `skills`),
- * receives an AI SDK UI-message stream, and either resolves fs
- * tool calls locally (standalone document window: live `SvgEditor`
- * binding) or just observes them (workspace pane: agent host resolves
- * server-side because it holds the fs + command-execution bindings).
- *
- * Why a callback instead of an async iterator: `ReadableStream` and
- * generator objects don't round-trip cleanly through Electron's
- * `contextBridge` — they get stripped of methods on copy. The bridge
- * accepts a serializable `onChunk` callback that the agent host invokes
- * for each chunk. See `desktop/src/preload.ts`.
- *
- * GRIDA-SEC-004 — the renderer never holds upstream API keys. They live
- * in the agent host's `auth.json`. This namespace is the only surface in
- * the editor tree that touches `bridge.agent`.
- */
-export namespace ai {
-  /**
-   * Whether the current host explicitly accepts base64 scratch seeds.
-   * Protocol 1 predates this capability, so omission must fail closed.
-   */
-  export function supportsScratchSeedBase64(
-    bridge: DesktopBridge | null
-  ): boolean {
-    return bridge?.caps.agent?.scratch_seed_base64 === true;
-  }
-
-  /**
-   * Whether scratch-backed arbitrary bytes have an actual operability tool.
-   * A base64 staging transport alone is insufficient: without this capability
-   * a PDF/archive would become only an inert path in the prompt.
-   */
-  export function supportsScratchBinaryTools(
-    bridge: DesktopBridge | null
-  ): boolean {
-    return bridge?.caps.agent?.scratch_binary_tools === true;
-  }
-
-  /**
-   * Start an agent run. Resolves with `{streamId, done}` as
-   * soon as the SSE connection is established; `onChunk` is invoked
-   * once per `AgentUIMessageChunk` until the stream ends. `done` settles when
-   * the agent host closes the stream (after `finish` or `error`).
-   *
-   * Throws {@link DesktopBridgeMissingError} when invoked outside the
-   * desktop renderer.
-   */
-  export async function startAgentRun(
-    opts: AgentRunOptions,
-    onChunk: (chunk: AgentUIMessageChunk) => void
-  ): Promise<{ streamId: string; sessionId: string; done: Promise<void> }> {
-    const bridge = bridgeOrThrow();
-    if (
-      opts.scratch_seed?.some((entry) => "base64" in entry) &&
-      !supportsScratchSeedBase64(bridge)
-    ) {
-      throw new Error(
-        "agent.run: base64 scratch seeds are not supported by this desktop binary"
-      );
-    }
-    const handle = await legacyAgentOrThrow(bridge).run(opts, onChunk);
-    return {
-      streamId: handle.stream_id,
-      sessionId: handle.session_id,
-      done: handle.done,
-    };
-  }
-
-  /**
-   * Abort an in-flight agent run by session id. Idempotent.
-   */
-  export async function abortAgentRun(sessionId: string): Promise<void> {
-    await legacyAgentOrThrow().abort(sessionId);
-  }
-
-  /**
-   * Reconnect to an agent run that's still in flight on the agent host.
-   * Used by the chat transport's `reconnectToStream` to resume across
-   * a renderer refresh. The agent host replays its buffered chunk log
-   * from the start, then live-tails.
-   *
-   * Returns `null` when no run exists for `sessionId` (agent host already
-   * finished + GC'd, or never started). The caller's transport
-   * surfaces "no live stream"; the chat panel shows whatever was
-   * hydrated from the DB.
-   */
-  export async function reconnectAgentRun(
-    sessionId: string,
-    lastEventId: number,
-    onChunk: (chunk: AgentUIMessageChunk) => void
-  ): Promise<{
-    streamId: string;
-    sessionId: string;
-    done: Promise<void>;
-  } | null> {
-    const handle = await legacyAgentOrThrow().reconnect(
-      sessionId,
-      lastEventId,
-      onChunk
-    );
-    return handle
-      ? {
-          streamId: handle.stream_id,
-          sessionId: handle.session_id,
-          done: handle.done,
-        }
-      : null;
-  }
-}
-
-/* ──────────────────── sessions namespace ────────────────────── */
-
-/**
- * Agentic-chat sessions are persisted in the agent host's SQLite DB
- * (`${userData}/sessions.db`). This namespace is a thin client over
- * the bridge session methods. Renderer code reaches for these helpers;
- * never `window.grida.sessions` directly.
- *
- * The shape is agent-agnostic — the `agent` field is a free-form
- * string. Grida Copilot and future agents share the same row type.
- *
- * GRIDA-SEC-004 — sessions hold message bodies and tool I/O; treat
- * them as user data. The DB lives outside the renderer-accessible
- * surface; this namespace only reads/writes via the bridge.
- */
-export namespace sessions {
-  export async function list(
-    filter?: SessionListFilter
-  ): Promise<SessionListPage> {
-    return await legacySessionsOrThrow().list(filter);
-  }
-
-  export async function get(id: string): Promise<ChatSessionRow | null> {
-    return await legacySessionsOrThrow().get(id);
-  }
-
-  export async function create(
-    opts: CreateSessionOptions
-  ): Promise<ChatSessionRow> {
-    return await legacySessionsOrThrow().create(opts);
-  }
-
-  export async function rename(
-    id: string,
-    title: string
-  ): Promise<ChatSessionRow> {
-    return await legacySessionsOrThrow().patch(id, { title });
-  }
-
-  export async function archive(id: string): Promise<ChatSessionRow> {
-    return await legacySessionsOrThrow().patch(id, { archived: true });
-  }
-
-  export async function unarchive(id: string): Promise<ChatSessionRow> {
-    return await legacySessionsOrThrow().patch(id, { archived: false });
-  }
-
-  export async function remove(id: string): Promise<void> {
-    await legacySessionsOrThrow().delete(id);
-  }
-
-  export async function listMessages(
-    id: string
-  ): Promise<ChatMessageWithParts[]> {
-    return await legacySessionsOrThrow().list_messages(id);
-  }
-
-  /** Soft-truncate the session to a prior message (RFC `session / rewinding`).
-   *  `restore: true` un-rewinds. Rejected (409) while a run is in flight. */
-  export async function rewind(
-    id: string,
-    fromMessageId: string,
-    opts?: { restore?: boolean }
-  ): Promise<RewindResult> {
-    return await legacySessionsOrThrow().rewind(id, fromMessageId, opts);
-  }
-
-  /** Fork the session at a message into a new forked session
-   *  (RFC `session / fork`). Returns the new session row. */
-  export async function fork(
-    id: string,
-    fromMessageId: string,
-    metadata?: Record<string, unknown>
-  ): Promise<ChatSessionRow> {
-    return await legacySessionsOrThrow().fork(id, fromMessageId, metadata);
-  }
-
-  /** User-fired compaction (RFC `session / compaction`). */
-  export async function compact(id: string): Promise<{
-    compacted: boolean;
-    reason?: string;
-    summaryMessageId?: string;
-  }> {
-    return await legacySessionsOrThrow().compact(id);
-  }
-
-  /** Queued sends (RFC `queue`): enqueue a pending user message while a turn
-   *  is in flight. The caller mints the id for its optimistic mirror; the CORE
-   *  fires the row on a clean idle edge (the scheduler drains it). */
-  export async function enqueue(
-    id: string,
-    message: { id?: string; text: string }
-  ): Promise<ChatMessageWithParts> {
-    return await legacySessionsOrThrow().enqueue(id, message);
-  }
-
-  /** The pending queue for a session, FIFO by `queued_at`. */
-  export async function listQueued(
-    id: string
-  ): Promise<ChatMessageWithParts[]> {
-    return await legacySessionsOrThrow().list_queued(id);
-  }
-
-  /** Cancel (remove) a queued message before it fires. */
-  export async function cancelQueued(
-    id: string,
-    messageId: string
-  ): Promise<void> {
-    await legacySessionsOrThrow().cancel_queued(id, messageId);
-  }
-
-  /**
-   * Subscribe to a session's run-state (RFC `session` §Session status). The
-   * current status arrives first, then every idle⇄busy⇄waiting⇄error
-   * transition.
-   * Returns a `subscriptionId` to pass to {@link unsubscribeStatus} on
-   * cleanup, plus a `done` that settles when the subscription ends. This is
-   * the authoritative busy/idle the UI renders from — not the AI-SDK client's
-   * optimistic per-request status.
-   */
-  export async function subscribeStatus(
-    id: string,
-    onStatus: (status: SessionStatus) => void
-  ): Promise<{ subscriptionId: string; done: Promise<void> }> {
-    const { subscription_id, done } =
-      await legacySessionsOrThrow().subscribe_status(id, onStatus);
-    return { subscriptionId: subscription_id, done };
-  }
-
-  /** Stop a status subscription started by {@link subscribeStatus}. */
-  export async function unsubscribeStatus(
-    subscriptionId: string
-  ): Promise<void> {
-    await legacySessionsOrThrow().unsubscribe_status(subscriptionId);
   }
 }
 

@@ -1,14 +1,8 @@
 /**
- * Image attachment encoding for the agent composer.
- *
- * Turns a user pasted/dropped image `File` into an inline base64 data-URL
- * attachment the model can actually SEE — a provider-native multimodal `file`
- * part. This module owns only that bounded perception representation. The
- * resource router separately preserves the original bytes in session scratch,
- * yielding both pixels and an operable path when scratch is available.
+ * Image attachment policy and encoding for the agent composer.
  *
  * The pure helpers (policy, dimension math, byte accounting) are
- * framework-free and unit-tested. `encodeImageFile` is the single DOM/canvas
+ * framework-free and unit-tested. `encodeLibraryPng` is the single DOM/canvas
  * step (browser-only) and is exercised by the live + manual paths, not jsdom
  * (canvas is unreliable there).
  */
@@ -20,8 +14,6 @@ export type ImageAttachmentPolicy = {
   readonly maxEdge: number;
   /** Target max decoded bytes after encoding; drives downscale + quality. */
   readonly maxBytes: number;
-  /** Maximum wait for a URL-backed Library image to load and decode. */
-  readonly loadTimeoutMs: number;
 };
 
 /**
@@ -34,20 +26,12 @@ export const IMAGE_ATTACHMENT_POLICY: ImageAttachmentPolicy = {
   acceptMimes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
   maxEdge: 1568,
   maxBytes: 5 * 1024 * 1024,
-  loadTimeoutMs: 15_000,
 };
 
 export const LIBRARY_ATTACHMENT_SOURCE_LIMITS = {
   bytes: 4 * 1024 * 1024,
   pixels: 16 * 1024 * 1024,
 } as const;
-
-/** MIME types the canvas encoder can emit when pass-through is unavailable. */
-export const IMAGE_TRANSCODE_OUTPUT_MIMES = [
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-] as const;
 
 /**
  * A raster image type we inline as multimodal (SVG excluded — it's text).
@@ -99,8 +83,8 @@ export function decodedBytes(base64OrDataUrl: string): number {
   return Math.max(0, Math.floor((len * 3) / 4) - padding);
 }
 
-/** An encoded, send-ready image attachment (data URL + accounting). */
-export type EncodedImageAttachment = {
+/** An encoded image attachment (data URL + accounting). */
+type EncodedImageAttachment = {
   name: string;
   mime: string;
   /** Decoded byte size of the encoded payload (what actually ships). */
@@ -108,62 +92,6 @@ export type EncodedImageAttachment = {
   /** `data:<mime>;base64,<payload>` — goes straight into a `file` part. */
   url: string;
 };
-
-/**
- * Read an image `File` into a send-ready data-URL attachment, downscaling /
- * re-encoding when it exceeds the policy. Returns `null` for unsupported types
- * or on decode failure. DOM-only (uses `createImageBitmap` + canvas).
- *
- * Fast path: in-budget images keep their original bytes (lossless, preserves
- * animation for small gifs). Otherwise: downscale to `planResize` dims, then a
- * PNG → JPEG quality ladder, first encoding under `maxBytes` wins.
- */
-export async function encodeImageFile(
-  file: File,
-  policy: ImageAttachmentPolicy = IMAGE_ATTACHMENT_POLICY,
-  outputMimes: readonly string[] = policy.acceptMimes
-): Promise<EncodedImageAttachment | null> {
-  if (!isSupportedImageType(file.type, policy)) return null;
-  if (outputMimes.length === 0) return null;
-
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file);
-  } catch {
-    return null;
-  }
-
-  try {
-    const { width, height } = bitmap;
-    const target = planResize(width, height, policy.maxEdge);
-    const needsResize = target.width !== width || target.height !== height;
-
-    // Fast path — small enough and under the byte budget: ship original bytes.
-    if (!needsResize && outputMimes.includes(file.type)) {
-      const original = await readAsDataUrl(file);
-      const originalBytes = original ? decodedBytes(original) : 0;
-      if (original && originalBytes <= policy.maxBytes) {
-        return {
-          name: file.name,
-          mime: file.type,
-          size: originalBytes,
-          url: original,
-        };
-      }
-    }
-
-    return encodeRasterSource(
-      bitmap,
-      width,
-      height,
-      file.name,
-      policy,
-      outputMimes
-    );
-  } finally {
-    bitmap.close?.();
-  }
-}
 
 /** Normalize already-captured Library bytes without opening a remote image. */
 export async function encodeLibraryPng(
@@ -200,94 +128,6 @@ export async function encodeLibraryPng(
     ).buffer;
   } finally {
     bitmap.close();
-  }
-}
-
-/**
- * Materialize a Library image URL into inline bytes without granting the model
- * or provider a remote-fetch capability. Loading uses the browser's `img-src`
- * perimeter (the Desktop CSP allowlists only first-party Library storage), not
- * `fetch`/`connect-src`; `crossOrigin=anonymous` keeps canvas readback explicit.
- * The image is always re-encoded, so the returned part is a bounded data URL.
- */
-export async function encodeLibraryImageUrl(
-  url: string,
-  name: string,
-  declaredMime: string,
-  policy: ImageAttachmentPolicy = IMAGE_ATTACHMENT_POLICY,
-  outputMimes: readonly string[] = policy.acceptMimes,
-  libraryBaseUrl: string = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
-): Promise<EncodedImageAttachment | null> {
-  if (!isSupportedImageType(declaredMime, policy) || outputMimes.length === 0) {
-    return null;
-  }
-  const parsed = trustedLibraryImageUrl(url, libraryBaseUrl);
-  if (!parsed) return null;
-
-  const image = new Image();
-  image.crossOrigin = "anonymous";
-  image.decoding = "async";
-  let loadTimer: ReturnType<typeof setTimeout> | null = null;
-  const clearLoadTimer = () => {
-    if (loadTimer === null) return;
-    clearTimeout(loadTimer);
-    loadTimer = null;
-  };
-  try {
-    await new Promise<void>((resolve, reject) => {
-      let settled = false;
-      const finish = (settle: () => void) => {
-        if (settled) return;
-        settled = true;
-        clearLoadTimer();
-        settle();
-      };
-      loadTimer = setTimeout(
-        () => finish(() => reject(new Error("image URL load timed out"))),
-        policy.loadTimeoutMs
-      );
-      image.onload = () => finish(resolve);
-      image.onerror = () =>
-        finish(() => reject(new Error("image URL could not be decoded")));
-      image.src = parsed.href;
-    });
-    if (image.naturalWidth <= 0 || image.naturalHeight <= 0) return null;
-    return encodeRasterSource(
-      image,
-      image.naturalWidth,
-      image.naturalHeight,
-      name,
-      policy,
-      outputMimes
-    );
-  } catch {
-    return null;
-  } finally {
-    clearLoadTimer();
-    image.onload = null;
-    image.onerror = null;
-    image.src = "";
-  }
-}
-
-/** The semantic companion to Desktop's CSP `img-src` carve-out. */
-export function trustedLibraryImageUrl(
-  value: string,
-  libraryBaseUrl: string
-): URL | null {
-  if (!libraryBaseUrl) return null;
-  try {
-    const base = new URL(libraryBaseUrl);
-    const candidate = new URL(value);
-    return (candidate.protocol === "https:" ||
-      candidate.protocol === "http:") &&
-      candidate.protocol === base.protocol &&
-      candidate.origin === base.origin &&
-      candidate.pathname.startsWith("/storage/v1/object/public/")
-      ? candidate
-      : null;
-  } catch {
-    return null;
   }
 }
 
@@ -343,16 +183,6 @@ function encodeRasterSource(
     size: chosen.size,
     url: chosen.url,
   };
-}
-
-function readAsDataUrl(blob: Blob): Promise<string | null> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () =>
-      resolve(typeof reader.result === "string" ? reader.result : null);
-    reader.onerror = () => resolve(null);
-    reader.readAsDataURL(blob);
-  });
 }
 
 function renameExt(name: string, ext: string): string {

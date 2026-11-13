@@ -25,16 +25,12 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@app/ui/components/resizable";
-import { CurrentArtifactSurfaceHost } from "@/lib/desktop/current-artifact-surface-host";
 import { useDesktopBridge } from "@/lib/desktop/bridge";
-import { WorkspaceArtifact } from "@/lib/desktop/workspace-artifact";
-import { AISidebarChat } from "../ai-sidebar/chat";
 import { TitleBar } from "../chrome/title-bar";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { WorkspaceChangesProvider } from "../workbench/workspace-changes";
 import { NativeAgentPaneGate } from "../workbench/native-agent-pane";
-import { useActiveEditorAgentFs } from "./active-editor-agent-fs";
-import { CANVAS_PATH, DocumentSurfaceHost } from "./document-surface-host";
+import { DocumentSurfaceHost } from "./document-surface-host";
 import { SingleFileSvgSurface, type FileMeta } from "./single-file-svg-surface";
 
 /**
@@ -79,29 +75,10 @@ export function DesktopFileShell({
     };
   }, [bridge, mode, basePath]);
 
-  const { fs, setActiveEditor: bindLegacyEditor } = useActiveEditorAgentFs();
   const [fileSurface] = useState(() => new DocumentSurfaceHost());
   const setActiveEditor = useCallback(
-    (editor: SvgEditor | null) => {
-      fileSurface.setEditor(editor);
-      bindLegacyEditor(editor);
-    },
-    [fileSurface, bindLegacyEditor]
-  );
-  const currentSurfacePath =
-    mode === "doc"
-      ? CANVAS_PATH
-      : mode === "deck"
-        ? basePath
-          ? WorkspaceArtifact.toAgentPath(basePath)
-          : "/"
-        : null;
-  const surfaceHost = useMemo(
-    () =>
-      currentSurfacePath
-        ? new CurrentArtifactSurfaceHost(currentSurfacePath)
-        : undefined,
-    [currentSurfacePath]
+    (editor: SvgEditor | null) => fileSurface.setEditor(editor),
+    [fileSurface]
   );
   // The deck auto-persists (no dirty) and has no filename — its title is the
   // bundle dir's basename, falling back to a generic label for a directly-opened
@@ -130,13 +107,6 @@ export function DesktopFileShell({
     );
   }
 
-  // Only an installed Desktop build without native chat reaches this.
-  const legacyChat =
-    mode === "deck" ? (
-      <AISidebarChat workspaceId={workspaceId} surfaceHost={surfaceHost} />
-    ) : (
-      <AISidebarChat fs={fs} surfaceHost={surfaceHost} />
-    );
   // See test/desktop-agent-chat-standalone-svg.md and
   // test/desktop-agent-chat-nested-deck.md.
   const fileChatAvailable =
@@ -159,9 +129,7 @@ export function DesktopFileShell({
           maxSize={SIDEBAR_MAX_SIZE}
         >
           <aside className="flex h-full w-full flex-col">
-            {!nativeChat ? (
-              legacyChat
-            ) : fileChatAvailable ? (
+            {nativeChat && fileChatAvailable ? (
               <NativeAgentPaneGate
                 bridge={nativeChat}
                 selectionKey={
@@ -179,7 +147,7 @@ export function DesktopFileShell({
                 role="status"
                 className="px-3 py-2 text-xs text-muted-foreground"
               >
-                {mode === "doc" && nativeChat.documentUnavailable
+                {mode === "doc" && nativeChat?.documentUnavailable
                   ? "Chat is available in the workspace workbench."
                   : "Chat is unavailable for this file."}
               </p>

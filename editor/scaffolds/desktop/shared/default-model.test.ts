@@ -11,15 +11,8 @@ import {
   GG_INCLUDED_MODEL_ID,
   reconcileChatGptSubscriptionDefault,
   resolveDefaultModelSelection,
-  resolveNewChatTransition,
   shouldUpgradeToIncluded,
 } from "./default-model";
-
-/** A stub `isKnownId` that recognizes exactly the given ids. */
-const knows =
-  (...ids: string[]) =>
-  (id: string | undefined | null): id is string =>
-    typeof id === "string" && ids.includes(id);
 
 describe("resolveDefaultModelSelection", () => {
   it("uses GPT-5.6 Sol as the generic pro-tier fallback", () => {
@@ -35,7 +28,6 @@ describe("resolveDefaultModelSelection", () => {
       resolveDefaultModelSelection({
         chatGptReady: true,
         ggActive: true,
-        isKnownId: knows(),
       })
     ).toEqual({
       model_id: CHATGPT_READY_DEFAULT_MODEL_ID,
@@ -52,7 +44,6 @@ describe("resolveDefaultModelSelection", () => {
       resolveDefaultModelSelection({
         chatGptReady: false,
         ggActive: true,
-        isKnownId: knows(),
       })
     ).toEqual({
       model_id: GG_INCLUDED_MODEL_ID,
@@ -65,37 +56,6 @@ describe("resolveDefaultModelSelection", () => {
       resolveDefaultModelSelection({
         chatGptReady: false,
         ggActive: false,
-        isKnownId: knows(),
-      })
-    ).toEqual({ model_id: DEFAULT_MODEL_ID });
-  });
-
-  it("an explicit caller-seeded initial wins over the GG default", () => {
-    const initial = "openai/gpt-5.6-luna";
-    expect(
-      resolveDefaultModelSelection({
-        initial,
-        initialProviderId: CHATGPT_PROVIDER_ID,
-        chatGptReady: true,
-        ggActive: true,
-        isKnownId: knows(initial),
-      })
-    ).toEqual({
-      model_id: initial,
-      provider_id: CHATGPT_PROVIDER_ID,
-    });
-  });
-
-  it("a provided-but-unknown initial blocks provider-owned defaults", () => {
-    // A caller `initial` that isn't known yet may be a late-loading endpoint
-    // model (issue #806). Falls to the default until the registry loads
-    // upstream.
-    expect(
-      resolveDefaultModelSelection({
-        initial: "ollama/llama-3.3",
-        chatGptReady: true,
-        ggActive: true,
-        isKnownId: knows(),
       })
     ).toEqual({ model_id: DEFAULT_MODEL_ID });
   });
@@ -108,109 +68,12 @@ describe("resolveDefaultModelSelection", () => {
   });
 });
 
-describe("resolveNewChatTransition", () => {
-  it("resets a past chat to ChatGPT Sol when the subscription is ready", () => {
-    expect(
-      resolveNewChatTransition({
-        previousBindingEpoch: 4,
-        currentBindingEpoch: 5,
-        currentSessionId: null,
-        chatGptReady: true,
-        ggActive: true,
-      })
-    ).toEqual({
-      model_id: CHATGPT_READY_DEFAULT_MODEL_ID,
-      provider_id: CHATGPT_PROVIDER_ID,
-    });
-  });
-
-  it("falls back to Grida, then the generic default, when ChatGPT is unavailable", () => {
-    expect(
-      resolveNewChatTransition({
-        previousBindingEpoch: 4,
-        currentBindingEpoch: 5,
-        currentSessionId: null,
-        chatGptReady: false,
-        ggActive: true,
-      })
-    ).toEqual({
-      model_id: GG_INCLUDED_MODEL_ID,
-      provider_id: GG_PROVIDER_ID,
-    });
-    expect(
-      resolveNewChatTransition({
-        previousBindingEpoch: 4,
-        currentBindingEpoch: 5,
-        currentSessionId: null,
-        chatGptReady: false,
-        ggActive: false,
-      })
-    ).toEqual({ model_id: DEFAULT_MODEL_ID });
-  });
-
-  it("can promote a cold New Chat reset when readiness arrives later", () => {
-    const cold = resolveNewChatTransition({
-      previousBindingEpoch: 4,
-      currentBindingEpoch: 5,
-      currentSessionId: null,
-      chatGptReady: false,
-      ggActive: false,
-    });
-    expect(cold).toEqual({ model_id: DEFAULT_MODEL_ID });
-    expect(
-      reconcileChatGptSubscriptionDefault({
-        current: cold!,
-        chatGptReady: true,
-        ggActive: false,
-        userPicked: false,
-        hasInitial: false,
-        storedSeeded: false,
-      })
-    ).toEqual({
-      model_id: CHATGPT_READY_DEFAULT_MODEL_ID,
-      provider_id: CHATGPT_PROVIDER_ID,
-    });
-  });
-
-  it("does not reset the initial fresh-chat mount or an existing chat", () => {
-    expect(
-      resolveNewChatTransition({
-        previousBindingEpoch: undefined,
-        currentBindingEpoch: 0,
-        currentSessionId: null,
-        chatGptReady: true,
-        ggActive: true,
-      })
-    ).toBeNull();
-    expect(
-      resolveNewChatTransition({
-        previousBindingEpoch: 4,
-        currentBindingEpoch: 5,
-        currentSessionId: "ses_next",
-        chatGptReady: true,
-        ggActive: true,
-      })
-    ).toBeNull();
-    expect(
-      resolveNewChatTransition({
-        previousBindingEpoch: 5,
-        currentBindingEpoch: 5,
-        currentSessionId: null,
-        chatGptReady: true,
-        ggActive: true,
-      })
-    ).toBeNull();
-  });
-});
-
 describe("reconcileChatGptSubscriptionDefault", () => {
   const untouched = {
     current: { model_id: DEFAULT_MODEL_ID },
     chatGptReady: true,
     ggActive: false,
     userPicked: false,
-    hasInitial: false,
-    storedSeeded: false,
   };
 
   it("promotes the untouched generic or Grida default to ChatGPT Sol", () => {
@@ -264,21 +127,6 @@ describe("reconcileChatGptSubscriptionDefault", () => {
     ).toEqual(untouched.current);
   });
 
-  it("never overrides a caller initial or stored-session seed", () => {
-    expect(
-      reconcileChatGptSubscriptionDefault({
-        ...untouched,
-        hasInitial: true,
-      })
-    ).toEqual(untouched.current);
-    expect(
-      reconcileChatGptSubscriptionDefault({
-        ...untouched,
-        storedSeeded: true,
-      })
-    ).toEqual(untouched.current);
-  });
-
   it("never overrides another model or explicit provider", () => {
     const anotherModel = { model_id: "anthropic/claude-opus-4.8" };
     expect(
@@ -304,8 +152,6 @@ describe("shouldUpgradeToIncluded — the async GG-active guard", () => {
   const untouched = {
     current: { model_id: DEFAULT_MODEL_ID },
     userPicked: false,
-    hasInitial: false,
-    storedSeeded: false,
   };
 
   it("upgrades the untouched fallback default", () => {
@@ -314,18 +160,6 @@ describe("shouldUpgradeToIncluded — the async GG-active guard", () => {
 
   it("never overrides an explicit user pick", () => {
     expect(shouldUpgradeToIncluded({ ...untouched, userPicked: true })).toBe(
-      false
-    );
-  });
-
-  it("never overrides a caller-provided initial (even before it is known)", () => {
-    expect(shouldUpgradeToIncluded({ ...untouched, hasInitial: true })).toBe(
-      false
-    );
-  });
-
-  it("never overrides a stored-session seed", () => {
-    expect(shouldUpgradeToIncluded({ ...untouched, storedSeeded: true })).toBe(
       false
     );
   });

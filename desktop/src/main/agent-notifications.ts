@@ -16,8 +16,8 @@
  * Click-to-attend (RFC `events` §click-to-attend): focus the workspace
  * window presenting the chat; reopen it when closed (the fresh window
  * carries `&session=` on the URL — no IPC race against a renderer with no
- * listener yet); for a live window additionally push AGENT_FOCUS_SESSION
- * over IPC so the agent pane selects the chat.
+ * listener yet); for a live window stage the target and push
+ * AGENT_FOCUS_SESSION over IPC so the agent pane takes it.
  */
 
 import {
@@ -58,18 +58,12 @@ function liveMainFrame(sender: WebContents) {
   if (!frame.isDestroyed() && !frame.detached) return frame;
 }
 
-function wakeFocus(
-  sender: WebContents,
-  workspaceId: string,
-  { sessionId, profileId }: NativeChatNotificationFocus
-): void {
+/** Wake the pane's guarded take; the staged intent is the only payload. */
+function wakeFocus(sender: WebContents, workspaceId: string): void {
   const frame = liveMainFrame(sender);
   if (!frame || workspaceFor(frame.url) !== workspaceId) return;
   try {
-    frame.send(IPC_CHANNELS.AGENT_FOCUS_SESSION, {
-      session_id: sessionId,
-      ...(profileId && { profile_id: profileId }),
-    });
+    frame.send(IPC_CHANNELS.AGENT_FOCUS_SESSION);
   } catch {
     // A navigation may replace the frame before the wake reaches it.
   }
@@ -194,7 +188,7 @@ function attendSession(
       intent,
       () => admitted() && current()
     );
-    wakeFocus(target.webContents, workspaceId, intent);
+    wakeFocus(target.webContents, workspaceId);
     return;
   }
   const window = open_workspace_window({

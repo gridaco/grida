@@ -292,16 +292,13 @@ ipcRenderer.on(IPC_CHANNELS.WORKSPACE_COMMAND, (_event, command: unknown) => {
   );
 });
 
-// Main → renderer "bring this session into view" push (RFC `events`
+// Main → renderer "bring this session into view" wake (RFC `events`
 // §click-to-attend): a notification click focused this window; the agent
-// pane selects the named session. Native panes use this as a wake for the
-// guarded take; earlier renderers still read the payload. Only the payload
-// crosses, never the Electron event object (GRIDA-SEC-004).
-ipcRenderer.on(IPC_CHANNELS.AGENT_FOCUS_SESSION, (_event, payload: unknown) => {
+// pane takes the staged target through its guarded read. Nothing crosses,
+// never the Electron event object (GRIDA-SEC-004).
+ipcRenderer.on(IPC_CHANNELS.AGENT_FOCUS_SESSION, () => {
   if (!isDesktopPath(location.pathname)) return;
-  window.dispatchEvent(
-    new CustomEvent(IPC_CHANNELS.AGENT_FOCUS_SESSION, { detail: payload })
-  );
+  window.dispatchEvent(new Event(IPC_CHANNELS.AGENT_FOCUS_SESSION));
 });
 
 /**

@@ -200,18 +200,8 @@ describe("EditorGroup — reopen-closed history", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it("never records a transient tab for reopen", () => {
-    const g = new EditorGroup();
-    g.open("a");
-    g.open("virtual://picker");
-    g.close("virtual://picker");
-    g.close("a");
-    g.reopenClosed(); // only "a" is in history
-    expect(snap(g)).toEqual({ tabs: ["a"], active: "a" });
-  });
-
   it("bounds the history to the configured limit", () => {
-    const g = new EditorGroup(undefined, 2);
+    const g = new EditorGroup(2);
     for (const t of ["a", "b", "c"]) {
       g.open(t);
       g.close(t);
@@ -223,51 +213,5 @@ describe("EditorGroup — reopen-closed history", () => {
     expect(snap(g).active).toBe("b");
     g.reopenClosed(); // "a" is gone
     expect(snap(g).tabs).toEqual(["c", "b"]);
-  });
-});
-
-describe("EditorGroup — ephemeral (preview) tab", () => {
-  const ID = "virtual://design-search";
-
-  it("a new key opens + focuses the ephemeral tab", () => {
-    const g = new EditorGroup();
-    g.open("a");
-    g.syncEphemeral(ID, "call-1");
-    expect(snap(g)).toEqual({ tabs: ["a", ID], active: ID });
-  });
-
-  it("a null key closes it and restores the left neighbor", () => {
-    const g = new EditorGroup();
-    g.open("a");
-    g.syncEphemeral(ID, "call-1");
-    g.syncEphemeral(ID, null);
-    expect(snap(g)).toEqual({ tabs: ["a"], active: "a" });
-  });
-
-  it("the same key does not reopen after a manual close (rising edge)", () => {
-    const g = new EditorGroup();
-    g.open("a");
-    g.syncEphemeral(ID, "call-1");
-    g.close(ID); // user closes the picker tab
-    g.syncEphemeral(ID, "call-1"); // same pending pick — must stay closed
-    expect(snap(g)).toEqual({ tabs: ["a"], active: "a" });
-  });
-
-  it("a new, distinct key reopens after a manual close", () => {
-    const g = new EditorGroup();
-    g.open("a");
-    g.syncEphemeral(ID, "call-1");
-    g.close(ID);
-    g.syncEphemeral(ID, "call-2"); // fresh pick
-    expect(snap(g).active).toBe(ID);
-  });
-
-  it("closing the ephemeral tab never lands it in the reopen history", () => {
-    const g = new EditorGroup();
-    g.open("a");
-    g.syncEphemeral(ID, "call-1");
-    g.syncEphemeral(ID, null); // closed via null key
-    g.reopenClosed();
-    expect(snap(g).tabs).not.toContain(ID);
   });
 });

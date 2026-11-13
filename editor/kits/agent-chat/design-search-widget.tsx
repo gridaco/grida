@@ -1,7 +1,7 @@
 /**
  * Transcript record for `design_search` (the gather+curate step). The live pick
- * interaction is a session-global card pinned above the composer
- * (`design-search-card.tsx`); here we render only the PASSIVE record: while
+ * interaction is pinned above the composer by the chat surface; here we render
+ * only the PASSIVE record: while
  * pending, a "gathering" line; once answered, the references the user picked as
  * thumbnails. Library pins are URLs, so thumbnails render straight from `url`.
  */
@@ -46,7 +46,7 @@ export function DesignSearchContent({ entry }: { entry: ToolCallEntry }) {
     "input" in entry ? entry.input : undefined
   );
 
-  // Pending — the pick card above the composer is handling it.
+  // Pending — the picker above the composer is handling it.
   if (entry.state === "input-streaming" || entry.state === "input-available") {
     return (
       <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">

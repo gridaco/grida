@@ -57,8 +57,7 @@ stays owned by the native host.
 After the workbench chat connects, `takeNotificationFocus()` consumes its
 latest pending notification click once. The result identifies the saved chat
 and, when applicable, its model connection. A missing or stale click returns
-`null`. The focus push wakes the same read. Older bridges deliver the target
-directly in the push.
+`null`. The focus push wakes the same read.
 
 ## Anti-goals
 

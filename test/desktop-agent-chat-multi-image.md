@@ -11,7 +11,6 @@ updated: 2026-11-13
 automatable: false
 covered_by:
   - editor/kits/composer/composer-transfer.test.ts
-  - editor/lib/agent-chat/input-resource-router.test.ts
 ---
 
 ## Behavior

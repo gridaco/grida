@@ -116,20 +116,20 @@ describe("WorkspaceSurfaceHost.open", () => {
 });
 
 describe("WorkspaceSurfaceHost.listOpen", () => {
-  it("returns canonical paths, excludes virtual tabs, and reports file activity", () => {
+  it("returns canonical paths and reports file activity", () => {
     const { host, group } = createHost([]);
     group.open("a.svg");
-    group.open("virtual://design-search");
+    group.open("b.svg");
 
     expect(host.listOpen()).toEqual({
-      active: null,
-      open: ["/a.svg"],
+      active: "/b.svg",
+      open: ["/a.svg", "/b.svg"],
     });
 
     group.activate("a.svg");
     expect(host.listOpen()).toEqual({
       active: "/a.svg",
-      open: ["/a.svg"],
+      open: ["/a.svg", "/b.svg"],
     });
   });
 
@@ -139,18 +139,17 @@ describe("WorkspaceSurfaceHost.listOpen", () => {
     const unsubscribe = host.subscribeToEditorSurfaces(observe);
     group.open("a.svg");
     group.open("b.canvas");
-    group.open("virtual://design-search");
     expect(host.readEditorSurfaces()).toEqual({
-      active: null,
+      active: "/b.canvas",
       open: ["/a.svg", "/b.canvas"],
       truncated: false,
     });
     group.activate("a.svg");
-    expect(observe).toHaveBeenCalledTimes(4);
+    expect(observe).toHaveBeenCalledTimes(3);
     expect(host.readEditorSurfaces().active).toBe("/a.svg");
     unsubscribe();
     group.activate("b.canvas");
-    expect(observe).toHaveBeenCalledTimes(4);
+    expect(observe).toHaveBeenCalledTimes(3);
   });
 
   it("publishes only the latest bounded view after an outstanding publication", async () => {
@@ -266,28 +265,21 @@ describe("WorkspaceSurfaceHost.rememberedTabs", () => {
     });
   });
 
-  it("uses the last still-open real tab while a virtual tab is active", () => {
+  it("falls back to the last open tab after the active one closes", () => {
     const { host, group } = createHost([]);
     group.open("a.svg");
     group.open("b.svg");
-    group.open("virtual://design-search");
-
-    expect(host.rememberedTabs()).toEqual({
-      open: ["a.svg", "b.svg"],
-      active: "b.svg",
-    });
-
     group.close("b.svg");
+
     expect(host.rememberedTabs()).toEqual({
       open: ["a.svg"],
       active: "a.svg",
     });
   });
 
-  it("persists an empty group when only virtual tabs remain", () => {
+  it("persists an empty group when no tabs remain", () => {
     const { host, group } = createHost([]);
     group.open("remembered.svg");
-    group.open("virtual://design-search");
     group.close("remembered.svg");
 
     expect(host.rememberedTabs()).toEqual({ open: [], active: null });

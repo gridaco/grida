@@ -75,17 +75,17 @@ Their presence does not make every operation a tool available to the agent.
 
 ## Supported surfaces
 
-| Surface                | Scope                                                                                                                                                            |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Desktop chat           | macOS and Linux. The web-rendered chat runs its agent through the native host. Windows keeps file and media workflows; chat is unavailable there.                |
-| Headless `grida-agent` | macOS and Linux, built from source. Scripted `run`, ACP over stdio or a local WebSocket, and the standalone MCP tool host. [Client guide](./clients.md)          |
-| `grida` CLI            | Gateway chat under your Grida account and local external ACP peers. [Use your Grida login](./clients.md#use-your-grida-login)                                    |
-| Earlier Desktop chat   | Desktop builds or profiles without the native host keep the earlier chat served by the hosted editor. It receives no new features and retires with those builds. |
+| Surface                | Scope                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Desktop chat           | macOS and Linux. The web-rendered chat runs its agent through the native host. Windows keeps file and media workflows; chat is unavailable there.       |
+| Headless `grida-agent` | macOS and Linux, built from source. Scripted `run`, ACP over stdio or a local WebSocket, and the standalone MCP tool host. [Client guide](./clients.md) |
+| `grida` CLI            | Gateway chat under your Grida account and local external ACP peers. [Use your Grida login](./clients.md#use-your-grida-login)                           |
 
-| Retired surface      | What it provided                                                     | Disposition                                                                                    |
-| -------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Web SVG assistant    | Hosted chat and tool execution for the browser SVG editor.           | Hosted execution, chat panel and assistant controls removed. SVG editing and storage retained. |
-| Web canvas assistant | Hosted chat and design-tool execution for the browser canvas editor. | Hosted execution and the Agent tab removed. Canvas editing and inspector retained.             |
+| Retired surface      | What it provided                                                         | Disposition                                                                                    |
+| -------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Web SVG assistant    | Hosted chat and tool execution for the browser SVG editor.               | Hosted execution, chat panel and assistant controls removed. SVG editing and storage retained. |
+| Web canvas assistant | Hosted chat and design-tool execution for the browser canvas editor.     | Hosted execution and the Agent tab removed. Canvas editing and inspector retained.             |
+| Earlier Desktop chat | Chat the hosted editor served to Desktop builds without the native host. | Removed. Those builds show no chat; update Desktop to use chat.                                |
 
 Desktop pages open only in Desktop; use the headless host for
 [headless development](./clients.md).

@@ -232,10 +232,7 @@ describe("error detectors (contextBridge-flattened messages)", () => {
       )
     ).toBe(true);
     expect(gridaGateway.isGgTokenExpired("gg_token_expired")).toBe(true);
-    expect(
-      gridaGateway.isGgInsufficientCredits(new Error("insufficient_credits"))
-    ).toBe(true);
     expect(gridaGateway.isGgTokenExpired(new Error("other"))).toBe(false);
-    expect(gridaGateway.isGgInsufficientCredits(undefined)).toBe(false);
+    expect(gridaGateway.isGgTokenExpired(undefined)).toBe(false);
   });
 });

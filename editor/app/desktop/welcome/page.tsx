@@ -373,12 +373,7 @@ function WelcomeSurface({
     provider_id: modelProviderId,
     setSelection: setModelSelection,
     is_user_pick: isUserPick,
-  } = useModelPickerState({
-    current_id: null,
-    binding_epoch: 0,
-    sessions: [],
-    endpoints,
-  });
+  } = useModelPickerState();
 
   // Stash the (possibly empty) prompt + model + scratch seed for a workspace's
   // agent and become the workspace window. Shared by the default-workspace and

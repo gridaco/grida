@@ -79,7 +79,7 @@ grida.co  (one Next.js app)
 
 | Concern                     | Where                                       |
 | --------------------------- | ------------------------------------------- |
-| Editor UI, AI sidebar       | `editor/scaffolds/desktop/`                 |
+| Editor UI, agent pane       | `editor/scaffolds/desktop/`                 |
 | `/desktop/*` route group    | `editor/app/desktop/`                       |
 | Typed bridge client         | `editor/lib/desktop/bridge.ts`              |
 | Desktop chat seam           | `editor/lib/agent-chat/`                    |

@@ -7,7 +7,6 @@ export {
 export type {
   ChatGptConnectResult,
   ConfirmOptions,
-  DesktopAgentCapabilities,
   DesktopBridge,
   DesktopCapabilities,
   DesktopHostAppId,

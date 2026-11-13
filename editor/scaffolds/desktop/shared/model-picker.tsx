@@ -1,15 +1,12 @@
 // GRIDA-GG: desktop — the GG-included picker affordance (docs/wg/platform/hosted-ai.md)
 /**
- * Desktop model picker — every catalog model grouped by provider, plus
- * any user-registered endpoint models (issue #806 — local Ollama,
+ * Welcome composer model picker — every catalog model grouped by provider,
+ * plus any user-registered endpoint models (issue #806 — local Ollama,
  * self-hosted gateways).
  *
- * The agent system is tier-based (4 tiers → 4 models), but the catalog
- * holds more models than the tiers map to, leaving some unreachable.
- * This picker lists them all so a desktop user can run any specific
- * model. The chosen provider/model pair rides end-to-end (renderer → agent
- * sidecar → model factory), preserving native ChatGPT, BYOK, Grida, and
- * endpoint identity separately from the model id.
+ * The chosen provider/model pair rides the welcome handoff, preserving
+ * ChatGPT, BYOK, Grida, and endpoint identity separately from the model id.
+ * Native chat chooses its model through its own connection picker.
  */
 
 "use client";
@@ -23,7 +20,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { CheckIcon, ChevronDownIcon, TriangleAlertIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import {
   Command,
   CommandEmpty,
@@ -47,24 +44,9 @@ import {
   OpenRouterLogo,
   VercelLogo,
 } from "@grida/react-icons/logos";
-// Pull the catalog from the framework-free `@grida/ai/catalogue` entry,
-// NOT the editor's `@/lib/ai/models` seam — that seam constructs server
-// providers (live keys) and is lint-blocked from the desktop renderer
-// (GRIDA-SEC-004). This entry is pure data and renderer-safe.
-import { catalog as _models } from "@grida/ai/catalogue";
-import type {
-  ChatSessionRow,
-  EndpointProviderConfig,
-} from "@/lib/desktop/bridge";
-import {
-  registered_models,
-  useConfiguredTextByokProviderIds,
-} from "./registered-models";
-import {
-  CHATGPT_PROVIDER_ID,
-  GG_PROVIDER_ID,
-  isChatGptSubscriptionModelId,
-} from "@grida/agent";
+import type { EndpointProviderConfig } from "@/lib/desktop/bridge";
+import { useConfiguredTextByokProviderIds } from "./registered-models";
+import { CHATGPT_PROVIDER_ID, GG_PROVIDER_ID } from "@grida/agent";
 import { useGGModels } from "@/lib/desktop/gg-models";
 import * as gridaGateway from "@/lib/desktop/gg-session";
 import { useChatGptSubscription } from "@/lib/desktop/chatgpt-subscription-react";
@@ -72,7 +54,6 @@ import {
   GG_INCLUDED_MODEL_ID,
   reconcileChatGptSubscriptionDefault,
   resolveDefaultModelSelection,
-  resolveNewChatTransition,
   shouldUpgradeToIncluded,
 } from "./default-model";
 import {
@@ -81,16 +62,6 @@ import {
   type ModelPickerOption,
   type ModelPickerSelection,
 } from "./model-picker-options";
-// The default-model constants live in a react-free module so the decision
-// is unit-testable in Node; re-exported here to keep the public symbol home.
-export { DEFAULT_MODEL_ID } from "./default-model";
-
-const catalog = _models.text.catalog;
-type CatalogId = _models.text.CatalogId;
-
-function isCatalogId(id: string | undefined | null): id is CatalogId {
-  return typeof id === "string" && Object.hasOwn(catalog, id);
-}
 
 export function DesktopModelPicker({
   value,
@@ -285,108 +256,30 @@ function modelPickerCommandValue(
 }
 
 /**
- * Inline notice for a selected model that is marked `tool_call: false`
- * (issue #806). The agent loop is tool-heavy (files, commands, todos) —
- * gating is deliberately permissive (the run is not blocked), so the
- * honest move is a visible expectation-setter, not a hard stop.
+ * Model selection state for the welcome composer. Starts on the
+ * provider-owned default (the generic catalog default, ChatGPT when the
+ * subscription is ready, or the included Grida tier when a Grida Gateway
+ * session is live; issue #942) and keeps that default current until the user
+ * picks a model.
  */
-export function ModelToolCallNotice({
-  model_id: modelId,
-  provider_id: providerId,
-  endpoints,
-}: {
-  model_id: string;
-  provider_id?: string;
-  endpoints: readonly EndpointProviderConfig[];
-}) {
-  // Memoized: this renders inside chat panels that re-render per streamed
-  // token, and resolve() rebuilds the flattened spec list each call.
-  const ggModels = useGGModels();
-  const spec = useMemo(
-    () => registered_models.resolve(modelId, endpoints, providerId, ggModels),
-    [modelId, providerId, endpoints, ggModels]
-  );
-  if (!spec || spec.tool_call) return null;
-  return (
-    <div className="flex items-start gap-2 border-t bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-      <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />
-      <span>
-        {spec.label} is marked as not supporting tool calls — the agent&apos;s
-        file, command, and planning abilities may not work with it.
-      </span>
-    </div>
-  );
-}
-
-/**
- * Model selection state for a chat panel. Defaults to
- * {@link DEFAULT_MODEL_ID} (or `initial`, when a caller seeds one — e.g.
- * the welcome handoff carrying the home composer's pick), then re-seeds
- * from a session's stored model whenever the active session id changes —
- * so opening a past chat shows the model it ran with and opening a genuinely
- * new chat resolves a fresh provider-owned default. A background session-list
- * refresh never clobbers a pick the user just made (the seed fires once per
- * id, not per `sessions` change). When a Grida Gateway session is live and
- * nothing else has claimed the selection, the keyless default is upgraded to
- * the included hosted tier ({@link GG_INCLUDED_MODEL_ID}; issue #942).
- */
-export function useModelPickerState({
-  current_id: currentId,
-  binding_epoch: bindingEpoch,
-  sessions,
-  initial,
-  initial_provider_id: initialProviderId,
-  endpoints = [],
-}: {
-  current_id: string | null;
-  /** Real chat-binding generation from `useChatSession().epoch`. */
-  binding_epoch: number;
-  sessions: ChatSessionRow[];
-  /** Initial selection, applied only on first mount. Falls back to
-   * {@link DEFAULT_MODEL_ID} when absent or not a known model id. */
-  initial?: string;
-  /** Provider paired with `initial`, when it was an explicit provider/model
-   *  selection (for example the welcome handoff's ChatGPT choice). */
-  initial_provider_id?: string;
-  /** Configured endpoint providers — their registered model ids count as
-   *  known, so a session that ran on a local model re-seeds correctly. */
-  endpoints?: readonly EndpointProviderConfig[];
-}): {
+export function useModelPickerState(): {
   model_id: string;
   provider_id?: string;
   setSelection: (selection: ModelPickerSelection) => void;
   /** True once the user has explicitly picked a model in the UI (not a
-   *  default or a seed). A producer of a cross-navigation handoff (the
-   *  welcome composer) uses this to carry the model ONLY when it was a
-   *  deliberate choice — otherwise the destination resolves its own
-   *  default, so an unresolved default never masquerades as a pick. */
+   *  default). A producer of a cross-navigation handoff (the welcome
+   *  composer) uses this to carry the model ONLY when it was a deliberate
+   *  choice — otherwise the destination resolves its own default, so an
+   *  unresolved default never masquerades as a pick. */
   is_user_pick: boolean;
 } {
-  const registeredIds = useMemo(
-    () => new Set(registered_models.specs(endpoints).map((m) => m.id)),
-    [endpoints]
-  );
   const chatGptState = useChatGptSubscription();
   const chatGptReady =
     chatGptState.kind === "ready" && chatGptState.status.ready;
-  const isKnownId = (id: string | undefined | null): id is string =>
-    (typeof id === "string" && isChatGptSubscriptionModelId(id)) ||
-    (initialProviderId === "gg" && typeof id === "string" && id === initial) ||
-    isCatalogId(id) ||
-    (typeof id === "string" && registeredIds.has(id));
-
-  // Whether a caller passed an `initial` at all — a stable mount-time fact
-  // (the prop never changes). The GG upgrade guards on THIS, not on whether
-  // `initial` is *known*: knownness depends on the async endpoint registry
-  // and would go stale in the mount-only effect below, letting a late-loading
-  // endpoint pick get overwritten.
-  const initialProvided = initial != null && initial !== "";
 
   const [selection, setSelection] = useState<ModelPickerSelection>(() =>
     resolveDefaultModelSelection({
-      initial,
-      initialProviderId,
-      chatGptReady: currentId === null && chatGptReady,
+      chatGptReady,
       // Synchronous cached GG state: when the session is already known
       // active (warmed by an earlier `ensureFresh`), a keyless surface
       // starts on the included model with no async gap — so an instant
@@ -394,99 +287,34 @@ export function useModelPickerState({
       // effect below runs. `peek()` never does IO; the effect still
       // covers a cold cache.
       ggActive: gridaGateway.peek().kind === "active",
-      isKnownId,
     })
   );
   // Flipped once the user picks a model in the UI, so the async Grida
   // Gateway upgrade below never clobbers a deliberate choice.
   const userPickedRef = useRef(false);
   const [userPicked, setUserPicked] = useState(false);
-  // The session id we last seeded from. Re-seed only when the active id
-  // changes — `undefined` means "never seeded" so the first run fires.
-  const seededFor = useRef<string | null | undefined>(undefined);
-  // Unlike `seededFor`, this tracks real rebindings even when the id remains
-  // null. It distinguishes the initial mount from an explicit New Chat.
-  const previousBindingEpoch = useRef<number | undefined>(undefined);
-  // A welcome handoff applies only to the first fresh chat on this mount.
-  // Once any persisted session has been observed, later New Chat transitions
-  // must resolve the current provider default instead of reusing that handoff.
-  const initialSeedActive = useRef(initialProvided);
 
+  // GRIDA-SEC-008 — reconcile async subscription readiness for an untouched
+  // selection. Ready promotes the generic fallback to `{ chatgpt, Sol }`;
+  // signing out restores the generic fallback so a stale explicit provider
+  // cannot make the first send fail. Component state only: no model
+  // preference is persisted.
   useEffect(() => {
-    const previousEpoch = previousBindingEpoch.current;
-    previousBindingEpoch.current = bindingEpoch;
-
-    if (currentId === null) {
-      const freshSelection = resolveNewChatTransition({
-        previousBindingEpoch: previousEpoch,
-        currentBindingEpoch: bindingEpoch,
-        currentSessionId: currentId,
-        chatGptReady,
-        ggActive: gridaGateway.peek().kind === "active",
-      });
-      seededFor.current = null;
-      if (freshSelection) {
-        initialSeedActive.current = false;
-        userPickedRef.current = false;
-        setUserPicked(false);
-        setSelection(freshSelection);
-      }
-      return;
-    }
-    if (seededFor.current === currentId) return;
-    initialSeedActive.current = false;
-    const row = sessions.find((s) => s.id === currentId);
-    // Row not in the list yet (still loading) — wait for it before
-    // committing, so we don't lock in the default and skip the real seed.
-    if (!row) return;
-    const stored = row.model?.model_id;
-    if (
-      typeof stored === "string" &&
-      stored.length > 0 &&
-      (row.model?.provider_id === "gg" || isKnownId(stored))
-    ) {
-      setSelection({
-        model_id: stored,
-        ...(row.model?.provider_id
-          ? { provider_id: row.model.provider_id }
-          : {}),
-      });
-      seededFor.current = currentId;
-      return;
-    }
-    // Stored id not (yet) known. Endpoints load async — when the session
-    // ran on a registered local model, leave the seed open so the
-    // `registeredIds` dep can complete it once the endpoint list lands.
-    // A session with NO stored model is seeded-done immediately.
-    if (!stored) seededFor.current = currentId;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bindingEpoch, chatGptReady, currentId, sessions, registeredIds]);
-
-  // GRIDA-SEC-008 — reconcile async subscription readiness for a genuinely
-  // fresh, untouched chat. Ready promotes the generic fallback to
-  // `{ chatgpt, Sol }`; signing out restores the generic fallback so a stale
-  // explicit provider cannot make the next send fail. Component state only:
-  // no model preference is persisted.
-  useEffect(() => {
-    if (currentId !== null) return;
     setSelection((current) =>
       reconcileChatGptSubscriptionDefault({
         current,
         chatGptReady,
         ggActive: gridaGateway.peek().kind === "active",
         userPicked: userPickedRef.current,
-        hasInitial: initialSeedActive.current,
-        storedSeeded: seededFor.current != null,
       })
     );
-  }, [chatGptReady, currentId]);
+  }, [chatGptReady]);
 
   // GRIDA-SEC-006 / issue #942 — when a Grida Gateway session is live and
   // the user hasn't otherwise chosen a model, keep the keyless default on the
   // included hosted tier. Session liveness resolves async, so this arrives
-  // after mount; `shouldUpgradeToIncluded` guards on live refs + the stable
-  // `initialProvided` so an explicit pick, a caller `initial`, or a stored-
-  // session seed always wins the race. The catalog itself is never hidden —
+  // after mount; `shouldUpgradeToIncluded` guards on the live ref so an
+  // explicit pick always wins the race. The catalog itself is never hidden —
   // BYOK can still serve any model.
   useEffect(() => {
     if (!gridaGateway.isSupported()) return;
@@ -497,8 +325,6 @@ export function useModelPickerState({
         shouldUpgradeToIncluded({
           current,
           userPicked: userPickedRef.current,
-          hasInitial: initialProvided,
-          storedSeeded: seededFor.current != null,
         })
           ? {
               model_id: GG_INCLUDED_MODEL_ID,
@@ -510,8 +336,6 @@ export function useModelPickerState({
     return () => {
       cancelled = true;
     };
-    // Resolve once on mount; the guard reads live refs, not reactive deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Wrap the setter so a user's explicit pick marks the selection touched —

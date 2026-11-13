@@ -3,101 +3,13 @@ import {
   IMAGE_ATTACHMENT_POLICY,
   decodedBytes,
   encodeLibraryPng,
-  encodeLibraryImageUrl,
   isSupportedImageType,
   planResize,
-  trustedLibraryImageUrl,
 } from "./image-attachment";
-
-type StubImage = {
-  onload: (() => void) | null;
-  onerror: (() => void) | null;
-  src: string;
-};
-
-function stubImage(): () => StubImage {
-  const instances: StubImage[] = [];
-  vi.stubGlobal(
-    "Image",
-    class {
-      crossOrigin = "";
-      decoding = "";
-      naturalWidth = 0;
-      naturalHeight = 0;
-      onload: (() => void) | null = null;
-      onerror: (() => void) | null = null;
-      src = "";
-
-      constructor() {
-        instances.push(this);
-      }
-    }
-  );
-  return () => {
-    const instance = instances[0];
-    if (!instance) throw new Error("Image was not constructed");
-    return instance;
-  };
-}
 
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
-});
-
-describe("encodeLibraryImageUrl", () => {
-  const base = "https://project.supabase.co";
-  const url = `${base}/storage/v1/object/public/library/example.png`;
-  const policy = { ...IMAGE_ATTACHMENT_POLICY, loadTimeoutMs: 25 };
-
-  it("stops a stalled Library image load at the configured timeout", async () => {
-    vi.useFakeTimers();
-    const getImage = stubImage();
-
-    const encoded = encodeLibraryImageUrl(
-      url,
-      "example.png",
-      "image/png",
-      policy,
-      ["image/png"],
-      base
-    );
-    expect(getImage().src).toBe(url);
-
-    await vi.advanceTimersByTimeAsync(policy.loadTimeoutMs);
-
-    await expect(encoded).resolves.toBeNull();
-    expect(vi.getTimerCount()).toBe(0);
-    expect(getImage()).toMatchObject({
-      onload: null,
-      onerror: null,
-      src: "",
-    });
-  });
-
-  it.each(["load", "error"] as const)(
-    "clears the timeout and image state after %s",
-    async (event) => {
-      vi.useFakeTimers();
-      const getImage = stubImage();
-
-      const encoded = encodeLibraryImageUrl(
-        url,
-        "example.png",
-        "image/png",
-        policy,
-        ["image/png"],
-        base
-      );
-      const image = getImage();
-      if (event === "load") image.onload?.();
-      else image.onerror?.();
-
-      await expect(encoded).resolves.toBeNull();
-      expect(vi.getTimerCount()).toBe(0);
-      expect(image).toMatchObject({ onload: null, onerror: null, src: "" });
-    }
-  );
 });
 
 it("normalizes captured WebP bytes into a bounded PNG without opening an image URL", async () => {
@@ -142,34 +54,6 @@ it("normalizes captured WebP bytes into a bounded PNG without opening an image U
     [240, 120],
   ]);
   expect(close).toHaveBeenCalledOnce();
-});
-
-describe("trustedLibraryImageUrl", () => {
-  const base = "https://project.supabase.co";
-
-  it("accepts only public-storage objects on the configured Library origin", () => {
-    expect(
-      trustedLibraryImageUrl(
-        `${base}/storage/v1/object/public/library/example.png`,
-        base
-      )?.href
-    ).toBe(`${base}/storage/v1/object/public/library/example.png`);
-    expect(
-      trustedLibraryImageUrl(`${base}/storage/v1/object/private/x.png`, base)
-    ).toBeNull();
-    expect(
-      trustedLibraryImageUrl(
-        "https://attacker.test/storage/v1/object/public/library/x.png",
-        base
-      )
-    ).toBeNull();
-    expect(
-      trustedLibraryImageUrl(
-        "http://project.supabase.co/storage/v1/object/public/library/x.png",
-        base
-      )
-    ).toBeNull();
-  });
 });
 
 describe("planResize", () => {

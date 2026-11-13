@@ -1,97 +1,17 @@
 /**
- * Registered (endpoint) models in the desktop renderer — issue #806.
- *
- * One fetch surface + pure resolution helpers shared by the model
- * picker, exact model capability gates, and the context
- * meter. GG uses current discovery, BYOK uses pinned public facts, and
- * registered endpoints retain their own metadata and provider identity.
+ * Text-model availability for the welcome composer's model picker —
+ * configured endpoint providers (issue #806) and BYOK key presence.
  */
 
 "use client";
 
 import { useEffect, useState } from "react";
-import type { CurrentGGModel } from "@/lib/desktop/gg-models";
-import { catalog as _models } from "@grida/ai/catalogue";
-import {
-  byokProvidersFor,
-  resolveEndpointModels,
-  type ByokProviderId,
-} from "@grida/agent";
+import { byokProvidersFor, type ByokProviderId } from "@grida/agent";
 import {
   providers,
   secrets,
-  type EndpointModelSpec,
   type EndpointProviderConfig,
 } from "@/lib/desktop/bridge";
-
-export namespace registered_models {
-  /** Flatten endpoint configs into the registry's custom-spec list —
-   *  OVERRIDE-RESOLVED, mirroring the host's `registeredModels()`. */
-  export function specs(
-    endpoints: readonly EndpointProviderConfig[]
-  ): EndpointModelSpec[] {
-    return endpoints.flatMap((endpoint) => resolveEndpointModels(endpoint));
-  }
-
-  /** Resolve a model id over catalog ∪ registered (normalized defaults). */
-  export function resolve(
-    modelId: string,
-    endpoints: readonly EndpointProviderConfig[],
-    providerId?: string,
-    ggModels: readonly CurrentGGModel[] | null = []
-  ): _models.text.registry.ResolvedModelSpec | undefined {
-    if (providerId === "gg" && ggModels === null)
-      return _models.text.registry.resolve(modelId, []);
-    if (providerId === "gg") {
-      const current = ggModels?.find(
-        (model) =>
-          model.id === modelId && model.interfaces.includes("chat.completions")
-      );
-      if (!current) return undefined;
-      const installed = _models.text.registry.resolve(modelId, []);
-      return _models.text.registry.normalize({
-        id: modelId,
-        label: current.label,
-        contextWindow: current.limits.context_tokens,
-        outputLimit: current.limits.max_output_tokens,
-        tool_call: current.capabilities.tools === true,
-        // Broad image support cannot manufacture exact native MIME declarations.
-        imageInputMimes: current.capabilities.image_input
-          ? (installed?.imageInputMimes ?? [])
-          : [],
-      });
-    }
-    // An explicit endpoint provider owns only its own registered metadata.
-    // An explicit native/BYOK/Grida provider must never inherit capabilities
-    // from an unrelated endpoint whose model id happens to collide.
-    const endpoint = providerId
-      ? endpoints.find((candidate) => candidate.id === providerId)
-      : undefined;
-    const custom = endpoint
-      ? resolveEndpointModels(endpoint).find((spec) => spec.id === modelId)
-      : providerId
-        ? undefined
-        : specs(endpoints).find((spec) => spec.id === modelId);
-    return custom
-      ? _models.text.registry.normalize(custom)
-      : _models.text.registry.resolve(modelId, []);
-  }
-
-  /**
-   * The endpoint provider id serving `modelId`, or `undefined` for
-   * catalog models. Rides each send as `provider_id` so an explicit
-   * local-model pick can't be swallowed by the BYOK-first cascade (a
-   * stored OpenRouter key cannot serve `llama3.1:8b`).
-   */
-  export function providerIdForModel(
-    modelId: string,
-    endpoints: readonly EndpointProviderConfig[]
-  ): string | undefined {
-    return endpoints.find((endpoint) =>
-      endpoint.models.some((m) => m.id === modelId)
-    )?.id;
-  }
-}
 
 /**
  * The configured endpoint providers. `[]` while loading, outside the desktop

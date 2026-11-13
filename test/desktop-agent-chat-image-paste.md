@@ -12,7 +12,6 @@ automatable: false
 covered_by:
   - editor/kits/composer/composer-transfer.test.ts
   - editor/lib/agent-chat/image-attachment.test.ts
-  - editor/lib/agent-chat/input-resource-router.test.ts
   - desktop/src/main/native-agent-images.test.ts
   - crates/grida-agent/tests/process/images.rs
 ---
@@ -57,20 +56,9 @@ instead.
 
 ## Notes
 
-- Encoding/policy: `editor/lib/agent-chat/image-attachment.ts`
-  (`encodeImageFile`, downscale to ~1568px / ~5 MB, PNG→JPEG ladder).
 - Paste/drop enters through `ComposerContent.onTransfer`; `ComposerTransfer`
-  preserves the gesture provenance and original browser files. The desktop
-  wiring and chip render are in
-  `editor/scaffolds/desktop/shared/legacy-agent-composer-input.tsx`.
+  preserves the gesture provenance and original browser files.
 - Native image intake and restart recovery are automated in
-  `crates/grida-agent/tests/process/images.rs`; this TC covers the UI gesture
-  that test can't.
-- Dual routing, raw-byte preservation, scratch budgeting, and provider-only
-  fallback are automated in `input-resource-policy.test.ts` and
-  `input-resource-router.test.ts`; the clipboard gesture and rendered chip
-  remain manual.
-- A server-side size guard rejects inline images >~8 MB before persistence
-  (`run-input.ts` `normalizeWireParts`).
+  `crates/grida-agent/tests/process/images.rs`.
 
 - Retired with the previous chat. Native Desktop chat accepts one PNG or file of at most 256 KiB per message; see TC-DESKTOP-AGENT-CHAT-021 for pasting or dropping it and TC-DESKTOP-AGENT-CHAT-009 for an oversize file. The covered_by tests exercise the previous chat.
