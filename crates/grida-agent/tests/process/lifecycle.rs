@@ -4,7 +4,6 @@ use super::*;
 async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
     use agent_kit_core::{ChangeId, SessionId};
     use agent_kit_sessions::{ControlRequest, SessionControl, SessionStore, Submission};
-    use agent_kit_store_sqlite::SqliteStore;
 
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("agent-state");
@@ -161,7 +160,8 @@ async fn queue_edits_keep_receipts_and_only_advance_after_stop_is_released() {
 
     // Simulate a later accepted input whose worker had not claimed it when
     // the previous host stopped. The original Resume must not release it.
-    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let store =
+        grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
     let session_id = SessionId::new(session).unwrap();
     let view = store.inspect(session_id.clone()).await.unwrap();
     store

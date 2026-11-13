@@ -9,22 +9,43 @@ submissions, request receipts, and individual turns have separate records. A
 turn commit updates that turn and any terminal session disposition in the same
 transaction. Earlier turns are retained independently.
 
+## Schema and opening
+
+The database has one schema, declared in `src/schema.rs`, and carries this
+store's SQLite application identity and schema version 1. Opening an empty
+database installs the schema in one transaction. A database with this store's
+identity and version opens as it is. Every other file is refused unchanged
+with `store_schema_unsupported`: a database another program wrote, one without
+this store's identity whatever its version, and a non-empty file at version 0.
+There are no in-place upgrades.
+
+The database records the owner projections it was created with: whether it
+keeps a catalog and whether it links submissions to source turns. Reopening it
+with a different set is refused with `store_profile_mismatch`, so a session is
+never admitted without the catalog placement or link its owner relies on.
+
+Deleting a session inserts its retirement and removes the session row. Its
+turns, parts, messages, submissions, links, receipts, history views and
+context replacements are removed with it by foreign-key cascade, as are links
+from other sessions to its turns.
+
 A turn is stored as a small head row, one row per operation, history record and
 commit receipt, and each conversation message once per session under its digest.
 A model call's request and outcome refer to those messages rather than repeating
 them, so a turn's stored size grows with what it adds rather than with the
 square of its length. A commit encodes and writes only the parts that differ
-from this process's previous write of the turn. That previous state is trusted
-only while the turn's stored generation token and head still match it; a newly
-opened store, a rolled-back write or any other change reads the stored rows.
-Reading assembles the same state, so recovery, identity and evidence checks are
-unchanged. A turn written before this layout is read as it was and converts on
-its next commit. A process keeps at most 16 such turns, within the largest
-assembled size of one turn, releases the least recently used first, and
-releases a store's turns when the store closes.
+from the store's previous write of the turn. The store keeps that previous
+state in memory: a write inside a transaction is staged and becomes the
+remembered state only after the transaction commits, so a rolled-back or
+abandoned write is never read back. The open store is the database's only
+writer, so the remembered state always equals the stored rows; edit the file
+only while no store has it open. Reading assembles the same state, so
+recovery, identity and evidence checks are unchanged. A store keeps at most 16
+unsettled turns, within the largest assembled size of one turn, and releases
+the least recently used first.
 
 A lease's control reads, session inspection and claim receipts read a turn's
-head and the count of its history records rather than assembling the turn, so
+head and its stored history length rather than assembling the turn, so
 watching controls or inspecting an idle session costs the same however long
 its turns grew. Inspecting one turn assembles it and refuses malformed
 stored data.
@@ -39,7 +60,7 @@ An optional bounded driver-state envelope has its own revision and is carried
 into each claimed turn. State changes share the transaction with an exact
 active-turn control or a turn journal commit. The committed revision appears
 in the receipt. The adapter preserves the driver's bytes without interpreting
-its policy. Earlier databases upgrade with empty driver state.
+its policy.
 Conditional submission keeps ordinary input identity while fencing admission
 at the observed session revision. A new claim can reserve driver state in the
 same transaction that claims the input and issues ownership.
@@ -81,8 +102,8 @@ source turn and retained related control by the original claim request.
 Repeating a committed claim never issues a new lease.
 
 The optional owner-defined catalog projects immutable session configuration
-into a scope fingerprint. It indexes the scope at creation and upgrades earlier
-records without reading their turns. A scoped page returns at most 32 entries
+into a scope fingerprint once, at creation. A configuration the owner does not
+recognize is in no scope. A scoped page returns at most 32 entries
 from an owner-selected bucket in reverse creation order. Its anchor must
 already belong to that scope. An entry has an optional bounded display label
 and its own revision. Updating it leaves execution and history unchanged.
@@ -90,14 +111,10 @@ An update or deletion at a stale entry revision is a conflict to reload and
 retry.
 
 An optional owner projection links an immutable submission to an exact retained
-source turn in the acceptance transaction. Historical submissions are projected
-in resumable batches when the owner opens the store. A known source session
-with an unresolved historical turn marks its coverage incomplete. When even
-the historical source session is unknown, every page discloses incomplete
-coverage without exposing the unclassified submission. Reads are
-bounded and require the source session and turn, and a linked input's current
-disposition determines whether it has a turn to inspect. Deleting either side
-removes the link.
+source turn in the acceptance transaction. A linked source turn must be
+retained, or the submission is refused. Reads are bounded and require the
+source session and turn, and a linked input's current disposition determines
+whether it has a turn to inspect. Deleting either side removes the link.
 
 A live lease blocks recovery of its turn. Dropping it makes interrupted execution
 eligible for an explicit recovery request. Reopening the database preserves the
@@ -113,9 +130,7 @@ cursor is the last returned session identity, even if that session is later
 removed. Pages reflect each read rather than a frozen snapshot; a caller must
 recheck an identity before acting and restart a pass to observe concurrent
 insertions behind its cursor. Malformed stored identities fail explicitly.
-The partial active-session index makes each page an indexed traversal. Its
-first creation on an existing database scans sessions once, without changing
-the database version or requiring a new reader format.
+The partial active-session index makes each page an indexed traversal.
 
 On Unix, the parent directory must exclude group/other access. Database and lock
 files use owner-only permissions, and existing symlinks or hard-linked files are
@@ -135,8 +150,11 @@ the host.
 
 Acceptance positions remain immutable while queued work has its own ordering.
 Replacement and withdrawal preserve original payloads and dispositions.
-Their controls, queue updates, and receipts commit together. Reopening upgrades
-the earlier schema transactionally while retaining completed and queued inputs.
+Their controls, queue updates, and receipts commit together. A submission's
+disposition is one recorded state, and the schema ties its queue order, turn
+and replacement to that state. An accepted submission is its own retry
+receipt: the same identity and content returns the original acceptance, and
+the same identity with other content is `request_identity_reused`.
 
 `SqliteStore::history` reads the active view's materialized seed and committed
 local records in append order. An exclusive turn cut selects the view that
@@ -187,9 +205,8 @@ request identity, and the observed session and catalog revisions. In one
 immediate transaction the store checks both revisions, requires no active turn,
 no live owner and an empty queue, and runs the owner's pure checks over the
 session's configuration and driver state and over each retained turn within
-the history scan bounds. It then removes the session's submissions, request
-receipts, turns, history views and context replacements, and records the
-identity in `session_retirements`. A retired identity cannot be created again
+the history scan bounds. It then records the identity in `session_retirements` and removes the session
+with every row it owns. A retired identity cannot be created again
 (`session_identity_retired`), and an absence check for a deterministic
 identity treats it as taken.
 
@@ -224,7 +241,8 @@ returns a record's displayed size, or zero for a record it does not show. A
 window holds up to 128 displayed records and 256 KiB, scans up to 32 turns or
 the history byte limit per call, and refuses a single record over 1 MiB. It
 returns the records in history order with the turn that committed each one,
-recorded facts about each contributing turn (status, start and settle times,
+recorded facts about each contributing turn (status, start time, settle time
+once settled,
 reported context tokens, whether the window holds the turn's newest record,
 and the account of a settled turn that added no records), and an opaque
 `ReplayCursor` for the next older window, or none at the start of the view.

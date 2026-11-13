@@ -615,9 +615,7 @@ impl Host {
                 "sponsored_subagent_source_input",
             ));
         };
-        if input.payload.schema().as_str() != INPUT_SCHEMA
-            || !matches!(input.payload.version(), 2 | 3)
-        {
+        if !is_stored_input(&input.payload) {
             return Err(problem(
                 ErrorKind::Unsupported,
                 "sponsored_subagent_source_input",
@@ -871,7 +869,7 @@ impl Host {
             create: CreateSession {
                 id: child.clone(),
                 request: ChangeId::new("sponsored-create")?,
-                configuration: encode(SESSION_SCHEMA, 2, &config)?,
+                configuration: encode(SESSION_SCHEMA, SESSION_VERSION, &config)?,
             },
             claim: ClaimRequest {
                 id: ChangeId::new("sponsored-claim")?,
@@ -2367,7 +2365,7 @@ mod tests {
                 create: CreateSession {
                     id: child.clone(),
                     request: change_id().unwrap(),
-                    configuration: encode(SESSION_SCHEMA, 2, &config).unwrap(),
+                    configuration: encode(SESSION_SCHEMA, SESSION_VERSION, &config).unwrap(),
                 },
                 claim: new_claim(
                     child.clone(),

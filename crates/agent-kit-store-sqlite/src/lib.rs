@@ -7,6 +7,7 @@ pub mod deletion;
 pub mod driver;
 pub mod history;
 mod resume;
+mod schema;
 mod turn_layout;
 pub mod turn_links;
 
@@ -40,10 +41,9 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
-const SCHEMA_VERSION: i64 = 13;
 const MAX_PENDING_INPUTS: i64 = 256;
 const MAX_PENDING_BYTES: i64 = 32 * 1024 * 1024;
-const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_STORED_TURN_BYTES: usize = 64 * 1024 * 1024;
 const MAX_HISTORY_TURNS: i64 = 4_096;
 const MAX_HISTORY_RECORDS: usize = 4_096;
 const MAX_HISTORY_BYTES: usize = 8 * 1024 * 1024;
@@ -95,98 +95,6 @@ pub struct ExistingOperationClaim {
     pub driver_state: DriverStateChange,
 }
 
-const SCHEMA: &str = "
-CREATE TABLE sessions (
-    id TEXT PRIMARY KEY,
-    configuration BLOB NOT NULL,
-    revision INTEGER NOT NULL,
-    paused INTEGER NOT NULL,
-    active_turn TEXT,
-    next_input INTEGER NOT NULL,
-    driver_state BLOB
-);
-CREATE TABLE submissions (
-    session TEXT NOT NULL REFERENCES sessions(id),
-    id TEXT NOT NULL,
-    position INTEGER NOT NULL,
-    payload BLOB NOT NULL,
-    fingerprint BLOB NOT NULL,
-    turn_id TEXT,
-    turn_order INTEGER,
-    completed INTEGER NOT NULL DEFAULT 0,
-    queue_order INTEGER CHECK(queue_order IS NULL OR queue_order >= 0),
-    replacement_id TEXT,
-    withdrawn INTEGER NOT NULL DEFAULT 0 CHECK(withdrawn IN (0, 1)),
-    PRIMARY KEY(session, id),
-    UNIQUE(session, position)
-);
-CREATE UNIQUE INDEX submission_queue_order ON submissions(session,queue_order)
-WHERE queue_order IS NOT NULL;
-CREATE TABLE turns (
-    ordinal INTEGER PRIMARY KEY AUTOINCREMENT,
-    session TEXT NOT NULL REFERENCES sessions(id),
-    id TEXT NOT NULL,
-    snapshot BLOB NOT NULL,
-    UNIQUE(session, id)
-);
-CREATE TABLE requests (
-    session TEXT NOT NULL REFERENCES sessions(id),
-    kind TEXT NOT NULL,
-    id TEXT NOT NULL,
-    fingerprint BLOB NOT NULL,
-    receipt BLOB NOT NULL,
-    PRIMARY KEY(session, kind, id)
-);
-";
-
-const UPGRADE_QUEUE: &str = "
-ALTER TABLE submissions ADD COLUMN queue_order INTEGER CHECK(queue_order IS NULL OR queue_order >= 0);
-ALTER TABLE submissions ADD COLUMN replacement_id TEXT;
-ALTER TABLE submissions ADD COLUMN withdrawn INTEGER NOT NULL DEFAULT 0 CHECK(withdrawn IN (0, 1));
-UPDATE submissions SET queue_order=position WHERE turn_id IS NULL;
-CREATE UNIQUE INDEX submission_queue_order ON submissions(session,queue_order)
-WHERE queue_order IS NOT NULL;
-";
-
-// Wall-clock facts for presentation. They never order or authorize work.
-const TURN_TIMES: &str = "
-CREATE TABLE turn_times (
-    session TEXT NOT NULL,
-    turn TEXT NOT NULL,
-    started_ms INTEGER NOT NULL CHECK(started_ms >= 0),
-    settled_ms INTEGER CHECK(settled_ms IS NULL OR settled_ms >= started_ms),
-    PRIMARY KEY(session, turn),
-    FOREIGN KEY(session, turn) REFERENCES turns(session, id) ON DELETE CASCADE
-);
-";
-
-const HISTORY_VIEWS: &str = "
-CREATE INDEX session_turn_order ON turns(session,ordinal);
-CREATE TABLE session_history_views (
-    session TEXT NOT NULL REFERENCES sessions(id),
-    view INTEGER NOT NULL CHECK(view >= 0),
-    seed BLOB,
-    seed_identity BLOB CHECK((seed IS NULL) = (seed_identity IS NULL)),
-    after_ordinal INTEGER NOT NULL CHECK(after_ordinal >= 0),
-    end_ordinal INTEGER CHECK(end_ordinal IS NULL OR end_ordinal >= after_ordinal),
-    PRIMARY KEY(session, view)
-);
-CREATE UNIQUE INDEX active_history_view ON session_history_views(session)
-WHERE end_ordinal IS NULL;
-CREATE INDEX history_view_order ON session_history_views(session,after_ordinal,view);
-";
-
-const CONTEXT_REPLACEMENTS: &str = "
-CREATE TABLE session_context_replacements (
-    session TEXT NOT NULL REFERENCES sessions(id),
-    view INTEGER NOT NULL CHECK(view >= 0),
-    turn_ordinal INTEGER NOT NULL REFERENCES turns(ordinal),
-    replacement BLOB NOT NULL,
-    identity BLOB NOT NULL,
-    PRIMARY KEY(session,view,turn_ordinal)
-);
-";
-
 /// One opened database authority. Clones share its connection and ownership lock.
 #[derive(Clone)]
 pub struct SqliteStore {
@@ -201,25 +109,14 @@ pub struct InputObservation {
 
 struct Inner {
     connection: Mutex<Connection>,
+    /// Unsettled turns as this store last wrote or read them.
+    turns: Mutex<turn_layout::TurnCache>,
     owners: Mutex<BTreeMap<(SessionId, TurnId), Weak<()>>>,
     changed: Notify,
     catalog: Option<catalog::ScopeProjection>,
     turn_links: Option<turn_links::TurnLinkProjection>,
     // Drop SQLite before releasing the writer lock.
     _lock: Option<WriterLock>,
-}
-
-impl Drop for Inner {
-    /// Turns this store kept in memory are released with the store.
-    fn drop(&mut self) {
-        let connection = self
-            .connection
-            .get_mut()
-            .unwrap_or_else(PoisonError::into_inner);
-        if let Some(path) = connection.path().filter(|path| !path.is_empty()) {
-            turn_layout::forget(path);
-        }
-    }
 }
 
 struct WriterLock(File);
@@ -341,10 +238,6 @@ impl SqliteStore {
         let database = open_private_file(&path)?;
         drop(database);
         let connection = Connection::open(&path).map_err(database_error)?;
-        // A newly opened store reads stored turns rather than earlier writes.
-        if let Some(opened) = connection.path() {
-            turn_layout::forget(opened);
-        }
         Self::initialize(Some(lock), connection, catalog, turn_links)
     }
 
@@ -361,6 +254,13 @@ impl SqliteStore {
         connection
             .pragma_update(None, "foreign_keys", true)
             .map_err(database_error)?;
+        schema::prepare(
+            &mut connection,
+            schema::Profile {
+                catalog: catalog.is_some(),
+                turn_links: turn_links.is_some(),
+            },
+        )?;
         if lock.is_some() {
             connection
                 .pragma_update(None, "journal_mode", "WAL")
@@ -369,126 +269,10 @@ impl SqliteStore {
                 .pragma_update(None, "synchronous", "FULL")
                 .map_err(database_error)?;
         }
-        let version: i64 = connection
-            .pragma_query_value(None, "user_version", |row| row.get(0))
-            .map_err(database_error)?;
-        match version {
-            0 => {
-                let transaction = connection.transaction().map_err(database_error)?;
-                transaction.execute_batch(SCHEMA).map_err(database_error)?;
-                transaction
-                    .execute_batch(HISTORY_VIEWS)
-                    .map_err(database_error)?;
-                transaction
-                    .execute_batch(CONTEXT_REPLACEMENTS)
-                    .map_err(database_error)?;
-                transaction
-                    .execute_batch(catalog::SCHEMA)
-                    .map_err(database_error)?;
-                transaction
-                    .execute_batch(catalog::ORGANIZATION_SCHEMA)
-                    .map_err(database_error)?;
-                transaction
-                    .execute_batch(deletion::SCHEMA)
-                    .map_err(database_error)?;
-                transaction
-                    .execute_batch(deletion::CLEANUP_SCHEMA)
-                    .map_err(database_error)?;
-                transaction
-                    .execute_batch(turn_links::SCHEMA)
-                    .map_err(database_error)?;
-                transaction
-                    .execute_batch(TURN_TIMES)
-                    .map_err(database_error)?;
-                turn_layout::install(&transaction)?;
-                transaction
-                    .pragma_update(None, "user_version", SCHEMA_VERSION)
-                    .map_err(database_error)?;
-                transaction.commit().map_err(database_error)?;
-            }
-            SCHEMA_VERSION => {}
-            1..=12 => {
-                let transaction = connection.transaction().map_err(database_error)?;
-                if version == 1 {
-                    transaction
-                        .execute_batch(UPGRADE_QUEUE)
-                        .map_err(database_error)?;
-                }
-                if version <= 2 {
-                    transaction
-                        .execute_batch(HISTORY_VIEWS)
-                        .map_err(database_error)?;
-                }
-                if version <= 3 {
-                    transaction
-                        .execute_batch(CONTEXT_REPLACEMENTS)
-                        .map_err(database_error)?;
-                }
-                if version <= 4 {
-                    transaction
-                        .execute_batch("ALTER TABLE sessions ADD COLUMN driver_state BLOB")
-                        .map_err(database_error)?;
-                }
-                if version <= 5 {
-                    transaction
-                        .execute_batch(catalog::SCHEMA)
-                        .map_err(database_error)?;
-                }
-                if version <= 6 {
-                    transaction
-                        .execute_batch(catalog::ORGANIZATION_SCHEMA)
-                        .map_err(database_error)?;
-                }
-                if version <= 7 {
-                    transaction
-                        .execute_batch(deletion::SCHEMA)
-                        .map_err(database_error)?;
-                }
-                if version <= 8 {
-                    transaction
-                        .execute_batch(catalog::REPROJECT_UNSCOPED)
-                        .map_err(database_error)?;
-                }
-                if version <= 9 {
-                    transaction
-                        .execute_batch(deletion::CLEANUP_SCHEMA)
-                        .map_err(database_error)?;
-                }
-                if version <= 10 {
-                    transaction
-                        .execute_batch(turn_links::SCHEMA)
-                        .map_err(database_error)?;
-                }
-                if version <= 11 {
-                    transaction
-                        .execute_batch(TURN_TIMES)
-                        .map_err(database_error)?;
-                }
-                // Earlier turns stay as written and convert on their next commit.
-                turn_layout::install(&transaction)?;
-                transaction
-                    .pragma_update(None, "user_version", SCHEMA_VERSION)
-                    .map_err(database_error)?;
-                transaction.commit().map_err(commit_error)?;
-            }
-            _ => return Err(error(ErrorKind::Unsupported, "store_schema_unsupported")),
-        }
-        // This additive index changes no persisted authority or schema version.
-        // An interrupted build rolls back and is retried on the next open.
-        connection
-            .execute_batch(
-                "CREATE INDEX IF NOT EXISTS sessions_active_turn_scan ON sessions(id,active_turn) WHERE active_turn IS NOT NULL",
-            )
-            .map_err(database_error)?;
-        if let Some(project) = catalog {
-            catalog::project_existing(&mut connection, project)?;
-        }
-        if let Some(project) = turn_links {
-            turn_links::project_existing(&mut connection, project)?;
-        }
         Ok(Self {
             inner: Arc::new(Inner {
                 connection: Mutex::new(connection),
+                turns: Mutex::new(turn_layout::TurnCache::default()),
                 owners: Mutex::new(BTreeMap::new()),
                 changed: Notify::new(),
                 catalog,
@@ -622,8 +406,8 @@ impl SqliteStore {
         session: SessionId,
         turn: TurnId,
     ) -> Result<Vec<Submission>> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
-            load_turn(connection, &session, &turn)?;
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            load_turn(inner, connection, &session, &turn)?;
             turn_inputs(connection, &session, &turn)
         })
         .await
@@ -637,8 +421,8 @@ impl SqliteStore {
         turn: TurnId,
         project: impl FnOnce(&TurnState) -> Result<T> + Send + 'static,
     ) -> Result<T> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
-            project(&load_turn(connection, &session, &turn)?)
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            project(&load_turn(inner, connection, &session, &turn)?)
         })
         .await
     }
@@ -655,7 +439,7 @@ impl SqliteStore {
         if operations.is_empty() {
             return Ok(None);
         }
-        execute(Arc::clone(&self.inner), move |_, connection| {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
             let mut destination = None;
             for operation in operations {
                 if let Some(claim) =
@@ -668,7 +452,7 @@ impl SqliteStore {
             let Some(claim) = destination else {
                 return Ok(None);
             };
-            match load_turn(connection, &claim.session, &claim.turn) {
+            match load_turn(inner, connection, &claim.session, &claim.turn) {
                 Ok(state) => project(&state).map(Some),
                 Err(error) if error.code == "turn_missing" => Ok(None),
                 Err(error) => Err(error),
@@ -826,7 +610,7 @@ impl SqliteStore {
                 &source_key,
                 fingerprint,
             )? {
-                let state = load_turn(&transaction, &receipt.session, &receipt.turn)?;
+                let state = load_turn(inner, &transaction, &receipt.session, &receipt.turn)?;
                 return Ok(PreparedClaim::Existing(turn_view(inner, &state)?));
             }
             let _source_owner = require_operation_owner(inner, &transaction, &source)?;
@@ -857,7 +641,7 @@ impl SqliteStore {
                     turn: claim.binding.turn.clone(),
                 },
             )?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             Ok(prepared)
         })
         .await?;
@@ -875,10 +659,7 @@ impl SqliteStore {
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
             let mut session = load_session(&transaction, &session_id)?;
-            let fingerprint = Fingerprint::of(&input)?;
-            if let Some(receipt) =
-                lookup_request(&transaction, &session_id, "submit", &input.id, fingerprint)?
-            {
+            if let Some(receipt) = accepted(&transaction, &session_id, &input)? {
                 return Ok(receipt);
             }
             if let Some(expected) = expected {
@@ -888,15 +669,7 @@ impl SqliteStore {
                 insert_input(inner, &transaction, &session_id, &mut session, &input, None)?;
             bump_revision(&mut session)?;
             save_session(&transaction, &session_id, &session)?;
-            save_request(
-                &transaction,
-                &session_id,
-                "submit",
-                &input.id,
-                fingerprint,
-                &receipt,
-            )?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             Ok(receipt)
         })
     }
@@ -916,7 +689,7 @@ impl SqliteStore {
                 let prepared =
                     prepare_claim(inner, &transaction, request, state_change, submission)?;
                 if matches!(&prepared, PreparedClaim::Acquired(_)) {
-                    transaction.commit().map_err(commit_error)?;
+                    commit(inner, transaction)?;
                 }
                 Ok(prepared)
             })
@@ -989,16 +762,7 @@ fn prepare_pending_claim(
             if unique.len() != inputs.len() {
                 return Err(error(ErrorKind::InvalidInput, "duplicate_input_selection"));
             }
-            let exists: bool = transaction
-                .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM turns WHERE session=?1 AND id=?2)",
-                    params![request.session.as_str(), turn.as_str()],
-                    |row| row.get(0),
-                )
-                .map_err(database_error)?;
-            if exists {
-                return Err(error(ErrorKind::Conflict, "turn_exists"));
-            }
+            require_new_turn(transaction, &request.session, turn)?;
             if let Some(change) = state_change {
                 session.driver_state.apply(change)?;
             }
@@ -1011,21 +775,13 @@ fn prepare_pending_claim(
                 if waiting {
                     return Err(error(ErrorKind::Conflict, "session_queue_waiting"));
                 }
-                let receipt = insert_input(
+                insert_input(
                     inner,
                     transaction,
                     &request.session,
                     &mut session,
                     &input,
                     None,
-                )?;
-                save_request(
-                    transaction,
-                    &request.session,
-                    "submit",
-                    &input.id,
-                    Fingerprint::of(&input)?,
-                    &receipt,
                 )?;
             }
             let state = TurnState::with_driver_state(
@@ -1050,13 +806,10 @@ fn prepare_pending_claim(
                 }
                 selected.push(input.input);
             }
-            if !turn_layout::write(transaction, &state, true)? {
-                return Err(error(ErrorKind::Conflict, "turn_exists"));
-            }
-            record_turn_start(transaction, &request.session, turn)?;
+            turn_layout::write(&inner.turns, transaction, &state, true)?;
             for (order, id) in inputs.iter().enumerate() {
                 transaction.execute(
-                    "UPDATE submissions SET turn_id=?3,turn_order=?4,queue_order=NULL WHERE session=?1 AND id=?2",
+                    "UPDATE submissions SET state='claimed',turn=?3,turn_order=?4,queue_order=NULL WHERE session=?1 AND id=?2",
                     params![request.session.as_str(), id.as_str(), turn.as_str(), order as i64],
                 ).map_err(database_error)?;
             }
@@ -1076,7 +829,7 @@ fn prepare_pending_claim(
             if session.active_turn.as_ref() != Some(turn) {
                 return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
             }
-            let mut state = load_turn(transaction, &request.session, turn)?;
+            let mut state = load_turn(inner, transaction, &request.session, turn)?;
             if !state.is_suspended()
                 || state.position() != *position
                 || state.binding().epoch != *epoch
@@ -1118,7 +871,7 @@ fn prepare_pending_claim(
                 return Err(error(ErrorKind::InvalidState, "turn_admission_closed"));
             }
             rebind(&mut state)?;
-            save_turn(transaction, &state)?;
+            save_turn(inner, transaction, &state)?;
             let inputs = turn_inputs(transaction, &request.session, turn)?;
             (state, inputs)
         }
@@ -1163,7 +916,7 @@ impl SessionStore for SqliteStore {
                 return Ok(receipt);
             }
             let receipt = record_creation(&transaction, &request, inner.catalog, fingerprint)?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             Ok(receipt)
         })
     }
@@ -1197,14 +950,14 @@ impl SessionStore for SqliteStore {
                 )? {
                     return Ok(PreparedClaim::Existing(turn_view(
                         inner,
-                        &load_turn(&transaction, &request.session, &receipt.turn)?,
+                        &load_turn(inner, &transaction, &request.session, &receipt.turn)?,
                     )?));
                 }
                 let mut session = load_session(&transaction, &request.session)?;
                 if session.active_turn.as_ref() != Some(&request.turn) {
                     return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
                 }
-                let mut state = load_turn(&transaction, &request.session, &request.turn)?;
+                let mut state = load_turn(inner, &transaction, &request.session, &request.turn)?;
                 if state.binding().epoch != request.expected_epoch
                     || (state.is_suspended() && !state.controls().cancelled)
                     || state.outcome().is_some()
@@ -1213,7 +966,7 @@ impl SessionStore for SqliteStore {
                 }
                 require_released(inner, state.binding())?;
                 rebind(&mut state)?;
-                save_turn(&transaction, &state)?;
+                save_turn(inner, &transaction, &state)?;
                 let owner = register_owner(inner, state.binding())?;
                 bump_revision(&mut session)?;
                 save_session(&transaction, &request.session, &session)?;
@@ -1226,7 +979,7 @@ impl SessionStore for SqliteStore {
                     &ClaimRecord::new(request.turn.clone()),
                 )?;
                 let inputs = turn_inputs(&transaction, &request.session, &request.turn)?;
-                transaction.commit().map_err(commit_error)?;
+                commit(inner, transaction)?;
                 Ok(PreparedClaim::Acquired(Acquired {
                     binding: state.binding().clone(),
                     configuration: session.configuration,
@@ -1255,7 +1008,7 @@ impl SessionStore for SqliteStore {
                 return Ok(receipt);
             }
             let receipt = record_control(inner, &transaction, &request, fingerprint, None)?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             inner.changed.notify_waiters();
             Ok(receipt)
         })
@@ -1269,14 +1022,19 @@ impl SessionStore for SqliteStore {
 
     fn inspect_turn(&self, session: SessionId, turn: TurnId) -> BoxFuture<'_, Result<TurnView>> {
         execute(Arc::clone(&self.inner), move |inner, connection| {
-            turn_view(inner, &load_turn(connection, &session, &turn)?)
+            turn_view(inner, &load_turn(inner, connection, &session, &turn)?)
         })
     }
 
     fn verify(&self, receipt: CommitReceipt) -> BoxFuture<'_, Result<()>> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
             let record = receipt.record();
-            let state = load_turn(connection, &record.binding.session, &record.binding.turn)?;
+            let state = load_turn(
+                inner,
+                connection,
+                &record.binding.session,
+                &record.binding.turn,
+            )?;
             if state.receipt(&record.change) != Some(&receipt) {
                 return Err(error(ErrorKind::Conflict, "receipt_not_committed"));
             }
@@ -1303,8 +1061,8 @@ impl TurnJournal for SqliteJournal {
 
     fn load(&self) -> BoxFuture<'_, Result<TurnState>> {
         let binding = self.binding.clone();
-        execute(Arc::clone(&self.inner), move |_, connection| {
-            let state = load_turn(connection, &binding.session, &binding.turn)?;
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            let state = load_turn(inner, connection, &binding.session, &binding.turn)?;
             require_binding(&state, &binding)?;
             Ok(state)
         })
@@ -1316,7 +1074,7 @@ impl TurnJournal for SqliteJournal {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
-            let mut state = load_turn(&transaction, &binding.session, &binding.turn)?;
+            let mut state = load_turn(inner, &transaction, &binding.session, &binding.turn)?;
             require_binding(&state, &binding)?;
             let before = change
                 .actions()
@@ -1324,7 +1082,7 @@ impl TurnJournal for SqliteJournal {
                 .any(|action| matches!(action, JournalAction::SetDriverState(_)))
                 .then(|| state.driver_state().clone());
             let receipt = state.apply(change)?;
-            save_turn(&transaction, &state)?;
+            save_turn(inner, &transaction, &state)?;
             let previous = before.filter(|snapshot| snapshot != state.driver_state());
             let settled = state.outcome().is_some();
             if settled || previous.is_some() {
@@ -1342,7 +1100,7 @@ impl TurnJournal for SqliteJournal {
                     if settled {
                         session.active_turn = None;
                         transaction.execute(
-                            "UPDATE submissions SET completed=1 WHERE session=?1 AND turn_id=?2",
+                            "UPDATE submissions SET state='completed' WHERE session=?1 AND turn=?2",
                             params![binding.session.as_str(), binding.turn.as_str()],
                         ).map_err(database_error)?;
                     }
@@ -1352,7 +1110,7 @@ impl TurnJournal for SqliteJournal {
                     return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
                 }
             }
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             inner.changed.notify_waiters();
             Ok(receipt)
         })
@@ -1360,10 +1118,12 @@ impl TurnJournal for SqliteJournal {
 
     fn lookup(&self, change: ChangeId) -> BoxFuture<'_, Result<Option<CommitReceipt>>> {
         let binding = self.binding.clone();
-        execute(Arc::clone(&self.inner), move |_, connection| {
-            Ok(load_turn(connection, &binding.session, &binding.turn)?
-                .receipt(&change)
-                .cloned())
+        execute(Arc::clone(&self.inner), move |inner, connection| {
+            Ok(
+                load_turn(inner, connection, &binding.session, &binding.turn)?
+                    .receipt(&change)
+                    .cloned(),
+            )
         })
     }
 }
@@ -1440,7 +1200,12 @@ fn execute<T: Send + 'static>(
                     .connection
                     .lock()
                     .unwrap_or_else(PoisonError::into_inner);
-                operation(&inner, &mut connection)
+                // Turns an earlier operation staged without committing, as
+                // after a panic, describe no stored state.
+                turn_layout::lock(&inner.turns).discard();
+                let result = operation(&inner, &mut connection);
+                turn_layout::lock(&inner.turns).discard();
+                result
             };
             // Release transient ownership before publishing the blocking task's
             // result. An awaited operation must not retain the database lock
@@ -1453,23 +1218,31 @@ fn execute<T: Send + 'static>(
     })
 }
 
+/// Create a session with its catalog placement and its first history view,
+/// which holds the seed of a seeded session.
 fn insert_session(
     transaction: &Transaction<'_>,
     request: &CreateSession,
     catalog: Option<catalog::ScopeProjection>,
+    seed: Option<&history::HistorySeed>,
 ) -> Result<SessionCreated> {
     deletion::require_unretired(transaction, &request.id)?;
+    let scope = catalog.and_then(|project| project(&request.configuration));
     let inserted = transaction
         .execute(
-            "INSERT INTO sessions(id,configuration,revision,paused,next_input) VALUES(?1,?2,0,0,0)
+            "INSERT INTO sessions(id,configuration,revision,paused,next_input,scope) VALUES(?1,?2,0,0,0,?3)
          ON CONFLICT(id) DO NOTHING",
-            params![request.id.as_str(), encode(&request.configuration)?],
+            params![
+                request.id.as_str(),
+                encode(&request.configuration)?,
+                scope.as_ref().map(|scope| scope.bytes().as_slice())
+            ],
         )
         .map_err(database_error)?;
     if inserted == 0 {
         return Err(error(ErrorKind::Conflict, "session_exists"));
     }
-    catalog::insert(transaction, request, catalog)?;
+    history::insert_view(transaction, &request.id, SessionRevision(0), seed, 0)?;
     Ok(SessionCreated {
         session: request.id.clone(),
         revision: SessionRevision(0),
@@ -1482,7 +1255,7 @@ fn record_creation(
     catalog: Option<catalog::ScopeProjection>,
     fingerprint: Fingerprint,
 ) -> Result<SessionCreated> {
-    let receipt = insert_session(transaction, request, catalog)?;
+    let receipt = insert_session(transaction, request, catalog, None)?;
     save_request(
         transaction,
         &request.id,
@@ -1514,7 +1287,7 @@ fn require_operation_owner(
     if session.active_turn.as_ref() != Some(&binding.turn) {
         return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
     }
-    let state = load_turn(transaction, &binding.session, &binding.turn)?;
+    let state = load_turn(inner, transaction, &binding.session, &binding.turn)?;
     require_binding(&state, binding)?;
     if state.controls().revision != source.control {
         return Err(error(ErrorKind::Conflict, "stale_control_revision"));
@@ -1627,10 +1400,10 @@ fn apply_control(
                 return Err(error(ErrorKind::Conflict, "input_identity_reused"));
             }
             transaction.execute(
-                "UPDATE submissions SET queue_order=NULL,replacement_id=?3 WHERE session=?1 AND id=?2",
+                "UPDATE submissions SET state='superseded',queue_order=NULL,replacement=?3 WHERE session=?1 AND id=?2",
                 params![request.session.as_str(), input.as_str(), replacement.id.as_str()],
             ).map_err(database_error)?;
-            let receipt = insert_input(
+            insert_input(
                 inner,
                 transaction,
                 &request.session,
@@ -1638,20 +1411,12 @@ fn apply_control(
                 replacement,
                 Some(order),
             )?;
-            save_request(
-                transaction,
-                &request.session,
-                "submit",
-                &replacement.id,
-                Fingerprint::of(replacement)?,
-                &receipt,
-            )?;
             None
         }
         SessionControl::WithdrawQueued { input } => {
             queued_order(transaction, &request.session, input)?;
             transaction.execute(
-                "UPDATE submissions SET queue_order=NULL,withdrawn=1 WHERE session=?1 AND id=?2",
+                "UPDATE submissions SET state='withdrawn',queue_order=NULL WHERE session=?1 AND id=?2",
                 params![request.session.as_str(), input.as_str()],
             ).map_err(database_error)?;
             None
@@ -1666,7 +1431,7 @@ fn apply_control(
             expected_history,
             records,
         } => {
-            let state = loaded_turn(&mut active, transaction, &request.session, turn)?;
+            let state = loaded_turn(inner, &mut active, transaction, &request.session, turn)?;
             if state.history().position() != *expected_history {
                 return Err(error(ErrorKind::Conflict, "history_position_changed"));
             }
@@ -1705,7 +1470,7 @@ fn apply_control(
             answer,
             records,
         } => {
-            let state = loaded_turn(&mut active, transaction, &request.session, turn)?;
+            let state = loaded_turn(inner, &mut active, transaction, &request.session, turn)?;
             if state.history().position() != *expected_history {
                 return Err(error(ErrorKind::Conflict, "history_position_changed"));
             }
@@ -1758,7 +1523,7 @@ fn apply_control(
         if session.active_turn.as_ref() != Some(turn) {
             return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
         }
-        loaded_turn(&mut active, transaction, &request.session, turn)?;
+        loaded_turn(inner, &mut active, transaction, &request.session, turn)?;
         let mut state = active
             .take()
             .ok_or_else(|| error(ErrorKind::InvalidState, "turn_missing"))?;
@@ -1784,7 +1549,7 @@ fn apply_control(
         )?;
         let receipt = state.apply(change)?;
         session.driver_state = state.driver_state().clone();
-        save_turn(transaction, &state)?;
+        save_turn(inner, transaction, &state)?;
         Some(receipt)
     } else {
         None
@@ -1804,6 +1569,7 @@ fn apply_control(
 
 /// The turn a control acts on, loaded once and kept for the rest of the control.
 fn loaded_turn<'a>(
+    inner: &Inner,
     slot: &'a mut Option<TurnState>,
     connection: &Connection,
     session: &SessionId,
@@ -1813,7 +1579,7 @@ fn loaded_turn<'a>(
         .as_ref()
         .is_none_or(|state| &state.binding().turn != turn)
     {
-        *slot = Some(load_turn(connection, session, turn)?);
+        *slot = Some(load_turn(inner, connection, session, turn)?);
     }
     slot.as_ref()
         .ok_or_else(|| error(ErrorKind::InvalidState, "turn_missing"))
@@ -1867,7 +1633,7 @@ fn insert_input(
         position: session.next_input,
     };
     transaction.execute(
-        "INSERT INTO submissions(session,id,position,payload,fingerprint,queue_order) VALUES(?1,?2,?3,?4,?5,?6)",
+        "INSERT INTO submissions(session,id,position,payload,fingerprint,state,queue_order) VALUES(?1,?2,?3,?4,?5,'queued',?6)",
         params![session_id.as_str(), input.id.as_str(), sql_number(receipt.position)?,
             payload, Fingerprint::of(input)?.bytes().as_slice(), sql_number(order.unwrap_or(receipt.position))?],
     ).map_err(database_error)?;
@@ -1924,10 +1690,13 @@ fn reorder_queue(
     if selected.len() != inputs.len() || selected != expected {
         return Err(error(ErrorKind::Conflict, "queue_order_mismatch"));
     }
+    // Move every queued order above the current ones first, so each row keeps
+    // an order and no two rows share one at any step.
+    let shift = pending.last().map_or(0, |(_, order)| *order) + 1;
     transaction
         .execute(
-            "UPDATE submissions SET queue_order=NULL WHERE session=?1 AND queue_order IS NOT NULL",
-            [session.as_str()],
+            "UPDATE submissions SET queue_order=queue_order+?2 WHERE session=?1 AND state='queued'",
+            params![session.as_str(), shift],
         )
         .map_err(database_error)?;
     for (input, (_, order)) in inputs.iter().zip(pending) {
@@ -1965,7 +1734,7 @@ fn session_view_with<T>(
     let state = session
         .active_turn
         .as_ref()
-        .map(|id| load_turn(connection, &session_id, id))
+        .map(|id| load_turn(inner, connection, &session_id, id))
         .transpose()?;
     let projection = project(state.as_ref())?;
     let current = state
@@ -2028,6 +1797,34 @@ fn session_view_from(
     })
 }
 
+/// The receipt of an identical earlier submission. A submission's identity
+/// with different content is a reused request identity.
+fn accepted(
+    connection: &Connection,
+    session: &SessionId,
+    input: &Submission,
+) -> Result<Option<Acceptance>> {
+    let stored: Option<(i64, Vec<u8>)> = connection
+        .query_row(
+            "SELECT position,fingerprint FROM submissions WHERE session=?1 AND id=?2",
+            params![session.as_str(), input.id.as_str()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(database_error)?;
+    let Some((position, fingerprint)) = stored else {
+        return Ok(None);
+    };
+    if fingerprint.as_slice() != Fingerprint::of(input)?.bytes() {
+        return Err(error(ErrorKind::Conflict, "request_identity_reused"));
+    }
+    Ok(Some(Acceptance {
+        session: session.clone(),
+        input: input.id.clone(),
+        position: unsigned(position)?,
+    }))
+}
+
 fn load_input(connection: &Connection, session: &SessionId, id: &ChangeId) -> Result<InputView> {
     find_input(connection, session, id)?
         .ok_or_else(|| error(ErrorKind::InvalidInput, "submission_missing"))
@@ -2038,20 +1835,18 @@ fn find_input(
     session: &SessionId,
     id: &ChangeId,
 ) -> Result<Option<InputView>> {
-    let Some((position, bytes, turn, completed, fingerprint, queue_order, replacement, withdrawn)) = connection
+    let Some((position, bytes, fingerprint, state, turn, replacement)) = connection
         .query_row(
-            "SELECT position,payload,turn_id,completed,fingerprint,queue_order,replacement_id,withdrawn FROM submissions WHERE session=?1 AND id=?2",
+            "SELECT position,payload,fingerprint,state,turn,replacement FROM submissions WHERE session=?1 AND id=?2",
             params![session.as_str(), id.as_str()],
             |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
                     row.get::<_, Vec<u8>>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                    row.get::<_, bool>(3)?,
-                    row.get::<_, Vec<u8>>(4)?,
-                    row.get::<_, Option<i64>>(5)?,
-                    row.get::<_, Option<String>>(6)?,
-                    row.get::<_, bool>(7)?,
+                    row.get::<_, Vec<u8>>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, Option<String>>(5)?,
                 ))
             },
         )
@@ -2059,19 +1854,18 @@ fn find_input(
         .map_err(database_error)? else {
             return Ok(None);
         };
-    let queued = queue_order.map(unsigned).transpose()?.is_some();
-    let disposition = match (turn, completed, queued, replacement, withdrawn) {
-        (None, false, true, None, false) => InputDisposition::Queued,
-        (Some(turn), true, false, None, false) => InputDisposition::Completed {
+    let disposition = match (state.as_str(), turn, replacement) {
+        ("queued", None, None) => InputDisposition::Queued,
+        ("claimed", Some(turn), None) => InputDisposition::Claimed {
             turn: TurnId::new(turn)?,
         },
-        (Some(turn), false, false, None, false) => InputDisposition::Claimed {
+        ("completed", Some(turn), None) => InputDisposition::Completed {
             turn: TurnId::new(turn)?,
         },
-        (None, false, false, Some(replacement), false) => InputDisposition::Superseded {
+        ("superseded", None, Some(replacement)) => InputDisposition::Superseded {
             replacement: ChangeId::new(replacement)?,
         },
-        (None, false, false, None, true) => InputDisposition::Withdrawn,
+        ("withdrawn", None, None) => InputDisposition::Withdrawn,
         _ => {
             return Err(error(
                 ErrorKind::InvalidState,
@@ -2102,7 +1896,7 @@ fn turn_inputs(
     turn: &TurnId,
 ) -> Result<Vec<Submission>> {
     let mut statement = connection
-        .prepare("SELECT id FROM submissions WHERE session=?1 AND turn_id=?2 ORDER BY turn_order")
+        .prepare("SELECT id FROM submissions WHERE session=?1 AND turn=?2 ORDER BY turn_order")
         .map_err(database_error)?;
     let ids = statement
         .query_map(params![session.as_str(), turn.as_str()], |row| {
@@ -2116,11 +1910,16 @@ fn turn_inputs(
         .collect()
 }
 
-fn load_turn(connection: &Connection, session: &SessionId, turn: &TurnId) -> Result<TurnState> {
-    turn_layout::load(connection, session, turn)
+fn load_turn(
+    inner: &Inner,
+    connection: &Connection,
+    session: &SessionId,
+    turn: &TurnId,
+) -> Result<TurnState> {
+    turn_layout::load(&inner.turns, connection, session, turn)
 }
 
-/// Assemble a turn from its `turns.snapshot` head; see `turn_layout`.
+/// Assemble a turn from its `turns.head` row; see `turn_layout`.
 fn decode_turn(
     connection: &Connection,
     head: &[u8],
@@ -2130,39 +1929,26 @@ fn decode_turn(
     turn_layout::read(connection, head, session, turn)
 }
 
-fn save_turn(transaction: &Transaction<'_>, state: &TurnState) -> Result<()> {
-    let binding = state.binding();
-    turn_layout::write(transaction, state, false)?;
-    if state.outcome().is_some() {
-        // The first settlement is the recorded finish. A clock that moved
-        // backwards cannot produce a negative duration.
-        transaction
-            .execute(
-                "UPDATE turn_times SET settled_ms=MAX(started_ms,?3)
-                 WHERE session=?1 AND turn=?2 AND settled_ms IS NULL",
-                params![binding.session.as_str(), binding.turn.as_str(), now_ms()],
-            )
-            .map_err(database_error)?;
+fn save_turn(inner: &Inner, transaction: &Transaction<'_>, state: &TurnState) -> Result<()> {
+    turn_layout::write(&inner.turns, transaction, state, false)
+}
+
+/// Refuse a new turn whose identity its session already holds.
+fn require_new_turn(connection: &Connection, session: &SessionId, turn: &TurnId) -> Result<()> {
+    let exists: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM turns WHERE session=?1 AND id=?2)",
+            params![session.as_str(), turn.as_str()],
+            |row| row.get(0),
+        )
+        .map_err(database_error)?;
+    if exists {
+        return Err(error(ErrorKind::Conflict, "turn_exists"));
     }
     Ok(())
 }
 
-pub(crate) fn record_turn_start(
-    transaction: &Transaction<'_>,
-    session: &SessionId,
-    turn: &TurnId,
-) -> Result<()> {
-    transaction
-        .execute(
-            "INSERT INTO turn_times(session,turn,started_ms) VALUES(?1,?2,?3)
-             ON CONFLICT(session,turn) DO NOTHING",
-            params![session.as_str(), turn.as_str(), now_ms()],
-        )
-        .map_err(database_error)?;
-    Ok(())
-}
-
-fn now_ms() -> i64 {
+pub(crate) fn now_ms() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |elapsed| {
@@ -2356,6 +2142,14 @@ fn database_error(_: rusqlite::Error) -> Error {
 }
 fn commit_error(_: rusqlite::Error) -> Error {
     error(ErrorKind::Uncertain, "sqlite_commit_unconfirmed")
+}
+
+/// Commit a store transaction, then remember the turns it wrote. Nothing is
+/// remembered unless the commit succeeded.
+fn commit(inner: &Inner, transaction: Transaction<'_>) -> Result<()> {
+    transaction.commit().map_err(commit_error)?;
+    turn_layout::lock(&inner.turns).publish();
+    Ok(())
 }
 fn lock_path(path: &Path) -> PathBuf {
     let mut value = path.as_os_str().to_os_string();

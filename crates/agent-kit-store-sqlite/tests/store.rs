@@ -50,10 +50,10 @@ async fn store() -> (TempDir, SqliteStore) {
 }
 #[tokio::test]
 async fn acceptance_is_idempotent_and_inspection_is_observational() {
-    let (_directory, store) = store().await;
+    let (directory, store) = store().await;
     let input = submission("request", "hello");
     let first = store.submit(session(), input.clone()).await.unwrap();
-    assert_eq!(store.submit(session(), input).await.unwrap(), first);
+    assert_eq!(store.submit(session(), input.clone()).await.unwrap(), first);
     assert_error(
         store
             .submit(session(), submission("request", "different"))
@@ -61,6 +61,20 @@ async fn acceptance_is_idempotent_and_inspection_is_observational() {
         ErrorKind::Conflict,
         "request_identity_reused",
     );
+    // The accepted submission itself is the receipt of a retry.
+    drop(store);
+    let path = directory.path().join("sessions.sqlite");
+    let receipts: i64 = rusqlite::Connection::open(&path)
+        .unwrap()
+        .query_row(
+            "SELECT count(*) FROM requests WHERE kind<>'create'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(receipts, 0);
+    let store = SqliteStore::open(&path).unwrap();
+    assert_eq!(store.submit(session(), input).await.unwrap(), first);
     let view = store.inspect(session()).await.unwrap();
     assert_eq!(view.queued.len(), 1);
     assert!(view.current.is_none());
@@ -392,74 +406,6 @@ async fn queue_replacement_and_claim_have_one_winner() {
                 .is_none()
         );
     }
-}
-
-#[tokio::test]
-async fn previous_schema_upgrades_without_changing_completed_or_queued_input() {
-    let (directory, store) = store().await;
-    store
-        .submit(session(), submission("completed", "retained result input"))
-        .await
-        .unwrap();
-    store
-        .submit(session(), submission("pending", "retained pending input"))
-        .await
-        .unwrap();
-    let claim = claim(&store, "claim", vec![change("completed")]).await;
-    commit(
-        &claim,
-        "settle",
-        vec![JournalAction::Settle(TurnOutcome {
-            status: OutcomeStatus::Succeeded,
-            account: None,
-            evidence: vec![],
-        })],
-    )
-    .await;
-    drop(claim);
-    drop(store);
-    let path = directory.path().join("sessions.sqlite");
-    let previous = rusqlite::Connection::open(&path).unwrap();
-    support::remove_turn_link_schema(&previous);
-    previous
-        .execute_batch(
-            "DROP TABLE session_retirements;
-         DROP TABLE session_catalog;
-         DROP TABLE session_context_replacements;
-         DROP TABLE session_history_views;
-         DROP INDEX session_turn_order;
-         DROP INDEX submission_queue_order;
-         ALTER TABLE submissions DROP COLUMN queue_order;
-         ALTER TABLE submissions DROP COLUMN replacement_id;
-         ALTER TABLE submissions DROP COLUMN withdrawn;
-         ALTER TABLE sessions DROP COLUMN driver_state;
-         PRAGMA user_version=1;",
-        )
-        .unwrap();
-    drop(previous);
-    let upgraded = SqliteStore::open(&path).unwrap();
-    let pending = upgraded.inspect(session()).await.unwrap().queued;
-    assert_eq!(pending.len(), 1);
-    assert_eq!(pending[0].input.payload, payload("retained pending input"));
-    assert_eq!(pending[0].position, 1);
-    let completed = upgraded
-        .input(session(), change("completed"))
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(
-        completed.disposition,
-        InputDisposition::Completed { turn: turn() }
-    );
-    assert_eq!(completed.input.payload, payload("retained result input"));
-    assert_eq!(
-        upgraded
-            .submit(session(), submission("pending", "retained pending input"))
-            .await
-            .unwrap()
-            .position,
-        1
-    );
 }
 
 #[tokio::test]
@@ -893,18 +839,23 @@ async fn malformed_stored_turn_is_rejected_before_recovery() {
     )
     .await;
     drop(acquired);
-    let connection = rusqlite::Connection::open(directory.path().join("sessions.sqlite")).unwrap();
+    // The open store is the database's only writer; edit it once closed.
+    drop(store);
+    let path = directory.path().join("sessions.sqlite");
+    let connection = rusqlite::Connection::open(&path).unwrap();
     let bytes: Vec<u8> = connection
-        .query_row("SELECT snapshot FROM turns", [], |row| row.get(0))
+        .query_row("SELECT head FROM turns", [], |row| row.get(0))
         .unwrap();
     let mut state: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     state["position"] = serde_json::json!(999);
     connection
         .execute(
-            "UPDATE turns SET snapshot=?1",
+            "UPDATE turns SET head=?1",
             [serde_json::to_vec(&state).unwrap()],
         )
         .unwrap();
+    drop(connection);
+    let store = SqliteStore::open(&path).unwrap();
     assert_error(
         store.inspect_turn(session(), turn()).await,
         ErrorKind::InvalidState,
@@ -959,6 +910,71 @@ fn unknown_database_schema_is_rejected() {
         SqliteStore::open(&path),
         ErrorKind::Unsupported,
         "store_schema_unsupported",
+    );
+}
+
+/// Only an empty file or one this store created opens. A file another
+/// program or schema wrote is refused unchanged, whatever its version.
+#[test]
+fn a_database_this_store_did_not_create_is_refused_unchanged() {
+    let directory = private_directory();
+    let refused = |name: &str, setup: &str| {
+        let path = directory.path().join(name);
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        connection.execute_batch(setup).unwrap();
+        drop(connection);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        assert_error(
+            SqliteStore::open(&path),
+            ErrorKind::Unsupported,
+            "store_schema_unsupported",
+        );
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        let tables: i64 = connection
+            .query_row(
+                "SELECT count(*) FROM sqlite_schema WHERE type='table'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let application_id: i64 = connection
+            .pragma_query_value(None, "application_id", |row| row.get(0))
+            .unwrap();
+        (tables, application_id)
+    };
+    // Tables at version 0, as from another program.
+    assert_eq!(
+        refused("foreign.sqlite", "CREATE TABLE notes(text TEXT);"),
+        (1, 0)
+    );
+    // Another schema's sessions at the first version, without this store's identity.
+    assert_eq!(
+        refused(
+            "versioned.sqlite",
+            "CREATE TABLE sessions(id TEXT PRIMARY KEY, configuration BLOB NOT NULL);
+             PRAGMA user_version=1;",
+        ),
+        (1, 0)
+    );
+    assert_eq!(
+        refused(
+            "later.sqlite",
+            "CREATE TABLE sessions(id TEXT PRIMARY KEY); CREATE TABLE turns(id TEXT);
+             PRAGMA user_version=13;",
+        ),
+        (2, 0)
+    );
+    // This store's identity at a version it does not know.
+    assert_eq!(
+        refused(
+            "unknown-version.sqlite",
+            "PRAGMA application_id=1196572999; PRAGMA user_version=2;",
+        ),
+        (0, 1196572999)
     );
 }
 
@@ -1480,7 +1496,8 @@ async fn bounded_context_prefix_still_refuses_a_malformed_or_oversized_scan() {
     let corrupt = rusqlite::Connection::open(&path).unwrap();
     corrupt
         .execute(
-            "INSERT INTO turns(session,id,snapshot) VALUES(?1,'malformed',?2)",
+            "INSERT INTO turns(session,id,head,history_len,stored_bytes,started_ms)
+             VALUES(?1,'malformed',?2,0,7,0)",
             rusqlite::params![session().as_str(), b"invalid"],
         )
         .unwrap();
@@ -1507,14 +1524,19 @@ async fn bounded_context_prefix_still_refuses_a_malformed_or_oversized_scan() {
             epoch: 1,
         })
         .unwrap();
+        // An empty turn's head: its state without parts.
+        let mut head = serde_json::to_value(&state).unwrap();
+        let fields = head.as_object_mut().unwrap();
+        for part in ["operations", "receipts", "checkpoint"] {
+            fields.remove(part);
+        }
+        fields.insert("history".into(), serde_json::json!({}));
+        let head = serde_json::to_vec(&head).unwrap();
         transaction
             .execute(
-                "INSERT INTO turns(session,id,snapshot) VALUES(?1,?2,?3)",
-                rusqlite::params![
-                    session().as_str(),
-                    turn.as_str(),
-                    serde_json::to_vec(&state).unwrap()
-                ],
+                "INSERT INTO turns(session,id,head,history_len,stored_bytes,started_ms)
+                 VALUES(?1,?2,?3,0,?4,0)",
+                rusqlite::params![session().as_str(), turn.as_str(), head, head.len() as i64],
             )
             .unwrap();
     }
@@ -1591,35 +1613,6 @@ async fn paged_transcript_replay_freezes_the_active_tail_without_a_lease() {
 }
 
 #[tokio::test]
-async fn upgraded_turns_replay_without_invented_timing() {
-    let (directory, store) = store().await;
-    let path = directory.path().join("sessions.sqlite");
-    let old = history_message("before-upgrade", "kept text");
-    finish_history_turn(&store, session(), "before-upgrade", vec![old.clone()]).await;
-    drop(store);
-    let previous = rusqlite::Connection::open(&path).unwrap();
-    previous
-        .execute_batch("DROP TABLE turn_times; PRAGMA user_version=11;")
-        .unwrap();
-    drop(previous);
-    let store = SqliteStore::open(&path).unwrap();
-    let new = history_message("after-upgrade", "timed text");
-    finish_history_turn(&store, session(), "after-upgrade", vec![new.clone()]).await;
-    let project = |state: &agent_kit_core::turn::TurnState| state.history().records().to_vec();
-    let window = store
-        .history_replay_window(session(), None, project, |_| 1)
-        .await
-        .unwrap();
-    assert_eq!(plain(&window.records), vec![old, new]);
-    let [before, after] = &window.turns[..] else {
-        panic!("expected two turns")
-    };
-    assert_eq!(before.status, Some(OutcomeStatus::Succeeded));
-    assert_eq!((before.started_ms, before.settled_ms), (None, None));
-    assert!(after.started_ms.unwrap() <= after.settled_ms.unwrap());
-}
-
-#[tokio::test]
 async fn earlier_replay_windows_keep_the_exact_boundary_as_new_turns_arrive() {
     let (_directory, store) = store().await;
     let mut expected = Vec::new();
@@ -1642,7 +1635,7 @@ async fn earlier_replay_windows_keep_the_exact_boundary_as_new_turns_arrive() {
     for (record, turn) in latest.records.iter().zip(&latest.turns) {
         assert_eq!(record.turn.as_ref(), Some(&turn.id));
         assert_eq!(turn.status, Some(OutcomeStatus::Succeeded));
-        let (started, settled) = (turn.started_ms.unwrap(), turn.settled_ms.unwrap());
+        let (started, settled) = (turn.started_ms, turn.settled_ms.unwrap());
         assert!(started > 0 && started <= settled);
     }
     assert_eq!(latest.turns[0].id.as_str(), "window-turn-38");
@@ -1697,7 +1690,7 @@ async fn an_earlier_window_cannot_mix_changed_records_within_an_active_turn() {
     // A running turn has a recorded start and no outcome or finish.
     assert_eq!(latest.turns.len(), 1);
     assert_eq!(latest.turns[0].status, None);
-    assert!(latest.turns[0].started_ms.is_some());
+    assert!(latest.turns[0].started_ms > 0);
     assert_eq!(latest.turns[0].settled_ms, None);
     let older = store
         .history_replay_window(session(), latest.older.clone(), project, measure)
@@ -2314,40 +2307,6 @@ async fn revision_refuses_queue_and_live_ownership() {
 }
 
 #[tokio::test]
-async fn version_two_upgrades_with_original_history_view() {
-    let (directory, store) = store().await;
-    let original = history_message("previous", "existing history");
-    finish_history_turn(&store, session(), "previous", vec![original.clone()]).await;
-    drop(store);
-    let path = directory.path().join("sessions.sqlite");
-    let previous = rusqlite::Connection::open(&path).unwrap();
-    support::remove_turn_link_schema(&previous);
-    previous
-        .execute_batch(
-            "DROP TABLE session_retirements;
-         DROP TABLE session_catalog;
-         DROP TABLE session_context_replacements;
-         DROP TABLE session_history_views;
-         DROP INDEX session_turn_order;
-         ALTER TABLE sessions DROP COLUMN driver_state;
-         PRAGMA user_version=2;",
-        )
-        .unwrap();
-    drop(previous);
-    let store = SqliteStore::open(&path).unwrap();
-    let retained = current_history(&store, session()).await;
-    assert_eq!(retained.basis.view, SessionRevision(0));
-    assert!(retained.seed.is_none());
-    assert_eq!(retained.into_records(), vec![original]);
-    drop(store);
-    let reopened = rusqlite::Connection::open(&path).unwrap();
-    let version: i64 = reopened
-        .pragma_query_value(None, "user_version", |row| row.get(0))
-        .unwrap();
-    assert_eq!(version, 13);
-}
-
-#[tokio::test]
 async fn older_reconciliation_invalidates_a_cut_without_moving_its_tail() {
     use agent_kit_core::authority::{AuthorityBinding, GrantSelection};
     use agent_kit_core::inference::{
@@ -2820,34 +2779,6 @@ async fn context_candidate_cannot_install_after_a_new_turn_claim() {
             .into_records(),
         [original, later]
     );
-}
-
-#[tokio::test]
-async fn upgrades_context_store_without_inventing_driver_state() {
-    let (directory, store) = store().await;
-    let filename = directory.path().join("sessions.sqlite");
-    let accepted = submission("prior-input", "pending user work");
-    store.submit(session(), accepted.clone()).await.unwrap();
-    let before = store.inspect(session()).await.unwrap();
-    drop(store);
-
-    let previous = rusqlite::Connection::open(&filename).unwrap();
-    support::remove_turn_link_schema(&previous);
-    previous
-        .execute_batch(
-            "DROP TABLE session_retirements;
-             DROP TABLE session_catalog;
-             ALTER TABLE sessions DROP COLUMN driver_state;
-             PRAGMA user_version=4;",
-        )
-        .unwrap();
-    drop(previous);
-
-    let reopened = SqliteStore::open(filename).unwrap();
-    let after = reopened.inspect(session()).await.unwrap();
-    assert_eq!(after, before);
-    assert!(after.driver_state.is_initial());
-    assert_eq!(after.queued[0].input, accepted);
 }
 
 #[tokio::test]

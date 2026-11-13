@@ -4,7 +4,7 @@ use super::{
     CHILD_INPUT, CHILD_TURN, delegation_definition, delegation_grant, named, related_changed,
 };
 use crate::host::{
-    INPUT_SCHEMA, PromptPart, StoredPrompt, decode_input, problem, session_configuration,
+    PromptPart, StoredPrompt, decode_input, is_stored_input, problem, session_configuration,
 };
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ToolArguments};
@@ -109,9 +109,7 @@ impl CollectReview {
             })
             .ok_or_else(related_changed)?;
         let input = accepted.input.input;
-        if input.payload.schema().as_str() != INPUT_SCHEMA
-            || !matches!(input.payload.version(), 2 | 3)
-        {
+        if !is_stored_input(&input.payload) {
             return Err(related_changed());
         }
         let stored: StoredPrompt = decode_input(&input)?;

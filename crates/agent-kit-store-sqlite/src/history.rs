@@ -2,7 +2,7 @@
 
 use super::{
     Inner, MAX_HISTORY_BYTES, MAX_HISTORY_RECORDS, MAX_HISTORY_SCAN_BYTES, MAX_HISTORY_TURNS,
-    SqliteStore, bump_revision, commit_error, database_error, decode, decode_turn, encode, error,
+    SqliteStore, bump_revision, commit, database_error, decode, decode_turn, encode, error,
     execute, has_live_session_owner, insert_input, insert_session, load_session, load_turn,
     lookup_request, require_revision, save_request, save_session, sql_number, unsigned,
 };
@@ -157,9 +157,9 @@ pub struct ReplayTurn {
     pub id: TurnId,
     /// None while the turn has no terminal outcome.
     pub status: Option<OutcomeStatus>,
-    /// Wall-clock milliseconds since the Unix epoch. Absent for turns
-    /// recorded before timing was retained.
-    pub started_ms: Option<u64>,
+    /// Wall-clock milliseconds since the Unix epoch at which the turn started.
+    pub started_ms: u64,
+    /// When the turn first settled, absent until it settles.
     pub settled_ms: Option<u64>,
     /// The tokens the turn's context occupied at its largest model call, as
     /// the provider reported them. Absent when no call reported usage.
@@ -236,10 +236,9 @@ impl SqliteStore {
                 };
                 let mut query = connection
                     .prepare(
-                        "SELECT t.ordinal,t.id,t.snapshot,tt.started_ms,tt.settled_ms,COALESCE(t.bytes,length(t.snapshot)) FROM turns t
-                         LEFT JOIN turn_times tt ON tt.session=t.session AND tt.turn=t.id
-                         WHERE t.session=?1 AND t.ordinal>?2 AND t.ordinal<=?3
-                         ORDER BY t.ordinal DESC LIMIT ?4",
+                        "SELECT ordinal,id,head,started_ms,settled_ms,stored_bytes FROM turns
+                         WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
+                         ORDER BY ordinal DESC LIMIT ?4",
                     )
                     .map_err(database_error)?;
                 let mut rows = query
@@ -254,7 +253,7 @@ impl SqliteStore {
                 let mut scanned_bytes = 0;
                 while let Some(row) = rows.next().map_err(database_error)? {
                     let ordinal: i64 = row.get(0).map_err(database_error)?;
-                    let snapshot = row
+                    let head = row
                         .get_ref(2)
                         .map_err(database_error)?
                         .as_blob()
@@ -267,7 +266,7 @@ impl SqliteStore {
                             .finish(view.id, Some(ReplayBoundary::Turn { ordinal, cut: None })));
                     }
                     let turn = TurnId::new(row.get::<_, String>(1).map_err(database_error)?)?;
-                    let state = decode_turn(connection, snapshot, &session, &turn)?;
+                    let state = decode_turn(connection, head, &session, &turn)?;
                     let position = state.position();
                     let records = project(&state);
                     let silent_account = records
@@ -281,16 +280,17 @@ impl SqliteStore {
                         Some(_) => return Err(replay_changed()),
                         None => None,
                     };
-                    let time = |index| {
-                        row.get::<_, Option<i64>>(index)
-                            .map(|value| value.and_then(|value| u64::try_from(value).ok()))
-                            .map_err(database_error)
-                    };
+                    let started_ms = unsigned(row.get(3).map_err(database_error)?)?;
+                    let settled_ms = row
+                        .get::<_, Option<i64>>(4)
+                        .map_err(database_error)?
+                        .map(unsigned)
+                        .transpose()?;
                     let facts = ReplayTurn {
                         id: turn.clone(),
                         status: state.outcome().map(|outcome| outcome.status),
-                        started_ms: time(3)?,
-                        settled_ms: time(4)?,
+                        started_ms,
+                        settled_ms,
                         context_tokens: context_tokens(&state),
                         silent_account,
                         tail: before.is_none(),
@@ -333,7 +333,7 @@ impl SqliteStore {
         project: fn(&TurnState) -> Vec<HistoryRecord>,
     ) -> Result<HistoryReplay> {
         let replay_owner = Arc::clone(&self.inner);
-        execute(Arc::clone(&self.inner), move |_, connection| {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
             let state = load_session(connection, &session)?;
             let (view, _) = select_view(connection, &session, HistorySelection::Current)?;
             let mut end = connection
@@ -360,7 +360,7 @@ impl SqliteStore {
                             "history_active_turn_not_last",
                         ));
                     }
-                    active = Some(project(&load_turn(connection, &session, &turn)?));
+                    active = Some(project(&load_turn(inner, connection, &session, &turn)?));
                     end -= 1;
                 }
             }
@@ -425,8 +425,8 @@ impl SqliteStore {
             )?;
             require_basis(&history.basis, &request.expected_history)?;
             let seed = make_seed(history)?;
-            let receipt = insert_session(&transaction, &request.create, inner.catalog)?;
-            insert_view(&transaction, destination, receipt.revision, &seed, 0)?;
+            let receipt =
+                insert_session(&transaction, &request.create, inner.catalog, Some(&seed))?;
             save_request(
                 &transaction,
                 destination,
@@ -435,7 +435,7 @@ impl SqliteStore {
                 fingerprint,
                 &receipt,
             )?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             Ok(receipt)
         })
         .await
@@ -487,28 +487,17 @@ impl SqliteStore {
             ).map_err(database_error)?;
             let seed = make_seed(history)?;
             let closed = transaction.execute(
-                "UPDATE session_history_views SET end_ordinal=?2 WHERE session=?1 AND end_ordinal IS NULL",
+                "UPDATE history_views SET end_ordinal=?2 WHERE session=?1 AND end_ordinal IS NULL",
                 params![id.as_str(), end],
             ).map_err(database_error)?;
-            if closed == 0 {
-                transaction.execute(
-                    "INSERT INTO session_history_views(session,view,after_ordinal,end_ordinal) VALUES(?1,0,0,?2)",
-                    params![id.as_str(), end],
-                ).map_err(database_error)?;
+            if closed != 1 {
+                return Err(error(ErrorKind::InvalidState, "stored_history_view_missing"));
             }
             let acceptance =
                 insert_input(inner, &transaction, id, &mut session, &request.replacement, None)?;
             bump_revision(&mut session)?;
-            insert_view(&transaction, id, session.revision, &seed, end)?;
+            insert_view(&transaction, id, session.revision, Some(&seed), end)?;
             save_session(&transaction, id, &session)?;
-            save_request(
-                &transaction,
-                id,
-                "submit",
-                &request.replacement.id,
-                Fingerprint::of(&request.replacement)?,
-                &acceptance,
-            )?;
             let receipt = HistoryRevised { view: session.revision, acceptance };
             save_request(
                 &transaction,
@@ -518,7 +507,7 @@ impl SqliteStore {
                 fingerprint,
                 &receipt,
             )?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             inner.changed.notify_waiters();
             Ok(receipt)
         })
@@ -601,18 +590,25 @@ pub(super) fn require_basis(current: &HistoryBasis, expected: &HistoryBasis) -> 
     Ok(())
 }
 
-fn insert_view(
+/// Open a session's current view after `after`, with an optional seed.
+pub(super) fn insert_view(
     transaction: &Transaction<'_>,
     session: &SessionId,
     view: SessionRevision,
-    seed: &HistorySeed,
+    seed: Option<&HistorySeed>,
     after: i64,
 ) -> Result<()> {
-    let bytes = seed_bytes(seed)?;
-    let identity = encode(&Fingerprint::of(seed)?)?;
+    let bytes = seed.map(seed_bytes).transpose()?;
+    let identity = seed.map(Fingerprint::of).transpose()?;
     transaction.execute(
-        "INSERT INTO session_history_views(session,view,seed,after_ordinal,seed_identity) VALUES(?1,?2,?3,?4,?5)",
-        params![session.as_str(), sql_number(view.0)?, bytes, after, identity],
+        "INSERT INTO history_views(session,view,seed,after_ordinal,seed_identity) VALUES(?1,?2,?3,?4,?5)",
+        params![
+            session.as_str(),
+            sql_number(view.0)?,
+            bytes,
+            after,
+            identity.as_ref().map(|identity| identity.bytes().as_slice())
+        ],
     ).map_err(database_error)?;
     Ok(())
 }
@@ -629,7 +625,6 @@ pub(super) fn seed_bytes(seed: &HistorySeed) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-#[derive(Default)]
 pub(super) struct View {
     pub(super) id: SessionRevision,
     pub(super) seed: Option<HistorySeed>,
@@ -660,12 +655,12 @@ pub(super) fn select_view(
         HistorySelection::View(id) => (None, Some(sql_number(id.0)?)),
     };
     let sql = match (before, view) {
-        (Some(_), _) => "SELECT view,seed,after_ordinal,end_ordinal,seed_identity FROM session_history_views
+        (Some(_), _) => "SELECT view,seed,after_ordinal,end_ordinal,seed_identity FROM history_views
                         WHERE session=?1 AND after_ordinal<?2 AND (end_ordinal IS NULL OR ?2<=end_ordinal)
                         ORDER BY after_ordinal DESC,view DESC LIMIT 1",
-        (_, Some(_)) => "SELECT view,seed,after_ordinal,end_ordinal,seed_identity FROM session_history_views
+        (_, Some(_)) => "SELECT view,seed,after_ordinal,end_ordinal,seed_identity FROM history_views
                         WHERE session=?1 AND view=?2",
-        _ => "SELECT view,seed,after_ordinal,end_ordinal,seed_identity FROM session_history_views
+        _ => "SELECT view,seed,after_ordinal,end_ordinal,seed_identity FROM history_views
               WHERE session=?1 AND end_ordinal IS NULL",
     };
     let mut statement = connection.prepare(sql).map_err(database_error)?;
@@ -696,27 +691,18 @@ pub(super) fn select_view(
                 seed_identity: row
                     .get::<_, Option<Vec<u8>>>(4)
                     .map_err(database_error)?
-                    .map(|bytes| decode(&bytes))
+                    .map(stored_identity)
                     .transpose()?,
                 after: row.get(2).map_err(database_error)?,
                 end: row.get(3).map_err(database_error)?,
             }
         }
-        None if view.is_none_or(|id| id == 0) => {
-            let materialized: bool = connection
-                .query_row(
-                    "SELECT EXISTS(SELECT 1 FROM session_history_views WHERE session=?1)",
-                    [session.as_str()],
-                    |row| row.get(0),
-                )
-                .map_err(database_error)?;
-            if materialized {
-                return Err(error(
-                    ErrorKind::InvalidState,
-                    "stored_history_view_missing",
-                ));
-            }
-            View::default()
+        // Every session holds its current view and the view of each turn.
+        None if view.is_none() => {
+            return Err(error(
+                ErrorKind::InvalidState,
+                "stored_history_view_missing",
+            ));
         }
         None => return Err(error(ErrorKind::InvalidInput, "history_view_missing")),
     };
@@ -733,7 +719,7 @@ fn read_replay_page(
     load_session(connection, session)?;
     let mut query = connection
         .prepare(
-            "SELECT ordinal,id,snapshot,COALESCE(bytes,length(snapshot)) FROM turns WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
+            "SELECT ordinal,id,head,stored_bytes FROM turns WHERE session=?1 AND ordinal>?2 AND ordinal<=?3
              ORDER BY ordinal LIMIT ?4",
         )
         .map_err(database_error)?;
@@ -744,19 +730,19 @@ fn read_replay_page(
     let mut scanned_bytes = 0;
     let mut scanned_turns = 0;
     while let Some(row) = rows.next().map_err(database_error)? {
-        let snapshot = row
+        let head = row
             .get_ref(2)
             .map_err(database_error)?
             .as_blob()
             .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
         // A single durable turn may exceed the target page size. Never split
-        // its projection or accumulate it alongside other large snapshots.
+        // its projection or accumulate it alongside other large turns.
         let stored = stored_bytes(row.get(3).map_err(database_error)?)?;
         if scanned_turns != 0 && scanned_bytes + stored > MAX_HISTORY_BYTES {
             return Ok((after, records));
         }
         let turn = TurnId::new(row.get::<_, String>(1).map_err(database_error)?)?;
-        let state = decode_turn(connection, snapshot, session, &turn)?;
+        let state = decode_turn(connection, head, session, &turn)?;
         records.extend(project(&state));
         after = row.get(0).map_err(database_error)?;
         scanned_turns += 1;
@@ -809,7 +795,7 @@ pub(super) fn read_view_projection(
     allow_prefix: bool,
 ) -> Result<(RetainedHistory, Option<TurnId>)> {
     let mut query = connection.prepare(
-        "SELECT ordinal,id,snapshot,COALESCE(bytes,length(snapshot)) FROM turns
+        "SELECT ordinal,id,head,stored_bytes FROM turns
          WHERE session=?1 AND ordinal>?2 AND (?3 IS NULL OR ordinal<=?3) AND (?4 IS NULL OR ordinal<?4)
          ORDER BY ordinal LIMIT ?5",
     ).map_err(database_error)?;
@@ -834,7 +820,7 @@ pub(super) fn read_view_projection(
     while let Some(row) = rows.next().map_err(database_error)? {
         let ordinal = unsigned(row.get(0).map_err(database_error)?)?;
         let turn = TurnId::new(row.get::<_, String>(1).map_err(database_error)?)?;
-        let snapshot = row
+        let head = row
             .get_ref(2)
             .map_err(database_error)?
             .as_blob()
@@ -844,7 +830,7 @@ pub(super) fn read_view_projection(
         if scanned_turns > MAX_HISTORY_TURNS || scanned_bytes > MAX_HISTORY_SCAN_BYTES {
             return Err(projection_limit());
         }
-        let state = decode_turn(connection, snapshot, session, &turn)?;
+        let state = decode_turn(connection, head, session, &turn)?;
         let position = state.position();
         if unprojected_suffix_after.is_none() {
             let projected = project(&state);
@@ -926,8 +912,15 @@ fn context_tokens(state: &TurnState) -> Option<u64> {
         .max()
 }
 
-/// A turn's stored size: its head, parts and distinct messages, or the whole
-/// snapshot of a turn written before that layout.
+/// A turn's stored size: its head, parts and distinct messages.
 pub(crate) fn stored_bytes(value: i64) -> Result<usize> {
     usize::try_from(value).map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))
+}
+
+/// A stored 32-byte identity.
+pub(crate) fn stored_identity(bytes: Vec<u8>) -> Result<Fingerprint> {
+    let bytes: [u8; 32] = bytes
+        .try_into()
+        .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
+    Ok(Fingerprint::from_bytes(bytes))
 }

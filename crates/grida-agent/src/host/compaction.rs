@@ -330,8 +330,7 @@ impl Host {
         };
         if self.side_context.is_some()
             || session_configuration(view)?.subagent.is_some()
-            || head.payload.schema().as_str() != INPUT_SCHEMA
-            || !matches!(head.payload.version(), 2 | 3)
+            || !is_stored_input(&head.payload)
             || view.latest.as_ref().is_some_and(|latest| {
                 latest
                     .binding

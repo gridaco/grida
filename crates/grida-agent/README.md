@@ -35,7 +35,9 @@ feature's current behavior, intended outcome, caveats, and availability.
 Build with `cargo build -p grida-agent --locked`. Use an absolute workspace
 directory and a dedicated state directory. The host creates missing state
 directories with private permissions where the platform supports them.
-The state directory contains `runtime.sqlite` and has one owning process.
+The state directory contains the session database `agent.sqlite` and has one
+owning process. The database opens only if it is empty or was created by this
+host; a file from any other schema is refused rather than converted.
 
 ```sh
 printf '%s' 'Explain this concept briefly.' | target/debug/grida-agent run \
@@ -764,10 +766,6 @@ an exact retry cannot create replacement authority.
 Saved-chat deletion retires only that parent's local task authority after its
 owned work is excluded. Removing a child does not remove the parent's shared
 authority, and deleting local records never refunds remote pending charges.
-Capped work and registered lifecycle-hook work use an extended input-envelope
-version. Older native workers may read its history but cannot resume the task
-by ignoring unknown policy fields. Continue with a compatible worker; do not
-remove the retained policy or spending records to force a downgrade.
 
 An opted-in private ACP submission can schedule one wake-up for its own task.
 Goal Start can also opt in for the first Standard Act reservation. The timer

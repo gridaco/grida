@@ -29,77 +29,25 @@ fn ids(page: &CatalogPage) -> Vec<SessionId> {
 }
 
 #[tokio::test]
-async fn upgraded_projection_indexes_previously_hidden_records() {
-    fn earlier(configuration: &Envelope) -> Option<Fingerprint> {
-        if configuration.bytes() == b"b" {
-            None
-        } else {
-            project(configuration)
-        }
-    }
+async fn catalog_paging_keeps_scope_and_creation_order() {
     let directory = private_directory();
     let filename = directory.path().join("sessions.sqlite");
-    let store = SqliteStore::open_cataloged(&filename, earlier).unwrap();
-    store.create(create("a-chat", "a")).await.unwrap();
-    store.create(create("b-chat", "b")).await.unwrap();
-    let a = project(&payload("a")).unwrap();
-    let b = project(&payload("b")).unwrap();
-    assert!(store.has_catalog_entries(a).await.unwrap());
-    assert!(!store.has_catalog_entries(b).await.unwrap());
-    drop(store);
-
-    let previous = rusqlite::Connection::open(&filename).unwrap();
-    support::remove_turn_link_schema(&previous);
-    previous
-        .execute_batch(
-            "DROP INDEX session_retirements_pending;
-             ALTER TABLE session_retirements DROP COLUMN cleanup;
-             PRAGMA user_version=8;",
-        )
-        .unwrap();
-    drop(previous);
-    let store = SqliteStore::open_cataloged(filename, project).unwrap();
-    assert_eq!(
-        ids(&store.list_catalog(a, 0, None).await.unwrap()),
-        [SessionId::new("a-chat").unwrap()]
-    );
-    assert!(store.has_catalog_entries(b).await.unwrap());
-    assert_eq!(
-        ids(&store.list_catalog(b, 0, None).await.unwrap()),
-        [SessionId::new("b-chat").unwrap()]
-    );
-}
-
-#[tokio::test]
-async fn catalog_migration_and_paging_keep_scope_and_creation_order() {
-    let directory = private_directory();
-    let filename = directory.path().join("sessions.sqlite");
-    let legacy = SqliteStore::open(&filename).unwrap();
+    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
     for n in 0..34 {
-        legacy
+        store
             .create(create(&format!("a-{n:02}"), "a"))
             .await
             .unwrap();
-        legacy
+        store
             .create(create(&format!("b-{n:02}"), "b"))
             .await
             .unwrap();
     }
-    legacy
+    // A configuration the owner does not recognize is in no scope.
+    store
         .create(create("unprojected", "unknown"))
         .await
         .unwrap();
-    drop(legacy);
-    let legacy = rusqlite::Connection::open(&filename).unwrap();
-    support::remove_turn_link_schema(&legacy);
-    legacy
-        .execute_batch(
-            "DROP TABLE session_retirements; DROP TABLE session_catalog; PRAGMA user_version=5;",
-        )
-        .unwrap();
-    drop(legacy);
-
-    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
     let scope_a = project(&payload("a")).unwrap();
     let scope_b = project(&payload("b")).unwrap();
     let page = store.list_catalog(scope_a, 0, None).await.unwrap();
@@ -153,7 +101,7 @@ async fn catalog_migration_and_paging_keep_scope_and_creation_order() {
 }
 
 #[tokio::test]
-async fn catalog_organization_upgrades_an_existing_index_and_fences_edits() {
+async fn catalog_organization_fences_edits() {
     let directory = private_directory();
     let filename = directory.path().join("sessions.sqlite");
     let store = SqliteStore::open_cataloged(&filename, project).unwrap();
@@ -162,24 +110,6 @@ async fn catalog_organization_upgrades_an_existing_index_and_fences_edits() {
     let id = chat.id.clone();
     store.create(chat).await.unwrap();
     let before = store.inspect(id.clone()).await.unwrap();
-    drop(store);
-
-    let legacy = rusqlite::Connection::open(&filename).unwrap();
-    support::remove_turn_link_schema(&legacy);
-    legacy
-        .execute_batch(
-            "DROP TABLE session_retirements;
-             DROP INDEX session_catalog_bucket;
-             ALTER TABLE session_catalog DROP COLUMN revision;
-             ALTER TABLE session_catalog DROP COLUMN label;
-             ALTER TABLE session_catalog DROP COLUMN bucket;
-             CREATE INDEX session_catalog_scope ON session_catalog(scope,ordinal);
-             PRAGMA user_version=6;",
-        )
-        .unwrap();
-    drop(legacy);
-
-    let store = SqliteStore::open_cataloged(&filename, project).unwrap();
     let mut draft = store.catalog_entry(id.clone()).await.unwrap();
     assert_eq!(draft.revision, 0);
     assert_eq!(draft.label, None);
@@ -214,4 +144,22 @@ async fn catalog_organization_upgrades_an_existing_index_and_fences_edits() {
 
     let reopened = SqliteStore::open_cataloged(&filename, project).unwrap();
     assert_eq!(reopened.catalog_entry(id).await.unwrap(), archived);
+}
+
+#[tokio::test]
+async fn a_catalog_profile_is_kept_by_the_database() {
+    let directory = private_directory();
+    let cataloged = directory.path().join("cataloged.sqlite");
+    drop(SqliteStore::open_cataloged(&cataloged, project).unwrap());
+    assert_eq!(
+        SqliteStore::open(&cataloged).err().unwrap().code,
+        "store_profile_mismatch"
+    );
+    let plain = directory.path().join("plain.sqlite");
+    drop(SqliteStore::open(&plain).unwrap());
+    let error = SqliteStore::open_cataloged(&plain, project).err().unwrap();
+    assert_eq!(error.code, "store_profile_mismatch");
+    assert_eq!(error.kind, ErrorKind::Unsupported);
+    SqliteStore::open_cataloged(&cataloged, project).unwrap();
+    SqliteStore::open(&plain).unwrap();
 }

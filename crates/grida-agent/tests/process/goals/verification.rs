@@ -3,7 +3,6 @@
 use super::super::approvals::{Fixture, Stdio};
 use super::*;
 use agent_kit_core::TurnId;
-use agent_kit_store_sqlite::SqliteStore;
 use grida_agent_master::read_account;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -151,7 +150,9 @@ async fn configured_goal_checks_the_exact_observed_bytes_before_completing() {
 
         if let Some(hinted_call) = hinted_call {
             let state = fixture.primary.parent().unwrap().join("state");
-            let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+            let store =
+                grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE))
+                    .unwrap();
             let exact = store
                 .inspect_turn_with(
                     SessionId::new(session).unwrap(),

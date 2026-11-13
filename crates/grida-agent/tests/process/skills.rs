@@ -307,7 +307,7 @@ async fn queue_retains_selected_guidance_and_new_acceptance_rejects_a_stale_refe
     let retained_guidance = {
         use agent_kit_core::{ChangeId, SessionId};
         let store =
-            agent_kit_store_sqlite::SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+            grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
         let retained = store
             .input(
                 SessionId::new(session).unwrap(),

@@ -225,7 +225,7 @@ async fn admit(
     if identity.is_some() != profile.workspace_identity.is_some() {
         return Err(invalid_profile());
     }
-    let database = options.state_directory.join("runtime.sqlite");
+    let database = options.state_directory.join(crate::host::DATABASE_FILE);
     let (intent, owned_store) = if let Some(identity) = identity {
         let intent = Fingerprint::of(&(&options.profile, &bytes, &input, options.timeout))?;
         // The store lock serializes the first admission with every retry.
@@ -416,7 +416,7 @@ fn load_driver(
 pub async fn inspect(state: &Path, id: Uuid) -> Result<u8> {
     let identity = RunIdentity::new(id)?;
     check_private_directory(state)?;
-    let database = state.join("runtime.sqlite");
+    let database = state.join(crate::host::DATABASE_FILE);
     let missing = || problem(ErrorKind::InvalidInput, "external_acp_run_missing");
     match std::fs::symlink_metadata(&database) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Err(missing()),

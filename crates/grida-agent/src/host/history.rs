@@ -111,9 +111,7 @@ impl Host {
                 .turn_submissions(session.clone(), turn.clone())
                 .await?
             {
-                if input.payload.schema().as_str() != INPUT_SCHEMA
-                    || !matches!(input.payload.version(), 2 | 3)
-                {
+                if !is_stored_input(&input.payload) {
                     continue;
                 }
                 let stored: StoredPrompt = decode_input(&input)?;
@@ -345,9 +343,7 @@ impl Host {
         Option<agent_kit_core::inference::ReasoningEffort>,
     )> {
         for input in self.store.turn_submissions(session, turn).await? {
-            if input.payload.schema().as_str() != INPUT_SCHEMA
-                || !matches!(input.payload.version(), 2 | 3)
-            {
+            if !is_stored_input(&input.payload) {
                 continue;
             }
             let stored: StoredPrompt = decode_input(&input)?;
@@ -411,10 +407,10 @@ impl Host {
                     let configuration = SessionConfiguration {
                         cwd: canonical_workspace(&session_configuration(&source_view)?.cwd)?,
                         execution: execution.configuration,
-                        owner: Some(execution.owner),
+                        owner: execution.owner,
                         subagent: None,
                     };
-                    encode(SESSION_SCHEMA, 2, &configuration)?
+                    encode(SESSION_SCHEMA, SESSION_VERSION, &configuration)?
                 }
                 Err(error) => return Err(error),
             };

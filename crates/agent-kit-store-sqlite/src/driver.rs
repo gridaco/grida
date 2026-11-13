@@ -63,7 +63,7 @@ impl SqliteStore {
             if session.active_turn.as_ref() != Some(&turn.turn) {
                 return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
             }
-            let active = load_turn(&transaction, &request.session, &turn.turn)?;
+            let active = load_turn(inner, &transaction, &request.session, &turn.turn)?;
             if active.controls().revision != turn.expected {
                 return Err(error(ErrorKind::Conflict, "stale_journal_change"));
             }
@@ -87,7 +87,7 @@ impl SqliteStore {
                 fingerprint,
                 &receipt,
             )?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             inner.changed.notify_waiters();
             Ok(receipt)
         })
@@ -132,7 +132,7 @@ impl SqliteStore {
             let active = session
                 .active_turn
                 .as_ref()
-                .map(|turn| load_turn(&transaction, &request.session, turn))
+                .map(|turn| load_turn(inner, &transaction, &request.session, turn))
                 .transpose()?;
             let current = active
                 .as_ref()
@@ -169,7 +169,7 @@ impl SqliteStore {
                 fingerprint,
                 &receipt,
             )?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             inner.changed.notify_waiters();
             Ok(receipt)
         })

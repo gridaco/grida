@@ -104,8 +104,25 @@ use std::time::Duration;
 use tokio::sync::{Mutex, MutexGuard, Notify, Semaphore, broadcast, oneshot};
 use tokio::task::AbortHandle;
 
+/// The session database of a state directory. External runs keep their own
+/// database under the same name in their own directories.
+pub const DATABASE_FILE: &str = "agent.sqlite";
+
+/// Open a host's session database with the host's catalog and turn-link
+/// projections. A database created with them refuses any other opener.
+pub fn open_store(database: &Path) -> Result<SqliteStore> {
+    SqliteStore::open_cataloged_with_turn_links(
+        database,
+        catalog::configuration_scope,
+        subagents::turn_link,
+    )
+}
+
 const SESSION_SCHEMA: &str = "grida.agent.native.session";
 const INPUT_SCHEMA: &str = "grida.agent.native.input";
+/// The one stored version of each envelope this host writes and reads.
+const SESSION_VERSION: u32 = 1;
+const INPUT_VERSION: u32 = 1;
 const MAX_PROMPT_BYTES: usize = 512 * 1024;
 pub(crate) const MAX_PROMPT_PARTS: usize = 64;
 pub(crate) const RETAINED_IMAGE_LABEL: &str = "\n[Retained PNG image]\n";
@@ -173,7 +190,6 @@ pub struct Host {
 
 struct Execution {
     configuration: Fingerprint,
-    legacy_configuration: Fingerprint,
     owner: Fingerprint,
     runtime: Runtime,
     config: MasterConfig,
@@ -377,23 +393,16 @@ struct StoredPrompt {
     authority: Option<CapturedAuthority>,
     #[serde(default, skip_serializing_if = "OperatingRegime::is_act")]
     operating_regime: OperatingRegime,
-    #[serde(default)]
     questions: bool,
-    #[serde(default)]
     allow_wakeups: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_library_selection: bool,
-    #[serde(default)]
     configuration_permission: crate::ConfigurationPermission,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     permission_capture: Option<crate::permissions::PermissionCapture>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_reviewer_primary_read: bool,
-    #[serde(
-        rename = "mcp_capture",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     host_tools_capture: Option<host_tools::Capture>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     desktop_image_generation: Option<BindingId>,
@@ -440,9 +449,7 @@ impl CapturedRoute {
     /// Whether a retained input would run under this execution, by the same
     /// model and authority rules that admission applies to it.
     fn admits(input: &Submission, execution: &Execution) -> bool {
-        if input.payload.schema().as_str() != INPUT_SCHEMA
-            || !matches!(input.payload.version(), 2 | 3)
-        {
+        if !is_stored_input(&input.payload) {
             return false;
         }
         let live = &execution.authority.inference.authority;
@@ -610,9 +617,8 @@ struct SessionConfiguration {
     cwd: PathBuf,
     execution: Fingerprint,
     /// Who holds the credential the chat runs under. A chat can change model
-    /// between turns only within the same owner. Absent on older chats.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    owner: Option<Fingerprint>,
+    /// between turns only within the same owner.
+    owner: Fingerprint,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     subagent: Option<grida_agent_master::subagents::Profile>,
 }
@@ -743,17 +749,13 @@ impl Host {
         >,
         workspace_configuration: Option<&WorkspaceConfiguration>,
     ) -> Result<Self> {
-        let database = state_dir.join("runtime.sqlite");
+        let database = state_dir.join(DATABASE_FILE);
         if execution.is_some() {
             prepare_state_dir(state_dir)?;
         } else if !database.is_file() {
             return Err(problem(ErrorKind::Unavailable, "agent_state_unavailable"));
         }
-        let store = Arc::new(SqliteStore::open_cataloged_with_turn_links(
-            database,
-            catalog::configuration_scope,
-            subagents::turn_link,
-        )?);
+        let store = Arc::new(open_store(&database)?);
         let configuration = execution
             .as_ref()
             .map(|_| match workspace_configuration {
@@ -833,7 +835,7 @@ impl Host {
         let configuration = SessionConfiguration {
             cwd: canonical_workspace(&cwd)?,
             execution: execution.configuration,
-            owner: Some(execution.owner),
+            owner: execution.owner,
             subagent: None,
         };
         let session = SessionId::new(uuid())?;
@@ -841,7 +843,7 @@ impl Host {
             .create(CreateSession {
                 id: session.clone(),
                 request: change_id()?,
-                configuration: encode(SESSION_SCHEMA, 2, &configuration)?,
+                configuration: encode(SESSION_SCHEMA, SESSION_VERSION, &configuration)?,
             })
             .await?;
         Ok(session)
@@ -1071,7 +1073,7 @@ impl Host {
                 Ok(gateway.retained_billing(state))
             })
             .await?;
-        let mut coverage_incomplete = page.coverage_incomplete;
+        let mut coverage_incomplete = false;
         let mut assignments = Vec::new();
         let mut owned_page = true;
         for entry in page.entries {
@@ -2125,14 +2127,9 @@ impl Host {
 
     fn check_execution(&self, view: &SessionView) -> Result<()> {
         let execution = self.execution()?;
-        let expected = if view.configuration.version() == 1 {
-            execution.legacy_configuration
-        } else {
-            execution.configuration
-        };
         let configuration = session_configuration(view)?;
-        if configuration.execution != expected
-            && !(configuration.owner == Some(execution.owner)
+        if configuration.execution != execution.configuration
+            && !(configuration.owner == execution.owner
                 && Self::route_movable(view, &configuration, execution))
         {
             return Err(problem(
@@ -2395,8 +2392,8 @@ impl Host {
         authority: InputAuthority,
     ) -> Result<PreparedInput> {
         let mut config = execution.config.clone();
-        let mut lifecycle_hooks = None;
-        let mut spending = None;
+        let lifecycle_hooks;
+        let spending;
         if self.side_context.is_some() {
             if !config.instructions.is_empty() {
                 config.instructions.push_str("\n\n");
@@ -2408,8 +2405,8 @@ impl Host {
         let cancellation_only = matches!(authority, InputAuthority::CancellationOnly);
         let mut host_tools = Vec::new();
         let mut image_generation = None;
-        let mut subagent = false;
-        let mut effort = None;
+        let subagent;
+        let effort;
         let mut retained_file = None;
         let (
             messages,
@@ -2425,34 +2422,8 @@ impl Host {
             goal,
             completion_checks,
         ) = match input.payload.version() {
-            1 if input.payload.schema().as_str() == INPUT_SCHEMA => {
-                authority.validate(None, &execution.authority.inference.authority)?;
-                config.max_steps = 1;
-                (
-                    decode_input(input)?,
-                    OperatingRegime::Act,
-                    None,
-                    false,
-                    false,
-                    false,
-                    crate::ConfigurationPermission::Disabled,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                )
-            }
-            2 | 3 if input.payload.schema().as_str() == INPUT_SCHEMA => {
+            INPUT_VERSION if input.payload.schema().as_str() == INPUT_SCHEMA => {
                 let stored: StoredPrompt = decode_input(input)?;
-                if (input.payload.version() == 3)
-                    != (stored.spending.is_some() || stored.lifecycle_hooks.is_some())
-                {
-                    return Err(problem(
-                        ErrorKind::Unsupported,
-                        "submission_policy_version_unsupported",
-                    ));
-                }
                 lifecycle_hooks = stored.lifecycle_hooks.clone();
                 spending = stored.spending.clone();
                 if !cancellation_only
@@ -3325,7 +3296,6 @@ impl Execution {
         supervised: Option<crate::SupervisedProvider>,
         retained_inputs: Option<Arc<retained_inputs::RetainedInputs>>,
     ) -> Result<Self> {
-        let legacy_configuration = Fingerprint::of(&options)?;
         let transport = Arc::new(HttpTransport::new(state_dir, &options, supervised)?);
         let configuration = transport.selection();
         let binding = transport.binding().clone();
@@ -3442,7 +3412,6 @@ impl Execution {
         };
         let mut execution = Self::compose(
             configuration,
-            legacy_configuration,
             options.model,
             Some(options.max_output_tokens),
             provider,
@@ -3505,7 +3474,6 @@ impl Execution {
         .with_admission_rate_limit_evidence();
         let mut execution = Self::compose(
             configuration,
-            configuration,
             options.model,
             Some(options.max_output_tokens),
             Arc::new(provider),
@@ -3549,7 +3517,6 @@ impl Execution {
         )?);
         Self::compose(
             configuration,
-            configuration,
             model,
             None,
             provider,
@@ -3560,7 +3527,6 @@ impl Execution {
 
     fn compose(
         configuration: Fingerprint,
-        legacy_configuration: Fingerprint,
         model: ModelId,
         max_output_tokens: Option<u64>,
         provider: Arc<dyn Provider>,
@@ -3605,7 +3571,6 @@ impl Execution {
         })?;
         Ok(Self {
             configuration,
-            legacy_configuration,
             owner,
             runtime,
             config: MasterConfig {
@@ -3867,15 +3832,13 @@ fn new_claim(
     })
 }
 
-// Extended task policy has a distinct envelope version so earlier hosts
-// reject it before work instead of ignoring unfamiliar authority fields.
 fn encode_stored_prompt(prompt: &StoredPrompt) -> Result<Envelope> {
-    let version = if prompt.spending.is_some() || prompt.lifecycle_hooks.is_some() {
-        3
-    } else {
-        2
-    };
-    encode(INPUT_SCHEMA, version, prompt)
+    encode(INPUT_SCHEMA, INPUT_VERSION, prompt)
+}
+
+/// Whether a payload is an input this host stored.
+fn is_stored_input(payload: &Envelope) -> bool {
+    payload.schema().as_str() == INPUT_SCHEMA && payload.version() == INPUT_VERSION
 }
 
 fn decode_input<T: serde::de::DeserializeOwned>(input: &Submission) -> Result<T> {
@@ -3992,7 +3955,7 @@ fn session_configuration(view: &SessionView) -> Result<SessionConfiguration> {
 }
 
 fn decode_session_configuration(config: &Envelope) -> Result<SessionConfiguration> {
-    if config.schema().as_str() != SESSION_SCHEMA || !matches!(config.version(), 1 | 2) {
+    if config.schema().as_str() != SESSION_SCHEMA || config.version() != SESSION_VERSION {
         return Err(problem(
             ErrorKind::Unsupported,
             "unsupported_session_configuration",

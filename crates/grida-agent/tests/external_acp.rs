@@ -905,7 +905,12 @@ async fn headless_external_refuses_an_untrusted_profile_before_admission() {
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("permission_profile_invalid"));
-    assert!(!fixture.state().join("runtime.sqlite").exists());
+    assert!(
+        !fixture
+            .state()
+            .join(grida_agent::host::DATABASE_FILE)
+            .exists()
+    );
     assert!(fs::read_dir(&fixture.temporary).unwrap().next().is_none());
 }
 

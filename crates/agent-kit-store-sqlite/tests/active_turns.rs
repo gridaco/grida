@@ -127,15 +127,12 @@ async fn pages_are_bounded_observations_and_cursor_survives_removal() {
 
     // The cursor is a value, not a lookup of an anchor that must still exist.
     let connection = rusqlite::Connection::open(&path).unwrap();
-    for table in ["turns", "requests", "session_catalog", "sessions"] {
-        let column = if table == "sessions" { "id" } else { "session" };
-        connection
-            .execute(
-                &format!("DELETE FROM {table} WHERE {column}=?1"),
-                [cursor.as_str()],
-            )
-            .unwrap();
-    }
+    connection
+        .pragma_update(None, "foreign_keys", true)
+        .unwrap();
+    connection
+        .execute("DELETE FROM sessions WHERE id=?1", [cursor.as_str()])
+        .unwrap();
     drop(connection);
     let store = SqliteStore::open(&path).unwrap();
     let resumed = store.active_turn_page(Some(cursor)).await.unwrap();
@@ -187,31 +184,11 @@ async fn malformed_active_identity_is_reported_instead_of_skipped() {
 }
 
 #[test]
-fn interrupted_additive_index_build_is_retryable_without_changing_version() {
+fn an_active_turn_page_is_an_indexed_traversal() {
     let directory = private_directory();
-    let path = directory.path().join("runtime.sqlite");
+    let path = directory.path().join("sessions.sqlite");
     drop(SqliteStore::open(&path).unwrap());
     let connection = rusqlite::Connection::open(&path).unwrap();
-    assert_eq!(
-        connection
-            .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
-            .unwrap(),
-        13
-    );
-    connection.execute_batch("DROP INDEX sessions_active_turn_scan; BEGIN IMMEDIATE; CREATE INDEX sessions_active_turn_scan ON sessions(id,active_turn) WHERE active_turn IS NOT NULL;").unwrap();
-    drop(connection);
-    let connection = rusqlite::Connection::open(&path).unwrap();
-    let count: i64 = connection.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='sessions_active_turn_scan'", [], |row| row.get(0)).unwrap();
-    assert_eq!(count, 0);
-    drop(connection);
-    drop(SqliteStore::open(&path).unwrap());
-    let connection = rusqlite::Connection::open(&path).unwrap();
-    assert_eq!(
-        connection
-            .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
-            .unwrap(),
-        13
-    );
     let query: String = connection.query_row(
         "EXPLAIN QUERY PLAN SELECT id,active_turn FROM sessions INDEXED BY sessions_active_turn_scan WHERE active_turn IS NOT NULL AND id>?1 ORDER BY id LIMIT 33",
         ["cursor"], |row| row.get(3),
@@ -220,5 +197,4 @@ fn interrupted_additive_index_build_is_retryable_without_changing_version() {
         query.contains("SEARCH") && query.contains("sessions_active_turn_scan"),
         "{query}"
     );
-    drop(connection);
 }

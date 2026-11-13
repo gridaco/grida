@@ -706,7 +706,7 @@ fn embedded_image_run(state: &Path, endpoint: &str, model: &str, path: &Path) ->
 async fn deleting_a_crop_chat_reclaims_its_private_files_and_recovers_after_interruption() {
     use agent_kit_core::Fingerprint;
     use agent_kit_sessions::SessionRevision;
-    use agent_kit_store_sqlite::{SqliteStore, deletion::DeleteSession};
+    use agent_kit_store_sqlite::deletion::DeleteSession;
     use std::fs;
     use std::os::unix::fs::{DirBuilderExt, MetadataExt};
 
@@ -807,7 +807,9 @@ async fn deleting_a_crop_chat_reclaims_its_private_files_and_recovers_after_inte
             ))
             .unwrap()
             .bytes();
-            let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+            let store =
+                grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE))
+                    .unwrap();
             store
                 .delete_idle_with_cleanup(
                     DeleteSession {
@@ -1287,7 +1289,8 @@ async fn private_image_bytes_survive_waiting_input_restart_and_reach_responses()
     assert_eq!(settled(&mut first, session).await["admissionPaused"], true);
     first.close().await;
 
-    let store = agent_kit_store_sqlite::SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let store =
+        grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
     let input = store
         .input(
             SessionId::new(session).unwrap(),
@@ -1477,7 +1480,7 @@ async fn missing_retained_png_after_restart_fails_before_provider_requests() {
         assert!(!owner.exists());
 
         let store =
-            agent_kit_store_sqlite::SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+            grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
         let input = store
             .input(
                 SessionId::new(session).unwrap(),

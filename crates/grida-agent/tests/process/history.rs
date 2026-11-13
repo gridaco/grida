@@ -467,7 +467,6 @@ async fn a_fork_captures_committed_live_history_without_starting_or_stopping_wor
 async fn an_earlier_revision_retains_original_view_and_captures_fresh_permissions() {
     use agent_kit_core::{ChangeId, SessionId};
     use agent_kit_sessions::{SessionStore, Submission};
-    use agent_kit_store_sqlite::SqliteStore;
 
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("state");
@@ -649,7 +648,8 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
     terminate_shared_server(host).await;
     // Retain unrelated input as if the previous process stopped before its
     // claim. An old revision receipt must never kick this new queue.
-    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let store =
+        grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
     let session_id = SessionId::new(session.clone()).unwrap();
     let payload = store
         .input(session_id.clone(), ChangeId::new("replacement").unwrap())

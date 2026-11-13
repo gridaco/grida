@@ -734,11 +734,11 @@ async fn seed_oversized_context(
     use agent_kit_core::turn::{JournalAction, JournalChange, TurnOutcome};
     use agent_kit_core::{ChangeId, Envelope, MessageId, SchemaId, SessionId, TurnId};
     use agent_kit_sessions::ClaimOutcome;
-    use agent_kit_store_sqlite::SqliteStore;
     use agent_kit_store_sqlite::context::UnpromptedClaim;
 
     // Retain complete turns through the same journal used by live requests.
-    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let store =
+        grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
     let session_id = SessionId::new(session).unwrap();
     let mut original = Vec::new();
     for (turn, count, padding) in [

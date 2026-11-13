@@ -2,13 +2,13 @@
 
 use super::history::{
     HistoryBasis, HistorySeed, HistorySelection, RetainedHistory, View, read_view,
-    read_view_projection, require_basis, seed_bytes, select_view,
+    read_view_projection, require_basis, seed_bytes, select_view, stored_identity,
 };
 use super::{
-    Acquired, ClaimRecord, MAX_HISTORY_BYTES, PreparedClaim, SqliteStore, bump_revision,
-    commit_error, database_error, decode, encode, error, execute, finish_claim, load_session,
-    load_turn, lookup_request, record_turn_start, register_owner, require_revision, save_request,
-    save_session, sql_number, turn_layout, turn_view,
+    Acquired, ClaimRecord, MAX_HISTORY_BYTES, PreparedClaim, SqliteStore, bump_revision, commit,
+    database_error, decode, error, execute, finish_claim, load_session, load_turn, lookup_request,
+    register_owner, require_new_turn, require_revision, save_request, save_session, sql_number,
+    turn_layout, turn_view,
 };
 use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::messages::OutcomeStatus;
@@ -51,13 +51,6 @@ pub struct ContextPrefix {
     /// The last projected nonempty turn when a suffix did not fit. All later
     /// turns remain outside the projection and must be retained.
     pub unprojected_suffix_after: Option<TurnId>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(untagged)]
-enum StoredContextReplacement {
-    Prefix { seed: HistorySeed, through: i64 },
-    Full(HistorySeed),
 }
 
 impl SqliteStore {
@@ -131,7 +124,7 @@ impl SqliteStore {
                 &transaction, id, "unprompted-claim", &request.request, fingerprint,
             )? {
                 return Ok(PreparedClaim::Existing(turn_view(
-                    inner, &load_turn(&transaction, id, &receipt.turn)?,
+                    inner, &load_turn(inner, &transaction, id, &receipt.turn)?,
                 )?));
             }
             let mut session = load_session(&transaction, id)?;
@@ -151,6 +144,7 @@ impl SqliteStore {
             }
             let history = read_context(&transaction, id, session.revision, None, &|_| Vec::new())?;
             require_basis(&history.basis, &request.expected_context)?;
+            require_new_turn(&transaction, id, &request.turn)?;
             let mut state = TurnState::with_driver_state(TurnBinding {
                 session: id.clone(), turn: request.turn.clone(), epoch: 1,
             }, session.driver_state.clone())?;
@@ -161,17 +155,14 @@ impl SqliteStore {
                 state.controls().revision,
                 vec![JournalAction::SetCheckpoint(request.checkpoint)],
             )?)?;
-            if !turn_layout::write(&transaction, &state, true)? {
-                return Err(error(ErrorKind::Conflict, "turn_exists"));
-            }
-            record_turn_start(&transaction, id, &request.turn)?;
+            turn_layout::write(&inner.turns, &transaction, &state, true)?;
             let owner = register_owner(inner, state.binding())?;
             session.active_turn = Some(request.turn.clone());
             bump_revision(&mut session)?;
             save_session(&transaction, id, &session)?;
             save_request(&transaction, id, "unprompted-claim", &request.request, fingerprint,
                 &ClaimRecord::new(request.turn))?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             Ok(PreparedClaim::Acquired(Acquired {
                 binding: state.binding().clone(), configuration: session.configuration,
                 inputs: Vec::new(), owner,
@@ -184,7 +175,7 @@ impl SqliteStore {
     /// source view or newer claimed turn leaves the prior replacement intact.
     /// Queued submissions are independent of this model-context boundary.
     pub async fn install_context(&self, request: ContextInstall) -> Result<()> {
-        execute(Arc::clone(&self.inner), move |_, connection| {
+        execute(Arc::clone(&self.inner), move |inner, connection| {
             let transaction = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(database_error)?;
@@ -196,13 +187,13 @@ impl SqliteStore {
             let ordinal = ordinal
                 .ok_or_else(|| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
             let view = sql_number(source_view.id.0)?;
-            let identity = encode(&Fingerprint::of(&request)?)?;
+            let identity = Fingerprint::of(&request)?;
             let existing: Option<Vec<u8>> = transaction.query_row(
-                "SELECT identity FROM session_context_replacements WHERE session=?1 AND view=?2 AND turn_ordinal=?3",
+                "SELECT identity FROM context_replacements WHERE session=?1 AND view=?2 AND turn_ordinal=?3",
                 params![id.as_str(), view, ordinal], |row| row.get(0),
             ).optional().map_err(database_error)?;
             if let Some(existing) = existing {
-                return if existing == identity { Ok(()) } else {
+                return if existing.as_slice() == identity.bytes() { Ok(()) } else {
                     Err(error(ErrorKind::Conflict, "context_replacement_identity_reused"))
                 };
             }
@@ -214,7 +205,7 @@ impl SqliteStore {
             if current_view.id != source_view.id || latest != Some(ordinal) || session.active_turn.is_some() {
                 return Err(error(ErrorKind::Conflict, "context_install_basis_changed"));
             }
-            let state = load_turn(&transaction, id, &request.turn)?;
+            let state = load_turn(inner, &transaction, id, &request.turn)?;
             let outcome = state.outcome().ok_or_else(|| error(ErrorKind::Conflict, "context_outcome_missing"))?;
             if outcome.status != OutcomeStatus::Succeeded || Fingerprint::of(outcome)? != request.expected_outcome {
                 return Err(error(ErrorKind::Conflict, "context_outcome_changed"));
@@ -223,26 +214,23 @@ impl SqliteStore {
             let previous_through = context.after;
             let history = read_view(&transaction, id, session.revision, context, before, &|_| Vec::new())?;
             require_basis(&history.basis, &request.expected_context)?;
-            let mut bytes = seed_bytes(&request.replacement)?;
-            if let Some(turn) = request.covered_through {
-                let through = transaction.query_row(
+            let seed = seed_bytes(&request.replacement)?;
+            let through: i64 = match request.covered_through {
+                Some(turn) => transaction.query_row(
                     "SELECT ordinal FROM turns WHERE session=?1 AND id=?2 AND ordinal>?3 AND ordinal<?4",
                     params![id.as_str(), turn.as_str(), previous_through, ordinal],
                     |row| row.get(0),
                 ).optional().map_err(database_error)?.ok_or_else(|| {
                     error(ErrorKind::Conflict, "context_coverage_boundary_changed")
-                })?;
-                bytes = encode(&StoredContextReplacement::Prefix { seed: request.replacement, through })?;
-                if bytes.len() > MAX_HISTORY_BYTES {
-                    return Err(error(ErrorKind::LimitExceeded, "history_projection_limit"));
-                }
-            }
+                })?,
+                None => ordinal,
+            };
             transaction.execute(
-                "INSERT INTO session_context_replacements(session,view,turn_ordinal,replacement,identity)
-                 VALUES(?1,?2,?3,?4,?5)",
-                params![id.as_str(), view, ordinal, bytes, identity],
+                "INSERT INTO context_replacements(session,view,turn_ordinal,through_ordinal,seed,identity)
+                 VALUES(?1,?2,?3,?4,?5,?6)",
+                params![id.as_str(), view, ordinal, through, seed, identity.bytes().as_slice()],
             ).map_err(database_error)?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             Ok(())
         }).await
     }
@@ -268,40 +256,31 @@ fn context_view(
     let (mut view, before) = select_view(connection, session, selection)?;
     let replacement = connection
         .query_row(
-            "SELECT turn_ordinal,replacement,identity FROM session_context_replacements
+            "SELECT turn_ordinal,through_ordinal,seed,identity FROM context_replacements
          WHERE session=?1 AND view=?2 AND (?3 IS NULL OR turn_ordinal<?3)
          ORDER BY turn_ordinal DESC LIMIT 1",
             params![session.as_str(), sql_number(view.id.0)?, before],
             |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
-                    row.get::<_, Vec<u8>>(1)?,
+                    row.get::<_, i64>(1)?,
                     row.get::<_, Vec<u8>>(2)?,
+                    row.get::<_, Vec<u8>>(3)?,
                 ))
             },
         )
         .optional()
         .map_err(database_error)?;
-    if let Some((ordinal, bytes, identity)) = replacement {
-        if bytes.len() > MAX_HISTORY_BYTES || ordinal <= view.after {
-            return Err(error(
-                ErrorKind::InvalidState,
-                "stored_context_replacement_invalid",
-            ));
-        }
-        let (seed, through) = match decode(&bytes)? {
-            StoredContextReplacement::Prefix { seed, through } => (seed, through),
-            StoredContextReplacement::Full(seed) => (seed, ordinal),
-        };
-        if through <= view.after || through > ordinal {
+    if let Some((ordinal, through, seed, identity)) = replacement {
+        if seed.len() > MAX_HISTORY_BYTES || through <= view.after || through > ordinal {
             return Err(error(
                 ErrorKind::InvalidState,
                 "stored_context_replacement_invalid",
             ));
         }
         view.after = through;
-        view.seed = Some(seed);
-        view.seed_identity = Some(decode(&identity)?);
+        view.seed = Some(decode(&seed)?);
+        view.seed_identity = Some(stored_identity(identity)?);
     }
     Ok((view, before))
 }

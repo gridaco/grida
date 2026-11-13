@@ -1041,7 +1041,8 @@ async fn idle_goal_resume_replay_recovers_only_its_committed_session_revision() 
     drop(client);
     terminate_shared_server(child).await;
 
-    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let store =
+        grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
     let session_id = SessionId::new(session).unwrap();
     let (older, older_revision) =
         commit_goal_control_without_wake(&store, &session_id, "older-resume", GoalAction::Resume)
@@ -1157,7 +1158,8 @@ async fn active_goal_resume_replay_wakes_only_its_original_suspension() {
     drop(client);
     terminate_shared_server(child).await;
 
-    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let store =
+        grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
     let session_id = SessionId::new(session).unwrap();
     let (older, older_revision) =
         commit_goal_control_without_wake(&store, &session_id, "first-resume", GoalAction::Resume)

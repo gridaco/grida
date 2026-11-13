@@ -416,8 +416,7 @@ impl InputSettings {
             ));
         }
         match input.payload.version() {
-            1 => Ok(Self::default()),
-            2 | 3 => {
+            INPUT_VERSION => {
                 let stored: StoredPrompt = decode_input(input)?;
                 let goal_max_cost_mills = matches!(&stored.goal, Some(goals::GoalInput::Start(_)))
                     .then(|| {
@@ -569,19 +568,7 @@ impl Host {
             .await?
             .ok_or_else(|| problem(ErrorKind::Unavailable, "input_unavailable"))?;
         let settings = InputSettings::for_input(&view.input)?;
-        let mut parts: Vec<_> = if view.input.payload.version() == 1 {
-            let messages: Vec<Message> = decode_input(&view.input)?;
-            messages
-                .into_iter()
-                .flat_map(|message| message.content)
-                .filter_map(|content| match content {
-                    Content::Text(text) => Some(PromptPart::Text { text }),
-                    _ => None,
-                })
-                .collect()
-        } else {
-            decode_input::<StoredPrompt>(&view.input)?.parts
-        };
+        let mut parts = decode_input::<StoredPrompt>(&view.input)?.parts;
         for part in &mut parts {
             if let PromptPart::Skill { reference } = part
                 && reference.uri().is_none()
@@ -688,7 +675,7 @@ impl Host {
                             .map_or(self.operating_regime, |settings| settings.operating_regime)
                     };
                     let stored = original
-                        .filter(|input| matches!(input.payload.version(), 2 | 3))
+                        .filter(|input| is_stored_input(&input.payload))
                         .map(decode_input::<StoredPrompt>)
                         .transpose()?;
                     let capture = stored
@@ -1025,18 +1012,7 @@ pub(super) fn check_input(input: &Submission, parts: &[PromptPart]) -> Result<()
         ));
     }
     let same = match input.payload.version() {
-        1 => {
-            if parts
-                .iter()
-                .any(|part| matches!(part, PromptPart::Image { .. } | PromptPart::File { .. }))
-            {
-                return Err(problem(ErrorKind::Conflict, "submission_input_changed"));
-            }
-            let previous: Vec<Message> = decode_input(input)?;
-            let current = prompt_input(&input.id, parts)?;
-            previous.len() == 1 && previous[0].content == current[0].content
-        }
-        2 | 3 => {
+        INPUT_VERSION => {
             let previous: StoredPrompt = decode_input(input)?;
             previous.goal.is_none() && images::same_prompt(&previous.parts, parts)
         }

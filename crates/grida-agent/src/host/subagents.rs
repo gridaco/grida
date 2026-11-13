@@ -144,7 +144,7 @@ impl Host {
                 .create(CreateSession {
                     id: child.clone(),
                     request,
-                    configuration: encode(SESSION_SCHEMA, 2, &configuration)?,
+                    configuration: encode(SESSION_SCHEMA, SESSION_VERSION, &configuration)?,
                 })
                 .await?;
             Ok(child)
@@ -234,10 +234,7 @@ impl Host {
             .turn_submissions(parent.clone(), parent_turn.clone())
             .await?;
         let spending = match parent_inputs.as_slice() {
-            [parent_input]
-                if parent_input.payload.schema().as_str() == INPUT_SCHEMA
-                    && matches!(parent_input.payload.version(), 2 | 3) =>
-            {
+            [parent_input] if is_stored_input(&parent_input.payload) => {
                 decode_input::<StoredPrompt>(parent_input)?.spending
             }
             _ => None,
@@ -555,37 +552,13 @@ impl Host {
         control: TurnControl,
     ) -> Result<ControlReceipt> {
         self.child_for_control(&parent, &control.session).await?;
-        let stopped = self
-            .stop(
-                control.session.clone(),
-                control.turn.clone(),
-                control.request.clone(),
-                control.expected_session,
-                control.expected_control,
-            )
-            .await;
-        if !matches!(&stopped, Err(error) if error.code == "request_identity_reused") {
-            return stopped;
-        }
-        // A retained receipt may predate queued child assignments. This
-        // request already has a receipt, so the fallback can only replay it.
-        self.owned_control(move |host| async move {
-            let previous = host
-                .store
-                .control(ControlRequest {
-                    id: control.request,
-                    session: control.session.clone(),
-                    expected_revision: control.expected_session,
-                    action: SessionControl::Turn {
-                        turn: control.turn.clone(),
-                        expected: control.expected_control,
-                        directive: ControlDirective::Cancel,
-                    },
-                })
-                .await?;
-            host.kick_stopped(control.session, control.turn).await;
-            Ok(previous)
-        })
+        self.stop(
+            control.session.clone(),
+            control.turn.clone(),
+            control.request.clone(),
+            control.expected_session,
+            control.expected_control,
+        )
         .await
     }
 
@@ -670,10 +643,7 @@ pub(super) fn turn_link(
     {
         return Ok(TurnLinkDecision::Unrelated);
     }
-    let Some(profile) = (match decode_session_configuration(configuration) {
-        Ok(configuration) => configuration.subagent,
-        Err(_) => return Ok(incomplete_turn_link(configuration)),
-    }) else {
+    let Some(profile) = decode_session_configuration(configuration)?.subagent else {
         return Ok(TurnLinkDecision::Unrelated);
     };
     if profile.sponsorship().is_some() {
@@ -683,46 +653,21 @@ pub(super) fn turn_link(
     struct RetainedAssignment {
         subagent: Option<Assignment>,
     }
-    let assignment = (input.schema().as_str() == INPUT_SCHEMA && matches!(input.version(), 1..=3))
+    let assignment = is_stored_input(input)
         .then(|| serde_json::from_slice::<RetainedAssignment>(input.bytes()).ok())
         .flatten()
         .and_then(|stored| stored.subagent);
-    if assignment
-        .as_ref()
-        .is_some_and(|assignment| assignment.named_sponsorship.is_some())
-    {
+    let Some(assignment) = assignment else {
+        // Work for a child is assigned from an exact parent turn.
+        return Err(problem(ErrorKind::InvalidInput, "turn_link_source_missing"));
+    };
+    if assignment.named_sponsorship.is_some() {
         return Ok(TurnLinkDecision::Unrelated);
     }
     Ok(TurnLinkDecision::Linked(TurnLinkParent {
         session: profile.parent().clone(),
-        turn: assignment.map(|assignment| assignment.parent_turn),
+        turn: assignment.parent_turn,
     }))
-}
-
-fn incomplete_turn_link(
-    configuration: &Envelope,
-) -> agent_kit_store_sqlite::turn_links::TurnLinkDecision {
-    use agent_kit_store_sqlite::turn_links::{TurnLinkDecision, TurnLinkParent};
-    #[derive(Deserialize)]
-    struct HistoricalProfile {
-        subagent: Option<HistoricalChild>,
-    }
-    #[derive(Deserialize)]
-    struct HistoricalChild {
-        parent: SessionId,
-    }
-    match serde_json::from_slice::<HistoricalProfile>(configuration.bytes()) {
-        Ok(HistoricalProfile {
-            subagent: Some(child),
-        }) => TurnLinkDecision::Linked(TurnLinkParent {
-            session: child.parent,
-            turn: None,
-        }),
-        Ok(HistoricalProfile { subagent: None }) if matches!(configuration.version(), 1 | 2) => {
-            TurnLinkDecision::Unrelated
-        }
-        _ => TurnLinkDecision::CoverageUnknown,
-    }
 }
 
 fn assignment_preview(text: &str) -> (String, bool) {
@@ -860,7 +805,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn attribution_projects_legacy_ordinary_assignments_and_identifies_incomplete_evidence() {
+    fn attribution_links_ordinary_assignments_to_their_exact_parent_turn() {
         let parent = SessionId::new("parent").unwrap();
         let turn = TurnId::new("source-turn").unwrap();
         let authority = AuthorityBinding {
@@ -871,11 +816,11 @@ mod tests {
         let configuration = |profile| {
             encode(
                 SESSION_SCHEMA,
-                1,
+                SESSION_VERSION,
                 &SessionConfiguration {
                     cwd: PathBuf::from("/workspace"),
                     execution: Fingerprint::of(&"execution").unwrap(),
-                    owner: None,
+                    owner: Fingerprint::of(&"owner").unwrap(),
                     subagent: Some(profile),
                 },
             )
@@ -883,37 +828,35 @@ mod tests {
         };
         let ordinary =
             configuration(Profile::new(parent.clone(), "Reader".into(), 2, &authority).unwrap());
-        let linked = |configuration: &Envelope, input: &Envelope| {
-            let TurnLinkDecision::Linked(link) = turn_link(configuration, input).unwrap() else {
-                panic!("expected an exact or incomplete parent link");
-            };
-            link
-        };
-        let input = |version, assignment| {
-            encode(INPUT_SCHEMA, version, &json!({"subagent":assignment})).unwrap()
+        let input = |assignment| {
+            encode(INPUT_SCHEMA, INPUT_VERSION, &json!({"subagent":assignment})).unwrap()
         };
         let assignment = Assignment::new(turn.clone());
-        for version in [1, 2, 3] {
-            let link = linked(&ordinary, &input(version, assignment.clone()));
-            assert_eq!(link.session, parent);
-            assert_eq!(link.turn.as_ref(), Some(&turn));
-        }
-        let unknown = linked(&ordinary, &input(4, assignment.clone()));
-        assert_eq!(unknown.session, parent);
-        assert!(unknown.turn.is_none());
-        let invalid = encode(INPUT_SCHEMA, 2, &json!({"subagent":{"parent_turn":12}})).unwrap();
-        assert!(linked(&ordinary, &invalid).turn.is_none());
-        let partial_configuration =
-            encode(SESSION_SCHEMA, 2, &json!({"subagent":{"parent":parent}})).unwrap();
-        let incomplete = linked(&partial_configuration, &input(2, assignment.clone()));
-        assert_eq!(incomplete.session, parent);
-        assert!(incomplete.turn.is_none());
-        let unreadable_configuration =
-            Envelope::new(SchemaId::new(SESSION_SCHEMA).unwrap(), 2, b"{".to_vec()).unwrap();
-        assert!(matches!(
-            turn_link(&unreadable_configuration, &invalid).unwrap(),
-            TurnLinkDecision::CoverageUnknown
-        ));
+        let TurnLinkDecision::Linked(link) =
+            turn_link(&ordinary, &input(assignment.clone())).unwrap()
+        else {
+            panic!("expected an exact parent link");
+        };
+        assert_eq!(link.session, parent);
+        assert_eq!(link.turn, turn);
+        // Child work without a readable assignment names no source turn.
+        let invalid = encode(
+            INPUT_SCHEMA,
+            INPUT_VERSION,
+            &json!({"subagent":{"parent_turn":12}}),
+        )
+        .unwrap();
+        assert_eq!(
+            turn_link(&ordinary, &invalid).err().unwrap().code,
+            "turn_link_source_missing"
+        );
+        let unreadable_configuration = Envelope::new(
+            SchemaId::new(SESSION_SCHEMA).unwrap(),
+            SESSION_VERSION,
+            b"{".to_vec(),
+        )
+        .unwrap();
+        assert!(turn_link(&unreadable_configuration, &invalid).is_err());
         let message = encode(MESSAGE_SCHEMA, 1, &json!({"parent":parent,"text":"FYI"})).unwrap();
         assert!(matches!(
             turn_link(&ordinary, &message).unwrap(),
@@ -930,7 +873,7 @@ mod tests {
             Profile::sponsored(parent, "Reviewer".into(), sponsor.clone(), &authority).unwrap(),
         );
         assert!(matches!(
-            turn_link(&sponsored, &input(2, assignment)).unwrap(),
+            turn_link(&sponsored, &input(assignment)).unwrap(),
             TurnLinkDecision::Unrelated
         ));
         let named = Assignment {
@@ -944,7 +887,7 @@ mod tests {
             }),
         };
         assert!(matches!(
-            turn_link(&ordinary, &input(2, named)).unwrap(),
+            turn_link(&ordinary, &input(named)).unwrap(),
             TurnLinkDecision::Unrelated
         ));
     }

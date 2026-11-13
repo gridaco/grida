@@ -1,9 +1,9 @@
 //! Conditional controls for a turn and an operation's claimed destination.
 
 use super::{
-    Inner, OPERATION_CLAIM, OperationClaimRecord, SqliteStore, commit_error, database_error,
-    decode, deletion, error, execute, load_turn, lookup_request, operation_claim_key,
-    record_control, save_request,
+    Inner, OPERATION_CLAIM, OperationClaimRecord, SqliteStore, commit, database_error, decode,
+    deletion, error, execute, load_turn, lookup_request, operation_claim_key, record_control,
+    save_request,
 };
 use agent_kit_core::turn::TurnState;
 use agent_kit_core::{ChangeId, ErrorKind, Fingerprint, OperationId, Result, SessionId, TurnId};
@@ -153,7 +153,7 @@ impl SqliteStore {
                 fingerprint,
                 &record,
             )?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             inner.changed.notify_waiters();
             Ok(record.receipt)
         })
@@ -216,7 +216,10 @@ pub(super) fn apply_related_control(
                 session,
                 turn,
             )?;
-            if load_turn(transaction, session, turn)?.outcome().is_none() {
+            if load_turn(inner, transaction, session, turn)?
+                .outcome()
+                .is_none()
+            {
                 return Err(error(
                     ErrorKind::Conflict,
                     "operation_pair_destination_unsettled",

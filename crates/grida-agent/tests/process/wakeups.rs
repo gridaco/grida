@@ -607,7 +607,6 @@ async fn reopening_is_observational_until_a_private_recovery_request() {
 async fn an_already_delivered_wakeup_recovers_its_unclaimed_continuation() {
     use agent_kit_core::{SessionId, TurnId, WaitId};
     use agent_kit_sessions::{ControlRequest, SessionControl, SessionStore};
-    use agent_kit_store_sqlite::SqliteStore;
     use grida_agent_master::wakeups::{Delivery, WakeupDisposition, prepare_delivery};
 
     let temp = TempDir::new().unwrap();
@@ -623,7 +622,8 @@ async fn an_already_delivered_wakeup_recovers_its_unclaimed_continuation() {
     // Reproduce a process exit between the durable resolution and the
     // acquisition of the next execution owner.
     after_due(&wakeup).await;
-    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let store =
+        grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
     let session_id = SessionId::new(&session).unwrap();
     let turn_id = TurnId::new(&turn).unwrap();
     let wait = WaitId::new(wakeup["waitId"].as_str().unwrap()).unwrap();

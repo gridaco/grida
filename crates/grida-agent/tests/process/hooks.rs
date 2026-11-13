@@ -380,9 +380,10 @@ async fn completion_command_retains_observed_limits_without_exposing_output() {
                         .unwrap();
                 let turn =
                     agent_kit_core::TurnId::new(results[0]["turn_id"].as_str().unwrap()).unwrap();
-                let store =
-                    agent_kit_store_sqlite::SqliteStore::open(fixture.state.join("runtime.sqlite"))
-                        .unwrap();
+                let store = grida_agent::host::open_store(
+                    &fixture.state.join(grida_agent::host::DATABASE_FILE),
+                )
+                .unwrap();
                 store
                     .inspect_turn_with(session, turn, move |state| {
                         let outcome = state.outcome().expect("retained completion account");
@@ -908,7 +909,8 @@ async fn interrupted_goal_before_tool_check_retains_reservation_through_stop_aft
     assert!(stopped["progress"].is_null(), "{stopped}");
     reopened.close().await;
     let store =
-        agent_kit_store_sqlite::SqliteStore::open(fixture.state.join("runtime.sqlite")).unwrap();
+        grida_agent::host::open_store(&fixture.state.join(grida_agent::host::DATABASE_FILE))
+            .unwrap();
     let basis = serde_json::from_value(held["basis"].clone()).unwrap();
     let reported = store
         .inspect_turn_with(
@@ -1480,7 +1482,8 @@ async fn a_required_after_tool_hook_retains_the_successful_read_before_blocking(
         agent_kit_core::SessionId::new(records[0]["session_id"].as_str().unwrap()).unwrap();
     let turn = agent_kit_core::TurnId::new(records[0]["turn_id"].as_str().unwrap()).unwrap();
     let store =
-        agent_kit_store_sqlite::SqliteStore::open(fixture.state.join("runtime.sqlite")).unwrap();
+        grida_agent::host::open_store(&fixture.state.join(grida_agent::host::DATABASE_FILE))
+            .unwrap();
     let preserved=store.inspect_turn_with(session,turn,|state|Ok(state.operations().values().any(|operation|matches!(&operation.record.input,agent_kit_core::turn::OperationInput::Tool(invocation) if invocation.definition().id.as_str()=="read_file") && matches!(operation.outcome(),Some(agent_kit_core::turn::OperationOutcome::Tool(outcome)) if outcome.status==agent_kit_core::messages::OutcomeStatus::Succeeded && serde_json::to_string(outcome).unwrap().contains("verified original content"))))).await.unwrap();
     assert!(preserved);
     endpoint.request().await;
@@ -1753,7 +1756,8 @@ async fn a_sponsored_child_cannot_bypass_its_captured_input_hooks() {
     }
     assert!(endpoint.requests.try_recv().is_err());
     let store =
-        agent_kit_store_sqlite::SqliteStore::open(fixture.state.join("runtime.sqlite")).unwrap();
+        grida_agent::host::open_store(&fixture.state.join(grida_agent::host::DATABASE_FILE))
+            .unwrap();
     let session = agent_kit_core::SessionId::new(child).unwrap();
     let view = store.inspect(session.clone()).await.unwrap();
     let turn = view.latest.unwrap();

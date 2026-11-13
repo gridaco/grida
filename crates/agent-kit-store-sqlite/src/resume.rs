@@ -1,8 +1,8 @@
 //! Paused claims with an exact state or related control committed beside the lease.
 
 use super::{
-    ClaimRecord, PreparedClaim, SqliteStore, commit_error, database_error, error, execute,
-    finish_claim, load_turn, lookup_request, prepare_pending_claim, require_released, turn_view,
+    ClaimRecord, PreparedClaim, SqliteStore, commit, database_error, error, execute, finish_claim,
+    load_turn, lookup_request, prepare_pending_claim, require_released, turn_view,
 };
 use crate::control_pair::{OperationRelatedControl, apply_related_control};
 use agent_kit_core::driver_state::DriverStateChange;
@@ -61,7 +61,7 @@ impl SqliteStore {
                 fingerprint,
             )?
             .map(|record| {
-                let state = load_turn(connection, &request.session, &record.turn)?;
+                let state = load_turn(inner, connection, &request.session, &record.turn)?;
                 Ok(ResumeClaimReceipt {
                     turn: turn_view(inner, &state)?,
                     related: record.resume.and_then(|resume| resume.related),
@@ -105,7 +105,7 @@ impl SqliteStore {
                     .resume
                     .filter(|resume| resume.fingerprint == companion_fingerprint)
                     .ok_or_else(|| error(ErrorKind::Conflict, "request_identity_reused"))?;
-                let state = load_turn(&transaction, &request.session, &record.turn)?;
+                let state = load_turn(inner, &transaction, &request.session, &record.turn)?;
                 return Ok((
                     PreparedClaim::Existing(turn_view(inner, &state)?),
                     resume.related,
@@ -125,7 +125,7 @@ impl SqliteStore {
                             if !opens_admission(control) {
                                 return Ok(None);
                             }
-                            let state = load_turn(&transaction, &control.session, turn)?;
+                            let state = load_turn(inner, &transaction, &control.session, turn)?;
                             if !state.is_suspended()
                                 || !state.controls().paused
                                 || state.controls().cancelled
@@ -153,7 +153,7 @@ impl SqliteStore {
                     related: related.clone(),
                 }),
             )?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             inner.changed.notify_waiters();
             Ok((PreparedClaim::Acquired(claim), related))
         })

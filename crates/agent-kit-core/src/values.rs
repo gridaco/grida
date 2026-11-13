@@ -84,6 +84,10 @@ impl Fingerprint {
     pub fn bytes(&self) -> &[u8; 32] {
         &self.0
     }
+    /// A digest previously produced by `of`, read back from storage.
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
     /// The digest as 64 lowercase hexadecimal characters, the one encoding
     /// durable identifiers derived from a fingerprint use.
     pub fn to_hex(&self) -> String {

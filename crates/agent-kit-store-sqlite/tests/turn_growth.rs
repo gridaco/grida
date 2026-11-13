@@ -1,6 +1,6 @@
 //! A turn's stored size and per-commit writes grow with what the turn adds,
 //! not with the square of its length, while the journal reads back the same
-//! state, including turns written before messages were stored once.
+//! state.
 
 mod support;
 
@@ -160,7 +160,7 @@ fn stored(path: &Path) -> (usize, usize) {
             .unwrap()
             .unwrap_or(0) as usize
     };
-    let head = size("SELECT SUM(length(snapshot)) FROM turns");
+    let head = size("SELECT SUM(length(head)) FROM turns");
     let total = head
         + size("SELECT SUM(length(body)) FROM turn_parts")
         + size("SELECT SUM(length(body)) FROM turn_messages");
@@ -230,98 +230,18 @@ async fn stored_size_grows_with_what_the_turn_adds() {
     assert!(short * 4 < whole, "stored {short} of {whole} bytes");
 }
 
-#[tokio::test]
-async fn a_turn_written_as_one_value_reads_back_and_converts_on_its_next_commit() {
-    let directory = private_directory();
-    let path = directory.path().join("sessions.sqlite");
-    let store = create(&path).await;
-    let (claim, states) = run_turn(&store, 3).await;
-    let original = states.last().unwrap().clone();
-    // Rewrite the turn as an earlier store did: the whole state in its row.
-    let connection = Connection::open(&path).unwrap();
-    connection
-        .execute_batch("DELETE FROM turn_parts; DELETE FROM turn_messages;")
-        .unwrap();
-    connection
-        .execute(
-            "UPDATE turns SET snapshot=?1, bytes=NULL",
-            [serde_json::to_vec(&original).unwrap()],
-        )
-        .unwrap();
-    drop(connection);
-    assert_eq!(same(&read(&store).await), same(&original));
-
-    let reply = message("later", Role::Assistant);
-    commit(
-        &claim,
-        "later",
-        vec![JournalAction::AppendHistory(vec![HistoryRecord::Message(
-            reply.clone(),
-        )])],
-    )
-    .await;
-    let converted = read(&store).await;
-    assert_eq!(converted.operations(), original.operations());
-    assert_eq!(
-        converted.history().records().last(),
-        Some(&HistoryRecord::Message(reply))
-    );
-    let connection = Connection::open(&path).unwrap();
-    let head: Vec<u8> = connection
-        .query_row("SELECT snapshot FROM turns", [], |row| row.get(0))
-        .unwrap();
-    let head: serde_json::Value = serde_json::from_slice(&head).unwrap();
-    assert!(head.get("operations").is_none(), "{head}");
-}
-
-#[tokio::test]
-async fn a_store_written_before_this_layout_upgrades_and_reads_its_turns() {
-    let directory = private_directory();
-    let path = directory.path().join("sessions.sqlite");
-    let store = create(&path).await;
-    let (claim, states) = run_turn(&store, 2).await;
-    let original = states.last().unwrap().clone();
-    drop(claim);
-    drop(store);
-    // The previous schema: whole turns in their rows, no layout tables.
-    let connection = Connection::open(&path).unwrap();
-    connection
-        .execute(
-            "UPDATE turns SET snapshot=?1",
-            [serde_json::to_vec(&original).unwrap()],
-        )
-        .unwrap();
-    connection
-        .execute_batch(
-            "DROP TABLE turn_parts; DROP TABLE turn_messages;
-             ALTER TABLE turns DROP COLUMN bytes; ALTER TABLE turns DROP COLUMN generation;
-             PRAGMA user_version=12;",
-        )
-        .unwrap();
-    drop(connection);
-
-    let store = SqliteStore::open(&path).unwrap();
-    assert_eq!(same(&read(&store).await), same(&original));
-    drop(store);
-    let connection = Connection::open(&path).unwrap();
-    let version: i64 = connection
-        .pragma_query_value(None, "user_version", |row| row.get(0))
-        .unwrap();
-    assert_eq!(version, 13);
-}
-
 /// Replace the stored head of the only turn.
 fn rewrite_head(path: &Path, head: &[u8]) {
     let connection = Connection::open(path).unwrap();
     connection
-        .execute("UPDATE turns SET snapshot=?1", [head])
+        .execute("UPDATE turns SET head=?1", [head])
         .unwrap();
 }
 
 fn stored_head(path: &Path) -> Vec<u8> {
     Connection::open(path)
         .unwrap()
-        .query_row("SELECT snapshot FROM turns", [], |row| row.get(0))
+        .query_row("SELECT head FROM turns", [], |row| row.get(0))
         .unwrap()
 }
 
@@ -334,7 +254,7 @@ fn superseded(head: &[u8]) -> Vec<u8> {
 }
 
 /// Controls and views read from a turn's head equal those of the assembled
-/// turn, in both layouts.
+/// turn.
 async fn assert_head_reads(store: &SqliteStore, claim: Option<&ClaimedTurn>) {
     let assembled = store.inspect_turn(session(), turn()).await.unwrap();
     let view = store.inspect(session()).await.unwrap();
@@ -358,7 +278,7 @@ async fn controls_and_views_of_a_running_turn_are_read_from_its_head() {
     let directory = private_directory();
     let path = directory.path().join("sessions.sqlite");
     let store = create(&path).await;
-    let (claim, states) = run_turn(&store, 3).await;
+    let (claim, _) = run_turn(&store, 3).await;
     assert_head_reads(&store, Some(&claim)).await;
 
     // A head another writer now holds is refused to the earlier lease.
@@ -367,14 +287,7 @@ async fn controls_and_views_of_a_running_turn_are_read_from_its_head() {
     let error = claim.lease.controls().read().await.unwrap_err();
     assert_eq!(error.code, "stale_writer_epoch");
     rewrite_head(&path, &head);
-
-    // A turn written as one value reads the same.
-    let whole = serde_json::to_vec(states.last().unwrap()).unwrap();
-    rewrite_head(&path, &whole);
     assert_head_reads(&store, Some(&claim)).await;
-    rewrite_head(&path, &superseded(&whole));
-    let error = claim.lease.controls().read().await.unwrap_err();
-    assert_eq!(error.code, "stale_writer_epoch");
 }
 
 #[tokio::test]
@@ -405,9 +318,6 @@ async fn the_view_of_a_settled_turn_is_read_from_its_head() {
         view.disposition,
         agent_kit_sessions::TurnDisposition::Settled
     );
-
-    rewrite_head(&path, &serde_json::to_vec(&settled).unwrap());
-    assert_head_reads(&store, None).await;
 }
 
 /// Every message an inference operation holds, in its request, its attempts'

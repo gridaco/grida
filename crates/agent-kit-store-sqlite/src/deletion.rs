@@ -5,19 +5,6 @@ use rusqlite::types::ValueRef;
 
 const MAX_DEPENDENTS: usize = 128;
 
-pub(super) const SCHEMA: &str = "
-CREATE TABLE session_retirements (
-    session TEXT PRIMARY KEY,
-    scope BLOB NOT NULL CHECK(length(scope) = 32),
-    fingerprint BLOB NOT NULL CHECK(length(fingerprint) = 32)
-) WITHOUT ROWID;
-";
-
-pub(super) const CLEANUP_SCHEMA: &str = "
-ALTER TABLE session_retirements ADD COLUMN cleanup BLOB CHECK(length(cleanup) = 32);
-CREATE INDEX session_retirements_pending ON session_retirements(session) WHERE cleanup IS NOT NULL;
-";
-
 #[derive(Clone, Debug, Serialize)]
 pub struct DeleteSession {
     pub session: SessionId,
@@ -132,7 +119,7 @@ impl SqliteStore {
             let id = &request.session;
             let catalog_revision: i64 = transaction
                 .query_row(
-                    "SELECT revision FROM session_catalog WHERE session=?1 AND scope=?2",
+                    "SELECT catalog_revision FROM sessions WHERE id=?1 AND scope=?2",
                     params![id.as_str(), request.scope.bytes().as_slice()],
                     |row| row.get(0),
                 )
@@ -177,7 +164,7 @@ impl SqliteStore {
                 }
             }
             delete_rows(&transaction, id, request.scope, fingerprint, cleanup)?;
-            transaction.commit().map_err(commit_error)?;
+            commit(inner, transaction)?;
             inner.changed.notify_waiters();
             Ok(receipt(&request, cleanup))
         })
@@ -232,9 +219,8 @@ fn retirement_dependencies(
 ) -> Result<RetirementDependencies> {
     let mut statement = connection
         .prepare(
-            "SELECT catalog.session, session.revision, catalog.revision
-         FROM session_catalog catalog JOIN sessions session ON session.id=catalog.session
-         WHERE catalog.scope=?1 ORDER BY catalog.session LIMIT ?2",
+            "SELECT id,revision,catalog_revision FROM sessions
+             WHERE scope=?1 ORDER BY id LIMIT ?2",
         )
         .map_err(database_error)?;
     let mut rows = statement
@@ -287,6 +273,9 @@ fn require_idle(
     Ok(())
 }
 
+/// Retire the identity and remove the session. Every row the session owns,
+/// and every link from another session to one of its turns, follows it.
+/// Only unsettled turns are kept in memory, and a removed session has none.
 fn delete_rows(
     connection: &Connection,
     id: &SessionId,
@@ -298,20 +287,9 @@ fn delete_rows(
         "INSERT INTO session_retirements(session,scope,fingerprint,cleanup) VALUES(?1,?2,?3,?4)",
         params![id.as_str(), scope.bytes().as_slice(), fingerprint.bytes().as_slice(), cleanup.as_ref().map(|value| value.as_slice())],
     ).map_err(database_error)?;
-    for sql in [
-        "DELETE FROM session_context_replacements WHERE session=?1",
-        "DELETE FROM session_history_views WHERE session=?1",
-        "DELETE FROM submissions WHERE session=?1",
-        "DELETE FROM requests WHERE session=?1",
-        "DELETE FROM turn_parts WHERE session=?1",
-        "DELETE FROM turns WHERE session=?1",
-        "DELETE FROM turn_messages WHERE session=?1",
-        "DELETE FROM sessions WHERE id=?1",
-    ] {
-        connection
-            .execute(sql, [id.as_str()])
-            .map_err(database_error)?;
-    }
+    connection
+        .execute("DELETE FROM sessions WHERE id=?1", [id.as_str()])
+        .map_err(database_error)?;
     Ok(())
 }
 
@@ -343,13 +321,15 @@ impl RetirementScan {
         mut check: impl FnMut(&TurnState) -> Result<()>,
     ) -> Result<()> {
         let mut statement = connection
-            .prepare("SELECT id,snapshot,COALESCE(bytes,length(snapshot)) FROM turns WHERE session=?1 ORDER BY ordinal LIMIT ?2")
+            .prepare(
+                "SELECT id,head,stored_bytes FROM turns WHERE session=?1 ORDER BY ordinal LIMIT ?2",
+            )
             .map_err(database_error)?;
         let mut rows = statement
             .query(params![session.as_str(), MAX_HISTORY_TURNS + 1])
             .map_err(database_error)?;
         while let Some(row) = rows.next().map_err(database_error)? {
-            let ValueRef::Blob(snapshot) = row.get_ref(1).map_err(database_error)? else {
+            let ValueRef::Blob(head) = row.get_ref(1).map_err(database_error)? else {
                 return Err(error(ErrorKind::InvalidState, "stored_data_invalid"));
             };
             self.turns += 1;
@@ -361,7 +341,7 @@ impl RetirementScan {
                 ));
             }
             let turn = TurnId::new(row.get::<_, String>(0).map_err(database_error)?)?;
-            let state = decode_turn(connection, snapshot, session, &turn)?;
+            let state = decode_turn(connection, head, session, &turn)?;
             if state.outcome().is_none() {
                 return Err(error(ErrorKind::Conflict, "session_deletion_requires_idle"));
             }

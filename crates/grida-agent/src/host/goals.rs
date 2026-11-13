@@ -912,8 +912,7 @@ pub(super) fn require_goal_resolved_for_revision(view: &SessionView) -> Result<(
 }
 
 fn retained_goal_prompt(input: &Submission) -> Result<StoredPrompt> {
-    if input.payload.schema().as_str() != INPUT_SCHEMA || !matches!(input.payload.version(), 2 | 3)
-    {
+    if !is_stored_input(&input.payload) {
         return Err(problem(ErrorKind::Conflict, "input_identity_reused"));
     }
     decode_input(input)

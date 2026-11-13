@@ -11,80 +11,38 @@
 //! the same state value, so the journal's recovery, identity and evidence
 //! rules are unchanged.
 //!
-//! A commit encodes and writes only the parts that differ from this process's
-//! previous write of the turn. That previous state is kept in memory beside a
-//! generation token stored with the turn, and is trusted only while the stored
-//! token still matches, so a rolled-back write is never mistaken for the
-//! stored state. Few turns are kept, within a byte budget, least recently
-//! used first out, and a store's turns are released when it closes.
+//! A commit encodes and writes only the parts that differ from the store's
+//! previous write of the turn. The store keeps that previous state in memory.
+//! A write inside a transaction is staged and becomes the remembered state
+//! only after the transaction commits; a transaction that ends any other way
+//! leaves the remembered state as it was. The store is the database's only
+//! writer while it is open, so a remembered state always equals the stored
+//! rows. Only unsettled turns are kept, few of them, within a byte budget,
+//! least recently used first out.
 //!
 //! Readers that need only what the head holds, such as controls or a turn's
-//! view, read the head and count history parts instead of assembling.
+//! view, read the head and the stored history length instead of assembling.
 //!
 //! References replace messages only at the positions where the state model
 //! holds a message, never inside arbitrary values such as tool arguments.
-//! A head that still holds its operations is a turn written before this
-//! layout; it is read as before and rewritten in this layout on its next
-//! commit.
 
-use super::{MAX_SNAPSHOT_BYTES, Result, database_error, decode, encode, error};
+use super::{MAX_STORED_TURN_BYTES, Result, database_error, decode, encode, error, now_ms};
 use agent_kit_core::history::HistoryPosition;
 use agent_kit_core::turn::{ControlSnapshot, JournalPosition, TurnBinding, TurnOutcome, TurnState};
 use agent_kit_core::{ErrorKind, SessionId, TurnId};
 use rusqlite::{Connection, OptionalExtension, params};
-use serde::de::IgnoredAny;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock, PoisonError};
-
-const SCHEMA: &str = "
-CREATE TABLE IF NOT EXISTS turn_parts (
-    session TEXT NOT NULL,
-    turn TEXT NOT NULL,
-    key TEXT NOT NULL,
-    digest BLOB NOT NULL,
-    body BLOB NOT NULL,
-    PRIMARY KEY(session, turn, key),
-    FOREIGN KEY(session, turn) REFERENCES turns(session, id) ON DELETE CASCADE
-);
-CREATE TABLE IF NOT EXISTS turn_messages (
-    session TEXT NOT NULL REFERENCES sessions(id),
-    digest BLOB NOT NULL,
-    body BLOB NOT NULL,
-    PRIMARY KEY(session, digest)
-);
-";
-
-/// Create this layout's tables and the turn columns when absent.
-pub(crate) fn install(connection: &Connection) -> Result<()> {
-    connection.execute_batch(SCHEMA).map_err(database_error)?;
-    let sized: bool = connection
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('turns') WHERE name='bytes')",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(database_error)?;
-    if !sized {
-        connection
-            .execute_batch(
-                "ALTER TABLE turns ADD COLUMN bytes INTEGER;
-                 ALTER TABLE turns ADD COLUMN generation INTEGER;",
-            )
-            .map_err(database_error)?;
-    }
-    Ok(())
-}
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 /// The assembled state a reader holds in memory. Repeated context is shared
 /// on disk but not in memory, so this bounds one turn's decoded size.
 const MAX_ASSEMBLED_BYTES: usize = 512 * 1024 * 1024;
 const CACHED_TURNS: usize = 16;
-/// The summed assembled size of every cached turn in this process. One turn
-/// of the largest readable size still fits.
+/// The summed assembled size of every turn one store keeps. One turn of the
+/// largest readable size still fits.
 const CACHED_BYTES: usize = MAX_ASSEMBLED_BYTES;
 
 const OPERATION: &str = "o/";
@@ -101,12 +59,9 @@ struct Size {
     assembled: usize,
 }
 
-/// A turn as this process last wrote or read it.
+/// A turn as the store last wrote or read it.
 struct Cached {
-    generation: i64,
     state: TurnState,
-    /// Digest of the stored head, so a head changed outside a write is read again.
-    head_digest: [u8; 32],
     head: usize,
     parts: BTreeMap<String, Size>,
     /// Distinct messages the turn refers to, by digest, with their sizes.
@@ -129,23 +84,36 @@ impl Cached {
     }
 }
 
-type CacheKey = (String, String, String);
+type CacheKey = (String, String);
 
-/// Turns this process last wrote or read, by database path, session and turn.
-/// Bounded by count and by summed assembled size; the least recently used turn
-/// leaves first, and a turn larger than the whole budget is not kept.
-struct TurnCache {
+fn cache_key(session: &str, turn: &str) -> CacheKey {
+    (session.to_owned(), turn.to_owned())
+}
+
+/// The turns one store last wrote or read. Committed entries are bounded by
+/// count and by summed assembled size; the least recently used turn leaves
+/// first, and a turn larger than the whole budget is not kept. Entries written
+/// or read inside an open transaction are staged until it commits.
+pub(crate) struct TurnCache {
     entries: BTreeMap<CacheKey, (u64, Cached)>,
+    staged: BTreeMap<CacheKey, Cached>,
     clock: u64,
     bytes: usize,
     turns_limit: usize,
     bytes_limit: usize,
 }
 
+impl Default for TurnCache {
+    fn default() -> Self {
+        Self::new(CACHED_TURNS, CACHED_BYTES)
+    }
+}
+
 impl TurnCache {
     const fn new(turns_limit: usize, bytes_limit: usize) -> Self {
         Self {
             entries: BTreeMap::new(),
+            staged: BTreeMap::new(),
             clock: 0,
             bytes: 0,
             turns_limit,
@@ -158,8 +126,11 @@ impl TurnCache {
         self.clock
     }
 
-    /// The cached turn, marked as just used.
+    /// The turn as the current transaction or the last commit left it.
     fn get(&mut self, key: &CacheKey) -> Option<&Cached> {
+        if self.staged.contains_key(key) {
+            return self.staged.get(key);
+        }
         let now = self.tick();
         let (used, entry) = self.entries.get_mut(key)?;
         *used = now;
@@ -167,9 +138,25 @@ impl TurnCache {
     }
 
     fn take(&mut self, key: &CacheKey) -> Option<Cached> {
+        if let Some(entry) = self.staged.remove(key) {
+            return Some(entry);
+        }
         let (_, entry) = self.entries.remove(key)?;
         self.bytes = self.bytes.saturating_sub(entry.assembled());
         Some(entry)
+    }
+
+    /// Keep a turn read or written through `connection`. Inside an open
+    /// transaction it is staged until that transaction commits.
+    fn remember(&mut self, connection: &Connection, key: CacheKey, entry: Cached) {
+        if entry.state.outcome().is_some() {
+            // A settled turn is no longer written; readers assemble it as needed.
+            self.take(&key);
+        } else if connection.is_autocommit() {
+            self.insert(key, entry);
+        } else {
+            self.staged.insert(key, entry);
+        }
     }
 
     fn insert(&mut self, key: CacheKey, entry: Cached) {
@@ -194,141 +181,73 @@ impl TurnCache {
         self.entries.insert(key, (now, entry));
     }
 
-    fn forget(&mut self, path: &str) {
-        let keys: Vec<CacheKey> = self
-            .entries
-            .keys()
-            .filter(|(cached, _, _)| cached == path)
-            .cloned()
-            .collect();
-        for key in keys {
-            self.take(&key);
+    /// Keep what the transaction that just committed staged.
+    pub(crate) fn publish(&mut self) {
+        for (key, entry) in std::mem::take(&mut self.staged) {
+            self.insert(key, entry);
         }
     }
-}
 
-/// Every cached entry is checked against the stored generation and head
-/// before use, so a panic elsewhere while the lock was held cannot make a
-/// stale entry trusted.
-fn cache() -> std::sync::MutexGuard<'static, TurnCache> {
-    static CACHE: Mutex<TurnCache> = Mutex::new(TurnCache::new(CACHED_TURNS, CACHED_BYTES));
-    CACHE.lock().unwrap_or_else(PoisonError::into_inner)
-}
-
-fn cache_key(connection: &Connection, session: &str, turn: &str) -> Option<CacheKey> {
-    let path = connection.path().filter(|path| !path.is_empty())?;
-    Some((path.to_owned(), session.to_owned(), turn.to_owned()))
-}
-
-fn remember(key: Option<CacheKey>, entry: Cached) {
-    let Some(key) = key else { return };
-    let mut cache = cache();
-    if entry.state.outcome().is_some() {
-        // A settled turn is no longer written; readers assemble it as needed.
-        cache.take(&key);
-        return;
+    /// Drop what a transaction that did not commit staged.
+    pub(crate) fn discard(&mut self) {
+        self.staged.clear();
     }
-    cache.insert(key, entry);
 }
 
-/// The stored generation and head digest of a turn written in this layout.
-fn stored_identity(
-    connection: &Connection,
-    session: &str,
-    turn: &str,
-) -> Result<Option<(i64, [u8; 32])>> {
-    let row: Option<(Option<i64>, Vec<u8>)> = connection
-        .query_row(
-            "SELECT generation,snapshot FROM turns WHERE session=?1 AND id=?2",
-            params![session, turn],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()
-        .map_err(database_error)?;
-    Ok(row.and_then(|(generation, head)| Some((generation?, Sha256::digest(&head).into()))))
+/// Every update leaves the cache consistent, so a panic elsewhere while it
+/// was held does not invalidate it.
+pub(crate) fn lock(cache: &Mutex<TurnCache>) -> MutexGuard<'_, TurnCache> {
+    cache.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Forget every turn cached for a database, as when its store is opened or
-/// released.
-pub(crate) fn forget(path: &str) {
-    cache().forget(path);
-}
-
-/// A token no earlier write of this database can hold.
-fn fresh_generation() -> i64 {
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-    static SALT: OnceLock<[u8; 16]> = OnceLock::new();
-    let salt = SALT.get_or_init(|| {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |elapsed| elapsed.as_nanos());
-        let mut salt = [0u8; 16];
-        salt.copy_from_slice(&Sha256::digest(format!("{now}:{}", std::process::id()))[..16]);
-        salt
-    });
-    let count = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let digest = Sha256::digest([salt.as_slice(), &count.to_le_bytes()].concat());
-    i64::from_le_bytes(digest[..8].try_into().expect("eight bytes"))
-}
-
-/// Load the turn a journal is writing, from this process's last write while
-/// the store still holds it.
+/// Load the turn a journal is writing, from the store's last write or read
+/// while it keeps one.
 pub(crate) fn load(
+    cache: &Mutex<TurnCache>,
     connection: &Connection,
     session: &SessionId,
     turn: &TurnId,
 ) -> Result<TurnState> {
-    let key = cache_key(connection, session.as_str(), turn.as_str());
-    let row: Option<(Vec<u8>, Option<i64>)> = connection
-        .query_row(
-            "SELECT snapshot,generation FROM turns WHERE session=?1 AND id=?2",
-            params![session.as_str(), turn.as_str()],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()
-        .map_err(database_error)?;
-    let (head, stored) = row.ok_or_else(|| error(ErrorKind::InvalidInput, "turn_missing"))?;
-    let head_digest: [u8; 32] = Sha256::digest(&head).into();
-    if let (Some(key), Some(stored)) = (&key, stored)
-        && let Some(entry) = cache().get(key)
-        && entry.generation == stored
-        && entry.head_digest == head_digest
-    {
+    let key = cache_key(session.as_str(), turn.as_str());
+    if let Some(entry) = lock(cache).get(&key) {
         return Ok(entry.state.clone());
     }
-    let (state, sizes) = assemble(connection, &head, session, turn)?;
-    if let (Some(stored), Some((head, parts, messages))) = (stored, sizes) {
-        remember(
-            key,
-            Cached {
-                generation: stored,
-                state: state.clone(),
-                head_digest,
-                head,
-                parts,
-                messages,
-            },
-        );
-    }
+    let head: Vec<u8> = connection
+        .query_row(
+            "SELECT head FROM turns WHERE session=?1 AND id=?2",
+            params![session.as_str(), turn.as_str()],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(database_error)?
+        .ok_or_else(|| error(ErrorKind::InvalidInput, "turn_missing"))?;
+    let (state, (head, parts, messages)) = assemble(connection, &head, session, turn)?;
+    lock(cache).remember(
+        connection,
+        key,
+        Cached {
+            state: state.clone(),
+            head,
+            parts,
+            messages,
+        },
+    );
     Ok(state)
 }
 
-/// Write a turn's rows. `insert` creates its head and reports whether it was
-/// new; otherwise the existing head is replaced. Parts equal to the previous
-/// write are neither encoded nor written.
-pub(crate) fn write(connection: &Connection, state: &TurnState, insert: bool) -> Result<bool> {
+/// Write a turn's rows. `insert` creates its head, which must be absent;
+/// otherwise the existing head is replaced. Parts equal to the previous write
+/// are neither encoded nor written.
+pub(crate) fn write(
+    cache: &Mutex<TurnCache>,
+    connection: &Connection,
+    state: &TurnState,
+    insert: bool,
+) -> Result<()> {
     let binding = state.binding();
     let (session, turn) = (binding.session.as_str(), binding.turn.as_str());
-    let key = cache_key(connection, session, turn);
-    let previous = match (&key, insert) {
-        (Some(key), false) => {
-            let stored = stored_identity(connection, session, turn)?;
-            cache()
-                .take(key)
-                .filter(|entry| stored == Some((entry.generation, entry.head_digest)))
-        }
-        _ => None,
-    };
+    let key = cache_key(session, turn);
+    let previous = if insert { None } else { lock(cache).take(&key) };
     let full = previous.is_none();
     let (mut parts, mut messages) = previous
         .as_ref()
@@ -411,34 +330,44 @@ pub(crate) fn write(connection: &Connection, state: &TurnState, insert: bool) ->
     }
     let head = encode(&head(state)?)?;
     let entry = Cached {
-        generation: fresh_generation(),
         state: state.clone(),
-        head_digest: Sha256::digest(&head).into(),
         head: head.len(),
         parts,
         messages,
     };
-    if entry.assembled() > MAX_ASSEMBLED_BYTES || entry.stored() > MAX_SNAPSHOT_BYTES {
+    if entry.assembled() > MAX_ASSEMBLED_BYTES || entry.stored() > MAX_STORED_TURN_BYTES {
         return Err(error(ErrorKind::LimitExceeded, "turn_snapshot_too_large"));
     }
-    let bytes = i64::try_from(entry.stored())
+    let stored = i64::try_from(entry.stored())
+        .map_err(|_| error(ErrorKind::LimitExceeded, "turn_snapshot_too_large"))?;
+    let history_len = i64::try_from(records.len())
         .map_err(|_| error(ErrorKind::LimitExceeded, "turn_snapshot_too_large"))?;
     if insert {
-        let inserted = connection
-            .execute(
-                "INSERT INTO turns(session,id,snapshot,bytes,generation) VALUES(?1,?2,?3,?4,?5)
-                 ON CONFLICT(session,id) DO NOTHING",
-                params![session, turn, head, bytes, entry.generation],
-            )
-            .map_err(database_error)?;
-        if inserted == 0 {
-            return Ok(false);
-        }
-    } else {
         connection
             .execute(
-                "UPDATE turns SET snapshot=?3,bytes=?4,generation=?5 WHERE session=?1 AND id=?2",
-                params![session, turn, head, bytes, entry.generation],
+                "INSERT INTO turns(session,id,head,history_len,stored_bytes,started_ms)
+                 VALUES(?1,?2,?3,?4,?5,?6)",
+                params![session, turn, head, history_len, stored, now_ms()],
+            )
+            .map_err(database_error)?;
+    } else {
+        // The first settlement is the recorded finish. A clock that moved
+        // backwards cannot produce a negative duration.
+        connection
+            .execute(
+                "UPDATE turns SET head=?3,history_len=?4,stored_bytes=?5,
+                     settled_ms=CASE WHEN ?6 AND settled_ms IS NULL THEN MAX(started_ms,?7)
+                                     ELSE settled_ms END
+                 WHERE session=?1 AND id=?2",
+                params![
+                    session,
+                    turn,
+                    head,
+                    history_len,
+                    stored,
+                    state.outcome().is_some(),
+                    now_ms()
+                ],
             )
             .map_err(database_error)?;
     }
@@ -455,7 +384,7 @@ pub(crate) fn write(connection: &Connection, state: &TurnState, insert: bool) ->
                 .map_err(database_error)?;
         }
     }
-    // Without a trusted previous write, compare against the stored parts so
+    // Without a remembered previous write, compare against the stored parts so
     // unchanged rows are kept and parts the state no longer holds are removed.
     let existing: BTreeMap<String, Vec<u8>> = if full {
         let mut statement = connection
@@ -503,8 +432,8 @@ pub(crate) fn write(connection: &Connection, state: &TurnState, insert: bool) ->
                 .map_err(database_error)?;
         }
     }
-    remember(key, entry);
-    Ok(true)
+    lock(cache).remember(connection, key, entry);
+    Ok(())
 }
 
 /// The head: the state without its operations, history records, receipts and
@@ -611,37 +540,31 @@ pub(crate) struct HeadFacts {
     pub(crate) outcome: Option<TurnOutcome>,
 }
 
-/// The head fields both layouts hold. A head written before this layout also
-/// holds its operations and history records, which are skipped unread.
+/// The head fields readers of controls and views need.
 #[derive(Deserialize)]
 struct StoredHead {
     binding: TurnBinding,
     position: JournalPosition,
     controls: ControlSnapshot,
-    history: StoredHistory,
-    #[serde(default)]
-    operations: Option<IgnoredAny>,
     suspended: bool,
     outcome: Option<TurnOutcome>,
 }
 
-#[derive(Deserialize)]
-struct StoredHistory {
-    #[serde(default)]
-    records: Vec<IgnoredAny>,
-}
-
-fn stored_head(connection: &Connection, session: &SessionId, turn: &TurnId) -> Result<StoredHead> {
-    let head: Vec<u8> = connection
+fn stored_head(
+    connection: &Connection,
+    session: &SessionId,
+    turn: &TurnId,
+) -> Result<(StoredHead, u64)> {
+    let (head, history_len): (Vec<u8>, i64) = connection
         .query_row(
-            "SELECT snapshot FROM turns WHERE session=?1 AND id=?2",
+            "SELECT head,history_len FROM turns WHERE session=?1 AND id=?2",
             params![session.as_str(), turn.as_str()],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()
         .map_err(database_error)?
         .ok_or_else(|| error(ErrorKind::InvalidInput, "turn_missing"))?;
-    if head.len() > MAX_SNAPSHOT_BYTES {
+    if head.len() > MAX_STORED_TURN_BYTES {
         return Err(error(ErrorKind::LimitExceeded, "turn_snapshot_too_large"));
     }
     let head: StoredHead = decode(&head)?;
@@ -651,7 +574,9 @@ fn stored_head(connection: &Connection, session: &SessionId, turn: &TurnId) -> R
             "stored_turn_binding_mismatch",
         ));
     }
-    Ok(head)
+    let history_len = u64::try_from(history_len)
+        .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
+    Ok((head, history_len))
 }
 
 /// A turn's writer binding and controls, from its head alone.
@@ -660,32 +585,18 @@ pub(crate) fn read_controls(
     session: &SessionId,
     turn: &TurnId,
 ) -> Result<(TurnBinding, ControlSnapshot)> {
-    let head = stored_head(connection, session, turn)?;
+    let (head, _) = stored_head(connection, session, turn)?;
     Ok((head.binding, head.controls))
 }
 
-/// A turn's view facts from its head and the count of its history records,
-/// without reading its operations or messages.
+/// A turn's view facts from its head and its stored history length, without
+/// reading its operations or messages.
 pub(crate) fn read_facts(
     connection: &Connection,
     session: &SessionId,
     turn: &TurnId,
 ) -> Result<HeadFacts> {
-    let head = stored_head(connection, session, turn)?;
-    let records = if head.operations.is_some() {
-        head.history.records.len() as u64
-    } else {
-        // Record keys are `h/` and a zero-padded index; `0` follows `/`.
-        let count: i64 = connection
-            .query_row(
-                "SELECT COUNT(*) FROM turn_parts
-                 WHERE session=?1 AND turn=?2 AND key>='h/' AND key<'h0'",
-                params![session.as_str(), turn.as_str()],
-                |row| row.get(0),
-            )
-            .map_err(database_error)?;
-        u64::try_from(count).map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?
-    };
+    let (head, records) = stored_head(connection, session, turn)?;
     Ok(HeadFacts {
         binding: head.binding,
         position: head.position,
@@ -696,7 +607,7 @@ pub(crate) fn read_facts(
     })
 }
 
-/// Assemble a turn from its head row as read from `turns.snapshot`.
+/// Assemble a turn from its head row as read from `turns.head`.
 pub(crate) fn read(
     connection: &Connection,
     head: &[u8],
@@ -708,32 +619,20 @@ pub(crate) fn read(
 
 type Sizes = (usize, BTreeMap<String, Size>, BTreeMap<[u8; 32], usize>);
 
-/// The assembled state and, for a turn in this layout, its part sizes.
+/// The assembled state and its part sizes.
 fn assemble(
     connection: &Connection,
     head: &[u8],
     session: &SessionId,
     turn: &TurnId,
-) -> Result<(TurnState, Option<Sizes>)> {
-    if head.len() > MAX_SNAPSHOT_BYTES {
+) -> Result<(TurnState, Sizes)> {
+    if head.len() > MAX_STORED_TURN_BYTES {
         return Err(error(ErrorKind::LimitExceeded, "turn_snapshot_too_large"));
     }
     let Value::Object(mut value) = decode::<Value>(head)? else {
         return Err(error(ErrorKind::InvalidState, "stored_data_invalid"));
     };
-    // A head that holds its operations was written before this layout: the
-    // whole state with messages inline, read as it is.
-    let sizes = if value.contains_key("operations") {
-        None
-    } else {
-        Some(assemble_parts(
-            connection,
-            &mut value,
-            session,
-            turn,
-            head.len(),
-        )?)
-    };
+    let sizes = assemble_parts(connection, &mut value, session, turn, head.len())?;
     let state: TurnState = serde_json::from_value(Value::Object(value))
         .map_err(|_| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
     if &state.binding().session != session || &state.binding().turn != turn {
@@ -915,54 +814,71 @@ mod tests {
         serde_json::to_value(state).unwrap()
     }
 
-    /// A write inside a transaction that rolls back is never read back from
-    /// memory, and the next write still stores exactly its state.
+    /// A write inside a transaction is remembered only once the transaction
+    /// commits: a rolled-back write is never read back from memory, and the
+    /// next write still stores exactly its state.
     #[test]
     fn a_rolled_back_write_is_never_read_back() {
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("turns.sqlite");
-        let mut connection = Connection::open(&path).unwrap();
+        let mut connection = Connection::open_in_memory().unwrap();
         connection
-            .execute_batch(
-                "CREATE TABLE sessions(id TEXT PRIMARY KEY);
-                 CREATE TABLE turns(ordinal INTEGER PRIMARY KEY AUTOINCREMENT, session TEXT NOT NULL,
-                     id TEXT NOT NULL, snapshot BLOB NOT NULL, UNIQUE(session,id));
-                 INSERT INTO sessions(id) VALUES('session');",
+            .pragma_update(None, "foreign_keys", true)
+            .unwrap();
+        crate::schema::install_for_test(&mut connection);
+        connection
+            .execute(
+                "INSERT INTO sessions(id,configuration,revision,paused,next_input)
+                 VALUES('session',x'',0,0,0)",
+                [],
             )
             .unwrap();
-        install(&connection).unwrap();
+        let cache = Mutex::new(TurnCache::default());
         let (session, turn) = (binding().session, binding().turn);
+        let cold = |connection: &Connection| {
+            let head: Vec<u8> = connection
+                .query_row("SELECT head FROM turns", [], |row| row.get(0))
+                .unwrap();
+            same(&read(connection, &head, &session, &turn).unwrap())
+        };
 
         let mut state = TurnState::new(binding()).unwrap();
         said(&mut state, "first");
-        assert!(write(&connection, &state, true).unwrap());
+        write(&cache, &connection, &state, true).unwrap();
         let committed = state.clone();
         assert_eq!(
-            same(&load(&connection, &session, &turn).unwrap()),
+            same(&load(&cache, &connection, &session, &turn).unwrap()),
             same(&committed)
         );
 
         said(&mut state, "rolled-back");
         let transaction = connection.transaction().unwrap();
-        write(&transaction, &state, false).unwrap();
-        transaction.rollback().unwrap();
+        write(&cache, &transaction, &state, false).unwrap();
+        // The transaction reads its own write.
         assert_eq!(
-            same(&load(&connection, &session, &turn).unwrap()),
+            same(&load(&cache, &transaction, &session, &turn).unwrap()),
+            same(&state)
+        );
+        transaction.rollback().unwrap();
+        lock(&cache).discard();
+        assert_eq!(
+            same(&load(&cache, &connection, &session, &turn).unwrap()),
             same(&committed)
         );
 
         let mut later = committed.clone();
         said(&mut later, "later");
-        write(&connection, &later, false).unwrap();
+        let transaction = connection.transaction().unwrap();
+        write(&cache, &transaction, &later, false).unwrap();
+        transaction.commit().unwrap();
+        lock(&cache).publish();
         assert_eq!(
-            same(&load(&connection, &session, &turn).unwrap()),
+            same(&load(&cache, &connection, &session, &turn).unwrap()),
             same(&later)
         );
-        forget(connection.path().unwrap());
-        assert_eq!(
-            same(&load(&connection, &session, &turn).unwrap()),
-            same(&later)
-        );
+        assert_eq!(cold(&connection), same(&later));
+        let history_len: i64 = connection
+            .query_row("SELECT history_len FROM turns", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(history_len, 2);
     }
 
     /// The head written without encoding the whole state must equal the
@@ -1043,9 +959,7 @@ mod tests {
 
     fn cached(head: usize) -> Cached {
         Cached {
-            generation: 0,
             state: TurnState::new(binding()).unwrap(),
-            head_digest: [0; 32],
             head,
             parts: BTreeMap::new(),
             messages: BTreeMap::new(),
@@ -1053,7 +967,7 @@ mod tests {
     }
 
     fn key(turn: usize) -> CacheKey {
-        ("path".into(), "session".into(), format!("turn-{turn}"))
+        ("session".into(), format!("turn-{turn}"))
     }
 
     /// The turn used last stays while others leave, oldest use first.
@@ -1083,8 +997,6 @@ mod tests {
         cache.insert(key(3), cached(1_001));
         assert!(cache.get(&key(3)).is_none());
         assert_eq!(cache.bytes, 800);
-        cache.forget("path");
-        assert_eq!((cache.entries.len(), cache.bytes), (0, 0));
     }
 
     /// A malformed stored reference is invalid data, never a panic.

@@ -12,7 +12,7 @@ use agent_kit_store_sqlite::SqliteStore;
 use agent_kit_store_sqlite::deletion::DeleteSession;
 use agent_kit_store_sqlite::turn_links::{TurnLinkCursor, TurnLinkDecision, TurnLinkParent};
 use std::path::Path;
-use support::{change, commit, payload, private_directory, remove_turn_link_schema, submission};
+use support::{change, commit, payload, private_directory, submission};
 
 fn session(id: &str) -> SessionId {
     SessionId::new(id).unwrap()
@@ -42,16 +42,9 @@ fn link(configuration: &Envelope, input: &Envelope) -> Result<TurnLinkDecision> 
     if input == "malformed" {
         return Err(Error::new(ErrorKind::InvalidState, "test_projection_error"));
     }
-    if input == "unclassified" {
-        return Ok(TurnLinkDecision::CoverageUnknown);
-    }
     Ok(TurnLinkDecision::Linked(TurnLinkParent {
         session: SessionId::new(parent)?,
-        turn: if input == "unknown" {
-            None
-        } else {
-            Some(TurnId::new(input)?)
-        },
+        turn: TurnId::new(input)?,
     }))
 }
 
@@ -112,30 +105,69 @@ fn projected_turn(state: &TurnState) -> Result<TurnId> {
 }
 
 #[tokio::test]
-async fn historical_links_preserve_exact_assignment_and_disclose_unknown_sources_after_reopen() {
+async fn links_keep_the_exact_source_turn_across_reopen() {
     let directory = private_directory();
     let path = directory.path().join("sessions.sqlite");
-    let generic = SqliteStore::open(&path).unwrap();
-    create(&generic, "parent", "root").await;
-    create(&generic, "foreign", "root").await;
-    create(&generic, "child", "child/parent").await;
-    source_turn(&generic, "parent", "first").await;
-    source_turn(&generic, "parent", "second").await;
-    source_turn(&generic, "foreign", "first").await;
-    for (input, source, child_turn) in [
-        ("shared", "first", "original"),
-        ("reuse", "second", "latest"),
-        ("unknown", "unknown", "historical-unknown"),
-        ("missing", "missing-source", "historical-missing"),
+    {
+        let store = open(&path);
+        create(&store, "parent", "root").await;
+        create(&store, "foreign", "root").await;
+        create(&store, "child", "child/parent").await;
+        source_turn(&store, "parent", "first").await;
+        source_turn(&store, "parent", "second").await;
+        source_turn(&store, "foreign", "first").await;
+        for (input, source, child_turn) in [
+            ("shared", "first", "original"),
+            ("reuse", "second", "latest"),
+        ] {
+            store
+                .submit(session("child"), submission(input, source))
+                .await
+                .unwrap();
+            settle(&store, "child", input, child_turn).await;
+        }
+    }
+    let store = open(&path);
+    for (source, input, child_turn) in [
+        ("first", "shared", "original"),
+        ("second", "reuse", "latest"),
     ] {
-        generic
-            .submit(session("child"), submission(input, source))
+        let page = store
+            .turn_links(session("parent"), turn(source), None, projected_turn)
             .await
             .unwrap();
-        settle(&generic, "child", input, child_turn).await;
+        assert_eq!(page.entries.len(), 1);
+        assert_eq!(page.entries[0].cursor, cursor("child", input));
+        assert_eq!(page.entries[0].configuration, payload("child/parent"));
+        assert_eq!(
+            page.entries[0].disposition,
+            InputDisposition::Completed {
+                turn: turn(child_turn),
+            },
+        );
+        assert_eq!(
+            page.entries[0].turn,
+            Some((turn(child_turn), turn(child_turn)))
+        );
+        assert!(page.next_after.is_none());
     }
+    // A turn with the same identity in another session has no links.
+    let foreign = store
+        .turn_links(session("foreign"), turn("first"), None, projected_turn)
+        .await
+        .unwrap();
+    assert!(foreign.entries.is_empty());
+    drop(store);
+
+    // The database records that it links turns; a store without the link
+    // projection cannot open it, and one without it reads no links.
     assert_eq!(
-        generic
+        SqliteStore::open(&path).err().unwrap().code,
+        "store_profile_mismatch"
+    );
+    let plain = SqliteStore::open(directory.path().join("plain.sqlite")).unwrap();
+    assert_eq!(
+        plain
             .turn_links(session("parent"), turn("first"), None, projected_turn)
             .await
             .err()
@@ -143,62 +175,6 @@ async fn historical_links_preserve_exact_assignment_and_disclose_unknown_sources
             .code,
         "turn_link_projection_missing",
     );
-    drop(generic);
-    let previous = rusqlite::Connection::open(&path).unwrap();
-    remove_turn_link_schema(&previous);
-    previous.pragma_update(None, "user_version", 10).unwrap();
-    drop(previous);
-
-    for _ in 0..2 {
-        let store = open(&path);
-        let page = store
-            .turn_links(session("parent"), turn("first"), None, projected_turn)
-            .await
-            .unwrap();
-        assert!(page.coverage_incomplete);
-        assert_eq!(page.entries.len(), 1);
-        assert_eq!(page.entries[0].cursor, cursor("child", "shared"));
-        assert_eq!(page.entries[0].configuration, payload("child/parent"));
-        assert_eq!(
-            page.entries[0].disposition,
-            InputDisposition::Completed {
-                turn: turn("original"),
-            },
-        );
-        assert_eq!(
-            page.entries[0].turn,
-            Some((turn("original"), turn("original"))),
-        );
-        for (parent, source) in [
-            ("parent", "second"),
-            ("foreign", "first"),
-            ("parent", "missing-source"),
-        ] {
-            assert_eq!(
-                store
-                    .inspect_turn_link_with(
-                        session(parent),
-                        turn(source),
-                        cursor("child", "shared"),
-                        projected_turn,
-                    )
-                    .await
-                    .unwrap(),
-                None,
-            );
-        }
-        let foreign = store
-            .turn_links(session("foreign"), turn("first"), None, projected_turn)
-            .await
-            .unwrap();
-        assert!(!foreign.coverage_incomplete);
-        assert!(foreign.entries.is_empty());
-    }
-    let current = rusqlite::Connection::open(&path).unwrap();
-    let version: u32 = current
-        .pragma_query_value(None, "user_version", |row| row.get(0))
-        .unwrap();
-    assert_eq!(version, 13);
 }
 
 #[tokio::test]
@@ -322,7 +298,7 @@ async fn invalid_live_projection_rolls_back_admission_and_queue_replacement() {
     create(&store, "parent", "root").await;
     create(&store, "child", "child/parent").await;
     source_turn(&store, "parent", "source").await;
-    for text in ["missing", "unknown", "unclassified", "malformed"] {
+    for text in ["missing", "malformed"] {
         assert!(
             store
                 .submit(session("child"), submission("request", text))
@@ -371,165 +347,5 @@ async fn invalid_live_projection_rolls_back_admission_and_queue_replacement() {
         .await
         .unwrap();
     assert_eq!(page.entries.len(), 1);
-    assert!(!page.coverage_incomplete);
     assert_eq!(page.entries[0].cursor, cursor("child", "request"));
-}
-
-#[tokio::test]
-async fn failed_backfill_leaves_the_batch_unprojected_for_owner_retry() {
-    let directory = private_directory();
-    let path = directory.path().join("sessions.sqlite");
-    let generic = SqliteStore::open(&path).unwrap();
-    create(&generic, "parent", "root").await;
-    create(&generic, "child", "child/parent").await;
-    source_turn(&generic, "parent", "source").await;
-    generic
-        .submit(session("child"), submission("prior", "source"))
-        .await
-        .unwrap();
-    for index in 0..126 {
-        generic
-            .submit(
-                session("parent"),
-                submission(&format!("ignored-{index}"), "unlinked"),
-            )
-            .await
-            .unwrap();
-    }
-    generic
-        .submit(session("child"), submission("valid", "source"))
-        .await
-        .unwrap();
-    generic
-        .submit(session("child"), submission("bad", "malformed"))
-        .await
-        .unwrap();
-    drop(generic);
-
-    let failure = SqliteStore::open_cataloged_with_turn_links(&path, scope, link)
-        .err()
-        .unwrap();
-    assert_eq!(failure.code, "test_projection_error");
-    let connection = rusqlite::Connection::open(&path).unwrap();
-    let counts: (u32, u32) = connection
-        .query_row(
-            "SELECT (SELECT count(*) FROM turn_submission_links),
-                    (SELECT count(*) FROM submissions WHERE link_projected=0)",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .unwrap();
-    assert_eq!(counts, (1, 2));
-    drop(connection);
-
-    let store =
-        SqliteStore::open_cataloged_with_turn_links(&path, scope, |configuration, input| {
-            if input.bytes() == b"malformed" {
-                link(configuration, &payload("unknown"))
-            } else {
-                link(configuration, input)
-            }
-        })
-        .unwrap();
-    let page = store
-        .turn_links(session("parent"), turn("source"), None, projected_turn)
-        .await
-        .unwrap();
-    assert_eq!(page.entries.len(), 2);
-    assert_eq!(page.entries[0].cursor, cursor("child", "prior"));
-    assert_eq!(page.entries[1].cursor, cursor("child", "valid"));
-    assert!(page.coverage_incomplete);
-}
-
-#[tokio::test]
-async fn malformed_historical_envelopes_and_orphans_keep_exact_evidence_available() {
-    let directory = private_directory();
-    let path = directory.path().join("sessions.sqlite");
-    let generic = SqliteStore::open(&path).unwrap();
-    create(&generic, "parent", "root").await;
-    create(&generic, "independent", "root").await;
-    create(&generic, "valid", "child/parent").await;
-    create(&generic, "bad-payload", "child/parent").await;
-    create(&generic, "bad-configuration", "child/parent").await;
-    create(&generic, "altered-payload", "child/parent").await;
-    create(&generic, "orphan", "child/missing-parent").await;
-    source_turn(&generic, "parent", "source").await;
-    source_turn(&generic, "independent", "source").await;
-    for child in [
-        "valid",
-        "bad-payload",
-        "bad-configuration",
-        "altered-payload",
-        "orphan",
-    ] {
-        generic
-            .submit(session(child), submission("assignment", "source"))
-            .await
-            .unwrap();
-        settle(&generic, child, "assignment", "work").await;
-    }
-    drop(generic);
-    let previous = rusqlite::Connection::open(&path).unwrap();
-    remove_turn_link_schema(&previous);
-    previous
-        .execute_batch(
-            "UPDATE sessions SET configuration=X'00' WHERE id='bad-configuration';
-             UPDATE submissions SET payload=X'00' WHERE session='bad-payload';
-             PRAGMA user_version=10;",
-        )
-        .unwrap();
-    previous
-        .execute(
-            "UPDATE submissions SET payload=?1 WHERE session='altered-payload'",
-            [serde_json::to_vec(&payload("changed")).unwrap()],
-        )
-        .unwrap();
-    drop(previous);
-
-    for _ in 0..2 {
-        let store = open(&path);
-        let page = store
-            .turn_links(session("parent"), turn("source"), None, projected_turn)
-            .await
-            .unwrap();
-        assert!(page.coverage_incomplete);
-        assert_eq!(page.entries.len(), 1);
-        assert_eq!(page.entries[0].cursor, cursor("valid", "assignment"));
-        assert_eq!(page.entries[0].turn, Some((turn("work"), turn("work"))));
-        let independent = store
-            .turn_links(session("independent"), turn("source"), None, projected_turn)
-            .await
-            .unwrap();
-        assert!(independent.coverage_incomplete);
-        assert!(independent.entries.is_empty());
-        assert!(
-            store
-                .inspect_turn_link_with(
-                    session("parent"),
-                    turn("source"),
-                    cursor("bad-payload", "assignment"),
-                    projected_turn,
-                )
-                .await
-                .unwrap()
-                .is_none()
-        );
-        assert_eq!(
-            store
-                .input(session("altered-payload"), change("assignment"))
-                .await
-                .unwrap_err()
-                .code,
-            "stored_input_fingerprint_mismatch",
-        );
-    }
-    let current = rusqlite::Connection::open(&path).unwrap();
-    let unknown: u32 = current
-        .query_row(
-            "SELECT count(*) FROM submissions WHERE link_projected=2",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert_eq!(unknown, 4);
 }

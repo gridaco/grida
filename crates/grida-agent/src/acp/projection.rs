@@ -560,7 +560,7 @@ mod compaction_fact_tests {
         ReplayTurn {
             id: TurnId::new(id).unwrap(),
             status: Some(OutcomeStatus::Succeeded),
-            started_ms: Some(1),
+            started_ms: 1,
             settled_ms: Some(2),
             context_tokens: None,
             silent_account,

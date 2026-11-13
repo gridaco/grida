@@ -81,8 +81,6 @@ pub struct ProviderOptions {
     pub model: ModelId,
     pub credential_env: Option<String>,
     pub max_output_tokens: u64,
-    // Preserve the launch fingerprint of existing compatible sessions.
-    #[serde(skip_serializing_if = "ProviderProtocol::is_compatible")]
     pub protocol: ProviderProtocol,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub credential_home: Option<PathBuf>,

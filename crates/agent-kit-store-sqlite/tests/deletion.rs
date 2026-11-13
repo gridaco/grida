@@ -162,24 +162,37 @@ async fn removes_only_owned_rows_and_replays_exact_receipt_after_reopen() {
     drop(store);
 
     let connection = rusqlite::Connection::open(&path).unwrap();
+    // Removing the session row removes every row it owns; only its
+    // retirement remains.
     for sql in [
-        "SELECT count(*) FROM session_context_replacements WHERE session=?1",
-        "SELECT count(*) FROM session_history_views WHERE session=?1",
+        "SELECT count(*) FROM context_replacements WHERE session=?1",
+        "SELECT count(*) FROM history_views WHERE session=?1",
         "SELECT count(*) FROM submissions WHERE session=?1",
+        "SELECT count(*) FROM submission_links WHERE session=?1 OR parent_session=?1",
         "SELECT count(*) FROM requests WHERE session=?1",
         "SELECT count(*) FROM turns WHERE session=?1",
         "SELECT count(*) FROM turn_parts WHERE session=?1",
         "SELECT count(*) FROM turn_messages WHERE session=?1",
         "SELECT count(*) FROM sessions WHERE id=?1",
-        "SELECT count(*) FROM session_catalog WHERE session=?1",
     ] {
         assert_eq!(
             connection
                 .query_row(sql, [session().as_str()], |row| row.get::<_, i64>(0))
                 .unwrap(),
-            0
+            0,
+            "{sql}"
         );
     }
+    assert_eq!(
+        connection
+            .query_row(
+                "SELECT count(*) FROM session_retirements WHERE session=?1",
+                [session().as_str()],
+                |row| row.get::<_, i64>(0)
+            )
+            .unwrap(),
+        1
+    );
     drop(connection);
 
     let store = SqliteStore::open_cataloged(&path, project).unwrap();
@@ -350,68 +363,6 @@ async fn deletion_and_submit_serialize_without_losing_accepted_input() {
         }
         result => panic!("unexpected deletion/admission outcomes: {result:?}"),
     }
-}
-
-#[tokio::test]
-async fn migrates_existing_catalog_without_changing_its_entries() {
-    let directory = private_directory();
-    let path = directory.path().join("sessions.sqlite");
-    let store = SqliteStore::open_cataloged(&path, project).unwrap();
-    store.create(create(session(), "workspace")).await.unwrap();
-    let mut entry = store.catalog_entry(session()).await.unwrap();
-    entry.label = Some("Saved".into());
-    entry.bucket = 1;
-    let entry = store.replace_catalog_entry(entry).await.unwrap();
-    drop(store);
-    let previous = rusqlite::Connection::open(&path).unwrap();
-    support::remove_turn_link_schema(&previous);
-    previous
-        .execute_batch("DROP TABLE session_retirements; PRAGMA user_version=7;")
-        .unwrap();
-    drop(previous);
-    let store = SqliteStore::open_cataloged(&path, project).unwrap();
-    assert_eq!(store.catalog_entry(session()).await.unwrap(), entry);
-    remove(&store, deletion(&store).await).await.unwrap();
-}
-
-#[tokio::test]
-async fn upgrades_a_retired_chat_without_reopening_its_identity() {
-    let directory = private_directory();
-    let path = directory.path().join("sessions.sqlite");
-    let store = SqliteStore::open_cataloged(&path, project).unwrap();
-    let original = create(session(), "workspace");
-    store.create(original.clone()).await.unwrap();
-    let request = deletion(&store).await;
-    let receipt = remove(&store, request.clone()).await.unwrap();
-    drop(store);
-
-    let previous = rusqlite::Connection::open(&path).unwrap();
-    support::remove_turn_link_schema(&previous);
-    previous
-        .execute_batch(
-            "DROP INDEX session_retirements_pending;
-         ALTER TABLE session_retirements DROP COLUMN cleanup;
-         PRAGMA user_version=9;",
-        )
-        .unwrap();
-    drop(previous);
-
-    let store = SqliteStore::open_cataloged(&path, project).unwrap();
-    assert_eq!(
-        store.deletion_receipt(request).await.unwrap(),
-        Some(receipt)
-    );
-    assert!(
-        store
-            .pending_retirement_cleanup(None)
-            .await
-            .unwrap()
-            .is_empty()
-    );
-    assert_eq!(
-        store.create(original).await.unwrap_err().code,
-        "session_identity_retired"
-    );
 }
 
 #[tokio::test]

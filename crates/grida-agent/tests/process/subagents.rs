@@ -369,29 +369,10 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
 
 #[tokio::test]
 async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_and_restart() {
-    verify_gateway_summary(None).await;
-}
-
-/// A store the previous worker wrote is migrated, and that worker then
-/// refuses the migrated store.
-#[tokio::test]
-#[ignore = "requires GRIDA_TEST_AGENT_SCHEMA_V10 pointing to a reviewed previous worker"]
-async fn gateway_summary_migrates_a_previous_store_that_the_previous_worker_then_refuses() {
-    let previous = std::env::var_os("GRIDA_TEST_AGENT_SCHEMA_V10")
-        .expect("GRIDA_TEST_AGENT_SCHEMA_V10 names the previous worker");
-    verify_gateway_summary(Some(Path::new(&previous))).await;
-}
-
-async fn verify_gateway_summary(previous: Option<&Path>) {
     use base64::{Engine, engine::general_purpose::STANDARD};
 
-    async fn serve_gateway(
-        state: &Path,
-        scope: &str,
-        child_billing: bool,
-        previous: Option<&Path>,
-    ) -> PrivateStdio {
-        let mut command = previous.map_or_else(executable, Command::new);
+    async fn serve_gateway(state: &Path, scope: &str, child_billing: bool) -> PrivateStdio {
+        let mut command = executable();
         let process = command
             .args([
                 "serve",
@@ -498,7 +479,7 @@ async fn verify_gateway_summary(previous: Option<&Path>) {
     let workspace = TempDir::new().unwrap();
     let state = temporary.path().join("state");
     let scope = "a".repeat(64);
-    let mut first = serve_gateway(&state, &scope, previous.is_none(), previous).await;
+    let mut first = serve_gateway(&state, &scope, true).await;
     let parent = new_session(&mut first, workspace.path()).await;
     let mut child = None;
     let mut parent_turns = Vec::new();
@@ -525,15 +506,13 @@ async fn verify_gateway_summary(previous: Option<&Path>) {
             .unwrap()
             .to_owned();
         parent_turns.push(parent_turn.clone());
-        if previous.is_none() {
-            let summary = first
-                .request(SUMMARY, json!({"sessionId":parent,"turnId":parent_turn}))
-                .await;
-            assert_eq!(
-                summary["result"]["gatewayBilling"]["children"],
-                json!({"assignments":[],"coverageIncomplete":false})
-            );
-        }
+        let summary = first
+            .request(SUMMARY, json!({"sessionId":parent,"turnId":parent_turn}))
+            .await;
+        assert_eq!(
+            summary["result"]["gatewayBilling"]["children"],
+            json!({"assignments":[],"coverageIncomplete":false})
+        );
         if child.is_none() {
             let created = first.request(CREATE, create(&parent)).await;
             child = Some(created["result"]["childId"].as_str().unwrap().to_owned());
@@ -558,7 +537,7 @@ async fn verify_gateway_summary(previous: Option<&Path>) {
     first.close().await;
 
     let load = json!({"sessionId":parent,"cwd":workspace.path(),"mcpServers":[]});
-    let mut reopened = serve_gateway(&state, &scope, true, None).await;
+    let mut reopened = serve_gateway(&state, &scope, true).await;
     assert!(reopened.request("session/load", load.clone()).await["result"].is_object());
     let mut previous_attempt = Value::Null;
     for (index, input, kind) in [
@@ -624,7 +603,7 @@ async fn verify_gateway_summary(previous: Option<&Path>) {
     );
     reopened.close().await;
 
-    let mut legacy = serve_gateway(&state, &scope, false, None).await;
+    let mut legacy = serve_gateway(&state, &scope, false).await;
     assert!(legacy.request("session/load", load).await["result"].is_object());
     let summary = legacy
         .request(
@@ -639,7 +618,7 @@ async fn verify_gateway_summary(previous: Option<&Path>) {
     assert!(summary["result"]["gatewayBilling"]["children"].is_null());
     legacy.close().await;
 
-    let mut foreign = serve_gateway(&state, &"b".repeat(64), true, None).await;
+    let mut foreign = serve_gateway(&state, &"b".repeat(64), true).await;
     let load = json!({"sessionId":parent,"cwd":workspace.path(),"mcpServers":[]});
     assert!(foreign.request("session/load", load).await["result"].is_object());
     let foreign_summary = foreign
@@ -653,23 +632,6 @@ async fn verify_gateway_summary(previous: Option<&Path>) {
         "{foreign_summary}"
     );
     foreign.close().await;
-
-    if let Some(previous) = previous {
-        let refused = timeout(
-            WAIT,
-            Command::new(previous)
-                .arg("inspect")
-                .arg("--state-dir")
-                .arg(&state)
-                .arg(&parent)
-                .output(),
-        )
-        .await
-        .unwrap()
-        .unwrap();
-        assert!(!refused.status.success());
-        assert!(String::from_utf8_lossy(&refused.stderr).contains("store_schema_unsupported"));
-    }
 }
 
 async fn serve(state: &Path, endpoint: &str) -> PrivateStdio {
@@ -715,34 +677,23 @@ async fn connect_subagents(mut command: Command) -> PrivateStdio {
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[tokio::test]
 async fn ordinary_ultra_reviewer_reads_only_its_captured_primary_across_restart() {
-    verify_primary_reviewer("act", true, None).await;
+    verify_primary_reviewer("act", true).await;
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[tokio::test]
 async fn ordinary_ultra_plan_reviewer_reads_only_its_captured_primary_across_restart() {
-    verify_primary_reviewer("plan", true, None).await;
+    verify_primary_reviewer("plan", true).await;
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[tokio::test]
 async fn ordinary_ultra_parent_collects_the_primary_review_finding() {
-    verify_primary_reviewer("act", false, None).await;
-}
-
-/// A worker from before primary review refuses to resume a reviewer it did
-/// not authorize.
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-#[tokio::test]
-#[ignore = "requires GRIDA_AGENT_PRE_PRIMARY_REVIEW_BIN pointing to a reviewed previous worker"]
-async fn a_previous_worker_refuses_to_resume_a_primary_reviewer() {
-    let previous = std::env::var_os("GRIDA_AGENT_PRE_PRIMARY_REVIEW_BIN")
-        .expect("GRIDA_AGENT_PRE_PRIMARY_REVIEW_BIN names the previous worker");
-    verify_primary_reviewer("act", true, Some(Path::new(&previous))).await;
+    verify_primary_reviewer("act", false).await;
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-async fn verify_primary_reviewer(regime: &str, interrupt: bool, previous: Option<&Path>) {
+async fn verify_primary_reviewer(regime: &str, interrupt: bool) {
     const PRIMARY: &str = "PRIMARY REVIEW FIXTURE CONTENT";
     const PRIVATE: &str = "ADDITIONAL ROOT MUST STAY PRIVATE";
     const FINDING: &str = "The primary file is ready for review.";
@@ -799,21 +750,12 @@ async fn verify_primary_reviewer(regime: &str, interrupt: bool, previous: Option
     replies.push(Reply::Finished("Unexpected duplicate dispatch."));
     let mut endpoint = Endpoint::start(replies).await;
     let endpoint_url = endpoint.url.clone();
-    let open = |old: Option<&Path>| {
-        let mut command = if let Some(old) = old {
-            let mut command = Command::new(old);
-            command.arg("serve");
-            configured(&mut command, &fixture.state, &endpoint_url);
-            command.arg("--permission-profile").arg(&fixture.profile);
-            command.kill_on_drop(true);
-            command
-        } else {
-            fixture.process(&endpoint_url, "serve")
-        };
+    let open = || {
+        let mut command = fixture.process(&endpoint_url, "serve");
         command.args(["--stdio", "--subagents", "--max-output-tokens", "128"]);
         connect_subagents(command)
     };
-    let mut host = open(None).await;
+    let mut host = open().await;
     let parent = new_session(&mut host, &fixture.primary).await;
     let submitted = host
         .request(
@@ -901,17 +843,6 @@ async fn verify_primary_reviewer(regime: &str, interrupt: bool, previous: Option
     .await;
     host.close().await;
     let resume = resume_basis(&paused, &parent, child, "resume");
-    if let Some(binary) = previous {
-        let mut old = open(Some(binary)).await;
-        load_parent(&mut old, &parent, &fixture.primary).await;
-        let refused = old.request(RESUME, resume.clone()).await;
-        assert_eq!(
-            refused["error"]["data"], "invalid_subagent_authority",
-            "{refused}"
-        );
-        old.close().await;
-        assert!(endpoint.requests.try_recv().is_err());
-    }
     let mut changed_profile = profile.clone();
     changed_profile["revision"] = json!("changed-permissions");
     std::fs::write(
@@ -919,7 +850,7 @@ async fn verify_primary_reviewer(regime: &str, interrupt: bool, previous: Option
         serde_json::to_vec(&changed_profile).unwrap(),
     )
     .unwrap();
-    let mut changed = open(None).await;
+    let mut changed = open().await;
     load_parent(&mut changed, &parent, &fixture.primary).await;
     let refused = changed.request(RESUME, resume.clone()).await;
     assert_eq!(
@@ -930,7 +861,7 @@ async fn verify_primary_reviewer(regime: &str, interrupt: bool, previous: Option
     changed.close().await;
     assert!(endpoint.requests.try_recv().is_err());
     std::fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
-    let mut reopened = open(None).await;
+    let mut reopened = open().await;
     load_parent(&mut reopened, &parent, &fixture.primary).await;
     let resumed = reopened.request(RESUME, resume.clone()).await;
     assert_eq!(
@@ -2066,83 +1997,6 @@ async fn child_queue_survives_restart_and_stays_held_after_stop() {
         "A separate follow-up."
     );
     second.close().await;
-    provider.done().await;
-}
-
-#[tokio::test]
-async fn stop_replays_a_retained_child_cancellation_from_before_queue_controls() {
-    use agent_kit_core::turn::ControlDirective;
-    use agent_kit_core::{ChangeId, SessionId};
-    use agent_kit_sessions::{ControlRequest, SessionControl, SessionStore};
-    use agent_kit_store_sqlite::SqliteStore;
-
-    let temporary = TempDir::new().unwrap();
-    let workspace = TempDir::new().unwrap();
-    let state = temporary.path().join("state");
-    let mut provider = Endpoint::start(vec![
-        Reply::Finished("Parent completed."),
-        Reply::Hold("Partial child finding."),
-    ])
-    .await;
-    let mut client = serve(&state, &provider.url).await;
-    let parent = new_session(&mut client, workspace.path()).await;
-    let parent_turn = settle_parent(&mut client, &parent).await;
-    provider.request().await;
-    let created = client.request(CREATE, create(&parent)).await;
-    let child = created["result"]["childId"].as_str().unwrap().to_owned();
-    let accepted = client
-        .request(
-            ASSIGN,
-            assign(&parent, &child, &parent_turn, "first", "Investigate."),
-        )
-        .await;
-    assert!(accepted.get("error").is_none(), "{accepted}");
-    provider.request().await;
-    client.close().await;
-
-    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
-    let child_id = SessionId::new(child.clone()).unwrap();
-    let paused = store.inspect(child_id.clone()).await.unwrap();
-    let turn = paused.current.unwrap();
-    let old_receipt = store
-        .control(ControlRequest {
-            id: ChangeId::new("earlier-stop").unwrap(),
-            session: child_id,
-            expected_revision: paused.revision,
-            action: SessionControl::Turn {
-                turn: turn.binding.turn.clone(),
-                expected: turn.controls.revision,
-                directive: ControlDirective::Cancel,
-            },
-        })
-        .await
-        .unwrap();
-    drop(store);
-
-    let mut reopened = serve(&state, &provider.url).await;
-    load_parent(&mut reopened, &parent, workspace.path()).await;
-    let replay = reopened
-        .request(
-            STOP,
-            json!({
-                "parentSessionId":parent,"childId":child,"turnId":turn.binding.turn,
-                "requestId":"earlier-stop","expectedSessionRevision":paused.revision,
-                "expectedControlRevision":turn.controls.revision,
-            }),
-        )
-        .await;
-    assert_eq!(
-        replay["result"]["sessionRevision"], old_receipt.revision.0,
-        "{replay}"
-    );
-    let settled = wait_for(&mut reopened, &parent, &child, "first", |view| {
-        view["assignment"]["disposition"]["kind"] == "completed"
-    })
-    .await;
-    assert_eq!(settled["assignment"]["result"]["status"], "cancelled");
-    assert_eq!(settled["admissionPaused"], false);
-    assert!(provider.requests.try_recv().is_err());
-    reopened.close().await;
     provider.done().await;
 }
 

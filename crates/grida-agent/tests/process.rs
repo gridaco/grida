@@ -848,7 +848,7 @@ async fn embedded_run_and_restart_inspect_through_built_executable() {
     assert_eq!(inspected[0]["session_id"], session);
     assert_eq!(inspected[0]["latest"]["outcome"]["status"], "succeeded");
     assert!(inspected[0]["current"].is_null());
-    let database = std::fs::read(state.join("runtime.sqlite")).unwrap();
+    let database = std::fs::read(state.join(grida_agent::host::DATABASE_FILE)).unwrap();
     assert!(
         !database
             .windows(TEST_CREDENTIAL.len())
@@ -1824,86 +1824,6 @@ fn extension_initialize() -> Value {
             "co.grida/config/reload":1
         }}
     })
-}
-
-#[tokio::test]
-async fn retry_reports_a_previously_accepted_unclaimed_input_without_starting_it() {
-    use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Role};
-    use agent_kit_core::{ChangeId, Envelope, MessageId, ModelId, SchemaId};
-    use agent_kit_sessions::{InputDisposition, SessionStore, Submission};
-    use agent_kit_store_sqlite::SqliteStore;
-    use grida_agent::ProviderOptions;
-    use grida_agent::host::{Host, PromptPart, PromptRequest};
-
-    let temporary = TempDir::new().unwrap();
-    let state = temporary.path().join("agent-state");
-    let workspace = TempDir::new().unwrap();
-    let options = || ProviderOptions {
-        protocol: ProviderProtocol::OpenAiCompatible,
-        credential_home: None,
-        compatible_output_limit_field: None,
-        llama_cpp_input_count: false,
-        endpoint: "http://127.0.0.1:1/v1".into(),
-        model: ModelId::new("fixture-model").unwrap(),
-        credential_env: None,
-        max_output_tokens: 1024,
-        reasoning: Default::default(),
-    };
-    let host = Host::open(&state, Some(options())).unwrap();
-    let session = host.new_session(workspace.path().into()).await.unwrap();
-    drop(host);
-    let store = SqliteStore::open(state.join("runtime.sqlite")).unwrap();
-    let id = ChangeId::new("accepted-before-interruption").unwrap();
-    let recorded = vec![Message {
-        id: MessageId::new("input/accepted-before-interruption").unwrap(),
-        role: Role::User,
-        phase: None,
-        content: vec![Content::Text("Keep this input".into())],
-        provenance: Provenance {
-            source: "native-client".into(),
-            kind: ProvenanceKind::Supplied,
-            fingerprint: None,
-        },
-    }];
-    let accepted = store
-        .submit(
-            session.clone(),
-            Submission {
-                id: id.clone(),
-                payload: Envelope::new(
-                    SchemaId::new("grida.agent.native.input").unwrap(),
-                    1,
-                    serde_json::to_vec(&recorded).unwrap(),
-                )
-                .unwrap(),
-            },
-        )
-        .await
-        .unwrap();
-    drop(store);
-
-    let host = Host::open(&state, Some(options())).unwrap();
-    let receipt = host
-        .submit_prompt(PromptRequest {
-            id,
-            session: session.clone(),
-            parts: vec![PromptPart::Text {
-                text: "Keep this input".into(),
-            }],
-            questions: false,
-            configuration_permission: grida_agent::ConfigurationPermission::Disabled,
-            operating_regime: None,
-            effort: None,
-            reasoning: Default::default(),
-        })
-        .await
-        .unwrap();
-    assert_eq!(receipt.position, accepted.position);
-    assert_eq!(receipt.disposition, InputDisposition::Queued);
-    let snapshot = host.inspect(session).await.unwrap();
-    assert!(snapshot.current.is_none());
-    assert_eq!(snapshot.queued.len(), 1);
-    host.shutdown().await.unwrap();
 }
 
 #[cfg(unix)]

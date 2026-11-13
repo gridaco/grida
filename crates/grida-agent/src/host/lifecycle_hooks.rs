@@ -358,10 +358,7 @@ impl Host {
                             .await?;
                         let captured = inputs
                             .iter()
-                            .find(|input| {
-                                input.payload.schema().as_str() == INPUT_SCHEMA
-                                    && matches!(input.payload.version(), 2 | 3)
-                            })
+                            .find(|input| is_stored_input(&input.payload))
                             .map(decode_input::<StoredPrompt>)
                             .transpose()?
                             .and_then(|input| input.lifecycle_hooks);

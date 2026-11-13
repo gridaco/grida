@@ -179,7 +179,8 @@ async fn reviewed_deletion_removes_only_idle_owned_children() {
     );
     client.close().await;
 
-    let store = agent_kit_store_sqlite::SqliteStore::open(state.join("runtime.sqlite")).unwrap();
+    let store =
+        grida_agent::host::open_store(&state.join(grida_agent::host::DATABASE_FILE)).unwrap();
     use agent_kit_sessions::SessionStore;
     for removed in [&parent, &first, &second] {
         assert_eq!(

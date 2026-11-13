@@ -481,9 +481,7 @@ impl Host {
         let [input] = inputs.as_slice() else {
             return Ok(());
         };
-        if input.payload.schema().as_str() != INPUT_SCHEMA
-            || !matches!(input.payload.version(), 2 | 3)
-        {
+        if !is_stored_input(&input.payload) {
             return Ok(());
         }
         let stored: StoredPrompt = decode_input(input)?;
@@ -732,7 +730,7 @@ mod tests {
         let state = directory.path().join("state");
         prepare_state_dir(&state).unwrap();
         let state = state.canonicalize().unwrap();
-        let owner = Arc::new(SqliteStore::open(state.join("runtime.sqlite")).unwrap());
+        let owner = Arc::new(SqliteStore::open(state.join(DATABASE_FILE)).unwrap());
         let store = Arc::new(Store::new(&state, owner));
         let selection = store
             .capture(
