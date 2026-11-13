@@ -10,10 +10,6 @@ export {
   byokProvidersFor,
   GG_PROVIDER_ID,
   GG_PROVIDER_METADATA,
-  CHATGPT_PROVIDER_ID,
-  CHATGPT_SUBSCRIPTION_MODEL_IDS,
-  CHATGPT_SUBSCRIPTION_MODEL_METADATA,
-  isChatGptSubscriptionModelId,
   type ByokProviderId,
   type ByokProviderMetadata,
   type ProviderId,
@@ -21,7 +17,6 @@ export {
 export type {
   ChatGptAuthStart,
   ChatGptSubscriptionAccount,
-  ChatGptSubscriptionModelId,
   ChatGptSubscriptionStatus,
 } from "./protocol/chatgpt";
 // GRIDA-SEC-006 — hosted-session wire shapes (types only; the store is

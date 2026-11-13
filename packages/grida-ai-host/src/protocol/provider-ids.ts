@@ -9,14 +9,7 @@
 
 import { CHATGPT_PROVIDER_ID } from "./chatgpt";
 
-export {
-  CHATGPT_PROVIDER_ID,
-  CHATGPT_PROVIDER_METADATA,
-  CHATGPT_SUBSCRIPTION_MODEL_IDS,
-  CHATGPT_SUBSCRIPTION_MODEL_METADATA,
-  isChatGptProviderId,
-  isChatGptSubscriptionModelId,
-} from "./chatgpt";
+export { isChatGptProviderId } from "./chatgpt";
 
 // Shared model-provider identity lives with the AI provider implementations.
 import { type ByokProviderId, GG_PROVIDER_ID } from "@grida/ai/providers";

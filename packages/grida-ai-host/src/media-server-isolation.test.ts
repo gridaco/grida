@@ -440,7 +440,7 @@ try {
 } finally { await restart.stop(); }
 
 const protocol = await load("@grida/ai-host");
-assert.equal(protocol.CHATGPT_PROVIDER_ID, "chatgpt");
+assert.equal(protocol.OLLAMA_ENDPOINT_PRESET.id, "ollama");
 assert.deepEqual(forbidden, { module: 0, process: 0, network: 0, state: 0 });
 assert.equal(byok, 1);
 assert.equal(gg, 1);

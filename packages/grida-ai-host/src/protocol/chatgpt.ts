@@ -18,12 +18,6 @@ export type ChatGptAuthStart = {
   authorization_url: string;
 };
 
-export const CHATGPT_PROVIDER_METADATA = {
-  id: CHATGPT_PROVIDER_ID,
-  label: "ChatGPT",
-  modalities: ["text"],
-} as const;
-
 /**
  * The closed Grida catalog projection supported by the ChatGPT subscription
  * adapter. Session and picker ids stay namespaced; the server-only adapter
@@ -39,18 +33,6 @@ export const CHATGPT_SUBSCRIPTION_MODEL_IDS = [
 
 export type ChatGptSubscriptionModelId =
   (typeof CHATGPT_SUBSCRIPTION_MODEL_IDS)[number];
-
-/** Renderer-safe labels for the closed subscription model vocabulary. */
-export const CHATGPT_SUBSCRIPTION_MODEL_METADATA = {
-  "openai/gpt-5.6-sol": { label: "GPT-5.6 Sol" },
-  "openai/gpt-5.6-terra": { label: "GPT-5.6 Terra" },
-  "openai/gpt-5.6-luna": { label: "GPT-5.6 Luna" },
-  "openai/gpt-5.5": { label: "GPT-5.5" },
-  "openai/gpt-5.4": { label: "GPT-5.4" },
-} as const satisfies Record<
-  ChatGptSubscriptionModelId,
-  Readonly<{ label: string }>
->;
 
 export function isChatGptSubscriptionModelId(
   id: string
