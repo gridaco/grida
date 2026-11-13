@@ -1,4 +1,4 @@
-# Agent configuration proposal
+# Agent host configuration
 
 The native host provides a small typed configuration surface shared by Desktop,
 headless clients, and agent tools. A person can ask the agent to explain a setting,
@@ -10,13 +10,13 @@ The native host implements the file, client operations and model-facing tools
 below. Existing model and mode selectors retain their separate settings
 contracts.
 
-## Initial scope
+## Scope
 
-Use one host-owned file at `<state-dir>/config.toml`, with an explicit schema
-version. The first persistent scope is this user's agent defaults on this host.
-Explicit per-request overrides already belong to accepted input. Project-file
+The host owns one file at `<state-dir>/config.toml`, with an explicit schema
+version. Its persistent scope is this user's agent defaults on this host.
+Explicit per-request overrides belong to accepted input. Project-file
 inheritance, named profiles, environment expansion, and a universal settings
-framework are outside the first version.
+framework are outside this schema.
 
 Field definitions belong to `grida-agent-master`. The native host owns parsing,
 storage, update serialization, and protocol exposure. Core components receive
@@ -30,14 +30,14 @@ to master and avoids a second settings path inside the agent loop.
 
 ## Field review
 
-| Field                              | Proposed meaning                                                                                           | Default and bounds                                                                                                                                                                                                                                                                       | Status                         |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `schema_version`                   | Version of this file's schema.                                                                             | Required version `1` when the file exists.                                                                                                                                                                                                                                               | Format metadata.               |
-| `context.max_input_tokens`         | Upper limit on the complete assembled model input, including instructions, history, and tool declarations. | Omitted means automatic product/model budgeting. Explicit values are integers from `1` through `9007199254740991`, preserving exact values across native and JavaScript clients. Effective input is also capped by provider capacity after output/headroom reservations and host limits. | First reviewed behavior field. |
-| Automatic-compaction threshold     | When the master should summarize or replace context.                                                       | Requires a separate definition of measured scope and interaction with the input budget.                                                                                                                                                                                                  | Review later.                  |
-| Provider context-window correction | Replace stale or missing model-capacity metadata for a specific provider/model binding.                    | Needs provenance, known-maximum handling, and explicit treatment of unverified capacity.                                                                                                                                                                                                 | Review separately.             |
+| Field                              | Meaning                                                                                                    | Default and bounds                                                                                                                                                                                                                                                                       | Status                   |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `schema_version`                   | Version of this file's schema.                                                                             | Required version `1` when the file exists.                                                                                                                                                                                                                                               | Format metadata.         |
+| `context.max_input_tokens`         | Upper limit on the complete assembled model input, including instructions, history, and tool declarations. | Omitted means automatic product/model budgeting. Explicit values are integers from `1` through `9007199254740991`, preserving exact values across native and JavaScript clients. Effective input is also capped by provider capacity after output/headroom reservations and host limits. | Reviewed behavior field. |
+| Automatic-compaction threshold     | When the master should summarize or replace context.                                                       | Requires a separate definition of measured scope and interaction with the input budget.                                                                                                                                                                                                  | Not reviewed.            |
+| Provider context-window correction | Replace stale or missing model-capacity metadata for a specific provider/model binding.                    | Needs provenance, known-maximum handling, and explicit treatment of unverified capacity.                                                                                                                                                                                                 | Not reviewed.            |
 
-The first behavior field controls how much input the agent tries to use. Raising
+The behavior field controls how much input the agent tries to use. Raising
 it can increase cost and admit more context, subject to available model capacity.
 It does not increase the model's actual capacity or grant more spending authority.
 If the capacity is unknown, inspection reports that uncertainty. A numeric local
@@ -68,7 +68,7 @@ max_input_tokens = 64000
 
 Removing `max_input_tokens` restores automatic budgeting. Zero has no special
 reset meaning. Credentials, access grants, sandbox rules, and spending limits
-have their existing owners and are excluded from this initial schema.
+have their existing owners and are excluded from this schema.
 
 ## Hook definitions
 
@@ -85,7 +85,7 @@ registry. Saved changes activate on a new connection; accepted work retains its
 captured policy. A changed capture cannot resume paused work. Stop and inspection
 remain available without rerunning checks. Checks can run in Plan or Act when
 the task already has the required read scope. A text-only child gains no scope
-merely to execute a check. Project/plugin discovery remains a later source
+merely to execute a check. Project and plugin discovery is deferred to a source
 adapter with review of new or changed executable content.
 
 The user-writable configuration service keeps its scalar setting. Hook
@@ -104,21 +104,27 @@ Changing a persistent default applies to later accepted requests. Already queued
 work retains its captured settings. Changing active or queued work uses its
 explicit control or replacement operation, with renewed validation.
 
-The first configuration writer updates user defaults only. It never turns a
+The configuration writer updates user defaults only. It never turns a
 request limited to one task into a persistent global change. When the requested
 scope is ambiguous, the master resolves that ambiguity before writing. Additional
 persistent scopes require their own field and precedence review.
 
 ## Shared host operations
 
-Three small operations establish the surface. These are logical service names.
-Their ACP wire names use the negotiated `_co.grida/` extension namespace.
+Three operations establish the surface. Each requires its negotiated
+`co.grida/config/` capability, and unknown parameters are rejected.
 
-| Operation        | Input                                                                        | Result                                                                                                                                                                           |
-| ---------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `config.inspect` | Optional supported keys and an optional request/session to explain.          | Reviewed descriptions, stored override, requested/effective values, default/source, current file revision, active snapshot identity, diagnostics, bounds, and activation timing. |
-| `config.update`  | Expected file revision and a bounded list of typed `set` or `reset` changes. | Validated changes, resulting file revision and active snapshot, persisted/effective values, diagnostics, and activation timing.                                                  |
-| `config.reload`  | Expected current file revision.                                              | Validate manually edited content and activate it for future requests, or return diagnostics while retaining the active snapshot.                                                 |
+| Method                     | Parameters                                                | Result                                                                                                                                                     |
+| -------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_co.grida/config/inspect` | None (`{}`).                                              | Reviewed field descriptions, stored override, requested and effective values, default and source, current file revision, active snapshot, and diagnostics. |
+| `_co.grida/config/update`  | `expectedRevision` and one typed `change` (set or reset). | The resulting file revision and active snapshot, persisted and effective values, and diagnostics.                                                          |
+| `_co.grida/config/reload`  | `expectedRevision`.                                       | Validates manually edited content and activates it for future requests, or returns diagnostics while retaining the active snapshot.                        |
+
+`expectedRevision` is the file revision from inspection. It is null exactly
+when no configuration file exists; any other mismatch fails with
+`config_revision_changed`. A `change` carries `operation`
+(`set_context_max_input_tokens` with a positive `value`, or
+`reset_context_max_input_tokens`).
 
 Each field descriptor provides its name, human label, meaning, type, units,
 default rule, supported scope, validation, activation rule, and whether the
@@ -127,7 +133,8 @@ Comments and arbitrary file text never become configuration instructions.
 
 Reset removes the selected override. It uses the same update operation and
 validation path. Unknown keys, unsupported schema versions, and invalid types
-produce explicit errors. Changes are validated as a group before any write.
+produce explicit errors. The complete candidate file is validated before any
+write.
 The caller cannot supply an arbitrary file path, TOML fragment, or unreviewed key.
 
 Desktop controls, protocol clients, and model-facing tools share these operations.
@@ -153,7 +160,7 @@ begun publication remains owned through its result.
 Use standard ACP session configuration for advertised selectors whose scope and
 semantics match. Its current select/negotiated-boolean options do not express
 this arbitrary numeric, host-global file contract. Persistent defaults therefore
-use the host-configuration extension in the [client protocol proposal](./rust-client-protocol.md).
+use the host-configuration extension in the [client protocol binding](./rust-client-protocol.md).
 Changing a session selector remains distinct from changing future defaults.
 [ACP session configuration](https://agentclientprotocol.com/protocol/v1/session-config-options).
 
@@ -171,8 +178,8 @@ and requested values. Retrying the same desired state cannot create additional
 work. The file update and session database are separate persistence boundaries.
 Capturing settings for accepted work uses the actual validated snapshot.
 
-Manual file edits are supported at startup and through `config.reload`. The
-first version needs no file watcher. Invalid startup configuration prevents
+Manual file edits are supported at startup and through reload. The host runs
+no file watcher. Invalid startup configuration prevents
 execution with a useful diagnostic. A rejected reload leaves the running host's
 last valid snapshot active and makes the rejected source visible. It never
 silently claims that invalid edits took effect.
@@ -221,20 +228,13 @@ keys, or rewrite configuration through an unrestricted shell tool.
 | Select a model with less capacity than the configured cap | Show the smaller effective ceiling and its source before assembling the request.                      |
 | Reload a malformed manual edit                            | Keep the last valid running snapshot and report the rejected source.                                  |
 
-## Reference and deliberate differences
+## Design rationale
 
-Codex exposes a TOML configuration reference, context-window and compaction
-settings, and a distinction between user preferences and managed requirements.
-[Official configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
-
-The inspected source exposes effective values and origins through config reads,
-and validated writes with version checks. Its context-window override affects
-model metadata and is bounded by a known maximum. That serves a different purpose
-from the proposed working-input budget above.
-[Config contracts](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/app-server-protocol/src/protocol/v2/config.rs),
-[write validation](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/app-server/src/config_manager_service.rs),
-[model override](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/models-manager/src/model_info.rs).
-
-The conversational configuration tools are our proposed product behavior. The
-config APIs establish a reference for inspection and controlled updates. Our
-agent-mediated workflow is a separate product requirement.
+The configuration surface is a working-input budget, not a model-capacity
+override. Model capacity is provider metadata with its own provenance; a local
+number cannot raise it. Keeping the budget a user default with explicit
+revisions lets a person, a client, and the agent change it through one
+validated path, inspect where an effective value came from, and see when a
+concurrent edit lost. Typed changes keep the agent from rewriting arbitrary
+configuration, and captured snapshots keep accepted work reproducible after a
+default changes.
