@@ -674,7 +674,7 @@ app.on("ready", async () => {
   } catch {
     dialog.showErrorBox(
       "External agent could not start",
-      "Use one trusted launch profile with an isolated native Linux workspace."
+      "Use one trusted launch profile with an isolated Linux workspace."
     );
     app.quit();
     return;
@@ -846,14 +846,14 @@ app.on("ready", async () => {
         externalProfile
           ? "External agent could not start"
           : nativeChatProfile
-            ? "Native chat could not start"
-            : "Native files could not start",
+            ? "Chat could not start"
+            : "Files and media could not start",
         externalProfile
           ? "Check the private launch profile, registered workspace, and installed sandbox helper."
           : !nativeChatProfile
             ? "The managed file and media profile could not be verified."
             : NativeDesktopProfile.managedCutover()
-              ? "The managed legacy profile could not be verified for archival."
+              ? "Previous chats could not be verified for archiving."
               : "Use a fresh Desktop profile with a separate Grida agent data directory."
       );
       app.quit();
@@ -881,8 +881,8 @@ app.on("ready", async () => {
         );
       } catch {
         dialog.showErrorBox(
-          "Native chat could not start",
-          "Grida could not prepare separate chat storage for this Desktop profile."
+          "Chat could not start",
+          "Grida could not prepare chat storage for this Desktop profile. Relaunch the app or report this issue."
         );
         app.quit();
         return;
@@ -1060,7 +1060,7 @@ app.on("ready", async () => {
         "Grida couldn't start",
         handoff
           ? "Open the managed profile normally to finish or verify its chat handoff."
-          : "The Grida agent sidecar failed to start. Please relaunch the app or report this issue."
+          : "Grida's background service failed to start. Relaunch the app or report this issue."
       );
       app.quit();
       return false;

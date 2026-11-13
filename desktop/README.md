@@ -194,7 +194,7 @@ existing owners.
 A managed archival handoff verifies a private archive of the old database and
 its managed scratch before opening a separate native store. Interrupted startup
 can retry after checking that archive. This handoff requires shared-source writer
-custody across editions. Windows cutover requires separate ACL-aware verification.
+custody across editions. Windows handoff requires ACL-aware verification.
 
 An approved managed macOS arm64 Stable build can enroll a fresh native profile.
 The build-time setting `GRIDA_MANAGED_NATIVE_FIRST=1` authorizes creating
@@ -221,7 +221,7 @@ Existing managed archival receipts remain readable and verified. A successor
 can retry an already admitted handoff and reopen the separate native store.
 Current builds cannot create or launch the historical predecessor chat engine.
 An unverified or undrained source remains unavailable for managed promotion.
-The ordinary fresh-store cutover needs no archive and preserves previous data
+The ordinary fresh-store handoff needs no archive and preserves previous data
 in place. These paths do not claim exclusion of other installed older editions.
 
 On macOS and Linux, Desktop refuses ordinary startup if the configured chat
@@ -305,8 +305,7 @@ main. On macOS and Linux it writes a private launch profile that allows reads
 in the primary workspace and asks before reading an eligible additional root.
 Main inspects the pending action and answers through its private ACP stdio
 connection. A repeat decision uses the original wait and revision basis.
-This integration supplies read-only tools. Command installation and the
-normal Desktop chat cutover have separate acceptance checks.
+This integration supplies read-only tools.
 
 ### Provision Local agent in Linux Insiders
 
