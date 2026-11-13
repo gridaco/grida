@@ -54,7 +54,7 @@ import {
 } from "./workspace-watcher-host";
 import { trashWorkspaceEntry } from "./workspace-files";
 import {
-  createChatGptOAuthCoordinator,
+  unavailableChatGptOAuth,
   type ChatGptOAuthCoordinator,
 } from "./chatgpt-oauth";
 import { ipc_admission, type DesktopIpcRole } from "./ipc-admission";
@@ -84,12 +84,6 @@ const EDITOR_ORIGIN = (() => {
 
 const providerEndpointMutations =
   new AgentProviderEndpointMutation.Coordinator();
-const legacyChatgptOAuth = createChatGptOAuthCoordinator({
-  sidecar_fetch: (path, init) => agentSidecarClient.fetch(path, init),
-  open_external: async (url) => {
-    await shell.openExternal(url);
-  },
-});
 
 type RegisterIpcHandlersOptions = {
   resolve_ipc_role: (window: BrowserWindow) => DesktopIpcRole | null;
@@ -928,7 +922,9 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     }
   }
 
-  const chatgptOAuth = options.native_chatgpt_oauth ?? legacyChatgptOAuth;
+  // Only the native subscription owner offers ChatGPT sign-in. Other launches
+  // report it as not configured instead of reaching a retired sidecar route.
+  const chatgptOAuth = options.native_chatgpt_oauth ?? unavailableChatGptOAuth;
   guarded(IPC_CHANNELS.CHATGPT_CONNECT, () => chatgptOAuth.connect());
   guarded(IPC_CHANNELS.CHATGPT_CANCEL, async () => {
     await chatgptOAuth.cancel();
@@ -1353,11 +1349,6 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.WORKSPACE_UNSUBSCRIBE_CHANGES, (_event, id: string) => {
     unsubscribeWorkspaceChanges(id);
   });
-}
-
-/** Close any active native-provider callback before Electron exits. */
-export function closeChatGptOAuth(): void {
-  void legacyChatgptOAuth.close().catch(() => {});
 }
 
 async function confirmProviderOrigin(

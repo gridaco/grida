@@ -7,7 +7,7 @@ tags: [chatgpt, oauth, artwork, first-run, workspace]
 status: untested
 severity: high
 date: 2026-07-28
-updated: 2026-07-28
+updated: 2026-11-13
 automatable: false
 covered_by:
   - desktop/src/main/desktop-entry-window.test.ts
@@ -32,7 +32,10 @@ flow has no Back action.
 Grida account authentication keeps the same compact geometry through
 onboarding. ChatGPT sign-in opens the system browser and returns to a connected
 state in the same step. The flow never exposes credentials to the renderer,
-never invokes ACP, and never blocks the user from continuing without ChatGPT. A
+never invokes ACP, and never blocks the user from continuing without ChatGPT.
+A launch that does not offer ChatGPT sign-in reports it as not configured: the
+step says sign-in is not available and offers only **Skip**, without a network
+request. A
 folder opened during onboarding becomes the welcome composer's active
 workspace. Completing the Workspace step records host onboarding completion,
 changes the same entry window to normal workstation dimensions, and enters

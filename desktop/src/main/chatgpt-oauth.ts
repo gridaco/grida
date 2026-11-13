@@ -243,6 +243,35 @@ export function createChatGptOAuthCoordinator(
   });
 }
 
+/**
+ * The ChatGPT surface of a launch without a native subscription owner.
+ * Status reports `configured: false`, the secret-free signal that this host
+ * does not offer ChatGPT sign-in, and no request leaves Main.
+ */
+export const unavailableChatGptOAuth: Pick<
+  ChatGptOAuthCoordinator,
+  "connect" | "cancel" | "status" | "signOut"
+> = {
+  connect: async () => {
+    throw new Error(CHATGPT_UNAVAILABLE_MESSAGE);
+  },
+  cancel: async () => {},
+  status: async () => unavailableStatus(),
+  signOut: async () => unavailableStatus(),
+};
+
+const CHATGPT_UNAVAILABLE_MESSAGE =
+  "ChatGPT sign-in is not available in this version of Grida Desktop.";
+
+function unavailableStatus(): ChatGptSubscriptionStatus {
+  return {
+    configured: false,
+    signed_in: false,
+    ready: false,
+    signing_in: false,
+  };
+}
+
 function parseStart(value: unknown): ChatGptAuthStart {
   if (!isRecord(value)) {
     throw new Error("ChatGPT provider returned an invalid sign-in attempt");

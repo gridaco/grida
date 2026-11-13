@@ -30,7 +30,7 @@ import {
   describeAgentProviderEndpoint,
   type AgentSidecarInfo,
 } from "./main/agent-sidecar-supervisor";
-import { closeChatGptOAuth, registerIpcHandlers } from "./main/ipc-handlers";
+import { registerIpcHandlers } from "./main/ipc-handlers";
 import { disposeAllTerminals } from "./main/terminal-host";
 import { disposeAllWorkspaceWatches } from "./main/workspace-watcher-host";
 import { agentSidecarClient } from "./main/agent-sidecar-client";
@@ -1161,7 +1161,6 @@ app.on("activate", () => {
 app.once("will-quit", () => {
   // A dirty window can cancel quit. Keep shared services available until
   // Electron confirms that all windows have closed.
-  closeChatGptOAuth();
   if (!strictRetainedMedia) stopAgentSidecar();
   disposeAllTerminals();
   void disposeAllWorkspaceWatches();

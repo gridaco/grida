@@ -57,6 +57,15 @@ describe("ChatGPT subscription state", () => {
     expect(subscription.peek()).toEqual({ kind: "ready", status: signedOut });
   });
 
+  it("does not offer ChatGPT when Desktop reports it as not configured", async () => {
+    mocks.status.mockResolvedValue({ ...signedOut, configured: false });
+    await expect(subscription.refresh()).resolves.toEqual({
+      kind: "unsupported",
+    });
+    expect(subscription.peek()).toEqual({ kind: "unsupported" });
+    expect(subscription.isReady()).toBe(false);
+  });
+
   it("warms the ready cache after browser sign-in", async () => {
     await subscription.connect();
     expect(subscription.isReady()).toBe(true);

@@ -6,7 +6,10 @@ import {
   CHATGPT_CALLBACK_URIS,
   CHATGPT_SUBSCRIPTION_CONFIG,
 } from "../chatgpt-configuration";
-import { ChatGptOAuthCoordinator } from "./chatgpt-oauth";
+import {
+  ChatGptOAuthCoordinator,
+  unavailableChatGptOAuth,
+} from "./chatgpt-oauth";
 import type { OAuthLoopbackCallback } from "./oauth-loopback-callback";
 
 const readyStatus = {
@@ -281,6 +284,39 @@ describe("ChatGPT IPC registration", () => {
     expect(source).toMatch(
       /guarded\(\s*IPC_CHANNELS\.CHATGPT_CONNECT,\s*\(\)\s*=>\s*chatgptOAuth\.connect\(\)\s*\)/
     );
+  });
+
+  it("reports ChatGPT as not configured without a native subscription owner", async () => {
+    const source = fs.readFileSync(
+      new URL("./ipc-handlers.ts", import.meta.url),
+      "utf8"
+    );
+    expect(source).toMatch(
+      /options\.native_chatgpt_oauth\s*\?\?\s*unavailableChatGptOAuth/
+    );
+    expect(source).not.toContain("createChatGptOAuthCoordinator");
+    const fetch = vi.spyOn(globalThis, "fetch");
+    try {
+      const unavailable = {
+        configured: false,
+        signed_in: false,
+        ready: false,
+        signing_in: false,
+      };
+      await expect(unavailableChatGptOAuth.status()).resolves.toEqual(
+        unavailable
+      );
+      await expect(unavailableChatGptOAuth.signOut()).resolves.toEqual(
+        unavailable
+      );
+      await expect(unavailableChatGptOAuth.cancel()).resolves.toBeUndefined();
+      await expect(unavailableChatGptOAuth.connect()).rejects.toThrow(
+        "ChatGPT sign-in is not available"
+      );
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      fetch.mockRestore();
+    }
   });
 });
 
