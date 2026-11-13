@@ -98,7 +98,9 @@ The ring beside the model picker shows how much of the selected model's
 context window the chat uses. After a reply, it uses the size the model's
 provider reported for the latest request: the agent's instructions, its tool
 definitions and results, and the conversation. Before then, it estimates from
-the visible conversation. Hover it for the percentage and token count; open it
+the visible conversation. The tooltip and breakdown say whether the value is
+**Estimated** or **Reported by provider**. Hover it for the percentage and
+token count; open it
 for a breakdown by user, assistant, tools and other content, where other
 covers instructions and tool work you don't see in the chat. The ring appears
 once the model's window is known.

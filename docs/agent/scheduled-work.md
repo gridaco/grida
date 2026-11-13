@@ -13,10 +13,10 @@ available to headless and ACP clients that request it for an idle **Act**
 message. Tell the agent what to check and when, for example, “Check this
 export in two minutes and tell me whether it’s ready.”
 
-For a **Standard** goal, select **Allow one check-in during the first goal
-turn** before choosing **Start goal**. Put the timing and purpose in the
-objective. The check-in uses the first turn's inference allowance. Later
-automatic goal turns start with their own permissions.
+A client that starts a goal can also request one check-in during the first
+goal turn; Desktop's goal composer does not offer it. The check-in uses the
+first turn's inference allowance, and later automatic goal turns start with
+their own permissions.
 
 If the agent schedules a check-in, the chat shows its purpose and due time.
 The task can wait for up to seven days without an open model request. When the
@@ -32,5 +32,5 @@ After restarting Desktop, reopen the same chat and choose **Restore schedule**.
 If the task is paused, choose **Resume** when you want it to continue. An
 overdue check-in can then run.
 
-Each opt-in permits one check-in. Desktop offers it for idle Act text
-messages and the first turn of a Standard goal.
+Each opt-in permits one check-in. A check-in that already exists stays
+visible in Desktop, which can cancel it or restore its schedule.

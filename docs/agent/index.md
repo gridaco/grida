@@ -43,13 +43,11 @@ can still work with the same project files.
 
 ## Give independent work a place
 
-On a supported Gateway connection, open **Chat options → Subagents** to give a named
-reviewer an independent text assignment and inspect its findings. Choose
-**Ultra** from the composer’s model picker when the agent should decide whether to start an
-independent review. To let
-the same task check back once later, enable a scheduled check-in on an
-eligible Act message. A persistent goal can keep a larger task's objective,
-success criteria, and work allowance visible across turns.
+Choose **Ultra** from the composer’s model picker when the agent should decide
+whether to start an independent review on a supported connection. A
+persistent goal can keep a larger task's objective, success criteria, and work
+allowance visible across turns. Named subagents and scheduled check-ins are
+available to headless and ACP clients; Desktop chat does not offer them.
 
 - [Work with subagents](./subagents.md)
 - [Plan work, choose effort, and pursue a goal](./effort-and-goals.md)
