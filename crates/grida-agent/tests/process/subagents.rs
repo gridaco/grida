@@ -740,12 +740,16 @@ async fn verify_primary_reviewer(regime: &str, interrupt: bool) {
     std::fs::write(fixture.primary.join("review.txt"), PRIMARY).unwrap();
     std::fs::write(Path::new(extra).join("private.txt"), PRIVATE).unwrap();
     let follow_ups = if interrupt { 3 } else { 4 };
+    // Collection waits only a bounded window for the review to settle, so a
+    // slow reviewer leaves the parent a pending result and it collects again.
+    let pending_collections = if interrupt { 0 } else { 6 };
     let mut replies = vec![Reply::Tool(
         "delegate_review",
         r#"{"instructions":"Check the primary workspace."}"#,
     )];
     replies.extend(
-        (0..follow_ups).map(|_| Reply::Choose(Box::new(move |request| reply(request, interrupt)))),
+        (0..follow_ups + pending_collections)
+            .map(|_| Reply::Choose(Box::new(move |request| reply(request, interrupt)))),
     );
     replies.push(Reply::Finished("Unexpected duplicate dispatch."));
     let mut endpoint = Endpoint::start(replies).await;
@@ -776,7 +780,9 @@ async fn verify_primary_reviewer(regime: &str, interrupt: bool) {
     );
     let mut reviewer_requests = Vec::new();
     let mut collected = false;
-    for _ in 0..follow_ups {
+    let mut served = 0;
+    while served < follow_ups || (!collected && served < follow_ups + pending_collections) {
+        served += 1;
         let request = endpoint.request().await;
         let messages = request["messages"].to_string();
         if messages.contains("You are a subagent.") {
