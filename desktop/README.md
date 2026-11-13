@@ -143,9 +143,10 @@ Windows retains its existing unwrapped file/media services with chat and local
 agent execution unavailable. Those services have no kernel confinement claim;
 renderer admission and HTTP authentication do not establish one.
 
-If a bug reproduces in files, workspaces, BYOK providers, sessions,
-or agent execution, add the first test in
-`packages/grida-ai-agent`, not here. Desktop tests should prove the host
+If a bug reproduces in files, workspaces, BYOK providers or media
+operations, add the first test in `packages/grida-daemon` or
+`packages/grida-ai-agent`; agent execution and sessions belong to the native
+agent crates. Not here. Desktop tests should prove the host
 adapter still wires the core.
 
 ## Distributions

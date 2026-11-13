@@ -319,7 +319,7 @@ next thing to ship.
 ## What lives where
 
 - `packages/grida-ai-agent/src/fs/` — filesystem fundamentals
-  ([README](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/fs/README.md))
+  ([source](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/fs/index.ts))
 - `packages/grida-ai-agent/src/todos/` — planning fundamentals
 - `packages/grida-ai-agent/src/tool-search/` — _not yet created; see proposal above_
 - Document-specific tools belong to their editor implementations. See
