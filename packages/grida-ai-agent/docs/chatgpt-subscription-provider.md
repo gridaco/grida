@@ -1,12 +1,19 @@
 # ChatGPT subscription provider
 
-`@grida/agent` can consume an eligible ChatGPT account as a native text-model
-provider. Grida continues to own the model loop, tools, approvals, sessions,
-and persistence. This path never launches Codex app-server and never enters
-the external agent-provider/ACP branch.
+`@grida/agent/chatgpt-host` exports `ChatGptSubscriptionHost`, which lets a
+trusted native host use an eligible ChatGPT account as a text-model provider
+for the native agent. The native agent continues to own the model loop, tools,
+approvals, sessions, and persistence. This path never launches Codex
+app-server and never enters the external ACP agent branch.
 
-The provider is dormant unless a Node host passes `chatgpt` in
-`AgentTenantOptions`. The host supplies a `ChatGptProviderConfig` containing:
+One host process constructs the subscription host with three options:
+
+- `userDataPath` — the absolute, normalized directory whose `AuthStore` holds
+  the credential;
+- `post` — the host's narrow request callback for the two fixed destinations,
+  the token endpoint and the subscription Responses endpoint. It returns the
+  provider response, or `null` when the host refuses or cannot dispatch; and
+- `configuration` — a `ChatGptProviderConfig` containing:
 
 - the exact authorization and token endpoints;
 - the public native OAuth client id and fixed loopback redirect URIs accepted
@@ -35,8 +42,9 @@ client identity is Grida-owned or that OpenAI approves/supports Grida.
 
 ## Native-host auth seam
 
-When configured, the agent tenant mounts authenticated, sidecar-private POST
-routes under `/auth/chatgpt/*`:
+`ceremonyRequest(route, init)` invokes the private ceremony routes in-process,
+without opening an HTTP listener. Each is a POST with a string body of at most
+32 KiB:
 
 | Route      | Purpose                                                   |
 | ---------- | --------------------------------------------------------- |
@@ -46,9 +54,9 @@ routes under `/auth/chatgpt/*`:
 | `status`   | Return the secret-free subscription status DTO.           |
 | `sign-out` | Remove the persisted credential and pending attempt.      |
 
-These routes deliberately do not appear in `AgentTransport`. A trusted native
-host drives the system-browser and loopback-callback ceremony with the
-daemon's low-level authenticated fetch. A renderer may receive only
+These routes never appear in a renderer transport. The trusted native host
+drives the system-browser and loopback-callback ceremony through
+`ceremonyRequest`. A renderer may receive only
 `ChatGptSubscriptionStatus`; it never receives the authorization code, state,
 PKCE verifier, access token, or refresh token.
 
@@ -80,7 +88,8 @@ written before the corresponding access token can be used. Sign-out advances
 a generation guard so an exchange or refresh already in flight cannot restore
 a deleted credential.
 
-Inference reads credentials inside the Node tenant. It injects:
+Each subscription request reads credentials inside the subscription host,
+which injects:
 
 - `Authorization: Bearer …`;
 - the account-scoping header from the authenticated token claims;
@@ -89,21 +98,34 @@ Inference reads credentials inside the Node tenant. It injects:
 
 Provider responses and token-endpoint bodies are never copied into public
 auth errors. Refresh or inference authentication failure is terminal for the
-selected provider; the runtime does not silently move the turn to another
+selected provider; the native agent does not silently move the turn to another
 provider.
 
-## Model and provider resolution
+## Native inference
 
-An explicitly requested provider always wins. An explicitly changed model is
-an intentional re-resolution request and may switch to another compatible
-provider. Otherwise a persisted provider remains sticky while the model is
-omitted or unchanged. For a fresh, provider-unqualified text session, a
-configured and ready ChatGPT provider is considered before the existing BYOK
-→ Grida Gateway → endpoint fallback order.
+`capture(modelId)` binds one supported model to the current credential lineage
+and returns a connection with the fixed Responses `target`, the bare wire
+`model`, an opaque 64-hex `scope` for that account lineage, and a
+`request(body, signal)` function. The scope carries no credential or account
+identifier.
 
-Compatibility is checked before selection. Grida session and renderer ids
-remain namespaced (`openai/gpt-…`); the server-only adapter maps the closed
-supported set to the bare model names required by the subscription backend:
+Desktop launches the native host with `serve --stdio --supervised-provider
+--supervised-chatgpt-scope <scope>` and the Responses provider. The native
+adapter prepares each request and sends it over the
+[supervised provider egress](./rust-client-protocol.md#supervised-provider-egress)
+with only `Content-Type` and `Accept` headers and no credential. Main accepts
+only that exact target and header set, then passes the body to the captured
+connection, which attaches the credential headers above.
+
+The connection refuses any body that departs from the native request shape:
+the captured model, streaming, `store: false`, string `instructions`, function
+tools only, and encrypted reasoning as the only included field. A connection
+captured under a replaced account lineage answers `401` without dispatch, and
+a new capture yields a different scope.
+
+Grida session and renderer ids remain namespaced (`openai/gpt-…`). The native
+host maps the closed supported set to the bare model names required by the
+subscription backend and refuses any other model:
 
 - `openai/gpt-5.6-sol`;
 - `openai/gpt-5.6-terra`;
@@ -111,36 +133,27 @@ supported set to the bare model names required by the subscription backend:
 - `openai/gpt-5.5`;
 - `openai/gpt-5.4`.
 
-This allowlist mirrors the current observed Zed/Codex-compatible surface. It
-is not authenticated model discovery, may drift, and cannot prove that a
-particular account is entitled to every listed model. Unsupported ids fall
-through only while the session is still unqualified. An explicit or persisted
-`chatgpt` choice fails with `provider_down` or a typed provider error instead
-of changing capacity source.
-
-The selected provider/model pair is reused for continuation and queued work.
-Compaction and title generation stay on the same provider and credential/cost
-boundary, while intentionally using that provider's low-cost `nano` tier.
-Auxiliary work must not create an unqualified second provider resolution.
+This allowlist reflects the models the subscription backend currently accepts.
+It is not authenticated model discovery, may drift, and cannot prove that a
+particular account is entitled to every listed model.
 
 ## Network authority
 
-OAuth exchange, refresh, and Responses inference use the injected
-`provider_http` request operation. Desktop routes that operation through its
-main-owned provider network service. Standalone hosts may omit the transport
-and use the package's existing ambient-request behavior, but still own
-destination policy and OAuth activation.
+OAuth exchange, refresh, and subscription requests use the host's `post`
+callback and nothing else. Desktop routes it through its Main-owned provider
+network service, limited to the token and Responses endpoints. The subscription
+host refuses any other destination or request shape before credentials are
+attached.
 
-The Responses adapter accepts one exact credential-free HTTPS `/responses`
-URL and refuses any other destination before credentials are attached. It
-forces `store: false` and lowers Grida's system prompt to the top-level
-Responses `instructions` field required by the subscription wire.
+The native Responses adapter sends stateless requests (`store: false`) and
+places Grida's system instructions in the top-level `instructions` field
+required by the subscription wire.
 
 ## Boundaries
 
 The Desktop binding is part of the active
 `GRIDA-SEC-008: ChatGPT subscription OAuth credential boundary`. The security
-tag covers the exact callback, renderer-safe status, sidecar credential
+tag covers the exact callback, renderer-safe status, host-owned credential
 lifecycle, and destination-bound provider transport. It does not turn the
 experimental OAuth/backend profile into a supported public OpenAI contract.
 
