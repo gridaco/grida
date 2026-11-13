@@ -43,10 +43,10 @@ Retained media sidecar (AgentSidecar) — separate child of Main, runs no chat
 ```
 
 Crate ownership and cross-crate rules:
-[`packages/grida-ai-agent/docs/rust-core.md`](../../../packages/grida-ai-agent/docs/rust-core.md).
-Wire: [`rust-client-protocol.md`](../../../packages/grida-ai-agent/docs/rust-client-protocol.md).
+[`crates/grida-agent/docs/rust-core.md`](../../../crates/grida-agent/docs/rust-core.md).
+Wire: [`rust-client-protocol.md`](../../../crates/grida-agent/docs/rust-client-protocol.md).
 Tool ownership across Rust/Electron/MCP:
-[`tool-host-contract.md`](../../../packages/grida-ai-agent/docs/tool-host-contract.md).
+[`tool-host-contract.md`](../../../crates/grida-agent/docs/tool-host-contract.md).
 Feature status: [`docs/agent/features.md`](../../../docs/agent/features.md).
 
 ## Non-obvious facts
@@ -87,7 +87,7 @@ Feature status: [`docs/agent/features.md`](../../../docs/agent/features.md).
 - Perimeter, files, workspaces, secrets: `packages/grida-daemon/src/**`;
   media routes: `packages/grida-ai-agent/src/**`.
 - Regression obligations and coverage model:
-  [`rust-core-pressure-test.md`](../../../packages/grida-ai-agent/docs/rust-core-pressure-test.md#coverage-model).
+  [`rust-core-pressure-test.md`](../../../crates/grida-agent/docs/rust-core-pressure-test.md#coverage-model).
 
 ## Verification
 

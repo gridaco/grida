@@ -121,4 +121,4 @@ A host may also offer an authenticated local shared-service binding that
 carries the same vocabulary to independent clients. The native host's
 baseline, negotiated extensions, client compatibility checks, and shared-service
 binding are defined in its
-[client protocol binding](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-client-protocol.md).
+[client protocol binding](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-client-protocol.md).

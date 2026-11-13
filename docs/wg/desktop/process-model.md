@@ -158,7 +158,7 @@ editor state, or upstream entitlement and billing policy.
 its private state directory, execute tools and confined commands under the
 captured workspace and permission grants, and reach providers either directly
 or through main's supervised capability on its private stdio. The
-[native client protocol](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-client-protocol.md)
+[native client protocol](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-client-protocol.md)
 defines the wire.
 
 **`AgentSidecar`.** Hold media provider credentials at runtime. Start the

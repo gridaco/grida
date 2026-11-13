@@ -17,16 +17,16 @@ principal types, and states the cross-crate rules those signatures preserve.
 Each boundary is a Cargo package. Arrows in the graph below point from a
 consumer to its normal dependency.
 
-| Crate                                                                        | Owns                                                                                                                                    |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| [`agent-kit-core`](../../../crates/agent-kit-core/README.md)                 | Messages, Inference and Tool contracts, History, Context, turn journal records, authority references, driver state, and the error model |
-| [`agent-kit-runtime`](../../../crates/agent-kit-runtime/README.md)           | The live turn: admission gate, concurrent scoped operations, waits, suspension, and settlement                                          |
-| [`agent-kit-sessions`](../../../crates/agent-kit-sessions/README.md)         | Durable input acceptance, queue and controls, claims, recovery, and the injected turn driver                                            |
-| [`agent-kit-providers`](../../../crates/agent-kit-providers/README.md)       | Chat Completions-compatible, Responses, Anthropic Messages, and Gemini adapters over a host-owned streaming transport                   |
-| [`agent-kit-sandbox`](../../../crates/agent-kit-sandbox/README.md)           | Native confinement for raw processes: Seatbelt on macOS, bubblewrap with a seccomp helper on Linux                                      |
-| [`agent-kit-store-sqlite`](../../../crates/agent-kit-store-sqlite/README.md) | The SQLite `SessionStore` and `TurnJournal`, with its session catalog, history replay, and session deletion                             |
-| [`grida-agent-master`](../../../crates/grida-agent-master/README.md)         | Grida product policy: context selection, effort, goals, questions, subagents, lifecycle hooks, and completion accounts                  |
-| [`grida-agent`](../../../crates/grida-agent/README.md)                       | The native executable and host composition: ACP and MCP bindings, configuration, permissions, tools, processes, and credentials         |
+| Crate                                                              | Owns                                                                                                                                    |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| [`agent-kit-core`](../../agent-kit-core/README.md)                 | Messages, Inference and Tool contracts, History, Context, turn journal records, authority references, driver state, and the error model |
+| [`agent-kit-runtime`](../../agent-kit-runtime/README.md)           | The live turn: admission gate, concurrent scoped operations, waits, suspension, and settlement                                          |
+| [`agent-kit-sessions`](../../agent-kit-sessions/README.md)         | Durable input acceptance, queue and controls, claims, recovery, and the injected turn driver                                            |
+| [`agent-kit-providers`](../../agent-kit-providers/README.md)       | Chat Completions-compatible, Responses, Anthropic Messages, and Gemini adapters over a host-owned streaming transport                   |
+| [`agent-kit-sandbox`](../../agent-kit-sandbox/README.md)           | Native confinement for raw processes: Seatbelt on macOS, bubblewrap with a seccomp helper on Linux                                      |
+| [`agent-kit-store-sqlite`](../../agent-kit-store-sqlite/README.md) | The SQLite `SessionStore` and `TurnJournal`, with its session catalog, history replay, and session deletion                             |
+| [`grida-agent-master`](../../grida-agent-master/README.md)         | Grida product policy: context selection, effort, goals, questions, subagents, lifecycle hooks, and completion accounts                  |
+| [`grida-agent`](../README.md)                                      | The native executable and host composition: ACP and MCP bindings, configuration, permissions, tools, processes, and credentials         |
 
 ```mermaid
 flowchart TD
@@ -890,7 +890,7 @@ A trusted launch profile can select up to eight ordered lifecycle hooks. Each
 hook names one event, an optional exact tool for tool events, a mode, a pinned
 reviewed executable with literal arguments, and a deadline. The
 [hook contract](https://grida.co/docs/wg/ai/agent/hooks) describes the events;
-the [native host README](../../../crates/grida-agent/README.md#configure-lifecycle-hooks)
+the [native host README](../README.md#configure-lifecycle-hooks)
 documents the profile fields, the handler input and replies, and inspection.
 
 | Event               | Decision boundary                                                                                |
@@ -1151,7 +1151,7 @@ digests make committed writes recoverable after a lost acknowledgment.
 
 The SQLite adapter commits in WAL mode with synchronous FULL. Connection count,
 worker layout, and process-lock granularity are adapter choices that do not change the core contract. Its
-[README](../../../crates/agent-kit-store-sqlite/README.md) documents the record
+[README](../../agent-kit-store-sqlite/README.md) documents the record
 layout, catalog, history replay, and session deletion.
 
 Every topology must exclude or fence a previous owner of the same session, load
@@ -1225,7 +1225,7 @@ the accepted tenant, purpose, endpoint, and billing authority. The host records
 any allowed authority renewal. Recovery never requires storing old secret bytes
 in the journal.
 The host's `StreamingTransport` implementation owns HTTP, proxy, TLS, and
-credential placement; the [providers README](../../../crates/agent-kit-providers/README.md#host-transport)
+credential placement; the [providers README](../../agent-kit-providers/README.md#host-transport)
 states the transport contract.
 
 ## Native executable and headless host
@@ -1247,7 +1247,7 @@ substitution before use. Platform adapters supply equivalent access control.
 The sandbox also keeps these host-private locations outside raw-command grants.
 A state directory has one owning process.
 
-The [native host README](../../../crates/grida-agent/README.md) documents each
+The [native host README](../README.md) documents each
 subcommand's flags, output records, and exit statuses.
 
 | Entrypoint                                           | Contract                                                                                                                                                                                             |
@@ -1375,8 +1375,8 @@ Desktop-only resources have explicit client capabilities and protocol test
 adapters. A fixture's presentation acknowledgment establishes that exchange.
 Actual rendering and interaction have their own Desktop acceptance evidence.
 
-The native [entrypoint](../../../crates/grida-agent/src/main.rs) composes
-serving and one-shot execution. The [process tests](../../../crates/grida-agent/tests/process.rs)
+The native [entrypoint](../src/main.rs) composes
+serving and one-shot execution. The [process tests](../tests/process.rs)
 drive the executable with isolated state and explicit provider and connection
 targets.
 

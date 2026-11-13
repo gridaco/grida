@@ -29,7 +29,7 @@ agent clients. Two directions matter here.
 - A Grida tool host exposes reviewed editor, document, and media capabilities
   to independent agents. Native and MCP adapters share the same implementation.
 
-The [Grida tool-host contract](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/tool-host-contract.md)
+The [Grida tool-host contract](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/tool-host-contract.md)
 owns the concrete exporting boundary. This page describes consumer discovery,
 registration, and trust. Hosting an external agent's entire lifecycle is a
 separate [agent-provider choice](./acp-provider.md).

@@ -615,7 +615,7 @@ result. External agents retain their own prompts, controls, and reasoning behavi
 
 Headless document and media operations advertise their actual support. Optional
 presentation can report that no editor is attached while preserving the produced
-artifact. The [tool-host contract](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/tool-host-contract.md)
+artifact. The [tool-host contract](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/tool-host-contract.md)
 owns these capability and result guarantees.
 
 ## Know which features are available

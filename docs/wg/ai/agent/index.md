@@ -36,14 +36,14 @@ language, storage engine, provider adapters, and client protocols while
 satisfying the stated contracts.
 
 The native implementation's
-[sandbox binding](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md)
+[sandbox binding](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-sandbox.md)
 defines native command confinement, its launch contract, and platform
 boundaries.
 
 The native implementation includes a headless agent executable. Its service and
 unattended entrypoints run the same master and components used by Desktop.
 Desktop, automation, and test clients exercise one execution contract. The
-[executable design](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-core.md#native-executable-and-headless-host)
+[executable design](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-core.md#native-executable-and-headless-host)
 defines process boundaries, interaction policy, and machine-readable outcomes.
 The [ACP integration contract](./acp.md) defines the shared client vocabulary
 and how custom presentation and durable controls extend it.

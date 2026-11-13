@@ -458,7 +458,7 @@ Observing a child or negotiating durable sessions grants no child control.
 Resuming, steering, new messages, and new assignments require the original
 verified provider principal and scope; without that continuity a client can
 still inspect, retry an existing receipt, withdraw, pause, or stop. The
-[native host README](../../../crates/grida-agent/README.md#run-named-child-work-from-a-private-launcher)
+[native host README](../README.md#run-named-child-work-from-a-private-launcher)
 documents allowance and context behavior. ACP's subagent and session-fork work
 is under upstream discussion; the host adopts a matching upstream contract when
 one covers these semantics.

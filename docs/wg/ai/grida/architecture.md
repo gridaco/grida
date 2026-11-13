@@ -27,8 +27,8 @@ policy, and component contracts are [the agent RFC](../agent/index.md).
 
 Native chat reaches model providers either directly or through main's
 supervised transport, which owns Gateway grants and subscription credentials.
-The [native client protocol](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-client-protocol.md)
-and the [tool-host contract](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/tool-host-contract.md)
+The [native client protocol](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-client-protocol.md)
+and the [tool-host contract](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/tool-host-contract.md)
 bind the native host to Desktop. Package and crate inventories live in each
 package's or crate's README.
 

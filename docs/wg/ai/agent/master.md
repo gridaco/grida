@@ -238,7 +238,7 @@ each document implementation owning its interpretation, edits, persistence, and
 any conflict behavior. The master uses those tools and their reported outcomes.
 Discovery describes operations independently of the current selection. Optional presentation can return its declared
 non-interactive disposition. Missing essential execution capabilities remain
-explicit. The [tool-host contract](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/tool-host-contract.md)
+explicit. The [tool-host contract](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/tool-host-contract.md)
 defines the concrete bindings.
 
 ### Failures, retries, and fallback

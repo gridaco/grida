@@ -110,7 +110,7 @@ identifier.
 Desktop launches the native host with `serve --stdio --supervised-provider
 --supervised-chatgpt-scope <scope>` and the Responses provider. The native
 adapter prepares each request and sends it over the
-[supervised provider egress](./rust-client-protocol.md#supervised-provider-egress)
+[supervised provider egress](../../../crates/grida-agent/docs/rust-client-protocol.md#supervised-provider-egress)
 with only `Content-Type` and `Accept` headers and no credential. Main accepts
 only that exact target and header set, then passes the body to the captured
 connection, which attaches the credential headers above.

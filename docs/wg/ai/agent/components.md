@@ -92,7 +92,7 @@ A product tool host can expose the same operations through a direct adapter
 and a public protocol adapter. That host owns shared capability definitions,
 resource authorization, routing, and result delivery. It can serve another agent
 without creating a local agent session. The concrete
-[Grida tool-host contract](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/tool-host-contract.md)
+[Grida tool-host contract](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/tool-host-contract.md)
 binds these roles to native and editor execution.
 
 The dependency direction permits all of these uses.

@@ -4,6 +4,32 @@
 provider transport. It supports bounded non-interactive runs and supervised
 Agent Client Protocol (ACP) v1 stdio sessions.
 
+## Reference docs
+
+The [Agent Features catalog](../../docs/agent/features.md) records each
+feature's current behavior, intended outcome, caveats, and availability.
+
+- [Rust agent core](docs/rust-core.md) — crate map, dependency graph,
+  error model, and the cross-crate contracts of the native agent.
+- [Native executable and headless host](docs/rust-core.md#native-executable-and-headless-host)
+  — the shared engine/server binary, its subcommands, unattended runs, and
+  process-level testing.
+- [Rust core pressure test](docs/rust-core-pressure-test.md) — coverage
+  model, regression obligations, and minimal-master and durable-session
+  walkthroughs.
+- [Tool-host contract](docs/tool-host-contract.md) — Rust/Electron
+  ownership, shared native/MCP capabilities, endpoint identity, domain-owned
+  results, and invocation recovery.
+- [Host configuration](docs/rust-config.md) — reviewed settings,
+  conversational inspection and changes, and the host-owned TOML surface.
+- [Client protocol](docs/rust-client-protocol.md) — ACP-first clients,
+  custom presentation, negotiated durable controls, and compatibility checks.
+- [Lifecycle hooks](docs/rust-core.md#configured-lifecycle-hooks) — ordered
+  configured checks and context contributions through existing execution
+  contracts.
+- [Native sandbox](docs/rust-sandbox.md) — native command confinement, its
+  launch contract, and platform boundaries.
+
 ## Run locally
 
 Build with `cargo build -p grida-agent --locked`. Use an absolute workspace
@@ -443,7 +469,7 @@ with an underscore.
 Standard `session/prompt` streams its response. Durable submission and enqueue
 acknowledge accepted input independently of completion. Exact input retries
 return retained dispositions. Exact control retries reconcile their committed
-request IDs. Read the [native client protocol](../../packages/grida-ai-agent/docs/rust-client-protocol.md)
+request IDs. Read the [native client protocol](docs/rust-client-protocol.md)
 for field names and revision bases.
 
 Forks capture committed context and can leave the source running. Attach the
@@ -687,7 +713,7 @@ and reviewer charge their recorded attempts against that allowance. Use
 the ordinary task Pause, Resume, and Stop controls while the funded turn
 owns work. If the review is still unsettled when the parent finishes, Goal
 Recover can account for it once its outcome is known. See the
-[Goal client contract](../../packages/grida-ai-agent/docs/rust-client-protocol.md#persistent-goal-operations).
+[Goal client contract](docs/rust-client-protocol.md#persistent-goal-operations).
 
 A private supervised Gateway client can negotiate `co.grida/goal/spending`
 version 1 and add `maxCostMills` to Goal Start. This is an exact USD-mills

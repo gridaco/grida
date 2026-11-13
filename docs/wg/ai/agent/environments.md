@@ -188,7 +188,7 @@ boundaries. The host supplies routing and transport trust, and concurrent
 executions retain independent grants. The
 [retired srt backend study](./srt.md) records the findings that informed it. The
 concrete platform choices and support boundary live in the
-[native sandbox binding](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md).
+[native sandbox binding](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-sandbox.md).
 
 For `shell.run`, the host creates a confined process tree from the effective
 grant: the host/user ceiling ∩ declared requirements ∩ parent-delegable

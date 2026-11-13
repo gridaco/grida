@@ -2,7 +2,7 @@
 
 This document specifies native command confinement for the
 [Rust agent core](./rust-core.md) and records the platform guarantees each
-backend must evidence. The [`agent-kit-sandbox` README](../../../crates/agent-kit-sandbox/README.md)
+backend must evidence. The [`agent-kit-sandbox` README](../../agent-kit-sandbox/README.md)
 documents its launch sequence, platform requirements, and native fixtures.
 
 ## Decision

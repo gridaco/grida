@@ -26,7 +26,7 @@ This is a historical study. Native confinement has replaced srt, and no
 current host depends on it. The page records the retired backend's capabilities
 and limitations because its findings informed the native adapter's
 requirements. The
-[native sandbox binding](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md)
+[native sandbox binding](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-sandbox.md)
 defines the current platform mechanisms, launch contract, and support limits.
 
 For the `computer` environment

@@ -38,8 +38,8 @@ belong to that capability's input/output schema. The agent and dispatcher carry
 those values without defining a common document state or editing model.
 
 These are roles within existing packages. In the Rust host, the
-[capability host](../../../crates/grida-agent/src/tool_host.rs) owns the
-dispatcher and the [MCP service](../../../crates/grida-agent/src/mcp.rs) its
+[capability host](../src/tool_host.rs) owns the
+dispatcher and the [MCP service](../src/mcp.rs) its
 public binding. Electron uses a narrow main/preload/editor bridge. Internal
 document objects stay with their owning implementation.
 
@@ -230,8 +230,8 @@ agent-internal controls, and renderer evaluation have separate authorization.
 
 Document editing tests belong to the relevant document implementation. These
 fixtures verify the tool-host boundary and faithful transport of domain results.
-The [tool-host tests](../../../crates/grida-agent/tests/tool_host.rs) and
-[MCP tests](../../../crates/grida-agent/tests/mcp.rs) exercise the native
+The [tool-host tests](../tests/tool_host.rs) and
+[MCP tests](../tests/mcp.rs) exercise the native
 boundary. Desktop's [editor surface binding](../../../desktop/src/main/native-editor-surfaces.ts),
 [editor MCP export](../../../desktop/src/main/native-editor-mcp-export.ts), and
 [IPC gate](../../../desktop/src/main/ipc-handlers.ts) own sender validation and

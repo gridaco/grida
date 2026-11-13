@@ -166,7 +166,7 @@ For each individual package, refer to the README of its own.
 
 For agent behavior and its host/client boundaries, read the
 [feature catalog](docs/agent/features.md) and the
-[coverage model and regression obligations](packages/grida-ai-agent/docs/rust-core-pressure-test.md#coverage-model).
+[coverage model and regression obligations](crates/grida-agent/docs/rust-core-pressure-test.md#coverage-model).
 
 - Trace the affected entrypoint, adjacent tests, and relevant fix history before
   changing behavior. Classify findings as an invariant, a replaceable implementation

@@ -766,7 +766,7 @@ Negotiate the version-1 capabilities `co.grida/goal/start`, `co.grida/goal/inspe
 `co.grida/goal/control`, and `co.grida/goal/recover` for these operations.
 `co.grida/goal/manual-continuation` additionally identifies support for one-turn
 manual continuation and reports when that continuation is queued.
-The [client protocol reference](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-client-protocol.md#persistent-goal-operations)
+The [client protocol reference](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-client-protocol.md#persistent-goal-operations)
 lists their parameters.
 
 ### Set a goal's spending limit

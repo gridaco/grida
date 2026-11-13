@@ -258,33 +258,9 @@ models}` — Ollama is the preset) and resolves media providers. There is no
 
 ## Package Docs
 
-Package docs cover the retained host contracts and the native agent's Rust
-bindings.
+The native agent's reference docs live with its crate, in the
+[native agent README](../../crates/grida-agent/README.md#reference-docs).
 
-The [Agent Features catalog](https://github.com/gridaco/grida/blob/main/docs/agent/features.md)
-records each feature's current behavior, intended outcome, caveats, and
-availability.
-
-- [Rust agent core](./docs/rust-core.md) — crate map, dependency graph,
-  error model, and the cross-crate contracts of the native agent.
-- [Native executable and headless host](./docs/rust-core.md#native-executable-and-headless-host)
-  — the shared engine/server binary, its subcommands, unattended runs, and
-  process-level testing.
-- [Rust core pressure test](./docs/rust-core-pressure-test.md) — coverage
-  model, regression obligations, and minimal-master and durable-session
-  walkthroughs.
-- [Tool-host contract](./docs/tool-host-contract.md) — Rust/Electron
-  ownership, shared native/MCP capabilities, endpoint identity, domain-owned
-  results, and invocation recovery.
-- [Host configuration](./docs/rust-config.md) — reviewed settings,
-  conversational inspection and changes, and the host-owned TOML surface.
-- [Client protocol](./docs/rust-client-protocol.md) — ACP-first clients,
-  custom presentation, negotiated durable controls, and compatibility checks.
-- [Lifecycle hooks](./docs/rust-core.md#configured-lifecycle-hooks) — ordered
-  configured checks and context contributions through existing execution
-  contracts.
-- [Native sandbox](./docs/rust-sandbox.md) — native command confinement, its
-  launch contract, and platform boundaries.
 - [DaemonServer](../grida-daemon/docs/daemon-server.md) — lifecycle,
   ownership, and what hosts must provide (`@grida/daemon`).
 - [HTTP access](../grida-daemon/docs/http-access.md) — Basic Auth, CORS, and
@@ -299,7 +275,7 @@ The wider architecture lives in the working-group docs:
   including the renderer bridge, GRIDA-SEC-004, storage, and process
   confinement.
 - [Agent system](../../docs/wg/ai/agent/index.md) — the behavior, policy, and
-  component contracts the native host implements and this package supports.
+  component contracts the native host implements.
 - [Grida bindings](../../docs/wg/ai/grida/index.md) — how Grida's tools and
   built-in subagents bind to those contracts.
 
