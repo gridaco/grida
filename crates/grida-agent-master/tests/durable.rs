@@ -28,8 +28,9 @@ use agent_kit_core::{
     WaitId,
 };
 use agent_kit_runtime::{
-    AdmissionContext, CompletionDraft, ExecutionLimits, ExecutionServices, FinishOutcome, Runtime,
-    ToolAdmission, ToolDecision, ToolGate, TurnObserver,
+    AdmissionContext, CompletionDraft, ExecutionLimits, ExecutionServices, FinishOutcome,
+    InvokeOutcome, OperationKey, PlannedInvocation, Runtime, ToolAdmission, ToolDecision, ToolGate,
+    TurnObserver, TurnOperations, TurnView,
 };
 use agent_kit_sessions::{
     ClaimOutcome, ClaimRequest, ClaimedTurn, ControlRequest, CreateSession, RecoveryRequest,
@@ -44,7 +45,7 @@ use grida_agent_master::hooks::{
 };
 use grida_agent_master::{
     Master, MasterAuthority, MasterConfig, MasterOutcome, OperatingRegime, StopReason,
-    read_account, subagents,
+    approval_review, lifecycle_hooks, read_account, subagents,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::NonZeroU32;
@@ -119,6 +120,7 @@ enum Script {
     AdmissionLimit(u64),
     UsageAnswer,
     Failure(FailureKind),
+    DeadlineCut,
     ToolThenAnswer,
     ToolAndDeferred,
     Tools,
@@ -355,6 +357,16 @@ impl Provider for ScriptProvider {
                     dispatch: None,
                 }),
             )
+        } else if matches!(self.script, Script::DeadlineCut) {
+            (
+                InferenceStatus::Interrupted,
+                Some(InferenceFailure {
+                    kind: FailureKind::Cancelled,
+                    code: "deadline".into(),
+                    retry_after_ms: None,
+                    dispatch: None,
+                }),
+            )
         } else {
             (InferenceStatus::Completed, None)
         };
@@ -488,11 +500,11 @@ impl Tool for IndependentReview {
     }
 }
 
-struct Granted(GrantSelection);
+struct Granted(Vec<GrantSelection>);
 impl AuthorityValidator for Granted {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
         Box::pin(async move {
-            if request.selection == self.0 {
+            if self.0.contains(&request.selection) {
                 Ok(())
             } else {
                 Err(Error::new(ErrorKind::InvalidInput, "unexpected_grant"))
@@ -613,11 +625,16 @@ impl Fixture {
         self.runtime_with_gate(Arc::new(Permit))
     }
     fn runtime_with_gate(&self, gate: Arc<dyn ToolGate>) -> Runtime {
+        self.runtime_granting(gate, vec![])
+    }
+    fn runtime_granting(&self, gate: Arc<dyn ToolGate>, private: Vec<GrantSelection>) -> Runtime {
         let provider: Arc<dyn Provider> = self.provider.clone();
+        let mut accepted = vec![self.grants()];
+        accepted.extend(private);
         Runtime::new(ExecutionServices {
             providers: BTreeMap::from([(provider_id(), provider)]),
             tools: self.inventory.clone(),
-            authority: Arc::new(Granted(self.grants())),
+            authority: Arc::new(Granted(accepted)),
             gate,
             limits: ExecutionLimits {
                 max_operations: self.max_operations,
@@ -1598,6 +1615,265 @@ async fn step_limit_bounds_repeated_tool_calls_and_records_a_failed_account() {
     assert_eq!(account.stop_reason, Some(StopReason::StepLimit));
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
     assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 2);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+struct ContinueHook {
+    definition: ToolDefinition,
+    calls: AtomicUsize,
+}
+
+impl Tool for ContinueHook {
+    fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+
+    fn validate(&self, args: &ToolArguments) -> Result<()> {
+        let ToolArguments::Json(value) = args else {
+            return Err(Error::new(ErrorKind::InvalidInput, "hook_envelope"));
+        };
+        serde_json::from_value::<lifecycle_hooks::HookInvocation>(value.clone())
+            .map(|_| ())
+            .map_err(|_| Error::new(ErrorKind::InvalidInput, "hook_envelope"))
+    }
+
+    fn invoke(&self, _: Invocation, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async move {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            ToolOutcome {
+                status: OutcomeStatus::Succeeded,
+                content: Vec::new(),
+                structured: Some(serde_json::json!({
+                    "decision": "continue",
+                    "context": "Verify the export once more."
+                })),
+                receipt: None,
+                truncated: false,
+            }
+        })
+    }
+}
+
+struct NeverApproves;
+
+impl approval_review::Reviewer for NeverApproves {
+    fn review<'a>(
+        &'a self,
+        _: &'a TurnOperations,
+        _: &'a TurnView,
+        _: &'a [WaitId],
+    ) -> BoxFuture<'a, Result<bool>> {
+        Box::pin(async { Ok(false) })
+    }
+}
+
+#[tokio::test]
+async fn a_completion_hook_continuation_stops_at_the_effective_step_limit() {
+    let fixture = Fixture::new(Script::Answer);
+    let store = fixture.store();
+    let handler = Arc::new(ContinueHook {
+        definition: ToolDefinition {
+            id: ToolId::new("continue_hook").unwrap(),
+            version: 1,
+            description: "Ask for one more verification pass.".into(),
+            input: InputFormat::Json(serde_json::json!({"type":"object"})),
+            max_input_bytes: 64 * 1024,
+            max_output_bytes: 1024,
+            recovery: RecoveryKind::Unavailable,
+        },
+        calls: AtomicUsize::new(0),
+    });
+    let hook = lifecycle_hooks::LifecycleHook {
+        id: BindingId::new("verify").unwrap(),
+        source: "trusted-user".into(),
+        revision: agent_kit_core::Fingerprint::of(&("verify", "reviewed")).unwrap(),
+        event: lifecycle_hooks::HookEvent::BeforeCompletion,
+        tool: None,
+        mode: CheckMode::Required,
+        handler: handler.definition().id.clone(),
+    };
+    let mut inventory = Inventory::new();
+    inventory.insert(handler.clone()).unwrap();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    // The approval reviewer reserves one of the three configured steps.
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(3, "Answer")
+        .with_approval_reviewer(Arc::new(NeverApproves))
+        .with_lifecycle_hooks(
+            lifecycle_hooks::LifecycleHooks::new(vec![hook.clone()]).unwrap(),
+            inventory
+                .snapshot(std::slice::from_ref(&hook.handler))
+                .unwrap(),
+            BTreeMap::from([(hook.id.clone(), fixture.grants())]),
+        )
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected a settled turn");
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Failed);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.steps, 2);
+    assert_eq!(account.stop_reason, None);
+    assert_eq!(account.text, "Finished");
+    assert_eq!(account.failure.unwrap().code, "lifecycle_hook_step_limit");
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
+    assert_eq!(handler.calls.load(Ordering::SeqCst), 2);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+struct AllowingHandler {
+    definition: ToolDefinition,
+    calls: AtomicUsize,
+}
+
+impl AllowingHandler {
+    fn new(id: &str) -> Arc<Self> {
+        Arc::new(Self {
+            definition: ToolDefinition {
+                id: ToolId::new(id).unwrap(),
+                version: 1,
+                description: "Allow the reviewed occurrence.".into(),
+                input: InputFormat::Json(serde_json::json!({"type":"object"})),
+                max_input_bytes: 64 * 1024,
+                max_output_bytes: 1024,
+                recovery: RecoveryKind::Unavailable,
+            },
+            calls: AtomicUsize::new(0),
+        })
+    }
+}
+
+impl Tool for AllowingHandler {
+    fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+
+    fn validate(&self, args: &ToolArguments) -> Result<()> {
+        match args {
+            ToolArguments::Json(value) if value.is_object() => Ok(()),
+            _ => Err(Error::new(ErrorKind::InvalidInput, "handler_arguments")),
+        }
+    }
+
+    fn invoke(&self, _: Invocation, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async move {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            ToolOutcome {
+                status: OutcomeStatus::Succeeded,
+                content: Vec::new(),
+                structured: Some(serde_json::json!({"decision": "allow"})),
+                receipt: None,
+                truncated: false,
+            }
+        })
+    }
+}
+
+fn private_grant(name: &str) -> GrantSelection {
+    GrantSelection {
+        authority: AuthorityBinding {
+            principal: PrincipalId::new("private").unwrap(),
+            binding: BindingId::new(format!("{name}/turn")).unwrap(),
+            scope: ScopeId::new(name).unwrap(),
+        },
+        grants: vec![GrantId::new(name).unwrap()],
+    }
+}
+
+#[tokio::test]
+async fn after_tool_hooks_observe_model_tools_but_not_private_checks() {
+    let fixture = Fixture::new(Script::ToolThenAnswer);
+    let store = fixture.store();
+    let admission = AllowingHandler::new("admission_check");
+    let completion = AllowingHandler::new("completion_check");
+    let observer = AllowingHandler::new("after_tool_hook");
+    let admission_grant = private_grant("admission");
+    let completion_grant = private_grant("completion");
+    let mut private = Inventory::new();
+    private.insert(admission.clone()).unwrap();
+    private.insert(completion.clone()).unwrap();
+    let private = private
+        .snapshot(&[
+            admission.definition().id.clone(),
+            completion.definition().id.clone(),
+        ])
+        .unwrap();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture
+        .runtime_granting(
+            Arc::new(Permit),
+            vec![admission_grant.clone(), completion_grant.clone()],
+        )
+        .open(claim.lease)
+        .await
+        .unwrap();
+    // Checks the host already ran under this turn's private authority.
+    for (key, tool, grant) in [
+        ("hook/admission", &admission, &admission_grant),
+        ("hook/completion", &completion, &completion_grant),
+    ] {
+        let outcome = opened
+            .turn
+            .operations()
+            .invoke_with_inventory(
+                OperationKey::new(key).unwrap(),
+                PlannedInvocation {
+                    tool: tool.definition().id.clone(),
+                    arguments: ToolArguments::Json(serde_json::json!({})),
+                    grants: grant.clone(),
+                },
+                private.clone(),
+            )
+            .await
+            .unwrap();
+        assert!(matches!(outcome, InvokeOutcome::Complete(_)));
+    }
+    let check = CompletionCheck {
+        id: BindingId::new("completion").unwrap(),
+        revision: agent_kit_core::Fingerprint::of(completion.definition()).unwrap(),
+        handler: completion.definition().id.clone(),
+        mode: CheckMode::Required,
+    };
+    let hook = lifecycle_hooks::LifecycleHook {
+        id: BindingId::new("observe-tools").unwrap(),
+        source: "trusted-user".into(),
+        revision: agent_kit_core::Fingerprint::of(&("observe-tools", "reviewed")).unwrap(),
+        event: lifecycle_hooks::HookEvent::AfterTool,
+        tool: None,
+        mode: CheckMode::Observe,
+        handler: observer.definition().id.clone(),
+    };
+    let mut hooks = Inventory::new();
+    hooks.insert(observer.clone()).unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Use tools")
+        .with_required_admission_check(admission_grant)
+        .with_completion_checks(
+            CompletionChecks::new(vec![check.clone()]).unwrap(),
+            private,
+            BTreeMap::from([(check.id.clone(), completion_grant)]),
+        )
+        .with_lifecycle_hooks(
+            lifecycle_hooks::LifecycleHooks::new(vec![hook.clone()]).unwrap(),
+            hooks.snapshot(std::slice::from_ref(&hook.handler)).unwrap(),
+            BTreeMap::from([(hook.id.clone(), fixture.grants())]),
+        )
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected a settled turn");
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
+    // One moment for the model's tool call; none for the private checks or
+    // for the hook's own handler operation.
+    assert_eq!(observer.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(admission.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(completion.calls.load(Ordering::SeqCst), 2);
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
 }
 
@@ -3288,6 +3564,92 @@ async fn pausing_an_input_count_preserves_the_last_generation_step() {
             .sum::<usize>(),
         1
     );
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_request_prepared_after_resume_settles_its_own_interruption_as_uncertain() {
+    let fixture = Fixture::new(Script::DeadlineCut);
+    *fixture.provider.measurement.lock().unwrap() = Some(InputMeasurement {
+        tokens: 100,
+        kind: MeasurementKind::Exact,
+    });
+    let entered = Arc::new(tokio::sync::Notify::new());
+    *fixture.provider.hold_next_count.lock().unwrap() = Some(entered.clone());
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let limit = std::num::NonZeroU64::new(100);
+    let master = fixture.master(3, "Be concise").with_input_limit(limit);
+    let worker = tokio::spawn(async move { master.run(opened.turn, input()).await.unwrap() });
+    tokio::time::timeout(Duration::from_secs(2), entered.notified())
+        .await
+        .unwrap();
+    let view = store.inspect(session_id()).await.unwrap();
+    store
+        .control(ControlRequest {
+            id: change_id("pause-before-dispatch"),
+            session: session_id(),
+            expected_revision: view.revision,
+            action: SessionControl::Turn {
+                turn: turn_id(),
+                expected: view.current.unwrap().controls.revision,
+                directive: ControlDirective::Pause,
+            },
+        })
+        .await
+        .unwrap();
+    let MasterOutcome::Suspended(suspension) = tokio::time::timeout(Duration::from_secs(2), worker)
+        .await
+        .unwrap()
+        .unwrap()
+    else {
+        panic!("expected durable suspension before the first dispatch");
+    };
+    store
+        .verify(CommitReceipt::Suspended(suspension))
+        .await
+        .unwrap();
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
+
+    let view = store.inspect(session_id()).await.unwrap();
+    let current = view.current.unwrap();
+    let ClaimOutcome::Acquired(claim) = store
+        .claim(ClaimRequest {
+            id: change_id("resume-before-dispatch"),
+            session: session_id(),
+            expected_revision: view.revision,
+            selection: TurnSelection::ResumePaused {
+                turn: turn_id(),
+                epoch: current.binding.epoch,
+                position: current.position,
+                control_revision: current.controls.revision,
+            },
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("expected resumed owner");
+    };
+    let resumed = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(3, "Be concise")
+        .with_input_limit(limit)
+        .run(resumed.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected the interrupted request to settle");
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Uncertain);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.steps, 1);
+    assert_eq!(account.stop_reason, None);
+    assert_eq!(
+        account.text,
+        "The model request reached its time limit. Review any partial work, then try a shorter request."
+    );
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
 }
 

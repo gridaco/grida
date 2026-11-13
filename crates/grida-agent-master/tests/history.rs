@@ -1,8 +1,8 @@
 use agent_kit_core::authority::{AuthorityBinding, GrantSelection};
 use agent_kit_core::history::{HistoryRecord, validate_exchanges};
 use agent_kit_core::inference::{
-    InferenceOutcome, InferenceRequest, InferenceStatus, InputFormat, Modality, ModelCapabilities,
-    PreparedRequest, ProviderBinding,
+    FailureKind, InferenceFailure, InferenceOutcome, InferenceRequest, InferenceStatus,
+    InputFormat, Modality, ModelCapabilities, PreparedRequest, ProviderBinding,
 };
 use agent_kit_core::messages::{
     Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
@@ -19,7 +19,7 @@ use agent_kit_core::{
     AttemptId, BindingId, BoxFuture, ChangeId, MessageId, ModelId, OperationId, PrincipalId,
     ProviderId, Result, ScopeId, SessionId, ToolCallId, ToolId, TurnId,
 };
-use grida_agent_master::history::project;
+use grida_agent_master::history::{RESUMED_GUIDANCE, model_context, project};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -360,4 +360,53 @@ fn an_assistant_message_with_unverified_origin_keeps_its_durable_position() {
         &[text("response", Role::Assistant, "Imported response.")],
     );
     assert_eq!(project(&state), state.history().records());
+}
+
+fn interrupted(responses: &[HistoryRecord], code: &str) -> OperationOutcome {
+    OperationOutcome::Inference(InferenceOutcome {
+        status: InferenceStatus::Interrupted,
+        messages: messages(responses),
+        usage: vec![],
+        failure: Some(InferenceFailure {
+            kind: FailureKind::Cancelled,
+            code: code.into(),
+            retry_after_ms: None,
+            dispatch: None,
+        }),
+        receipt: None,
+        terminal_receipt: None,
+    })
+}
+
+fn cut_response(code: &str) -> (TurnState, HistoryRecord, HistoryRecord) {
+    let mut state = state();
+    let initial = text("initial", Role::User, "Prepare the document.");
+    append(&mut state, std::slice::from_ref(&initial));
+    let operation = start_inference(&mut state, "original", std::slice::from_ref(&initial));
+    let partial = text("partial", Role::Assistant, "I started the docu");
+    finish(
+        &mut state,
+        operation,
+        interrupted(std::slice::from_ref(&partial), code),
+    );
+    append(&mut state, std::slice::from_ref(&partial));
+    (state, initial, partial)
+}
+
+#[test]
+fn a_paused_response_is_replaced_by_the_resumed_note() {
+    let (state, initial, _) = cut_response("turn_paused");
+    let context = model_context(&state);
+    assert_eq!(context.len(), 2);
+    assert_eq!(context[0], initial);
+    let HistoryRecord::Message(note) = &context[1];
+    assert_eq!(note.role, Role::User);
+    assert!(note.id.as_str().starts_with("interrupted/"));
+    assert_eq!(note.content, [Content::Text(RESUMED_GUIDANCE.into())]);
+}
+
+#[test]
+fn a_response_cut_by_its_deadline_stays_in_model_context() {
+    let (state, initial, partial) = cut_response("deadline");
+    assert_eq!(model_context(&state), [initial, partial]);
 }

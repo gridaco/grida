@@ -410,7 +410,7 @@ impl Master {
                     .await?;
                 let basis = turn.view();
                 match self
-                    .finish(&mut turn, &mut continuation, outcome, &basis)
+                    .finish(&mut turn, &mut continuation, max_steps, outcome, &basis)
                     .await?
                 {
                     Some(outcome) => return Ok(outcome),
@@ -447,7 +447,7 @@ impl Master {
                     continue;
                 }
                 match self
-                    .finish(&mut turn, &mut continuation, outcome, &basis)
+                    .finish(&mut turn, &mut continuation, max_steps, outcome, &basis)
                     .await?
                 {
                     Some(outcome) => return Ok(outcome),
@@ -479,20 +479,19 @@ impl Master {
                             None,
                             None,
                         )?;
-                        let mut account =
-                            read_account(outcome.account.as_ref().expect("master account"))?;
-                        account.failure = Some(Error::new(
-                            if uncertain {
-                                ErrorKind::Uncertain
-                            } else {
-                                ErrorKind::Unavailable
-                            },
-                            "lifecycle_hook_blocked",
-                        ));
-                        outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+                        update_account(&mut outcome, |account| {
+                            account.failure = Some(Error::new(
+                                if uncertain {
+                                    ErrorKind::Uncertain
+                                } else {
+                                    ErrorKind::Unavailable
+                                },
+                                "lifecycle_hook_blocked",
+                            ));
+                        })?;
                         let basis = turn.view();
                         match self
-                            .finish(&mut turn, &mut continuation, outcome, &basis)
+                            .finish(&mut turn, &mut continuation, max_steps, outcome, &basis)
                             .await?
                         {
                             Some(outcome) => return Ok(outcome),
@@ -517,7 +516,7 @@ impl Master {
                     }
                 }
                 match self
-                    .finish(&mut turn, &mut continuation, outcome, &view)
+                    .finish(&mut turn, &mut continuation, max_steps, outcome, &view)
                     .await?
                 {
                     Some(outcome) => return Ok(outcome),
@@ -534,7 +533,7 @@ impl Master {
                     None,
                 )?;
                 match self
-                    .finish(&mut turn, &mut continuation, outcome, &view)
+                    .finish(&mut turn, &mut continuation, max_steps, outcome, &view)
                     .await?
                 {
                     Some(outcome) => return Ok(outcome),
@@ -620,10 +619,7 @@ impl Master {
                         None,
                         None,
                     )?;
-                    let mut account =
-                        read_account(outcome.account.as_ref().expect("master account"))?;
-                    account.failure = Some(error);
-                    outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+                    update_account(&mut outcome, |account| account.failure = Some(error))?;
                     continuation.request = None;
                     continuation.outcome = Some(outcome);
                     turn.checkpoint(
@@ -636,9 +632,9 @@ impl Master {
             };
             if continuation.request.is_none() {
                 continuation.request_history = Some(input_view.state.history().position());
-                if continuation.pending_retry().is_some() {
-                    continuation.interrupted = false;
-                }
+                // An earlier pause cannot have interrupted a request that was
+                // not prepared yet.
+                continuation.interrupted = false;
                 continuation.request = Some(request.clone());
                 turn.checkpoint(
                     OperationKey::new(format!("{step_key}/request"))?,
@@ -675,7 +671,7 @@ impl Master {
                             .await?;
                         let basis = turn.view();
                         match self
-                            .finish(&mut turn, &mut continuation, outcome, &basis)
+                            .finish(&mut turn, &mut continuation, max_steps, outcome, &basis)
                             .await?
                         {
                             Some(outcome) => return Ok(outcome),
@@ -698,10 +694,7 @@ impl Master {
                             None,
                             None,
                         )?;
-                        let mut account =
-                            read_account(outcome.account.as_ref().expect("master account"))?;
-                        account.failure = Some(error);
-                        outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+                        update_account(&mut outcome, |account| account.failure = Some(error))?;
                         continuation.request = None;
                         continuation.outcome = Some(outcome);
                         turn.checkpoint(
@@ -752,7 +745,7 @@ impl Master {
                         .await?;
                     let basis = turn.view();
                     match self
-                        .finish(&mut turn, &mut continuation, outcome, &basis)
+                        .finish(&mut turn, &mut continuation, max_steps, outcome, &basis)
                         .await?
                     {
                         Some(outcome) => return Ok(outcome),
@@ -929,26 +922,41 @@ impl Master {
         turn: &Turn,
         execution: &LifecycleExecution,
     ) -> Result<lifecycle_hooks::HookReview> {
-        use lifecycle_hooks::{HookDecision, HookMoment, HookOccurrence};
+        use lifecycle_hooks::{HookDecision, HookEvent, HookMoment, HookOccurrence};
         let view = turn.view();
         let mut moments = vec![HookMoment::SessionStart {
             control_revision: view.state.controls().revision,
         }];
-        moments.extend(view.state.history().records().iter().filter_map(|record| {
-            let HistoryRecord::Message(message) = record;
-            (message.role == Role::User).then(|| HookMoment::BeforeInput {
-                message: message.clone(),
-            })
-        }));
+        // Select by event and tool before cloning a moment's message or
+        // outcome, so unselected boundaries cost no copies.
+        if execution.hooks.selects(HookEvent::BeforeInput, None) {
+            moments.extend(view.state.history().records().iter().filter_map(|record| {
+                let HistoryRecord::Message(message) = record;
+                (message.role == Role::User).then(|| HookMoment::BeforeInput {
+                    message: message.clone(),
+                })
+            }));
+        }
         moments.extend(view.state.operations().values().filter_map(|record| {
             let OperationInput::Tool(invocation) = &record.record.input else {
                 return None;
             };
-            if execution.hooks.is_handler(&invocation.definition().id)
-                || matches!(
-                    invocation.definition().id.as_str(),
-                    "before_tool_command" | "before_completion_command" | "require_completion_text"
-                )
+            if !execution
+                .hooks
+                .selects(HookEvent::AfterTool, Some(&invocation.definition().id))
+            {
+                return None;
+            }
+            // Private check operations are not tool moments. Recognize them
+            // from the checks this master was given: hook and completion
+            // handlers by tool, the admission check by its private grant.
+            let tool = &invocation.definition().id;
+            if execution.hooks.is_handler(tool)
+                || self
+                    .completion_checks
+                    .as_ref()
+                    .is_some_and(|checks| checks.checks.is_handler(tool))
+                || self.required_admission_check.as_ref() == Some(&record.record.grants)
             {
                 return None;
             }
@@ -1355,16 +1363,17 @@ impl Master {
         &self,
         turn: &mut Turn,
         continuation: &mut Continuation,
+        max_steps: u32,
         mut outcome: TurnOutcome,
         basis: &TurnView,
     ) -> Result<Option<MasterOutcome>> {
         let may_continue = outcome.status == OutcomeStatus::Succeeded;
         if !continuation.hook_diagnostics.is_empty() {
-            let mut account = read_account(outcome.account.as_ref().expect("master account"))?;
-            account
-                .lifecycle_hooks
-                .extend(continuation.hook_diagnostics.iter().cloned());
-            outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+            update_account(&mut outcome, |account| {
+                account
+                    .lifecycle_hooks
+                    .extend(continuation.hook_diagnostics.iter().cloned());
+            })?;
         }
         if may_continue && let Some(execution) = &self.lifecycle_hooks {
             use lifecycle_hooks::{HookDecision, HookMoment, HookOccurrence};
@@ -1382,8 +1391,7 @@ impl Master {
                     &execution.grants,
                 )
                 .await?;
-            {
-                let mut account = read_account(outcome.account.as_ref().expect("master account"))?;
+            update_account(&mut outcome, |account| {
                 account.lifecycle_hooks = execution.hooks.results(&turn.view());
                 account
                     .lifecycle_hooks
@@ -1398,13 +1406,12 @@ impl Master {
                         })
                         .cloned(),
                 );
-                outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
-            }
+            })?;
             match review.decision {
                 HookDecision::Reconsider => return Ok(None),
                 HookDecision::Continue => {
-                    let account = read_account(outcome.account.as_ref().expect("master account"))?;
-                    if continuation.step < self.config.max_steps && account.stop_reason.is_none() {
+                    let account = outcome_account(&outcome)?;
+                    if continuation.step < max_steps && account.stop_reason.is_none() {
                         continuation.request = None;
                         continuation.outcome = None;
                         turn.checkpoint(
@@ -1418,27 +1425,23 @@ impl Master {
                         return Ok(None);
                     }
                     outcome.status = OutcomeStatus::Failed;
-                    let mut account =
-                        read_account(outcome.account.as_ref().expect("master account"))?;
-                    account.failure = Some(Error::new(
-                        ErrorKind::LimitExceeded,
-                        "lifecycle_hook_step_limit",
-                    ));
-                    outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+                    update_account(&mut outcome, |account| {
+                        account.failure = Some(Error::new(
+                            ErrorKind::LimitExceeded,
+                            "lifecycle_hook_step_limit",
+                        ));
+                    })?;
                 }
                 HookDecision::Block => outcome.status = OutcomeStatus::Failed,
                 HookDecision::Uncertain => outcome.status = OutcomeStatus::Uncertain,
                 HookDecision::Allow => {}
             }
             if outcome.status != OutcomeStatus::Succeeded {
-                let mut account = read_account(outcome.account.as_ref().expect("master account"))?;
-                if account.failure.is_none() {
-                    account.failure = Some(Error::new(
-                        ErrorKind::Unavailable,
-                        "lifecycle_completion_blocked",
-                    ));
-                }
-                outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+                update_account(&mut outcome, |account| {
+                    account.failure.get_or_insert_with(|| {
+                        Error::new(ErrorKind::Unavailable, "lifecycle_completion_blocked")
+                    });
+                })?;
             }
             outcome.evidence.extend(
                 review
@@ -1466,46 +1469,55 @@ impl Master {
                 }
                 hooks::Decision::Allow | hooks::Decision::Block => {}
             }
-            let mut account = read_account(outcome.account.as_ref().expect("master account"))?;
-            for check in &review.checks {
-                if let Some(operation) = &check.operation {
-                    if !outcome.evidence.contains(operation) {
-                        outcome.evidence.push(operation.clone());
-                    }
-                    if check.status == hooks::CheckStatus::Uncertain
-                        && !account.unresolved.contains(operation)
-                    {
-                        account.unresolved.push(operation.clone());
-                    }
+            for operation in review
+                .checks
+                .iter()
+                .filter_map(|check| check.operation.as_ref())
+            {
+                if !outcome.evidence.contains(operation) {
+                    outcome.evidence.push(operation.clone());
                 }
             }
-            if review.decision == hooks::Decision::Block {
-                let uncertain = review
+            let blocked = (review.decision == hooks::Decision::Block).then(|| {
+                review
                     .checks
                     .iter()
                     .rev()
                     .find(|check| check.status != hooks::CheckStatus::Skipped)
-                    .is_some_and(|check| check.status == hooks::CheckStatus::Uncertain);
+                    .is_some_and(|check| check.status == hooks::CheckStatus::Uncertain)
+            });
+            if let Some(uncertain) = blocked {
                 outcome.status = if uncertain {
                     OutcomeStatus::Uncertain
                 } else {
                     OutcomeStatus::Failed
                 };
-                let kind = if uncertain {
-                    ErrorKind::Uncertain
-                } else {
-                    ErrorKind::Unavailable
-                };
-                account.failure = Some(Error::new(kind, "completion_check_blocked"));
-                account.text = if uncertain {
-                    "A required completion check could not be verified. Review the recorded work before continuing."
-                } else {
-                    "A required completion check did not pass. Review the recorded work before continuing."
-                }
-                .into();
             }
-            account.completion_checks = review.checks;
-            outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+            update_account(&mut outcome, |account| {
+                for check in &review.checks {
+                    if let Some(operation) = &check.operation
+                        && check.status == hooks::CheckStatus::Uncertain
+                        && !account.unresolved.contains(operation)
+                    {
+                        account.unresolved.push(operation.clone());
+                    }
+                }
+                if let Some(uncertain) = blocked {
+                    let kind = if uncertain {
+                        ErrorKind::Uncertain
+                    } else {
+                        ErrorKind::Unavailable
+                    };
+                    account.failure = Some(Error::new(kind, "completion_check_blocked"));
+                    account.text = if uncertain {
+                        "A required completion check could not be verified. Review the recorded work before continuing."
+                    } else {
+                        "A required completion check did not pass. Review the recorded work before continuing."
+                    }
+                    .into();
+                }
+                account.completion_checks = review.checks;
+            })?;
         }
         let child = match (
             &self.goal_child_work,
@@ -1528,9 +1540,7 @@ impl Master {
         )?;
         let state_change = match goal {
             Some((change, goal)) => {
-                let mut account = read_account(outcome.account.as_ref().expect("master account"))?;
-                account.goal = Some(goal);
-                outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+                update_account(&mut outcome, |account| account.goal = Some(goal))?;
                 Some(change)
             }
             None => None,
@@ -1621,6 +1631,23 @@ pub fn read_account(envelope: &Envelope) -> Result<Account> {
     decode(ACCOUNT_SCHEMA, envelope)
 }
 
+/// The account a master-built outcome carries.
+fn outcome_account(outcome: &TurnOutcome) -> Result<Account> {
+    let envelope = outcome
+        .account
+        .as_ref()
+        .ok_or_else(|| Error::new(ErrorKind::InvalidState, "master_account_missing"))?;
+    read_account(envelope)
+}
+
+/// Amend the account a master-built outcome carries.
+fn update_account(outcome: &mut TurnOutcome, change: impl FnOnce(&mut Account)) -> Result<()> {
+    let mut account = outcome_account(outcome)?;
+    change(&mut account);
+    outcome.account = Some(encode(ACCOUNT_SCHEMA, &account)?);
+    Ok(())
+}
+
 fn encode<T: Serialize>(schema: &str, value: &T) -> Result<Envelope> {
     let bytes = serde_json::to_vec(value)
         .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid_master_state"))?;
@@ -1648,7 +1675,14 @@ fn host_response_limit(failure: &InferenceFailure) -> bool {
 
 fn inference_failure_text(inference: &InferenceOutcome) -> &'static str {
     if inference.status == InferenceStatus::Interrupted {
-        return "The provider did not confirm the result. Review any partial work before trying again.";
+        let deadline = inference.failure.as_ref().is_some_and(|failure| {
+            failure.kind == FailureKind::Cancelled && failure.code == "deadline"
+        });
+        return if deadline {
+            "The model request reached its time limit. Review any partial work, then try a shorter request."
+        } else {
+            "The provider did not confirm the result. Review any partial work before trying again."
+        };
     }
     let Some(failure) = &inference.failure else {
         return "The model request failed.";

@@ -104,6 +104,11 @@ impl CompletionChecks {
         Ok(selected)
     }
 
+    /// Whether `tool` is the private handler of a selected check.
+    pub fn is_handler(&self, tool: &ToolId) -> bool {
+        self.0.iter().any(|check| &check.handler == tool)
+    }
+
     fn validate(&self) -> Result<()> {
         let mut ids = BTreeSet::new();
         if self.0.len() > MAX_CHECKS || self.0.iter().any(|check| !ids.insert(&check.id)) {

@@ -15,6 +15,10 @@ The continuation identity includes this projection so recovery cannot silently
 replace the context on which the turn was based.
 
 Pause-origin interruptions remain distinguishable after a rapid resumption.
+Only a person's Pause or Stop replaces a cut-off response in model context; a
+deadline or provider interruption leaves the published response in place. A
+request prepared after resumption is not treated as paused, so its own
+interruption ends the turn as uncertain.
 Stopping accounts for unfinished operations and publishes recorded effects into
 the conversation before settlement. Completion and suspension validate the
 control and history positions on which the master made its decision.
@@ -121,7 +125,10 @@ ordered definition selection and exact event occurrence. A required rejection
 skips later checks; observational failures retain diagnostics. Post-effect
 checks preserve the actual outcome. Context is bounded, source-attributed data,
 kept separate from user instructions and execution authority. Completion can
-request another step only within the captured task allowance. Private checks
-are ordinary durable operations, excluded from recursive hook dispatch. Reads
+request another step only within the turn's effective step allowance, after
+goal, delegation and approval-review reservations. Private checks are ordinary
+durable operations, excluded from recursive hook dispatch: the master recognizes
+them from the hook and completion-check handlers and the admission-check grant
+it was given. Reads
 and reconnect never execute them. The host owns trusted registration, executable
 review, live grants and native confinement.

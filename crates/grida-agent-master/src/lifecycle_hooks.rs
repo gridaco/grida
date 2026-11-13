@@ -207,6 +207,11 @@ impl LifecycleHooks {
     pub fn matches(&self, moment: &HookMoment) -> bool {
         self.0.iter().any(|hook| matches_hook(hook, moment))
     }
+    /// Whether any hook selects this event and tool, without building the
+    /// moment it would review.
+    pub fn selects(&self, event: HookEvent, tool: Option<&ToolId>) -> bool {
+        self.0.iter().any(|hook| selects(hook, event, tool))
+    }
     pub fn is_handler(&self, tool: &ToolId) -> bool {
         self.0.iter().any(|hook| &hook.handler == tool)
     }
@@ -397,11 +402,14 @@ impl LifecycleHooks {
 }
 
 fn matches_hook(hook: &LifecycleHook, moment: &HookMoment) -> bool {
-    hook.event == moment.event()
+    selects(hook, moment.event(), moment.tool())
+}
+fn selects(hook: &LifecycleHook, event: HookEvent, tool: Option<&ToolId>) -> bool {
+    hook.event == event
         && hook
             .tool
             .as_ref()
-            .is_none_or(|tool| moment.tool() == Some(tool))
+            .is_none_or(|selected| tool == Some(selected))
 }
 fn same_basis(left: &TurnView, right: &TurnView) -> bool {
     left.state.controls().revision == right.state.controls().revision

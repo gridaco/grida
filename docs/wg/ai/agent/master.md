@@ -707,8 +707,10 @@ Both notes say that an aborted tool or command may have partially executed.
 
 Completed responses, tool calls, and their results are never repeated or
 dropped by an interruption. Only a response that a person interrupted is
-replaced; a provider failure or a retry is not an interruption and adds no
-note. The rule matches the established convention for interactive coding
+replaced; a provider failure, a retry, or a response cut off by its time limit
+is not an interruption and adds no note. A response cut off by its time limit
+stays in model context as published, and the turn ends with an uncertain result
+that asks the person to review the partial work. The rule matches the established convention for interactive coding
 agents, so behavior after an interruption is familiar.
 
 ## Performance is a product claim

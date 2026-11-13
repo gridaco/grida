@@ -2,7 +2,7 @@
 
 use agent_kit_core::MessageId;
 use agent_kit_core::history::HistoryRecord;
-use agent_kit_core::inference::{FailureKind, InferenceStatus};
+use agent_kit_core::inference::{FailureKind, InferenceFailure, InferenceStatus};
 use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, ProvenanceKind, Role};
 use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnState};
 use std::collections::{BTreeMap, BTreeSet};
@@ -28,10 +28,7 @@ pub fn model_context(state: &TurnState) -> Vec<HistoryRecord> {
     for operation in state.operations().values() {
         if let Some(OperationOutcome::Inference(outcome)) = operation.outcome()
             && outcome.status == InferenceStatus::Interrupted
-            && outcome
-                .failure
-                .as_ref()
-                .is_some_and(|failure| failure.kind == FailureKind::Cancelled)
+            && outcome.failure.as_ref().is_some_and(person_interruption)
         {
             interrupted.extend(
                 outcome
@@ -74,6 +71,13 @@ pub fn model_context(state: &TurnState) -> Vec<HistoryRecord> {
         }
     }
     output
+}
+
+/// A pause or stop from the person. Other cancellations, such as an
+/// operation deadline, leave the published response in model context.
+fn person_interruption(failure: &InferenceFailure) -> bool {
+    failure.kind == FailureKind::Cancelled
+        && matches!(failure.code.as_str(), "turn_paused" | "turn_cancelled")
 }
 
 const NOTE_PREFIX: &str = "interrupted/";
