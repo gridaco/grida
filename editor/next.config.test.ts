@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { NextConfig } from "next";
 import { createRequire } from "node:module";
+import { IncomingMessage } from "node:http";
+import { Socket } from "node:net";
+import type { RouteHas } from "next/dist/lib/load-custom-routes";
+import { matchHas } from "next/dist/shared/lib/router/utils/prepare-destination";
 
 // Exercise Vercel's compiled routes: an empty wildcard retains its preceding slash.
 const { convertRewrites, convertRedirects } = createRequire(import.meta.url)(
@@ -15,8 +19,16 @@ const { convertRewrites, convertRedirects } = createRequire(import.meta.url)(
       destination: string;
       permanent?: boolean;
       statusCode?: number;
+      has?: RouteHas[];
+      missing?: RouteHas[];
     }[]
-  ): { src: string; status: number; headers?: Record<string, string> }[];
+  ): {
+    src: string;
+    status: number;
+    headers?: Record<string, string>;
+    has?: RouteHas[];
+    missing?: RouteHas[];
+  }[];
 };
 
 let config: NextConfig;
@@ -24,6 +36,8 @@ beforeAll(async () => {
   vi.stubEnv("NEXT_PUBLIC_GRIDA_USE_TELEMETRY", "0");
   vi.stubEnv("NEXT_PUBLIC_BLOG_URL", "https://blog.example.test");
   vi.stubEnv("NEXT_PUBLIC_WWW_INDEX_URL", "https://www.example.test");
+  vi.stubEnv("VERCEL_URL", "preview-fixture-grida.vercel.app");
+  vi.stubEnv("VERCEL_BRANCH_URL", "branch-fixture-grida.vercel.app");
   config = (await import("./next.config")).default;
 });
 afterAll(() => vi.unstubAllEnvs());
@@ -51,15 +65,48 @@ describe("Standalone blog routing", () => {
 });
 
 describe("Standalone marketing routing", () => {
+  async function redirectFor(host: string, path = "/index") {
+    const request = new IncomingMessage(new Socket());
+    request.headers.host = host;
+    const routes = convertRedirects(await config.redirects!());
+    return routes.find(
+      ({ src, has, missing }) =>
+        new RegExp(src).test(path) && matchHas(request, {}, has, missing)
+    );
+  }
+
   it.each([
-    "/index",
+    "grida.co",
+    "GRIDA.CO:443",
+    "preview-fixture-grida.vercel.app",
+    "branch-fixture-grida.vercel.app",
+    "localhost:3041",
+    "127.0.0.1:3041",
+  ])("redirects /index temporarily on app host %s", async (host) => {
+    const route = await redirectFor(host);
+    expect(route?.status).toBe(307);
+    expect(route?.headers?.Location).toBe("https://grida.co/home");
+  });
+
+  it.each([
+    "studio.grida.site",
+    "studio.example.test",
+    "grida.co.attacker.test",
+    "preview-fixture-grida.vercel.app.attacker.test",
+    "branch-fixture-grida.vercel.app.attacker.test",
+    "other-deployment.vercel.app",
+    "gridaXco",
+  ])("leaves /index on %s to tenant routing", async (host) => {
+    expect(await redirectFor(host)).toBeUndefined();
+  });
+
+  it.each([
     "/index/games",
     "/index/sitemap.xml",
     "/index/_next/static/example.js",
     "/index/canvas",
-  ])("leaves %s for host-aware routing before redirects", async (path) => {
-    const routes = convertRedirects(await config.redirects!());
-    expect(routes.some(({ src }) => new RegExp(src).test(path))).toBe(false);
+  ])("does not redirect descendant %s", async (path) => {
+    expect(await redirectFor("grida.co", path)).toBeUndefined();
   });
 
   it.each([

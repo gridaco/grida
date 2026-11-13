@@ -82,12 +82,12 @@ Tenant sites are primarily accessed via **tenant domains** (e.g. `xyz.grida.site
 - **Exception: `/index/canvas` stays here**, including its canonical URL, links,
   and root sitemap entry. The external rewrite explicitly excludes that subtree;
   moving it requires a separate migration.
-- `app/(www)/index/route.ts` owns the exact `/index` temporary redirect to
-  `https://grida.co/home`, after tenant host rewriting. Keep it out of global
-  `next.config.ts` redirects so tenant/custom-domain `/index` pages stay tenant-owned.
-  An external rewrite can consume the upstream redirect and return HTML instead
-  of the intended 307. The standalone deployment retains its own base-path
-  redirect for direct access.
+- `next.config.ts` owns the exact `/index` temporary redirect to
+  `https://grida.co/home`, before filesystem routing: Next's hosted minimal mode
+  normalizes `/index` to `/` before a route handler can respond. The redirect is
+  scoped to `grida.co`, the exact `VERCEL_URL` and `VERCEL_BRANCH_URL` app hosts,
+  and local `localhost`/`127.0.0.1` hosts. Tenant/custom-domain `/index` pages stay
+  tenant-owned. The standalone deployment retains its own base-path redirect.
 - Blank marketing scaffolds stay `noindex` and out of navigation and sitemaps.
   When the first indexable page ships, add it to the standalone site's sitemap
   and register `https://grida.co/index/sitemap.xml` in `app/robots.txt` together.

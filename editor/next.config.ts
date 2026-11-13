@@ -11,6 +11,16 @@ const BLOG_URL = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.grida.co";
 // Marketing deployment origin, without /index; gridaco/www owns that base path.
 const WWW_INDEX_URL =
   process.env.NEXT_PUBLIC_WWW_INDEX_URL || "https://grida-www-index.vercel.app";
+const WWW_INDEX_REDIRECT_HOST_PATTERN = `(?:${[
+  "grida.co",
+  process.env.VERCEL_URL,
+  process.env.VERCEL_BRANCH_URL,
+  "localhost",
+  "127.0.0.1",
+]
+  .filter((host): host is string => !!host)
+  .map((host) => host.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+  .join("|")})`;
 const USE_TELEMETRY =
   process.env.NODE_ENV === "production" &&
   process.env.NEXT_PUBLIC_GRIDA_USE_TELEMETRY === "1";
@@ -65,6 +75,14 @@ const nextConfig: NextConfig = {
         source: `/:path(${apiPolicy.webPathGuard}.+)/`,
         destination: "/:path",
         permanent: true,
+      },
+      // Next's minimal server maps /index to / before route handlers. Redirect
+      // early on app hosts only; tenant/custom-domain /index stays tenant-owned.
+      {
+        source: "/index",
+        destination: "https://grida.co/home",
+        permanent: false,
+        has: [{ type: "host", value: WWW_INDEX_REDIRECT_HOST_PATTERN }],
       },
       // Engine WG docs moved to the engine repo (gridaco/nothing) — the docs
       // site no longer produces these pages. Path-shape contract: the tree
