@@ -21,11 +21,10 @@ Desktop can run chat on:
 
 A Desktop build started from source or an Insiders build can also use your
 **ChatGPT subscription**, which takes text only.
-[Configure a Desktop launch profile](https://github.com/gridaco/grida/blob/main/desktop/README.md#distributions)
 
-Endpoints use HTTPS, except plain HTTP on `localhost` and numeric loopback
-addresses. An HTTP endpoint on another device stays in Desktop settings but
-cannot run chat, even if you approved it in an earlier Desktop version.
+An endpoint on another device must use HTTPS; plain HTTP works only for
+`localhost` or `127.0.0.1`. A saved HTTP endpoint on another device stays in
+Desktop settings but cannot run chat.
 
 ## Choose a model
 
@@ -45,7 +44,7 @@ model.
 
 Desktop reopens a workspace with the model you chose there last, including
 after a restart. If that model can no longer run, the workspace opens with the
-default connection. If the default Gateway connection cannot start, Desktop
+default model. If the default Gateway connection cannot start, Desktop
 continues with a saved OpenRouter or Vercel AI Gateway key, using Grida's
 default model when that key offers it. Only when no connection can run does
 the composer show **Choose model** with a prompt to add a provider.

@@ -21,7 +21,7 @@ not require an existing check definition or an earlier chat.
 2. Choose **Import check…** and select its JSON definition. An agent can help
    prepare the definition; it cannot trust executable code for you.
 3. Review the event, exact command and arguments, workspace, deadline and
-   required/observational behavior in the native dialog. Choose **Trust and save
+   required/observational behavior in the dialog. Choose **Trust and save
    check** only when those match your intent.
 4. Restart Desktop to activate saved changes. Running and paused work keeps
    its captured checks. Restoring a paused task requires its original selection;
