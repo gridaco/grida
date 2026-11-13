@@ -60,6 +60,7 @@ const copiedFiles = [
   "lib/desktop/csp.ts",
   "lib/library/storage.ts",
   "lib/domains/index.ts",
+  "lib/maintenance/server-instance-cache.ts",
   "lib/platform/index.ts",
   "lib/platform/billing-consumer.ts",
   "lib/platform/console-destination.ts",
@@ -2663,6 +2664,8 @@ async function main() {
       GRIDA_OAUTH_CLIENT_IDS: issuer.client,
       GRIDA_API_ORIGIN: apiOrigin,
       GRIDA_API_MAINTENANCE: "0",
+      // Each web positive control must reach the maintenance tripwire.
+      GRIDA_MAINTENANCE_MODE_CACHE_TTL_MS: "0",
       GG_TOKEN_SECRET: signingSecret,
       GRIDA_AI_GATEWAY_ORIGIN: `http://127.0.0.1:${ggPort}`,
       GRIDA_AI_GATEWAY_ALLOW_LOCAL: "1",
