@@ -178,6 +178,43 @@ fn unsupported_descendant_requirement_and_protected_overlap_refuse_before_launch
     assert_eq!(error.code, "sandbox_process_scope_invalid");
 }
 
+#[test]
+#[cfg_attr(target_os = "linux", ignore = "requires bubblewrap")]
+fn preparation_refuses_what_launch_could_not_honour() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+
+    // An unwritable path that contains a readable location cannot be carved.
+    let mut scope = fixture.scope();
+    let inside = fixture.outside.join("inside");
+    fs::create_dir(&inside).unwrap();
+    scope.read.push(inside);
+    scope.protected = vec![ProtectedPath {
+        path: fixture.outside.clone(),
+        access: DeniedAccess::Write,
+    }];
+    let error = sandbox
+        .prepare(fixture.command("exit 0"), scope)
+        .err()
+        .unwrap();
+    assert_eq!(error.code, "sandbox_protected_overlap");
+
+    // A scope realizing no grant is not an expired one.
+    let mut scope = fixture.scope();
+    scope.grants.grants.clear();
+    let error = sandbox
+        .prepare(fixture.command("exit 0"), scope)
+        .err()
+        .unwrap();
+    assert_eq!(error.code, "sandbox_scope_ungranted");
+
+    // The setup frame is measured as the helper reads it, escapes included.
+    let mut spec = fixture.command("exit 0");
+    spec.arguments.push("\"".repeat(200 * 1024));
+    let error = sandbox.prepare(spec, fixture.scope()).err().unwrap();
+    assert_eq!(error.code, "sandbox_setup_limit");
+}
+
 #[cfg(target_os = "macos")]
 #[tokio::test]
 async fn changed_scope_identity_refuses_before_payload_spawn() {
@@ -346,6 +383,180 @@ async fn protected_paths_inside_a_writable_root_stay_unwritable() {
         fs::read(fixture.workspace.join("permitted")).unwrap(),
         b"allowed"
     );
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn missing_protected_paths_cannot_be_created_under_a_writable_root() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let mut scope = fixture.scope();
+    scope.protected.extend([
+        ProtectedPath {
+            path: fixture.workspace.join(".agent"),
+            access: DeniedAccess::Write,
+        },
+        ProtectedPath {
+            path: fixture.workspace.join("state"),
+            access: DeniedAccess::ReadWrite,
+        },
+    ]);
+    let attempt = r#"
+        if mkdir .agent 2>/dev/null; then exit 31; fi
+        if (printf x > .agent) 2>/dev/null; then exit 32; fi
+        if (printf x > .agent/config) 2>/dev/null; then exit 33; fi
+        if mkdir state 2>/dev/null; then exit 34; fi
+        if (printf x > state) 2>/dev/null; then exit 35; fi
+        printf allowed > permitted || exit 36
+    "#;
+    // A longer launch relies on the same protection while a shorter one
+    // starts and finishes.
+    let older = sandbox
+        .prepare(
+            fixture.command(&format!(
+                "{attempt}\nprintf ready > older-ready\n\
+                 while [ ! -f release ]; do /bin/sleep 0.02; done"
+            )),
+            scope.clone(),
+        )
+        .unwrap()
+        .spawn(CancellationToken::new())
+        .unwrap();
+    let ready = tokio::time::timeout(Duration::from_secs(3), async {
+        while !fixture.workspace.join("older-ready").exists() {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await;
+    if ready.is_err() {
+        older.request_stop();
+        let evidence = older.finish().await.unwrap();
+        panic!(
+            "{evidence:?} stderr={:?}",
+            String::from_utf8_lossy(&evidence.stderr)
+        );
+    }
+    let newer = sandbox
+        .prepare(fixture.command(attempt), scope)
+        .unwrap()
+        .spawn(CancellationToken::new())
+        .unwrap()
+        .finish()
+        .await
+        .unwrap();
+    assert_eq!(
+        newer.completion,
+        Completion::Exited(0),
+        "stderr={:?}",
+        String::from_utf8_lossy(&newer.stderr)
+    );
+    fs::write(fixture.workspace.join("release"), b"").unwrap();
+    let older = older.finish().await.unwrap();
+    assert_eq!(
+        older.completion,
+        Completion::Exited(0),
+        "stderr={:?}",
+        String::from_utf8_lossy(&older.stderr)
+    );
+    #[cfg(target_os = "linux")]
+    assert_eq!(older.descendants, Descendants::NamespaceEnded);
+    // Nothing the launches were denied is left on the host.
+    assert!(fs::symlink_metadata(fixture.workspace.join(".agent")).is_err());
+    assert!(fs::symlink_metadata(fixture.workspace.join("state")).is_err());
+    assert_eq!(
+        fs::read(fixture.workspace.join("permitted")).unwrap(),
+        b"allowed"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+async fn denials_outside_the_grant_never_widen_access() {
+    let fixture = Fixture::new();
+    let sandbox = fixture.sandbox();
+    let secret = fixture.outside.join("secret");
+    fs::write(&secret, "private").unwrap();
+    let state = fixture.workspace.join("state");
+    fs::create_dir(&state).unwrap();
+    fs::write(state.join("token"), "private").unwrap();
+    let mut scope = fixture.scope();
+    // An unwritable path outside every grant stays out of reach, and a path
+    // protected twice keeps the stronger denial.
+    scope.protected = vec![
+        ProtectedPath {
+            path: secret.clone(),
+            access: DeniedAccess::Write,
+        },
+        ProtectedPath {
+            path: state.clone(),
+            access: DeniedAccess::ReadWrite,
+        },
+        ProtectedPath {
+            path: state.clone(),
+            access: DeniedAccess::Write,
+        },
+    ];
+    let mut spec = fixture.command(
+        r#"
+        if /bin/cat "$1" >/dev/null 2>&1; then exit 31; fi
+        if /bin/cat state/token >/dev/null 2>&1; then exit 32; fi
+        printf complete
+        "#,
+    );
+    spec.arguments.push(secret.to_string_lossy().into_owned());
+    let evidence = sandbox
+        .prepare(spec, scope)
+        .unwrap()
+        .spawn(CancellationToken::new())
+        .unwrap()
+        .finish()
+        .await
+        .unwrap();
+    assert_eq!(
+        evidence.completion,
+        Completion::Exited(0),
+        "stderr={:?}",
+        String::from_utf8_lossy(&evidence.stderr)
+    );
+    assert_eq!(evidence.stdout, b"complete");
+}
+
+#[test]
+#[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
+fn a_launch_outlives_the_thread_that_started_it() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .thread_keep_alive(Duration::from_millis(100))
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let fixture = Fixture::new();
+        let sandbox = std::sync::Arc::new(fixture.sandbox());
+        let spec = fixture.command("/bin/sleep 2; printf complete");
+        let scope = fixture.scope();
+        // The blocking-pool thread retires long before the command ends.
+        let running = tokio::task::spawn_blocking(move || {
+            sandbox
+                .prepare(spec, scope)
+                .unwrap()
+                .spawn(CancellationToken::new())
+                .unwrap()
+        })
+        .await
+        .unwrap();
+        let evidence = running.finish().await.unwrap();
+        assert_eq!(
+            evidence.completion,
+            Completion::Exited(0),
+            "{evidence:?} stderr={:?}",
+            String::from_utf8_lossy(&evidence.stderr)
+        );
+        assert_eq!(evidence.stdout, b"complete");
+        #[cfg(target_os = "macos")]
+        assert_eq!(evidence.descendants, Descendants::ProcessGroupSignalled);
+        #[cfg(target_os = "linux")]
+        assert_eq!(evidence.descendants, Descendants::NamespaceEnded);
+    });
 }
 
 #[tokio::test]
@@ -548,11 +759,20 @@ async fn reviewed_streaming_stdio_retains_bounds_and_stop_ownership() {
 #[tokio::test]
 #[ignore = "requires native Seatbelt or bubblewrap and working namespaces"]
 async fn concurrent_executions_cannot_read_each_others_temporary_files() {
+    // Reading anywhere on disk still excludes other launches' storage.
+    for disk_read in [false, true] {
+        concurrent_temporary_files_stay_private(disk_read).await;
+    }
+}
+
+async fn concurrent_temporary_files_stay_private(disk_read: bool) {
     let fixture = Fixture::new();
     let sandbox = fixture.sandbox();
+    let mut scope = fixture.scope();
+    scope.disk_read = disk_read;
     let older = sandbox.prepare(
         fixture.command("printf private > \"$TMPDIR/file\"; printf %s \"$TMPDIR/file\" > older-path; while :; do :; done"),
-        fixture.scope(),
+        scope.clone(),
     ).unwrap().spawn(CancellationToken::new()).unwrap();
     let older_path = tokio::time::timeout(Duration::from_secs(3), async {
         loop {
@@ -567,18 +787,32 @@ async fn concurrent_executions_cannot_read_each_others_temporary_files() {
     .await
     .unwrap();
     let mut newer = fixture.command(
-        "if /bin/cat \"$1\" >/dev/null 2>&1; then exit 51; fi; printf local > \"$TMPDIR/file\"",
+        "if /bin/cat \"$1\" >/dev/null 2>&1; then exit 51; fi; \
+         if test -e \"$2\"; then exit 52; fi; \
+         printf local > \"$TMPDIR/file\"",
     );
     newer.arguments.push(older_path.clone());
+    newer.arguments.push(
+        Path::new(&older_path)
+            .parent()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned(),
+    );
     let newer = sandbox
-        .prepare(newer, fixture.scope())
+        .prepare(newer, scope)
         .unwrap()
         .spawn(CancellationToken::new())
         .unwrap()
         .finish()
         .await
         .unwrap();
-    assert_eq!(newer.completion, Completion::Exited(0));
+    assert_eq!(
+        newer.completion,
+        Completion::Exited(0),
+        "disk_read={disk_read} stderr={:?}",
+        String::from_utf8_lossy(&newer.stderr)
+    );
     assert!(newer.temporary_removed);
     assert_eq!(fs::read(&older_path).unwrap(), b"private");
     older.request_stop();

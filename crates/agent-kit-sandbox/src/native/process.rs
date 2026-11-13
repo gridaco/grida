@@ -1,9 +1,13 @@
+//! GRIDA-SEC-004 — native launch, confinement profiles and supervision.
+
+#[cfg(target_os = "linux")]
+use super::placeholder::Placeholder;
 use super::*;
 use crate::wire::HELPER_FLAG;
 use std::os::fd::AsRawFd;
 use std::os::unix::net::UnixStream;
 use std::process::Stdio;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock, mpsc};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt, DuplexStream, WriteHalf};
 use tokio::process::{Child, Command};
 use tokio::task::JoinHandle;
@@ -34,44 +38,115 @@ impl Drop for Running {
     }
 }
 
+/// Placeholders a launch holds for missing protected paths. Only bubblewrap
+/// needs them: Seatbelt denies a path whether or not it exists.
+#[derive(Default)]
+pub(super) struct Placeholders(#[cfg(target_os = "linux")] Vec<Placeholder>);
+
+impl Placeholders {
+    #[cfg(target_os = "linux")]
+    fn hold(prepared: &mut Prepared) -> Result<Self> {
+        let mut held = Self::default();
+        let mut verified = Vec::new();
+        for (path, access) in prepared.placeholder_candidates()? {
+            match Placeholder::hold(&path) {
+                Ok(Some(placeholder)) => {
+                    // An unwritable placeholder is mounted onto itself, so the
+                    // helper can require that exact directory. An unreadable
+                    // one is covered by an empty file system instead.
+                    if access == DeniedAccess::Write {
+                        verified.push(placeholder.identity());
+                    }
+                    held.0.push(placeholder);
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    held.release(true);
+                    return Err(error);
+                }
+            }
+        }
+        prepared.launch.roots.extend(verified);
+        Ok(held)
+    }
+
+    #[cfg(target_os = "macos")]
+    fn hold(_: &mut Prepared) -> Result<Self> {
+        Ok(Self())
+    }
+
+    /// `ended` states that no process of the launch can still observe them.
+    fn release(self, ended: bool) {
+        #[cfg(target_os = "linux")]
+        for placeholder in self.0 {
+            placeholder.release(ended);
+        }
+        #[cfg(target_os = "macos")]
+        let _ = ended;
+    }
+}
+
 pub(super) fn spawn(
-    prepared: Prepared,
+    mut prepared: Prepared,
     cancellation: CancellationToken,
     stream: Option<DuplexStream>,
 ) -> Result<Running> {
-    tokio::runtime::Handle::try_current()
+    let runtime = tokio::runtime::Handle::try_current()
         .map_err(|_| refused(ErrorKind::InvalidState, "sandbox_async_runtime_required"))?;
-    let payload = serde_json::to_vec(&prepared.launch)
-        .map_err(|_| refused(ErrorKind::InvalidInput, "sandbox_setup_encoding"))?;
-    if payload.len() > wire::MAX_FRAME_BYTES {
-        return Err(refused(ErrorKind::LimitExceeded, "sandbox_setup_limit"));
+    let held = Placeholders::hold(&mut prepared)?;
+    match launch(prepared, cancellation, stream, runtime, held) {
+        Ok(running) => Ok(running),
+        Err((error, held)) => {
+            // Nothing started unless the launcher's start is uncertain.
+            held.release(error.kind != ErrorKind::Uncertain);
+            Err(error)
+        }
     }
-    let (status_read, status_write) = UnixStream::pair()
-        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_status_channel_unavailable"))?;
-    status_read
-        .set_nonblocking(true)
-        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_status_channel_unavailable"))?;
-    let status_read = tokio::net::UnixStream::from_std(status_read)
-        .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_status_channel_unavailable"))?;
-    let mut command = command(&prepared, status_write.as_raw_fd());
-    command
-        .env_clear()
-        .current_dir("/")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
-    configure_spawn(&mut command, status_write.as_raw_fd())?;
-    if prepared.valid_until <= Instant::now() || cancellation.is_cancelled() {
-        return Err(refused(ErrorKind::InvalidState, "sandbox_admission_closed"));
-    }
-    // Tokio can fail to register a child with the process or I/O driver
-    // after the OS has started it. No setup frame was sent, but launcher
-    // termination and cleanup are not established on this error path.
-    let child = command
-        .spawn()
-        .map_err(|_| refused(ErrorKind::Uncertain, "sandbox_spawn_unconfirmed"))?;
-    drop(status_write);
+}
+
+fn launch(
+    mut prepared: Prepared,
+    cancellation: CancellationToken,
+    stream: Option<DuplexStream>,
+    runtime: tokio::runtime::Handle,
+    held: Placeholders,
+) -> std::result::Result<Running, (Error, Placeholders)> {
+    let started = (|| {
+        // Preparation measured this frame with room for every placeholder.
+        let payload = serde_json::to_vec(&prepared.launch)
+            .map_err(|_| refused(ErrorKind::InvalidInput, "sandbox_setup_encoding"))?;
+        if payload.len() > wire::MAX_FRAME_BYTES {
+            return Err(refused(ErrorKind::LimitExceeded, "sandbox_setup_limit"));
+        }
+        let channel = || refused(ErrorKind::Unavailable, "sandbox_status_channel_unavailable");
+        let (status_read, status_write) = UnixStream::pair().map_err(|_| channel())?;
+        status_read.set_nonblocking(true).map_err(|_| channel())?;
+        let status_read = tokio::net::UnixStream::from_std(status_read).map_err(|_| channel())?;
+        let mut command = command(&prepared, status_write.as_raw_fd());
+        command
+            .env_clear()
+            .current_dir("/")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
+        configure_spawn(&mut command, status_write.as_raw_fd())?;
+        if prepared.valid_until <= Instant::now() || cancellation.is_cancelled() {
+            return Err(refused(ErrorKind::InvalidState, "sandbox_admission_closed"));
+        }
+        // Tokio can fail to register a child with the process or I/O driver
+        // after the OS has started it. No setup frame was sent, but launcher
+        // termination and cleanup are not established on this error path.
+        let child = spawn_on_launcher(command, runtime)?
+            .map_err(|_| refused(ErrorKind::Uncertain, "sandbox_spawn_unconfirmed"))?;
+        drop(status_write);
+        Ok((child, status_read, payload))
+    })();
+    let (child, status_read, payload) = match started {
+        Ok(started) => started,
+        Err(error) => return Err((error, held)),
+    };
+    prepared.placeholders = held;
     let stop = CancellationToken::new();
     let task = tokio::spawn(supervise(
         child,
@@ -83,6 +158,52 @@ pub(super) fn spawn(
         stream,
     ));
     Ok(Running { stop, task })
+}
+
+type LaunchJob = Box<dyn FnOnce() + Send>;
+
+/// Start the launcher from a thread this crate owns for the life of the
+/// process. bubblewrap's `--die-with-parent` follows the thread that forked
+/// it, so a caller's short-lived thread, such as a blocking-pool worker,
+/// would otherwise end a running sandbox when that thread retires.
+/// The outer error means the launch was never attempted.
+fn spawn_on_launcher(
+    mut command: Command,
+    runtime: tokio::runtime::Handle,
+) -> Result<io::Result<Child>> {
+    let unavailable = || refused(ErrorKind::Unavailable, "sandbox_launcher_unavailable");
+    static LAUNCHER: OnceLock<Option<Mutex<mpsc::Sender<LaunchJob>>>> = OnceLock::new();
+    let launcher = LAUNCHER
+        .get_or_init(|| {
+            let (jobs, received) = mpsc::channel::<LaunchJob>();
+            std::thread::Builder::new()
+                .name("agent-kit-sandbox-launcher".into())
+                .spawn(move || {
+                    for job in received {
+                        // A failed job must not end launches for the process.
+                        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(job));
+                    }
+                })
+                .ok()
+                .map(|_| Mutex::new(jobs))
+        })
+        .as_ref()
+        .ok_or_else(unavailable)?;
+    let (reply, result) = mpsc::sync_channel(1);
+    let job: LaunchJob = Box::new(move || {
+        // The child registers with the caller's runtime for reaping and I/O.
+        let _runtime = runtime.enter();
+        let _ = reply.send(command.spawn());
+    });
+    launcher
+        .lock()
+        .map_err(|_| unavailable())?
+        .send(job)
+        .map_err(|_| unavailable())?;
+    // A job that ended without replying may have started the launcher.
+    Ok(result
+        .recv()
+        .unwrap_or_else(|_| Err(io::Error::other("sandbox launcher ended"))))
 }
 
 #[cfg(target_os = "macos")]
@@ -158,14 +279,20 @@ fn command(prepared: &Prepared, status: i32) -> Command {
         command.arg("-D").arg(format!("{name}={}", path.display()));
     }
     if prepared.disk_read {
+        // Other launches' private temporary storage stays hidden. This
+        // launch's own directory is allowed below as a location.
+        let hidden = format!("{unreadable} (require-not (subpath (param \"T\")))");
         let _ = writeln!(
             profile,
-            "(allow file-read* file-test-existence (require-all (subpath \"/\"){unreadable}))"
+            "(allow file-read* file-test-existence (require-all (subpath \"/\"){hidden}))"
         );
         let _ = writeln!(
             profile,
-            "(allow process-exec file-map-executable (require-all (subpath \"/\"){unreadable}))"
+            "(allow process-exec file-map-executable (require-all (subpath \"/\"){hidden}))"
         );
+        command
+            .arg("-D")
+            .arg(format!("T={}", prepared.temporary_parent.path().display()));
     }
     for (index, (bound, access)) in locations.iter().enumerate() {
         let name = format!("L{index}");
@@ -205,7 +332,6 @@ fn command(prepared: &Prepared, status: i32) -> Command {
 
 #[cfg(target_os = "linux")]
 fn command(prepared: &Prepared, status: i32) -> Command {
-    const HELPER: &str = "/run/agent-kit-sandbox/helper";
     let mut command = Command::new(prepared.bubblewrap.bound.path());
     command.args([
         "--unshare-user",
@@ -220,9 +346,13 @@ fn command(prepared: &Prepared, status: i32) -> Command {
         "--as-pid-1",
         "--clearenv",
     ]);
+    let temporary_parent = prepared.temporary_parent.path();
     if prepared.disk_read {
-        // Everything readable first; later mounts narrow or widen it.
+        // Everything readable first; later mounts narrow or widen it. Other
+        // launches' private temporary storage is hidden under an empty
+        // file system.
         command.args(["--ro-bind", "/", "/"]);
+        command.arg("--tmpfs").arg(temporary_parent);
     }
     command.args(["--proc", "/proc", "--dev", "/dev"]);
     let mut mounts = BTreeMap::new();
@@ -243,10 +373,14 @@ fn command(prepared: &Prepared, status: i32) -> Command {
             .arg(source)
             .arg(destination);
     }
-    // Carve protected paths out of the mounts above. A missing path has no
-    // mount point; under a writable grant it could then be created, so the
-    // host keeps those it relies on present.
-    for (path, access) in &prepared.protected {
+    if prepared.disk_read {
+        command.arg("--remount-ro").arg(temporary_parent);
+    }
+    // Carve protected paths out of the mounts above, outermost first. A
+    // missing path that a writable mount would let the payload create holds
+    // a placeholder for this launch, so it exists here; any other missing
+    // path is out of the payload's reach.
+    for (path, access) in prepared.carve_outs() {
         let Ok(metadata) = std::fs::symlink_metadata(path) else {
             continue;
         };
@@ -266,11 +400,16 @@ fn command(prepared: &Prepared, status: i32) -> Command {
             }
         }
     }
+    // The helper runs from its own path. Under disk read every other path
+    // is read-only, so no new mount point could be created for it.
+    let helper = prepared.helper.bound.path();
     command
         .arg("--ro-bind")
-        .arg(prepared.helper.bound.path())
-        .arg(HELPER)
-        .args(["--", HELPER, HELPER_FLAG])
+        .arg(helper)
+        .arg(helper)
+        .arg("--")
+        .arg(helper)
+        .arg(HELPER_FLAG)
         .arg(status.to_string());
     command
 }
@@ -520,6 +659,10 @@ async fn supervise(
         }
         _ => Descendants::Unverified,
     };
+    prepared.placeholders.release(matches!(
+        descendants,
+        Descendants::NoPayload | Descendants::NamespaceEnded
+    ));
     let temporary_removed = prepared.temporary.close().is_ok();
     let mut output = capture.lock().expect("output lock");
     ProcessEvidence {

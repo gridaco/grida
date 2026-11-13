@@ -1,3 +1,5 @@
+//! GRIDA-SEC-004 — native scope preparation, identity capture and launch checks.
+
 use crate::wire::{self, Launch, PathIdentity, Task};
 use crate::*;
 use sha2::{Digest, Sha256};
@@ -8,6 +10,8 @@ use std::path::Path;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+#[cfg(target_os = "linux")]
+mod placeholder;
 mod process;
 mod reviewed;
 
@@ -215,12 +219,25 @@ struct Location {
     destination: PathBuf,
 }
 
+/// The executable and working directory bound by a command preparation.
+struct ProcessBinding {
+    executable: Bound,
+    cwd: Bound,
+}
+
+impl ProcessBinding {
+    fn bounds(&self) -> [&Bound; 2] {
+        [&self.executable, &self.cwd]
+    }
+}
+
 pub(super) struct Prepared {
     helper: Arc<Trusted>,
     #[cfg(target_os = "linux")]
     bubblewrap: Arc<Trusted>,
     locations: Vec<Location>,
-    anchors: Vec<Bound>,
+    temporary_parent: Bound,
+    process: Option<ProcessBinding>,
     temporary: TempDir,
     launch: Launch,
     stdin: Vec<u8>,
@@ -233,17 +250,33 @@ pub(super) struct Prepared {
     /// Canonical protected paths carved out of the granted locations.
     protected: Vec<(PathBuf, DeniedAccess)>,
     disk_read: bool,
+    placeholders: process::Placeholders,
 }
 
 impl Installation {
     pub(super) fn new(installation: crate::Installation) -> Result<Self> {
         #[cfg(target_os = "linux")]
-        if fs::read_to_string("/proc/sys/kernel/osrelease")
-            .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_linux_kernel_unknown"))?
-            .to_ascii_lowercase()
-            .contains("microsoft")
         {
-            return Err(refused(ErrorKind::Unsupported, "sandbox_wsl_unavailable"));
+            let release = fs::read_to_string("/proc/sys/kernel/osrelease")
+                .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_linux_kernel_unknown"))?;
+            if release.to_ascii_lowercase().contains("microsoft") {
+                return Err(refused(ErrorKind::Unsupported, "sandbox_wsl_unavailable"));
+            }
+            match kernel_supported(&release) {
+                Some(true) => {}
+                Some(false) => {
+                    return Err(refused(
+                        ErrorKind::Unsupported,
+                        "sandbox_linux_kernel_unsupported",
+                    ));
+                }
+                None => {
+                    return Err(refused(
+                        ErrorKind::Unavailable,
+                        "sandbox_linux_kernel_unknown",
+                    ));
+                }
+            }
         }
         let helper = Arc::new(Trusted::new(installation.helper)?);
         #[cfg(target_os = "linux")]
@@ -260,8 +293,24 @@ impl Installation {
 
     pub(super) async fn probe(&self, scope: &ExecutionScope) -> Result<Support> {
         let prepared = self.capture(scope, None)?;
+        // A command's capture fingerprint needs the same identities. Report a
+        // filesystem that cannot provide them before any command is admitted.
+        for location in &prepared.locations {
+            if location.bound.path() != prepared.temporary.path() {
+                location.bound.captured()?;
+            }
+        }
         let support = prepared.support;
-        let evidence = prepared.spawn(CancellationToken::new())?.finish().await?;
+        // The probe runs no payload, so a launcher that did not start is a
+        // definite probe failure.
+        let running =
+            prepared
+                .spawn(CancellationToken::new())
+                .map_err(|error| match error.kind {
+                    ErrorKind::Uncertain => refused(ErrorKind::Unavailable, "sandbox_probe_failed"),
+                    _ => error,
+                })?;
+        let evidence = running.finish().await?;
         if evidence.completion != Completion::Exited(0)
             || evidence.stopped.is_some()
             || !evidence.temporary_removed
@@ -277,8 +326,11 @@ impl Installation {
 
     fn capture(&self, scope: &ExecutionScope, spec: Option<ProcessSpec>) -> Result<Prepared> {
         let support = support(scope.termination)?;
-        if scope.valid_until <= Instant::now() || scope.grants.grants.is_empty() {
+        if scope.valid_until <= Instant::now() {
             return Err(refused(ErrorKind::InvalidState, "sandbox_scope_expired"));
+        }
+        if scope.grants.grants.is_empty() {
+            return Err(refused(ErrorKind::InvalidInput, "sandbox_scope_ungranted"));
         }
         if scope.read.len() + scope.write.len() + scope.runtime.len() + scope.protected.len()
             > MAX_PATHS
@@ -314,8 +366,7 @@ impl Installation {
         let temporary = tempfile::tempdir_in(temporary_parent.path())
             .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_temporary_unavailable"))?;
         locations.push(Location::new(temporary.path(), Access::Write)?);
-        let mut anchors = vec![temporary_parent];
-        let (task, stdin, timeout, max_output_bytes) = if let Some(mut spec) = spec {
+        let (task, process, stdin, timeout, max_output_bytes) = if let Some(mut spec) = spec {
             if spec.stdin.len() > MAX_INPUT
                 || spec.max_output_bytes == 0
                 || spec.max_output_bytes > MAX_OUTPUT
@@ -325,19 +376,6 @@ impl Installation {
                 return Err(refused(ErrorKind::LimitExceeded, "sandbox_process_limit"));
             }
             validate_environment(&spec.environment)?;
-            let launch_text_bytes = spec
-                .arguments
-                .iter()
-                .map(String::len)
-                .chain(
-                    spec.environment
-                        .iter()
-                        .map(|(key, value)| key.len().saturating_add(value.len())),
-                )
-                .fold(0_usize, usize::saturating_add);
-            if launch_text_bytes > wire::MAX_FRAME_BYTES {
-                return Err(refused(ErrorKind::LimitExceeded, "sandbox_setup_limit"));
-            }
             if spec
                 .arguments
                 .iter()
@@ -373,11 +411,25 @@ impl Installation {
                 cwd: cwd.path().to_owned(),
                 environment: spec.environment,
             };
-            anchors.extend([executable, cwd]);
-            (task, spec.stdin, spec.timeout, spec.max_output_bytes)
+            (
+                task,
+                Some(ProcessBinding { executable, cwd }),
+                spec.stdin,
+                spec.timeout,
+                spec.max_output_bytes,
+            )
         } else {
-            (Task::Probe, vec![], Duration::from_secs(5), 4096)
+            (Task::Probe, None, vec![], Duration::from_secs(5), 4096)
         };
+        // Under disk read the host's own root is visible read-only, so a
+        // runtime path that is a link, such as `/lib`, already resolves to
+        // its bound target. A second mount there could only land on the link.
+        #[cfg(target_os = "linux")]
+        if scope.disk_read {
+            for location in &mut locations {
+                location.destination = location.bound.path().to_owned();
+            }
+        }
         let protected = self.check_locations(&locations, scope)?;
         let mut roots = Vec::new();
         for location in &locations {
@@ -390,7 +442,9 @@ impl Installation {
                 });
             }
         }
-        roots.extend(anchors.iter().skip(1).map(|anchor| anchor.identity.clone()));
+        if let Some(process) = &process {
+            roots.extend(process.bounds().map(|bound| bound.identity.clone()));
+        }
         let launch = Launch {
             roots,
             private_temp: temporary.path().to_owned(),
@@ -399,12 +453,13 @@ impl Installation {
             host_namespaces: wire::namespaces()
                 .map_err(|_| refused(ErrorKind::Unavailable, "sandbox_namespace_unavailable"))?,
         };
-        Ok(Prepared {
+        let mut prepared = Prepared {
             helper: Arc::clone(&self.helper),
             #[cfg(target_os = "linux")]
             bubblewrap: Arc::clone(&self.bubblewrap),
             locations,
-            anchors,
+            temporary_parent,
+            process,
             temporary,
             launch,
             stdin,
@@ -416,7 +471,10 @@ impl Installation {
             revision: scope.revision.clone(),
             protected,
             disk_read: scope.disk_read,
-        })
+            placeholders: process::Placeholders::default(),
+        };
+        prepared.measure_setup_frame()?;
+        Ok(prepared)
     }
 
     fn check_locations(
@@ -444,12 +502,13 @@ impl Installation {
         for protected in &scope.protected {
             let path = protected_path(&protected.path)?;
             // A protected path inside a granted location is carved out of it.
-            // A granted location at or inside a protected path cannot be.
+            // A granted location at or inside a protected path cannot be,
+            // whatever either access: the backends express a denial as an
+            // exclusion from grants, not as a narrower grant inside it.
             let denied = locations.iter().any(|location| {
-                (protected.access == DeniedAccess::ReadWrite || location.access == Access::Write)
-                    && [path.as_path(), protected.path.as_path()]
-                        .into_iter()
-                        .any(|protected| location.bound.path().starts_with(protected))
+                [path.as_path(), protected.path.as_path()]
+                    .into_iter()
+                    .any(|protected| location.bound.path().starts_with(protected))
             });
             if denied
                 || (protected.access == DeniedAccess::ReadWrite
@@ -483,7 +542,7 @@ impl Location {
             bound.path().to_owned()
         };
         #[cfg(target_os = "linux")]
-        for reserved in ["/proc", "/dev", "/run/agent-kit-sandbox"] {
+        for reserved in ["/proc", "/dev"] {
             if overlaps(&bound, Path::new(reserved)) || destination.starts_with(reserved) {
                 return Err(refused(ErrorKind::Unsupported, "sandbox_reserved_location"));
             }
@@ -508,6 +567,22 @@ fn validate_environment(environment: &BTreeMap<String, String>) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+/// Linux 5.11 added `close_range(CLOSE_RANGE_CLOEXEC)`, which the launch
+/// uses to keep host descriptors out of the sandbox.
+#[cfg(any(test, target_os = "linux"))]
+fn kernel_supported(release: &str) -> Option<bool> {
+    let mut parts = release.trim().split(['.', '-']);
+    let major: u32 = parts.next()?.parse().ok()?;
+    let minor: u32 = parts
+        .next()?
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect::<String>()
+        .parse()
+        .ok()?;
+    Some((major, minor) >= (5, 11))
 }
 
 fn support(termination: Termination) -> Result<Support> {
@@ -542,10 +617,11 @@ pub(super) use process::Running;
 impl Prepared {
     pub(super) fn verify_executable(&self, executable: &TrustedExecutable) -> Result<()> {
         let changed = || refused(ErrorKind::Conflict, "reviewed_executable_changed");
-        let bound = self
-            .anchors
-            .get(1)
-            .ok_or_else(|| refused(ErrorKind::InvalidState, "sandbox_capture_process_required"))?;
+        let bound = &self
+            .process
+            .as_ref()
+            .ok_or_else(|| refused(ErrorKind::InvalidState, "sandbox_capture_process_required"))?
+            .executable;
         if bound.path() != executable.path {
             return Err(changed());
         }
@@ -591,10 +667,12 @@ impl Prepared {
             })
             .collect::<Result<Vec<_>>>()?;
         let process = self
-            .anchors
-            .iter()
-            .skip(1)
+            .process
+            .as_ref()
+            .ok_or_else(|| refused(ErrorKind::InvalidState, "sandbox_capture_process_required"))?
+            .bounds()
             .map(Bound::captured)
+            .into_iter()
             .collect::<Result<Vec<_>>>()?;
         let termination = match self.support.termination {
             Termination::ProcessGroup => "process_group",
@@ -677,11 +755,144 @@ impl Prepared {
             .locations
             .iter()
             .map(|location| &location.bound)
-            .chain(&self.anchors)
+            .chain([&self.temporary_parent])
+            .chain(self.process.iter().flat_map(ProcessBinding::bounds))
             .any(|bound| !bound.identity.matches())
         {
             return Err(refused(ErrorKind::Conflict, "sandbox_location_changed"));
         }
         Ok(())
+    }
+
+    /// Refuse a setup frame the helper would reject, before admission. On
+    /// Linux the frame later also carries the identity of each placeholder
+    /// for a missing protected path, so those are counted at their largest.
+    fn measure_setup_frame(&mut self) -> Result<()> {
+        let roots = self.launch.roots.len();
+        #[cfg(target_os = "linux")]
+        {
+            let missing = self.placeholder_candidates()?;
+            self.launch
+                .roots
+                .extend(missing.into_iter().map(|(path, _)| PathIdentity {
+                    path,
+                    device: u64::MAX,
+                    inode: u64::MAX,
+                }));
+        }
+        let frame = serde_json::to_vec(&self.launch).map(|frame| frame.len());
+        self.launch.roots.truncate(roots);
+        let frame =
+            frame.map_err(|_| refused(ErrorKind::InvalidInput, "sandbox_setup_encoding"))?;
+        if frame > wire::MAX_FRAME_BYTES {
+            return Err(refused(ErrorKind::LimitExceeded, "sandbox_setup_limit"));
+        }
+        Ok(())
+    }
+}
+
+/// How bubblewrap carves protected paths out of the location mounts.
+#[cfg(target_os = "linux")]
+impl Prepared {
+    /// The deepest location mount covering `path`, and whether it is writable.
+    /// Mounts are applied outermost first, so the deepest one decides.
+    fn covering_mount(&self, path: &Path) -> Option<bool> {
+        let mut deepest: Option<(usize, bool)> = None;
+        for location in &self.locations {
+            for destination in [location.bound.path(), location.destination.as_path()] {
+                let covers = if location.bound.directory {
+                    path.starts_with(destination)
+                } else {
+                    path == destination
+                };
+                if !covers {
+                    continue;
+                }
+                let depth = destination.components().count();
+                let write = location.access == Access::Write;
+                deepest = match deepest {
+                    Some((current, writable)) if current > depth => Some((current, writable)),
+                    Some((current, writable)) if current == depth => {
+                        Some((current, writable || write))
+                    }
+                    _ => Some((depth, write)),
+                };
+            }
+        }
+        deepest.map(|(_, write)| write)
+    }
+
+    /// Protected paths that need a mount of their own, outermost first. One
+    /// path protected twice keeps the stronger denial. A path inside an
+    /// unreadable protected path, or an unwritable path inside an unwritable
+    /// one, is already covered. A `Write` denial matters only where a
+    /// writable mount would expose it, and a `ReadWrite` denial only where
+    /// the path is visible at all.
+    fn carve_outs(&self) -> Vec<(&Path, DeniedAccess)> {
+        let mut merged = BTreeMap::new();
+        for (path, access) in &self.protected {
+            let entry = merged.entry(path.as_path()).or_insert(*access);
+            if *access == DeniedAccess::ReadWrite {
+                *entry = DeniedAccess::ReadWrite;
+            }
+        }
+        merged
+            .iter()
+            .filter(|&(path, access)| {
+                !merged.iter().any(|(other, other_access)| {
+                    other != path
+                        && path.starts_with(other)
+                        && (*other_access == DeniedAccess::ReadWrite
+                            || *access == DeniedAccess::Write)
+                })
+            })
+            .filter(|&(path, access)| match access {
+                DeniedAccess::Write => self.covering_mount(path) == Some(true),
+                DeniedAccess::ReadWrite => self.disk_read || self.covering_mount(path).is_some(),
+            })
+            .map(|(path, access)| (*path, *access))
+            .collect()
+    }
+
+    /// Carved paths that a writable mount would let the payload create. A
+    /// missing one gets a read-only placeholder for the launch. One whose
+    /// parent is also missing cannot be held that way and refuses the scope.
+    fn placeholder_candidates(&self) -> Result<Vec<(PathBuf, DeniedAccess)>> {
+        let carved = self.carve_outs();
+        let mut candidates = Vec::new();
+        for (path, access) in &carved {
+            let nested = self
+                .protected
+                .iter()
+                .any(|(other, _)| other.as_path() != *path && path.starts_with(other));
+            if nested || self.covering_mount(path) != Some(true) {
+                continue;
+            }
+            if fs::symlink_metadata(path).is_err()
+                && !path
+                    .parent()
+                    .is_some_and(|parent| fs::symlink_metadata(parent).is_ok_and(|m| m.is_dir()))
+            {
+                return Err(refused(ErrorKind::Unsupported, "sandbox_protected_overlap"));
+            }
+            candidates.push((path.to_path_buf(), *access));
+        }
+        Ok(candidates)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::kernel_supported;
+
+    #[test]
+    fn linux_requires_descriptor_range_closing() {
+        assert_eq!(kernel_supported("6.12.54-linuxkit\n"), Some(true));
+        assert_eq!(kernel_supported("5.11.0"), Some(true));
+        assert_eq!(kernel_supported("5.15.0-91-generic"), Some(true));
+        assert_eq!(kernel_supported("5.10.0-28-amd64"), Some(false));
+        assert_eq!(kernel_supported("4.19.0"), Some(false));
+        assert_eq!(kernel_supported("6.1+rpt"), Some(true));
+        assert_eq!(kernel_supported("unknown"), None);
     }
 }

@@ -605,8 +605,11 @@ reaches them; the sandbox expresses each as an exclusion of every grant rather
 than relying on rule order. Version-control and agent metadata (`.git`,
 `.agents`, `.grida`, `.codex`, `.aws`) directly under a writable root stay
 read-only once it exists when the command starts; agent configuration
-(`.grida`, `.codex`) is protected even before it exists. A command can
-therefore initialize a new repository, and the next command cannot change it.
+(`.grida`, `.codex`) is protected even before it exists. On Linux the sandbox
+holds an empty, read-only placeholder directory at such a missing path for the
+command and removes it after a verified end, since bubblewrap can only carve
+out a path that exists. A command can therefore initialize a new repository,
+and the next command cannot change it.
 A command that may write the project may also write the shared `/tmp`, as the
 policy's workspace-write level allows; the host's stores never live there.
 A protected path inside a granted location is carved out of it; one
