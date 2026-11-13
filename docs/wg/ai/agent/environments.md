@@ -186,7 +186,7 @@ trust, and concurrent executions retain independent grants. The
 [existing srt backend study](./srt.md) records capabilities and limitations relevant
 to replacing that dependency. The concrete platform choices and initial support
 boundary live in the
-[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox-proposal.md).
+[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md).
 
 For `shell.run`, the host creates a confined process tree from the effective
 grant: the host/user ceiling ∩ declared requirements ∩ parent-delegable

@@ -1,7 +1,7 @@
 # Native sandbox proposal
 
 This document specifies native command confinement for the
-[Rust agent core](./rust-core-proposal.md). It selects a small first
+[Rust agent core](./rust-core.md). It selects a small first
 implementation and records the platform guarantees that still require
 executable evidence.
 

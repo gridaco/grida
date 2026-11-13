@@ -1,176 +1,58 @@
-# Rust agent core proposal
+# Rust agent core
 
-This is a proposed crate layout and public Rust contract for a fresh agent
-implementation. It binds the responsibilities in the [component
-specification](https://grida.co/docs/wg/ai/agent/components) to concrete Rust
-boundaries. The [master specification](https://grida.co/docs/wg/ai/agent/master)
+This document binds the responsibilities in the [component
+specification](https://grida.co/docs/wg/ai/agent/components) to the Rust
+crates that implement them. The [master specification](https://grida.co/docs/wg/ai/agent/master)
 owns product strategy and the [experience
 specification](https://grida.co/docs/wg/ai/agent/experience) owns user-visible
-promises.
+promises. The [feature catalog](../../../docs/agent/features.md) owns
+release availability.
 
-The signatures below describe the candidate public surface. Supporting record
-fields and error variants are summarized beside them. They are declaration
-sketches, with method bodies deliberately omitted. The scope of this artifact
-is documentation and API design.
+Each crate's README and rustdoc are the authority for exact public signatures,
+record fields, and error codes. This document names the owning crate and its
+principal types, and states the cross-crate rules those signatures preserve.
 
-## Packaging decision and growth reservations
+## Crate map
 
-Reserve **three coarse neutral boundaries** now: shared core, live Runtime,
-and durable Sessions. Create each Cargo package when substantive work reaches
-that boundary. The known durable-service and external-agent consumers justify
-this destination before the first implementation grows around them.
+Each boundary is a Cargo package. Arrows in the graph below point from a
+consumer to its normal dependency.
 
-A single-core bootstrap remains useful for an embedded-turn prototype. For the
-durable vertical slice described in this proposal, the Runtime and Sessions
-packages can be active from its first implementation. The lower components
-remain modules of the shared core.
-
-A reservation records a name, owned responsibility, allowed dependencies,
-consumer, advantage, and activation point. It is documented design intent.
-Empty Cargo packages provide no useful enforcement before implementation.
-
-A crate boundary determines dependencies, compilation, publication, and version
-compatibility. A module boundary organizes responsibility and controls access
-to implementation details. Independent APIs need suitable entry points.
-Packaging decisions also consider the concrete growth paths already identified.
-[Rust visibility and privacy](https://doc.rust-lang.org/reference/visibility-and-privacy.html).
-
-| Layout                           | Advantage                                                                    | Limitation                                                                               | Decision                                                              |
-| -------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Single core bootstrap            | Smallest initial package surface                                             | Can accumulate coupling that obstructs the already-known service boundaries              | Suitable for an embedded-only prototype                               |
-| Shared core + Runtime + Sessions | Separates direct model/tool use, live turns, and durable independent drivers | Requires deliberate shared contract ownership and a few package interfaces               | Reserved destination, activated with the corresponding implementation |
-| One crate per logical component  | Fine dependency and release isolation                                        | Public bridge types and package coordination before those fine divisions have a consumer | Reserve module boundaries, not all these packages                     |
-
-### Reserved crate map
-
-| Reserved crate                             | Owns                                                                                              | Allowed dependency direction                                             | Known consumer and advantage                                                                           | Activate when                                                                 |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| `agent-kit-core`                           | Messages, Inference/Tool contracts, History, Context, authority references, and journal contracts | Shared libraries for values, serialization, futures, and cancellation    | Direct inference/tool callers and every higher layer share one vocabulary                              | First component implementation                                                |
-| `agent-kit-runtime`                        | Live turn cycle, admission, concurrent operations, waits, and settlement mechanics                | Core and execution utilities                                             | Embedded masters execute turns without adopting a durable service                                      | First live-turn implementation, or extraction from a short embedded prototype |
-| `agent-kit-sessions`                       | Durable input acceptance, queue/control state, ownership, recovery, injected drivers              | Core and service utilities                                               | Native and external-agent drivers share durable coordination without a Runtime dependency              | First durable service implementation                                          |
-| `agent-kit-sandbox`                        | Platform confinement for raw process execution                                                    | Core authority contracts and OS-specific dependencies                    | Local commands and external agents need enforceable filesystem/network/process limits                  | First raw-process execution adapter                                           |
-| `agent-kit-providers`                      | Selected concrete model protocol/transport adapters                                               | Core and their selected transport/authentication dependencies            | Multiple hosts can reuse provider implementations independently of an agent loop                       | First selected provider integration                                           |
-| `agent-kit-store-sqlite`                   | One SQLite implementation of SessionStore and TurnJournal                                         | Core, Sessions, and SQLite dependencies                                  | Durable execution retains one transactional authority without putting a database in the neutral kernel | First SQLite-backed durable slice                                             |
-| Protocol adapter extraction, name deferred | A reusable binding for a selected external protocol                                               | The public contracts needed by that protocol                             | Independently maintained hosts can share a proven binding                                              | A second concrete consumer justifies extraction from the host                 |
-| `grida-agent-master`                       | Grida policy, prompts, context selection, and product decisions                                   | Runtime, Sessions, and shared contracts through supplied capabilities    | Desktop and unattended runs use the same product harness                                               | First Grida consumer                                                          |
-| `grida-agent`                              | Native executable, server protocol, and concrete host composition                                 | Master, selected neutral packages, providers, storage, and host adapters | Desktop, scripts, and process-level tests use one executable                                           | First durable headless vertical slice                                         |
-
-The Runtime/Sessions division has especially strong evidence. Zed hosts both
-native and external agents through a connection contract, and Grida already has
-an external-agent route whose engine owns its loop. Direct model callers and
-provider adapters also establish a credible shared-core consumer independent
-of either service. [Zed agent connection](https://github.com/zed-industries/zed/blob/main/crates/acp_thread/src/connection.rs),
-[Grida agent integration](../README.md#agent-provider-class-experimental--issue-813).
-
-### Lower components stay modules
-
-| Component           | Reserved home           | Reason to keep this granularity                                                                       |
-| ------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------- |
-| Messages            | Core `messages` module  | Shared values participate in the same compatibility contract as their consumers                       |
-| Inference contracts | Core `inference` module | Independent calls are available without an execution loop                                             |
-| Tools               | Core `tools` module     | Definitions and invocation contracts introduce no concrete environment                                |
-| History             | Core `history` module   | Pure records and projections share the message vocabulary                                             |
-| Context             | Core `context` module   | Pure assembly can remain independently testable inside the shared library                             |
-| Turn records        | Core `turn` module      | Runtime, Sessions, storage, and drivers need a common lower contract                                  |
-| Authority           | Core `authority` module | Shared action identities, grant references, and validation outcomes used by Runtime and host adapters |
-
-A future pure-data or inference-only consumer may justify a narrower package.
-Those possibilities receive dependency budgets now, rather than empty crates
-or a commitment to split every module.
-
-## Proposed layout
-
-The neutral namespace remains `agent-kit-*`. `agent-kit-core` contains the
-shared modules, while `agent-kit-runtime` and `agent-kit-sessions` are reserved
-higher packages. The shorter `agent-kit` name is already registered.
-[Existing agent-kit package](https://crates.io/crates/agent-kit).
-
-```text
-crates/
-  agent-kit-core/
-    src/
-      lib.rs
-      messages.rs
-      inference.rs
-      tools.rs
-      history.rs
-      context.rs
-      turn.rs
-      authority.rs
-
-  agent-kit-runtime/              activate with live execution
-    src/lib.rs
-
-  agent-kit-sessions/             activate with durable service
-    src/lib.rs
-
-  agent-kit-providers/            selected integrations may share one crate
-    src/
-      lib.rs
-      openai.rs
-      anthropic.rs
-
-  agent-kit-sandbox/              activate with raw-process execution
-    src/lib.rs
-
-  agent-kit-store-sqlite/         activate with SQLite persistence
-    src/lib.rs
-
-  grida-agent-master/             activate with product policy
-    src/lib.rs
-
-  grida-agent/                    native host and executable
-    src/
-      lib.rs                     production host construction
-      main.rs                    argument dispatch and process lifecycle
-      server.rs                  local service and transport lifecycle
-      acp.rs                     ACP binding and negotiated product extensions
-      run.rs                     bounded non-interactive execution
-      config.rs                  typed configuration storage and host operations
-      hooks.rs                   configured lifecycle dispatcher and result policy
-      authorization.rs           approval routing, reviewer adapters, and grant selection
-      tool_host.rs               product capability dispatch and result delivery
-      mcp.rs                     public MCP binding of reviewed Grida capabilities
-```
-
-This is the reserved topology. The implementation creates packages only when
-it fills their stated responsibility. An embedded prototype may initially host
-Runtime as a module, while keeping its intended boundary intact. Public import
-paths remain provisional until that initial packaging is selected.
-Such a combined bootstrap stays unpublished or explicitly provisional. Activating
-the Runtime package requires a source/import move, with the dependency direction
-preserved during that move.
-
-Concrete tools can begin with their host. A reusable filesystem adapter gains
-its own package when shared host consumers or platform dependencies justify it.
-Provider definitions can share a package when their transport, dependency, and
-release requirements align. Traits supply extension contracts independently of
-crate count or dynamic plugin loading.
-
-## Dependency budgets and graphs
-
-At the reserved Cargo level, arrows point from a consumer to its dependency.
-The implementation activates the applicable subset of this graph.
+| Crate                                                                        | Owns                                                                                                                                    |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| [`agent-kit-core`](../../../crates/agent-kit-core/README.md)                 | Messages, Inference and Tool contracts, History, Context, turn journal records, authority references, driver state, and the error model |
+| [`agent-kit-runtime`](../../../crates/agent-kit-runtime/README.md)           | The live turn: admission gate, concurrent scoped operations, waits, suspension, and settlement                                          |
+| [`agent-kit-sessions`](../../../crates/agent-kit-sessions/README.md)         | Durable input acceptance, queue and controls, claims, recovery, and the injected turn driver                                            |
+| [`agent-kit-providers`](../../../crates/agent-kit-providers/README.md)       | Chat Completions-compatible, Responses, Anthropic Messages, and Gemini adapters over a host-owned streaming transport                   |
+| [`agent-kit-sandbox`](../../../crates/agent-kit-sandbox/README.md)           | Native confinement for raw processes: Seatbelt on macOS, bubblewrap with a seccomp helper on Linux                                      |
+| [`agent-kit-store-sqlite`](../../../crates/agent-kit-store-sqlite/README.md) | The SQLite `SessionStore` and `TurnJournal`, with its session catalog, history replay, and session deletion                             |
+| [`grida-agent-master`](../../../crates/grida-agent-master/README.md)         | Grida product policy: context selection, effort, goals, questions, subagents, lifecycle hooks, and completion accounts                  |
+| [`grida-agent`](../../../crates/grida-agent/README.md)                       | The native executable and host composition: ACP and MCP bindings, configuration, permissions, tools, processes, and credentials         |
 
 ```mermaid
 flowchart TD
-    master[grida-agent-master] --> runtime[agent-kit-runtime]
-    master --> sessions[agent-kit-sessions]
-    host[grida-agent] --> master
-    host --> runtime
-    host --> sessions
+    host[grida-agent] --> master[grida-agent-master]
+    host --> runtime[agent-kit-runtime]
+    host --> sessions[agent-kit-sessions]
     host --> providers[agent-kit-providers]
+    host --> sandbox[agent-kit-sandbox]
     host --> sqlite[agent-kit-store-sqlite]
-    runtime --> core[agent-kit-core]
+    host --> auth[grida-auth]
+    host --> core[agent-kit-core]
+    master --> runtime
+    master --> core
+    runtime --> core
     sessions --> core
     providers --> core
-    sandbox[agent-kit-sandbox] --> core
-    host --> sandbox
+    sandbox --> core
     sqlite --> sessions
     sqlite --> core
 ```
 
-Inside the shared core, retain these logical import directions.
+The master depends on Runtime and the shared core only. It receives sessions,
+storage, providers, and execution through capabilities its host supplies.
+`grida-auth` provides credential custody to the host and to no neutral crate.
+
+Inside the shared core, these logical import directions hold.
 
 ```mermaid
 flowchart TD
@@ -183,6 +65,8 @@ flowchart TD
     turn --> authority
 ```
 
+### Dependency budgets
+
 | Boundary          | Dependency budget                                                      | Keep outside it                                                                       |
 | ----------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | Shared core       | Values, serialization, futures/cancellation contracts, pure transforms | Concrete HTTP, SQLite, keyring, filesystem, UI, and Grida policy                      |
@@ -190,52 +74,32 @@ flowchart TD
 | Runtime           | Shared core, execution coordination, timing and concurrency utilities  | Sessions implementation, concrete providers, databases, and product decisions         |
 | Sessions          | Shared core, injected driver/store contracts, service coordination     | Runtime implementation, model requests, and tool arguments                            |
 | Provider adapters | Shared core and selected transport/authentication dependencies         | Product model defaults, task strategy, and session scheduling                         |
+| Sandbox           | Shared core authority contracts and platform-specific dependencies     | Grant decisions, product policy, and network routing                                  |
 | SQLite adapter    | Shared core, Sessions, and database dependencies                       | Model execution, tool execution, and product policy                                   |
-| Product master    | Runtime, Sessions, and supplied capability contracts                   | Concrete server startup, databases, provider construction, process and terminal state |
+| Product master    | Runtime and supplied capability contracts                              | Concrete server startup, databases, provider construction, process and terminal state |
 | Native host       | Master, selected adapters, transport and process utilities             | A second task loop or separate unattended agent policy implementation                 |
 
-Cargo enforces boundaries between active packages. An initial combined package
-must preserve the same import direction and private ownership by review and
-boundary checks. A convenient `pub(crate)` helper must not become a hidden API
-between groups reserved for separate crates. Each such interaction needs a
-named capability or shared core contract.
+Cargo enforces these boundaries between packages. Inside a package, a
+`pub(crate)` helper must not become a hidden API between modules with separate
+owners. Each such interaction needs a named capability or shared core contract.
 
-Host composition owns the native driver adapter that implements the Sessions
-contract using Runtime. This preserves their sibling relationship. The Runtime
-package depends on shared Core rather than on the service that drives it.
-
-The shared core stays below Runtime and Sessions. It cannot later become a
-facade that imports those packages while they still depend on it. Any future
-compatibility facade would sit above them. Persisted schema identity is
-independent of Rust module paths, and public type moves require an explicit
-compatibility review.
+Host composition owns the native driver that implements the Sessions contract
+using Runtime. This preserves their sibling relationship: Runtime depends on
+the shared core rather than on the service that drives it. The shared core
+stays below Runtime and Sessions and never imports them. Persisted schema
+identity is independent of Rust module paths, and public type moves require an
+explicit compatibility review.
 
 Inference receives a model-facing `ToolOffer`. Tools owns the executable
 `ToolDefinition`. Runtime projects a captured definition into an offer and
 retains their common identity and schema fingerprint. A direct Inference caller
 needs no executor or session instance.
 
-### Activating later boundaries
-
-A known consumer can activate a reserved crate as soon as its substantive work
-starts. Waiting for tangled dependencies or measured damage is unnecessary.
-The implementation still has to satisfy the reservation's contract.
-
-Further splits inside the shared core need a concrete additional reason.
-
-- A supported platform or target needs a smaller dependency set.
-- A separately maintained consumer needs an independent compatibility contract.
-- A substantial dependency cannot stay in an integration adapter.
-- Build measurements justify a smaller compilation unit.
-- Repeated boundary violations justify Cargo enforcement at finer granularity.
-
-Core consumers build its common dependency set. Finer crates can improve
-exclusion or incremental builds, but that benefit has not been measured here.
-The initial dependency budget therefore preserves the option of a pure-data or
-inference-only extraction without claiming either is already required.
-
-Cargo features can select optional integrations. A feature for every logical
-module would add combinations without a corresponding consumer requirement.
+Further splits inside the shared core need a concrete reason: a platform that
+needs a smaller dependency set, a separately maintained consumer with its own
+compatibility contract, a substantial dependency that cannot stay in an
+adapter, measured build cost, or repeated boundary violations. Cargo features
+select optional integrations, not individual logical modules.
 [Cargo features](https://doc.rust-lang.org/cargo/reference/features.html).
 
 ## Rust conventions
@@ -246,16 +110,12 @@ storage adapters. Those traits return boxed `Send` futures. This keeps them
 usable behind `Arc<dyn Trait>` under Rust's dyn-compatibility rules.
 [Rust Reference](https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility)
 
-```rust
-pub type BoxFuture<'a, T> =
-    Pin<Box<dyn Future<Output = T> + Send + 'a>>;
-```
-
-The asynchronous modules share the equivalent alias from `futures`. Native composition uses Tokio. Public execution
-contracts expose futures and streams, while cancellation uses
-`tokio_util::sync::CancellationToken`. This token signals a request. Settlement
-is a separate result. Messages, History, and Context expose pure operations that need no running
-executor. Their consumers still build the shared crate dependency set. [CancellationToken](https://docs.rs/tokio-util/latest/tokio_util/sync/struct.CancellationToken.html)
+The shared core re-exports `BoxFuture` from `futures-core` and
+`CancellationToken` from `tokio-util`. Native composition uses Tokio. Public
+execution contracts expose futures and streams. A cancellation token signals a
+request; settlement is a separate result. Messages, History, and Context expose
+pure operations that need no running executor.
+[CancellationToken](https://docs.rs/tokio-util/latest/tokio_util/sync/struct.CancellationToken.html)
 
 Validated identifiers are distinct newtypes. Invalid or oversized wire values
 fail at construction. Private fields protect prepared requests, captured
@@ -263,12 +123,28 @@ inventories, and bound execution handles. Durable encodings have explicit schema
 identity and version. Rust struct layout and `Debug` output carry no persistence
 contract.
 
-Operational results distinguish invalid input, unsupported capability, denied
-authority, stale state, interruption, unknown external outcome, and storage
-failure. Ordinary model/tool failure and requested stop remain outcome data so
-the master can account for them and finish. `RuntimeError` identifies failures
-that prevent trustworthy continuation, such as unavailable storage or invalid
-execution state. Display text is separate from these classifications.
+### Error model
+
+Every neutral crate returns `agent_kit_core::Result`, whose `Error` pairs one
+`ErrorKind` with a stable machine-readable code. Display text is derived and
+carries no contract.
+
+| `ErrorKind`     | Meaning                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------- |
+| `InvalidInput`  | The input is malformed or violates its own declared constraints                         |
+| `Unsupported`   | The input is valid, but the receiving capability does not accept it                     |
+| `Conflict`      | An expected position or revision moved, or an identity was reused for different content |
+| `LimitExceeded` | A size, count, or numeric bound would be exceeded                                       |
+| `InvalidState`  | The target's current state does not allow the requested transition                      |
+| `Unavailable`   | A required capability or resource cannot be reached now                                 |
+| `Uncertain`     | Whether an effect happened is unknown; the caller reconciles before repeating it        |
+
+`Error` describes structural failures that prevent an operation or trustworthy
+continuation. Ordinary model and tool failure, denied authority, and requested
+stop remain outcome data so the master can account for them and finish. A
+`Conflict` asks the caller to re-read current state before deciding whether to
+retry. An `Uncertain` error keeps dependent execution suspended until readback
+resolves it.
 
 ## Messages
 
@@ -277,40 +153,11 @@ or projected to a client. Sessions owns queue state, the master selects models,
 and execution accounting belongs to the turn. Storage connections stay in
 adapters.
 
-```rust
-pub struct Message {
-    pub id: MessageId,
-    pub role: Role,
-    pub phase: Option<MessagePhase>,
-    pub content: Vec<Content>,
-    pub provenance: Provenance,
-}
-
-pub enum MessagePhase {
-    Progress,
-    Answer,
-}
-
-pub enum Content {
-    Text(Arc<str>),
-    Reasoning(Arc<str>),
-    Media(MediaRef),
-    ToolCall(ToolCall),
-    ToolResult(ToolResult),
-    ProviderState(ProviderState),
-}
-
-pub struct ToolCall {
-    pub id: ToolCallId,
-    pub name: ToolName,
-    pub input: ToolArguments,
-}
-
-pub enum ToolArguments {
-    Json(serde_json::Value),
-    Text(Arc<str>),
-}
-```
+A `Message` has an identity, a role, an optional `MessagePhase` (`Progress` or
+`Answer`), ordered `Content`, and `Provenance`. `Content` is text, readable
+reasoning, a `MediaRef`, a `ToolCall`, a `ToolResult`, or an opaque
+`ProviderState`. A `ToolCall` carries the call identity, the target `ToolId`,
+and its `ToolArguments`, which are JSON or text.
 
 `ToolResult` carries the original call identity, a bounded content view, and
 artifact references. The execution ledger retains the authoritative outcome.
@@ -334,9 +181,8 @@ for a model request preserves the original execution uncertainty.
 Readable reasoning has its own content kind. Signed, redacted, or encrypted
 provider material retains its original envelope in `ProviderState`. An optional
 assistant phase is an adapter-supplied semantic hint, and never establishes
-terminal settlement. This preserves the distinctions exposed by
-[Codex response items](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/protocol/src/models.rs)
-and [Zed message content](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/language_model_core/src/request.rs).
+terminal settlement. Provider protocols distinguish these kinds, and a
+lossless round trip through History requires the same distinctions.
 
 ## Inference
 
@@ -344,35 +190,16 @@ and [Zed message content](https://github.com/zed-industries/zed/blob/62682ebde9e
 describes supported operations and limits. The master selects the model,
 instructions, tool offers, model reasoning effort, fallback, and compaction strategy.
 
-```rust
-pub trait Provider: Send + Sync {
-    fn capabilities(&self, model: &ModelId)
-        -> Result<ModelCapabilities, CapabilityError>;
-
-    fn prepare(&self, request: InferenceRequest)
-        -> Result<PreparedRequest, PrepareError>;
-
-    fn start(
-        &self,
-        request: PreparedRequest,
-        control: InferenceControl,
-    ) -> Result<InferenceRun, StartError>;
-}
-
-impl InferenceRun {
-    pub fn from_stream(
-        stream: BoxStream<'static, ProviderEvent>,
-        control: InferenceControl,
-    ) -> Self;
-
-    pub async fn next(&mut self) -> Option<InferenceUpdate>;
-    pub async fn finish(self) -> InferenceOutcome;
-}
-```
+A `Provider` reports `capabilities` for a model, `prepare`s an
+`InferenceRequest` into an immutable `PreparedRequest`, can measure the
+complete prepared input (`measure_input` locally, `measure_input_async` within
+an admitted request scope), and `start`s an `InferenceRun`. The run yields
+`InferenceUpdate`s through `next` and its authoritative `InferenceOutcome`
+through `finish`.
 
 `prepare` performs capability and structural validation without dispatching a
-request. `start` constructs an owned, poll-driven operation. A `StartError`
-means dispatch has not begun. Once dispatch can have occurred, failures are
+request. `start` constructs an owned, poll-driven operation. An error from
+`start` means dispatch has not begun. Once dispatch can have occurred, failures are
 reported in `InferenceOutcome` with their evidence.
 
 The adapter-facing module exposes
@@ -451,35 +278,15 @@ agent's model loop.
 ## Tools
 
 `agent_kit_core::tools` owns definitions and invocation mechanics. Concrete tools
-receive their environment capabilities at construction. For example,
-`FileReadTool::new(Arc<dyn Files>)` belongs in the selected filesystem adapter. A pure text
+receive their environment capabilities at construction; the host's file tools,
+for example, are constructed with their granted filesystem scope. A pure text
 tool needs only its input values.
 
-```rust
-pub trait Tool: Send + Sync {
-    fn definition(&self) -> &ToolDefinition;
-
-    fn invoke(
-        &self,
-        invocation: Invocation,
-        context: InvocationContext,
-    ) -> BoxFuture<'_, ToolOutcome>;
-
-    fn recover(
-        &self,
-        recovery: InvocationRecovery,
-        context: InvocationContext,
-    ) -> BoxFuture<'_, ToolOutcome>;
-}
-
-impl Inventory {
-    pub fn new() -> Self;
-    pub fn insert(&mut self, tool: Arc<dyn Tool>) -> Result<(), InventoryError>;
-    pub fn snapshot(&self, selected: &[ToolId])
-        -> Result<InventorySnapshot, InventoryError>;
-}
-
-```
+A `Tool` exposes its `ToolDefinition`, `validate`s arguments against the
+declared input schema without effects, `invoke`s an `Invocation` within an
+`InvocationContext`, and optionally `recover`s an `InvocationRecovery`. An
+`Inventory` rejects duplicate tool identities, and its `InventorySnapshot`
+fixes the selected executable definitions.
 
 `ToolDefinition` contains identity/version, model-facing description and input
 contract, required capabilities, output bounds, and recovery
@@ -532,7 +339,7 @@ before depending on later status or retrieval, according to that adapter's
 contract. Missing readback support leaves an outcome uncertain.
 
 A shared incremental-input or staged-effect API requires independent consumer
-evidence. The initial core adds no universal segment protocol or effect-gate
+evidence. The core adds no universal segment protocol or effect-gate
 hierarchy.
 
 `ToolOutcome` retains structured output alongside its bounded model-facing
@@ -620,25 +427,9 @@ retention. They do not require a global Project service inside the neutral core.
 `agent_kit_core::history` is an in-memory ordered semantic history with pure
 projections. Persistence adapters encode its records through the Turn journal.
 
-```rust
-impl History {
-    pub fn new() -> Self;
-
-    pub fn append(
-        &mut self,
-        expected: HistoryPosition,
-        records: &[HistoryRecord],
-    ) -> Result<HistoryPosition, AppendError>;
-
-    pub fn view(&self, selection: HistorySelection)
-        -> Result<HistoryView<'_>, ViewError>;
-
-    pub fn fork(&self, at: HistoryPosition) -> Result<History, ForkError>;
-
-    pub fn project(&self, projection: &HistoryProjection)
-        -> Result<ConversationView, ProjectionError>;
-}
-```
+`History` supports `append` against an expected `HistoryPosition`, selected
+`view`s, `fork` at a position, and `project`ion into a `ConversationView`.
+Each operation returns the shared `Result`.
 
 `HistoryRecord` represents accepted content, completed content, invocation
 results, and explicit history operations. Compaction records include covered
@@ -663,18 +454,8 @@ versions, when a tool uses them, remain part of that tool's domain data.
 `agent_kit_core::context` assembles selected history and supplied fragments into a
 bounded, structurally valid model input.
 
-```rust
-pub fn assemble(
-    input: ContextInput<'_>,
-    limits: ContextLimits,
-    transform: ContextTransform,
-    measure: &dyn ContextMeasure,
-) -> Result<ContextSnapshot, ContextError>;
-
-pub trait ContextMeasure {
-    fn measure(&self, content: &[Message]) -> ContextMeasurement;
-}
-```
+`assemble` takes a `ContextInput`, `ContextLimits`, a `ContextTransform`, and a
+`ContextMeasure`, and returns a `ContextSnapshot`.
 
 `ContextInput` includes explicit history selections, supplied fragments, and an
 explicit non-message input-overhead measurement. That measurement covers the
@@ -769,49 +550,17 @@ turn/effect/attempt IDs, phase and outcome records, conditional positions,
 checkpoint envelopes, journal interfaces, and settlement receipts. It performs
 no inference, tool dispatch, queue selection, or process spawning.
 
-```rust
-pub struct TurnLease {
-    // Private fields. Intentionally not Clone.
-}
+A `TurnLease` is not `Clone`. `bind_lease` constructs it from a
+`TurnBinding`, a boxed `TurnJournal`, and a shared `ControlReader`, and rejects
+a journal or reader bound to a different session, turn, or writer epoch. A
+`TurnJournal` exposes its `binding`, `load`s the current `TurnState`, `commit`s
+a `JournalChange`, and `lookup`s an earlier change by identity. A
+`ControlReader` exposes its `binding`, `read`s the committed `ControlSnapshot`,
+and waits until controls `changed` after a revision. A `CommitReceipt` is
+`Recorded`, `Suspended`, or `Settled`.
 
-impl TurnLease {
-    pub fn journal(&self) -> &dyn TurnJournal;
-    pub fn controls(&self) -> &dyn ControlReader;
-}
-
-pub fn bind_lease(
-    binding: TurnBinding,
-    journal: Box<dyn TurnJournal>,
-    controls: Arc<dyn ControlReader>,
-) -> Result<TurnLease, BindingError>;
-
-pub trait TurnJournal: Send + Sync {
-    fn load(&self) -> BoxFuture<'_, Result<TurnSnapshot, JournalError>>;
-
-    fn commit(&self, change: JournalChange)
-        -> BoxFuture<'_, Result<CommitReceipt, JournalError>>;
-
-    fn lookup(&self, change: ChangeId)
-        -> BoxFuture<'_, Result<Option<CommitReceipt>, JournalError>>;
-}
-
-pub trait ControlReader: Send + Sync {
-    fn read(&self)
-        -> BoxFuture<'_, Result<ControlSnapshot, ControlError>>;
-
-    fn changed(&self, after: ControlRevision)
-        -> BoxFuture<'_, Result<ControlSnapshot, ControlError>>;
-}
-
-pub enum CommitReceipt {
-    Recorded(RecordedPosition),
-    Suspended(SuspensionReceipt),
-    Settled(SettlementReceipt),
-}
-```
-
-`TurnLease` transfers unique continuation ownership into Runtime. It contains a
-bound `Box<dyn TurnJournal>` and the authoritative control reader for the same
+`TurnLease` transfers unique continuation ownership into Runtime. It contains the
+bound journal and the authoritative control reader for the same
 turn and writer epoch. Trusted storage implementations construct it after
 acquiring ownership. Runtime consumes the lease once and shares the journal
 internally with scoped operations. A second controller requires an explicit
@@ -871,27 +620,11 @@ its failure model and commit barrier. Versioned input/checkpoint envelopes are
 owned by their producing adapter or master. They contain no untyped map of
 unrelated application state.
 
-```rust
-impl EphemeralJournal {
-    pub fn create(seed: TurnSeed) -> EphemeralTurn;
-}
-
-pub struct EphemeralTurn {
-    pub lease: TurnLease,
-    pub control: EphemeralControl,
-}
-
-impl EphemeralControl {
-    pub async fn resolve_wait(&self, request: ResolveWait)
-        -> Result<ControlReceipt, ControlError>;
-
-    pub async fn cancel(&self, request: CancelTurn)
-        -> Result<ControlReceipt, ControlError>;
-}
-```
-
-Both requests carry a stable control identity and expected control revision.
-`ResolveWait` also carries the exact wait identity and typed response.
+`EphemeralJournal::create` takes a `TurnBinding` and returns an
+`EphemeralTurn` holding the lease and an `EphemeralControl`. The control's
+`change` commits a `ControlDirective`, and `resolve` answers an identified wait
+with an envelope. Both take a stable change identity and the expected control
+revision, and return a `CommitReceipt`.
 
 ## Authority, approval, and confinement
 
@@ -925,26 +658,23 @@ uses ordinary Inference and Tools with explicitly supplied authority. The host
 owns its evidence policy, escalation, retry, and failure handling. These routes
 need no `Human`/`Model` enum or dedicated reviewer interface in the shared core.
 
-`agent-kit-sandbox` is a reserved native adapter boundary. Its platform backends
+`agent-kit-sandbox` is the native confinement adapter. Its platform backends
 compile host-issued execution scope into actual confinement and report whether
 the requested profile can be enforced. A raw command or external agent receives
 that scope for its process tree. Required but unavailable enforcement rejects
 launch. Structured editor operations use their host capability checks.
 
-The rebuild replaces srt. The [native sandbox proposal](./rust-sandbox-proposal.md)
-selects Seatbelt on macOS and bubblewrap plus a trusted seccomp helper on Linux
-for the first raw-command implementation. Raw networking is denied initially.
-Native Windows raw execution remains unavailable until its own backend proves
-the requested profile. Host-native routing and transport trust remain host
-adapter concerns.
+The [native sandbox binding](./rust-sandbox.md) uses Seatbelt on macOS and
+bubblewrap plus a trusted seccomp helper on Linux for raw commands. Raw
+networking is denied. Native Windows raw execution is unavailable until its own
+backend proves the requested profile. Host-native routing and transport trust
+remain host adapter concerns.
 
-Whole-host containment is a separate deployment profile. The current TS host's
-outer sandbox is evidence for that deployment, and does not require the native
-host to reproduce its process topology. The native host declares its trusted
-services, raw execution boundaries, and selected hardening independently.
-Concurrent raw executions retain independent filesystem, network, and
-inherited-handle authority. The neutral adapter does not require a particular
-host-process topology.
+Whole-host containment is a separate deployment profile. The native host
+declares its trusted services, raw execution boundaries, and selected hardening
+independently. Concurrent raw executions retain independent filesystem,
+network, and inherited-handle authority. The neutral adapter does not require a
+particular host-process topology.
 
 Cancellation records distinguish a stopped operation, terminated worker,
 revoked descendant authority, and completed cleanup. A process-group signal alone
@@ -960,68 +690,15 @@ async program using a scoped turn controller. It can assemble context, run a
 step, inspect the outcome, invoke verification, request an answer, and decide
 when to finish.
 
-```rust
-impl Runtime {
-    pub fn new(services: ExecutionServices) -> Self;
-
-    pub async fn open(
-        &self,
-        lease: TurnLease,
-    ) -> Result<OpenedTurn, OpenError>;
-}
-
-pub struct OpenedTurn {
-    pub turn: Turn,
-    pub observer: TurnObserver,
-}
-
-impl TurnObserver {
-    pub fn snapshot(&self) -> TurnView;
-    pub async fn next(&mut self) -> Option<TurnUpdate>;
-}
-
-impl Turn {
-    pub fn view(&self) -> MasterView;
-    pub fn operation(&self, key: &OperationKey) -> Option<OperationView>;
-    pub fn operations(&self) -> TurnOperations;
-
-    pub async fn checkpoint(&mut self, state: MasterCheckpoint)
-        -> Result<CheckpointReceipt, RuntimeError>;
-
-    pub async fn step(&mut self, plan: StepPlan)
-        -> Result<StepOutcome, RuntimeError>;
-
-    pub async fn try_finish(&mut self, draft: CompletionDraft)
-        -> Result<FinishOutcome, RuntimeError>;
-
-    pub async fn try_suspend(&mut self, draft: SuspensionDraft)
-        -> Result<SuspendOutcome, RuntimeError>;
-}
-
-impl TurnOperations {
-    pub async fn infer(&self, key: OperationKey, request: PreparedRequest)
-        -> Result<InferenceOutcome, RuntimeError>;
-
-    pub async fn invoke(&self, key: OperationKey, invocation: PlannedInvocation)
-        -> Result<ToolOutcome, RuntimeError>;
-
-    pub async fn wait(&self, request: WaitRequest)
-        -> Result<WaitOutcome, RuntimeError>;
-
-    pub async fn request_input(&self, request: WaitRequest)
-        -> Result<InteractionReceipt, RuntimeError>;
-}
-
-pub enum FinishOutcome {
-    Settled(SettlementReceipt),
-    Continue(FinishRejection),
-}
-
-pub enum SuspendOutcome {
-    Suspended(SuspensionReceipt),
-    Continue(SuspendRejection),
-}
-```
+`Runtime::new` takes `ExecutionServices`; `with_authorization` and
+`with_provider` derive configured copies. `Runtime::open` consumes a
+`TurnLease` and returns an `OpenedTurn`: one `Turn` controller and one
+`TurnObserver`. The controller exposes its `view`, recorded operations by key,
+cloneable `TurnOperations`, `checkpoint`, `step`, `try_finish`, and
+`try_suspend`. The operations handle runs `infer`, `invoke`, `wait`, and
+`request_input`, plus recovery and reconciliation of recorded tool work.
+`FinishOutcome` and `SuspendOutcome` either commit a receipt or return
+`Continue` with the refusal, leaving the controller usable.
 
 `Turn` is the unique continuation/settlement controller. `TurnOperations` is a
 cloneable capability limited to that active turn. The master can obtain it
@@ -1061,19 +738,19 @@ state management stays inside the concrete document tools.
 
 `TurnObserver` exposes a current `TurnView` and bounded updates of text,
 tool progress, pending waits, and terminal status. Dropping it detaches the
-observer. Ephemeral hosts obtain a control handle alongside their in-memory
-lease through `resolve_wait(ResolveWait)` and `cancel(CancelTurn)`.
-Durable hosts use the corresponding
+observer. Ephemeral hosts answer and control the turn through the
+`EphemeralControl` issued with their in-memory lease. Durable hosts use the corresponding
 Sessions controls. Both routes record the exact answer or approval before
 execution resumes.
 
-`MasterView` is a designed view of accepted input, incorporated steering,
-semantic history, operation results, remaining allowances, and optional master
-state. Journal replay records stay behind the storage-facing interface.
+The turn's `TurnView` carries the loaded `TurnState` (controls, semantic
+history, operation states, waits, checkpoint, driver state, and outcome), the
+operations with a live local owner, and whether admission is closed. Journal
+replay records stay behind the storage-facing interface.
 Reading this view, subscribing, inspecting a session, and reconnecting a client
 are observation operations. They never admit work or trigger queue advancement.
 
-`WaitRequest` carries an identity, request payload, response schema, and the
+A `WaitRecord` carries an identity, request payload, response schema, and the
 authority needed to answer it. The requesting tool owns that schema, allowing
 text answers, selected assets, and other structured results. The host authorization adapter interprets approval responses and validates
 their action binding. A narrow host adapter can expose
@@ -1112,7 +789,7 @@ Inference tool offers must match that captured inventory.
 Runtime validates this relationship before dispatch.
 
 This is an attribution boundary. Complete validated calls may execute while
-later response items stream, and independent calls may overlap. The first tool
+later response items stream, and independent calls may overlap. The tool
 profile dispatches each eligible call after its arguments validate. Streaming
 edit protocols remain executor-specific.
 Before dispatch, Runtime records that call's identity, arguments, captured
@@ -1129,7 +806,7 @@ Different input under that key is rejected. A retry of an interrupted physical
 attempt remains inside that operation and requires the executor's recovery
 contract. A completed step returns its recorded `StepOutcome`, including tool
 results. An unknown or in-flight operation first requires reconciliation. An
-intentional new repetition uses a new key. `WaitRequest` likewise carries a
+intentional new repetition uses a new key. A `WaitRecord` likewise carries a
 stable wait identity.
 
 If the inference and individual tool outcomes are committed but the aggregate
@@ -1160,21 +837,10 @@ resolved data, and policy identity. Recovery resolves those bindings through
 an explicit recovery state. Trait objects and closures are recreated from
 those identities and the supported master checkpoint schema.
 
-```rust
-pub trait ToolGate: Send + Sync {
-    fn decide(
-        &self,
-        call: ToolAdmission,
-        context: AdmissionContext,
-    ) -> BoxFuture<'_, ToolDecision>;
-}
-
-pub enum ToolDecision {
-    Permit(GrantSelection),
-    Deny(Denial),
-    Defer(WaitId),
-}
-```
+A `ToolGate` `decide`s a `ToolAdmission` within an `AdmissionContext` and
+returns a `ToolDecision`: `Permit`, `Deny` with a recorded reason, or `Defer`
+on an already open wait. `invoke` reports `Complete`, `Deferred`, or `Paused`
+when an actual Pause interrupts admission before the attempt commits.
 
 The supplied gate is an asynchronous admission boundary. `AdmissionContext`
 provides current control/authority observations and scoped operations for
@@ -1184,10 +850,11 @@ through this boundary. It can return a correlated wait so the turn can suspend.
 Runtime retains that pending invocation and re-enters the gate using recorded
 state when eligible. The host reuses completed checks and interprets responses.
 
-A permit selects existing host-issued authority. Runtime checks that authority
-and current controls at dispatch. Host gate implementation details and product
-policy remain outside `ExecutionServices`. Exact gate context fields require
-the first approval and hook consumers to establish their minimal shared needs.
+A permit continues to authorization and dispatch, where Runtime validates the
+selected host-issued authority and current controls. A gate error or denial is
+recorded as definite nonexecution. Host gate implementation details and product
+policy remain outside `ExecutionServices`. `AdmissionContext` supplies the turn's
+operations for recorded checks, such as opening a question.
 
 `ToolAdmission` contains the definition, supplied scope, and complete validated
 arguments. The executor owns any internal staging protocol and its recovery data.
@@ -1219,43 +886,49 @@ socket or file.
 
 ### Configured lifecycle hooks
 
-The native host currently supports the final-text check, one reviewed
-before-completion command, and one required pre-tool command for Act
-`run_command` calls. The [hook contract](https://grida.co/docs/wg/ai/agent/hooks)
-describes the remaining lifecycle events. Their host dispatcher would use the
-admission gate, recorded outcome boundaries, and ordinary scoped operations.
-Runtime has no configured-handler registry or named hook-event vocabulary.
-The host owns handler selection and result interpretation. The pre-tool check
-matches the exact command tool and excludes its private handler from recursion;
-general discovery, matching, and ordering remain planned.
+A trusted launch profile can select up to eight ordered lifecycle hooks. Each
+hook names one event, an optional exact tool for tool events, a mode, a pinned
+reviewed executable with literal arguments, and a deadline. The
+[hook contract](https://grida.co/docs/wg/ai/agent/hooks) describes the events;
+the [native host README](../../../crates/grida-agent/README.md#configure-lifecycle-hooks)
+documents the profile fields, the handler input and replies, and inspection.
 
-Each reviewed command executes through an admitted tool under the selected
-confinement profile. The host assigns stable operation keys
-and records the selected handler identity with its invocation. Recovery can
-reuse completed results. Interrupted commands retain the executor's ordinary
-uncertainty and recovery behavior.
+| Event               | Decision boundary                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| `session_start`     | When a turn's execution starts, with its control revision                                        |
+| `before_input`      | At the master's decision boundary, with the retained user message                                |
+| `before_tool`       | After ordinary admission of the exact operation and before its attempt; authority is revalidated |
+| `after_tool`        | After the recorded outcome; the actual effect is preserved                                       |
+| `before_completion` | At the completion boundary, with the proposed outcome                                            |
 
-The pre-tool command uses the gate so calls produced inside `step` receive the
-same policy as direct invocations. The host would consume recorded outcomes for
-after-tool checks. The master would run input checks at its decision boundary
-and runs completion checks at its completion boundary.
-A required check completes before its governed action is admitted. Sibling
-effects already admitted in the same step can finish. Ordinary event
-subscriptions remain observational.
+The master owns the captured selection, event dispatch, and result
+interpretation. The host owns discovery, review, executables, confinement, and
+the handler tools. Runtime has no configured-handler registry or hook-event
+vocabulary: each handler runs as an ordinary admitted operation with a stable
+key, read-only native confinement, a deadline, and cancellation, and records
+its hook identity with the invocation.
 
-The current required checks block their governed action on failure and suppress
-recursive hook dispatch for their own handler operations. The planned multi-hook
-policy runs selected handlers in declared order. Authority checks still apply
-to those operations.
-Stop and Pause govern handler work through the same controls as other operations.
-Executable work after settlement needs another explicitly admitted owner.
+A `required` hook can deny its governed action. A failing `after_tool` check
+blocks only later dependent work or completion. A `before_completion` handler
+may instead request another model step within the original task allowance. An
+`observe` hook retains diagnostics and may contribute attributed context, but
+cannot reject an action or require another step. Hook output is labeled
+contextual data with its source and revision; it grants no access and never
+becomes a user instruction.
 
-The first fixture for each event fixes its name, response fields, and how the
-dispatcher uses the minimal gate context. Argument rewriting, background
-handlers, and additional handler types remain separate product extensions.
-[Codex hooks](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/hooks/src/lib.rs),
-[dispatcher](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/hooks/src/engine/dispatcher.rs),
-[command runner](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/hooks/src/engine/command_runner.rs).
+Handlers run in declared order and never recursively dispatch hooks for their
+own check operations. Sibling effects already admitted in the same step can
+finish. Pause and Stop prevent new handler admission. Handler bytes, the
+selected definitions, and the permission scope participate in the captured
+revision, so a change applies only to future accepted work. An unknown handler
+outcome stays uncertain, and reopening or replay reuses recorded outcomes
+instead of executing the handler again. Ordinary event subscriptions remain
+observational.
+
+The earlier single-check `beforeTool` and `beforeCompletion` profile fields
+keep their narrower semantics alongside ordered hooks. Argument rewriting,
+background handlers, additional handler types, and project-local or
+user-owned hook executables are deferred.
 
 ## Sessions
 
@@ -1263,50 +936,14 @@ handlers, and additional handler types remain separate product extensions.
 injected turn driver. Its submission body is opaque, bounded, versioned data.
 The driver owns decoding it and constructing the master.
 
-```rust
-pub trait TurnDriver: Send + Sync {
-    fn capabilities(&self) -> DriverCapabilities;
-
-    fn run(&self, claim: ClaimedTurn)
-        -> BoxFuture<'static, Result<DriverOutcome, DriverError>>;
-}
-
-pub enum DriverOutcome {
-    Settled(SettlementReceipt),
-    Suspended(SuspensionReceipt),
-}
-
-impl Sessions {
-    pub fn new(
-        store: Arc<dyn SessionStore>,
-        driver: Arc<dyn TurnDriver>,
-    ) -> Result<Self, ConfigurationError>;
-
-    pub async fn create(&self, request: CreateSession)
-        -> Result<SessionCreated, SessionError>;
-
-    pub async fn submit(&self, session: SessionId, input: Submission)
-        -> Result<Acceptance, SessionError>;
-
-    pub async fn control(&self, request: ControlRequest)
-        -> Result<ControlReceipt, SessionError>;
-
-    pub async fn run_selected(&self, selection: TurnSelection)
-        -> Result<RunDisposition, SessionError>;
-
-    pub async fn recover(&self, request: RecoveryRequest)
-        -> Result<RunDisposition, SessionError>;
-
-    pub async fn inspect(&self, session: SessionId)
-        -> Result<SessionView, SessionError>;
-}
-
-pub enum RunDisposition {
-    Settled(SettlementReceipt),
-    Suspended(SuspensionReceipt),
-    Existing(ClaimStatus),
-}
-```
+A `TurnDriver` `run`s one `ClaimedTurn` until it returns a `DriverOutcome`:
+`Settled` or `Suspended` with the journal receipt proving it. `Sessions::new`
+takes a `SessionStore` and a driver. It exposes `create`, `submit`, `control`,
+`inspect`, `run_selected` for a `ClaimRequest`, and `recover` for a
+`RecoveryRequest`. A `RunDisposition` is `Settled` or `Suspended` with a receipt
+verified against the store, or `Existing` with the turn's current `TurnView`
+for an exact claim retry or a driver failure after the turn already reached a
+durable stop.
 
 `create` establishes a caller-identified session with bounded, versioned driver
 configuration. `submit` acknowledges durable acceptance independently of driver preparation.
@@ -1338,11 +975,11 @@ state update shares the turn's commit. Goal tools use a narrowly granted state
 control with the same conditional-update and request-identity rules. They do
 not receive unrestricted access to the session store.
 
-`ClaimedTurn` and `MasterView` provide the trusted driver with the selected
-snapshot. `SessionView` exposes its revision for reconciliation, while the host
+`ClaimedTurn` and the turn's `TurnView` provide the trusted driver with the
+selected snapshot. `SessionView` exposes its revision for reconciliation, while the host
 projects user-facing fields through its client adapter. Credentials remain in
 their dedicated host-owned custody. A decision that depends on driver state
-records its revision in `TurnSelection`, `StepPlan`, `SuspensionDraft`, or
+records its revision in the claim, `StepPlan`, `SuspensionDraft`, or
 `CompletionDraft` as appropriate. Admission verifies it before dependent work.
 When no state is consulted, no extra precondition is required.
 
@@ -1361,27 +998,32 @@ completion meaning.
 
 ### Selection and controls
 
-`TurnSelection` has a stable `ClaimId`, expected control revision, and either
-selected accepted inputs for a new turn or the identity and suspension receipt
-of an existing unfinished turn. The master or host scheduler chooses it. `run_selected`
+A `ClaimRequest` has a stable change identity, the expected session revision,
+and a `TurnSelection`: `New` over selected queued inputs in order, `Resume` of a
+suspended turn exactly as last observed (writer epoch and journal position), or
+`ResumePaused`, which also lifts its pause in the same commit. The master or
+host scheduler chooses it. `run_selected`
 claims ownership atomically and drives a newly issued lease. The host owns the
 future's task lifetime. A repeated claim returns the existing disposition and
 never issues a second live lease. An unknown acknowledgment is resolved using
 that same claim identity before the caller attempts recovery.
-`Existing` reports an active, suspended, or interrupted claim without starting a
-competing driver. `Settled` and `Suspended` are returned only after verification
+`Existing` reports the turn as it now stands without starting a competing
+driver. `Settled` and `Suspended` are returned only after verification
 against the store. A suspension retains the logical turn while releasing its
 live execution lease. A conditional resumed claim uses the same `TurnId` and a
 fresh writer epoch after its pause and readiness conditions permit execution.
 The suspended logical turn retains its active session position. Suspension
 alone never selects the next queued request.
 
-`ControlRequest` includes a stable `ControlId`, target, content digest, and
-expected control revision. Repeating identical content returns the original
-receipt even after the revision has advanced. Defined
-operations include steering, queue replacement/reordering, task pause/resume,
-pausing/resuming admission, cancellation, resolving an identified wait,
-lifecycle deletion, and atomic pause-plus-cancel. The product chooses which
+A `ControlRequest` has a stable change identity, the session, the expected
+session revision, and one `SessionControl`. Repeating identical content returns
+the original receipt even after the revision has advanced. Defined controls
+pause and resume admission; replace, withdraw, or reorder queued input; append
+steering history to the active turn; apply a turn directive (Pause, Resume, or
+Cancel); answer an identified wait, optionally with appended history; pause
+admission and cancel the active turn in one commit; and change driver state.
+Turn-scoped controls also carry the expected turn control revision. Session
+deletion is a storage-adapter operation with its own preconditions. The product chooses which
 operation and target scope its controls request. Display metadata such as names
 and archive visibility remains host-owned and does not imply execution control.
 
@@ -1389,7 +1031,7 @@ A queue-content edit supplies a new immutable `Submission` identity that
 supersedes the unclaimed input at its existing position. The old identity retains
 its superseded disposition. The control transaction checks that the selected
 input has not been claimed. Replacement and claim cannot both succeed against
-the same state. Reordering preserves the selected input identities. `TurnSelection`
+the same state. Reordering preserves the selected input identities. The claim
 captures the actual selected inputs and any consulted driver-state revision.
 The opaque payload and driver state carry settings according to master policy.
 
@@ -1402,47 +1044,18 @@ dispositions. A late answer cannot resolve a current wait or grant current autho
 Late effect results also retain their original step and branch attribution.
 They cannot become new work on the selected branch merely by arriving later.
 
-`ClaimedTurn` carries accepted input, turn identity, writer epoch, current
-checkpoint, and the non-Clone `TurnLease`. The native driver transfers the lease
+`ClaimedTurn` carries the session's driver configuration, the accepted inputs,
+and the non-Clone `TurnLease`, which binds the turn identity and writer epoch. The native driver transfers the lease
 into Runtime and runs the product master. The Sessions module uses the Turn contract without constructing Runtime.
 
-The adapter-facing storage contract has the following bounded operations.
+A `SessionStore` implements `create`, `submit`, `claim`, `recover`, `control`,
+`inspect`, `inspect_turn`, and `verify`. `verify` succeeds only when the exact
+`CommitReceipt` is committed in its turn's journal.
 
-```rust
-pub trait SessionStore: Send + Sync {
-    fn create(&self, request: CreateSession)
-        -> BoxFuture<'_, Result<SessionCreated, StoreError>>;
-
-    fn submit(&self, session: SessionId, input: Submission)
-        -> BoxFuture<'_, Result<Acceptance, StoreError>>;
-
-    fn claim(&self, selection: TurnSelection)
-        -> BoxFuture<'_, Result<ClaimOutcome, StoreError>>;
-
-    fn recover(&self, request: RecoveryRequest)
-        -> BoxFuture<'_, Result<ClaimOutcome, StoreError>>;
-
-    fn control(&self, request: ControlRequest)
-        -> BoxFuture<'_, Result<ControlReceipt, StoreError>>;
-
-    fn inspect(&self, session: SessionId)
-        -> BoxFuture<'_, Result<SessionView, StoreError>>;
-
-    fn verify_settlement(&self, receipt: SettlementReceipt)
-        -> BoxFuture<'_, Result<VerifiedSettlement, StoreError>>;
-
-    fn verify_suspension(&self, receipt: SuspensionReceipt)
-        -> BoxFuture<'_, Result<VerifiedSuspension, StoreError>>;
-
-    fn record_interruption(&self, request: DriverInterruption)
-        -> BoxFuture<'_, Result<InterruptionReceipt, StoreError>>;
-}
-```
-
-`ClaimOutcome` distinguishes a newly issued `ClaimedTurn`, an existing active,
-suspended, or interrupted claim, and an already settled turn. Only the newly issued variant
-contains a lease. `RecoveryRequest` identifies the unresolved turn, expected
-old epoch, and a stable recovery request ID. It preserves the turn identity,
+`ClaimOutcome` is `Acquired` with a newly issued `ClaimedTurn`, or `Existing`
+with the turn's current view for an exact retry. Only `Acquired` contains a
+lease. `RecoveryRequest` identifies the session, the unresolved turn, the
+expected old epoch, and a stable change identity. It preserves the turn identity,
 acquires a new epoch after ownership release is established, and reconstructs
 committed work for reconciliation. Recovery does not resubmit accepted input.
 
@@ -1451,13 +1064,13 @@ identical request retrieves its committed disposition. Conflicting reuse is
 rejected. Store errors distinguish rejection from an unknown acknowledgment,
 and inspection exposes the current disposition when a response was lost.
 
-On a driver error, Sessions first reads authoritative state and verifies any
-settlement or suspension receipt. Either committed handoff survives loss of the
-driver's return value. After the local controller exits, `record_interruption`
-applies only if that turn has neither settled nor committed an intentional
-suspension. It preserves outstanding-effect
-uncertainty. If the execution future itself is dropped, the next recovery can
-establish local ownership release without relying on that asynchronous write.
+On a driver error, Sessions reads the turn back with `inspect_turn`. A turn
+that already settled or suspended is reported as `Existing`, so either committed
+handoff survives loss of the driver's return value. Otherwise the driver's
+error is returned and the turn remains unsettled with its outstanding-effect
+uncertainty. A successor takes ownership through `recover` under the next
+writer epoch, which requires no asynchronous write from the lost owner. A
+driver receipt bound to another turn or writer is refused before verification.
 
 `SessionView` is a designed projection of accepted input dispositions, queue
 state, current activity, waits, and settled outcomes. Its authorized child view
@@ -1466,10 +1079,11 @@ A client subscription
 adds a cursor and resynchronization protocol around these views. Raw storage
 rows stay behind the adapter-facing contract.
 
-`DriverCapabilities` declares durable-acceptance coverage, controls, observation,
-reconnect/restart support, and ownership of child work. For an external agent,
-the outer run can durably record submission and remote receipts. The external
-agent's internal effects require its own declared guarantees.
+A driver's guarantees are part of its host's contract rather than a neutral
+capability record. For an external agent, the outer run can durably record
+submission and remote receipts; the native host declares that driver's text
+acceptance, local receipt, and owned-process stop in its run records. The
+external agent's internal effects require its own declared guarantees.
 
 ### Reusable child sessions
 
@@ -1535,10 +1149,10 @@ applicable controls. Terminal journal publication also settles the session's
 active-turn projection in that transaction. Stable request identities and
 digests make committed writes recoverable after a lost acknowledgment.
 
-SQLite is the first persistent-adapter candidate. `rusqlite` with a dedicated
-blocking worker is one possible implementation. Connection count, worker layout,
-and process-lock granularity remain implementation choices. A minimal prototype
-may begin with one process-wide lock, but this does not define the core contract.
+The SQLite adapter commits in WAL mode with synchronous FULL. Connection count,
+worker layout, and process-lock granularity are adapter choices that do not change the core contract. Its
+[README](../../../crates/agent-kit-store-sqlite/README.md) documents the record
+layout, catalog, history replay, and session deletion.
 
 Every topology must exclude or fence a previous owner of the same session, load
 authoritative state under the acquired ownership, and validate writer epochs on
@@ -1593,14 +1207,16 @@ settlement. Process loss, a dropped driver, or storage failure leaves recorded
 work available for reconciliation under a new fenced owner.
 
 The concrete adapters expose construction APIs and implement the interfaces
-above. Their initial public inputs are intentionally specific.
+above.
 
-| Adapter                                                            | Construction contract                                                                          |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `SqliteStore::open(StoreOptions)`                                  | Database path, selected durability profile, ownership lock configuration                       |
-| `OpenAiProvider::new(OpenAiOptions, transport, credentials)`       | Explicit endpoint/model metadata, bounded HTTP transport, host-owned credential source         |
-| `AnthropicProvider::new(AnthropicOptions, transport, credentials)` | The corresponding provider-specific configuration and host capabilities                        |
-| `FileReadTool::new(Arc<dyn Files>)`                                | A filesystem capability whose implementation enforces granted roots, versions, and read limits |
+| Adapter                                                        | Construction contract                                                                                |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `SqliteStore::open`                                            | An explicit database path inside an existing application-owned directory                             |
+| `OpenAiCompatible`, `Anthropic`, `Responses`, `Gemini` (`new`) | A provider binding, an explicit model registry, a host-owned `StreamingTransport`, and stream limits |
+| Host file tools                                                | A filesystem capability whose implementation enforces granted roots, versions, and read limits       |
+
+`Responses` and `Gemini` also take a replay binding that the host retains only
+while provider account and endpoint continuity is verified.
 
 Provider credential sources return an identified principal as well as secret
 material. Prepared requests and resumed attempts retain that principal binding.
@@ -1608,64 +1224,65 @@ Compatible reauthorization may replace expired secret material while preserving
 the accepted tenant, purpose, endpoint, and billing authority. The host records
 any allowed authority renewal. Recovery never requires storing old secret bytes
 in the journal.
-Transport and credential interface details belong to the concrete adapter
-design and must be shared only when the two provider consumers establish a
-common contract.
+The host's `StreamingTransport` implementation owns HTTP, proxy, TLS, and
+credential placement; the [providers README](../../../crates/agent-kit-providers/README.md#host-transport)
+states the transport contract.
 
 ## Native executable and headless host
 
-The native `grida-agent` executable is a required delivery surface. It runs the
-production host without Electron or a terminal UI. Desktop supervises or connects
-to that host and supplies its available client capabilities. Scripts and tests
-use the same master, admission, persistence, tools, and session controls.
+The native `grida-agent` executable runs the production host without Electron
+or a terminal UI. Desktop supervises it over private stdio and supplies its
+available client capabilities. Scripts and tests use the same master,
+admission, persistence, tools, and session controls.
 
 The trusted Rust host owns its authorized provider connections and native
-execution adapters. Desktop supplies supervision and UI capabilities. The
-current TS sidecar's main-owned socket and provider-fetch brokers describe its
-deployment, and are not required layers in this native composition. Every host
-profile still supplies explicit access, routing, trust, and credential custody.
+execution adapters. Desktop supplies supervision, UI capabilities, and, when
+selected, the supervised provider transport. Every host profile supplies
+explicit access, routing, trust, and credential custody.
 
 Create the state directory, database files and sidecars, retained hook output,
 and local control endpoints with private owner access from creation. Inspect
 pre-existing paths and reject incompatible ownership, permissions, or link
 substitution before use. Platform adapters supply equivalent access control.
 The sandbox also keeps these host-private locations outside raw-command grants.
+A state directory has one owning process.
 
-The initial host keeps two entrypoints in one crate. Command spelling remains
-provisional while the behavior below is part of the design.
+The [native host README](../../../crates/grida-agent/README.md) documents each
+subcommand's flags, output records, and exit statuses.
 
-| Entrypoint                                 | Contract                                                                                                                                                                                                                   |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `grida-agent serve`                        | Foreground durable service exposing the versioned local protocol. Clients can submit, inspect, answer, steer, queue, pause, resume, stop, derive conversations, and retrieve artifacts through their granted capabilities. |
-| `grida-agent run --non-interactive --json` | Bounded execution with structured progress and one final disposition. It embeds the same host composition by default. An explicit connection target can select an existing service.                                        |
+| Entrypoint                                           | Contract                                                                                                                                                                                             |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `grida-agent run`                                    | Bounded execution of one prompt from `--prompt` or stdin, embedding its own host. Stdout carries versioned JSON Lines: an `accepted` record, then a `finished` record with the verified disposition. |
+| `grida-agent run-external`                           | One text turn through a reviewed, confined external ACP peer selected by a private launch profile, with the same `accepted` and `finished` records.                                                  |
+| `grida-agent inspect`                                | Reads a persisted session's latest and current turn state without provider configuration, after the owning process exits.                                                                            |
+| `grida-agent serve --stdio`                          | A parent-owned ACP service over stdio. Clients can submit, inspect, answer, steer, queue, pause, resume, stop, derive conversations, and retrieve artifacts through their negotiated capabilities.   |
+| `grida-agent serve --listen ws://127.0.0.1:PORT/acp` | A shared local ACP service over an authenticated loopback WebSocket, with a bearer selected by `--server-token-env`.                                                                                 |
+| `grida-agent serve-mcp`                              | Serves reviewed Grida tools over MCP without starting a model session.                                                                                                                               |
 
-The service uses ACP over bidirectional JSON-RPC, with negotiated Grida extensions
-for missing durable controls and client capabilities. Start with the current v1
-contract, pin its schema/SDK at implementation, and review v2 Draft independently.
-The [client protocol proposal](./rust-client-protocol.md) owns the version,
-standard-feature mapping, extension boundaries, and interoperability obligations.
-The initial ACP adapter and transport bindings are modules in the host crate.
-Protocol extraction requires another concrete consumer.
+The service uses ACP v1 over bidirectional JSON-RPC, with negotiated Grida
+extensions for durable controls and client capabilities. The
+[client protocol binding](./rust-client-protocol.md) owns the version,
+standard-feature mapping, extension boundaries, and interoperability
+obligations. The ACP adapter and transport bindings are modules in the host
+crate.
 
-| Binding                          | Use and ownership                                                                                                                                                                      |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stdio, default                   | A parent-owned sidecar for Desktop and headless process tests. One supervising client owns the pipes and can multiplex many sessions and UI views.                                     |
-| Authenticated loopback WebSocket | A Grida custom ACP binding for an explicitly selected shared service. Independent clients can attach and reconnect while the host keeps running. Activate with shared-service support. |
+| Binding                          | Use and ownership                                                                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Stdio                            | A parent-owned host for Desktop and headless process tests. One supervising client owns the pipes and can multiplex many sessions and UI views.              |
+| Authenticated loopback WebSocket | A Grida ACP binding for an explicitly selected shared service. Independent clients holding the bearer can attach and reconnect while the host keeps running. |
 
-`serve --stdio` is the initial process entrypoint. A later
-`serve --listen ws://127.0.0.1:PORT` selects shared-service ownership. Exact spelling
-remains provisional. `run` can embed the dispatcher directly, and explicit attach
-uses the shared-service binding. Desktop's main process supervises the stdio host
-and exposes its authorized projections through the existing preload boundary.
-Renderer windows share that main-process client.
+Desktop's main process supervises the stdio host and exposes its authorized
+projections through the preload boundary. Renderer windows share that
+main-process client. `run` embeds the dispatcher directly and does not attach
+to a running service.
 
 Stdio uses one JSON-RPC object per line with bounded UTF-8 framing. Stdout carries
 only protocol records, and stderr carries diagnostics. Spawned tools have separate
-captured streams. WebSocket uses the same message vocabulary and checks local
-bind scope, client authentication, and permitted origins before admitting calls.
-It supplies a single cross-platform listening binding. The initial design leaves
-platform-specific sockets and a separate HTTP command API outside its delivery
-scope. [WebSocket protocol](https://www.rfc-editor.org/rfc/rfc6455.html),
+captured streams. WebSocket carries the same message vocabulary, one object per
+text message, and checks numeric loopback bind scope, the exact authority and
+path, the bearer, and an absent `Origin` before admitting calls. Platform-specific
+sockets and a separate HTTP command API are outside this binding.
+[WebSocket protocol](https://www.rfc-editor.org/rfc/rfc6455.html),
 [Electron IPC boundary](https://www.electronjs.org/docs/latest/tutorial/ipc).
 
 Connection-local RPC IDs correlate calls. Durable submission, operation,
@@ -1679,46 +1296,46 @@ commands, interaction delivery, attachments, and client tools. The core remains
 independent of ACP, JSON-RPC, and both transport bindings.
 
 The executable prioritizes scriptability, bounded execution, and inspectable
-failures. Terminal syntax highlighting, full-screen navigation, and an interactive
-chat interface are outside its initial delivery scope. Basic help and readable
-diagnostics support development and operations. The CLI exposes the engine and
+failures. Terminal syntax highlighting, full-screen navigation, and an
+interactive chat interface are outside its scope. The CLI exposes the engine and
 service for automation, integration, testing, and operations.
 
-The [configuration proposal](./rust-config-proposal.md) defines a small typed
-settings surface for this host. TOML loading, validated updates/reloads, and
-agent-facing inspection use one path, while Runtime receives resolved input and limits.
+The [configuration binding](./rust-config.md) defines the typed settings
+surface for this host. TOML loading, validated updates and reloads, and
+agent-facing inspection use one path, while Runtime receives resolved input and
+limits.
 
 ### Interaction and outcome contract
 
 Headless describes the absence of a graphical interface. A service can still
-receive answers and approvals from protocol clients. `--non-interactive` forbids
-terminal prompting and requires a declared unattended policy. It grants no
-additional authority and preserves the configured confinement and approval rules.
-Session or invocation configuration declares interaction support explicitly.
+receive answers and approvals from protocol clients. `run` never prompts on a
+terminal. Its interaction support is declared explicitly: `--questions` lets a
+tool-capable model request input, and no launch option grants additional
+authority or relaxes the configured confinement and approval rules.
 Terminal presence and the `serve` command confer no interaction capability.
 
 A required unanswered question or approval produces a durable waiting or
-suspended disposition with its interaction, session, and turn identities. The
-attached `run` client can return while the service retains waiting work. An
-embedded `run` commits and verifies suspension before returning that disposition
-and shutting down its host. A later invocation can start or attach to a host
-using the same explicit state directory, supply the answer, and request
-continuation under the existing controls.
+suspended disposition with its interaction, session, and turn identities. `run`
+commits and verifies suspension before emitting a `finished` record with
+`input_required` and the pending questions, then shuts down its host. A later
+host using the same explicit state directory can reopen the session through an
+ACP client, supply the answer, and request continuation under the existing
+controls.
 The master may resolve nonessential ambiguity within its allowed policy.
 
 Machine output has versioned framing, bounded records, and a final disposition
 that distinguishes completed, failed, cancelled, suspended, input-required, and
 uncertain work. It includes known artifacts and recovery identities. Logs and
 diagnostics use stderr. A successful process launch or RPC response does not
-mean the task completed. For `run`, only completed work has a success exit status.
-Other dispositions have documented distinct exit classes and structured detail.
+mean the task completed. For `run`, only completed work has a success exit status;
+failure, suspension, input-required suspension, uncertainty, and Stop have
+distinct exit statuses with structured detail.
 For `serve`, process exit describes host shutdown, while task outcomes remain
 individually inspectable.
 
 State directories, workspaces, and connection targets are explicit. Tests use
-isolated directories and explicit pipe or listening endpoints. Default `run`
-execution never discovers and attaches to an unrelated personal daemon. An attached invocation identifies its
-remote execution owner and its disconnect behavior in the accepted result.
+isolated directories and explicit pipe or listening endpoints. `run` never
+discovers or attaches to an unrelated personal service.
 
 ### Process lifetime
 
@@ -1747,8 +1364,7 @@ client detach, and permanent session deletion retain their distinct meanings.
 
 ### Headless conformance
 
-The first durable slice must launch the built executable and exercise its normal
-entrypoints. Controlled provider and client-capability fixtures use the production
+Process tests launch the built executable and exercise its normal entrypoints. Controlled provider and client-capability fixtures use the production
 protocol, admission, storage, and driver paths. The tests cover duplicate input,
 multi-turn continuity, pending answers and approvals, controls, artifacts,
 disconnect, and termination/restart. A process test identifies which native
@@ -1762,30 +1378,33 @@ Actual rendering and interaction have their own Desktop acceptance evidence.
 The native [entrypoint](../../../crates/grida-agent/src/main.rs) composes
 serving and one-shot execution. The [process tests](../../../crates/grida-agent/tests/process.rs)
 drive the executable with isolated state and explicit provider and connection
-targets. Codex similarly exposes distinct noninteractive execution and
-application-server commands in its
-[dispatcher](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/cli/src/main.rs).
+targets.
 
-## Master policy and initial public scope
+## Master policy and public extension points
 
-`grida-agent-master` owns the product's prompts, context selection, model and
-agent effort presets, tool presentation, queue policy, planning, delegation strategy,
+`grida-agent-master` owns the product's context selection, model and agent
+effort presets, tool presentation, queue policy, planning, delegation strategy,
 verification, completion criteria, and final wording. Those choices can be
 concrete functions and structs inside that crate. The native host supplies its
 provider, storage, execution, and interaction capabilities. Argument parsing and
-server construction belong to `grida-agent`.
+server construction belong to `grida-agent`, which also supplies the system
+instructions the master places in context.
 
 The driver calls an ordinary async master function using `Turn`. A different
 master can be a different consumer crate or host adapter that
 uses the same execution operations. A foreign-language master needs an explicit
 protocol adapter for those operations and their ownership rules.
 
-The candidate public extension points are Provider, Tool, ContextMeasure,
-TurnJournal, ToolGate, TurnDriver, and the adapter-facing SessionStore. Their
-scope is fixed by the single operation each supplies. Pure data constructors,
+The public extension points are `Provider`, `Tool`, `ContextMeasure`,
+`AuthorityValidator`, `TurnJournal`, `ControlReader`, `ToolGate`, `TurnDriver`,
+the adapter-facing `SessionStore`, and the providers' `StreamingTransport`.
+Their scope is fixed by the operations each supplies. Pure data constructors,
 validators, and projections remain concrete APIs.
 
-## Consumers that must fit before API stabilization
+## Consumer obligations
+
+The public contracts keep serving these consumers. A change that breaks one
+needs an explicit compatibility review.
 
 | Consumer or case                      | Required demonstration                                                                                         |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -1804,14 +1423,13 @@ validators, and projections remain concrete APIs.
 | Crash after outcome before checkpoint | Re-enter the master and retrieve the same logical operation's committed result                                 |
 | Child completes during parent restart | Retain result, delivery, and consumption as separate facts                                                     |
 
-## What to lock after the pressure test
+## Committed boundaries
 
 The [consumer walkthroughs](./rust-core-pressure-test.md) exercise a minimal
-master, durable recovery, and existing Grida-specific features. They support
-locking semantic boundaries while leaving packaging and unmeasured API costs
-open to the first implementation.
+master, durable recovery, and Grida-specific features against these semantic
+commitments.
 
-| Recommended commitment                                                                                 | Basis                                                                                                     |
+| Commitment                                                                                             | Basis                                                                                                     |
 | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | Product decisions remain in the master                                                                 | Context, effort, tool selection, verification, and completion vary independently of execution correctness |
 | Inference, tool execution, semantic history, and model input have separate contracts                   | Direct callers and rich tool-result lowering require each to work independently                           |
@@ -1823,9 +1441,6 @@ open to the first implementation.
 | Separate effect, artifact-retention, and presentation evidence                                         | Supports paid media and optional surface presentation accurately                                          |
 | Read-only inspection and subscription stay observational                                               | Reconnection cannot admit, resume, or charge for work                                                     |
 
-The shared-core/Runtime/Sessions boundaries are reserved design commitments.
-Their activation follows the first substantive consumer in the crate map.
-Finer core extraction, exact trait/factory names, serialized record layout, the
-public checkpoint envelope, and SQLite ownership mechanics still require
-implementation evidence. A shared staged-effect API is deferred until independent incremental-edit and
-media-recovery consumers establish it. Performance claims and Rust ergonomics require implementation evidence.
+Finer core extraction and a shared staged-effect API are deferred until
+independent consumers establish them. Serialized record layout and the public
+checkpoint envelope change only through explicit schema versions.

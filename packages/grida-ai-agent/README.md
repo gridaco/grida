@@ -320,22 +320,22 @@ The [Agent Features catalog](https://github.com/gridaco/grida/blob/main/docs/age
 records current implementation coverage alongside the rebuilt product's feature
 promises and scope.
 
-- [Rust core proposal](./docs/rust-core-proposal.md) — proposed crate layout,
+- [Rust core proposal](./docs/rust-core.md) — proposed crate layout,
   dependency graph, and public contracts for the fresh agent implementation.
-- [Native executable and headless host](./docs/rust-core-proposal.md#native-executable-and-headless-host)
+- [Native executable and headless host](./docs/rust-core.md#native-executable-and-headless-host)
   — the shared engine/server binary, unattended runs, and process-level testing
   required before Desktop integration.
 - [Rust core pressure test](./docs/rust-core-pressure-test.md) — minimal-master
   and durable-session walkthroughs, Grida feature checks, and proposed commitments.
 - [Tool-host contract](./docs/tool-host-contract.md) — concrete Rust/Electron
   ownership, shared native/MCP capabilities, endpoint identity, domain-owned results, and invocation recovery.
-- [Configuration proposal](./docs/rust-config-proposal.md) — reviewed settings,
+- [Configuration proposal](./docs/rust-config.md) — reviewed settings,
   conversational inspection and changes, and the minimal host-owned TOML surface.
 - [Client protocol proposal](./docs/rust-client-protocol.md) — ACP-first clients,
   custom presentation, negotiated durable controls, and compatibility checks.
-- [Lifecycle hooks](./docs/rust-core-proposal.md#configured-lifecycle-hooks) —
+- [Lifecycle hooks](./docs/rust-core.md#configured-lifecycle-hooks) —
   configured checks and context contributions through existing execution contracts.
-- [Native sandbox proposal](./docs/rust-sandbox-proposal.md) — concrete srt
+- [Native sandbox proposal](./docs/rust-sandbox.md) — concrete srt
   replacement, minimal launch contract, and native platform boundaries.
 - [DaemonServer](../grida-daemon/docs/daemon-server.md) — lifecycle,
   ownership, and what hosts must provide (`@grida/daemon`).

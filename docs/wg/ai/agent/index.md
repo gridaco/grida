@@ -36,13 +36,13 @@ language, storage engine, provider adapters, and client protocols while
 satisfying the stated contracts.
 
 The concrete Rust design includes a
-[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox-proposal.md)
+[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md)
 with the srt replacement, launch contract, platform boundaries, and source study.
 
 The native delivery includes a headless agent executable. Its service and
 unattended entrypoints run the same master and components used by Desktop.
 Desktop, automation, and test clients exercise one execution contract. The
-[executable design](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-core-proposal.md#native-executable-and-headless-host)
+[executable design](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-core.md#native-executable-and-headless-host)
 defines process boundaries, interaction policy, and machine-readable outcomes.
 The [ACP integration contract](./acp.md) defines the shared client vocabulary
 and how custom presentation and durable controls extend it.

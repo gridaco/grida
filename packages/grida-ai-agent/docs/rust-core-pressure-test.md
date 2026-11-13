@@ -1,6 +1,6 @@
 # Rust core pressure test
 
-This is a design walkthrough of the [Rust core proposal](./rust-core-proposal.md).
+This is a design walkthrough of the [Rust core proposal](./rust-core.md).
 It follows a minimal master and a durable session through their public contracts,
 then checks those contracts against current Grida features and comparable agent
 runtimes. The traces are paper executions. They establish contract consistency
@@ -323,7 +323,7 @@ design. [Codex thread store](https://github.com/openai/codex/blob/main/codex-rs/
 
 ## Headless executable walkthrough
 
-The [native host](./rust-core-proposal.md#native-executable-and-headless-host)
+The [native host](./rust-core.md#native-executable-and-headless-host)
 is part of the first durable delivery. The same binary serves Desktop and
 headless protocol clients, and its bounded run entrypoint uses the same master.
 Passing imported-handler tests is supporting evidence. The executable path
@@ -836,7 +836,7 @@ credential custody, and process supervision remain separately owned. Outer host 
 deployment profile, retained by the current Grida host. Platform support requires
 direct enforcement evidence.
 
-The [native sandbox proposal](./rust-sandbox-proposal.md) selects one crate
+The [native sandbox proposal](./rust-sandbox.md) selects one crate
 with Seatbelt on macOS and bubblewrap plus a trusted seccomp helper on Linux.
 The initial raw-command profile denies networking. Native Windows raw execution
 is deferred behind capability checks.
@@ -964,14 +964,14 @@ and release requirements align. The branded master remains a separate consumer.
 This approach preserves the known destination without requiring a package for
 every pure component. It also prevents the shared Core from accumulating
 dependencies on its future Runtime and Sessions consumers. The proposal records
-the [reserved crate map](./rust-core-proposal.md#reserved-crate-map),
-[dependency budgets](./rust-core-proposal.md#dependency-budgets-and-graphs), and
-[activation rules](./rust-core-proposal.md#activating-later-boundaries).
+the [reserved crate map](./rust-core.md#reserved-crate-map),
+[dependency budgets](./rust-core.md#dependency-budgets-and-graphs), and
+[activation rules](./rust-core.md#activating-later-boundaries).
 
 ## Lock recommendation
 
 The responsibilities and failure semantics survive these walkthroughs. The
 concrete guarantees recommended for commitment are listed in the proposal's
-[lock table](./rust-core-proposal.md#what-to-lock-after-the-pressure-test).
+[lock table](./rust-core.md#what-to-lock-after-the-pressure-test).
 The first implementation still needs to demonstrate Rust ergonomics, actual
 crash recovery, resource bounds, and the performance of the supported paths.

@@ -25,7 +25,7 @@ tags:
 The proposed Rust rebuild replaces srt with a native confinement adapter.
 This page records the existing backend's capabilities and limitations as evidence
 for that replacement. The current TypeScript host still uses srt. The
-[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox-proposal.md)
+[native sandbox proposal](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-sandbox.md)
 now selects the initial platform mechanisms, launch contract, and support limits.
 
 For the `computer` environment

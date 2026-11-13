@@ -4,7 +4,7 @@ The source-built native host implements **ACP first**, with negotiated
 extensions for product behavior the selected version cannot express. This
 document distinguishes the available wire contract from later Desktop and
 client integrations. The
-[core proposal](./rust-core-proposal.md#native-executable-and-headless-host)
+[core proposal](./rust-core.md#native-executable-and-headless-host)
 owns process lifetime, and the [feature catalog](../../../docs/agent/features.md)
 owns the promised behavior.
 
@@ -122,7 +122,7 @@ extensions produce a defined fallback or unavailable outcome.
 | Capability family  | Additional semantics                                                                                                                                                                                                                                                                         |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Durable sessions   | Identified acceptance, retry reconciliation, snapshots/cursors, queue and steering controls, verified pause/resume/settlement, history derivation, child-session controls. Product-owned goal payloads and host timer operations use these mechanisms. Reuse equivalent standard operations. |
-| Host configuration | Typed persistent-default inspection, set/reset, revision checks, and reload. The [configuration proposal](./rust-config-proposal.md) owns the field semantics.                                                                                                                               |
+| Host configuration | Typed persistent-default inspection, set/reset, revision checks, and reload. The [configuration proposal](./rust-config.md) owns the field semantics.                                                                                                                                        |
 | Client surfaces    | Resource access or editor actions missing from standard ACP, plus optional structured view data. Each action has a capability schema and required authority. The adapter preserves call and endpoint correlation. Domain fields follow the capability. Pure styling requires no operation.   |
 
 These families organize the review. They do not enable every listed action as
@@ -547,7 +547,7 @@ projects current or latest retained check results. `supportedEvents`, `hooks`
 and `results` are bounded; a result's `operation` is null when no operation was
 admitted. Inspection neither discovers programs nor executes a handler. Trusted
 host launch policy owns registration and executable authority. See the
-[configuration binding](./rust-config-proposal.md#hook-definitions).
+[configuration binding](./rust-config.md#hook-definitions).
 
 ### Gateway settlement lookup
 
