@@ -5,21 +5,14 @@
  * `@/kits/agent-chat` tool-card renderer.
  */
 
-import Link from "next/link";
 import { ChatMessageView } from "@/kits/agent-chat";
-import { TOOL_CARD_DEMOS } from "../_scenarios";
+import { TOOL_CARD_DEMOS } from "../_tool-card-demos";
 
 export default function AiChatToolsDemoPage() {
   return (
     <main className="container mx-auto max-w-screen-xl py-10">
       <div className="space-y-6">
         <div>
-          <p className="mb-2 text-muted-foreground text-xs">
-            <Link href="/ui/components/ai-chat" className="hover:underline">
-              AI Chat
-            </Link>{" "}
-            / Tools
-          </p>
           <h1 className="text-3xl font-bold">AI Chat Tool Cards</h1>
           <p className="max-w-2xl text-muted-foreground text-sm">
             Static examples for every agent tool renderer and its key active
