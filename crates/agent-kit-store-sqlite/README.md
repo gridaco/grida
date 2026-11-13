@@ -178,3 +178,60 @@ A turn view reports its history position, and a history contribution or
 answer-with-contribution applies only while that position is unchanged.
 External answers and history contributions are rejected after cancellation,
 while the turn owner can still record already-observed outcomes.
+
+## Delete an idle session
+
+`delete_idle` removes one saved session conditionally and retires its identity.
+A `DeleteSession` names the session, its owner-defined catalog scope, a stable
+request identity, and the observed session and catalog revisions. In one
+immediate transaction the store checks both revisions, requires no active turn,
+no live owner and an empty queue, and runs the owner's pure checks over the
+session's configuration and driver state and over each retained turn within
+the history scan bounds. It then removes the session's submissions, request
+receipts, turns, history views and context replacements, and records the
+identity in `session_retirements`. A retired identity cannot be created again
+(`session_identity_retired`), and an absence check for a deterministic
+identity treats it as taken.
+
+An exact retry returns the original `SessionDeleted` receipt without
+rechecking retired state; `deletion_receipt` reads that receipt. A changed
+revision or a request reused with different content is a conflict, and a busy
+or queued session is refused with `session_deletion_requires_idle` or
+`session_deletion_requires_empty_queue`.
+
+`delete_idle_with_dependents` also retires a reviewed family. The caller first
+reads `retirement_dependencies` for an owner-defined dependent scope, which
+returns at most 128 sessions and a basis over their membership and revisions,
+and passes that scope and basis in `DeleteDependents`. The deletion fails with
+`session_deletion_dependencies_changed` if the basis moved; otherwise every
+dependent must be idle and pass the owner's checks, and all are retired in the
+same transaction.
+
+Removal of owner storage outside the database is two-phase.
+`delete_idle_with_cleanup` and `delete_idle_with_dependents` retain an
+optional 32-byte cleanup identity with the retirement. After a restart,
+`pending_retirement_cleanup` pages through retirements still awaiting cleanup,
+16 at a time, and `finish_retirement_cleanup` clears only that exact identity
+once the owner has verified removal. Retrying the exact deletion request
+returns the cleanup identity while it is still pending.
+
+## Read history backward
+
+`history_replay_window` reads the current view of a session from newest to
+oldest in bounded windows without acquiring a lease. The caller supplies a
+pure projection from each turn to its displayed records and a measure that
+returns a record's displayed size, or zero for a record it does not show. A
+window holds up to 128 displayed records and 256 KiB, scans up to 32 turns or
+the history byte limit per call, and refuses a single record over 1 MiB. It
+returns the records in history order with the turn that committed each one,
+recorded facts about each contributing turn (status, start and settle times,
+reported context tokens, whether the window holds the turn's newest record,
+and the account of a settled turn that added no records), and an opaque
+`ReplayCursor` for the next older window, or none at the start of the view.
+Inherited seed records come last and belong to no turn of this session.
+
+The cursor is bound to the view and to the turn and position at which it cut.
+If history is revised, or the cut turn's journal position changes, the next
+read fails with `history_replay_window_changed`; restart from the latest
+window. `open_history_replay` instead captures the current view once and
+yields its seed, settled turns in pages, and the projected active turn last.
