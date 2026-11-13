@@ -65,6 +65,12 @@ Message and call identities are scoped to the supplied inference attempt.
 Usage observations share that attempt identity. Missing usage stays absent.
 Cache-related counters retain their provider-specific meanings.
 
+Every adapter validates each emitted tool call's arguments as JSON before
+emitting the call. An unparseable call fails the attempt as an interrupted
+protocol error (`invalid_tool_arguments`) instead of reaching the model as a
+correctable error, so the turn ends without automatic correction. Returning a
+malformed call to the model is deliberately deferred.
+
 - `OpenAiCompatible` validates the configured output-token field and usage
   option. Completion requires a finish reason and `[DONE]`. It emits calls
   after the tool-call finish reason and JSON validation. Compatible reasoning
