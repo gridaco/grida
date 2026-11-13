@@ -9,16 +9,12 @@ const MAX_PATH_BYTES = 4096;
 const utf8 = new TextEncoder();
 
 export namespace WorkspaceFileMentions {
-  export type Mode = "native" | "compatibility";
-
   export async function list(
     readdir: WorkspaceArtifact.Readdir,
-    signal: AbortSignal,
-    mode: Mode
+    signal: AbortSignal
   ): Promise<ComposerMention[]> {
     const files: ComposerMention[] = [];
     const directories = [{ path: "", depth: 0 }];
-    const compatibility = mode === "compatibility";
     scan: for (const directory of directories) {
       if (signal.aborted) return [];
       const entries = await readdir(directory.path).catch(() => []);
@@ -33,22 +29,17 @@ export namespace WorkspaceFileMentions {
         )
           continue;
         if (entry.kind === "directory") {
-          // The compatibility catalog keeps its original bounds: depth and
-          // file count.
           if (
-            (compatibility || directories.length < MAX_DIRECTORIES) &&
+            directories.length < MAX_DIRECTORIES &&
             directory.depth < MAX_DEPTH &&
             !entry.name.startsWith(".") &&
             !SKIP_DIRS.has(entry.name)
           )
             directories.push({ path, depth: directory.depth + 1 });
-        } else if (
-          entry.kind === "file" ||
-          (compatibility && entry.kind === "symlink")
-        ) {
+        } else if (entry.kind === "file") {
           files.push({
             id: path,
-            label: compatibility ? entry.name : path,
+            label: path,
             kind: "file",
             path,
             description: path,

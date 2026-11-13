@@ -12,7 +12,7 @@ const entry = (
   kind,
 });
 
-it("offers exact relative paths from this workspace and preserves the compatibility catalog", async () => {
+it("offers exact relative paths from this workspace", async () => {
   const children: Record<string, WorkspaceFsEntry[]> = {
     "": [
       entry("one", "directory"),
@@ -33,30 +33,19 @@ it("offers exact relative paths from this workspace and preserves the compatibil
   );
   const { signal } = new AbortController();
 
-  const native = await WorkspaceFileMentions.list(readdir, signal, "native");
-  expect(native.map(({ label, path }) => ({ label, path }))).toEqual([
+  const mentions = await WorkspaceFileMentions.list(readdir, signal);
+  expect(mentions.map(({ label, path }) => ({ label, path }))).toEqual([
     { label: "one/brief.txt", path: "one/brief.txt" },
     { label: "two/brief.txt", path: "two/brief.txt" },
   ]);
   expect(readdir.mock.calls).toEqual([[""], ["one"], ["two"]]);
-
-  const compatibility = await WorkspaceFileMentions.list(
-    readdir,
-    signal,
-    "compatibility"
-  );
-  expect(compatibility.map(({ label, path }) => ({ label, path }))).toEqual([
-    { label: "brief.txt", path: "one/brief.txt" },
-    { label: "brief.txt", path: "two/brief.txt" },
-    { label: "outside.txt", path: "outside.txt" },
-  ]);
 });
 
 it("does not return stale results or continue discovery after a workspace change", async () => {
   const owner = new AbortController();
   const root = Promise.withResolvers<WorkspaceFsEntry[]>();
   const readdir = vi.fn<WorkspaceArtifact.Readdir>(() => root.promise);
-  const old = WorkspaceFileMentions.list(readdir, owner.signal, "native");
+  const old = WorkspaceFileMentions.list(readdir, owner.signal);
   owner.abort();
   root.resolve([entry("old.txt"), entry("old", "directory")]);
 
@@ -74,36 +63,7 @@ it("bounds discovery even in a wide workspace with no files", async () => {
   );
 
   await expect(
-    WorkspaceFileMentions.list(readdir, new AbortController().signal, "native")
+    WorkspaceFileMentions.list(readdir, new AbortController().signal)
   ).resolves.toEqual([]);
-  expect(readdir).toHaveBeenCalledTimes(64);
-});
-
-it("keeps the compatibility catalog bounded by depth and file count only", async () => {
-  const folders = 100;
-  const readdir = vi.fn<WorkspaceArtifact.Readdir>(async (path) =>
-    path === ""
-      ? Array.from({ length: folders }, (_, index) =>
-          entry(`folder-${index}`, "directory")
-        )
-      : Array.from({ length: 10 }, (_, index) => entry(`${path}/${index}.txt`))
-  );
-  const signal = new AbortController().signal;
-
-  const compatibility = await WorkspaceFileMentions.list(
-    readdir,
-    signal,
-    "compatibility"
-  );
-  // Files beyond the 64th folder are listed, and the walk stops at 800 files.
-  expect(compatibility).toHaveLength(800);
-  expect(compatibility.some(({ path }) => path === "folder-79/9.txt")).toBe(
-    true
-  );
-  expect(readdir).toHaveBeenCalledTimes(81);
-
-  readdir.mockClear();
-  const native = await WorkspaceFileMentions.list(readdir, signal, "native");
-  expect(native).toHaveLength(630);
   expect(readdir).toHaveBeenCalledTimes(64);
 });

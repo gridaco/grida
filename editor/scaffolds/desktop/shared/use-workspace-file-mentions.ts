@@ -14,22 +14,20 @@ import { WorkspaceFileMentions } from "./workspace-file-mentions";
 const NO_MENTIONS: ComposerMention[] = [];
 
 export function useWorkspaceFileMentions(
-  workspaceId?: string,
-  mode: WorkspaceFileMentions.Mode = "native"
+  workspaceId?: string
 ): ComposerMention[] {
-  const request = useMemo(() => ({ workspaceId, mode }), [workspaceId, mode]);
+  const request = useMemo(() => ({ workspaceId }), [workspaceId]);
   const [loaded, setLoaded] = useState<{
     request: typeof request;
     mentions: ComposerMention[];
   }>();
   useEffect(() => {
-    const { workspaceId, mode } = request;
+    const { workspaceId } = request;
     if (!workspaceId) return;
     const owner = new AbortController();
     void WorkspaceFileMentions.list(
       (path) => bridgeWorkspaces.readdir(workspaceId, path),
-      owner.signal,
-      mode
+      owner.signal
     ).then((mentions) => {
       if (!owner.signal.aborted) setLoaded({ request, mentions });
     });
