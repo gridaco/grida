@@ -121,7 +121,6 @@ These are required working mechanisms behind the features above.
 | [Experience](../wg/ai/agent/experience.md) | Detailed behavior, edge cases, and acceptance scenarios for those promises.                    |
 | [Master](../wg/ai/agent/master.md)         | Product strategy and composition that fulfill the promises.                                    |
 | [Components](../wg/ai/agent/components.md) | Reusable execution and durability contracts.                                                   |
-| [FAQ](../wg/ai/agent/faq.md)               | Short answers derived from the owning documents.                                               |
 
 ## Keeping this compact and current
 

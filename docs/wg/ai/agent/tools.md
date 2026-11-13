@@ -27,10 +27,9 @@ introduces an available operation. Execution authority is supplied separately
 by the host and checked before effects. Concrete tool implementations own
 resource access and enforce their operation-specific requirements.
 
-## Locked fundamental tools
+## Tool profiles
 
-An earlier design proposed a locked tool set. The current design puts tool
-profiles in the product harness. Tool names and schemas can be tuned to the
+The product harness owns tool profiles. Tool names and schemas can be tuned to the
 selected models and environment. A core consumer can expose any coherent set
 of declared capabilities.
 
@@ -172,6 +171,4 @@ progress, and results independently.
 
 - [Components](./components.md)
 - [Tool design](./tool-design.md)
-- [Skills](./skills.md)
 - [MCP](./mcp.md)
-- [Subagents](./subagents.md)

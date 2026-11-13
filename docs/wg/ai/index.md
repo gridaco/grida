@@ -27,8 +27,8 @@ For product review, read the three proposals in this order.
 These are the current contracts, with release availability recorded in the
 [feature catalog](../../agent/features.md). They are independent of programming
 language and transport. The
-[agent index](./agent/index.md#earlier-design-studies) also locates the earlier
-studies on sessions, tools, queues, permissions, context, and hosting.
+[agent index](./agent/index.md#topic-contracts-and-studies) also locates the
+topic contracts on tools, permissions, workspaces, events, and hosting.
 
 [Grida's existing bindings](./grida/index.md) and
 [implementation architecture](./grida/architecture.md) describe the existing

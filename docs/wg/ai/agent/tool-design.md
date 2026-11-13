@@ -54,7 +54,7 @@ differs from an ordinary API's in two ways that shape the discipline:
   fills every argument you expose, and forms habits on what it sees.
 - **Changing the surface is costly — most costly where the model is most
   fluent.** Familiar names and schemas can influence tool use. The master
-  chooses a [product tool profile](./tools.md#locked-fundamental-tools) and
+  chooses a [product tool profile](./tools.md#tool-profiles) and
   evaluates its behavior with the selected models.
   For a tool the model never trained on, the cost is narrower — keeping
   live and resumed sessions consistent with the calls already in their
@@ -206,7 +206,7 @@ actionable detail.
 Not every capability should be a tool. Three surfaces extend what an agent
 can do, and they answer three different questions. The
 surface-selection matrix is canonical in
-[Skills / decision matrix](./skills.md); this is the _design reasoning_
+[Master / context and tool design](./master.md#context-and-tool-design); this is the _design reasoning_
 behind it.
 
 - A **tool** is a capability you **own and shape**. It is part of the
@@ -221,7 +221,7 @@ behind it.
   not control its surface.
 - A **skill** is **not a capability at all** — it is procedural knowledge,
   a recipe for _using_ capabilities, loaded on demand and free until
-  invoked (see [Skills](./skills.md)). Reach for a skill when the thing is
+  invoked (see [Master / context and tool design](./master.md#context-and-tool-design)). Reach for a skill when the thing is
   a procedure (prose, deletable without breaking the agent), not a new
   callable.
 

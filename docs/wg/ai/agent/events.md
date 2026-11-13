@@ -172,7 +172,7 @@ An attention consumer needs only two facts, a verified settlement
 with its outcome or an outstanding approval wait. Both carry the chat
 and turn identity. The host may project those facts alone. A consumer
 that needs to render Stop or Send reads the
-[session status](./session.md#session-status). Event delivery is
+[session status](./components.md#session-driver-state). Event delivery is
 read-only and grants no authority to start a turn or answer approval.
 
 ## The first consumer: host notifications
@@ -327,11 +327,6 @@ A conforming implementation MUST hold all of these:
 
 - [Turn Authority](./turn-authority.md) — the authority direction
   this channel's reports follow.
-- [Turn Queue](./queue.md) — how queued input advances; this channel
-  reports turn outcomes and does not drive the queue.
-- [Session Lifecycle](./session.md#session-status) — the per-session
-  status back-channel this channel complements, and the persisted
-  approval state the doorbell points at.
 - [Triggers](./triggers.md) — non-human turn sources whose turns
   publish the same facts (a scheduled turn that fails wants the same
   notification as a human one).

@@ -98,28 +98,19 @@ The product's [acceptance scenarios](./experience.md#judge-the-experience-by-out
 connect these requirements to observable behavior. Performance comparisons must
 state the task, success criteria, available capabilities, and resource allowance.
 
-## Earlier design studies
+## Topic contracts and studies
 
-The following pages retain detailed studies and contracts from the earlier
-agent design. They are useful source material when refining a component or
-product behavior. The current contracts above govern where their requirements
-differ. Each older page's implementation or feature-status claims
-remain scoped to the design it describes.
+These pages specify one topic each. They defer to the three contracts above
+for every concept those contracts own.
 
-In particular, the earlier fixed tool profile, universal loop, internal stream
-format, storage schema, and default queue-drain behavior are earlier design
-choices. Their concrete representations do not constrain the current design.
-The product's new Stop behavior pauses automatic queue advancement until the
-user resumes it.
-
-| Topic                         | Existing studies                                                                                                                                                                                                                                                  |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Foundations and environment   | [Foundations](./foundations.md), [Environments](./environments.md), [Execution authority](./execution-authority.md), [Retired sandbox backend study](./srt.md)                                                                                                    |
-| Durable work and control      | [Session lifecycle](./session.md), [Persistency](./persistency.md), [Turn queue](./queue.md), [Turn authority](./turn-authority.md), [Lifecycle events](./events.md)                                                                                              |
-| Capability and context design | [Tools](./tools.md), [Tool design](./tool-design.md), [Skills and project instructions](./skills.md), [MCP and connectors](./mcp.md), [Visual perception](./vision.md), [Binary files](./binary.md), [Scratch](./scratch.md)                                      |
-| Product behavior              | [Compositor](./compositor.md), [UX patterns](./ux.md), [Plan mode](./mode-plan.md), [Subagents](./subagents.md), [Triggers](./triggers.md), [Cost optimization](./cost-optimization.md)                                                                           |
-| Inspection and hosting        | [Debugging](./debugging.md), [Local daemon](./daemon.md), [FAQ](./faq.md)                                                                                                                                                                                         |
-| Protocol and provider studies | [ACP integration](./acp.md), [ACP provider class](./acp-provider.md), [Codex provider profile](./acp-provider-codex.md), [Subscription provider](./chatgpt-subscription-provider.md), [AI SDK](./ai-sdk/index.md), [Vision lowering](./ai-sdk/vision-lowering.md) |
+| Topic                         | Pages                                                                                                                                                                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Environment and authority     | [Environments](./environments.md), [Execution authority](./execution-authority.md), [Permission policy](./permissions.md), [Workspaces](./workspace.md), [Retired sandbox backend study](./srt.md) |
+| Durable work and control      | [Turn authority](./turn-authority.md), [Lifecycle events](./events.md), [Hooks](./hooks.md)                                                                                                        |
+| Capability and context design | [Tools](./tools.md), [Tool design](./tool-design.md), [MCP and connectors](./mcp.md), [Visual perception](./vision.md), [Binary files](./binary.md), [Scratch](./scratch.md)                       |
+| Product behavior              | [Compositor](./compositor.md), [Plan mode](./mode-plan.md), [Triggers](./triggers.md), [Cost optimization](./cost-optimization.md)                                                                 |
+| Hosting                       | [Local daemon](./daemon.md)                                                                                                                                                                        |
+| Protocol and provider studies | [ACP integration](./acp.md), [ACP provider class](./acp-provider.md), [Codex provider profile](./acp-provider-codex.md), [Subscription provider](./chatgpt-subscription-provider.md)               |
 
 [Grida bindings](../grida/index.md) describe the existing product's concrete
 integration. They remain a separate reference for that implementation.

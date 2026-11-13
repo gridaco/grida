@@ -31,11 +31,10 @@ both: the agent **explores read-only, produces a reviewable plan, and
 executes only after a human approves it.**
 
 This page specifies plan mode as a **mode** — a named operating regime —
-and the contract that governs moving between regimes. It is the dedicated
-treatment of the plan/build pattern introduced as an opinionated subagent
-shape in [`subagents`](./subagents.md#plan--build-mode); that page says
-plan mode is a pattern hosts MAY layer, and this page says **what that
-pattern is** when a host chooses to ship it.
+and the contract that governs moving between regimes. Plan mode is a
+pattern hosts MAY layer; this page says **what that pattern is** when a
+host chooses to ship it. The user-facing behavior is owned by
+[Experience / plan before acting](./experience.md#plan-before-acting).
 
 The keywords **MUST**, **MUST NOT**, **SHOULD**, **MAY** are used as in
 [RFC 2119](https://datatracker.ietf.org/doc/html/rfc2119).
@@ -117,13 +116,13 @@ be **gated on a human act** — no transition originates from the model's
 own decision alone.
 
 In this guide's session schema the carrier is the
-[per-message agent override](./persistency.md#chat_messages): the new
+[per-message agent override](./components.md#storage-and-recovery): the new
 regime's agent id is written onto the **next user message**
 (`metadata_json.agent`), and the loop runs that agent for that turn and
 onward; the opened-with `chat_sessions.agent` is left immutable. A
 human's approval — whether a button or a typed "looks good, go" — is the
 **same wire event**: a user message carrying the override. See
-[`faq` / approve-and-auto](./faq.md) for why a click and a typed approval
+[Experience / understand permissions and questions](./experience.md#understand-permissions-and-questions) for why a click and a typed approval
 are not different cases.
 
 ### I4 — The plan is an artifact the agent produces and a human reviews before execution
@@ -268,17 +267,6 @@ capability layer rather than by prompt alone.
 
 ## See also
 
-- [Subagents](./subagents.md#plan--build-mode) — the opinionated pattern
-  this page is the dedicated treatment of; agents-as-data with different
-  permission sets.
-- [FAQ](./faq.md) — approve-and-continue as a user message; the
-  structured-pick paths; the "plan mode is not a protocol primitive"
-  framing.
-- [Persistency](./persistency.md#chat_messages) — the per-message agent
-  override (`metadata_json.agent`) that carries a transition.
-- [Skills and Project Instructions](./skills.md) — a scenario carried as a
-  skill is a natural home for a mode-default and for the agent-proposed
-  "when to suggest planning" instruction.
 - [Tools](./tools.md) — the locked-vs-host-shipped boundary a
   propose/exit tool sits on; the `question` tool it is a sibling of.
 - [Compositor](./compositor.md) — injected instruction and the

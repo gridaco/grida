@@ -46,7 +46,7 @@ to what the model sees. The principle the rest of the doc rests on:
 
 The compositor and the [editor context](#editor-context) sit on the
 same vocabulary; UX patterns that ride on top (queued sends, sidecar,
-memory) live in [`ux`](./ux.md).
+memory) live in [User experience](./experience.md).
 
 ## The user message shape
 
@@ -241,7 +241,7 @@ The acquisition and authority rules are:
 Attaching a directory and working in a directory are different user
 intents. Promoting the reference to a workspace, or otherwise granting
 write access, requires a separate explicit action. Under the
-[directory-rooted execution](./foundations.md#directory-rooted-execution)
+[directory-rooted execution](./components.md#files-workspaces-and-scratch)
 model, making it the working root starts a new session; a host that
 supports additional writable roots MUST still obtain a distinct write
 grant. The original drop alone is never sufficient write authority.
@@ -251,7 +251,7 @@ unavailable, or moved. In that state the compositor renders an
 unavailable reference and the runtime fails closed. Resuming the same
 session MAY re-establish its session grant; replaying the message into a
 new session or fork MUST NOT create authority from the persisted part
-alone. See [permission scopes](./session.md#permission-scopes).
+alone. See [permission scopes](./permissions.md).
 
 ### Multi-modal handling
 
@@ -339,7 +339,7 @@ A mention to a **skill** is a special case: the model never sees the
 literal `@skill:...`. Instead, the compositor records the intent in
 the persisted user message (for the inspector / replay), and the
 skill body lands in context via the normal
-[`skill` tool](./skills.md) flow. This keeps the model's input clean
+[skill](./master.md#context-and-tool-design) flow. This keeps the model's input clean
 and avoids two paths for "the same skill."
 
 A mention to a **file** lowers to a file-ref. A mention to a **doc
@@ -451,7 +451,7 @@ entity into the compositor.
   model is not forced to act on it. `editor-context` is a host-driven
   description of observed UI state at the recorded time. That observation
   does not promote embedded document content into trusted instructions.
-- **vs Memory** ([`ux / memory`](./ux.md#memory)) — Memory is
+- **vs Memory** ([Experience / keep useful results and history](./experience.md#keep-useful-results-and-history)) — Memory is
   **durable** across turns and sessions. Editor context is
   **ephemeral** — a snapshot at the moment of the user's message.
 - **vs skills / `/` commands** — a `/` command invokes a host action
@@ -526,7 +526,7 @@ Per part type:
 | `directory-ref`   | Folder chip / link                               | `{ type: "directory-ref", ref }`                                 | A compact descriptor naming the tool-addressable directory scope. Descendant contents are never inlined by lowering.                                                                                                       |
 | `file-attachment` | Thumbnail or file chip                           | `{ type: "file-attachment", data?, url?, mime, name, … }`        | The declared route's provider-native block, tool-addressable staged-copy descriptor, or explicit composite of both. Either leg may appear alone only when the routing result selected that fallback.                       |
 | `command`         | Resolved chip / palette result                   | `{ type: "command", id, args }`                                  | **Nothing** when the command is host-action-only. Otherwise the command's result lowered as text/file parts (e.g. `/read foo.ts` → the file's contents). The literal `/foo` is never sent.                                 |
-| `mention` (skill) | Chip / pill in the input                         | `{ type: "mention", target }`                                    | **Nothing** in the user message; the [skill body](./skills.md) loads via the normal `skill` tool flow.                                                                                                                     |
+| `mention` (skill) | Chip / pill in the input                         | `{ type: "mention", target }`                                    | **Nothing** in the user message; the [skill body](./master.md#context-and-tool-design) loads via the normal `skill` tool flow.                                                                                             |
 | `mention` (file)  | Same                                             | Same                                                             | Lowered as a `file-ref` (and from there per the file-ref row).                                                                                                                                                             |
 | `mention` (other) | Same                                             | Same                                                             | Lowered as an `editor-context` part if it resolves to an entity; otherwise dropped.                                                                                                                                        |
 | `editor-context`  | Chip / collapsible / inline-quote                | `{ type: "editor-context", kind, source?, payload, emitted_at }` | A structured-text block the model can discriminate. **Default**: `<editor_context kind="..." source="...">payload-as-text</editor_context>`. Implementors MAY substitute, but the marker SHOULD be stable for portability. |
@@ -630,7 +630,7 @@ A conforming compositor MUST:
 - Resolve commands at submission time; never let the model parse a
   literal `/foo` out of prose.
 - Resolve skill mentions before the model sees them; the skill body
-  loads via the [`skill` tool](./skills.md), not via a string
+  loads as a selected [skill](./master.md#context-and-tool-design), not via a string
   wrapper.
 - Emit ephemeral editor state (selection on non-file entities, open
   documents, recent actions) as `editor-context` parts rather than
@@ -660,15 +660,5 @@ A conforming compositor MUST:
 
 ## See also
 
-- [UX Patterns](./ux.md) — queued sends, sidecar forks, memory,
-  the patterns that ride on top of the compositor.
-- [Skills](./skills.md) — how skill bodies actually enter context
-  (not via mention strings).
 - [Tools](./tools.md) — the `read`, `web_fetch`, and host-supplied
   tools the compositor's refs flow into.
-- [Persistency](./persistency.md) — how the persisted user message
-  is stored (`data_json` carries the typed part verbatim).
-- [Session Lifecycle](./session.md) — what happens after the
-  compositor's submission: the turn fires, the lowering chain runs.
-- [Debugging](./debugging.md) — the canonical inspection format
-  that records what the compositor emitted, at every stage.

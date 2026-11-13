@@ -24,7 +24,7 @@ tags:
 An agent runs in **one of three environments**. The environment
 determines which capabilities the runtime can offer, how the
 sandbox is enforced, and how the locked tool set
-([`foundations / locked tools`](./foundations.md#locked-fundamental-tools))
+([Tools](./tools.md))
 degrades. Choosing the environment is the host's call; the agent
 sees only the capabilities the chosen environment exposes.
 
@@ -147,7 +147,7 @@ continue an interrupted session.
   compromised agent that escapes the runtime's capability check is
   still bounded by the container.
 - Snapshot the container's filesystem at user-message boundaries if
-  side-effect rewind ([`session / rewinding`](./session.md#rewinding))
+  side-effect rewind ([Master / branching and editing history](./master.md#branching-and-editing-history))
   is required.
 - Run one container per session to avoid cross-session interference.
 - Time-bound the container (idle timeout, max lifetime).
@@ -193,7 +193,7 @@ concrete platform choices and support boundary live in the
 For `shell.run`, the host creates a confined process tree from the effective
 grant: the host/user ceiling ∩ declared requirements ∩ parent-delegable
 authority. The watchdog may narrow that result; it cannot mint authority
-([`foundations / watchdog`](./foundations.md#watchdog)). The trusted agent host
+([Permission policy](./permissions.md)). The trusted agent host
 uses its own authority and selected containment profile. Its provider calls use
 the host-service destination grant and transport.
 
@@ -216,7 +216,7 @@ the agent.
 
 **Persistence.** Local-first, durable. The session store is a
 filesystem-resident database
-([`persistency`](./persistency.md)). Sync, if added, is a layer above.
+([Components / storage and recovery](./components.md#storage-and-recovery)). Sync, if added, is a layer above.
 
 **Recommended discipline.**
 
@@ -260,9 +260,9 @@ Regardless of environment:
   the underlying capability outright.
 - **The session shape is the same.** A session row from a web host is
   inspectable next to a session row from a desktop host
-  ([`persistency`](./persistency.md)).
+  ([Components / storage and recovery](./components.md#storage-and-recovery)).
 - **The streaming substrate is the same.** AI SDK v6 chunks regardless
-  of where the loop runs ([`foundations / streaming substrate`](./foundations.md#streaming-substrate-ai-sdk-v6)).
+  of where the loop runs ([Components / inference](./components.md#inference)).
 - **Subagents share the parent's environment.** A subagent spawned in
   a cloud sandbox runs in the same container; a subagent spawned in
   the web environment is also a browser-side runner.
@@ -280,10 +280,4 @@ Regardless of environment:
 
 ## See also
 
-- [Foundations](./foundations.md) — the locked tool set and the
-  capability vocabulary every environment must honor.
-- [Session Lifecycle](./session.md) — what the loop does regardless
-  of environment.
-- [Persistency](./persistency.md) — the session store every
-  environment can plug into.
 - [Tools](./tools.md) — per-tool detail and the result envelope.

@@ -37,7 +37,7 @@ fired** — and the answer is a single rule:
 > local state. The fact travels on the wire, sourced from the core.
 
 This is the inverse of an easy mistake. When the [Turn
-Queue](./queue.md) drains, the natural-seeming shortcut is for a
+Queue](./master.md#input-during-work-and-stopping) drains, the natural-seeming shortcut is for a
 client to watch its own status back-channel, see the session go busy,
 and conclude "the core must have just fired the head of my queue." It
 then promotes that head into the transcript. The shortcut is wrong,
@@ -49,8 +49,8 @@ The keywords **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**,
 
 ## The problem: a status channel that omits identity
 
-The [session status](./session.md#session-status) back-channel
-projects the [run-state machine](./queue.md#the-run-state-machine):
+The [session status](./components.md#session-driver-state) back-channel
+projects the [run-state machine](./master.md#input-during-work-and-stopping):
 `idle` / `busy` / `retrying` / `error`, with an optional retry
 `attempt`, a human-readable `message`, and a `started_at`. It answers
 **"is a turn running?"** It does **not** answer **"which message is
@@ -66,7 +66,7 @@ Here is the race, in domain terms:
 
 1. A client keeps an **optimistic mirror** of the queue — a local,
    FIFO-ordered copy of the pending messages, for instant feedback.
-   It is a [display nicety, not an authority](./queue.md#the-core--host--ui-boundary);
+   It is a [display nicety, not an authority](./master.md#input-during-work-and-stopping);
    the authoritative queue is the core's persisted-message set.
 2. The core drains **serially**: on a clean idle edge it dequeues the
    earliest pending message (clears its `queued_at`), then fires its
@@ -126,9 +126,9 @@ gets the rapid-drain race slightly differently, and the queue / fork /
 rewind surface multiplies subtle, host-specific bugs that no shared
 test can catch — because the racing logic lives in the host, not the
 core. A turn promoted to the wrong id corrupts the rewind checkpoints
-([rewind is to a user message](./session.md#rewinding)) and the fork
+([rewind is to a user message](./master.md#branching-and-editing-history)) and the fork
 points ([a fork copies up to a message
-id](./session.md#forking)) that are keyed on that id.
+id](./master.md#branching-and-editing-history)) that are keyed on that id.
 
 The cross-cutting nature is exactly the test for an own-page contract:
 the join point between "core decides what runs" and "client renders
@@ -145,7 +145,7 @@ The core is the single authority on turn lifecycle. Concretely:
 
 - The core **MUST** be the only component that decides which message
   becomes a running turn (it already is — the [drain lives in the
-  core](./queue.md#the-run-state-machine)).
+  core](./master.md#input-during-work-and-stopping)).
 - The core **MUST** report that decision on the wire, naming the
   message it fired.
 - A client **MUST** treat that report as the source of truth for the
@@ -175,7 +175,7 @@ host emits and a conforming client reads:
   message and lets a client settle its rendering.
 - **Turn aborted / failed** — the turn ended abnormally, with its
   `message_id` and a reason. Distinguished from a clean finish because
-  a [hard error pauses the drain](./queue.md#the-run-state-machine)
+  a [hard error pauses the drain](./master.md#input-during-work-and-stopping)
   and the client must reflect that the queue did not advance.
 
 The existing `idle` / `busy` / `retrying` / `error` projection
@@ -215,7 +215,7 @@ regardless of whether it holds a mirror:
   their own way.
 
 This is the same strict-layering discipline the [streaming
-layer](./session.md#strict-layering) already holds — the core states,
+layer](./master.md#context-and-tool-design) already holds — the core states,
 the host transports, the client renders — extended from the chunk
 stream to the turn-lifecycle back-channel. The chunk stream already
 names what it is producing; the lifecycle channel must too.
@@ -243,7 +243,7 @@ most of the time and silently corrupts the transcript the rest.
 
 ### Lengthen the settle delay so the mirror always reconciles first
 
-The [drain cadence](./queue.md#drain-discipline) already inserts a
+The [drain cadence](./master.md#input-during-work-and-stopping) already inserts a
 settle delay between idle and the next fire. One could widen it until
 the mirror is guaranteed to have reconciled before the next `busy`
 edge. **Rejected:** it trades correctness for a tuning constant. The
@@ -268,7 +268,7 @@ the fork-per-host failure restated.
 
 Drop the core drain entirely and let each client hold its pending
 messages and resubmit them on idle. **Rejected for the same reason the
-[queue page](./queue.md#the-core--host--ui-boundary) rejects it:** a
+[queue page](./master.md#input-during-work-and-stopping) rejects it:** a
 client-private queue is invisible to every other consumer, drops when
 the client closes, and cannot serve a host with no human present. The
 cloud runtime and CLI make this non-negotiable — there is no client
@@ -298,7 +298,7 @@ sequencing a host follows:
    and is reconciled against the reports, never consulted for the
    promote.
 3. **Add finished / aborted transitions** so a client can settle by id
-   and reflect a [paused drain](./queue.md#the-run-state-machine) on
+   and reflect a [paused drain](./master.md#input-during-work-and-stopping) on
    hard error without inferring it from a bare `error` state.
 
 A host that has not yet migrated still renders turns — it just keeps
@@ -334,28 +334,17 @@ A conforming implementation MUST hold all of these:
 - **The packetization.** Whether the fired-message identity rides on
   the existing status frame or a parallel lifecycle channel, and
   whether the transport is SSE, IPC, or polling, is the host's — same
-  as the [status transport](./queue.md#what-this-guide-does-not-specify).
+  as the [status transport](./master.md#input-during-work-and-stopping).
 - **Whether a client keeps an optimistic mirror at all.** A renderer
   wants one for instant feedback; a CLI may not. The contract requires
   only that _if_ a mirror exists it is reconciled, never authoritative.
 - **The drain discipline.** Serial vs coalescing is the [queue
-  page's](./queue.md#drain-discipline) concern. A coalescing drain
+  page's](./master.md#input-during-work-and-stopping) concern. A coalescing drain
   reports the fired turn's constituent message ids by the same rule;
   the identity requirement does not change with granularity.
 
 ## See also
 
-- [Turn Queue](./queue.md) — the run-state machine and drain this
-  contract makes legible; the core-vs-surface boundary that demotes the
-  client mirror to a display nicety.
-- [Session / session status](./session.md#session-status) — the
-  run-state back-channel this contract extends with fired-message
-  identity.
-- [Session / rewinding](./session.md#rewinding) and
-  [forking](./session.md#forking) — the `message_id`-keyed checkpoints
-  a wrong promotion corrupts.
-- [UX / queued sends](./ux.md#queued-sends) — the user-facing framing
-  of the queue whose drain this governs.
 - [Grida Gateway (GG)](../../platform/hosted-ai.md)
   — hosted model capacity ships; a remote agent runtime remains a future
   consumer this contract is written ahead of.

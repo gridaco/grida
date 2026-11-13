@@ -14,7 +14,7 @@ tags:
 # Built-in subagents
 
 This page is the **Grida binding** of the agent RFC's specialized
-subagent pattern ([`../agent/subagents.md#specialized-subagents`](../agent/subagents.md)).
+subagent pattern ([Master / delegation and verification](../agent/master.md#delegation-and-verification)).
 The RFC names the shape: an internal agent the runtime invokes with a
 constrained prompt and bounded cost. This page records what Grida runs and
 the product decisions for each.
@@ -56,7 +56,7 @@ silent; the chat stays untitled.
 
 ## Compaction
 
-**Contract.** Realizes [`../agent/session.md#compaction`](../agent/session.md)
+**Contract.** Realizes [Master / context and tool design](../agent/master.md#context-and-tool-design)
 as one bounded, tool-free summary of portable earlier context.
 
 **Triggers.** Automatic when the assembled context approaches the model's
@@ -75,8 +75,8 @@ outcome (stale, stopped, uncertain, failed, no change) leaves history intact.
 
 ## Planner (future)
 
-Plan/build is an opinionated subagent pattern named in
-[`../agent/subagents.md#plan--build-mode`](../agent/subagents.md). Until it
+Plan/build is the opinionated pattern specified in
+[Plan mode](../agent/mode-plan.md). Until it
 ships, agents that want a plan step use the locked `todo` tool inline.
 
 ## Adding a built-in subagent
@@ -86,13 +86,11 @@ yes, it is a built-in. Titling, compaction, and plan generation pass;
 canvas-specific extraction or form-builder helpers do not.
 
 1. Confirm the RFC carries the pattern shape — if not, propose it to
-   [`../agent/subagents.md`](../agent/subagents.md) first.
+   [Master / delegation and verification](../agent/master.md#delegation-and-verification) first.
 2. Add a row to the [catalog](#catalog) and a section here.
 3. State the cost bounds (input, output, timeout, tools) explicitly.
    Specialized subagents are where runaway cost compounds silently.
 
 ## See also
 
-- [Agent system RFC / Subagents](../agent/subagents.md)
-- [Agent system RFC / Session lifecycle / compaction](../agent/session.md#compaction)
 - [Fundamental tools (Grida binding)](./tools-fundamentals.md)

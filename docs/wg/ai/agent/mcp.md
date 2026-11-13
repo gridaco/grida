@@ -231,10 +231,6 @@ to its source trust and authority.
 ## See also
 
 - [Tools](./tools.md) — the contract MCP tools obey.
-- [Skills](./skills.md) — the sibling lazy-discovery layer for
-  domain knowledge.
-- [Foundations](./foundations.md) — the watchdog the trust policy
-  rides on.
 - [ACP integration](./acp.md) — capability flags
   (`mcpCapabilities.http`, `mcpCapabilities.sse`) advertised at
   initialize.

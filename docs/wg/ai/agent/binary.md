@@ -49,7 +49,7 @@ chooses.
 > the descriptor fallback, the storage threshold), see
 > [`compositor / attachments`](./compositor.md#attachments--the-long-tail).
 > For the broader skill discovery and loading flow, see
-> [`skills`](./skills.md).
+> [Master / context and tool design](./master.md#context-and-tool-design).
 
 ## The three resolution paths
 
@@ -165,7 +165,7 @@ Skill discipline for binary handling:
   not installed; please install via `apt install libreoffice` or
   attach the file as a PDF") rather than retrying blindly.
 
-See [`skills`](./skills.md) for the general skill contract (manifest
+See [skill policy](./master.md#context-and-tool-design) for the general skill contract (manifest
 shape, discovery, body loading).
 
 ## Shell-based conversion
@@ -184,7 +184,7 @@ Shell is the **least preferred** of the three paths because:
   environment (not portable across hosts).
 - It requires `shell.run` in the agent's manifest (a meaningful
   capability grant).
-- It requires the watchdog ([`foundations / watchdog`](./foundations.md#watchdog))
+- It requires the watchdog ([Permission policy](./permissions.md))
   to approve the specific command shape.
 - It produces unstructured stdout the agent has to parse.
 
@@ -307,9 +307,6 @@ A conforming implementation SHOULD:
   storage threshold.
 - [Compositor / templating](./compositor.md#templating-user-view-vs-model-view) —
   the lowering chain that picks one of the three paths.
-- [Skills](./skills.md) — the general contract for skill discovery,
-  loading, and the descriptor-first index. The skill-per-format
-  pattern is the same machinery applied to binary handling.
 - [Tools / bash](./tools.md) — the capability that backs
   shell-based conversion.
 - [Visual perception](./vision.md) — the adjacent problem: perceiving a

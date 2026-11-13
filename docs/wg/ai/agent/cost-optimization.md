@@ -33,7 +33,7 @@ This page is a **doctrine and case study**, not a tool spec. It names
 the cost model of an agent loop, the recurring leaks that follow from
 ignoring it, and the discipline that closes them. Tools and mechanisms
 mentioned here may be idealized rather than as-shipped; the sibling
-pages ([Session Lifecycle](./session.md), [Tools](./tools.md),
+pages ([Components / sessions](./components.md#sessions), [Tools](./tools.md),
 [Tool Design](./tool-design.md)) own the normative contracts this page
 reasons about.
 
@@ -166,7 +166,7 @@ The discipline:
   request, so the cacheable prefix covers everything already sent.
 - **The prefix MUST be stable.** Caching is prefix-matching. The
   system-prompt assembly order is fixed
-  ([Session / system prompt assembly](./session.md#system-prompt-assembly)),
+  ([Master / context and tool design](./master.md#context-and-tool-design)),
   history is append-only, and — critically — **replayed history MUST
   NOT be mutated between steps**. Any transformation of past messages
   (pruning, placeholder substitution, re-serialization that reorders
@@ -225,7 +225,7 @@ Two related failures:
 - **No pruning of stale outputs at replay time.** A file read from
   forty steps ago — of a file since rewritten — is not just dead
   weight; it is _stale_ context that can mislead. The contract answer
-  is [tool-output pruning](./session.md#tool-output-pruning-vs-compaction):
+  is [tool-output pruning](./master.md#context-and-tool-design):
   protect a recent-output budget, replace older outputs with a stub
   that preserves the call + arguments ("I read file X" survives; X's
   old bytes do not).
@@ -248,7 +248,7 @@ configured independently:
 - The **window** the loop requests (some providers gate a long-context
   window behind an opt-in request flag).
 - The **compaction threshold**, which
-  [derives from the window](./session.md#threshold) — raise the window
+  [derives from the window](./master.md#context-and-tool-design) — raise the window
   and the threshold rises with it.
 - The **price tier**: the portion of input above the provider's
   long-context threshold bills at a premium (~2×).
@@ -301,7 +301,7 @@ told when to prefer.
 
 The first step of every session pays the **baseline**: system prompt,
 project instructions, skill index, environment context, tool catalog
-([Session / system prompt assembly](./session.md#system-prompt-assembly))
+([Master / context and tool design](./master.md#context-and-tool-design))
 — plus whatever a host injects (workspace listings, template
 catalogs, upload manifests). In the measured incident the baseline
 alone approached 100k tokens before the user's first word.
@@ -315,7 +315,7 @@ step of every session**. The discipline:
   wrong number.
 - The lazy-loading machinery exists to keep the baseline small: skills
   advertise one-line descriptions and load bodies on demand
-  ([Skills](./skills.md)); bulk tool catalogs sit behind search
+  ([Master / context and tool design](./master.md#context-and-tool-design)); bulk tool catalogs sit behind search
   ([MCP / lazy materialization](./mcp.md)). A baseline that inlines
   what those layers were built to defer is re-importing the cost they
   were built to remove.
@@ -325,8 +325,8 @@ step of every session**. The discipline:
 The entire incident above was reconstructible **weeks later, offline,
 with SQL** — because the peer system persisted per-step usage into the
 session store. That is the contract this guide already pins
-([Session / context-window tracking](./session.md#context-window-tracking),
-with the [cache normalization rule](./ai-sdk/index.md#token-usage--the-cache-normalization-rule)),
+([Master / context and tool design](./master.md#context-and-tool-design),
+with the [cache normalization rule](./master.md#usage-and-cost-presentation)),
 and the incident is the argument for it: **usage persistence is the
 flight recorder that pays for itself the first time cost goes wrong.**
 
@@ -345,7 +345,7 @@ The doctrine adds two obligations on top of recording:
 
 Pricing itself stays where the guide put it: next to the model
 catalog, not inside the recorder
-([Session / cost](./session.md#cost)). Observability records tokens by
+([Master / usage and cost presentation](./master.md#usage-and-cost-presentation)). Observability records tokens by
 tier; the catalog turns tiers into money.
 
 ## The ordering
@@ -364,7 +364,7 @@ agent cost, spend it in this order:
 
 Model tiering — the cheapest sufficient model for auxiliary work — is
 already normative where it matters most
-([Session / summarizer cost discipline](./session.md#summarizer-cost-discipline));
+([Master / context and tool design](./master.md#context-and-tool-design));
 the same reasoning extends to any specialized subagent whose task does
 not need the frontier tier.
 
@@ -387,9 +387,3 @@ waiting to be measured.
   prices; the retraction asymmetry that applies to result fields.
 - [Tools](./tools.md) — the result envelope and the truncation
   contract.
-- [Session Lifecycle](./session.md) — compaction, tool-output pruning,
-  context-window tracking, the summarizer's cost discipline.
-- [AI SDK annex](./ai-sdk/index.md) — the cache normalization rule
-  that keeps recorded usage honest.
-- [Skills](./skills.md) and [MCP](./mcp.md) — the lazy-loading layers
-  that keep the baseline small.

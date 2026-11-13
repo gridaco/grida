@@ -87,8 +87,8 @@ checks. The tool-host contract separates those responsibilities.
 ## Reading order
 
 1. This doc.
-2. [agent/foundations.md](../agent/foundations.md).
-3. [agent/tools.md](../agent/tools.md) and [agent/persistency.md](../agent/persistency.md).
+2. [agent/components.md](../agent/components.md#integration-capabilities-and-bounds).
+3. [agent/tools.md](../agent/tools.md) and [agent/components.md / storage and recovery](../agent/components.md#storage-and-recovery).
 4. [tools-fundamentals.md](./tools-fundamentals.md).
 5. [desktop/process-model.md](../../desktop/process-model.md).
 6. [GRIDA-SEC-004](https://github.com/gridaco/grida/blob/main/SECURITY.md#grida-sec-004--desktop-daemon-trust-boundary).

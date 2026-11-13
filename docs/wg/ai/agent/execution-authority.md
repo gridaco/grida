@@ -505,4 +505,3 @@ routing while keeping agent authority confined.
 - [Tools](./tools.md) — structured capability checks and the watchdog.
 - [MCP and Connectors](./mcp.md) — extension trust and per-tool permission
   policy.
-- [Subagents](./subagents.md) — permission intersection for child agents.

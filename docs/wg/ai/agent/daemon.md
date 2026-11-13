@@ -25,7 +25,7 @@ tags:
 
 An agent system that conforms to this guide is already an HTTP
 server on a loopback interface — the host starts it, a client
-transport drives it ([`foundations`](./foundations.md)). What a
+transport drives it ([Components / integration capabilities and bounds](./components.md#integration-capabilities-and-bounds)). What a
 single-host embedding lacks is **discoverability**: the server's
 address and credential live in one supervisor's memory, so only
 that supervisor's client can reach it. Every other would-be client
@@ -171,7 +171,7 @@ every client finds it**.
 
 ## Auth model
 
-Everything in [the session guide's perimeter](./session.md) holds;
+Everything in [the session guide's perimeter](./components.md#sessions) holds;
 the daemon model adds the credential-lifetime question and one
 attach affordance.
 
@@ -304,11 +304,7 @@ A conforming daemon implementation can demonstrate:
 
 ## See also
 
-- [Session Lifecycle](./session.md) — the perimeter the daemon
-  inherits; status streams, resume.
 - [ACP Integration](./acp.md) — the editor-facing adapter that
   rides the daemon as a local-process client.
-- [Debugging](./debugging.md) — what "debug what you ship"
-  buys; the inspection formats served over the same wire.
 - [Environments](./environments.md) — where the daemon sits in
   the web / sandbox / computer taxonomy.

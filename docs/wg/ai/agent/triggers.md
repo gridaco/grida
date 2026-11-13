@@ -97,7 +97,7 @@ Why `role: "user"` and not a new role:
 - Persisting as `role: "user"` keeps the rewind / fork / queue /
   compaction code paths the same.
 - A new role would bend the AI SDK chunk shape
-  ([`foundations`](./foundations.md)) for no behavioral gain.
+  ([Components / integration capabilities and bounds](./components.md#integration-capabilities-and-bounds)) for no behavioral gain.
 
 The cost of this choice is one indirection: an inspector showing
 "who fired this turn" reads `metadata_json.trigger.source` rather
@@ -107,13 +107,13 @@ than `role`. The benefit is that everything else stays simple.
 
 A trigger fires while another turn may be in progress on the same
 session. A trigger message is a `user` message like any other, so it
-obeys the **single, shared [Turn Queue](./queue.md) contract**:
+obeys the **single, shared [turn queue](./master.md#input-during-work-and-stopping) contract**:
 persisted immediately, stamped `metadata_json.queued_at` while a turn
 runs, and fired earliest-first when the session goes idle. Compositor-
 and trigger-originated messages queue against the **same clock** — the
 user is not jumped by a webhook, the webhook is not jumped by the user
 — and no trigger preempts a running turn. The queue is core state; see
-[Turn Queue](./queue.md) for the full rule.
+[Master / input during work and stopping](./master.md#input-during-work-and-stopping) for the full rule.
 
 What is trigger-specific is the **drop** rule: unlike a typed message,
 a trigger MAY be discarded before it ever enters the queue, under two
@@ -130,7 +130,7 @@ host policies:
 
 A dropped trigger never enters the queue — the **trigger layer**
 applies these checks before it submits. The
-[Turn Queue](./queue.md) itself is source-agnostic and owns no drop
+[turn queue](./master.md#input-during-work-and-stopping) itself is source-agnostic and owns no drop
 policy; it serializes whatever a source hands it. Dropping is a
 property of the source (a human never dedupes or throttles
 themselves), not of the queue.
@@ -231,7 +231,7 @@ the user can audit what fired while they were away.
 
 ## Relationship to background subagents
 
-Both [background subagents](./subagents.md#blocking-vs-background)
+Both [background subagents](./components.md#owned-child-sessions)
 and triggers fire turns the foreground user did not type. They are
 distinct primitives:
 
@@ -270,13 +270,13 @@ the host MUST apply:
    triggered message so an inspector can answer "who fired this and
    when did upstream send it."
 
-The watchdog ([`foundations / watchdog`](./foundations.md#watchdog))
+The watchdog ([Permission policy](./permissions.md))
 runs on the trigger-fired turn the same way it runs on a
 compositor turn. A triggered turn does not bypass tool permission
 checks; if anything, hosts SHOULD apply a **stricter** permission
 profile to triggered turns since there is no human present to
 approve an `ask` outcome (headless behavior — see
-[`foundations / watchdog`](./foundations.md#watchdog)).
+[Permission policy](./permissions.md)).
 
 ## Implementor checklist
 
@@ -285,7 +285,7 @@ A conforming implementation that supports triggers MUST:
 - Persist every trigger-fired turn as a `user` message with
   `metadata_json.trigger` set.
 - Apply the same `queued_at` queue rule as the compositor; never
-  start parallel turns on the same session ([Turn Queue](./queue.md)).
+  start parallel turns on the same session ([Master / input during work and stopping](./master.md#input-during-work-and-stopping)).
 - Honor `delivery_id` for idempotency; drop duplicates.
 - Apply the watchdog to triggered turns and treat `ask` as `deny`
   when no human is present.
@@ -319,17 +319,6 @@ A conforming implementation that supports agent self-scheduling MUST:
 
 - [Compositor](./compositor.md) — the human-originated trigger
   source; the canonical home for user-message vocabulary.
-- [Turn Queue](./queue.md) — the single queue contract triggers share
-  with compositor messages; this page adds only the drop rules.
-- [UX / queued sends](./ux.md#queued-sends) — the user-facing framing
-  of that shared queue.
-- [Subagents / blocking vs background](./subagents.md#blocking-vs-background) —
-  the sibling primitive for non-foreground turns.
-- [Foundations / watchdog](./foundations.md#watchdog) — runs on
-  triggered turns; `ask` SHOULD be treated as `deny` when no human
-  is present.
-- [Persistency](./persistency.md) — where the `metadata_json.trigger`
-  envelope lives.
 - [Tools](./tools.md) — `request_wakeup` is agent-specific, not
   locked.
 - [Claude Code Routines](https://code.claude.com/docs/en/routines) —

@@ -35,7 +35,7 @@ Windows lacks the outer-sandbox control and does not make the same containment
 claim.
 
 For the abstract defense-in-depth model the agent system specifies, see
-[agent/foundations.md / watchdog vs permission rules vs sandbox](../ai/agent/foundations.md#watchdog-vs-permission-rules-vs-sandbox)
+[Permission policy](../ai/agent/permissions.md)
 and [agent/tools.md / defense in depth](../ai/agent/tools.md#defense-in-depth).
 This page is the desktop-specific landing.
 
@@ -132,7 +132,7 @@ execution.
 
 **What this does not catch.** A compromised agent that sends data to an origin
 already granted through the provider transport. The RFC's
-[watchdog](../ai/agent/foundations.md#watchdog) is the answer to semantic misuse
+[watchdog](../ai/agent/permissions.md) is the answer to semantic misuse
 inside a legitimate provider request — host-configured policy, not srt.
 
 ## Command execution
@@ -159,7 +159,7 @@ protected paths.
   **never** placed on argv, env, disk, or `window`.
 - Logs never include tokens, message content, tool args, or model
   output ([sessions / security boundary in
-  bedrock](../ai/agent/persistency.md) carries the same rule).
+  bedrock](../ai/agent/components.md#storage-and-recovery) carries the same rule).
 - `secrets.get` is not exposed in the bridge. The renderer may check, set, or
   delete keys, but key material never crosses back from the agent host.
 
@@ -319,7 +319,5 @@ note in the PR, not a silent regression.
 - [Desktop agent authority](https://github.com/gridaco/grida/blob/main/desktop/docs/agent-authority.md)
   — the landed native provider slice and the remaining raw-worker re-scope.
 - [Agent storage layout](./agent-storage-layout.md) — secrets and state file map.
-- [Agent system RFC / foundations / watchdog](../ai/agent/foundations.md#watchdog)
-  — abstract defense-in-depth model.
 - [ChatGPT Subscription native provider](../ai/agent/chatgpt-subscription-provider.md)
   — the golden provider contract and external activation gate.

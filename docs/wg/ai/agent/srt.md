@@ -95,7 +95,7 @@ srt can provide either of the OS boundaries named in
 
 These roles MUST NOT share mutable authority. For `shell.run`, the execution
 policy is built from the effective host-issued grant; the
-[watchdog](./foundations.md#watchdog) may narrow that grant but cannot mint
+[watchdog](./permissions.md) may narrow that grant but cannot mint
 authority. The three defense-in-depth layers are:
 
 1. The runtime's capability check refuses out-of-scope arguments at the API
@@ -219,8 +219,6 @@ require implementation evidence. The component contract does not select them.
   `computer` environment.
 - [Execution authority](./execution-authority.md) — principal separation,
   host routing, and grant attribution.
-- [Foundations](./foundations.md#watchdog) — the pre-execute hook above the
-  sandbox.
 - [Tools](./tools.md#capability-requirements) — the capability shape srt
   compiles from.
 - srt source and documentation:

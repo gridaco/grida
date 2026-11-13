@@ -12,7 +12,7 @@ tags:
 # Agent storage layout
 
 This page is the **desktop-specific binding** of the
-[agent RFC's persistency contract](../ai/agent/persistency.md). The RFC owns
+[agent storage and recovery contract](../ai/agent/components.md#storage-and-recovery). The RFC owns
 the abstract session model; this page records only which Desktop process
 keeps which files, and why they stay separate.
 
@@ -55,8 +55,6 @@ risks tearing.
 
 ## See also
 
-- [Agent system RFC / Persistency](../ai/agent/persistency.md) — the abstract
-  storage contract.
 - [Process model](./process-model.md) — what each process owns.
 - [Agent security / secrets discipline](./agent-security.md#secrets-discipline)
   — credential discipline.
