@@ -838,7 +838,7 @@ test("grida fx hands its arguments to the pinned Grida FX as the grida invoker",
   assert.equal(other.stdout, "native");
 });
 
-test("the update notice compares SemVer and stays out of scripts, CI and --json", () => {
+test("the update notice compares SemVer and stays out of scripts, CI, --json and opt-outs", () => {
   for (const [a, b] of [
     ["0.6.0", "0.5.0"],
     ["1.0.0", "0.9.9"],
@@ -864,6 +864,9 @@ test("the update notice compares SemVer and stays out of scripts, CI and --json"
   assert(!enabled([], {}, {}));
   assert(!enabled([], { CI: "true" }, tty));
   assert(!enabled([], { GRIDA_NO_UPDATE_CHECK: "1" }, tty));
+  // NO_UPDATE_NOTIFIER opts out when present, whatever its value.
+  for (const value of ["1", "true", "0", ""])
+    assert(!enabled([], { NO_UPDATE_NOTIFIER: value }, tty), value);
   assert(!enabled(["ai", "models", "list", "--json"], {}, tty));
   assert.equal(
     notice("0.5.0", { latest: "0.6.0" }),
@@ -939,6 +942,10 @@ test("the update notice reads a local record and refreshes it at most daily", as
   checkForUpdate([], {
     ...options(99 * 24 * 60 * 60 * 1000),
     stderr: { write: stderr.write },
+  });
+  checkForUpdate([], {
+    ...options(99 * 24 * 60 * 60 * 1000),
+    env: { ...env, NO_UPDATE_NOTIFIER: "1" },
   });
   assert.deepEqual([written, refreshed], [[], []]);
 });
