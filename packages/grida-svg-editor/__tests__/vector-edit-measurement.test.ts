@@ -229,6 +229,17 @@ describe("project_onto_segment", () => {
     expect(out!.b[1]).toBeCloseTo(40, 3);
   });
 
+  it("resolves a cursor near the end of a long straight segment", () => {
+    const LONG = PathModel.fromSvgPathD("M0,0 L10000,0").snapshot();
+    const t = project_onto_segment(LONG, 0, identity, [20, 5])!;
+    const out = vector_measurement_operands(
+      LONG,
+      { vertices: [0], segments: [] },
+      { kind: "segment", segment: 0, t }
+    );
+    expect(out!.b[0]).toBeCloseTo(20, 3);
+  });
+
   it("projects in the frame the projection maps into", () => {
     // Screen frame = path-local scaled 2× and shifted by (10, 20): the
     // screen point (210, 120) is local (100, 50), the middle of s1.
