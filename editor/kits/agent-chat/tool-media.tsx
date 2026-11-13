@@ -16,17 +16,16 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { getToolName } from "ai";
-import { AgentVision } from "@grida/agent/vision";
+import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { FullscreenImagePreview } from "@/kits/image-preview";
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 
-// `@grida/agent/gen` is not a published entrypoint; the tool name is locked
-// (AgentGen.TOOL_NAMES.generate_image), matching how this kit refers to
-// `run_command`/`question` by their locked literals (see `tool-display.ts`).
+// The image generation tool name is a locked literal, like `run_command` and
+// `question` in `tool-display.ts`.
 const GENERATE_IMAGE = "generate_image";
 
 export function isViewImageEntry(entry: ToolCallEntry): boolean {
-  return getToolName(entry) === AgentVision.TOOL_NAMES.view_image;
+  return getToolName(entry) === chat_vocabulary.TOOL_NAMES.view_image;
 }
 
 export function isGenerateImageEntry(entry: ToolCallEntry): boolean {

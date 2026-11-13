@@ -33,9 +33,8 @@ import { TitleBar } from "../chrome/title-bar";
 import { DesktopCanvasBundleShell } from "../canvas/canvas-bundle-shell";
 import { WorkspaceChangesProvider } from "../workbench/workspace-changes";
 import { NativeAgentPaneGate } from "../workbench/native-agent-pane";
-import { CANVAS_PATH } from "../ai-sidebar/agent-fs-binding";
 import { useActiveEditorAgentFs } from "./active-editor-agent-fs";
-import { DocumentSurfaceHost } from "./document-surface-host";
+import { CANVAS_PATH, DocumentSurfaceHost } from "./document-surface-host";
 import { SingleFileSvgSurface, type FileMeta } from "./single-file-svg-surface";
 
 /**
@@ -131,6 +130,7 @@ export function DesktopFileShell({
     );
   }
 
+  // Only an installed Desktop build without native chat reaches this.
   const legacyChat =
     mode === "deck" ? (
       <AISidebarChat workspaceId={workspaceId} surfaceHost={surfaceHost} />
@@ -159,14 +159,9 @@ export function DesktopFileShell({
           maxSize={SIDEBAR_MAX_SIZE}
         >
           <aside className="flex h-full w-full flex-col">
-            {mode === "doc" && nativeChat?.documentUnavailable ? (
-              <p
-                role="status"
-                className="px-3 py-2 text-xs text-muted-foreground"
-              >
-                Chat is available in the workspace workbench.
-              </p>
-            ) : nativeChat && fileChatAvailable ? (
+            {!nativeChat ? (
+              legacyChat
+            ) : fileChatAvailable ? (
               <NativeAgentPaneGate
                 bridge={nativeChat}
                 selectionKey={
@@ -178,10 +173,16 @@ export function DesktopFileShell({
                     ? fileSurface
                     : undefined
                 }
-                legacy={legacyChat}
               />
             ) : (
-              legacyChat
+              <p
+                role="status"
+                className="px-3 py-2 text-xs text-muted-foreground"
+              >
+                {mode === "doc" && nativeChat.documentUnavailable
+                  ? "Chat is available in the workspace workbench."
+                  : "Chat is unavailable for this file."}
+              </p>
             )}
           </aside>
         </ResizablePanel>

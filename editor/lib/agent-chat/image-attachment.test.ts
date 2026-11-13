@@ -6,7 +6,6 @@ import {
   encodeLibraryImageUrl,
   isSupportedImageType,
   planResize,
-  toFileUiParts,
   trustedLibraryImageUrl,
 } from "./image-attachment";
 
@@ -228,50 +227,5 @@ describe("decodedBytes", () => {
   it("strips a data: URL prefix before measuring", () => {
     expect(decodedBytes("data:image/png;base64,AAAA")).toBe(3);
     expect(decodedBytes("data:image/png;base64,")).toBe(0);
-  });
-});
-
-describe("toFileUiParts", () => {
-  it("maps only inlined raster image attachments to FileUIParts", () => {
-    const parts = [
-      {
-        type: "file-attachment",
-        mime: "image/png",
-        url: "data:image/png;base64,AAA",
-        name: "a.png",
-      },
-      // svg — excluded (text)
-      {
-        type: "file-attachment",
-        mime: "image/svg+xml",
-        url: "data:image/svg+xml;base64,AAA",
-        name: "b.svg",
-      },
-      // no url — excluded
-      { type: "file-attachment", mime: "image/png", name: "c.png" },
-      // not an image — excluded
-      {
-        type: "file-attachment",
-        mime: "application/pdf",
-        url: "data:application/pdf;base64,AAA",
-        name: "d.pdf",
-      },
-      // not a file-attachment — excluded
-      { type: "text", url: "data:image/png;base64,AAA" },
-    ];
-
-    expect(toFileUiParts(parts)).toEqual([
-      {
-        type: "file",
-        url: "data:image/png;base64,AAA",
-        mediaType: "image/png",
-        filename: "a.png",
-      },
-    ]);
-  });
-
-  it("returns an empty array when nothing qualifies", () => {
-    expect(toFileUiParts([])).toEqual([]);
-    expect(toFileUiParts([{ type: "text" }])).toEqual([]);
   });
 });

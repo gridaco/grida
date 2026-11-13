@@ -1,4 +1,4 @@
-import type { InputResourceRouter } from "@/lib/agent-chat";
+import type { InputResourceRouter } from "@/lib/agent-chat/input-resource-router";
 
 /**
  * Resource identity must outlive a particular composer mount because it also

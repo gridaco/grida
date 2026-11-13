@@ -23,7 +23,7 @@ import { AGENT_DEFAULT_MODE } from "@grida/agent";
 import { AgentFs } from "@grida/agent/fs";
 import type { AgentSurface } from "@grida/agent/surface";
 import { AgentTodos } from "@grida/agent/todos";
-import { resolveDesignSearch } from "@/scaffolds/desktop/shared/design-search";
+import { search as searchLibrary } from "@/app/(library)/library/actions";
 import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type UIMessage,
@@ -42,25 +42,27 @@ import {
   sessions as bridgeSessions,
   type AgentRunOptions,
 } from "@/lib/desktop/bridge";
+import { buildApprovalResumeBody } from "@/lib/agent-chat/approval-resume";
+import { buildAgentSend } from "@/lib/agent-chat/build-agent-send";
+import { chatError } from "@/lib/agent-chat/chat-error";
+import { desktopAgentTransport } from "@/lib/agent-chat/bridge-transport";
 import {
-  buildApprovalResumeBody,
-  buildAgentSend,
-  chatError,
-  desktopAgentTransport,
   isHumanInputPendingState,
   isSessionBusy,
   shouldUseLocalHumanInput,
-  StreamAttachOwner,
-  SurfaceToolCallObserver,
-  useChatSession,
+} from "@/lib/agent-chat/turn-queue";
+import { StreamAttachOwner } from "@/lib/agent-chat/stream-attach-owner";
+import { SurfaceToolCallObserver } from "@/lib/agent-chat/surface-tool-call-observer";
+import { useChatSession } from "@/lib/agent-chat/use-chat-session";
+import {
   useCoreTurnSync,
-  useRefreshOnStreamEnd,
-  useSessionFork,
   useSessionStatus,
-  useStreamAttach,
-  useTurnQueueController,
-  type ChatMessage,
-} from "@/lib/agent-chat";
+} from "@/lib/agent-chat/use-session-status";
+import { useRefreshOnStreamEnd } from "@/lib/agent-chat/use-refresh-on-stream-end";
+import { useSessionFork } from "@/lib/agent-chat/use-session-fork";
+import { useStreamAttach } from "@/lib/agent-chat/use-stream-attach";
+import { useTurnQueueController } from "@/lib/agent-chat/use-turn-queue-controller";
+import type { ChatMessage } from "@/lib/agent-chat/types";
 import { QueuedMessages } from "../shared/queued-messages";
 import {
   ChatMessageView,
@@ -81,7 +83,7 @@ import {
   ModelToolCallNotice,
   useModelPickerState,
 } from "../shared/model-picker";
-import { DesktopContextMeter } from "../shared/context-meter";
+import { DesktopContextMeter } from "../shared/desktop-context-meter";
 import {
   registered_models,
   useEndpointProviders,
@@ -89,16 +91,29 @@ import {
 import {
   AgentComposerInput,
   type ComposerCommandAction,
-} from "../shared/agent-composer-input";
+} from "../shared/legacy-agent-composer-input";
 import {
   AgentApprovalBar,
   findPendingApproval,
   type PendingApproval,
-} from "../shared/agent-approval";
+} from "../shared/legacy-agent-approval";
 
 // Standalone-doc surface: no workspace, so no file mentions or skill
 // commands — the composer is still the input for its rich-text + paste UX.
 const EMPTY_CATALOG: ComposerCatalog = { commands: [], mentions: [] };
+
+/** The pick card's one-shot Library search; it throws on failure so the card
+ *  shows an error state. */
+async function resolveDesignSearch(query: string) {
+  const { data } = await searchLibrary({ text: query, range: [0, 23] });
+  return data.map((o) => ({
+    id: o.id,
+    title: o.title ?? o.alt ?? "Untitled",
+    url: o.url,
+    width: o.width,
+    height: o.height,
+  }));
+}
 
 /**
  * Props for {@link AISidebarChat}. `fs` and `workspaceId` select the fs model

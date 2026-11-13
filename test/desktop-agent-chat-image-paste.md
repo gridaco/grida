@@ -62,7 +62,7 @@ instead.
 - Paste/drop enters through `ComposerContent.onTransfer`; `ComposerTransfer`
   preserves the gesture provenance and original browser files. The desktop
   wiring and chip render are in
-  `editor/scaffolds/desktop/shared/agent-composer-input.tsx`.
+  `editor/scaffolds/desktop/shared/legacy-agent-composer-input.tsx`.
 - The model→image round-trip (incl. multi-turn + resume) is automated against a
   real model in `packages/grida-ai-agent/src/runtime/runtime.live.test.ts`
   (gated `GRIDA_LIVE_AGENT=1`); this TC covers the UI gesture that test can't.

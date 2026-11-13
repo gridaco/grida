@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { toolDisplay } from "./tool-display";
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 
 describe("toolDisplay", () => {
   it("summarizes mixed tool chunks in stable product copy", () => {

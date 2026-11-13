@@ -1,4 +1,3 @@
-import type { AgentSurface } from "@grida/agent/surface";
 import {
   NativeEditorSurfaces,
   type NativeEditorSurfaceSnapshot,
@@ -11,13 +10,13 @@ import { WorkspaceSvgText } from "./workspace-svg-text";
 /**
  * Interactive surface host for one workspace workbench.
  *
- * The host validates every model-supplied path against live workspace
+ * The host validates every agent-supplied path against live workspace
  * directory truth before handing a relative id to the editor group. The
- * server owns the tool result; this renderer adapter only applies the
+ * agent owns the tool result; this renderer adapter only applies the
  * presentation request as an auxiliary side effect. Tab mutation stays in
  * `EditorGroup`.
  */
-export class WorkspaceSurfaceHost implements AgentSurface.Host {
+export class WorkspaceSurfaceHost {
   readonly svgText: WorkspaceSvgText;
 
   constructor(
@@ -87,7 +86,8 @@ export class WorkspaceSurfaceHost implements AgentSurface.Host {
     }
   }
 
-  listOpen(): AgentSurface.Snapshot {
+  /** Agent paths of the open real tabs, and the active one. */
+  listOpen(): { active: string | null; open: string[] } {
     const { tabs, active } = this.group.getSnapshot();
     const open = tabs.flatMap((id) => {
       if (this.isVirtual(id)) return [];

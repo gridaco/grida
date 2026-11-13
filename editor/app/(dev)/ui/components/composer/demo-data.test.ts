@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentDirectoryReference } from "@/lib/agent-chat";
+import { AgentDirectoryReference } from "@/lib/agent-chat/directory-reference";
 import { folders, resolveDropMode, toAttachment } from "./demo-data";
 
 describe("composer demo directory fixtures", () => {

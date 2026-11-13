@@ -55,9 +55,9 @@ sessions store, stream registry, and runtime. Public API:
 `constructor(opts) / start({ listen? }) / fetch(Request) / stop()`. HTTP routes
 are thin wrappers — business logic lives behind the class. The Electron-side
 [`agent-sidecar-supervisor.ts`](https://github.com/gridaco/grida/blob/main/desktop/src/main/agent-sidecar-supervisor.ts)
-spawns it; the renderer-side chat seam in `editor/lib/agent-chat`
-coordinates today's `use-chat-session`, bridge transport, and
-refresh-on-stream-end wiring.
+spawns it. The renderer's chat in `editor/lib/agent-chat` drives the native
+agent through the Desktop native chat bridge; its earlier session hooks and
+bridge transport remain only for installed builds without native chat.
 
 Three orchestrator files; everything else is a small collaborator with
 one job.

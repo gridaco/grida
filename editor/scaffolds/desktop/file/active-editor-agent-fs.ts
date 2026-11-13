@@ -20,7 +20,22 @@
 import { useCallback, useRef } from "react";
 import { AgentFs } from "@grida/agent/fs";
 import type { SvgEditor } from "@grida/svg-editor";
-import { CANVAS_PATH, bindEditor } from "../ai-sidebar/agent-fs-binding";
+import { formatSvg } from "@/app/(canvas)/svg/_storage/format-svg";
+import { CANVAS_PATH } from "./document-surface-host";
+
+/**
+ * The `AgentFs.LiveBinding` that ties the virtual canvas path to a live
+ * `SvgEditor`: pretty-printed serialization (stable for match-and-replace
+ * edits), editor-owned loading, content-version reads and editor emissions.
+ */
+function bindEditor(editor: SvgEditor): AgentFs.LiveBinding {
+  return {
+    serialize: () => formatSvg(editor.serialize()),
+    load: (content) => editor.load(content),
+    getVersion: () => editor.state.content_version,
+    subscribe: (cb) => editor.subscribe(cb),
+  };
+}
 
 export type ActiveEditorAgentFs = {
   /** The stable fs the sidebar chat resolves tool calls against. */

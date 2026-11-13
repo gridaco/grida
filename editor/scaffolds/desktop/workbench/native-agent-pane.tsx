@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
-  type ReactNode,
 } from "react";
 import type {
   DesktopNativeChat,
@@ -53,11 +52,11 @@ import {
   AgentComposerInput,
   type ComposerCommandAction,
 } from "../shared/agent-composer-input";
-import { useWorkspaceFileMentions } from "../shared/use-workspace-composer-catalog";
+import { useWorkspaceFileMentions } from "../shared/use-workspace-file-mentions";
 import { NativeComposerTray } from "./native-composer-tray";
 import { ComposerDrafts } from "@/lib/agent-chat/composer-drafts";
 import { ContextMeter } from "../shared/context-meter";
-import { computeContextUsage } from "@/lib/agent-chat";
+import { computeContextUsage } from "@/lib/agent-chat/context-usage";
 import { cn } from "@app/ui/lib/utils";
 import styles from "./agent-pane.module.css";
 import { NativeSideChatPanel } from "./native-side-chat-panel";
@@ -117,14 +116,12 @@ export function NativeAgentPaneGate({
   workspaceId,
   initialSession,
   editorSurfaces,
-  legacy,
 }: {
   bridge: DesktopNativeChat;
   selectionKey?: string;
   workspaceId?: string;
   initialSession: string | null;
   editorSurfaces?: NativeChatEditorSurfaces;
-  legacy: ReactNode;
 }) {
   const [attempt, setAttempt] = useState(0);
   const [selection, setSelection] = useState<{
@@ -148,7 +145,6 @@ export function NativeAgentPaneGate({
     selection?.bridge === bridge && selection.attempt === attempt
       ? selection.readiness
       : undefined;
-  if (readiness === "legacy") return legacy;
   // While the agent starts, the ordinary pane is shown; it connects and
   // accepts sends once startup finishes.
   const starting = readiness === undefined || readiness === "native-starting";
@@ -859,7 +855,6 @@ export function NativeAgentPane({
             }
             return false;
           }}
-          attach={false}
           attachments={
             state.attachmentDraft &&
             !state.attachmentReading && (
@@ -875,7 +870,6 @@ export function NativeAgentPane({
           onAttachmentTransfer={({ resources }) =>
             void controller.pickTransferredAttachment(state.scope, resources)
           }
-          operableFiles={false}
           awaitSubmission
           canSubmit={
             controller.canSubmit &&

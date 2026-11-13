@@ -1,5 +1,5 @@
 import type { NativeChatMessage } from "@grida/desktop-bridge";
-import { USER_FILE_ATTACHMENTS } from "@grida/agent";
+import { chat_vocabulary } from "./chat-vocabulary";
 import type { ChatMessage } from "./types";
 
 /**
@@ -14,7 +14,7 @@ export namespace native_message_parts {
     if (message.role !== "user" || !message.attachments?.length) return parts;
     return [
       {
-        type: USER_FILE_ATTACHMENTS,
+        type: chat_vocabulary.CONTEXT_PARTS.files,
         // The chip names each file; the bytes stay with the host.
         data: { files: message.attachments.map(({ name }) => ({ name })) },
       } as unknown as ChatMessage["parts"][number],

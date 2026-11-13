@@ -8,12 +8,12 @@
 
 import { getToolName } from "ai";
 import { Loader2Icon } from "lucide-react";
-import { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { FullscreenImagePreview } from "@/kits/image-preview";
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 
 export function isDesignSearchEntry(entry: ToolCallEntry): boolean {
-  return getToolName(entry) === AgentDesignSearch.TOOL_NAME;
+  return getToolName(entry) === chat_vocabulary.TOOL_NAMES.design_search;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -26,7 +26,7 @@ function str(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-type Pin = AgentDesignSearch.DesignSearchResult;
+type Pin = chat_vocabulary.DesignReference;
 
 function pickedPins(entry: ToolCallEntry): Pin[] {
   const out = asRecord("output" in entry ? entry.output : undefined);
@@ -42,7 +42,7 @@ function pickedPins(entry: ToolCallEntry): Pin[] {
 }
 
 export function DesignSearchContent({ entry }: { entry: ToolCallEntry }) {
-  const initialQuery = AgentDesignSearch.initialSearchQuery(
+  const initialQuery = chat_vocabulary.initialSearchQuery(
     "input" in entry ? entry.input : undefined
   );
 

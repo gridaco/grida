@@ -26,12 +26,7 @@ import {
   type ReactNode,
 } from "react";
 import { isFileUIPart, isTextUIPart, type FileUIPart } from "ai";
-import {
-  CONTEXT_MARKERS,
-  USER_DIRECTORY_REFERENCES,
-  USER_FILE_ATTACHMENTS,
-  USER_TEMPLATE_SELECTION,
-} from "@grida/agent";
+import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { cn } from "@app/ui/lib/utils";
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
@@ -76,7 +71,7 @@ import { Task, TaskContent, TaskTrigger } from "@app/ui/ai-elements/task";
 // Message/tool types stay in the shared `@/lib/agent-chat` seam (the
 // bridge transport + session helpers use them too); `toolDisplay` is
 // this renderer's own label/summary formatting, colocated in the kit.
-import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
+import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat/types";
 import { toolDisplay, type ToolDisplayDescription } from "./tool-display";
 import {
   formatElapsed,
@@ -191,7 +186,7 @@ export function ChatMessageView({
     const contexts = message.parts.filter(
       (part) =>
         typeof (part as { type?: unknown }).type === "string" &&
-        (part as { type: string }).type in CONTEXT_MARKERS
+        (part as { type: string }).type in chat_vocabulary.CONTEXT_MARKERS
     );
     return (
       <Message from="user">
@@ -201,14 +196,17 @@ export function ChatMessageView({
               <div className="flex flex-wrap gap-2">
                 {contexts.map((rawPart, index) => {
                   // `data-*` context part — read past the closed UIMessagePart
-                  // union; the filter above already gated `type` to CONTEXT_MARKERS.
+                  // union; the filter above already gated `type` to the context markers.
                   const part = rawPart as {
                     type: string;
                     data?: Record<string, unknown>;
                   };
-                  const isTemplate = part.type === USER_TEMPLATE_SELECTION;
-                  const isFiles = part.type === USER_FILE_ATTACHMENTS;
-                  const isDirectories = part.type === USER_DIRECTORY_REFERENCES;
+                  const isTemplate =
+                    part.type === chat_vocabulary.CONTEXT_PARTS.template;
+                  const isFiles =
+                    part.type === chat_vocabulary.CONTEXT_PARTS.files;
+                  const isDirectories =
+                    part.type === chat_vocabulary.CONTEXT_PARTS.directories;
                   const d = part.data ?? {};
                   const title =
                     typeof d.title === "string" ? d.title : undefined;
@@ -246,7 +244,7 @@ export function ChatMessageView({
                           ? directoryNames.length === 1
                             ? directoryNames[0]
                             : `${directoryNames.length} folders`
-                          : CONTEXT_MARKERS[part.type];
+                          : chat_vocabulary.CONTEXT_MARKERS[part.type];
                   return (
                     // Index key: a sent user message's parts are immutable and
                     // never reorder (same reasoning as the images below).

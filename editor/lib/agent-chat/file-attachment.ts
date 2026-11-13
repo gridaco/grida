@@ -13,10 +13,6 @@
  *   - {@link lowerOperableFiles} — typed prepared resources → the
  *     `scratch_seed` entries + the `USER_FILE_ATTACHMENTS` context part that
  *     TELLS the agent the files are waiting in scratch.
- *
- * {@link extractOperableFiles} retains the former payload-discriminator API as
- * a compatibility adapter. New callers classify once through the resource
- * policy/router and call the typed lowerer directly.
  */
 
 import {
@@ -26,7 +22,6 @@ import {
   type UserFileAttachmentsData,
 } from "@grida/agent";
 import type { ContextPart } from "./build-agent-send";
-import { decodedBytes } from "./image-attachment";
 
 export type OperableFilePolicy = {
   /** Per-file byte ceiling. A single file may fill the whole batch budget. */
@@ -108,17 +103,6 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-/** Minimal structural view of a composer `file-attachment` part. */
-type AttachmentPartLike = {
-  type: string;
-  id?: string;
-  name?: string;
-  mime?: string;
-  size?: number;
-  url?: string;
-  payload?: Record<string, unknown> | null;
-};
-
 /** The two products of a submit's operable-file attachments. */
 export type OperableFilesExtract = {
   /** `{ path, base64 }` entries to seed into the session scratch this turn. */
@@ -168,33 +152,6 @@ export function lowerOperableFiles(
       data: { location: "scratch", files },
     },
   };
-}
-
-/**
- * Split a composer message's `file-attachment` parts into scratch-upload entries
- * + the context part that names them for the model. Only parts carrying
- * `payload.base64` (operable files) are claimed; legacy inline-only images
- * (`url` with no raw payload) are left for `toFileUiParts`. Scratch paths are
- * sanitized to one safe segment and deduped within the batch. Compatibility
- * adapter; new code should use {@link lowerOperableFiles}. Pure.
- */
-export function extractOperableFiles(
-  parts: readonly AttachmentPartLike[]
-): OperableFilesExtract {
-  const encoded: EncodedOperableResource[] = [];
-  for (const p of parts) {
-    if (p.type !== "file-attachment") continue;
-    const base64 = p.payload?.base64;
-    if (typeof base64 !== "string" || base64.length === 0) continue;
-    encoded.push({
-      id: p.id ?? "attachment",
-      name: p.name ?? "file",
-      mime: p.mime || "application/octet-stream",
-      size: decodedBytes(base64),
-      base64,
-    });
-  }
-  return lowerOperableFiles(encoded);
 }
 
 /**

@@ -19,7 +19,7 @@ import {
   MessageContent,
   MessageResponse,
 } from "@app/ui/ai-elements/message";
-import { queuedMessageText } from "@/lib/agent-chat";
+import { queuedMessageText } from "@/lib/agent-chat/use-queued-messages";
 import type { ChatMessageWithParts } from "@/lib/desktop/bridge";
 
 // Same reveal-on-hover discipline as the kit's message actions: gate

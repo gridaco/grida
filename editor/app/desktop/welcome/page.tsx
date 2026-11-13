@@ -87,7 +87,7 @@ import {
 } from "@/scaffolds/desktop/home/application-preset";
 import { PresetRail } from "@/scaffolds/desktop/home/preset-rail";
 import { PresetChip } from "@/scaffolds/desktop/home/preset-chip";
-import type { AgentDesignSearch } from "@grida/agent/tools/design-search";
+import type { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { last_workspace } from "@/lib/desktop/last-workspace";
 
 const NOOP = () => {};
@@ -170,7 +170,7 @@ const EMPTY_CATALOG: ComposerCatalog = { commands: [], mentions: [] };
  *  when nothing is picked. */
 function composePromptWithRefs(
   text: string,
-  refs: AgentDesignSearch.DesignSearchResult[]
+  refs: chat_vocabulary.DesignReference[]
 ): string {
   if (refs.length === 0) return text;
   const list = refs
@@ -213,7 +213,7 @@ function WelcomeSurface({
   // References the user has gathered from the gallery (multi-select). They seed
   // ONE fresh board on submit; a click in the gallery toggles membership here.
   const [pickedRefs, setPickedRefs] = useState<
-    AgentDesignSearch.DesignSearchResult[]
+    chat_vocabulary.DesignReference[]
   >([]);
   const selectedRefIds = useMemo(
     () => new Set(pickedRefs.map((p) => p.id)),
@@ -500,16 +500,13 @@ function WelcomeSurface({
   // A Library card's Add action toggles it in the composer's tray (multi-select)
   // instead of starting a board on its own — the user gathers several, then
   // starts one board from all of them via the composer / the tray's Start button.
-  const togglePick = useCallback(
-    (pin: AgentDesignSearch.DesignSearchResult) => {
-      setPickedRefs((cur) =>
-        cur.some((p) => p.id === pin.id)
-          ? cur.filter((p) => p.id !== pin.id)
-          : [...cur, pin]
-      );
-    },
-    []
-  );
+  const togglePick = useCallback((pin: chat_vocabulary.DesignReference) => {
+    setPickedRefs((cur) =>
+      cur.some((p) => p.id === pin.id)
+        ? cur.filter((p) => p.id !== pin.id)
+        : [...cur, pin]
+    );
+  }, []);
 
   // Picking a slides template SELECTS it into the composer (single-select), like
   // attaching a reference — it does NOT start a session on its own. Clicking the
@@ -689,10 +686,6 @@ function WelcomeSurface({
                     onSubmit={start}
                     isStreaming={false}
                     onStop={NOOP}
-                    // Welcome uses the reference tray ("Start from an idea"), not
-                    // composer attachments — its `start` ignores files/uploads, so
-                    // hide the "+" rather than offer a dead control.
-                    attach={false}
                     allowEmptySubmit
                     emptySubmitLabel={
                       pickedTemplate || pickedRefs.length > 0

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { USER_FILE_ATTACHMENTS } from "@grida/agent";
 import { native_message_parts } from "./native-message-parts";
 
 describe("native_message_parts", () => {
@@ -12,7 +11,10 @@ describe("native_message_parts", () => {
         attachments: [{ name: "image.png", mimeType: "image/png", size: 179 }],
       })
     ).toEqual([
-      { type: USER_FILE_ATTACHMENTS, data: { files: [{ name: "image.png" }] } },
+      {
+        type: "data-user_file_attachments",
+        data: { files: [{ name: "image.png" }] },
+      },
       { type: "text", text: "What colour is it?" },
     ]);
   });

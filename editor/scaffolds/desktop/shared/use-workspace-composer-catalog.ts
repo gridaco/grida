@@ -1,52 +1,23 @@
 "use client";
 
 /**
- * Builds the `@/kits/composer` catalog for the workspace agent chat:
+ * Builds the `@/kits/composer` catalog for the earlier workspace chat, which
+ * only installed Desktop builds without native chat render:
  *
- *   - **mentions** — workspace files, for `@`-references. A bounded walk
- *     (depth + count capped, heavy dirs skipped) keeps it cheap; the
- *     composer filters client-side as the user types.
+ *   - **mentions** — workspace files in the original compatibility bounds.
  *   - **commands** — discovered skill names (the `.agents/skills` /
- *     `.claude/skills` dirs), for `/`-commands. Reuses the workspace
- *     readdir bridge — no extra host route.
+ *     `.claude/skills` dirs), for `/`-commands.
+ *
+ * The native pane takes `/`-commands from its controller and file mentions
+ * from `useWorkspaceFileMentions`.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { workspaces as bridgeWorkspaces } from "@/lib/desktop/bridge";
-import type {
-  ComposerCatalog,
-  ComposerCommand,
-  ComposerMention,
-} from "@/kits/composer";
-import { WorkspaceFileMentions } from "./workspace-file-mentions";
+import type { ComposerCatalog, ComposerCommand } from "@/kits/composer";
+import { useWorkspaceFileMentions } from "./use-workspace-file-mentions";
 
-const NO_MENTIONS: ComposerMention[] = [];
 const SKILL_DIRS = [".agents/skills", ".claude/skills"];
-
-export function useWorkspaceFileMentions(
-  workspaceId?: string,
-  mode: WorkspaceFileMentions.Mode = "native"
-): ComposerMention[] {
-  const request = useMemo(() => ({ workspaceId, mode }), [workspaceId, mode]);
-  const [loaded, setLoaded] = useState<{
-    request: typeof request;
-    mentions: ComposerMention[];
-  }>();
-  useEffect(() => {
-    const { workspaceId, mode } = request;
-    if (!workspaceId) return;
-    const owner = new AbortController();
-    void WorkspaceFileMentions.list(
-      (path) => bridgeWorkspaces.readdir(workspaceId, path),
-      owner.signal,
-      mode
-    ).then((mentions) => {
-      if (!owner.signal.aborted) setLoaded({ request, mentions });
-    });
-    return () => owner.abort();
-  }, [request]);
-  return loaded?.request === request ? loaded.mentions : NO_MENTIONS;
-}
 
 export function useWorkspaceComposerCatalog(
   workspaceId: string

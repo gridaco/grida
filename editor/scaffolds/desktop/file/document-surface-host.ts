@@ -1,7 +1,9 @@
 import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
 import type { SvgEditor } from "@grida/svg-editor";
-import { CANVAS_PATH } from "../ai-sidebar/agent-fs-binding";
 import { SelectedSvgText } from "../shared/selected-svg-text";
+
+/** The virtual path a file window's live SVG is published at. */
+export const CANVAS_PATH = "/canvas.svg" as const;
 
 /** The live SVG displayed in a file window. */
 export class DocumentSurfaceHost {

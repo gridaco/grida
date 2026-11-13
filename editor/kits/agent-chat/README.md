@@ -1,8 +1,10 @@
 # `@/kits/agent-chat`
 
 Render-only chat transcript renderer for Grida's agent surfaces. Given a single
-AI SDK `UIMessage` (settled or mid-stream) it renders one turn — user bubble or
-assistant response — including text (Markdown via Streamdown) and tool calls.
+`UIMessage`-shaped turn (settled or mid-stream) it renders one turn — user
+bubble or assistant response — including text (Markdown via Streamdown) and
+tool calls. The native Desktop chat maps its messages and tool activity onto
+these parts through `native_message_parts` and `native_tool_parts`.
 
 ```tsx
 import { ChatMessageView } from "@/kits/agent-chat";
@@ -77,11 +79,12 @@ React. Workbench surfaces may render the same explorer in a dedicated tab.
     `QuestionAnswerOutput` types.
   - The session-global Library prompt: `findPendingDesignSearch`,
     `DesignSearchPickCard`, `DesignSearchExplorer`, and the
-    `PickReferencesHandler` / `FetchReferences` types.
+    `PickReferencesHandler` type.
   - The `ChatMessage` / `ToolCallEntry` types. `toolDisplay` (label/summary
     formatting) is internal.
-- Shared message/tool types live in `@/lib/agent-chat` (the bridge transport +
-  session helpers use them too); the kit imports them type-only.
+- Shared message/tool types live in `@/lib/agent-chat/types`; the kit imports
+  them type-only. Tool and context-part names come from
+  `@/lib/agent-chat/chat-vocabulary`.
 
 ## Provenance
 
@@ -90,7 +93,11 @@ Promoted out of the desktop scaffolds (was render-mis-filed there):
 - `message.tsx` ← `scaffolds/desktop/ai-sidebar/chat-message.tsx`
 - `tool-display.ts` / `tool-display.test.ts` ← `lib/agent-chat/`
 
-Consumers (each also pins `QuestionCard` above its composer): the desktop AI
-sidebar (`scaffolds/desktop/ai-sidebar/`), the workbench agent pane
-(`scaffolds/desktop/workbench/agent-pane.tsx`), and the
-`/ui/components/ai-chat` demo.
+Consumers: the native Desktop chat (`scaffolds/desktop/workbench/native-agent-pane.tsx`
+and `native-turn-activity.tsx`), and the `/ui/components/ai-chat/tools` and
+`/ui/components/ai-chat/markdown` galleries. The earlier chat
+(`scaffolds/desktop/ai-sidebar/chat.tsx` and `AgentPaneContent` in
+`scaffolds/desktop/workbench/agent-pane.tsx`), which only installed Desktop
+builds without native chat reach, also uses `QuestionCard`,
+`DesignSearchPickCard`, `CompactingIndicator`, `ForkedNotice` and the rewind
+and fork message actions.

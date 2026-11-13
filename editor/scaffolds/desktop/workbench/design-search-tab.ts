@@ -10,7 +10,7 @@
  * session shape without importing each other.
  */
 
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 import type { PickReferencesHandler } from "@/kits/agent-chat";
 
 /** The single virtual tab id. A real `relPath` is a bundle-relative file path

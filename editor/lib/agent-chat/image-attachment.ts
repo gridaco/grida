@@ -7,13 +7,11 @@
  * resource router separately preserves the original bytes in session scratch,
  * yielding both pixels and an operable path when scratch is available.
  *
- * The pure helpers (policy, dimension math, byte accounting, part mapping) are
+ * The pure helpers (policy, dimension math, byte accounting) are
  * framework-free and unit-tested. `encodeImageFile` is the single DOM/canvas
  * step (browser-only) and is exercised by the live + manual paths, not jsdom
  * (canvas is unreliable there).
  */
-
-import type { FileUIPart } from "ai";
 
 export type ImageAttachmentPolicy = {
   /** Accepted source mime types. Raster only — SVG is text and is excluded. */
@@ -99,39 +97,6 @@ export function decodedBytes(base64OrDataUrl: string): number {
   if (len === 0) return 0;
   const padding = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
   return Math.max(0, Math.floor((len * 3) / 4) - padding);
-}
-
-/** Minimal structural view of a composer `file-attachment` part. */
-type AttachmentPartLike = {
-  type: string;
-  mime?: string;
-  url?: string;
-  name?: string;
-};
-
-/**
- * Map composer `file-attachment` parts to AI-SDK `FileUIPart`s — the shape
- * `sendMessage({ text, files })` accepts. Only inlined raster images with a
- * data/URL survive; everything else is dropped (defense in depth alongside
- * the ingest-time gate). Compatibility adapter for payload-shaped callers;
- * typed resource routing lowers provider files directly. Pure.
- */
-export function toFileUiParts(
-  parts: readonly AttachmentPartLike[],
-  policy: ImageAttachmentPolicy = IMAGE_ATTACHMENT_POLICY
-): FileUIPart[] {
-  const out: FileUIPart[] = [];
-  for (const p of parts) {
-    if (p.type !== "file-attachment") continue;
-    if (!p.url || !isSupportedImageType(p.mime, policy)) continue;
-    out.push({
-      type: "file",
-      url: p.url,
-      mediaType: p.mime,
-      filename: p.name,
-    });
-  }
-  return out;
 }
 
 /** An encoded, send-ready image attachment (data URL + accounting). */

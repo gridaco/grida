@@ -27,7 +27,7 @@ import { Checkbox } from "@app/ui/components/checkbox";
 import { Label } from "@app/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@app/ui/components/radio-group";
 import { Textarea } from "@app/ui/components/textarea";
-import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
+import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat/types";
 import {
   parseQuestions,
   QuestionSurvey,

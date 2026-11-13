@@ -3,18 +3,17 @@
 import { useState } from "react";
 import { getToolName } from "ai";
 import { AlertCircleIcon, CheckIcon, CircleIcon } from "lucide-react";
-import { AgentFs } from "@grida/agent/fs";
-import { AgentTodos } from "@grida/agent/todos";
+import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { cn } from "@app/ui/lib/utils";
 import type { ConfirmationProps } from "@app/ui/ai-elements/confirmation";
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 import { ToolFileContent, ToolFileDiff } from "./tool-diff";
 
 const RUN_COMMAND = "run_command";
 const SKILL = "skill";
 
 export function isHumanReadableToolCardEntry(entry: ToolCallEntry): boolean {
-  return getToolName(entry) === AgentTodos.TOOL_NAMES.todo_write;
+  return getToolName(entry) === chat_vocabulary.TOOL_NAMES.todo_write;
 }
 
 export function ToolCardContent({
@@ -34,17 +33,17 @@ export function ToolCardContent({
 
 function ToolBody({ entry }: { entry: ToolCallEntry }) {
   switch (getToolName(entry)) {
-    case AgentFs.TOOL_NAMES.read_file:
+    case chat_vocabulary.TOOL_NAMES.read_file:
       return <ReadFileCard entry={entry} />;
-    case AgentFs.TOOL_NAMES.edit_file:
+    case chat_vocabulary.TOOL_NAMES.edit_file:
       return <EditFileCard entry={entry} />;
-    case AgentFs.TOOL_NAMES.write_file:
+    case chat_vocabulary.TOOL_NAMES.write_file:
       return <WriteFileCard entry={entry} />;
-    case AgentFs.TOOL_NAMES.list_files:
+    case chat_vocabulary.TOOL_NAMES.list_files:
       return <ListFilesCard entry={entry} />;
-    case AgentFs.TOOL_NAMES.grep_files:
+    case chat_vocabulary.TOOL_NAMES.grep_files:
       return <GrepFilesCard entry={entry} />;
-    case AgentTodos.TOOL_NAMES.todo_write:
+    case chat_vocabulary.TOOL_NAMES.todo_write:
       return <TodoWriteCard entry={entry} />;
     case RUN_COMMAND:
       return <RunCommandCard entry={entry} />;

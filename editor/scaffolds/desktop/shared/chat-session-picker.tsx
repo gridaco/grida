@@ -52,7 +52,7 @@ import {
 } from "@app/ui/components/popover";
 import { Separator } from "@app/ui/components/separator";
 import { cn } from "@app/ui/lib/utils";
-import type { UseChatSessionResult } from "@/lib/agent-chat";
+import type { UseChatSessionResult } from "@/lib/agent-chat/use-chat-session";
 
 /** A single recent-session row, as surfaced by `useChatSession()`. */
 type SessionRow = UseChatSessionResult["sessions"][number];

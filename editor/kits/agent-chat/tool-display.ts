@@ -1,10 +1,6 @@
-import { AgentFs } from "@grida/agent/fs";
-import { AgentTodos } from "@grida/agent/todos";
-import { AgentVision } from "@grida/agent/vision";
-import { AgentDesignSearch } from "@grida/agent/tools/design-search";
-import { AgentSurface } from "@grida/agent/surface";
+import { chat_vocabulary } from "@/lib/agent-chat/chat-vocabulary";
 import { getToolName } from "ai";
-import type { ToolCallEntry } from "@/lib/agent-chat";
+import type { ToolCallEntry } from "@/lib/agent-chat/types";
 import { SurfaceToolCall } from "./surface-tool";
 
 const GENERATE_IMAGE = "generate_image";
@@ -46,7 +42,7 @@ export namespace toolDisplay {
     const tone = describeTone(entry);
 
     switch (toolName) {
-      case AgentFs.TOOL_NAMES.read_file:
+      case chat_vocabulary.TOOL_NAMES.read_file:
         return {
           action: "read",
           title: describeTitle(
@@ -60,7 +56,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentFs.TOOL_NAMES.edit_file:
+      case chat_vocabulary.TOOL_NAMES.edit_file:
         return {
           action: "edit",
           title: describeTitle(
@@ -74,7 +70,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentFs.TOOL_NAMES.write_file:
+      case chat_vocabulary.TOOL_NAMES.write_file:
         return {
           action: "write",
           title: describeTitle(
@@ -88,7 +84,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentFs.TOOL_NAMES.list_files:
+      case chat_vocabulary.TOOL_NAMES.list_files:
         return {
           action: "list",
           title: describeTitle(
@@ -101,7 +97,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentFs.TOOL_NAMES.grep_files:
+      case chat_vocabulary.TOOL_NAMES.grep_files:
         return {
           action: "search",
           title: describeTitle(
@@ -114,7 +110,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentTodos.TOOL_NAMES.todo_write:
+      case chat_vocabulary.TOOL_NAMES.todo_write:
         return {
           action: "plan",
           title: describeTitle(
@@ -127,7 +123,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentVision.TOOL_NAMES.view_image:
+      case chat_vocabulary.TOOL_NAMES.view_image:
         return {
           action: "view_image",
           title: describeTitle(
@@ -193,7 +189,7 @@ export namespace toolDisplay {
           tone,
         };
 
-      case AgentDesignSearch.TOOL_NAME:
+      case chat_vocabulary.TOOL_NAMES.design_search:
         return {
           action: "pick_references",
           title: describeTitle(
@@ -207,12 +203,12 @@ export namespace toolDisplay {
           // while pending, but don't attribute the final picks to that query.
           detail:
             tone === "running"
-              ? AgentDesignSearch.initialSearchQuery(args)
+              ? chat_vocabulary.initialSearchQuery(args)
               : undefined,
           tone,
         };
 
-      case AgentSurface.TOOL_NAMES.surface_open: {
+      case chat_vocabulary.TOOL_NAMES.surface_open: {
         const surface = SurfaceToolCall.from(entry);
         const surfaceTone =
           surface?.data.kind === "open" &&
@@ -237,7 +233,7 @@ export namespace toolDisplay {
         };
       }
 
-      case AgentSurface.TOOL_NAMES.surface_list_open: {
+      case chat_vocabulary.TOOL_NAMES.surface_list_open: {
         const surface = SurfaceToolCall.from(entry);
         const open = surface?.data.kind === "list" ? surface.data.open : null;
         return {

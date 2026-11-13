@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UIMessage } from "ai";
-import { findPendingApproval } from "./agent-approval";
+import { findPendingApproval } from "./legacy-agent-approval";
 
 function assistant(parts: unknown[]): UIMessage {
   return {

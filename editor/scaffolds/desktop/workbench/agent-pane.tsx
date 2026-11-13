@@ -64,24 +64,28 @@ import { useDesktopAgentFocusSession } from "@/lib/desktop/agent-focus-session";
 import {
   buildAgentSend,
   buildTemplateContext,
-  buildApprovalResumeBody,
-  chatError,
-  desktopAgentTransport,
+} from "@/lib/agent-chat/build-agent-send";
+import { buildApprovalResumeBody } from "@/lib/agent-chat/approval-resume";
+import { chatError } from "@/lib/agent-chat/chat-error";
+import { desktopAgentTransport } from "@/lib/agent-chat/bridge-transport";
+import {
   isHumanInputPendingState,
   isSessionBusy,
   shouldUseLocalHumanInput,
-  ScratchSeedBudget,
-  StreamAttachOwner,
-  SurfaceToolCallObserver,
-  useChatSession,
+} from "@/lib/agent-chat/turn-queue";
+import { ScratchSeedBudget } from "@/lib/agent-chat/scratch-seed-budget";
+import { StreamAttachOwner } from "@/lib/agent-chat/stream-attach-owner";
+import { SurfaceToolCallObserver } from "@/lib/agent-chat/surface-tool-call-observer";
+import { useChatSession } from "@/lib/agent-chat/use-chat-session";
+import {
   useCoreTurnSync,
-  useRefreshOnStreamEnd,
-  useSessionFork,
   useSessionStatus,
-  useStreamAttach,
-  useTurnQueueController,
-  type ChatMessage,
-} from "@/lib/agent-chat";
+} from "@/lib/agent-chat/use-session-status";
+import { useRefreshOnStreamEnd } from "@/lib/agent-chat/use-refresh-on-stream-end";
+import { useSessionFork } from "@/lib/agent-chat/use-session-fork";
+import { useStreamAttach } from "@/lib/agent-chat/use-stream-attach";
+import { useTurnQueueController } from "@/lib/agent-chat/use-turn-queue-controller";
+import type { ChatMessage } from "@/lib/agent-chat/types";
 import {
   ChatMessageView,
   CompactingIndicator,
@@ -107,7 +111,7 @@ import {
   useModelPickerState,
 } from "../shared/model-picker";
 import { DesktopModePicker, useModePickerState } from "../shared/mode-picker";
-import { DesktopContextMeter } from "../shared/context-meter";
+import { DesktopContextMeter } from "../shared/desktop-context-meter";
 import {
   registered_models,
   useEndpointProviders,
@@ -115,13 +119,13 @@ import {
 import {
   AgentComposerInput,
   type ComposerCommandAction,
-} from "../shared/agent-composer-input";
+} from "../shared/legacy-agent-composer-input";
 import { useWorkspaceComposerCatalog } from "../shared/use-workspace-composer-catalog";
 import {
   AgentApprovalBar,
   findPendingApproval,
   type PendingApproval,
-} from "../shared/agent-approval";
+} from "../shared/legacy-agent-approval";
 import { NativeAgentPaneGate } from "./native-agent-pane";
 import { NativeExternalAgentPanel } from "./native-external-agent-panel";
 import styles from "./agent-pane.module.css";
@@ -195,7 +199,6 @@ function AgentPaneRoute(props: AgentPaneContentProps) {
           workspaceId={props.workspace.id}
           initialSession={initialSession}
           editorSurfaces={props.surfaceHost}
-          legacy={<AgentPaneContent {...props} />}
         />
       ) : (
         <AgentPaneContent {...props} />

@@ -28,7 +28,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { AgentDesignSearch } from "@grida/agent/tools/design-search";
-import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat";
+import type { ChatMessage, ToolCallEntry } from "@/lib/agent-chat/types";
 import { DesignSearchExplorer } from "./design-search-explorer";
 
 type Pin = AgentDesignSearch.DesignSearchResult;
