@@ -17,8 +17,7 @@ export class SecretsStore {
 
   constructor(
     private readonly auth: AuthStore,
-    providerHome = auth.userDataPath,
-    private readonly prepareCustody?: () => Promise<void>
+    providerHome = auth.userDataPath
   ) {
     this.home = path.resolve(providerHome);
     // Select custody before access. Windows keeps the existing host-local
@@ -50,14 +49,8 @@ export class SecretsStore {
     const store = new ProviderCredentialStore({
       home: await fs.realpath(this.home),
     });
-    if (this.prepareCustody) await this.prepareCustody();
-    else await this.auth.migrateProviderKeys(store);
+    await this.auth.migrateProviderKeys(store);
     return store;
-  }
-
-  /** Prepare canonical custody without exposing any credential value. */
-  async prepareSharedCustody(): Promise<void> {
-    await this.store();
   }
 
   private async legacy<T>(operation: () => Promise<T>): Promise<T> {

@@ -109,8 +109,6 @@ export type ServerOptions = {
   user_data_path: string;
   /** GRIDA-SEC-014 — native-host input, never renderer/project configuration. */
   provider_home?: string;
-  /** Trusted initializer when legacy custody lives outside this host. */
-  prepare_provider_custody?: () => Promise<void>;
   /**
    * GRIDA-SEC-004 — host-injected managed root under which the auto-create
    * flow (`POST /workspaces/create`) mints new project folders (desktop:
@@ -196,11 +194,7 @@ export function buildServer(opts: ServerOptions): BuiltServer {
   // Per-launch daemon state (registry is in-memory and resets on restart;
   // recent.json / auth.json / workspaces.json are on disk and persist).
   const auth = new AuthStore(opts.user_data_path);
-  const secrets = new SecretsStore(
-    auth,
-    opts.provider_home,
-    opts.prepare_provider_custody
-  );
+  const secrets = new SecretsStore(auth, opts.provider_home);
   const protectedRoots = [
     secrets.directory,
     ...(opts.protected_file_roots ?? []),

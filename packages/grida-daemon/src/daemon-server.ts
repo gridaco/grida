@@ -52,7 +52,6 @@ export type DaemonServerOptions = {
   user_data_path: string;
   /** Explicit shared provider home. Omission isolates custody under user_data_path. */
   provider_home?: string;
-  prepare_provider_custody?: ServerOptions["prepare_provider_custody"];
   /**
    * GRIDA-SEC-004 — host-injected managed root for the auto-create flow
    * (`POST /workspaces/create`). The desktop supervisor passes
