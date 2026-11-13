@@ -57,8 +57,8 @@ jobs:
         env:
           GRIDA_CLI_DOCS_SUDO_NETWORK: "1"
         run: |
-          cargo build --locked -p grida-cli --bin grida
-          node scripts/cli-release/native-fixture.mjs --binary "$PWD/target/debug/grida" --out "$RUNNER_TEMP/grida-docs-native"
+          cargo build --locked --profile fixture -p grida-cli --bin grida
+          node scripts/cli-release/native-fixture.mjs --binary "$PWD/target/fixture/grida" --out "$RUNNER_TEMP/grida-docs-native"
           node scripts/cli-docs/check.mjs --native-candidate "$RUNNER_TEMP/grida-docs-native"
       - name: Download exact native release candidate
         if: inputs.native_candidate_artifact != ''

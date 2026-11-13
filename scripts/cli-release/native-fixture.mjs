@@ -17,13 +17,19 @@ import { parseArgs, promisify } from "node:util";
 import { FX, fxVersion, npmRun, platforms, prepareNative } from "./native.mjs";
 import { selectPlatform } from "../../packages/grida-cli/native/bin.mjs";
 
-export async function buildHostFixture(out) {
+/**
+ * Builds the host CLI in the `fixture` profile: unoptimized like a debug build,
+ * without the embedded debug info that would exceed the package bound on Linux.
+ */
+export async function buildFixtureBinary() {
   const root = fileURLToPath(new URL("../../", import.meta.url));
   const { stdout } = await promisify(execFile)(
     "cargo",
     [
       "build",
       "--locked",
+      "--profile",
+      "fixture",
       "-p",
       "grida-cli",
       "--bin",
@@ -43,7 +49,11 @@ export async function buildHostFixture(out) {
         record.executable
     )?.executable;
   assert(executable, "Cargo did not produce the native CLI executable");
-  return prepareHostFixture(executable, out);
+  return executable;
+}
+
+export async function buildHostFixture(out) {
+  return prepareHostFixture(await buildFixtureBinary(), out);
 }
 
 export function fixtureBinary(platform) {

@@ -20,3 +20,11 @@ unsafe_code = "deny"
 [workspace.lints.clippy]
 dbg_macro = "warn"
 todo = "warn"
+
+# Unoptimized host executables packed as local release-shaped fixtures. Without
+# embedded debug info they stay within the release package's executable bound
+# on every OS, as the macOS debug build already does.
+[profile.fixture]
+inherits = "dev"
+debug = false
+strip = "debuginfo"
