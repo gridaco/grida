@@ -217,8 +217,6 @@ impl Host {
                 || request
                     .reasoning
                     .is_some_and(|level| Some(level) != stored.reasoning)
-                || (stored.configuration_permission == crate::ConfigurationPermission::Change)
-                    != (request.configuration_permission == crate::ConfigurationPermission::Change)
             {
                 return Err(problem(ErrorKind::Conflict, "input_identity_reused"));
             }
@@ -539,7 +537,6 @@ impl Host {
         captured.allow_attachment_reference = false;
         captured.allow_workspace_reference = false;
         captured.allow_image_placement = false;
-        captured.configuration_permission = crate::ConfigurationPermission::Disabled;
         if let Some(permission) = &captured.permission_capture {
             let profile = self
                 .permissions

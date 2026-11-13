@@ -28,6 +28,9 @@ sandbox without asking. For example, ask “Run the tests and fix what fails.”
   existing one, so run commits yourself.
 - With the **Plan** badge on, the agent only reads and asks questions; it
   does not run commands or change files.
+- The agent's own settings file is the exception to working without asking:
+  it can read the file, but every change to it asks for your approval, and
+  commands cannot reach it. [Change agent settings](./settings.md#ask-the-agent)
 
 Desktop offers only this preset. The
 [permission policy](../wg/ai/agent/permissions.md) describes the full set of

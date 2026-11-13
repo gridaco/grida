@@ -27,6 +27,11 @@ pub(crate) const PROTECTED_METADATA: [&str; 5] = [".git", ".agents", ".grida", "
 /// names are protected for commands only once they exist, so a command can
 /// start a new repository (permission policy, protected paths).
 pub(crate) const PROTECTED_WHEN_MISSING: [&str; 2] = [".grida", ".codex"];
+/// The directory ID that names the agent settings file. Only
+/// [`SETTINGS_PATH`] is reachable under it, by reads and approved writes.
+pub(crate) const SETTINGS_DIRECTORY: &str = "agent-settings";
+pub(crate) const SETTINGS_PATH: &str = "config.toml";
+const SETTINGS_NOTE: &str = " Directory \"agent-settings\" holds only config.toml, the agent settings file. Every change to it asks the person, and a saved change applies to messages accepted afterwards.";
 const MAX_OUTPUT_BYTES: usize = 64 * 1024;
 const WORKERS: usize = 2;
 const TIME_LIMIT: Duration = Duration::from_secs(3);
@@ -42,6 +47,13 @@ pub struct FileAuthority {
 pub type CurrentFileAuthority = dyn Fn() -> Result<FileAuthority> + Send + Sync;
 type InvocationAuthority = dyn Fn(&Invocation) -> Result<FileAuthority> + Send + Sync;
 pub(crate) type ImageCapture = dyn Fn(Vec<u8>) -> Result<MediaRef> + Send + Sync;
+type SettingsAuthority = dyn Fn(&Invocation) -> Result<SettingsAccess> + Send + Sync;
+
+/// Current authority over the agent settings file for one admitted action.
+pub(crate) struct SettingsAccess {
+    pub configuration: Arc<crate::configuration::Configuration>,
+    pub write: bool,
+}
 pub(crate) const VIEW_IMAGE: &str = "view_image";
 pub(crate) const CAPTURE_IMAGE_REFERENCE: &str = "capture_image_reference";
 pub(crate) const WORKSPACE_IMAGE_REFERENCE_SCHEMA: &str = "grida.agent.workspace-image-reference";
@@ -52,6 +64,7 @@ pub struct FileTools {
     current: Arc<InvocationAuthority>,
     capture_image: Option<Arc<ImageCapture>>,
     capture_reference: Option<Arc<ImageCapture>>,
+    settings: Option<Arc<SettingsAuthority>>,
     workers: Arc<Semaphore>,
     /// Mutations are serialized so an edit always reads what it replaces.
     mutations: std::sync::Mutex<()>,
@@ -84,9 +97,17 @@ impl FileTools {
             current,
             capture_image,
             capture_reference,
+            settings: None,
             workers: Arc::new(Semaphore::new(WORKERS)),
             mutations: std::sync::Mutex::new(()),
         })
+    }
+
+    /// Reach the agent settings file through [`SETTINGS_DIRECTORY`]. The
+    /// authority decides each action; writes need an approved action.
+    pub(crate) fn with_settings(mut self, settings: Arc<SettingsAuthority>) -> Self {
+        self.settings = Some(settings);
+        self
     }
 
     /// These three adapters are read-only. The host selects offers and binds
@@ -223,13 +244,22 @@ impl FileTool {
                 )
             }
         };
+        let description = if scope.settings.is_some()
+            && matches!(
+                operation,
+                Operation::Read | Operation::Write | Operation::Edit
+            ) {
+            format!("{description}{SETTINGS_NOTE}")
+        } else {
+            description.into()
+        };
         Ok(Self {
             scope,
             operation,
             definition: ToolDefinition {
                 id: ToolId::new(id)?,
                 version: 1,
-                description: description.into(),
+                description,
                 input: InputFormat::Json(json!({
                     "type": "object", "properties": properties,
                     "required": required, "additionalProperties": false
@@ -475,6 +505,7 @@ impl FileTools {
             &self.current,
             &self.capture_image,
             &self.capture_reference,
+            &self.settings,
             request.directory,
             &budget.invocation,
         );

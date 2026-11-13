@@ -54,7 +54,6 @@ use crate::EffortPreset;
 use crate::configuration::{
     Configuration, ConfigurationInspection, ConfigurationSnapshot, WorkspaceConfiguration,
 };
-use crate::configuration_tools::ConfigurationAccess;
 use crate::gg::{
     GatewayChildBilling, GatewayChildBillingPage, GatewayChildBillingRef, GgConnection,
 };
@@ -198,7 +197,6 @@ struct Execution {
     authority: MasterAuthority,
     authorization: Arc<ExecutionAuthority>,
     questions: Arc<questions::QuestionAccess>,
-    configuration_tools: Arc<ConfigurationAccess>,
     accepts_selected_png: bool,
     image_tools: Option<Arc<retained_inputs::RetainedInputs>>,
     workspace_vision: bool,
@@ -340,7 +338,6 @@ pub struct PromptRequest {
     pub session: SessionId,
     pub parts: Vec<PromptPart>,
     pub questions: bool,
-    pub configuration_permission: crate::ConfigurationPermission,
     pub operating_regime: Option<OperatingRegime>,
     pub effort: Option<EffortPreset>,
     /// The person's reasoning level for this request's turn.
@@ -397,7 +394,6 @@ struct StoredPrompt {
     allow_wakeups: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     allow_library_selection: bool,
-    configuration_permission: crate::ConfigurationPermission,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     permission_capture: Option<crate::permissions::PermissionCapture>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -466,7 +462,6 @@ impl CapturedRoute {
 
 struct SubmissionPolicy {
     questions: bool,
-    configuration_permission: crate::ConfigurationPermission,
     allow_wakeups: bool,
     allow_library_selection: bool,
     allow_host_tools: bool,
@@ -574,8 +569,6 @@ struct PreparedInput {
     questions: bool,
     allow_wakeups: bool,
     allow_library_selection: bool,
-    configuration_permission: crate::ConfigurationPermission,
-    captured: Option<ConfigurationSnapshot>,
     permission_capture: Option<crate::permissions::PermissionCapture>,
     host_tools: Vec<Arc<host_tools::HostTools>>,
     image_generation: Option<image_generation::Prepared>,
@@ -1176,12 +1169,7 @@ impl Host {
             id, session, parts, ..
         } = request;
         validate_prompt_parts(&parts)?;
-        let launch = if identified
-            && compaction::ordinary_text(
-                policy.configuration_permission,
-                policy.effort.is_some(),
-                &parts,
-            ) {
+        let launch = if identified && compaction::ordinary_text(policy.effort.is_some(), &parts) {
             Launch::Identified { id, parts, policy }
         } else {
             Launch::Prompt {
@@ -1971,18 +1959,6 @@ impl Host {
         if let Some(wakeups) = &wakeups {
             wakeups.insert(operations.clone(), &mut inventory, &mut authority.tools)?;
         }
-        if prepared.configuration_permission != crate::ConfigurationPermission::Disabled {
-            let captured = prepared.captured.ok_or_else(|| {
-                problem(ErrorKind::InvalidState, "captured_configuration_missing")
-            })?;
-            execution.configuration_tools.insert(
-                self.clone(),
-                captured,
-                prepared.configuration_permission,
-                &mut inventory,
-                &mut authority.tools,
-            )?;
-        }
         for host_tools in host_tools {
             host_tools.insert(&mut inventory, &mut authority.tools)?;
         }
@@ -2008,13 +1984,6 @@ impl Host {
         }
         if !closing && let Some(wakeups) = &wakeups {
             wakeups.reconcile(&operations, &tools).await?;
-        }
-        if !closing && prepared.configuration_permission != crate::ConfigurationPermission::Disabled
-        {
-            execution
-                .configuration_tools
-                .reconcile(&operations, &tools)
-                .await?;
         }
         if let Some(disclosure) = history.disclosure {
             if !prepared.config.instructions.is_empty() {
@@ -2180,7 +2149,6 @@ impl Host {
             .filter(|_| operating_regime.is_act() && !allow_wakeups && self.side_context.is_none());
         Ok(SubmissionPolicy {
             questions: request.questions,
-            configuration_permission: request.configuration_permission,
             allow_wakeups,
             allow_library_selection: false,
             allow_host_tools: true,
@@ -2208,7 +2176,6 @@ impl Host {
     ) -> Result<Submission> {
         let SubmissionPolicy {
             questions,
-            configuration_permission,
             allow_wakeups,
             allow_library_selection,
             allow_host_tools,
@@ -2269,7 +2236,6 @@ impl Host {
         } else if self.side_context.is_some() {
             if questions
                 || allow_wakeups
-                || configuration_permission != crate::ConfigurationPermission::Disabled
                 || parts
                     .iter()
                     .any(|part| !matches!(part, PromptPart::Text { .. }))
@@ -2359,7 +2325,6 @@ impl Host {
                 questions,
                 allow_wakeups,
                 allow_library_selection,
-                configuration_permission,
                 permission_capture,
                 allow_reviewer_primary_read,
                 host_tools_capture,
@@ -2415,8 +2380,6 @@ impl Host {
             questions,
             allow_wakeups,
             allow_library_selection,
-            configuration_permission,
-            captured,
             permission_capture,
             guidance,
             goal,
@@ -2489,8 +2452,6 @@ impl Host {
                     if stored.questions
                         || stored.allow_wakeups
                         || stored.allow_library_selection
-                        || stored.configuration_permission
-                            != crate::ConfigurationPermission::Disabled
                         || stored.allow_reviewer_primary_read
                         || (stored.permission_capture.is_some() && profile.sponsorship().is_none())
                         || stored.host_tools_capture.is_some()
@@ -2698,10 +2659,6 @@ impl Host {
                     stored.questions,
                     !cancellation_only && stored.operating_regime.is_act() && stored.allow_wakeups,
                     !cancellation_only && stored.allow_library_selection,
-                    stored
-                        .configuration_permission
-                        .for_regime(stored.operating_regime),
-                    Some(stored.configuration),
                     if cancellation_only {
                         None
                     } else {
@@ -2770,8 +2727,6 @@ impl Host {
             questions,
             allow_wakeups,
             allow_library_selection,
-            configuration_permission,
-            captured,
             permission_capture,
             host_tools,
             image_generation,
@@ -2966,7 +2921,6 @@ impl Host {
         if editor_endpoint.is_some()
             && (!policy.operating_regime.is_act()
                 || !self.supports_editor_tools()
-                || policy.configuration_permission == crate::ConfigurationPermission::Change
                 || !request
                     .parts
                     .iter()
@@ -3033,17 +2987,6 @@ impl Host {
                 "submission_library_selection_changed",
             ));
         }
-        let requested = request
-            .configuration_permission
-            .for_regime(settings.operating_regime);
-        if (settings.configuration_permission == crate::ConfigurationPermission::Change)
-            != (requested == crate::ConfigurationPermission::Change)
-        {
-            return Err(problem(
-                ErrorKind::Conflict,
-                "submission_configuration_permission_changed",
-            ));
-        }
         Ok(Some(DurableSubmission {
             session: request.session.clone(),
             input: request.id.clone(),
@@ -3093,23 +3036,11 @@ impl Host {
         expected: Option<Fingerprint>,
         change: SettingChange,
     ) -> Result<ConfigurationSnapshot> {
-        self.configuration_update_controlled(expected, change, None)
-            .await
-    }
-
-    pub(crate) async fn configuration_update_controlled(
-        &self,
-        expected: Option<Fingerprint>,
-        change: SettingChange,
-        control: Option<RequestControl>,
-    ) -> Result<ConfigurationSnapshot> {
         self.owned_control(move |host| async move {
             let admission = host.configuration_admission.clone().lock_owned().await;
             host.with_configuration(move |configuration| {
                 let _admission = admission;
-                configuration.update_guarded(expected, change, || {
-                    control.as_ref().map_or(Ok(()), check_configuration_control)
-                })
+                configuration.update(expected, change)
             })
             .await
         })
@@ -3120,21 +3051,11 @@ impl Host {
         &self,
         expected: Option<Fingerprint>,
     ) -> Result<ConfigurationSnapshot> {
-        self.configuration_reload_controlled(expected, None).await
-    }
-
-    pub(crate) async fn configuration_reload_controlled(
-        &self,
-        expected: Option<Fingerprint>,
-        control: Option<RequestControl>,
-    ) -> Result<ConfigurationSnapshot> {
         self.owned_control(move |host| async move {
             let admission = host.configuration_admission.clone().lock_owned().await;
             host.with_configuration(move |configuration| {
                 let _admission = admission;
-                configuration.reload_guarded(expected, || {
-                    control.as_ref().map_or(Ok(()), check_configuration_control)
-                })
+                configuration.reload(expected)
             })
             .await
         })
@@ -3548,11 +3469,9 @@ impl Execution {
             }
         };
         let questions = Arc::new(questions::QuestionAccess::new()?);
-        let configuration_tools = Arc::new(ConfigurationAccess::new()?);
         let authorization = Arc::new(ExecutionAuthority {
             inference: inference.clone(),
             questions: questions.clone(),
-            configuration_tools: configuration_tools.clone(),
             credential,
         });
         let runtime = Runtime::new(ExecutionServices {
@@ -3588,7 +3507,6 @@ impl Execution {
             },
             authorization,
             questions,
-            configuration_tools,
             accepts_selected_png: false,
             image_tools: None,
             workspace_vision: false,
@@ -3619,16 +3537,13 @@ enum Credential {
 struct ExecutionAuthority {
     inference: GrantSelection,
     questions: Arc<questions::QuestionAccess>,
-    configuration_tools: Arc<ConfigurationAccess>,
     credential: Credential,
 }
 
 impl AuthorityValidator for ExecutionAuthority {
     fn validate(&self, request: AuthorityRequest) -> BoxFuture<'_, Result<()>> {
         Box::pin(async move {
-            if self.questions.accepts(&request.selection)
-                || self.configuration_tools.accepts(&request.selection)
-            {
+            if self.questions.accepts(&request.selection) {
                 return Ok(());
             }
             if request.selection != self.inference {
@@ -3653,13 +3568,6 @@ impl ToolGate for ExecutionAuthority {
         admission: ToolAdmission,
         context: AdmissionContext,
     ) -> BoxFuture<'_, Result<ToolDecision>> {
-        if self.configuration_tools.accepts(&admission.grants)
-            && self
-                .configuration_tools
-                .permits(&admission.invocation, &admission.grants)
-        {
-            return Box::pin(async { Ok(ToolDecision::Permit) });
-        }
         self.questions.decide(admission, context)
     }
 }
@@ -4020,17 +3928,4 @@ fn uuid() -> String {
 
 fn problem(kind: ErrorKind, code: &'static str) -> Error {
     Error::new(kind, code)
-}
-
-pub(crate) fn check_configuration_control(control: &RequestControl) -> Result<()> {
-    if control.cancellation.is_cancelled() {
-        return Err(problem(ErrorKind::Unavailable, "configuration_cancelled"));
-    }
-    if control
-        .deadline
-        .is_some_and(|deadline| deadline <= std::time::Instant::now())
-    {
-        return Err(problem(ErrorKind::Unavailable, "configuration_deadline"));
-    }
-    Ok(())
 }

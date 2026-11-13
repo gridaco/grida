@@ -61,7 +61,6 @@ mod tests {
                 text: "Fixture".into(),
             }],
             questions: false,
-            configuration_permission: crate::ConfigurationPermission::Disabled,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),
@@ -205,7 +204,6 @@ mod tests {
                 text: "Fixture".into(),
             }],
             questions: false,
-            configuration_permission: crate::ConfigurationPermission::Disabled,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),
@@ -336,7 +334,6 @@ pub enum QueueEdit {
         replacement: ChangeId,
         parts: Vec<PromptPart>,
         questions: bool,
-        configuration_permission: crate::ConfigurationPermission,
     },
     Withdraw {
         input: ChangeId,
@@ -378,8 +375,6 @@ pub struct InputSettings {
     pub goal_start: Option<GoalRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub goal_max_cost_mills: Option<String>,
-    #[serde(default)]
-    pub configuration_permission: crate::ConfigurationPermission,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<crate::skills::SkillDescription>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -446,9 +441,6 @@ impl InputSettings {
                         Some(goals::GoalInput::Start(goal)) => Some(goal),
                         _ => None,
                     },
-                    configuration_permission: stored
-                        .configuration_permission
-                        .for_regime(stored.operating_regime),
                     skills: stored
                         .guidance
                         .as_ref()
@@ -625,7 +617,6 @@ impl Host {
                 replacement,
                 parts,
                 questions,
-                configuration_permission,
             } => {
                 validate_prompt_parts(&parts)?;
                 let original = self.store.input(session.clone(), input.clone()).await?;
@@ -700,7 +691,6 @@ impl Host {
                         parts,
                         SubmissionPolicy {
                             questions,
-                            configuration_permission,
                             allow_wakeups: false,
                             allow_library_selection: false,
                             allow_host_tools,

@@ -917,7 +917,6 @@ mod tests {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     #[tokio::test]
     async fn selected_gateway_png_stays_on_the_exact_chat_connection() {
-        use crate::ConfigurationPermission;
         use crate::host::{GgOptions, Host, ImageUpload, PromptPart, PromptRequest, RunResult};
         use agent_kit_core::messages::OutcomeStatus;
         use base64::{Engine, engine::general_purpose::STANDARD};
@@ -1001,7 +1000,6 @@ mod tests {
             session,
             parts,
             questions: false,
-            configuration_permission: ConfigurationPermission::Disabled,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),

@@ -228,6 +228,84 @@ describe.skipIf(!supported)("Native agent workspace permissions", () => {
     );
     expect(request).toHaveBeenCalledTimes(2);
   });
+
+  it("offers a write review only for the agent settings file", async () => {
+    const settingsRoot = "/fixture/chats/workspaces/settings";
+    const list = async (approval: Record<string, unknown>) => {
+      const request =
+        vi.fn<(method: string, params: unknown) => Promise<unknown>>();
+      request
+        .mockResolvedValueOnce({
+          sessionId: "session",
+          sessionRevision: 5,
+          current: { turnId: "turn", controlRevision: 1 },
+        })
+        .mockResolvedValueOnce({
+          sessionId: "session",
+          turnId: "turn",
+          controlRevision: 1,
+          approvals: [
+            {
+              waitId: "approval/settings",
+              request: { session: "session", turn: "turn", ...approval },
+            },
+          ],
+        });
+      return new NativeAgentPermissions(
+        request,
+        new Map([["additional", "/fixture/additional"]]),
+        settingsRoot
+      ).list("session", "turn");
+    };
+    const write = (tool: string, relative_path: string) => ({
+      kind: "write",
+      tool,
+      relative_path,
+    });
+    await expect(
+      list({
+        directory: "agent-settings",
+        root: settingsRoot,
+        effect: write("edit_file", "config.toml"),
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        directory: "agent-settings",
+        root: settingsRoot,
+        tool: "edit_file",
+        relativePath: "config.toml",
+      }),
+    ]);
+    for (const approval of [
+      {
+        directory: "agent-settings",
+        root: settingsRoot,
+        effect: write("write_file", "agent.sqlite"),
+      },
+      {
+        directory: "agent-settings",
+        root: "/fixture/elsewhere",
+        effect: write("write_file", "config.toml"),
+      },
+      {
+        directory: "additional",
+        root: "/fixture/additional",
+        effect: write("write_file", "config.toml"),
+      },
+      {
+        directory: "agent-settings",
+        root: settingsRoot,
+        effect: {
+          kind: "read",
+          tool: "read_file",
+          relative_path: "config.toml",
+        },
+      },
+    ])
+      await expect(list(approval)).rejects.toThrow(
+        "native_agent_approval_invalid"
+      );
+  });
 });
 
 it.runIf(Boolean(packaged) && supported)(

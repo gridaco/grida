@@ -798,7 +798,6 @@ impl Host {
         captured.questions = false;
         captured.allow_library_selection = false;
         captured.allow_wakeups = false;
-        captured.configuration_permission = crate::ConfigurationPermission::Disabled;
         captured.permission_capture = primary_read;
         if captured.permission_capture.is_none() {
             // Text-only reviewers have no native workspace execution grant.
@@ -1509,7 +1508,6 @@ mod tests {
                 }],
                 SubmissionPolicy {
                     questions: true,
-                    configuration_permission: crate::ConfigurationPermission::Inspect,
                     allow_wakeups: false,
                     allow_library_selection: false,
                     allow_host_tools: false,

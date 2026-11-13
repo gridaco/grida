@@ -202,7 +202,6 @@ it.runIf(Boolean(packaged) && process.platform !== "win32").each([false, true])(
         (sender) =>
           sender === first.sender || sender === second.sender ? active : null,
         undefined,
-        undefined,
         confirm
       );
       const opened = await ipc.create(first.event);

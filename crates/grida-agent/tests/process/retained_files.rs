@@ -219,14 +219,6 @@ async fn unsupported_or_combined_embedded_inputs_are_refused_before_staging() {
         "selectedFile":{"name":"other.txt","data":STANDARD.encode(TEXT)},
     })).await;
     assert_eq!(refused["error"]["data"], "file_attachment_count_limit");
-    let refused = client.request("_co.grida/session/submit", json!({
-        "sessionId":session["sessionId"], "inputId":"configuration-and-resource", "prompt":[text, resource],
-        "allowConfigurationChanges":true,
-    })).await;
-    assert_eq!(
-        refused["error"]["data"],
-        "selected_file_options_unsupported"
-    );
     assert!(!state.join("retained-inputs").exists());
     assert!(endpoint.requests.try_recv().is_err());
     client.close().await;

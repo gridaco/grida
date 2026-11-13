@@ -97,7 +97,6 @@ type SelectedAttachment = Readonly<{
   name: string;
   bytes: ArrayBuffer;
 }>;
-const MAX_CONFIGURATION_MESSAGE_BYTES = 1024;
 const utf8 = new TextEncoder();
 
 const TERMINAL_OUTCOME: Record<NativeChatTurnSummary["status"], string> = {
@@ -169,7 +168,6 @@ export type NativeChatView = Readonly<{
   hooks: NativeHookInspection | null;
   hooksBusy: boolean;
   hooksError: string | null;
-  reviewConfiguration: boolean;
   observation: NativeChatObservation | null;
   turnSummary: (NativeChatTurnSummary & { detailsUnavailable?: true }) | null;
   gatewayBillingRefresh:
@@ -282,7 +280,6 @@ type Scope = {
     operatingRegime?: NativeChatOperatingRegime;
     effort?: NativeChatEffort;
     attachment?: SelectedAttachment;
-    reviewConfiguration: boolean;
     allowWakeup: boolean;
     allowLibrarySelection: boolean;
     editorSvgTargetId?: string;
@@ -338,7 +335,6 @@ const EMPTY: NativeChatView = Object.freeze({
   hooks: null,
   hooksBusy: false,
   hooksError: null,
-  reviewConfiguration: false,
   observation: null,
   turnSummary: null,
   gatewayBillingRefresh: null,
@@ -1014,7 +1010,6 @@ export class NativeChatController {
       !this.view.acting &&
       !this.view.steering &&
       !this.view.goalIntent &&
-      !this.view.reviewConfiguration &&
       !this.view.allowWakeup
     );
   }
@@ -1273,7 +1268,6 @@ export class NativeChatController {
       !this.view.acting &&
       !this.view.commandRunning &&
       !this.view.steering &&
-      !this.view.reviewConfiguration &&
       !this.view.attachmentDraft &&
       !this.scope.attachmentRead &&
       (!this.needsQueue || this.scope.pending?.allowWakeup === true)
@@ -1286,7 +1280,7 @@ export class NativeChatController {
   }
 
   get hasContextLimit(): boolean {
-    return !!this.bridge.contextLimit && !!this.bridge.saveContextLimit;
+    return !!this.bridge.contextLimit;
   }
 
   get hasHooks(): boolean {
@@ -1361,26 +1355,6 @@ export class NativeChatController {
     }
   }
 
-  get canReviewConfiguration(): boolean {
-    return (
-      !!this.scope &&
-      !!this.bridge.submitWithConfigurationReview &&
-      this.view.contextLimit?.exactCounting === true &&
-      this.view.contextLimit.source !== "invalid" &&
-      this.view.operatingRegime === "act" &&
-      !this.view.steering &&
-      !this.view.acting &&
-      !this.view.allowWakeup &&
-      !this.view.attachmentDraft &&
-      !this.scope.attachmentRead
-    );
-  }
-
-  setConfigurationReview(requested: boolean): void {
-    if (!this.view.acting && (!requested || this.canReviewConfiguration))
-      this.update({ reviewConfiguration: requested });
-  }
-
   async toggleContextLimit(): Promise<void> {
     if (!this.hasContextLimit || this.view.contextLimitBusy) return;
     const open = !this.view.contextLimitOpen;
@@ -1403,10 +1377,6 @@ export class NativeChatController {
         this.update({
           contextLimit,
           contextLimitDraft: contextLimit.limit?.toString() ?? "",
-          ...((!contextLimit.exactCounting ||
-            contextLimit.source === "invalid") && {
-            reviewConfiguration: false,
-          }),
         });
     } catch {
       if (this.owns(scope))
@@ -1415,67 +1385,6 @@ export class NativeChatController {
         });
     } finally {
       if (this.owns(scope)) this.update({ contextLimitBusy: false });
-    }
-  }
-
-  async saveContextLimit(reset = false): Promise<void> {
-    const scope = this.scope;
-    const basis = this.view.contextLimit;
-    const draft = this.view.contextLimitDraft;
-    if (
-      !scope ||
-      !basis ||
-      basis.source === "invalid" ||
-      (!reset && !basis.exactCounting) ||
-      !this.bridge.saveContextLimit ||
-      this.view.contextLimitBusy
-    )
-      return;
-    const limit = reset ? null : Number(draft);
-    if (
-      !reset &&
-      (!/^[0-9]+$/.test(draft) || !Number.isSafeInteger(limit) || limit! < 1)
-    ) {
-      this.update({
-        contextLimitError: "Enter a positive whole number of tokens.",
-      });
-      return;
-    }
-    this.update({ contextLimitBusy: true, contextLimitError: null });
-    let refresh = false;
-    try {
-      const result = await this.bridge.saveContextLimit(basis.reviewId, limit);
-      if (!this.owns(scope)) return;
-      this.update({
-        contextLimit: { ...basis, limit: result.limit, source: "active" },
-      });
-      refresh = true;
-    } catch (error) {
-      if (!this.owns(scope)) return;
-      if (
-        error instanceof Error &&
-        error.message.includes("config_revision_changed")
-      ) {
-        refresh = true;
-      } else {
-        this.update({
-          contextLimitError: describe(
-            error,
-            "Couldn't confirm the setting change. Check the current value."
-          ),
-        });
-      }
-    } finally {
-      if (this.owns(scope)) this.update({ contextLimitBusy: false });
-    }
-    if (refresh && this.owns(scope)) {
-      await this.refreshContextLimit();
-      if (this.owns(scope) && this.view.contextLimit?.limit !== limit)
-        this.update({
-          contextLimitDraft: draft,
-          contextLimitError:
-            "The default changed. Review it before saving again.",
-        });
     }
   }
 
@@ -1759,7 +1668,6 @@ export class NativeChatController {
       !!this.bridge.steer &&
       !this.view.attachmentDraft &&
       !this.scope?.attachmentRead &&
-      !this.view.reviewConfiguration &&
       !this.view.allowWakeup &&
       !!turn &&
       !turn.cancelled &&
@@ -2125,7 +2033,6 @@ export class NativeChatController {
       this.update({
         operatingRegime,
         ...(operatingRegime === "plan" && {
-          reviewConfiguration: false,
           allowWakeup: false,
         }),
       });
@@ -2206,7 +2113,6 @@ export class NativeChatController {
     const mode = this.needsQueue ? "enqueue" : "submit";
     const selectedAttachment = scope.selectedAttachment;
     const allowWakeup = this.view.allowWakeup;
-    const reviewConfiguration = this.view.reviewConfiguration;
     const retained = this.retainedSend(scope, text);
     // Depends on whether the chat is busy, so it is checked once a paused
     // turn has settled.
@@ -2216,10 +2122,7 @@ export class NativeChatController {
       throw new Error(error);
     }
     const operatingRegime =
-      selectedAttachment ||
-      reviewConfiguration ||
-      allowWakeup ||
-      this.bridge.submitInRegime
+      selectedAttachment || allowWakeup || this.bridge.submitInRegime
         ? this.view.operatingRegime
         : undefined;
     // Medium is the default stop and leaves the model's default in place.
@@ -2234,7 +2137,6 @@ export class NativeChatController {
       mode === "submit" &&
       operatingRegime === "act" &&
       !allowWakeup &&
-      !reviewConfiguration &&
       !selectedAttachment &&
       this.bridge.onEditorSvgText
         ? this.editorSurfaces?.svgText?.capture()
@@ -2247,15 +2149,12 @@ export class NativeChatController {
         throw new Error("native_chat_pending_regime_changed");
       if (retained && retained.effort !== effort)
         throw new Error("native_chat_pending_effort_changed");
-      if (retained && retained.reviewConfiguration !== reviewConfiguration)
-        throw new Error("native_context_limit_pending_review_changed");
       if (
         !retained &&
         this.libraryPicker &&
         scope.librarySelectionAvailable === undefined &&
         mode === "submit" &&
         !allowWakeup &&
-        !reviewConfiguration &&
         !selectedAttachment
       )
         await this.readInputCapabilities(scope);
@@ -2266,13 +2165,11 @@ export class NativeChatController {
         operatingRegime,
         effort,
         attachment: selectedAttachment,
-        reviewConfiguration,
         allowWakeup,
         allowLibrarySelection:
           mode === "submit" &&
           scope.librarySelectionAvailable === true &&
           !allowWakeup &&
-          !reviewConfiguration &&
           !selectedAttachment &&
           !(scope.stopEditorSvgText && svgTarget),
         editorSvgTargetId: scope.stopEditorSvgText ? svgTarget : undefined,
@@ -2298,18 +2195,6 @@ export class NativeChatController {
             pending.inputId,
             pending.text,
             ...(pending.effort ? [pending.effort] : [])
-          );
-        } else if (pending.reviewConfiguration) {
-          if (!this.bridge.submitWithConfigurationReview)
-            throw new Error("native_context_limit_unavailable");
-          accepted = await this.bridge.submitWithConfigurationReview(
-            attachment.attachmentId,
-            {
-              action: pending.mode,
-              inputId: pending.inputId,
-              text: pending.text,
-              ...(pending.effort && { effort: pending.effort }),
-            }
           );
         } else if (pending.attachment?.kind === "png") {
           if (!this.bridge.submitImage || !pending.operatingRegime)
@@ -2373,12 +2258,7 @@ export class NativeChatController {
         }
       } catch (error) {
         this.attachment(scope);
-        if (
-          scope.pending !== pending ||
-          pending.reviewConfiguration ||
-          pending.allowWakeup
-        )
-          throw error;
+        if (scope.pending !== pending || pending.allowWakeup) throw error;
         // Recover an earlier receipt without authorizing an unsupported resend.
         accepted = await this.bridge
           .inputReceipt(attachment.attachmentId, pending.inputId)
@@ -2388,8 +2268,6 @@ export class NativeChatController {
       }
       scope.pending = undefined;
       if (this.owns(scope)) {
-        if (pending.reviewConfiguration)
-          this.update({ reviewConfiguration: false });
         if (pending.allowWakeup) this.update({ allowWakeup: false });
         if (
           pending.attachment &&
@@ -2406,15 +2284,11 @@ export class NativeChatController {
         if (next) await this.playNext(scope, pending.inputId);
       }
     } catch (error) {
-      const reviewDeclined =
-        error instanceof Error &&
-        error.message.includes("native_context_limit_review_declined");
       if (
-        reviewDeclined ||
-        (error instanceof Error &&
-          /session_(queue_waiting|prompt_in_progress|admission_paused|turn_requires_recovery)/.test(
-            error.message
-          ))
+        error instanceof Error &&
+        /session_(queue_waiting|prompt_in_progress|admission_paused|turn_requires_recovery)/.test(
+          error.message
+        )
       )
         scope.pending = undefined;
       if (this.owns(scope)) {
@@ -2428,7 +2302,6 @@ export class NativeChatController {
         )
           void this.readInputCapabilities(scope);
         this.update({
-          ...(reviewDeclined && { reviewConfiguration: false }),
           error: describe(
             error,
             "Couldn't confirm the send. Your draft is still here."
@@ -2784,10 +2657,7 @@ export class NativeChatController {
       !this.bridge.queuedText ||
       this.view.acting ||
       this.view.queueDraft ||
-      scope.observation?.snapshot.pendingGoalId === inputId ||
-      this.view.queue?.items.some(
-        (item) => item.inputId === inputId && item.allowsConfigurationChange
-      )
+      scope.observation?.snapshot.pendingGoalId === inputId
     )
       return;
     this.update({ acting: true, error: null });
@@ -2848,11 +2718,7 @@ export class NativeChatController {
       !this.bridge.editQueue ||
       this.view.acting ||
       (action.action === "replace" &&
-        (scope.observation.snapshot.pendingGoalId === action.inputId ||
-          this.view.queue?.items.some(
-            (item) =>
-              item.inputId === action.inputId && item.allowsConfigurationChange
-          )))
+        scope.observation.snapshot.pendingGoalId === action.inputId)
     )
       return;
     const observationId =
@@ -2925,10 +2791,8 @@ export class NativeChatController {
       throw new Error(error);
     };
     if (this.view.goalIntent) {
-      if (this.view.attachmentDraft || this.view.reviewConfiguration)
-        throw new Error(
-          "Remove the attachment or settings review before starting a goal."
-        );
+      if (this.view.attachmentDraft)
+        throw new Error("Remove the attachment before starting a goal.");
       if (utf8.encode(text.trim()).length > 1024)
         refuse(
           "Use a shorter goal, or customize its objective and success criteria."
@@ -2943,12 +2807,6 @@ export class NativeChatController {
       refuse(
         "Retry with the original check-in permission, or edit the message to send a new one."
       );
-    if (this.view.reviewConfiguration) {
-      if (!this.canReviewConfiguration)
-        throw new Error("native_context_limit_unavailable");
-      if (utf8.encode(text).length > MAX_CONFIGURATION_MESSAGE_BYTES)
-        refuse("Use a message of at most 1 KiB for settings review.");
-    }
   }
 
   /**
@@ -3057,7 +2915,6 @@ export class NativeChatController {
       !!this.bridge.editQueue &&
       item.preview !== null &&
       !item.goalStart &&
-      !item.allowsConfigurationChange &&
       item.operatingRegime !== "plan" &&
       item.effort !== "ultra"
     );
@@ -4840,12 +4697,6 @@ function describe(error: unknown, fallback: string): string {
     return "This chat cannot inspect attached files.";
   if (error.message.includes("native_agent_frame_limit"))
     return "This message exceeds the connection limit. Shorten it and try again.";
-  if (error.message.includes("native_context_limit_review_declined"))
-    return "Settings review cancelled.";
-  if (error.message.includes("native_context_limit_pending_review_changed"))
-    return "Retry with the original settings permission, or edit the message to send a new one.";
-  if (error.message.includes("native_context_limit_unavailable"))
-    return "This workspace cannot apply a hard context input limit with the selected provider.";
   return fallback;
 }
 

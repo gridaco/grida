@@ -502,14 +502,15 @@ the side chat ID. These IDs work only on the connection that opened the chat.
 
 ## Set the context input limit
 
-Grida Desktop has no control for the context input limit; edit the workspace's
-`config.toml` and restart Desktop. [Change agent settings](./settings.md)
+In Grida Desktop, ask the agent to change the context input limit and approve
+the edit, or edit the workspace's `config.toml` and restart Desktop.
+[Change agent settings](./settings.md)
 
 An ACP client that negotiates the configuration operations can inspect, set,
-reset and reload the limit. To let the agent change it, submit an Act input with
-`allowConfigurationChanges: true`; that permission covers the context input
-limit for that input. To change a queued input with this permission, withdraw it
-and submit a new one. [Agent configuration](../reference/agent-configuration.md#changes-requested-through-the-agent)
+reset and reload the limit. Under a permission profile that allows file writes,
+the agent can also edit the host's `config.toml` as the directory
+`agent-settings`; every such write arrives as an ordinary approval request.
+[Agent configuration](../reference/agent-configuration.md#changes-made-by-the-agent)
 
 ## Attach a PNG to a message
 

@@ -153,30 +153,6 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
       admits: (sender) => admittedWindow(sender) !== null,
       ensure: options.ensure_native_chat,
     },
-    async (sender, review) => {
-      const window = admittedWindow(sender);
-      if (!window) return false;
-      const limit = review.kind === "limit";
-      const detail = limit
-        ? "This workspace default applies to future accepted messages."
-        : `This Act message can set or reset the workspace context input limit.\n\n${review.text}`;
-      const message =
-        review.kind === "limit"
-          ? review.limit === null
-            ? "Return the context input limit to Automatic?"
-            : `Set the context input limit to ${review.limit} tokens?`
-          : "Allow this message to change the context input limit?";
-      const confirmed = await dialog.showMessageBox(window, {
-        type: "question",
-        message,
-        detail,
-        buttons: ["Cancel", limit ? "Save setting" : "Send with permission"],
-        defaultId: 0,
-        cancelId: 0,
-        noLink: true,
-      });
-      return confirmed.response === 1;
-    },
     async (sender, title, ownedChildren) => {
       const window = admittedWindow(sender);
       if (!window) return false;
@@ -606,16 +582,6 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
     IPC_CHANNELS.NATIVE_CHAT_REMOVE_HOOK,
     (event, id: unknown, revision: unknown) =>
       nativeChat.removeHook(event, id, revision)
-  );
-  guarded(
-    IPC_CHANNELS.NATIVE_CHAT_SAVE_CONTEXT_LIMIT,
-    (event, reviewId: unknown, value: unknown) =>
-      nativeChat.saveContextLimit(event, reviewId, value)
-  );
-  guarded(
-    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_CONFIGURATION,
-    (event, id: string, input: unknown) =>
-      nativeChat.submitWithConfigurationReview(event, id, input)
   );
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SUBMIT_IMAGE,

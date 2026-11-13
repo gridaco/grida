@@ -541,7 +541,6 @@ async fn serve_connection(
                             session,
                             parts,
                             questions: false,
-                            configuration_permission: crate::ConfigurationPermission::Disabled,
                             operating_regime: None,
                             effort: None,
                             reasoning: Default::default(),

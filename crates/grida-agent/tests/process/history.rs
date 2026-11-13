@@ -468,11 +468,12 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
     use agent_kit_core::{ChangeId, SessionId};
     use agent_kit_sessions::{SessionStore, Submission};
 
-    let temporary = TempDir::new().unwrap();
-    let state = temporary.path().join("state");
-    let workspace = TempDir::new().unwrap();
+    let fixture = super::approvals::Fixture::new(false);
+    let state = fixture.state.clone();
+    let workspace = fixture.primary.clone();
+    std::fs::write(workspace.join("note.txt"), "Fixture note content").unwrap();
     let mut endpoint = Endpoint::start(vec![
-        Reply::Tool("config_inspect", "{}"),
+        Reply::Tool("read_file", r#"{"path":"note.txt"}"#),
         Reply::Finished("First answer"),
         Reply::Finished("Second answer"),
         Reply::Finished("Third answer"),
@@ -480,9 +481,15 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
         Reply::Finished("Explicitly resumed queued work."),
     ])
     .await;
-    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let (host, url) = shared_server_with_profile(
+        &state,
+        &endpoint.url,
+        TEST_CREDENTIAL,
+        Some(&fixture.profile),
+    )
+    .await;
     let mut socket = client(&url, true).await;
-    let session = create(&mut socket, workspace.path()).await;
+    let session = create(&mut socket, &workspace).await;
     let original = "Second input with the complete original wording. ".repeat(16);
     for (id, text) in [
         (3, "First input"),
@@ -490,9 +497,7 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
         (5, "Third input"),
     ] {
         if id < 5 {
-            let mut request =
-                prompt_request(&session, if id == 3 { "first" } else { "second" }, text);
-            request["allowConfigurationChanges"] = (id == 4).into();
+            let request = prompt_request(&session, if id == 3 { "first" } else { "second" }, text);
             let started = after_owner_release(
                 &mut socket,
                 id,
@@ -502,18 +507,10 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
             )
             .await;
             assert!(started.get("result").is_some(), "{started}");
-            let generation = endpoint.request().await;
-            assert_eq!(
-                generation["tools"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .any(|tool| tool["function"]["name"] == "config_update"),
-                id == 4,
-            );
+            endpoint.request().await;
             if id == 3 {
                 let with_result = endpoint.request().await;
-                assert!(with_result.to_string().contains("Maximum context input"));
+                assert!(with_result.to_string().contains("Fixture note content"));
             }
             wait_for_snapshot(&mut socket, &session, |snapshot| {
                 snapshot["current"].is_null()
@@ -581,7 +578,7 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
     let instructions = conversation[0]["content"].as_str().unwrap();
     assert!(instructions.contains("tool calls (1)"));
     assert!(instructions.contains("tool result payloads (1)"));
-    assert!(!next.to_string().contains("Maximum context input"));
+    assert!(!next.to_string().contains("Fixture note content"));
     assert_eq!(
         conversation
             .iter()
@@ -594,17 +591,6 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
             "First answer",
             "Revised second input"
         ]
-    );
-    let offered = next["tools"].as_array().unwrap();
-    assert!(
-        offered
-            .iter()
-            .any(|tool| tool["function"]["name"] == "config_inspect")
-    );
-    assert!(
-        !offered
-            .iter()
-            .any(|tool| tool["function"]["name"] == "config_update")
     );
     wait_for_snapshot(&mut socket, &session, |snapshot| {
         snapshot["current"].is_null()
@@ -638,10 +624,6 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
         json!({"sessionId":session,"inputId":"second"}),
     )
     .await;
-    assert_eq!(
-        original["result"]["settings"]["configurationPermission"],
-        "change"
-    );
     assert_eq!(original["result"]["receipt"]["disposition"], "completed");
 
     drop(socket);
@@ -669,16 +651,22 @@ async fn an_earlier_revision_retains_original_view_and_captures_fresh_permission
         .await
         .unwrap();
     drop(store);
-    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let (host, url) = shared_server_with_profile(
+        &state,
+        &endpoint.url,
+        TEST_CREDENTIAL,
+        Some(&fixture.profile),
+    )
+    .await;
     let mut socket = client(&url, true).await;
     assert_eq!(
-        load_transcript(&mut socket, &session, workspace.path()).await,
+        load_transcript(&mut socket, &session, &workspace).await,
         previews(&current)
     );
     let retry = ws_rpc(&mut socket, 8, "_co.grida/session/revise", revision.clone()).await;
     assert_eq!(retry["result"], changed["result"]);
     let mut different = revision;
-    different["allowConfigurationChanges"] = true.into();
+    different["operatingRegime"] = "plan".into();
     let rejected = ws_rpc(&mut socket, 9, "_co.grida/session/revise", different).await;
     assert_eq!(rejected["error"]["data"], "request_identity_reused");
     assert!(endpoint.requests.try_recv().is_err());
@@ -820,14 +808,15 @@ async fn a_pending_question_survives_fork_and_requires_stop_before_revision() {
 
 #[tokio::test]
 async fn a_reply_may_make_many_parallel_tool_calls() {
-    let temporary = TempDir::new().unwrap();
-    let state = temporary.path().join("state");
-    let workspace = TempDir::new().unwrap();
+    let fixture = super::approvals::Fixture::new(false);
+    let state = fixture.state.clone();
+    let workspace = fixture.primary.clone();
+    std::fs::write(workspace.join("note.txt"), "Fixture note").unwrap();
     // One reply may make more parallel calls than a typical client cap.
     let calls: Vec<Value> = (0..12)
         .map(|index| {
             json!({"index":index,"id":format!("call-{index}"),"type":"function",
-                "function":{"name":"config_inspect","arguments":"{}"}})
+                "function":{"name":"read_file","arguments":r#"{"path":"note.txt"}"#}})
         })
         .collect();
     let delta = json!({"id":"fixture-response","choices":[{"index":0,"delta":{
@@ -840,17 +829,23 @@ async fn a_reply_may_make_many_parallel_tool_calls() {
     );
     let mut endpoint = Endpoint::start(vec![
         Reply::RawHttp(response),
-        Reply::Finished("Inspected twelve times."),
+        Reply::Finished("Read twelve times."),
     ])
     .await;
-    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let (host, url) = shared_server_with_profile(
+        &state,
+        &endpoint.url,
+        TEST_CREDENTIAL,
+        Some(&fixture.profile),
+    )
+    .await;
     let mut socket = client(&url, true).await;
-    let session = create(&mut socket, workspace.path()).await;
+    let session = create(&mut socket, &workspace).await;
     let started = ws_rpc(
         &mut socket,
         3,
         "_co.grida/session/submit",
-        prompt_request(&session, "inspect", "Inspect the settings."),
+        prompt_request(&session, "inspect", "Read the note."),
     )
     .await;
     assert!(started.get("result").is_some(), "{started}");

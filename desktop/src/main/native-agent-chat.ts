@@ -12,7 +12,6 @@ import type {
   NativeChatRevisionInput,
   NativeChatRevisionReceipt,
   NativeChatRevisionTarget,
-  NativeChatConfigurationInput,
   NativeChatControlReceipt,
   NativeChatEffort,
   NativeChatGatewayAttemptRef,
@@ -244,7 +243,6 @@ type QueuePosition = Readonly<{
   goalStart?: NativeChatGoalRequest;
   operatingRegime?: NativeChatOperatingRegime;
   effort?: "ultra";
-  allowsConfigurationChange?: true;
 }>;
 const observed = new WeakMap<
   NativeChatSnapshot,
@@ -940,7 +938,6 @@ export class NativeAgentChat {
     options: {
       image?: ReturnType<typeof pngPrompt>;
       file?: ReturnType<typeof selectedFile>;
-      allowConfigurationChanges?: true;
       allowWakeups?: true;
       allowLibrarySelection?: true;
       editorSurfaces?: NativeEditorSurfaceSelection;
@@ -952,7 +949,6 @@ export class NativeAgentChat {
     const {
       image,
       file,
-      allowConfigurationChanges,
       allowWakeups,
       allowLibrarySelection,
       editorSurfaces,
@@ -968,14 +964,12 @@ export class NativeAgentChat {
         ...(file && { selectedFile: file }),
         ...(operatingRegime && { operatingRegime }),
         ...hostEffort(effort),
-        ...(allowConfigurationChanges && { allowConfigurationChanges }),
         ...(allowWakeups && { allowWakeups }),
         ...(allowLibrarySelection && { allowLibrarySelection }),
         ...(mode === "submit" &&
           operatingRegime === "act" &&
           !image &&
           !file &&
-          !allowConfigurationChanges &&
           editorSurfaces),
       }),
       sessionId,
@@ -1017,61 +1011,6 @@ export class NativeAgentChat {
     this.requireOpen();
     if (!this.hookRegistry) throw new Error("native_hooks_unavailable");
     await this.hookRegistry.remove(id, revision);
-  }
-
-  updateContextLimit(
-    basis: ContextLimitBasis,
-    limit: number | null
-  ): Promise<void> {
-    this.requireOpen();
-    return this.configuration.update(basis, limit);
-  }
-
-  async sendConfiguration(
-    session: NativeChatSession,
-    input: NativeChatConfigurationInput
-  ): Promise<NativeChatAcceptance> {
-    try {
-      return await this.send(
-        input.action,
-        session,
-        input.inputId,
-        input.text,
-        "act",
-        { allowConfigurationChanges: true, effort: input.effort }
-      );
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        error.message !== "native_agent_request_timeout"
-      )
-        throw error;
-      const sessionId = this.requireAttached(session);
-      const retained = await this.process
-        .request("_co.grida/session/input", {
-          sessionId,
-          inputId: input.inputId,
-        })
-        .then(object)
-        .catch(() => {
-          throw error;
-        });
-      this.requireAttached(session);
-      const settings = object(retained.settings);
-      const part =
-        Array.isArray(retained.prompt) && retained.prompt.length === 1
-          ? object(retained.prompt[0])
-          : null;
-      if (
-        settings.configurationPermission !== "change" ||
-        settings.operatingRegime !== "act" ||
-        (settings.effort === "ultra") !== (input.effort === "ultra") ||
-        part?.type !== "text" ||
-        part.text !== input.text
-      )
-        throw new Error("native_context_limit_receipt_mismatch");
-      return acceptance(retained.receipt, sessionId, input.inputId);
-    }
   }
 
   async inputReceipt(
@@ -1348,9 +1287,6 @@ export class NativeAgentChat {
         ...(row.goalStart && { goalStart: row.goalStart }),
         ...(row.operatingRegime && { operatingRegime: row.operatingRegime }),
         ...(row.effort && { effort: row.effort }),
-        ...(row.allowsConfigurationChange && {
-          allowsConfigurationChange: true as const,
-        }),
       });
     }
     return {
@@ -1371,7 +1307,7 @@ export class NativeAgentChat {
     const row = observed
       .get(snapshot)!
       .queue.find((item) => item.inputId === inputId);
-    if (!row || row.goalStart || row.allowsConfigurationChange)
+    if (!row || row.goalStart)
       throw new Error("native_chat_queue_input_unavailable");
     const input = await this.readQueueInput(sessionId, row);
     this.requireAttached(session);
@@ -1408,8 +1344,6 @@ export class NativeAgentChat {
       if (change.action === "replace") {
         if (queue[index].goalStart)
           throw new Error("queued_goal_requires_withdrawal");
-        if (queue[index].allowsConfigurationChange)
-          throw new Error("queued_configuration_requires_withdrawal");
         const prompt = textPrompt(change.text);
         const input = await this.readQueueInput(sessionId, queue[index]);
         this.requireAttached(session);
@@ -2565,9 +2499,6 @@ function queuePositions(
         operatingRegime: "plan" as const,
       }),
       ...(settings.effort === "ultra" && { effort: "ultra" as const }),
-      ...(settings.configurationPermission === "change" && {
-        allowsConfigurationChange: true as const,
-      }),
       ...(settings.goalStart === undefined
         ? {}
         : {

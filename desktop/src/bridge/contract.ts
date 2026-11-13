@@ -106,8 +106,6 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_HOOKS: "grida:native-chat:hooks",
   NATIVE_CHAT_IMPORT_HOOK: "grida:native-chat:import-hook",
   NATIVE_CHAT_REMOVE_HOOK: "grida:native-chat:remove-hook",
-  NATIVE_CHAT_SAVE_CONTEXT_LIMIT: "grida:native-chat:save-context-limit",
-  NATIVE_CHAT_SUBMIT_CONFIGURATION: "grida:native-chat:submit-configuration",
   NATIVE_CHAT_INPUT_RECEIPT: "grida:native-chat:input-receipt",
   NATIVE_CHAT_OBSERVE: "grida:native-chat:observe",
   NATIVE_CHAT_TURN_SUMMARY: "grida:native-chat:turn-summary",

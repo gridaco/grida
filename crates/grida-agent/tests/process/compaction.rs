@@ -101,8 +101,7 @@ fn offers_tool(request: &Value, name: &str) -> bool {
 
 fn assert_plan_request(request: &Value) {
     assert!(request["messages"].to_string().contains("Plan is active"));
-    assert!(offers_tool(request, "config_inspect"));
-    for denied in ["config_update", "config_reload", "run_command"] {
+    for denied in ["write_file", "edit_file", "run_command"] {
         assert!(!offers_tool(request, denied), "{request}");
     }
 }

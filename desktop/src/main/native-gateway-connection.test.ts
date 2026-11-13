@@ -1114,7 +1114,6 @@ it.skipIf(!resourcesPath || !["darwin", "linux"].includes(process.platform))(
         editor,
         (sender) => (sender === event.sender ? active : null),
         undefined,
-        undefined,
         async () => true
       );
       const attached = await ipc.create(event);

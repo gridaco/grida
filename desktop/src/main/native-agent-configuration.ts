@@ -10,8 +10,6 @@ export type ContextLimitBasis = Readonly<
 export class NativeAgentConfiguration {
   static readonly capabilities = {
     "co.grida/config/inspect": 1,
-    "co.grida/config/update": 1,
-    "co.grida/config/reload": 1,
   } as const;
 
   constructor(
@@ -45,21 +43,6 @@ export class NativeAgentConfiguration {
       revision: fileRevision,
     });
   }
-
-  async update(basis: ContextLimitBasis, limit: number | null): Promise<void> {
-    if (basis.source === "invalid" || (limit !== null && !basis.exactCounting))
-      throw new Error("native_context_limit_unavailable");
-    const applied = snapshot(
-      await this.request("_co.grida/config/update", {
-        expectedRevision: basis.revision,
-        change:
-          limit === null
-            ? { operation: "reset_context_max_input_tokens" }
-            : { operation: "set_context_max_input_tokens", value: limit },
-      })
-    );
-    if (applied.limit !== limit) throw invalid();
-  }
 }
 
 function snapshot(value: unknown): {
@@ -75,7 +58,7 @@ function snapshot(value: unknown): {
   };
 }
 
-export function contextLimitValue(value: unknown): number | null {
+function contextLimitValue(value: unknown): number | null {
   if (value === null) return null;
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1)
     throw invalid();

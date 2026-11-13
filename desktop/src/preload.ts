@@ -701,18 +701,6 @@ const bridge: DesktopBridge = {
         ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_REMOVE_HOOK, id, revision),
       contextLimit: () =>
         ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT),
-      saveContextLimit: (reviewId, limit) =>
-        ipcRenderer.invoke(
-          IPC_CHANNELS.NATIVE_CHAT_SAVE_CONTEXT_LIMIT,
-          reviewId,
-          limit
-        ),
-      submitWithConfigurationReview: (attachmentId, input) =>
-        ipcRenderer.invoke(
-          IPC_CHANNELS.NATIVE_CHAT_SUBMIT_CONFIGURATION,
-          attachmentId,
-          input
-        ),
     }),
     submitImage: (attachmentId, input) =>
       ipcRenderer.invoke(

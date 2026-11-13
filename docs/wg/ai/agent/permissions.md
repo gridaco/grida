@@ -99,7 +99,10 @@ shared agent directory and cloud credential directories are protected once they
 exist, so a program can initialize a new repository but a later program cannot
 rewrite it. The agent's own configuration directories are protected even before
 they exist, so creating one always needs the person's approval. The host's own
-stores are always protected. The agent's file tools never write any of these
+stores are always protected, with one exception: the host's settings file is
+readable by the agent's file tools, and every write to it is an action that
+asks, whatever the preset or earlier approvals allow, because the file can
+loosen the rules that guard the agent. Programs never reach it. The agent's file tools never write any of these
 names, in any letter case, since a case-insensitive volume resolves `.GIT` to
 `.git`.
 
@@ -181,6 +184,8 @@ individual fields.
 | Initialize a repository in a project without one     | Runs, confined.                                     |
 | Write inside existing version-control metadata       | Refused by the sandbox; may ask to retry.           |
 | Create the agent's configuration directory           | Refused by the sandbox; may ask to retry.           |
+| Edit the host's settings file with a file tool       | Asks, every time.                                   |
+| Read or write the host's settings file in a program  | Refused by the sandbox.                             |
 | Run a build or test command in the project           | Runs, confined.                                     |
 | A command needs the network                          | Refused by the sandbox; asks to retry with network. |
 | Read or write a path outside the project             | Asks.                                               |

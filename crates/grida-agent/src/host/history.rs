@@ -451,13 +451,9 @@ impl Host {
             drop(host.settled_work(&session).await);
             let _admission = host.configuration_admission.lock().await;
             let cut = ConversationCut::BeforeEditableUser(derivation.anchor);
-            // The explicit write opt-in is caller intent. Read and question
-            // capabilities are captured settings of the original acceptance.
-            let base = (
-                &cut,
-                &replacement.parts,
-                replacement.configuration_permission == crate::ConfigurationPermission::Change,
-            );
+            // Read and question capabilities are captured settings of the
+            // original acceptance.
+            let base = (&cut, &replacement.parts);
             let intent = match (replacement.operating_regime, replacement.effort) {
                 (regime, Some(effort)) => Fingerprint::of(&(base, "effort", regime, effort))?,
                 (Some(regime), None) => Fingerprint::of(&(base, regime))?,

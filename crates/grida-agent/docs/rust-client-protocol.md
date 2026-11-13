@@ -222,7 +222,7 @@ admission nor cancellation.
 | `history`                                | `sessionId`, optional `view`, `offset`, and `expectedHistory`. Read visible message anchors, previews, and any seed lineage.                                                                            |
 | `revision-target`                        | `sessionId`, visible `messageId`, and `expectedSessionRevision`. Read the original editable text, its effort and reasoning level, exact current basis and anchor, and subsequent visible message count. |
 | `fork`                                   | `sessionId`, `requestId`, `expectedHistory`, and `anchor`. Return the independent `sessionId` for a committed prefix through that message.                                                              |
-| `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `allowConfigurationChanges`, `effort` and `reasoning`. Return the installed view and accepted input.   |
+| `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `effort` and `reasoning`. Return the installed view and accepted input.                                |
 | `compact`                                | `sessionId`, `requestId`, and optional `recover`. Run or inspect one retained context compaction. Return its status and available usage/failure evidence.                                               |
 | `skills`                                 | `sessionId`. Read names, descriptions, sources, and versioned ACP resource-link URIs for available skills.                                                                                              |
 
@@ -814,19 +814,15 @@ sent; a lost or invalid reply to `dispatch` or during reading leaves the
 attempt interrupted. Desktop's Gateway
 profile uses the same pipe and attaches its short-lived grant at dispatch.
 
-### Configuration tools
+### Configuration operations
 
-For model-facing configuration tools, negotiating `co.grida/config/inspect`
-enables inspection on newly accepted enhanced inputs. Mutation tools additionally
-require all three configuration capabilities and an explicit
-`allowConfigurationChanges: true` in `submit`, `enqueue` or `replace`. The flag
-defaults to false and is retained with the accepted input. A request for changes
-without those capabilities fails before acceptance. Queue inspection reports
-the captured `configurationPermission` as `disabled`, `inspect` or `change`.
-Retry preserves the effective configuration write permission for the input.
-Configuration inspection reports `exact_input_counting` for the selected
-provider profile. The flag describes a supported counting route. Each prepared
-request must still return an exact count before an explicit limit can be used.
+The `co.grida/config/*` operations are client features: a person's own tooling
+inspects, sets, resets and reloads defaults through them. Configuration
+inspection reports `exact_input_counting` for the selected provider profile.
+The flag describes a supported counting route. Each prepared request must
+still return an exact count before an explicit limit can be used. The agent
+changes settings only by editing the settings file, which asks for approval
+like any other write ([agent edits](./rust-config.md#agent-edits)).
 
 ## Compatibility acceptance
 

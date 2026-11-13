@@ -1664,60 +1664,6 @@ it("sending while a turn is paused stops it and plays the new message next", asy
   controller.disconnect();
 });
 
-it("keeps a paused turn when the message sent after it cannot go out", async () => {
-  const { bridge, controller, waiting } = fixture();
-  waiting.add("chat-a");
-  const base = bridge.observe.bind(bridge);
-  bridge.observe = async (id) => {
-    const value = await base(id);
-    const current = value.snapshot.current;
-    return {
-      ...value,
-      snapshot: {
-        ...value.snapshot,
-        current: current && { ...current, paused: true },
-      },
-    };
-  };
-  const control = vi.fn<NonNullable<DesktopNativeChat["control"]>>(
-    bridge.control!.bind(bridge)
-  );
-  bridge.control = control;
-  bridge.contextLimit = async () => ({
-    reviewId: "config-basis",
-    limit: 4096,
-    exactCounting: true,
-    source: "active",
-  });
-  bridge.enqueue = (attachment, id, text) =>
-    bridge.submit(attachment, id, text);
-  bridge.saveContextLimit = async (_id, limit) => ({
-    limit,
-    disposition: "applied",
-  });
-  bridge.submitInRegime = vi.fn<
-    NonNullable<DesktopNativeChat["submitInRegime"]>
-  >(async (_mode, attachment, id, text) => bridge.submit(attachment, id, text));
-  bridge.submitWithConfigurationReview = vi.fn<
-    NonNullable<DesktopNativeChat["submitWithConfigurationReview"]>
-  >(async (attachment, input) =>
-    bridge.submit(attachment, input.inputId, input.text)
-  );
-  await controller.select("chat-a");
-  await vi.waitFor(() =>
-    expect(controller.read().observation?.snapshot.current?.paused).toBe(true)
-  );
-  await controller.toggleContextLimit();
-  controller.setConfigurationReview(true);
-  expect(controller.read().reviewConfiguration).toBe(true);
-  await expect(controller.submit("x".repeat(1025))).rejects.toThrow(
-    "Use a message of at most 1 KiB for settings review."
-  );
-  expect(control).not.toHaveBeenCalled();
-  expect(controller.read().observation?.snapshot.current?.paused).toBe(true);
-  controller.disconnect();
-});
-
 it("steers with a queued message only after it leaves the queue, and returns its text if the turn refuses", async () => {
   const { bridge, controller, running } = fixture();
   running.add("chat-a");
@@ -3375,77 +3321,6 @@ it("ignores an older PNG capability result after a newer refresh", async () => {
   old.resolve(true);
   await refresh;
   expect(controller.read().imageInput).toBe(false);
-  controller.disconnect();
-});
-
-it("keeps reviewed configuration separate from normal and Plan sends", async () => {
-  const { bridge, controller } = fixture();
-  let value: number | null = 4096;
-  let exactCounting = false;
-  bridge.contextLimit = async () => ({
-    reviewId: "config-basis",
-    limit: value,
-    exactCounting,
-    source: "active",
-  });
-  const save = vi.fn<NonNullable<DesktopNativeChat["saveContextLimit"]>>(
-    async (_id, limit) => {
-      value = limit;
-      return { limit, disposition: "applied" };
-    }
-  );
-  const normal = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
-    async (_mode, attachment, id, text) => bridge.submit(attachment, id, text)
-  );
-  const reviewed = vi.fn<
-    NonNullable<DesktopNativeChat["submitWithConfigurationReview"]>
-  >(async (attachment, input) =>
-    bridge.submit(attachment, input.inputId, input.text)
-  );
-  bridge.saveContextLimit = save;
-  bridge.submitInRegime = normal;
-  bridge.submitWithConfigurationReview = reviewed;
-  await controller.select("chat-a");
-  await controller.toggleContextLimit();
-  expect(controller.read().contextLimit?.limit).toBe(4096);
-  expect(controller.canReviewConfiguration).toBe(false);
-  controller.changeContextLimitDraft("8192");
-  await controller.saveContextLimit();
-  expect(save).not.toHaveBeenCalled();
-  await controller.saveContextLimit(true);
-  expect(save).toHaveBeenCalledExactlyOnceWith("config-basis", null);
-
-  exactCounting = true;
-  await controller.refreshContextLimit();
-  controller.changeContextLimitDraft("64000");
-  await controller.saveContextLimit();
-  expect(save).toHaveBeenLastCalledWith("config-basis", 64000);
-  controller.selectOperatingRegime("plan");
-  controller.setConfigurationReview(true);
-  await controller.submit("Explain the limit.");
-  expect(reviewed).not.toHaveBeenCalled();
-  expect(normal).toHaveBeenCalledExactlyOnceWith(
-    "submit",
-    "chat-a",
-    expect.any(String),
-    "Explain the limit.",
-    "plan"
-  );
-  controller.selectOperatingRegime("act");
-  controller.setConfigurationReview(true);
-  reviewed.mockRejectedValueOnce(new Error("fixture lost review reply"));
-  await expect(
-    controller.submit("Use Automatic for future messages.")
-  ).rejects.toThrow("fixture lost review reply");
-  controller.setConfigurationReview(false);
-  await expect(
-    controller.submit("Use Automatic for future messages.")
-  ).rejects.toThrow("native_context_limit_pending_review_changed");
-  controller.setConfigurationReview(true);
-  await controller.submit("Use Automatic for future messages.");
-  expect(reviewed.mock.calls[0]).toEqual(reviewed.mock.calls[1]);
-  expect(controller.read().reviewConfiguration).toBe(false);
-  expect(normal).toHaveBeenCalledTimes(1);
   controller.disconnect();
 });
 

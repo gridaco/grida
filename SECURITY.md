@@ -561,6 +561,28 @@ since it was read. Desktop grants the Default preset's write rule only for the
 selected project folder; additional folders stay read-on-request. Desktop
 supplies programs its captured login-shell environment, minus app variables.
 Preparation refusals share one tool response regardless of path existence.
+
+**Agent settings file.** The host's own state stays protected, with one
+carve-out: the file tools reach the host's settings file, `config.toml` in its
+configuration folder (Desktop: the workspace's folder under `chats/workspaces/`;
+headless: the state directory), as directory `agent-settings`. Nothing else
+in that folder is reachable: list, search, image and other paths are refused,
+and a launch profile cannot name a folder `agent-settings`. A read runs under
+the turn's file grant. Every write or edit is an approval request bound to that
+exact action; the fixed ask rule ignores the folder rules, so neither the
+Default preset's project write rule nor an earlier approval covers it, Plan
+withholds it, and the automatic reviewer answers reads only. The host offers
+the carve-out only while its command denials cover that folder for read and
+write, so a command can neither read nor change the file the file tools
+approve. The settings owner, not the workspace walker, performs the write: it
+validates the complete result first, refuses invalid content unchanged with
+its diagnostic, publishes owner-only content atomically under the writer lock,
+refuses a concurrent manual edit, and activates the result for later accepted
+input; accepted work keeps its capture. Desktop Main admits a write review
+only for `config.toml` under the canonical settings folder it launched.
+The schema accepts only `schema_version` and `context.max_input_tokens`, so an
+approved write cannot add grants, protected paths, credentials, commands or
+egress.
 The adapter retains supervision after the runtime cancels an invocation. The
 host's cleanup barrier reports pending or unverified command identities before
 the host releases resources that depend on cleanup. Same-process reconciliation
@@ -898,11 +920,11 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   token belongs to the current attachment. An unverified reply keeps both
   request identities and the exact replacement text and mode for retry.
   The [configuration adapter](desktop/src/main/native-agent-configuration.ts)
-  keeps file revisions in Main. An owner-bound context-limit change requires a
-  native confirmation of its exact value. Conversational permission requires a
-  separate native confirmation bound to the exact Act input and chat attachment.
-  Navigation retires both reviews. The renderer receives the active value and
-  support status through the guarded bridge.
+  only inspects the active value; Desktop negotiates no configuration change
+  and has no settings control or send-time settings permission. A change to
+  the workspace's agent settings file is an ordinary file write (see the agent
+  settings file above), and Main admits a write review only for that exact
+  file.
   The [workspace configuration owner](crates/grida-agent/src/configuration.rs)
   admits shared defaults only for a private supervising launch bound to the
   exact workspace state root and generation. It serializes source and active
@@ -1023,7 +1045,7 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   The [goal owner](crates/grida-agent/src/host/goals.rs) conditions each
   automatic claim on the captured goal revision, allowance and original
   settings. It revalidates current authority before dispatch. A generated
-  turn receives neither new access nor configuration-change permission.
+  turn receives no new access; a settings file write asks like any other.
   For a manual goal, an explicit idle Resume records authority for one further
   work turn. The existing claim atomically consumes that authority under the
   captured goal revision and allowance; replaying the control cannot create
@@ -1583,6 +1605,7 @@ Today:
 - The Desktop [artifact IPC](desktop/src/main/native-chat-ipc.ts) admits only an artifact listed for the same attachment's latest observed finished turn. Main rechecks the frame, chat, and observation after the read. The [PNG response validator](desktop/src/main/native-agent-artifacts.ts) validates the bounded byte response against the selected descriptor and returns only bytes. The [Desktop fixture](desktop/src/main/native-agent-images.test.ts) verifies restart recovery and missing-file refusal through the built native child.
 - The [retained file exporter](desktop/src/main/retained-file-export.ts) publishes a new file exclusively from bounded retained bytes. A window-owned chooser supplies the destination to Main. The chat caller supplies only its attachment, observation and artifact identities, and the Tools caller supplies only its media item ID. Main rechecks the initiating scope before publication. Existing destination files and the retained result remain available after a failed copy.
 - The native [read-only file adapters](crates/grida-agent/src/file_tools.rs) revalidate the turn's selected directory against current grants and protected roots. [Native path opening](crates/grida-agent/src/file_tools/native.rs) uses pinned directory handles and refuses link traversal. [File tool tests](crates/grida-agent/tests/file_tools.rs) cover grant revocation and protected files.
+- The [agent settings file adapter](crates/grida-agent/src/file_tools/settings.rs) reaches only the host settings file through the [settings owner](crates/grida-agent/src/configuration.rs). [Permission admission](crates/grida-agent/src/permissions.rs) asks for every write and withholds the file unless command denials cover its folder; [Desktop approval review](desktop/src/main/native-agent-permissions.ts) admits only that exact write. [Permission tests](crates/grida-agent/tests/permissions.rs), the [headless approval process test](crates/grida-agent/tests/process/approvals.rs) and [Desktop approval tests](desktop/src/main/native-agent-permissions.test.ts) cover the ask, decline, invalid content, scope and command coverage.
 - The native [history extension](crates/grida-agent/src/acp/extensions/history.rs) requires a negotiated operation and an attached source session. The [host](crates/grida-agent/src/host/history.rs) binds a derivation to committed history and keeps a fork in the source workspace. The [portable projection](crates/grida-agent-master/src/conversation_seed.rs) copies visible text with omission evidence and keeps raw tool data, provider state, and grants out of the seed. An edit target resolves the visible anchor to the exact retained text-only submission within the attached chat. Inherited context from another chat cannot authorize a source input read. [Native process tests](crates/grida-agent/tests/process/history.rs) cover attachment, source ownership, and fresh tool permissions.
 - Desktop's [bounded transcript read](desktop/src/main/native-agent-chat.ts) rechecks the frame's exact attachment through [Main IPC](desktop/src/main/native-chat-ipc.ts), correlates chunks to the current read, and caps buffered text. The [ACP handler](crates/grida-agent/src/acp.rs) requires the negotiated capability, an attached chat, and its workspace. Cursors select only the attached chat's current history view. Reading grants no execution authority.
 - `desktop/src/main/sidecar-sandbox-policy.ts` — binds Desktop's strict sandbox posture for the retained sidecar on the daemon's own policy frame: empty direct external egress (no development baseline and no agent provider hosts), host-routed provider HTTP, no generic local bind/connect authority, and an exact read/write grant for the long-lived sidecar's app-managed media root.
@@ -3592,7 +3615,9 @@ durable or discard unrelated OAuth records.
    adds fixed denials for host state, the profile file, and credential homes.
    File tools also deny installed executables, and confined commands cannot
    write them. A session working directory only selects an exact matching
-   profile. Chat input and model-editable configuration confer no grants.
+   profile. Chat input and model-editable configuration confer no grants; the
+   approval-gated agent settings file (GRIDA-SEC-004) stays outside every
+   command scope and accepts only reviewed defaults.
    The [Desktop launch adapter](desktop/src/main/native-agent-permissions.ts)
    publishes owner-only profiles from canonical main-selected roots and
    protects the native state and additional custody paths. The profile path

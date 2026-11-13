@@ -19,6 +19,9 @@ const MAX_FILE_BYTES: usize = 64 * 1024;
 const MAX_SEARCH_DEPTH: usize = 8;
 const SNIPPET_BYTES: usize = 240;
 
+#[path = "settings.rs"]
+mod settings;
+
 struct Root {
     file: File,
     path: PathBuf,
@@ -51,6 +54,14 @@ impl FileTools {
         request: Request,
         budget: &Budget,
     ) -> Result<ToolOutcome> {
+        if self.settings.is_some()
+            && request
+                .directory
+                .as_ref()
+                .is_some_and(|directory| directory.as_str() == SETTINGS_DIRECTORY)
+        {
+            return self.settings_file(operation, &request, budget);
+        }
         let path = request.path.as_deref().unwrap_or_else(|| Path::new(""));
         let directory = request.directory.as_ref();
         let outcome = match operation {

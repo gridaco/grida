@@ -138,29 +138,6 @@ fn capability_keys(
         .chain(reviewer.then_some(super::projection::TRANSCRIPT_WINDOW))
 }
 
-pub(super) fn configuration_permission(
-    sessions: &Mutex<ConnectionSessions>,
-    allow_changes: bool,
-) -> Result<crate::ConfigurationPermission> {
-    let sessions = sessions.lock().unwrap();
-    let can_inspect = sessions.negotiated.contains(CONFIG_INSPECT);
-    let can_change = [CONFIG_INSPECT, CONFIG_UPDATE, CONFIG_RELOAD]
-        .iter()
-        .all(|key| sessions.negotiated.contains(key));
-    if allow_changes {
-        return if can_change {
-            Ok(crate::ConfigurationPermission::Change)
-        } else {
-            Err(unavailable("configuration_capability_required"))
-        };
-    }
-    Ok(if can_inspect {
-        crate::ConfigurationPermission::Inspect
-    } else {
-        crate::ConfigurationPermission::Disabled
-    })
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
 #[request(method = "_co.grida/session/submit", response = SubmitResponse)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -169,8 +146,6 @@ struct Submit {
     input_id: ChangeId,
     prompt: Vec<ContentBlock>,
     selected_file: Option<SelectedFile>,
-    #[serde(default)]
-    allow_configuration_changes: bool,
     #[serde(default)]
     allow_wakeups: bool,
     #[serde(default)]
@@ -504,9 +479,7 @@ pub(super) fn handlers(
                         embedded_context,
                         request.selected_file,
                         &submit_sessions,
-                        request.allow_wakeups
-                            || request.allow_configuration_changes
-                            || request.editor_endpoint_id.is_some(),
+                        request.allow_wakeups || request.editor_endpoint_id.is_some(),
                     )?;
                     let accepted = submit_host
                         .submit_prompt_with_context(
@@ -515,10 +488,6 @@ pub(super) fn handlers(
                                 session: request.session_id,
                                 parts,
                                 questions: questions::available(&submit_sessions),
-                                configuration_permission: configuration_permission(
-                                    &submit_sessions,
-                                    request.allow_configuration_changes,
-                                )?,
                                 operating_regime: operating_regime(
                                     &submit_sessions,
                                     request.operating_regime,
@@ -649,38 +618,4 @@ fn require(
 fn encode_config(value: agent_kit_core::Result<impl Serialize>) -> Result<Value> {
     serde_json::to_value(value.map_err(host_error)?)
         .map_err(|_| unavailable("configuration_projection_failed"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn configuration_negotiation_keeps_inspection_and_explicit_changes_distinct() {
-        let sessions = Mutex::new(ConnectionSessions::default());
-        assert_eq!(
-            configuration_permission(&sessions, false).unwrap(),
-            crate::ConfigurationPermission::Disabled
-        );
-        assert!(configuration_permission(&sessions, true).is_err());
-        sessions.lock().unwrap().negotiated.insert(CONFIG_INSPECT);
-        assert_eq!(
-            configuration_permission(&sessions, false).unwrap(),
-            crate::ConfigurationPermission::Inspect
-        );
-        assert!(configuration_permission(&sessions, true).is_err());
-        sessions
-            .lock()
-            .unwrap()
-            .negotiated
-            .extend([CONFIG_UPDATE, CONFIG_RELOAD]);
-        assert_eq!(
-            configuration_permission(&sessions, false).unwrap(),
-            crate::ConfigurationPermission::Inspect
-        );
-        assert_eq!(
-            configuration_permission(&sessions, true).unwrap(),
-            crate::ConfigurationPermission::Change
-        );
-    }
 }

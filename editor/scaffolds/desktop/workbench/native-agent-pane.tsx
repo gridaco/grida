@@ -100,6 +100,8 @@ const APPROVAL_ACTION = {
   read_file: "Read file",
   list_files: "List folder",
   search_text: "Search files",
+  write_file: "Replace file",
+  edit_file: "Edit file",
 } as const;
 const selectionMemory = {
   getItem: (key: string) => window.localStorage.getItem(key),
@@ -595,7 +597,11 @@ export function NativeAgentPane({
       )}
       {approval && (
         <AgentApprovalPrompt
-          description="The agent is asking for additional read access."
+          description={
+            approval.tool === "write_file" || approval.tool === "edit_file"
+              ? "The agent is asking to change its settings file."
+              : "The agent is asking for additional read access."
+          }
           detail={
             <div className="mt-1 max-h-24 overflow-y-auto break-all font-mono text-xs text-foreground/80">
               <div>
@@ -732,19 +738,6 @@ export function NativeAgentPane({
         </DialogContent>
       </Dialog>
       <div className="shrink-0 p-3">
-        {state.reviewConfiguration && (
-          <Button
-            type="button"
-            size="xs"
-            variant="secondary"
-            className="mb-1"
-            disabled={state.acting}
-            aria-label="Cancel settings review"
-            onClick={() => controller.setConfigurationReview(false)}
-          >
-            Settings review on send
-          </Button>
-        )}
         {state.imageInput && (
           <input
             key={`png-${state.scope}`}

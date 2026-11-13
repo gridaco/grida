@@ -18,7 +18,6 @@ import type {
   NativeChatCatalogEntry,
   NativeChatCommand,
   NativeChatCommandResult,
-  NativeChatConfigurationInput,
   NativeChatControlReceipt,
   NativeChatEffort,
   NativeChatGoalObservation,
@@ -47,7 +46,6 @@ import type {
   NativeChatUpdate,
   NativeChatWakeup,
   NativeContextLimit,
-  NativeContextLimitResult,
   NativeHookInfo,
   NativeHookInspection,
 } from "@grida/desktop-bridge";
@@ -70,10 +68,7 @@ import type {
   NativeEditorSurfaceLease,
   NativeEditorSurfaceSelection,
 } from "./native-editor-surfaces";
-import {
-  contextLimitValue,
-  type ContextLimitBasis,
-} from "./native-agent-configuration";
+import type { ContextLimitBasis } from "./native-agent-configuration";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentWakeups } from "./native-agent-wakeups";
 import { RetainedFileExport } from "./retained-file-export";
@@ -86,7 +81,6 @@ const MAX_SUBSCRIPTIONS = 8;
 const MAX_UPDATE_BYTES = 8 * 1024;
 const MAX_DELIVERY_BYTES = 1024 * 1024;
 const MAX_DELIVERY_CHUNKS = 4096;
-const MAX_CONFIGURATION_MESSAGE_BYTES = 1024;
 const TOKEN = /^[a-f0-9-]{36}$/;
 
 export type ActiveNativeChat = Readonly<{
@@ -109,8 +103,6 @@ export type ActiveNativeChat = Readonly<{
     | "acceptsFile"
     | "submitFile"
     | "inspectContextLimit"
-    | "updateContextLimit"
-    | "sendConfiguration"
     | "inputReceipt"
     | "observe"
     | "turnSummary"
@@ -185,12 +177,6 @@ type Attachment = {
   editorSurfaces?: NativeEditorSurfaceLease;
   deckEditorSurface?: NativeEditorSurfaceSnapshot;
   side?: SideAttachment;
-  reviewedConfiguration?: {
-    input: NativeChatConfigurationInput;
-    approved: boolean;
-    request?: Promise<NativeChatAcceptance>;
-    accepted?: NativeChatAcceptance;
-  };
   closingSide?: Promise<void>;
 };
 
@@ -221,19 +207,13 @@ type Owner = {
   subscriptions: Map<string, Subscription>;
   pending: number;
   listing: boolean;
-  reviewingConfiguration?: boolean;
   reviewingHooks?: boolean;
   contextLimit?: {
     id: string;
     basis: ContextLimitBasis;
-    write?: { limit: number | null; result: Promise<NativeContextLimitResult> };
   };
   release(): void;
 };
-
-export type ConfigurationReview =
-  | { kind: "limit"; limit: number | null }
-  | { kind: "message"; text: string };
 
 type Startup = {
   frame: WebFrameMain;
@@ -345,10 +325,6 @@ export class NativeChatIpc {
       admits(sender: WebContents): boolean;
       ensure(workspaceId: string): Promise<void>;
     },
-    private readonly confirmConfiguration?: (
-      sender: WebContents,
-      review: ConfigurationReview
-    ) => Promise<boolean>,
     private readonly confirmDeletion?: (
       sender: WebContents,
       title: string | null,
@@ -1808,122 +1784,6 @@ export class NativeChatIpc {
     }
   }
 
-  async saveContextLimit(
-    event: IpcMainInvokeEvent,
-    reviewId: unknown,
-    value: unknown
-  ): Promise<NativeContextLimitResult> {
-    const owner = this.owner(event);
-    const inspected = owner.contextLimit;
-    const limit = contextLimitValue(value);
-    if (!inspected || inspected.id !== reviewId)
-      throw new Error("native_context_limit_review_unavailable");
-    if (inspected.write) {
-      if (inspected.write.limit !== limit)
-        throw new Error("native_context_limit_review_reused");
-      return inspected.write.result;
-    }
-    if (
-      inspected.basis.source === "invalid" ||
-      (limit !== null && !inspected.basis.exactCounting)
-    )
-      throw new Error("native_context_limit_unavailable");
-    const result = (async (): Promise<NativeContextLimitResult> => {
-      await this.reviewConfiguration(owner, { kind: "limit", limit });
-      this.revalidate(owner);
-      if (owner.contextLimit !== inspected)
-        throw new Error("native_context_limit_review_unavailable");
-      try {
-        await owner.active.chat.updateContextLimit(inspected.basis, limit);
-        this.revalidate(owner);
-        return { limit, disposition: "applied" };
-      } catch (error) {
-        this.revalidate(owner);
-        if (
-          !(error instanceof Error) ||
-          error.message !== "native_agent_request_timeout"
-        )
-          throw error;
-        const current = await owner.active.chat.inspectContextLimit();
-        this.revalidate(owner);
-        if (current.source === "active" && current.limit === limit)
-          return { limit, disposition: "observed" };
-        throw error;
-      }
-    })();
-    inspected.write = { limit, result };
-    void result.catch(() => {
-      inspected.write = undefined;
-    });
-    return result;
-  }
-
-  async submitWithConfigurationReview(
-    event: IpcMainInvokeEvent,
-    attachmentId: string,
-    value: unknown
-  ): Promise<NativeChatAcceptance> {
-    const { owner, attachment } = this.requireAttachment(event, attachmentId);
-    const input = configurationInput(value);
-    if (input.effort !== undefined && !owner.active.chat.acceptsEffort)
-      throw new Error("native_chat_effort_unavailable");
-    let review = attachment.reviewedConfiguration;
-    if (review?.input.inputId === input.inputId) {
-      if (
-        review.input.text !== input.text ||
-        review.input.action !== input.action ||
-        review.input.effort !== input.effort
-      )
-        throw new Error("native_context_limit_review_reused");
-      if (review.accepted) return review.accepted;
-      if (review.request) return review.request;
-    } else {
-      if (review?.request) throw new Error("native_context_limit_review_busy");
-      review = { input, approved: false };
-      attachment.reviewedConfiguration = review;
-    }
-    const exact = review;
-    exact.request = (async () => {
-      if (!exact.approved) {
-        const inspected = await owner.active.chat.inspectContextLimit();
-        this.revalidate(owner, attachment);
-        if (!inspected.exactCounting || inspected.source === "invalid")
-          throw new Error("native_context_limit_unavailable");
-        await this.reviewConfiguration(owner, {
-          kind: "message",
-          text: input.text,
-        });
-        this.revalidate(owner, attachment);
-        exact.approved = true;
-      }
-      const accepted = await owner.active.chat.sendConfiguration(
-        attachment.session,
-        exact.input
-      );
-      this.revalidate(owner, attachment);
-      exact.accepted = accepted;
-      return accepted;
-    })().finally(() => {
-      exact.request = undefined;
-    });
-    return exact.request;
-  }
-
-  private async reviewConfiguration(
-    owner: Owner,
-    review: ConfigurationReview
-  ): Promise<void> {
-    if (!this.confirmConfiguration || owner.reviewingConfiguration)
-      throw new Error("native_context_limit_review_busy");
-    owner.reviewingConfiguration = true;
-    try {
-      if (!(await this.confirmConfiguration(owner.sender, review)))
-        throw new Error("native_context_limit_review_declined");
-    } finally {
-      owner.reviewingConfiguration = false;
-    }
-  }
-
   async submitImage(
     event: IpcMainInvokeEvent,
     attachmentId: string,
@@ -3067,27 +2927,6 @@ function submitSelections(
 ): [surfaces?: NativeEditorSurfaceSelection, effort?: NativeChatEffort] {
   if (effort) return [surfaces, effort];
   return surfaces ? [surfaces] : [];
-}
-
-function configurationInput(value: unknown): NativeChatConfigurationInput {
-  const input = record(value);
-  if (
-    !input ||
-    Object.keys(input).length !== (input.effort === undefined ? 3 : 4) ||
-    (input.action !== "submit" && input.action !== "enqueue") ||
-    !token(input.inputId) ||
-    typeof input.text !== "string" ||
-    !input.text.trim() ||
-    Buffer.byteLength(input.text) > MAX_CONFIGURATION_MESSAGE_BYTES
-  )
-    throw new Error("native_context_limit_review_invalid");
-  const effort = agentEffort(input.effort);
-  return {
-    action: input.action,
-    inputId: input.inputId,
-    text: input.text,
-    ...(effort && { effort }),
-  };
 }
 
 function requireObservation(

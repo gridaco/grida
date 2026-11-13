@@ -324,7 +324,13 @@ impl Host {
             .permissions
             .as_ref()
             .ok_or_else(|| problem(ErrorKind::Unavailable, "permission_profile_unavailable"))?;
-        profile.bind(capture, binding, self.store.clone(), true)
+        profile.bind(
+            capture,
+            binding,
+            self.store.clone(),
+            true,
+            self.configuration.clone(),
+        )
     }
 
     pub async fn approvals(&self, session: SessionId, turn: TurnId) -> Result<Approvals> {

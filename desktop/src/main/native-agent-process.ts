@@ -182,17 +182,21 @@ export class NativeAgentProcess {
   private constructor(
     private readonly child: ChildProcessWithoutNullStreams,
     private readonly onSessionUpdate?: (params: unknown) => void,
-    askRoots?: ReadonlyMap<string, string>,
+    permissions?: Readonly<{
+      askRoots: ReadonlyMap<string, string>;
+      settingsRoot?: string;
+    }>,
     private readonly providerEgress?: NativeProviderEgress,
     private readonly imageGeneration?: NativeImageGeneration,
     private readonly imagePlacement?: NativeImagePlacement,
     private readonly reviewImageReference?: ImageReferenceReview,
     private readonly gatewayJobBilling?: NativeAgentLaunch["gatewayJobBilling"]
   ) {
-    if (askRoots) {
+    if (permissions) {
       this.permissions = new NativeAgentPermissions(
         (method, params) => this.call(method, params),
-        askRoots
+        permissions.askRoots,
+        permissions.settingsRoot
       );
     }
     let diagnostics = "";
@@ -540,7 +544,15 @@ export class NativeAgentProcess {
         stdio: "pipe",
       }),
       options.onSessionUpdate,
-      permissionProfile?.askRoots,
+      permissionProfile && {
+        askRoots: permissionProfile.askRoots,
+        // The host keeps the agent settings file in the workspace
+        // configuration folder, or in its own state folder.
+        settingsRoot: await fs.promises.realpath(
+          options.workspaceConfiguration?.directory ??
+            permissionProfile.stateDirectory
+        ),
+      },
       providerEgress,
       imageGeneration,
       imagePlacement,

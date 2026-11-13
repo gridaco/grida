@@ -11,11 +11,7 @@ import type {
 } from "@grida/desktop-bridge";
 import { describe, expect, it, vi } from "vitest";
 import { IPC_CHANNELS } from "../bridge/contract";
-import {
-  NativeChatIpc,
-  type ActiveNativeChat,
-  type ConfigurationReview,
-} from "./native-chat-ipc";
+import { NativeChatIpc, type ActiveNativeChat } from "./native-chat-ipc";
 import type { NativeChatSession } from "./native-agent-chat";
 import type { NativeSavedChatDeletionPreview } from "./native-agent-deletion";
 import { NativeEditorSurfaceEndpoints } from "./native-editor-surfaces";
@@ -78,7 +74,7 @@ it("requires native selection and exact trust before saving a hook", async () =>
     async () => "/fixture/check.json"
   );
   const confirm = vi.fn<() => Promise<boolean>>(async () => false);
-  const f = setup(undefined, undefined, undefined, { choose, confirm });
+  const f = setup(undefined, undefined, { choose, confirm });
   const review = { definition: HOOK, workspace: "/fixture/workspace" };
   f.chat.reviewHook = vi.fn<NonNullable<typeof f.chat.reviewHook>>(
     async () => review
@@ -104,7 +100,7 @@ it("requires native selection and exact trust before saving a hook", async () =>
 it("revokes hook trust review when its window navigates", async () => {
   const decision = Promise.withResolvers<boolean>();
   const confirm = vi.fn<() => Promise<boolean>>(async () => decision.promise);
-  const f = setup(undefined, undefined, undefined, {
+  const f = setup(undefined, undefined, {
     choose: async () => "/fixture/check.json",
     confirm,
   });
@@ -134,7 +130,7 @@ it("revokes hook trust review when its window navigates", async () => {
 
 it("requires current saved revision and native confirmation before removing a hook", async () => {
   const confirm = vi.fn<() => Promise<boolean>>(async () => false);
-  const f = setup(undefined, undefined, undefined, {
+  const f = setup(undefined, undefined, {
     choose: async () => null,
     confirm,
   });
@@ -498,17 +494,13 @@ function windowAt(url = WORKSPACE_URL) {
 }
 
 function setup(
-  confirm?: (
-    sender: WebContents,
-    review: ConfigurationReview
-  ) => Promise<boolean>,
   confirmDeletion?: (
     sender: WebContents,
     title: string | null,
     ownedChildren?: number
   ) => Promise<boolean>,
   selectArtifactDestination?: (sender: WebContents) => Promise<string | null>,
-  hookReview?: ConstructorParameters<typeof NativeChatIpc>[11]
+  hookReview?: ConstructorParameters<typeof NativeChatIpc>[10]
 ) {
   const first = windowAt();
   const second = windowAt();
@@ -616,10 +608,6 @@ function setup(
         source: "active",
         revision: null,
       };
-    },
-    async updateContextLimit() {},
-    async sendConfiguration(session, input) {
-      return this.submit(session, input.inputId, input.text);
     },
     async submitImage(session) {
       return this.submit(session, "image-input", "Describe image.");
@@ -752,7 +740,6 @@ function setup(
       ORIGIN,
       (sender) => scopes.get(sender) ?? null,
       undefined,
-      confirm,
       confirmDeletion,
       selectArtifactDestination,
       undefined,
@@ -812,7 +799,6 @@ describe("native chat IPC", () => {
       ORIGIN,
       () => null,
       { admits: () => true, ensure: workspace },
-      undefined,
       undefined,
       undefined,
       undefined,
@@ -908,7 +894,6 @@ describe("native chat IPC", () => {
       ORIGIN,
       () => null,
       { admits: () => true, ensure: workspace },
-      undefined,
       undefined,
       undefined,
       undefined,
@@ -1012,7 +997,6 @@ describe("native chat IPC", () => {
       undefined,
       undefined,
       undefined,
-      undefined,
       resolve
     );
     const inDeck = <T>(invoke: () => T) => ipc.deckRequest(first.event, invoke);
@@ -1079,7 +1063,6 @@ describe("native chat IPC", () => {
     const ipc = new NativeChatIpc(
       ORIGIN,
       resolve,
-      undefined,
       undefined,
       undefined,
       undefined,
@@ -1173,7 +1156,6 @@ describe("native chat IPC", () => {
       undefined,
       undefined,
       undefined,
-      undefined,
       {
         list: async () => ({ choices: [], saved: [] }),
         select: async (_workspace, _selection, requireCurrent) => {
@@ -1224,7 +1206,7 @@ describe("native chat IPC", () => {
         count?: number
       ) => Promise<boolean>
     >(async () => true);
-    const { first, chat, ipc } = setup(undefined, confirm);
+    const { first, chat, ipc } = setup(confirm);
     const observe = chat.observe.bind(chat);
     let sessionRevision = 1;
     chat.observe = async (session) => ({
@@ -1308,10 +1290,7 @@ describe("native chat IPC", () => {
     const confirm = vi.fn<
       (sender: WebContents, title: string | null) => Promise<boolean>
     >(async () => true);
-    const { first, second, chat, ipc, listeners, emit } = setup(
-      undefined,
-      confirm
-    );
+    const { first, second, chat, ipc, listeners, emit } = setup(confirm);
     const observe = chat.observe.bind(chat);
     chat.observe = async (session) => ({
       ...(await observe(session)),
@@ -1407,7 +1386,7 @@ describe("native chat IPC", () => {
     const confirm = vi.fn<
       (sender: WebContents, title: string | null) => Promise<boolean>
     >(() => approval.promise);
-    const { first, second, chat, ipc } = setup(undefined, confirm);
+    const { first, second, chat, ipc } = setup(confirm);
     const observe = chat.observe.bind(chat);
     chat.observe = async (session) => ({
       ...(await observe(session)),
@@ -1442,131 +1421,6 @@ describe("native chat IPC", () => {
     const late = ipc.load(second.event, opened.sessionId);
     loading.resolve({ id: opened.sessionId });
     await expect(late).rejects.toThrow("native_chat_session_deleted");
-  });
-
-  it("keeps the revision private and only retries the exact reviewed context update", async () => {
-    const confirm = vi.fn<
-      (sender: WebContents, review: ConfigurationReview) => Promise<boolean>
-    >(async () => true);
-    const { ipc, first, second, chat } = setup(confirm);
-    const update = vi.spyOn(chat, "updateContextLimit");
-    const inspected = await ipc.contextLimit(first.event);
-    expect(inspected).toEqual({
-      reviewId: expect.any(String),
-      limit: null,
-      exactCounting: true,
-      source: "active",
-    });
-    await expect(
-      ipc.saveContextLimit(second.event, inspected.reviewId, 1024)
-    ).rejects.toThrow("native_context_limit_review_unavailable");
-    const saved = await ipc.saveContextLimit(
-      first.event,
-      inspected.reviewId,
-      1024
-    );
-    expect(saved).toEqual({ limit: 1024, disposition: "applied" });
-    expect(
-      await ipc.saveContextLimit(first.event, inspected.reviewId, 1024)
-    ).toEqual(saved);
-    await expect(
-      ipc.saveContextLimit(first.event, inspected.reviewId, 4096)
-    ).rejects.toThrow("native_context_limit_review_reused");
-    expect(confirm).toHaveBeenCalledExactlyOnceWith(first.sender, {
-      kind: "limit",
-      limit: 1024,
-    });
-    expect(update).toHaveBeenCalledExactlyOnceWith(
-      { limit: null, exactCounting: true, source: "active", revision: null },
-      1024
-    );
-  });
-
-  it("allows Automatic recovery on an unsupported provider and labels an observed timeout outcome", async () => {
-    const confirm = vi.fn<
-      (sender: WebContents, review: ConfigurationReview) => Promise<boolean>
-    >(async () => true);
-    const { ipc, first, chat } = setup(confirm);
-    const inspect = vi.spyOn(chat, "inspectContextLimit").mockResolvedValue({
-      limit: 2048,
-      exactCounting: false,
-      source: "active",
-      revision: "2".repeat(64),
-    });
-    const update = vi
-      .spyOn(chat, "updateContextLimit")
-      .mockRejectedValueOnce(new Error("native_agent_request_timeout"));
-    const initial = await ipc.contextLimit(first.event);
-    await expect(
-      ipc.saveContextLimit(first.event, initial.reviewId, 4096)
-    ).rejects.toThrow("native_context_limit_unavailable");
-    expect(confirm).not.toHaveBeenCalled();
-    inspect.mockResolvedValue({
-      limit: null,
-      exactCounting: false,
-      source: "active",
-      revision: "3".repeat(64),
-    });
-    await expect(
-      ipc.saveContextLimit(first.event, initial.reviewId, null)
-    ).resolves.toEqual({ limit: null, disposition: "observed" });
-    expect(update).toHaveBeenCalledTimes(1);
-  });
-
-  it("reviews an exact Act input once and refuses a late or rewritten message", async () => {
-    const confirm = vi.fn<
-      (sender: WebContents, review: ConfigurationReview) => Promise<boolean>
-    >(async () => true);
-    const { ipc, first, chat } = setup(confirm);
-    const opened = await ipc.create(first.event);
-    const input = {
-      action: "submit",
-      inputId: randomUUID(),
-      text: "Change the future context limit.",
-    } as const;
-    const send = vi
-      .spyOn(chat, "sendConfiguration")
-      .mockRejectedValueOnce(new Error("fixture lost reply"));
-    await expect(
-      ipc.submitWithConfigurationReview(first.event, opened.attachmentId, input)
-    ).rejects.toThrow("fixture lost reply");
-    const accepted = await ipc.submitWithConfigurationReview(
-      first.event,
-      opened.attachmentId,
-      input
-    );
-    expect(accepted.inputId).toBe(input.inputId);
-    expect(
-      await ipc.submitWithConfigurationReview(
-        first.event,
-        opened.attachmentId,
-        input
-      )
-    ).toEqual(accepted);
-    await expect(
-      ipc.submitWithConfigurationReview(first.event, opened.attachmentId, {
-        ...input,
-        text: "Another message",
-      })
-    ).rejects.toThrow("native_context_limit_review_reused");
-    expect(confirm).toHaveBeenCalledExactlyOnceWith(first.sender, {
-      kind: "message",
-      text: input.text,
-    });
-    expect(send).toHaveBeenCalledTimes(2);
-
-    const delayed = Promise.withResolvers<boolean>();
-    confirm.mockReturnValueOnce(delayed.promise);
-    const later = ipc.submitWithConfigurationReview(
-      first.event,
-      opened.attachmentId,
-      { ...input, inputId: randomUUID() }
-    );
-    await vi.waitFor(() => expect(confirm).toHaveBeenCalledTimes(2));
-    first.contents.emit("did-start-navigation", { isMainFrame: true });
-    delayed.resolve(true);
-    await expect(later).rejects.toThrow("native_chat_attachment_unavailable");
-    expect(send).toHaveBeenCalledTimes(2);
   });
 
   it("reports PNG capability only in the current workspace and rejects late delivery", async () => {
@@ -1710,7 +1564,7 @@ describe("native chat IPC", () => {
 
   it("releases only a listed PNG and drops a read when its observed turn changes", async () => {
     const select = vi.fn<(sender: WebContents) => Promise<string | null>>();
-    const { ipc, first, second, chat } = setup(undefined, undefined, select);
+    const { ipc, first, second, chat } = setup(undefined, select);
     const parent = await ipc.create(first.event);
     const another = await ipc.load(second.event, parent.sessionId);
     const running = await ipc.observe(first.event, parent.attachmentId);
@@ -2327,7 +2181,6 @@ describe("native chat IPC", () => {
       { admits: () => true, ensure },
       undefined,
       undefined,
-      undefined,
       { list, select }
     );
     await expect(ipc.status(first.event, true)).resolves.toBe(
@@ -2369,7 +2222,6 @@ describe("native chat IPC", () => {
       { admits: () => true, ensure },
       undefined,
       undefined,
-      undefined,
       {
         list: async () => ({ choices: [], saved: [] }),
         select: async (_workspace, selection, requireCurrent) => {
@@ -2401,7 +2253,6 @@ describe("native chat IPC", () => {
         admits: () => true,
         ensure: async () => account.withGatewayGrant(undefined, () => {}),
       },
-      undefined,
       undefined,
       undefined,
       {
@@ -2646,7 +2497,6 @@ describe("Welcome connection choices", () => {
       ORIGIN,
       () => null,
       { admits: () => true, ensure },
-      undefined,
       undefined,
       undefined,
       { list, select, welcome },

@@ -275,7 +275,6 @@ describe.skipIf(!supported)("Native chat store", () => {
         undefined,
         undefined,
         undefined,
-        undefined,
         false,
         {
           identity: (sender, id, owner) => {

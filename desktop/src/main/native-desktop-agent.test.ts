@@ -1,6 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-008 — native Desktop provider lifetime fixtures.
 import { AuthStore, SecretsStore } from "@grida/daemon/server";
 import { AGENT_DEFAULT_TIER, TIER_MODEL_IDS } from "@grida/ai/catalogue";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -620,6 +621,25 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       expect(counts).toEqual([]);
       expect((await newChat.inspectContextLimit()).exactCounting).toBe(false);
 
+      // Set the workspace's input limit in its settings file. It applies once
+      // Desktop starts the workspace's agent again.
+      const settings = path.join(
+        await fs.realpath(source.desktopUserDataPath),
+        "chats",
+        "workspaces",
+        createHash("sha256")
+          .update(JSON.stringify([workspace.id, root]))
+          .digest("hex"),
+        "config.toml"
+      );
+      await fs.writeFile(
+        settings,
+        "schema_version = 1\n[context]\nmax_input_tokens = 1000\n",
+        { mode: 0o600 }
+      );
+      await agent.close();
+      vi.resetModules();
+      agent = await launch();
       await agent.selectProfile(
         workspace.id,
         { kind: "new", id: countedId },
@@ -629,9 +649,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       // Chats belong to the workspace: the counted connection lists the chat
       // the other connection started.
       expect((await countedChat.list()).sessionIds).toEqual([session.id]);
-      const basis = await countedChat.inspectContextLimit();
-      expect(basis.exactCounting).toBe(true);
-      await countedChat.updateContextLimit(basis, 1000);
+      expect((await countedChat.inspectContextLimit()).exactCounting).toBe(
+        true
+      );
       const countedSession = await countedChat.create();
       await countedChat.submit(countedSession, "counted", "Count this turn.");
       await vi.waitFor(async () =>

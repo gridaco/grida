@@ -11,15 +11,14 @@ The native host reads `config.toml` from its selected state directory. The file
 holds user defaults for that host. Each accepted input retains the defaults
 that applied when it was accepted.
 
-| Surface                                             | `config.toml`                                                                                                                               | Managed operations and agent-requested changes |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| Grida Desktop on macOS and Linux                    | One per workspace, in a digest-named folder under `chats/workspaces/` in Desktop's application data folder; edit it while Desktop is closed | Not offered                                    |
-| Source-built `grida-agent run`                      | In the `--state-dir` you choose; read at startup                                                                                            | Not offered                                    |
-| Source-built `grida-agent serve` with an ACP client | In the `--state-dir` you choose                                                                                                             | Available after negotiation                    |
+| Surface                                             | `config.toml`                                                                                              | Changes by the agent                                                  | Managed operations          |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | --------------------------- |
+| Grida Desktop on macOS and Linux                    | One per workspace, in a digest-named folder under `chats/workspaces/` in Desktop's application data folder | File edits; every write asks for your approval                        | Not offered                 |
+| Source-built `grida-agent run`                      | In the `--state-dir` you choose; read at startup                                                           | File edits under a write-capable permission profile; every write asks | Not offered                 |
+| Source-built `grida-agent serve` with an ACP client | In the `--state-dir` you choose                                                                            | As for `run`                                                          | Available after negotiation |
 
-Desktop offers no control for these settings and does not let the agent change
-them; a change to the file applies when Desktop next starts the workspace's
-agent. [Change agent settings](../agent/settings.md)
+In Desktop, ask the agent to change a setting, or edit the file while Desktop is
+closed. Desktop has no settings control. [Change agent settings](../agent/settings.md)
 
 For an ACP client, start the host with your own state directory, for example
 `grida-agent serve --stdio --state-dir /absolute/path/to/agent-state` plus
@@ -97,19 +96,37 @@ instead.
 Changes apply to later accepted inputs. Running and already accepted work retains
 its captured settings.
 
-Manual edits take effect at host startup or after an explicit configuration
-reload. An invalid startup file prevents execution. A rejected reload retains
-the last valid active defaults and reports the file diagnostic.
+An edit by the agent takes effect for inputs accepted after it is saved. A
+manual edit takes effect at host startup or after an explicit configuration
+reload. An invalid startup file prevents execution and reports its
+diagnostic. A rejected reload retains the last valid active defaults and
+reports the file diagnostic.
 
 Inspection distinguishes the current file revision from the active settings
 snapshot. They can differ after a manual edit awaiting reload or a rejected
 reload.
 
+## Changes made by the agent
+
+The agent reads and edits `config.toml` with its ordinary file tools, as the
+directory `agent-settings`; that directory holds only this file. A read runs
+without asking and reports whether the content is active, waiting for the next
+start, or invalid. Every `write_file` or `edit_file` on it is an approval request
+for that exact change, answered like any other file approval. It is asked even
+where the agent may write the project without asking, an earlier approval does
+not cover the next change, Plan offers no writes, and automatic review never
+answers it. Commands the agent runs can neither read nor write the file.
+
+The host validates the complete result before saving it. Invalid content is
+refused with its diagnostic and leaves the file and the active settings
+unchanged. A saved change applies to inputs accepted afterwards.
+
 ## Managed changes
 
-Capable clients use the same typed host operations for inspection, set/reset,
-and reload. These operations require the corresponding negotiated ACP
-capability. [Connect an agent client](../agent/clients.md#use-durable-client-operations).
+Capable ACP clients use typed host operations for inspection, set/reset, and
+reload. These are client operations for a person's own tooling; they require the
+corresponding negotiated ACP capability and are not offered to the agent.
+[Connect an agent client](../agent/clients.md#use-durable-client-operations).
 
 | Method                     | Behavior                                                                       |
 | -------------------------- | ------------------------------------------------------------------------------ |
@@ -124,19 +141,3 @@ inspection reveals the current revision and values.
 
 When editing manually, stop the host or reload deliberately after the edit.
 External editors operate independently of the managed writer lock.
-
-## Changes requested through the agent
-
-A capable native client can expose `config_inspect` to the agent. Its result
-includes the supported field description, current file and active defaults,
-and the defaults captured for the current task.
-
-`config_update` and `config_reload` require an explicit permission on the accepted
-input. A client supplies `allowConfigurationChanges: true` when submitting,
-enqueueing or replacing that input, after enabling all three configuration
-capabilities. This permits changes to the reviewed default for future tasks.
-Existing tasks retain their captured settings.
-
-Successful changes report the snapshot produced by the write. After an
-interrupted response, recovery can report that the requested setting is present.
-A differing state remains uncertain and needs inspection before another change.

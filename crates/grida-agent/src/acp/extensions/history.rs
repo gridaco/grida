@@ -68,8 +68,6 @@ struct Revise {
     anchor: ConversationAnchor,
     replacement_input_id: ChangeId,
     prompt: Vec<ContentBlock>,
-    #[serde(default)]
-    allow_configuration_changes: bool,
     operating_regime: Option<crate::OperatingRegime>,
     effort: Option<crate::EffortPreset>,
     #[serde(default)]
@@ -175,10 +173,6 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                                     .map(prompt_part)
                                     .collect::<Result<_>>()?,
                                 questions: questions::available(&sessions),
-                                configuration_permission: configuration_permission(
-                                    &sessions,
-                                    request.allow_configuration_changes,
-                                )?,
                                 operating_regime: operating_regime(
                                     &sessions,
                                     request.operating_regime,

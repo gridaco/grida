@@ -101,7 +101,6 @@ it.runIf(Boolean(resources)).each(["workbench", "root deck", "nested deck"])(
         undefined,
         undefined,
         undefined,
-        undefined,
         async () => grant,
         false,
         undefined,

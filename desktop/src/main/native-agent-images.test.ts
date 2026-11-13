@@ -551,7 +551,6 @@ it.runIf(
           : null,
       undefined,
       undefined,
-      undefined,
       async () => destination
     );
     try {

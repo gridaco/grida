@@ -342,13 +342,7 @@ impl Host {
             return Ok(None);
         }
         let stored: StoredPrompt = decode_input(head)?;
-        if stored.goal.is_some()
-            || !ordinary_text(
-                stored.configuration_permission,
-                stored.effort.is_some(),
-                &stored.parts,
-            )
-        {
+        if stored.goal.is_some() || !ordinary_text(stored.effort.is_some(), &stored.parts) {
             return Ok(None);
         }
         let fingerprint = Fingerprint::of(&(&view.session, &head.id, 1_u8))?;
@@ -788,13 +782,8 @@ impl Host {
     }
 }
 
-pub(super) fn ordinary_text(
-    configuration: crate::ConfigurationPermission,
-    ultra: bool,
-    parts: &[PromptPart],
-) -> bool {
-    configuration != crate::ConfigurationPermission::Change
-        && !ultra
+pub(super) fn ordinary_text(ultra: bool, parts: &[PromptPart]) -> bool {
+    !ultra
         && parts
             .iter()
             .all(|part| matches!(part, PromptPart::Text { .. }))

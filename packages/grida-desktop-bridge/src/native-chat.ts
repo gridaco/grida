@@ -115,18 +115,6 @@ export type NativeContextLimit = Readonly<{
   source: "active" | "pending" | "invalid";
 }>;
 
-export type NativeContextLimitResult = Readonly<{
-  limit: number | null;
-  disposition: "applied" | "observed";
-}>;
-
-export type NativeChatConfigurationInput = Readonly<{
-  action: "submit" | "enqueue";
-  inputId: string;
-  text: string;
-  effort?: NativeChatEffort;
-}>;
-
 export type NativeChatPage = Readonly<{
   sessionIds: readonly string[];
   titles?: readonly Readonly<{ sessionId: string; title: string }>[];
@@ -491,7 +479,6 @@ export type NativeChatQueueItem = Readonly<{
   goalStart?: NativeChatGoalRequest;
   operatingRegime?: NativeChatOperatingRegime;
   effort?: "ultra";
-  allowsConfigurationChange?: true;
 }>;
 
 export type NativeChatQueuePage = Readonly<{
@@ -635,7 +622,8 @@ export type NativeChatControlReceipt = Readonly<{
 
 export type NativeChatApproval = Readonly<{
   reviewId: string;
-  tool: "read_file" | "list_files" | "search_text";
+  /** Writes are asked only for the workspace's agent settings file. */
+  tool: "read_file" | "list_files" | "search_text" | "write_file" | "edit_file";
   root: string;
   relativePath: string;
   query?: string;
@@ -846,14 +834,6 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     input: NativeChatFileInput
   ): Promise<NativeChatAcceptance>;
   contextLimit?(): Promise<NativeContextLimit>;
-  saveContextLimit?(
-    reviewId: string,
-    limit: number | null
-  ): Promise<NativeContextLimitResult>;
-  submitWithConfigurationReview?(
-    attachmentId: string,
-    input: NativeChatConfigurationInput
-  ): Promise<NativeChatAcceptance>;
   inputReceipt(
     attachmentId: string,
     inputId: string

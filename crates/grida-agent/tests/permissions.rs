@@ -18,6 +18,7 @@ use agent_kit_sessions::{
 };
 use agent_kit_store_sqlite::SqliteStore;
 use grida_agent::command::{CommandLimits, CommandTool};
+use grida_agent::configuration::Configuration;
 use grida_agent::permissions::{
     AccessRule, ApprovalDecision, ApprovalEffect, CommandProfile, DirectoryAccess,
     PermissionCapture, PermissionProfile, TurnPermissions, approval_answer, read_approval,
@@ -174,6 +175,15 @@ impl Fixture {
     }
 
     async fn first(&self, profile: &Arc<PermissionProfile>, allow_review: bool) -> Running {
+        self.first_with(profile, allow_review, None).await
+    }
+
+    async fn first_with(
+        &self,
+        profile: &Arc<PermissionProfile>,
+        allow_review: bool,
+        settings: Option<Arc<Configuration>>,
+    ) -> Running {
         let store = Arc::new(SqliteStore::open(&self.database).unwrap());
         store
             .create(CreateSession {
@@ -209,7 +219,7 @@ impl Fixture {
         let ClaimOutcome::Acquired(claim) = claim else {
             panic!("owner expected")
         };
-        Running::open(profile, capture, store, claim.lease, allow_review).await
+        Running::open(profile, capture, store, claim.lease, allow_review, settings).await
     }
 
     async fn reopen(&self, profile: &Arc<PermissionProfile>, epoch: u64) -> Running {
@@ -240,7 +250,7 @@ impl Fixture {
             panic!("recovery owner expected")
         };
         let capture = serde_json::from_slice(claim.inputs[0].payload.bytes()).unwrap();
-        Running::open(profile, capture, store, claim.lease, true).await
+        Running::open(profile, capture, store, claim.lease, true, None).await
     }
 
     fn command(&self, executable: &Path, script: &str) -> Value {
@@ -266,6 +276,7 @@ impl Running {
         store: Arc<SqliteStore>,
         lease: TurnLease,
         allow_review: bool,
+        settings: Option<Arc<Configuration>>,
     ) -> Self {
         let permissions = profile
             .bind(
@@ -273,6 +284,7 @@ impl Running {
                 lease.binding().clone(),
                 store.clone(),
                 allow_review,
+                settings,
             )
             .unwrap();
         let mut inventory = Inventory::new();
@@ -810,4 +822,132 @@ async fn revocation_fences_approved_launch_and_stops_running_command() {
         assert_eq!(cleanup.unverified.len(), 1);
     }
     assert_eq!(fs::read_dir(&fixture.temporary).unwrap().count(), 0);
+}
+
+fn settings(directory: &Path) -> Arc<Configuration> {
+    Arc::new(Configuration::open(directory).unwrap())
+}
+
+fn max_input_tokens(configuration: &Configuration) -> Option<u64> {
+    configuration
+        .snapshot()
+        .unwrap()
+        .defaults
+        .context
+        .max_input_tokens
+        .map(|limit| limit.get())
+}
+
+/// The agent settings file is an ordinary file edit under the approval path:
+/// reads run, and every write asks, even where the project is writable and
+/// after an earlier change was approved.
+#[tokio::test]
+async fn settings_file_reads_run_and_every_write_asks_even_where_writes_are_allowed() {
+    let fixture = Fixture::new();
+    let state = fixture.database.parent().unwrap().to_owned();
+    let configuration = settings(&state);
+    let file = state.join("config.toml");
+    let run = fixture
+        .first_with(
+            &fixture.profile_with(false, true),
+            true,
+            Some(configuration.clone()),
+        )
+        .await;
+    let target = |content: &str| json!({"directory":"agent-settings","path":"config.toml","content":content});
+    let valid = "schema_version = 1\n[context]\nmax_input_tokens = 64000\n";
+
+    let absent = completed(
+        run.invoke(
+            "r1",
+            "read_file",
+            json!({"directory":"agent-settings","path":"config.toml"}),
+        )
+        .await,
+    );
+    assert_eq!(absent.status, OutcomeStatus::Succeeded, "{absent:?}");
+    assert!(text(&absent).contains("does not exist yet"), "{absent:?}");
+    assert!(run.opened.turn.view().state.waits().is_empty());
+
+    // The project's standing write rule does not cover the settings file.
+    let wait = deferred(run.invoke("w1", "write_file", target(valid)).await);
+    let approval = read_approval(&run.approval(&wait).await).unwrap();
+    assert_eq!(approval.directory, binding("agent-settings"));
+    assert_eq!(approval.root, state);
+    assert!(matches!(
+        approval.effect,
+        ApprovalEffect::Write { ref relative_path, .. } if relative_path == Path::new("config.toml")
+    ));
+    assert!(!file.exists());
+    run.answer(wait, ApprovalDecision::Decline).await;
+    let declined = completed(run.invoke("w1", "write_file", target(valid)).await);
+    assert_eq!(declined.status, OutcomeStatus::Failed, "{declined:?}");
+    assert!(!file.exists());
+    assert_eq!(max_input_tokens(&configuration), None);
+
+    let wait = deferred(run.invoke("w2", "write_file", target(valid)).await);
+    run.answer(wait, ApprovalDecision::ApproveOnce).await;
+    let saved = completed(run.invoke("w2", "write_file", target(valid)).await);
+    assert_eq!(saved.status, OutcomeStatus::Succeeded, "{saved:?}");
+    assert!(text(&saved).contains("messages accepted from now on"));
+    assert_eq!(fs::read_to_string(&file).unwrap(), valid);
+    assert_eq!(max_input_tokens(&configuration), Some(64000));
+
+    // An earlier approval in the same session does not cover the next change.
+    let edit = json!({
+        "directory":"agent-settings","path":"config.toml",
+        "old_string":"64000","new_string":"0",
+    });
+    let wait = deferred(run.invoke("e1", "edit_file", edit.clone()).await);
+    run.answer(wait, ApprovalDecision::ApproveOnce).await;
+    // An invalid result is reported and nothing changes.
+    let invalid = completed(run.invoke("e1", "edit_file", edit).await);
+    assert_eq!(invalid.status, OutcomeStatus::Failed, "{invalid:?}");
+    assert!(
+        text(&invalid).contains("config_value_out_of_range"),
+        "{invalid:?}"
+    );
+    assert_eq!(fs::read_to_string(&file).unwrap(), valid);
+    assert_eq!(max_input_tokens(&configuration), Some(64000));
+
+    // Only the one file is reachable, and only by read, write and edit.
+    for (id, tool, arguments) in [
+        ("o1", "list_files", json!({"directory":"agent-settings"})),
+        (
+            "o2",
+            "read_file",
+            json!({"directory":"agent-settings","path":"agent.sqlite"}),
+        ),
+        (
+            "o3",
+            "search_text",
+            json!({"directory":"agent-settings","query":"schema"}),
+        ),
+    ] {
+        failed(run.invoke(id, tool, arguments).await, "permission_denied");
+    }
+}
+
+/// The settings file is offered only while commands cannot read or write its
+/// directory, so a command never reaches what the file tools approve.
+#[tokio::test]
+async fn settings_file_is_withheld_where_commands_could_reach_it() {
+    let fixture = Fixture::new();
+    let run = fixture
+        .first_with(
+            &fixture.profile_with(false, true),
+            true,
+            Some(settings(&fixture.temporary)),
+        )
+        .await;
+    let read = completed(
+        run.invoke(
+            "r1",
+            "read_file",
+            json!({"directory":"agent-settings","path":"config.toml"}),
+        )
+        .await,
+    );
+    assert_eq!(read.status, OutcomeStatus::Failed, "{read:?}");
+    assert!(!fixture.temporary.join("config.toml").exists());
 }

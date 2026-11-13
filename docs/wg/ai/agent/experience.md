@@ -171,15 +171,19 @@ that setting as part of its strategy for fulfilling the chosen agent effort.
 
 The person can ask the agent to explain a supported setting, change a default,
 or restore automatic behavior. For example, “use a smaller context budget for
-future tasks” or “show which settings applied to this answer.” The agent knows
-the supported settings through the same descriptions and validation used by
-the product's controls.
+future tasks” or “show which settings applied to this answer.” Settings live in
+a plain settings file that the agent reads and edits with its ordinary file
+tools. The product has no separate settings screen or send-time permission for
+them.
 
-A change shows its scope, previous and resulting values, and when it takes
-effect. A default change applies to later accepted requests. Already accepted
-work keeps its recorded settings unless the person explicitly changes that work.
-An unsupported or invalid value has a clear explanation. Missing information
-about model capacity remains visible.
+Because a settings file can loosen the rules that guard the agent, every change
+to it asks the person, the way a write outside the project would, and no
+standing or earlier approval covers the next change. Programs the agent runs
+can neither read nor change the file. The host validates the file before it
+saves an edit and whenever it loads one: an invalid edit is reported and never
+silently applied. A change states when it takes effect. A default change
+applies to later accepted requests; already accepted work keeps its recorded
+settings. Missing information about model capacity remains visible.
 
 The model is chosen in the composer and can change between turns. Choosing
 another model keeps the conversation and its history in place; the next request
@@ -187,9 +191,10 @@ uses the new model with the earlier turns as context. A turn already running
 finishes with the model that started it. Without a usable default model, the
 conversation still opens and its composer asks the person to choose one.
 
-Using this feature requires no knowledge of a configuration file or field names.
-An advanced file-editing path can expose the same reviewed settings. The compact
-catalog identifies which settings and scopes the product currently supports.
+Using this feature requires no knowledge of field names: the agent finds and
+edits the file, and the person approves the change. The person can also edit
+the file directly. The compact catalog identifies which settings and scopes the
+product currently supports.
 
 ## Automate lifecycle checks
 

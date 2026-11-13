@@ -34,8 +34,6 @@ struct Enqueue {
     input_id: ChangeId,
     prompt: Vec<ContentBlock>,
     selected_file: Option<SelectedFile>,
-    #[serde(default)]
-    allow_configuration_changes: bool,
     operating_regime: Option<crate::OperatingRegime>,
     effort: Option<crate::EffortPreset>,
     #[serde(default)]
@@ -74,8 +72,6 @@ struct Replace {
     input_id: ChangeId,
     replacement_input_id: ChangeId,
     prompt: Vec<ContentBlock>,
-    #[serde(default)]
-    allow_configuration_changes: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcRequest)]
@@ -200,13 +196,9 @@ pub(super) fn handlers(
                                 embedded_context,
                                 request.selected_file,
                                 &enqueue.1,
-                                request.allow_configuration_changes,
+                                false,
                             )?,
                             questions: questions::available(&enqueue.1),
-                            configuration_permission: configuration_permission(
-                                &enqueue.1,
-                                request.allow_configuration_changes,
-                            )?,
                             operating_regime: operating_regime(
                                 &enqueue.1,
                                 request.operating_regime,
@@ -252,10 +244,6 @@ pub(super) fn handlers(
                         replacement: request.replacement_input_id,
                         parts: prompt_parts(request.prompt, image_intake, false)?,
                         questions: questions::available(&replace.1),
-                        configuration_permission: configuration_permission(
-                            &replace.1,
-                            request.allow_configuration_changes,
-                        )?,
                     };
                     edit_queue(&replace.0, request.queue, edit).await
                 }

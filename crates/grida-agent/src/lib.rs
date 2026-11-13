@@ -4,7 +4,6 @@ pub mod acp;
 mod chatgpt_subscription;
 pub mod command;
 pub mod configuration;
-mod configuration_tools;
 mod custody;
 mod editor_surfaces;
 pub mod file_tools;
@@ -30,6 +29,5 @@ pub mod workspace_file;
 pub use http::{CompatibleOutputLimitField, ProviderOptions, ProviderProtocol};
 pub use supervised_provider::SupervisedProvider;
 
-pub use configuration_tools::ConfigurationPermission;
 pub use grida_agent_master::OperatingRegime;
 pub use grida_agent_master::effort::Preset as EffortPreset;

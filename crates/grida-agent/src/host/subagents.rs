@@ -246,7 +246,6 @@ impl Host {
                 parts,
                 SubmissionPolicy {
                     questions: false,
-                    configuration_permission: crate::ConfigurationPermission::Disabled,
                     allow_wakeups: false,
                     allow_library_selection: false,
                     allow_host_tools: false,

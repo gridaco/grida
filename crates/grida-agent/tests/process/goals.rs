@@ -8,8 +8,8 @@ use agent_kit_core::{ChangeId, Envelope, ModelId, SchemaId, SessionId};
 use agent_kit_sessions::{InputDisposition, SessionStore, TurnDisposition};
 use agent_kit_store_sqlite::SqliteStore;
 use agent_kit_store_sqlite::driver::{DriverControlPlan, DriverControlRequest};
+use grida_agent::ProviderOptions;
 use grida_agent::host::{GoalAction, GoalRequest, Host, PromptPart, PromptRequest, TurnControl};
-use grida_agent::{ConfigurationPermission, ProviderOptions};
 use grida_agent_master::goals::{Allowance, Blocker, Goal, Objective, Status, Usage};
 use std::num::NonZeroU32;
 
@@ -57,7 +57,6 @@ fn request(session: &SessionId, id: &str, text: &str) -> PromptRequest {
         session: session.clone(),
         parts: vec![PromptPart::Text { text: text.into() }],
         questions: false,
-        configuration_permission: ConfigurationPermission::Disabled,
         operating_regime: None,
         effort: None,
         reasoning: Default::default(),

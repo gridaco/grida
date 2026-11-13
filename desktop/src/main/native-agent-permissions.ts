@@ -14,9 +14,14 @@ const APPROVALS = "co.grida/session/approvals";
 const ANSWER = "co.grida/session/answer-approval";
 const ID = /^[A-Za-z0-9_.:@/-]{1,256}$/;
 const READ_TOOLS = ["read_file", "list_files", "search_text"] as const;
+const WRITE_TOOLS = ["write_file", "edit_file"] as const;
+/** The host's directory ID and only path for the agent settings file. */
+const SETTINGS_DIRECTORY = "agent-settings";
+const SETTINGS_PATH = "config.toml";
 const MAX_PATH_BYTES = 4096;
 const MAX_QUERY_BYTES = 128;
 type ReadTool = (typeof READ_TOOLS)[number];
+type WriteTool = (typeof WRITE_TOOLS)[number];
 
 type Directory = Readonly<{
   id: string;
@@ -42,7 +47,8 @@ export type NativeApprovalReview = Readonly<{
   controlRevision: number;
   directory: string;
   root: string;
-  tool: ReadTool;
+  /** A write is asked only for the agent settings file. */
+  tool: ReadTool | WriteTool;
   relativePath: string;
   query?: string;
 }>;
@@ -67,9 +73,14 @@ export class NativeAgentPermissions {
   } as const);
   static readonly answerMethod = `_${ANSWER}`;
 
+  /**
+   * `settingsRoot` is the canonical folder of the workspace's agent settings
+   * file. The host asks before every write to that one file.
+   */
   constructor(
     private readonly request: Request,
-    private readonly askRoots: ReadonlyMap<string, string>
+    private readonly askRoots: ReadonlyMap<string, string>,
+    private readonly settingsRoot?: string
   ) {}
 
   /** Publish a Rust v1 launch profile. The path is stable across exact restarts. */
@@ -208,7 +219,8 @@ export class NativeAgentPermissions {
         turnId,
         sessionRevision,
         controlRevision,
-        this.askRoots
+        this.askRoots,
+        this.settingsRoot
       )
     );
     if (new Set(reviews.map(({ waitId }) => waitId)).size !== reviews.length)
@@ -225,7 +237,8 @@ export class NativeAgentPermissions {
       review;
     if (
       !issuedReviews.has(review) ||
-      this.askRoots.get(review.directory) !== review.root ||
+      reviewRoot(review.directory, this.askRoots, this.settingsRoot) !==
+        review.root ||
       (decision !== "approve_once" && decision !== "decline")
     )
       throw invalidApproval();
@@ -302,21 +315,33 @@ function readReview(
   turnId: string,
   sessionRevision: number,
   controlRevision: number,
-  askRoots: ReadonlyMap<string, string>
+  askRoots: ReadonlyMap<string, string>,
+  settingsRoot: string | undefined
 ): NativeApprovalReview {
   const row = object(entry);
   const request = object(row?.request);
   const effect = object(request?.effect);
+  const settings = request?.directory === SETTINGS_DIRECTORY;
+  // Only the settings file is ever asked for a write.
+  const tool: ReadTool | WriteTool | undefined = settings
+    ? effect?.kind === "write" &&
+      writeTool(effect.tool) &&
+      effect.relative_path === SETTINGS_PATH
+      ? effect.tool
+      : undefined
+    : effect?.kind === "read" && readTool(effect.tool)
+      ? effect.tool
+      : undefined;
   if (
+    !effect ||
+    !tool ||
     !identity(row?.waitId) ||
     request?.session !== sessionId ||
     request.turn !== turnId ||
     !identity(request.directory) ||
     typeof request.root !== "string" ||
     Buffer.byteLength(request.root) > MAX_PATH_BYTES ||
-    askRoots.get(request.directory) !== request.root ||
-    effect?.kind !== "read" ||
-    !readTool(effect.tool) ||
+    reviewRoot(request.directory, askRoots, settingsRoot) !== request.root ||
     typeof effect.relative_path !== "string" ||
     Buffer.byteLength(effect.relative_path) > MAX_PATH_BYTES ||
     path.isAbsolute(effect.relative_path) ||
@@ -334,7 +359,7 @@ function readReview(
     controlRevision,
     directory: request.directory,
     root: request.root,
-    tool: effect.tool,
+    tool,
     relativePath: effect.relative_path,
     ...(typeof effect.query === "string" ? { query: effect.query } : {}),
   });
@@ -350,6 +375,21 @@ function object(value: unknown): Record<string, unknown> | undefined {
 
 function readTool(value: unknown): value is ReadTool {
   return READ_TOOLS.some((tool) => tool === value);
+}
+
+function writeTool(value: unknown): value is WriteTool {
+  return WRITE_TOOLS.some((tool) => tool === value);
+}
+
+/** Where an approvable action may act: an ask folder or the settings file's. */
+function reviewRoot(
+  directory: string,
+  askRoots: ReadonlyMap<string, string>,
+  settingsRoot: string | undefined
+): string | undefined {
+  return directory === SETTINGS_DIRECTORY
+    ? settingsRoot
+    : askRoots.get(directory);
 }
 
 function identity(value: unknown): value is string {

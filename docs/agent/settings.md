@@ -13,11 +13,24 @@ budgets input automatically, and the ring beside the model picker shows how
 full the context is.
 [See how full the context is](./models-and-usage.md#see-how-full-the-context-is)
 
-Grida Desktop has no control for this setting, and a Desktop chat cannot ask
-the agent to change it. On macOS and Linux, edit the workspace's
-configuration file instead.
+The setting lives in the workspace's `config.toml`. Grida Desktop has no
+settings control: ask the agent, or edit the file yourself.
 
-## Set the limit for a Desktop workspace
+## Ask the agent
+
+On macOS and Linux, ask in an Act message, for example “cap the context input
+at 64000 tokens for future messages.” The agent reads and edits its settings
+file like any other file, and every change to it asks for your approval in the
+chat, even though the agent edits project files without asking. **Allow once**
+covers that one change; the next change asks again. **Decline** leaves the file
+as it was.
+
+The agent saves only valid settings. If the new content is invalid, it reports
+why and the file stays unchanged. A saved change applies to messages you send
+from then on; work that is already running, paused or queued keeps the value it
+started with.
+
+## Edit the file yourself
 
 1. Quit Desktop.
 2. In Desktop's application data folder, open `chats/workspaces/`. Each
@@ -34,17 +47,17 @@ configuration file instead.
    ```
 
 4. Start Desktop and open the workspace. The new limit applies to messages
-   you send from then on; work that is already running, paused or queued
-   keeps the value it started with.
+   you send from then on.
 
 A hard limit needs a connection that can count its requests exactly. If it
 cannot, or a request is larger than the limit, the turn fails before the
 model starts answering. Remove `max_input_tokens` to return to automatic
-budgeting. An invalid file prevents the workspace's chat from starting.
+budgeting. An invalid file prevents the workspace's chat from starting, and
+the error names the problem.
 
 ## Change it from a client
 
 Source-built headless runs read the same file from the state directory you
-choose. ACP clients can also inspect, change and reload the limit, and can let
-the agent request a reviewed change for one message.
+choose, and the agent can edit it under a permission profile that allows file
+writes. ACP clients can also inspect, change and reload the limit.
 [Agent configuration reference](../reference/agent-configuration.md)

@@ -70,8 +70,6 @@ export function DesktopFileShell({
       profiles: undefined,
       selectProfile: undefined,
       contextLimit: undefined,
-      saveContextLimit: undefined,
-      submitWithConfigurationReview: undefined,
     };
   }, [bridge, mode, basePath]);
 

@@ -387,6 +387,72 @@ async fn durable_headless_approval_accepts_only_the_private_reviewer() {
     endpoint.done().await;
 }
 
+/// Changing the agent settings file is an ordinary file write that always
+/// waits for approval, even though the profile lets the agent write the
+/// project without asking. The saved change applies to later input.
+#[tokio::test]
+async fn headless_settings_change_waits_for_approval_and_applies_to_later_input() {
+    let fixture = Fixture::new(false);
+    let mut profile: Value = serde_json::from_slice(&fs::read(&fixture.profile).unwrap()).unwrap();
+    profile["directories"][0]["write"] = json!("allow");
+    fs::write(&fixture.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    let settings = r#"{"directory":"agent-settings","path":"config.toml","content":"schema_version = 1\n[context]\nmax_input_tokens = 64000\n"}"#;
+    let mut endpoint = Endpoint::start(vec![
+        Reply::Tool("write_file", r#"{"path":"note.txt","content":"project"}"#),
+        Reply::Tool("write_file", settings),
+        Reply::Finished("Settings saved."),
+    ])
+    .await;
+    let output = fixture.run(&endpoint.url, &fixture.primary, 6).await;
+    assert_eq!(output[1]["disposition"], "input_required");
+    assert_eq!(
+        fs::read_to_string(fixture.primary.join("note.txt")).unwrap(),
+        "project"
+    );
+    let request = &output[1]["approvals"][0]["request"];
+    assert_eq!(request["directory"], "agent-settings");
+    assert_eq!(request["effect"]["kind"], "write");
+    assert_eq!(request["effect"]["relative_path"], "config.toml");
+    let state = fixture.state.canonicalize().unwrap();
+    assert_eq!(request["root"], json!(state));
+    assert!(!state.join("config.toml").exists());
+    let session = output[0]["session_id"].as_str().unwrap();
+    let turn = output[0]["turn_id"].as_str().unwrap();
+    let wait = output[1]["approvals"][0]["waitId"].as_str().unwrap();
+    for _ in 0..2 {
+        endpoint.request().await;
+    }
+
+    let mut owner = approve(&fixture, &endpoint.url, session, turn, wait).await;
+    let saved = endpoint.request().await["messages"].to_string();
+    assert!(saved.contains("Saved config.toml"), "{saved}");
+    settle(&mut owner, session).await;
+    assert!(
+        fs::read_to_string(state.join("config.toml"))
+            .unwrap()
+            .contains("max_input_tokens = 64000")
+    );
+    let queued = owner
+        .request(
+            "_co.grida/session/enqueue",
+            json!({
+                "sessionId":session,"inputId":"after-settings",
+                "prompt":[{"type":"text","text":"Later input."}],
+            }),
+        )
+        .await;
+    assert!(queued.get("error").is_none(), "{queued}");
+    let settings = owner
+        .request(
+            "_co.grida/session/input",
+            json!({"sessionId":session,"inputId":"after-settings"}),
+        )
+        .await;
+    assert_eq!(settings["result"]["settings"]["maxInputTokens"], 64000);
+    owner.close().await;
+    endpoint.done().await;
+}
+
 #[tokio::test]
 async fn headless_profile_defaults_to_primary_and_scopes_named_reads() {
     let fixture = Fixture::new(false);

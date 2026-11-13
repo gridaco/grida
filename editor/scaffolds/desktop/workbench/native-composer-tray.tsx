@@ -249,13 +249,9 @@ function QueueRow({
     view.queueDraft?.inputId === item.inputId ? view.queueDraft : null;
   const label = item.goalStart
     ? `Goal: ${item.preview ?? item.goalStart.objective}`
-    : `${item.operatingRegime === "plan" ? "Plan · " : item.allowsConfigurationChange ? "Settings permitted · " : ""}${item.effort === "ultra" ? "Ultra · " : ""}${item.preview ?? "Message with other content"}`;
+    : `${item.operatingRegime === "plan" ? "Plan · " : ""}${item.effort === "ultra" ? "Ultra · " : ""}${item.preview ?? "Message with other content"}`;
   const editable =
-    !locked &&
-    !view.queueDraft &&
-    !item.goalStart &&
-    !item.allowsConfigurationChange &&
-    item.preview !== null;
+    !locked && !view.queueDraft && !item.goalStart && item.preview !== null;
   const style = {
     transform: CSS.Translate.toString(transform),
     transition,

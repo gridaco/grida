@@ -25,8 +25,8 @@ use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 #[path = "process/compaction.rs"]
 mod compaction;
 #[cfg(unix)]
-#[path = "process/configuration_tools.rs"]
-mod configuration_tools;
+#[path = "process/configuration.rs"]
+mod configuration;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[path = "process/deletion.rs"]
 mod deletion;
@@ -1286,7 +1286,6 @@ async fn dropping_admission_waiter_leaves_the_worker_under_host_ownership() {
                 text: "Continue work".into()
             }],
             questions: false,
-            configuration_permission: grida_agent::ConfigurationPermission::Disabled,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),
@@ -2284,7 +2283,6 @@ async fn an_idle_chat_follows_a_changed_local_route_between_turns() {
                 text: "Continue under the selected route".into(),
             }],
             questions: false,
-            configuration_permission: grida_agent::ConfigurationPermission::Disabled,
             operating_regime: None,
             effort: None,
             reasoning: Default::default(),

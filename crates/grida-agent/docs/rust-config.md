@@ -138,25 +138,25 @@ produce explicit errors. The complete candidate file is validated before any
 write.
 The caller cannot supply an arbitrary file path, TOML fragment, or unreviewed key.
 
-Desktop controls, protocol clients, and model-facing tools share these operations.
-The agent's tools are ordinary capability-scoped invocations recorded by Runtime.
-The master changes persistent settings in response to an explicit user request.
-The configuration capability restricts writable fields and scope, and conveys
-no authority to alter unrelated files or execution limits.
+These operations are client features for a person's own tooling; the agent
+never receives them.
 
-Native clients can offer inspection by negotiating `co.grida/config/inspect`.
-Offering the mutation tools also requires the update and reload capabilities,
-plus an explicit `allowConfigurationChanges: true` on that accepted submit,
-enqueue or replacement request. The host retains this permission with the
-input. A reconnect preserves the accepted permission. An ordinary prompt or a
-model-generated tool argument cannot upgrade it. Read and change grants have
-separate identities and are checked against the selected operation.
+## Agent edits
 
-Managed tool changes return the exact snapshot produced by that write. Recovery
-inspects the requested postcondition and labels a matching state as observed
-after recovery. A differing or invalid state remains uncertain. Recovery performs
-no new write. Cancellation is checked at the final publication boundary, and a
-begun publication remains owned through its result.
+The agent changes settings by editing the file itself. The file tools reach
+`config.toml`, and nothing else in its folder, as the directory
+`agent-settings`. A read runs under the turn's file grant and reports whether
+the content is active, pending the next start, or invalid. Every write or edit
+is an exact-action approval request with a fixed ask rule: directory write
+rules, earlier approvals and the automatic reviewer never cover it, and Plan
+offers no writes. The host offers the directory only while its command denials
+cover the file's folder for reading and writing.
+
+The settings owner validates the complete result before publication, refuses
+invalid content unchanged with its diagnostic, and publishes through the same
+writer lock and atomic replacement as managed updates. A manual edit that lands
+first makes the write fail. A saved edit becomes the active snapshot for later
+accepted input; accepted work keeps its capture.
 
 Use standard ACP session configuration for advertised selectors whose scope and
 semantics match. Its current select/negotiated-boolean options do not express

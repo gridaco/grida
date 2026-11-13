@@ -1,4 +1,5 @@
-//! Validated host defaults with revision-checked, atomic TOML persistence.
+//! GRIDA-SEC-004 — validated host defaults with revision-checked, atomic TOML
+//! persistence, and the one host-state file the agent may change with approval.
 
 use agent_kit_core::{Error, ErrorKind, Fingerprint, Result};
 use grida_agent_master::configuration::{
@@ -31,6 +32,18 @@ pub struct ConfigurationInspection {
     pub file_diagnostic: Option<Error>,
     pub active: ConfigurationSnapshot,
     pub exact_input_counting: bool,
+}
+
+/// The settings file content and whether it is in effect.
+pub(crate) struct SettingsRead {
+    pub bytes: Option<Vec<u8>>,
+    pub diagnostic: Option<Error>,
+    pub applied: bool,
+}
+
+pub(crate) enum SettingsWrite {
+    Applied,
+    Invalid(Error),
 }
 
 pub struct Configuration {
@@ -259,6 +272,82 @@ impl Configuration {
             }
         })?;
         Ok(active.clone())
+    }
+
+    /// The directory holding the settings file. Hosts keep it protected from
+    /// commands and every workspace path.
+    pub(crate) fn directory(&self) -> &Path {
+        &self.directory
+    }
+
+    /// The settings file as the agent's file tools read it, with whether its
+    /// exact content is the active defaults.
+    pub(crate) fn read_settings(&self) -> Result<SettingsRead> {
+        let active = self
+            .active
+            .lock()
+            .map_err(|_| unavailable("config_lock_failed"))?;
+        self.validate_directory()?;
+        let _writer = self.workspace_writer()?;
+        let active = self.current(&active)?;
+        let bytes = read_bytes(&self.directory.join(SOURCE_FILE))?;
+        let file_revision = revision(bytes.as_deref())?;
+        Ok(SettingsRead {
+            diagnostic: parse(bytes.as_deref()).err(),
+            applied: file_revision == active.source_revision,
+            bytes,
+        })
+    }
+
+    /// Replace the settings file with content derived from its current bytes.
+    /// Invalid content is reported and leaves the file and the active defaults
+    /// unchanged. Valid content is published atomically and becomes the active
+    /// defaults for later accepted input; accepted work keeps its capture.
+    pub(crate) fn replace_settings(
+        &self,
+        edit: impl FnOnce(Option<&[u8]>) -> Result<Vec<u8>>,
+        admission: impl Fn() -> Result<()>,
+    ) -> Result<SettingsWrite> {
+        let mut active = self
+            .active
+            .lock()
+            .map_err(|_| unavailable("config_lock_failed"))?;
+        self.validate_directory()?;
+        let _writer = WriterGuard::acquire(&self.writer)?;
+        self.require_workspace_epoch()?;
+        let current = read_bytes(&self.directory.join(SOURCE_FILE))?;
+        let expected = revision(current.as_deref())?;
+        let bytes = edit(current.as_deref())?;
+        let defaults = match parse(Some(&bytes)) {
+            Ok(defaults) => defaults,
+            Err(error) => return Ok(SettingsWrite::Invalid(error)),
+        };
+        if bytes.len() as u64 > MAX_FILE_BYTES {
+            return Ok(SettingsWrite::Invalid(Error::new(
+                ErrorKind::LimitExceeded,
+                "config_file_too_large",
+            )));
+        }
+        admission()?;
+        write_atomic(&self.directory, SOURCE_FILE, &bytes, || {
+            admission()?;
+            self.validate_directory()?;
+            // A concurrent manual edit wins; the agent rereads and retries.
+            check_source_revision(&self.directory, expected)
+        })?;
+        let source = Source {
+            revision: revision(Some(&bytes))?,
+            document: DocumentMut::new(),
+            defaults,
+        };
+        *active = self.activate(&source, || Ok(())).map_err(|error| {
+            if self.workspace_epoch.is_some() {
+                Error::new(ErrorKind::Uncertain, "config_activation_uncertain")
+            } else {
+                error
+            }
+        })?;
+        Ok(SettingsWrite::Applied)
     }
 
     fn workspace_writer(&self) -> Result<Option<WriterGuard<'_>>> {
@@ -689,5 +778,103 @@ mod tests {
             assert_eq!(error.code, "workspace_configuration_scope_invalid");
         }
         assert!(!directory.join(WORKSPACE_ACTIVE_FILE).exists());
+    }
+
+    #[test]
+    fn an_invalid_settings_file_is_reported_on_load_and_never_applied() {
+        let root = private_workspace();
+        let directory = root.path().canonicalize().unwrap();
+        let configuration = Configuration::open(&directory).unwrap();
+        let source = b"schema_version = 1\n[context]\nmax_input_tokens = 0\n";
+        write_atomic(&directory, SOURCE_FILE, source, || Ok(())).unwrap();
+        let error = Configuration::open(&directory).err().unwrap();
+        assert_eq!(error.code, "config_value_out_of_range");
+        let read = configuration.read_settings().unwrap();
+        assert_eq!(read.bytes.as_deref(), Some(&source[..]));
+        assert_eq!(
+            read.diagnostic.map(|error| error.code),
+            Some("config_value_out_of_range".into())
+        );
+        assert!(!read.applied);
+        assert!(
+            configuration
+                .snapshot()
+                .unwrap()
+                .defaults
+                .context
+                .max_input_tokens
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn manual_changes_during_staging_reject_the_managed_replacement() {
+        let directory = private_workspace();
+        let configuration = Configuration::open(directory.path()).unwrap();
+        let before = configuration
+            .update(
+                None,
+                SettingChange::SetContextMaxInputTokens {
+                    value: NonZeroU64::new(64).unwrap(),
+                },
+            )
+            .unwrap();
+        let result = configuration.update_guarded(
+            before.source_revision,
+            SettingChange::SetContextMaxInputTokens {
+                value: NonZeroU64::new(128).unwrap(),
+            },
+            || {
+                std::fs::write(
+                    directory.path().join("config.toml"),
+                    "schema_version = 1\n[context]\nmax_input_tokens = 256\n",
+                )
+                .unwrap();
+                Ok(())
+            },
+        );
+        assert_eq!(result.unwrap_err().code, "config_revision_changed");
+        let inspection = configuration.inspect().unwrap();
+        assert_eq!(inspection.active, before);
+        assert_ne!(inspection.file_revision, before.source_revision);
+        let reloaded = configuration.reload(inspection.file_revision).unwrap();
+        assert_eq!(
+            reloaded.defaults.context.max_input_tokens.unwrap().get(),
+            256
+        );
+    }
+
+    #[test]
+    fn cancelled_publication_preserves_the_active_file_and_cleans_staging() {
+        let directory = private_workspace();
+        let configuration = Configuration::open(directory.path()).unwrap();
+        let before = configuration.snapshot().unwrap();
+        let checks = std::sync::atomic::AtomicUsize::new(0);
+        let result = configuration.update_guarded(
+            None,
+            SettingChange::SetContextMaxInputTokens {
+                value: NonZeroU64::new(64).unwrap(),
+            },
+            || {
+                if checks.fetch_add(1, std::sync::atomic::Ordering::Relaxed) == 0 {
+                    return Ok(());
+                }
+                Err(Error::new(
+                    ErrorKind::Unavailable,
+                    "configuration_cancelled",
+                ))
+            },
+        );
+        assert_eq!(result.unwrap_err().code, "configuration_cancelled");
+        assert_eq!(checks.load(std::sync::atomic::Ordering::Relaxed), 2);
+        assert_eq!(configuration.snapshot().unwrap(), before);
+        assert!(!directory.path().join("config.toml").exists());
+        assert!(!std::fs::read_dir(directory.path()).unwrap().any(|entry| {
+            entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".config-")
+        }));
     }
 }

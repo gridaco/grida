@@ -102,7 +102,6 @@ impl Host {
                     text: title_request(text),
                 }],
                 questions: false,
-                configuration_permission: crate::ConfigurationPermission::Disabled,
                 operating_regime: None,
                 effort: None,
                 reasoning: Default::default(),
