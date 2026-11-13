@@ -2693,3 +2693,469 @@ async fn a_derived_provider_preserves_shared_inference_and_tool_admission() {
     second_tool.await.unwrap().unwrap();
     assert!(!authority.requests.lock().unwrap().is_empty());
 }
+
+fn named_counter(id: &str, release: Option<Arc<Notify>>) -> Arc<CounterTool> {
+    Arc::new(CounterTool {
+        definition: ToolDefinition {
+            id: ToolId::new(id).unwrap(),
+            version: 1,
+            description: "Count an invocation".into(),
+            input: InputFormat::Json(serde_json::json!({"type":"object"})),
+            max_input_bytes: 1024,
+            max_output_bytes: 4096,
+            recovery: RecoveryKind::Reconcile,
+        },
+        calls: AtomicUsize::new(0),
+        recoveries: AtomicUsize::new(0),
+        attempts: Mutex::new(vec![]),
+        release,
+    })
+}
+
+fn captured(tools: &[Arc<dyn Tool>]) -> agent_kit_core::tools::InventorySnapshot {
+    let mut inventory = Inventory::new();
+    let ids: Vec<_> = tools
+        .iter()
+        .map(|tool| {
+            inventory.insert(tool.clone()).unwrap();
+            tool.definition().id.clone()
+        })
+        .collect();
+    inventory.snapshot(&ids).unwrap()
+}
+
+fn runtime_with(
+    provider: Arc<dyn Provider>,
+    tools: agent_kit_core::tools::InventorySnapshot,
+    operation_timeout: Duration,
+) -> Runtime {
+    Runtime::new(ExecutionServices {
+        providers: BTreeMap::from([(ProviderId::new("test").unwrap(), provider)]),
+        tools,
+        authority: Authority::allowed(),
+        gate: Arc::new(Allow),
+        limits: ExecutionLimits {
+            max_operations: 32,
+            max_concurrent_inferences: 1,
+            max_concurrent_tools: 2,
+            max_output_bytes: 65_536,
+            operation_timeout,
+            observer_capacity: 16,
+        },
+    })
+    .unwrap()
+}
+
+fn call(id: &str, tool: &str) -> ToolCall {
+    ToolCall {
+        id: ToolCallId::new(id).unwrap(),
+        tool: ToolId::new(tool).unwrap(),
+        arguments: ToolArguments::Json(serde_json::json!({})),
+    }
+}
+
+#[tokio::test]
+async fn a_failed_call_lets_admitted_siblings_and_the_response_settle() {
+    let release = Arc::new(Notify::new());
+    let slow = named_counter("counter", Some(release.clone()));
+    let ungranted = named_counter("ungranted", None);
+    let tools = captured(&[slow.clone(), ungranted.clone()]);
+    let (provider, events) = ScriptedProvider::streaming();
+    let runtime = runtime_with(provider.clone(), tools.clone(), Duration::from_secs(5));
+    let mut turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let plan = StepPlan {
+        key: OperationKey::new("sibling-failure").unwrap(),
+        request: request(&provider, &tools),
+        inference_grants: grants(),
+        tool_grants: tool_grants(),
+        tools,
+    };
+    let first = call("slow", "counter");
+    let second = call("denied", "ungranted");
+    for streamed in [&first, &second] {
+        events
+            .send(ProviderEvent::Update(InferenceUpdate::ToolCall(
+                streamed.clone(),
+            )))
+            .unwrap();
+    }
+    let step = tokio::spawn(async move {
+        let result = turn.step(plan).await;
+        (turn, result)
+    });
+    wait_for_count(&slow.calls, 1).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(!step.is_finished(), "the response is still streaming");
+    events
+        .send(ProviderEvent::Finished(inference_outcome(vec![
+            Content::ToolCall(first),
+            Content::ToolCall(second),
+        ])))
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(!step.is_finished(), "an admitted sibling is still running");
+    release.notify_one();
+    let (turn, result) = tokio::time::timeout(Duration::from_secs(2), step)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(result.unwrap_err().code, "tool_authority_missing");
+    let view = turn.view();
+    assert_eq!(view.state.operations().len(), 2);
+    assert!(
+        view.state
+            .operations()
+            .values()
+            .all(|operation| operation.outcome().is_some() && !operation.is_running())
+    );
+    assert_eq!(ungranted.calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn a_call_to_an_unoffered_tool_returns_a_correctable_result() {
+    let provider = Arc::new(ScriptedProvider {
+        starts: AtomicUsize::new(0),
+        attempts: Mutex::new(vec![]),
+        receiver: Mutex::new(None),
+        events: vec![ProviderEvent::Finished(inference_outcome(vec![
+            Content::ToolCall(call("valid", "counter")),
+            Content::ToolCall(call("invented", "not-offered")),
+        ]))],
+    });
+    let tool = CounterTool::new(None);
+    let runtime = runtime(
+        provider.clone(),
+        &tool,
+        Arc::new(Allow),
+        Authority::allowed(),
+    );
+    let mut turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let outcome = turn
+        .step(StepPlan {
+            key: OperationKey::new("invented-tool").unwrap(),
+            request: request(&provider, &inventory(&tool)),
+            inference_grants: grants(),
+            tool_grants: tool_grants(),
+            tools: inventory(&tool),
+        })
+        .await
+        .unwrap();
+    let results: BTreeMap<_, _> = outcome
+        .tools
+        .iter()
+        .map(|tool| (tool.call.id.as_str().to_owned(), tool.outcome.clone()))
+        .collect();
+    assert_eq!(
+        results["invented"],
+        InvokeOutcome::Complete(ToolOutcome::failed("tool_unavailable"))
+    );
+    assert_eq!(results["valid"], InvokeOutcome::Complete(success()));
+    assert_eq!(tool.calls.load(Ordering::SeqCst), 1);
+    assert!(outcome.history.iter().any(|record| matches!(
+        record,
+        HistoryRecord::Message(message) if message.content.iter().any(|content| matches!(
+            content,
+            Content::ToolResult(result) if result.call.as_str() == "invented"
+        ))
+    )));
+}
+
+struct CancellableTool {
+    definition: ToolDefinition,
+    started: AtomicUsize,
+}
+
+impl Tool for CancellableTool {
+    fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+    fn validate(&self, _: &ToolArguments) -> Result<()> {
+        Ok(())
+    }
+    fn invoke(&self, _: Invocation, context: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async move {
+            self.started.fetch_add(1, Ordering::SeqCst);
+            context.cancellation.cancelled().await;
+            ToolOutcome {
+                status: OutcomeStatus::Cancelled,
+                content: vec![],
+                structured: None,
+                receipt: None,
+                truncated: false,
+            }
+        })
+    }
+    fn recover(&self, _: InvocationRecovery, _: InvocationContext) -> BoxFuture<'_, ToolOutcome> {
+        Box::pin(async { success() })
+    }
+}
+
+#[tokio::test]
+async fn a_tool_that_acknowledges_pause_records_its_own_cancellation() {
+    let tool = Arc::new(CancellableTool {
+        definition: CounterTool::new(None).definition.clone(),
+        started: AtomicUsize::new(0),
+    });
+    let executor: Arc<dyn Tool> = tool.clone();
+    let runtime = runtime_with(
+        ScriptedProvider::complete(),
+        captured(std::slice::from_ref(&executor)),
+        Duration::from_secs(5),
+    );
+    let ephemeral = EphemeralJournal::create(binding()).unwrap();
+    let turn = runtime.open(ephemeral.lease).await.unwrap().turn;
+    let key = OperationKey::new("cancellable").unwrap();
+    let task = {
+        let operations = turn.operations();
+        let key = key.clone();
+        tokio::spawn(async move { operations.invoke(key, invocation(1)).await })
+    };
+    wait_for_count(&tool.started, 1).await;
+    let revision = turn.view().state.controls().revision;
+    ephemeral
+        .control
+        .change(
+            ChangeId::new("pause").unwrap(),
+            revision,
+            ControlDirective::Pause,
+        )
+        .await
+        .unwrap();
+    let outcome = tokio::time::timeout(Duration::from_secs(2), task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let InvokeOutcome::Complete(outcome) = outcome else {
+        panic!("dispatched work completes");
+    };
+    assert_eq!(outcome.status, OutcomeStatus::Cancelled);
+    let recorded = turn.operation(&key).unwrap().unwrap();
+    assert!(matches!(
+        recorded.outcome(),
+        Some(agent_kit_core::turn::OperationOutcome::Tool(ToolOutcome {
+            status: OutcomeStatus::Cancelled,
+            ..
+        }))
+    ));
+}
+
+struct SlowStart {
+    inner: Arc<ScriptedProvider>,
+    delay: Duration,
+}
+
+impl Provider for SlowStart {
+    fn capabilities(&self, model: &ModelId) -> Result<ModelCapabilities> {
+        self.inner.capabilities(model)
+    }
+    fn prepare(&self, request: InferenceRequest) -> Result<PreparedRequest> {
+        self.inner.prepare(request)
+    }
+    fn start(&self, request: PreparedRequest, control: InferenceControl) -> Result<InferenceRun> {
+        // The provider produces its complete response, but control returns
+        // only after the caller's deadline has passed.
+        std::thread::sleep(self.delay);
+        self.inner.start(request, control)
+    }
+}
+
+#[tokio::test]
+async fn a_response_that_finished_before_the_deadline_stays_completed() {
+    let inner = ScriptedProvider::complete();
+    let tool = CounterTool::new(None);
+    let provider = Arc::new(SlowStart {
+        inner: inner.clone(),
+        delay: Duration::from_millis(100),
+    });
+    let runtime = runtime(provider, &tool, Arc::new(Allow), Authority::allowed());
+    let turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let outcome = turn
+        .operations()
+        .infer_until(
+            OperationKey::new("just-in-time").unwrap(),
+            request(&inner, &inventory(&tool)),
+            grants(),
+            Instant::now() + Duration::from_millis(50),
+        )
+        .await
+        .unwrap();
+    assert_eq!(outcome.status, InferenceStatus::Completed);
+    assert!(outcome.failure.is_none());
+}
+
+#[tokio::test]
+async fn an_adapter_interruption_after_the_deadline_records_the_deadline() {
+    let (inner, events) = ScriptedProvider::streaming();
+    // The adapter cuts its stream off at the deadline it was given, without
+    // terminal evidence, before the runtime's own timer is observed.
+    drop(events);
+    let tool = CounterTool::new(None);
+    let provider = Arc::new(SlowStart {
+        inner: inner.clone(),
+        delay: Duration::from_millis(100),
+    });
+    let runtime = runtime(provider, &tool, Arc::new(Allow), Authority::allowed());
+    let turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let outcome = turn
+        .operations()
+        .infer_until(
+            OperationKey::new("adapter-deadline").unwrap(),
+            request(&inner, &inventory(&tool)),
+            grants(),
+            Instant::now() + Duration::from_millis(50),
+        )
+        .await
+        .unwrap();
+    assert_eq!(outcome.status, InferenceStatus::Interrupted);
+    let failure = outcome.failure.unwrap();
+    assert_eq!(
+        (failure.kind, failure.code.as_str()),
+        (FailureKind::Cancelled, "deadline")
+    );
+}
+
+#[tokio::test]
+async fn caller_and_operation_deadlines_record_a_deadline_interruption() {
+    let tool = CounterTool::new(None);
+    let (capped, _capped_events) = ScriptedProvider::streaming();
+    let runtime = runtime(capped.clone(), &tool, Arc::new(Allow), Authority::allowed());
+    let turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let outcome = turn
+        .operations()
+        .infer_until(
+            OperationKey::new("capped").unwrap(),
+            request(&capped, &inventory(&tool)),
+            grants(),
+            Instant::now() + Duration::from_millis(100),
+        )
+        .await
+        .unwrap();
+    assert_eq!(outcome.status, InferenceStatus::Interrupted);
+    let failure = outcome.failure.unwrap();
+    assert_eq!(
+        (failure.kind, failure.code.as_str()),
+        (FailureKind::Cancelled, "deadline")
+    );
+
+    let (uncapped, _uncapped_events) = ScriptedProvider::streaming();
+    let runtime = runtime_with(
+        uncapped.clone(),
+        inventory(&tool),
+        Duration::from_millis(100),
+    );
+    let turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let outcome = turn
+        .operations()
+        .infer(
+            OperationKey::new("uncapped").unwrap(),
+            request(&uncapped, &inventory(&tool)),
+            grants(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(outcome.status, InferenceStatus::Interrupted);
+    let failure = outcome.failure.unwrap();
+    assert_eq!(
+        (failure.kind, failure.code.as_str()),
+        (FailureKind::Cancelled, "deadline")
+    );
+}
+
+#[tokio::test]
+async fn suspension_releases_a_helper_waiting_on_a_retained_question() {
+    let tool = CounterTool::new(None);
+    let runtime = runtime(
+        ScriptedProvider::complete(),
+        &tool,
+        Arc::new(Allow),
+        Authority::allowed(),
+    );
+    let mut turn = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap()
+        .turn;
+    let waiter = {
+        let operations = turn.operations();
+        tokio::spawn(async move { operations.wait(question()).await })
+    };
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !turn.view().state.waits().contains_key(&question().id) {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("question opened");
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let view = turn.view();
+    let receipt = turn
+        .try_suspend(SuspensionDraft {
+            expected_control: view.state.controls().revision,
+            expected_history: view.state.history().position(),
+            checkpoint: None,
+        })
+        .await
+        .unwrap();
+    assert!(matches!(receipt, SuspendOutcome::Suspended(_)));
+    let outcome = tokio::time::timeout(Duration::from_secs(1), waiter)
+        .await
+        .expect("the waiting helper is released while the controller lives")
+        .unwrap()
+        .unwrap();
+    assert_eq!(outcome, WaitOutcome::Pending(question().id));
+    drop(turn);
+}
+
+#[tokio::test]
+async fn an_unchanged_refresh_publishes_no_snapshot() {
+    let tool = CounterTool::new(None);
+    let runtime = runtime(
+        ScriptedProvider::complete(),
+        &tool,
+        Arc::new(Allow),
+        Authority::allowed(),
+    );
+    let OpenedTurn { turn, mut observer } = runtime
+        .open(EphemeralJournal::create(binding()).unwrap().lease)
+        .await
+        .unwrap();
+    let absent = OperationKey::new("absent").unwrap();
+    assert!(turn.recorded_step_history(&absent).await.unwrap().is_none());
+    assert!(
+        tokio::time::timeout(Duration::from_millis(50), observer.next())
+            .await
+            .is_err()
+    );
+    turn.operations().request_input(question()).await.unwrap();
+    let update = tokio::time::timeout(Duration::from_secs(1), observer.next())
+        .await
+        .unwrap();
+    assert!(
+        matches!(update, Some(TurnUpdate::Snapshot(view)) if view.state.waits().contains_key(&question().id))
+    );
+}

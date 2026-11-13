@@ -5,6 +5,7 @@ use agent_kit_core::messages::{Content, Message, Provenance, ProvenanceKind, Rol
 use agent_kit_core::turn::{OperationInput, OperationOutcome};
 use agent_kit_core::{MessageId, ToolCallId};
 use futures_util::stream::{FuturesUnordered, StreamExt};
+use std::collections::BTreeSet;
 use std::pin::Pin;
 use tokio::sync::mpsc;
 
@@ -14,17 +15,32 @@ type ToolWork =
 impl Turn {
     /// Execute one response and its complete tool calls. Transcript installation
     /// remains a separate atomic publication with the master's continuation.
+    ///
+    /// A call to a tool outside the step inventory receives a failed
+    /// `tool_unavailable` result the model can correct from. A runtime error
+    /// in one call stops admission of later calls, but the response and every
+    /// call already admitted still run to their recorded outcomes before the
+    /// first error is returned.
     pub async fn step(&mut self, plan: StepPlan) -> Result<StepOutcome> {
         let operations = self.operations();
         let origin = operations.operation_id(&plan.key)?;
         let replay = self.view().state.operations().contains_key(&origin);
+        let offers = plan.tools.offers()?;
+        let available: BTreeSet<ToolId> = offers.iter().map(|offer| offer.id.clone()).collect();
         if !replay {
             let mut offered = plan.request.request().tools.clone();
             offered.sort_by(|left, right| left.id.cmp(&right.id));
-            if offered != plan.tools.offers()? {
+            if offered != offers {
                 return Err(Error::new(ErrorKind::Conflict, "step_inventory_mismatch"));
             }
         }
+        let step = StepCalls {
+            operations: &operations,
+            plan: &plan,
+            origin: &origin,
+            available: &available,
+            replay,
+        };
         let (sender, mut receiver) = mpsc::channel(self.inner_capacity());
         let inference = operations.infer_updates(
             plan.key.clone(),
@@ -39,30 +55,52 @@ impl Turn {
         let mut results = BTreeMap::new();
         let mut work = FuturesUnordered::<ToolWork>::new();
         let mut input_closed = false;
+        // The first failure stops admission. Admitted work and the response
+        // keep running so their attempts settle instead of being orphaned.
+        let mut failure: Option<Error> = None;
         while completed_inference.is_none() || !input_closed || !work.is_empty() {
             tokio::select! {
                 outcome = &mut inference, if completed_inference.is_none() => {
-                    if let Ok(outcome) = &outcome {
-                        for message in &outcome.messages {
-                            for content in &message.content {
-                                if let Content::ToolCall(call) = content {
-                                    queue_call(&operations, &plan, &origin, call.clone(), &mut calls, &mut work, replay)?;
+                    match &outcome {
+                        Ok(outcome) if failure.is_none() => {
+                            let declared = outcome.messages.iter().flat_map(|message| &message.content);
+                            for content in declared {
+                                if let Content::ToolCall(call) = content
+                                    && let Err(error) = step.queue(call.clone(), &mut calls, &mut work)
+                                {
+                                    failure = Some(error);
+                                    break;
                                 }
                             }
                         }
+                        Ok(_) => {}
+                        Err(error) => { failure.get_or_insert_with(|| error.clone()); }
                     }
                     completed_inference = Some(outcome);
                 }
                 call = receiver.recv(), if !input_closed => {
                     match call {
-                        Some(call) => queue_call(&operations, &plan, &origin, call, &mut calls, &mut work, replay)?,
+                        Some(call) if failure.is_none() => {
+                            if let Err(error) = step.queue(call, &mut calls, &mut work) {
+                                failure = Some(error);
+                            }
+                        }
+                        // Keep draining so the response is not cut off.
+                        Some(_) => {}
                         None => input_closed = true,
                     }
                 }
                 result = work.next(), if !work.is_empty() => {
-                    if let Some((call, result)) = result { results.insert(call.id, result?); }
+                    match result {
+                        Some((call, Ok(outcome))) => { results.insert(call.id, outcome); }
+                        Some((_, Err(error))) => { failure.get_or_insert(error); }
+                        None => {}
+                    }
                 }
             }
+        }
+        if let Some(error) = failure {
+            return Err(error);
         }
         let inference = completed_inference
             .ok_or_else(|| Error::new(ErrorKind::InvalidState, "inference_missing"))??;
@@ -162,81 +200,101 @@ impl Turn {
     }
 }
 
-fn queue_call(
-    operations: &TurnOperations,
-    plan: &StepPlan,
-    origin: &OperationId,
-    call: ToolCall,
-    calls: &mut BTreeMap<ToolCallId, ToolCall>,
-    work: &mut FuturesUnordered<ToolWork>,
+struct StepCalls<'a> {
+    operations: &'a TurnOperations,
+    plan: &'a StepPlan,
+    origin: &'a OperationId,
+    available: &'a BTreeSet<ToolId>,
     replay: bool,
-) -> Result<()> {
-    if let Some(existing) = calls.get(&call.id) {
-        if existing != &call {
-            return Err(Error::new(ErrorKind::Conflict, "tool_call_identity_reused"));
+}
+
+impl StepCalls<'_> {
+    fn queue(
+        &self,
+        call: ToolCall,
+        calls: &mut BTreeMap<ToolCallId, ToolCall>,
+        work: &mut FuturesUnordered<ToolWork>,
+    ) -> Result<()> {
+        if let Some(existing) = calls.get(&call.id) {
+            if existing != &call {
+                return Err(Error::new(ErrorKind::Conflict, "tool_call_identity_reused"));
+            }
+            return Ok(());
         }
-        return Ok(());
-    }
-    calls.insert(call.id.clone(), call.clone());
-    let tool_key = OperationKey::new(fingerprint_name("tool", &(&plan.key, &call.id))?)?;
-    let operations = operations.clone();
-    let inventory = plan.tools.clone();
-    let selected_grants = plan.tool_grants.get(&call.tool).cloned();
-    let origin = origin.clone();
-    let operation_id = operations.operation_id(&tool_key)?;
-    work.push(Box::pin(async move {
-        let view = operations.view();
-        let grants = match (view.operation(&operation_id), selected_grants) {
-            (Some(recorded), _) if recorded.outcome().is_some() => {
-                Some(recorded.record.grants.clone())
-            }
-            (Some(recorded), Some(selected)) => {
-                let authority = &recorded.record.grants.authority;
-                if selected.authority.principal != authority.principal
-                    || selected.authority.scope != authority.scope
-                {
-                    return (
-                        call,
-                        Err(Error::new(ErrorKind::Conflict, "operation_identity_reused")),
-                    );
+        calls.insert(call.id.clone(), call.clone());
+        let plan = self.plan;
+        let tool_key = OperationKey::new(fingerprint_name("tool", &(&plan.key, &call.id))?)?;
+        let operations = self.operations.clone();
+        let inventory = plan.tools.clone();
+        let offered = self.available.contains(&call.tool);
+        let selected_grants = plan.tool_grants.get(&call.tool).cloned();
+        let origin = self.origin.clone();
+        let replay = self.replay;
+        let operation_id = operations.operation_id(&tool_key)?;
+        work.push(Box::pin(async move {
+            let grants = {
+                let view = operations.inner.view.borrow();
+                let recorded = view.operation(&operation_id);
+                if recorded.is_none() && !offered {
+                    // A call the step never offered has no authority to
+                    // resolve. The model receives a result it can act on.
+                    let outcome = ToolOutcome::failed("tool_unavailable");
+                    return (call, Ok(InvokeOutcome::Complete(outcome)));
                 }
-                // A fresh selection keeps this tool eligible. Dispatch still
-                // validates the exact authority recorded with the action.
-                Some(recorded.record.grants.clone())
-            }
-            (_, selected) => selected,
-        };
-        let Some(grants) = grants else {
-            return (
-                call,
-                Err(Error::new(ErrorKind::Unavailable, "tool_authority_missing")),
-            );
-        };
-        let result = operations
-            .invoke_captured(
-                tool_key,
-                PlannedInvocation {
-                    tool: call.tool.clone(),
-                    arguments: call.arguments.clone(),
-                    grants,
-                },
-                inventory,
-                Some(origin),
-                Some(call.id.clone()),
-            )
-            .await;
-        let result = match result {
-            Err(error)
-                if error.kind == ErrorKind::InvalidInput
-                    || (!replay && error.code == "tool_unavailable") =>
-            {
-                Ok(InvokeOutcome::Complete(ToolOutcome::failed(&error.code)))
-            }
-            result => result,
-        };
-        (call, result)
-    }));
-    Ok(())
+                match (recorded, selected_grants) {
+                    (Some(recorded), _) if recorded.outcome().is_some() => {
+                        Some(recorded.record.grants.clone())
+                    }
+                    (Some(recorded), Some(selected)) => {
+                        let authority = &recorded.record.grants.authority;
+                        if selected.authority.principal != authority.principal
+                            || selected.authority.scope != authority.scope
+                        {
+                            return (
+                                call,
+                                Err(Error::new(ErrorKind::Conflict, "operation_identity_reused")),
+                            );
+                        }
+                        // A fresh selection keeps this tool eligible. Dispatch
+                        // still validates the exact authority recorded with
+                        // the action.
+                        Some(recorded.record.grants.clone())
+                    }
+                    (_, selected) => selected,
+                }
+            };
+            let Some(grants) = grants else {
+                return (
+                    call,
+                    Err(Error::new(ErrorKind::Unavailable, "tool_authority_missing")),
+                );
+            };
+            let result = operations
+                .invoke_captured(
+                    tool_key,
+                    PlannedInvocation {
+                        tool: call.tool.clone(),
+                        arguments: call.arguments.clone(),
+                        grants,
+                    },
+                    inventory,
+                    Some(origin),
+                    Some(call.id.clone()),
+                )
+                .await;
+            let result = match result {
+                Err(error)
+                    if error.kind == ErrorKind::InvalidInput
+                        || (!replay && error.code == "tool_unavailable") =>
+                {
+                    Ok(InvokeOutcome::Complete(ToolOutcome::failed(&error.code)))
+                }
+                result => result,
+            };
+            (call, result)
+        }));
+        Ok(())
+    }
 }
 
 fn candidate_history(

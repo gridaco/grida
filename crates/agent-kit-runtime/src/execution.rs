@@ -19,6 +19,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tokio::sync::{Mutex as AsyncMutex, Semaphore, broadcast, mpsc, watch};
 
+/// Shared execution services and capacity from which turns are opened.
 pub struct Runtime {
     services: Arc<ExecutionServices>,
     inference_permits: Arc<Semaphore>,
@@ -26,6 +27,8 @@ pub struct Runtime {
 }
 
 impl Runtime {
+    /// Create a runtime. Fails with `invalid_execution_limits` when a limit is
+    /// zero or out of range.
     pub fn new(services: ExecutionServices) -> Result<Self> {
         services.limits.validate()?;
         Ok(Self {
@@ -79,6 +82,9 @@ impl Runtime {
         })
     }
 
+    /// Take ownership of an active turn through its lease. Fails with
+    /// `turn_not_active` when the journal is settled, suspended or bound to
+    /// another writer.
     pub async fn open(&self, lease: TurnLease) -> Result<OpenedTurn> {
         let state = lease.journal().load().await?;
         state.validate()?;
@@ -120,26 +126,33 @@ impl Runtime {
     }
 }
 
+/// A newly opened turn's controller and its first observer.
 pub struct OpenedTurn {
     pub turn: Turn,
     pub observer: TurnObserver,
 }
 
+/// The single controller of an owned turn. Dropping it closes admission and
+/// cancels local execution; in-flight operations keep the lease until they
+/// exit. Settlement and suspension release ownership.
 pub struct Turn {
     pub(crate) inner: Arc<Inner>,
     monitor: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl Turn {
+    /// A copy of the latest view.
     pub fn view(&self) -> TurnView {
         self.inner.view.borrow().clone()
     }
 
+    /// The recorded state of the operation named by `key`, if any.
     pub fn operation(&self, key: &OperationKey) -> Result<Option<OperationState>> {
         let id = self.operations().operation_id(key)?;
-        Ok(self.view().state.operations().get(&id).cloned())
+        Ok(self.inner.view.borrow().operation(&id).cloned())
     }
 
+    /// A cloneable handle for concurrent work on this turn.
     pub fn operations(&self) -> TurnOperations {
         TurnOperations {
             inner: Arc::clone(&self.inner),
@@ -147,7 +160,8 @@ impl Turn {
     }
 
     /// Wait without claiming an executor. A changed control revision releases
-    /// the caller early so it can act on the new durable state.
+    /// the caller early so it can act on the new durable state. Returns true
+    /// only when the full delay elapsed under unchanged, admitting controls.
     pub async fn wait_while_admitted(
         &self,
         expected: ControlRevision,
@@ -170,6 +184,7 @@ impl Turn {
         Ok(elapsed && current.controls().revision == expected && current.controls().admits_work())
     }
 
+    /// Append history records. The key makes the append idempotent.
     pub async fn append_history(
         &mut self,
         key: OperationKey,
@@ -184,6 +199,8 @@ impl Turn {
             .await
     }
 
+    /// Append history and set the checkpoint in one atomic commit. The key
+    /// makes the publication idempotent.
     pub async fn publish_continuation(
         &mut self,
         key: OperationKey,
@@ -202,6 +219,7 @@ impl Turn {
             .await
     }
 
+    /// Set the caller's checkpoint. The key makes the update idempotent.
     pub async fn checkpoint(
         &mut self,
         key: OperationKey,
@@ -216,6 +234,10 @@ impl Turn {
             .await
     }
 
+    /// Settle the turn. Requires no live local owner, every operation to have
+    /// an outcome, no pending interaction and an unchanged draft basis. A
+    /// refusal returns `FinishOutcome::Continue`; only an unknown commit
+    /// disposition returns an error.
     pub async fn try_finish(&mut self, draft: CompletionDraft) -> Result<FinishOutcome> {
         self.finish(draft, None).await
     }
@@ -298,6 +320,10 @@ impl Turn {
         }
     }
 
+    /// Suspend the turn. Requires no live local owner, no running attempt and
+    /// an unchanged draft basis. Prepared operations and pending
+    /// interactions are retained for a later owner, and helpers waiting on
+    /// them return `WaitOutcome::Pending`.
     pub async fn try_suspend(&mut self, draft: SuspensionDraft) -> Result<SuspendOutcome> {
         self.inner.closing.store(true, Ordering::SeqCst);
         let _serial = self.inner.serial.lock().await;
@@ -361,6 +387,9 @@ impl Turn {
             monitor.abort();
         }
         self.inner.lease.lock().expect("lease lock").take();
+        // Release helpers still waiting on this owner, such as an open
+        // interaction a suspension retained, so they drop their lease handles.
+        self.inner.cancellation.cancel();
     }
 }
 
@@ -380,6 +409,7 @@ impl Drop for Turn {
     }
 }
 
+/// A read-only view of a turn. Dropping it does not affect the turn.
 pub struct TurnObserver {
     view: watch::Receiver<TurnView>,
     events: broadcast::Receiver<TurnUpdate>,
@@ -393,10 +423,13 @@ impl TurnObserver {
         }
     }
 
+    /// A copy of the latest view.
     pub fn snapshot(&self) -> TurnView {
         self.view.borrow().clone()
     }
 
+    /// The next update. A lagging observer receives the current snapshot in
+    /// place of missed updates. Returns `None` once the turn is gone.
     pub async fn next(&mut self) -> Option<TurnUpdate> {
         match self.events.recv().await {
             Ok(event) => Some(event),
@@ -408,16 +441,20 @@ impl TurnObserver {
     }
 }
 
+/// A cloneable handle for recorded work on one turn. Methods that start new
+/// work refuse it with `admission_closed` once the controller closes.
 #[derive(Clone)]
 pub struct TurnOperations {
     pub(crate) inner: Arc<Inner>,
 }
 
 impl TurnOperations {
+    /// A copy of the latest view.
     pub fn view(&self) -> TurnView {
         self.inner.view.borrow().clone()
     }
 
+    /// The stable operation identity this turn derives from `key`.
     pub fn operation_id(&self, key: &OperationKey) -> Result<OperationId> {
         OperationId::new(fingerprint_name(
             "operation",
@@ -425,6 +462,10 @@ impl TurnOperations {
         )?)
     }
 
+    /// Run one inference under `key`, or return its recorded outcome.
+    /// Provider failures, cancellation and the operation deadline are
+    /// recorded in the outcome; errors report identity conflicts, limits and
+    /// journal failures.
     pub async fn infer(
         &self,
         key: OperationKey,
@@ -590,10 +631,16 @@ impl TurnOperations {
             }
         };
         let mut calls = BTreeMap::new();
+        let mut deadline_fired = false;
         loop {
+            // Output the provider has already produced wins over a deadline
+            // that expires at the same moment. The output byte bound ends a
+            // stream that never pauses.
             let update = tokio::select! {
+                biased;
                 value = run.next() => value,
-                _ = tokio::time::sleep_until(deadline.into()) => {
+                _ = tokio::time::sleep_until(deadline.into()), if !deadline_fired => {
+                    deadline_fired = true;
                     owner.admission.cancellation.cancel();
                     run.next().await
                 }
@@ -620,18 +667,24 @@ impl TurnOperations {
             });
         }
         let mut outcome = run.finish().await;
-        if deadline_cap.is_some()
-            && Instant::now() >= deadline
-            && owner.admission.interruption_code().is_none()
-        {
-            outcome.status = InferenceStatus::Interrupted;
-            outcome.failure = inference_failure("deadline", FailureKind::Cancelled).failure;
-        } else if let Some(failure) = &mut outcome.failure
+        // An interruption after the deadline is attributed to it, whether the
+        // runtime cancelled the run or the adapter enforced the deadline it
+        // received. A completed or failed provider outcome keeps its own
+        // status and evidence, including retry information.
+        if let Some(failure) = &mut outcome.failure
             && outcome.status == InferenceStatus::Interrupted
-            && failure.kind == FailureKind::Cancelled
-            && let Some(code) = owner.admission.interruption_code()
         {
-            failure.code = code.into();
+            if let Some(code) = owner.admission.interruption_code()
+                && failure.kind == FailureKind::Cancelled
+            {
+                failure.code = code.into();
+            } else if owner.admission.interruption_code().is_none()
+                && (deadline_fired || Instant::now() >= deadline)
+            {
+                failure.kind = FailureKind::Cancelled;
+                failure.code = "deadline".into();
+                failure.retry_after_ms = None;
+            }
         }
         retain_calls(&id, &mut outcome, calls.into_values().collect())?;
         drop(permit);
@@ -683,6 +736,9 @@ impl TurnOperations {
             })
     }
 
+    /// Run one tool operation under `key` with the runtime's default tools,
+    /// or return its recorded outcome. The gate, current authority and
+    /// controls are checked before an attempt begins.
     pub async fn invoke(
         &self,
         key: OperationKey,
@@ -824,11 +880,14 @@ impl TurnOperations {
             outcome.status = OutcomeStatus::Cancelled;
             outcome
         } else {
-            tokio::select! {
-                outcome = prepared.invoke(context) => outcome,
-                _ = owner.admission.cancellation.cancelled() => ToolOutcome::uncertain(),
-                _ = tokio::time::sleep_until(deadline.into()) => ToolOutcome::uncertain(),
-            }
+            let invocation = prepared.invoke(context);
+            settle_executor(
+                invocation,
+                &owner.admission,
+                deadline,
+                ToolOutcome::uncertain,
+            )
+            .await
         };
         drop(permit);
         self.inner
@@ -875,6 +934,9 @@ impl TurnOperations {
         }
     }
 
+    /// Open a recorded interaction, or return the receipt of the identical
+    /// open. Fails with `wait_identity_reused` for a changed request and
+    /// `interaction_limit` beyond `max_operations` interactions.
     pub async fn request_input(&self, request: WaitRecord) -> Result<CommitReceipt> {
         self.inner.ensure_open()?;
         let _serial = self.inner.serial.lock().await;
@@ -944,22 +1006,13 @@ impl TurnOperations {
                 OperationOutcome::Tool(outcome)
             }
         };
-        self.inner
-            .commit_locked(
-                phase_id(&id, "reject", &outcome)?,
-                vec![JournalAction::RejectPrepared {
-                    operation: id.clone(),
-                    outcome: outcome.clone(),
-                }],
-            )
-            .await?;
-        let _ = self.inner.events.send(TurnUpdate::Operation {
-            operation: id,
-            outcome: outcome.clone(),
-        });
+        self.inner.reject_locked(&id, outcome.clone(), None).await?;
         Ok(outcome)
     }
 
+    /// Open the interaction if needed and wait for its answer or withdrawal.
+    /// Returns `WaitOutcome::Pending` when controls stop admitting work or
+    /// this turn's ownership closes, leaving the interaction recorded.
     pub async fn wait(&self, request: WaitRecord) -> Result<WaitOutcome> {
         let id = request.id.clone();
         self.request_input(request).await?;
@@ -1055,6 +1108,8 @@ impl TurnOperations {
         Ok(outcome)
     }
 
+    /// Reconcile a tool operation under `key` with the runtime's default
+    /// tools. See `reconcile_tool`.
     pub async fn recover_tool(&self, key: OperationKey) -> Result<ToolOutcome> {
         let id = self.operation_id(&key)?;
         self.reconcile_tool(id, self.inner.services.tools.clone())
@@ -1158,11 +1213,7 @@ impl TurnOperations {
                 max_output_bytes: self.inner.services.limits.max_output_bytes,
             },
         );
-        let outcome = tokio::select! {
-            outcome = future => outcome,
-            _ = owner.admission.cancellation.cancelled() => uncertain,
-            _ = tokio::time::sleep_until(deadline.into()) => uncertain,
-        };
+        let outcome = settle_executor(future, &owner.admission, deadline, || uncertain).await;
         drop(permit);
         self.inner
             .apply(
@@ -1176,6 +1227,31 @@ impl TurnOperations {
             .await?;
         Ok(outcome)
     }
+}
+
+/// How long an executor may take to acknowledge cancellation or an expired
+/// deadline with its own outcome before the runtime records uncertainty.
+const EXECUTOR_SETTLE_GRACE: Duration = Duration::from_millis(500);
+
+/// Await an executor's outcome. On cancellation or deadline the executor's
+/// token is cancelled and it keeps a bounded grace period to report a
+/// definite result, such as confirmed termination with a receipt. An
+/// executor that does not answer in time leaves its effects uncertain.
+async fn settle_executor(
+    execution: impl std::future::Future<Output = ToolOutcome>,
+    admission: &Admission,
+    deadline: Instant,
+    unanswered: impl FnOnce() -> ToolOutcome,
+) -> ToolOutcome {
+    tokio::pin!(execution);
+    tokio::select! {
+        outcome = &mut execution => return outcome,
+        _ = admission.cancellation.cancelled() => {}
+        _ = tokio::time::sleep_until(deadline.into()) => admission.cancellation.cancel(),
+    }
+    tokio::time::timeout(EXECUTOR_SETTLE_GRACE, execution)
+        .await
+        .unwrap_or_else(|_| unanswered())
 }
 
 fn inference_failure(code: &str, kind: FailureKind) -> InferenceOutcome {
@@ -1288,7 +1364,7 @@ pub(crate) struct Inner {
     closing: AtomicBool,
     frozen: AtomicBool,
     cancellation: CancellationToken,
-    view: watch::Sender<TurnView>,
+    pub(crate) view: watch::Sender<TurnView>,
     events: broadcast::Sender<TurnUpdate>,
 }
 
@@ -1446,6 +1522,12 @@ impl Inner {
     }
 
     fn publish_current(&self) {
+        self.publish(false);
+    }
+
+    /// Bring the live view's ownership fields up to date and broadcast a
+    /// snapshot only when the state, the active set or admission changed.
+    fn publish(&self, state_changed: bool) {
         let active: Vec<_> = self
             .active
             .lock()
@@ -1453,15 +1535,20 @@ impl Inner {
             .keys()
             .cloned()
             .collect();
-        self.view.send_modify(|view| {
-            view.active = active;
-            view.admission_closed = self.closing.load(Ordering::SeqCst)
+        let changed = self.view.send_if_modified(|view| {
+            let admission_closed = self.closing.load(Ordering::SeqCst)
                 || self.frozen.load(Ordering::SeqCst)
                 || !view.state.controls().admits_work();
+            let changed = view.active != active || view.admission_closed != admission_closed;
+            view.active = active;
+            view.admission_closed = admission_closed;
+            changed
         });
-        let _ = self
-            .events
-            .send(TurnUpdate::Snapshot(Box::new(self.view.borrow().clone())));
+        if changed || state_changed {
+            let _ = self
+                .events
+                .send(TurnUpdate::Snapshot(Box::new(self.view.borrow().clone())));
+        }
     }
 
     pub(crate) async fn refresh(&self) -> Result<TurnState> {
@@ -1474,13 +1561,17 @@ impl Inner {
         if state.binding() != &self.binding {
             return Err(self.freeze("writer_superseded"));
         }
-        self.view.send_modify(|view| {
-            if state.position() >= view.state.position() {
+        // Every journal commit, including a control change, advances the
+        // position, so an equal position carries no new state.
+        let advanced = self.view.send_if_modified(|view| {
+            let advanced = state.position() > view.state.position();
+            if advanced {
                 view.state = state.clone();
             }
+            advanced
         });
         self.observe_controls(state.controls());
-        self.publish_current();
+        self.publish(advanced);
         Ok(state)
     }
 
@@ -1612,19 +1703,15 @@ impl Inner {
         let fingerprint = Fingerprint::of(&actions)?;
         let lease = self.lease()?;
         for _ in 0..8 {
-            if let Some(receipt) = lease
-                .journal()
-                .lookup(id.clone())
-                .await
-                .map_err(|_| self.freeze("journal_lookup_unavailable"))?
-            {
+            // The loaded state carries every recorded receipt, so an already
+            // committed change replays without a separate journal lookup.
+            let state = self.refresh().await?;
+            if let Some(receipt) = state.receipt(&id) {
                 if receipt.record().content_fingerprint != fingerprint {
                     return Err(Error::new(ErrorKind::Conflict, "change_identity_reused"));
                 }
-                self.refresh().await?;
-                return Ok(receipt);
+                return Ok(receipt.clone());
             }
-            let state = self.refresh().await?;
             match &basis {
                 Some(CommitBasis::Completion(control, history))
                     if state.controls().revision != *control
@@ -1747,6 +1834,17 @@ impl Inner {
         basis: Option<CommitBasis<'_>>,
     ) -> Result<()> {
         let _serial = self.serial.lock().await;
+        self.reject_locked(id, outcome, basis).await
+    }
+
+    /// Record definite nonexecution for prepared work while the caller holds
+    /// the serial lock.
+    async fn reject_locked(
+        &self,
+        id: &OperationId,
+        outcome: OperationOutcome,
+        basis: Option<CommitBasis<'_>>,
+    ) -> Result<()> {
         self.commit_with_basis(
             phase_id(id, "reject", &outcome)?,
             vec![JournalAction::RejectPrepared {

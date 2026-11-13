@@ -353,7 +353,9 @@ calls can overlap within declared bounds. Acting on incomplete tool arguments
 uses a concrete executor protocol whose guarantees are declared separately.
 Before early dispatch, the journal retains the call, validated arguments,
 captured definition, and originating inference. A later stream failure preserves
-the effects and results of calls already admitted.
+the effects and results of calls already admitted. A failure in one call stops
+admission of later calls but does not abandon admitted siblings: they run to a
+recorded outcome before the step reports the failure.
 
 Runtime captures the model configuration, offered inventory, context positions,
 and authority relevant to each step. Tool activity keeps that snapshot even if

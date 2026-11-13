@@ -12,6 +12,8 @@ concurrent inference, tool work, and questions. Dropping an observer detaches it
 Dropping the controller closes admission and cancels the local execution scopes.
 In-flight operations keep the lease until their local execution exits. Verified
 settlement or suspension releases ownership and leaves old handles inactive.
+A helper still waiting on an interaction that suspension retained returns
+`WaitOutcome::Pending` and drops its lease handle.
 
 The master chooses requests, tools, retry policy, and completion. The host owns
 authorization and the meaning of its gate. Executors own domain behavior and
@@ -64,6 +66,15 @@ from the journal, so it may already show a later Resume. A committed Stop still
 records definite nonexecution for the unstarted target. Dispatched tool work
 can still have an uncertain result.
 
+A dispatched executor receives the cancellation token and absolute deadline.
+When the turn cancels or pauses the operation, or its deadline passes, the
+executor keeps a short bounded grace period to return its own outcome, such as
+confirmed termination with a receipt. An executor that does not answer in time
+leaves an uncertain result. Inference interrupted after the operation deadline
+or a caller's earlier deadline records the `deadline` failure code, whether the
+runtime or the adapter enforced it. A completed or failed provider outcome keeps
+its own status and evidence.
+
 Journal acknowledgment loss triggers readback using the same change identity.
 If the committed disposition cannot be established, admission freezes. A
 successor must reconcile that state before new dependent work.
@@ -83,7 +94,11 @@ executor work.
 A step consumes one prepared inference and its captured inventory. Complete tool
 calls can start while later response items stream. Every admitted child retains
 its inference origin and original provider call ID before effects. A later
-inference failure preserves those outcomes.
+inference failure preserves those outcomes. A call to a tool outside the step
+inventory receives a failed `tool_unavailable` result the model can correct
+from. A runtime error in one call stops admission of later calls, but the
+response and every admitted call still settle before the step returns that
+first error, so no attempt is left without an outcome.
 
 `StepOutcome.history` is a candidate projection of durable inference and tool
 results. The master installs it together with its next checkpoint using
@@ -96,6 +111,10 @@ starting provider or tool work. It keeps the original call identity and omits
 unpaired declarations. A master can publish this history when stopping a step
 whose outcomes were recorded before its transcript was installed.
 
+Observers receive a snapshot when the journal state, the set of live owners, or
+admission changes. A lagging observer receives the current snapshot in place of
+the updates it missed.
+
 Suspension and settlement validate the master's exact control and history basis.
 A concurrent change rejects that decision. Terminal commits never silently
 rebase onto newer input or controls.
@@ -105,8 +124,8 @@ rebase onto newer input or controls.
 Run from the repository root.
 
 ```sh
-cargo test -p agent-kit-runtime --locked
-cargo clippy -p agent-kit-runtime --all-targets --locked -- -D warnings
+cargo test -p agent-kit-runtime --all-features --locked
+cargo clippy -p agent-kit-runtime --all-targets --all-features --locked -- -D warnings
 cargo fmt -p agent-kit-runtime --check
 ```
 
