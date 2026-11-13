@@ -188,6 +188,8 @@ export type NativeChatView = Readonly<{
   goal: NativeChatGoalObservation | null;
   goalReady: boolean;
   goalIntent: boolean;
+  /** The next send asks the temporary read-only side chat, not this chat. */
+  sideIntent: boolean;
   loading: boolean;
   acting: boolean;
   repairing: boolean;
@@ -334,6 +336,7 @@ const EMPTY: NativeChatView = Object.freeze({
   goal: null,
   goalReady: false,
   goalIntent: false,
+  sideIntent: false,
   loading: false,
   acting: false,
   repairing: false,
@@ -978,7 +981,8 @@ export class NativeChatController {
       !this.view.profileBusy &&
       !this.view.acting &&
       !this.view.steering &&
-      !this.view.goalIntent
+      !this.view.goalIntent &&
+      !this.view.sideIntent
     );
   }
 
@@ -1540,6 +1544,30 @@ export class NativeChatController {
     }
   }
 
+  /**
+   * Ask the draft in the side chat, opening its panel when needed. The text
+   * never reaches this chat; a failed ask keeps the draft and the badge.
+   */
+  private async askSide(scope: Scope, text: string): Promise<void> {
+    if (!text.trim()) throw new Error("native_chat_not_ready");
+    if (!scope.sideChat) {
+      if (!this.canAskSide)
+        throw new Error("A side question needs an idle chat with history.");
+      this.openSideChat();
+    }
+    const side = scope.sideChat;
+    if (!side) throw new Error("Couldn't open the side chat.");
+    await side.open();
+    if (side.read().phase !== "ready")
+      throw new Error(side.read().error ?? "Couldn't open the side chat.");
+    const asked = side.read().exchanges.length;
+    side.setDraft(text);
+    await side.ask();
+    if (side.read().exchanges.length === asked)
+      throw new Error(side.read().error ?? "Couldn't ask the side chat.");
+    if (this.owns(scope)) this.update({ sideIntent: false });
+  }
+
   stageSideAnswer(
     side: NativeSideChatController,
     turnId: string,
@@ -1939,10 +1967,39 @@ export class NativeChatController {
       });
       return;
     }
-    if (!enabled || this.canStartGoal) {
+    if (!enabled || (this.canStartGoal && !this.view.sideIntent)) {
       this.update({ goalIntent: enabled, error: null });
       this.saveDraftModes();
     }
+  }
+
+  /**
+   * Whether a side question can be asked: an idle chat with committed
+   * history whose connection offers side chats. A side chat is read-only and
+   * text-only, so it excludes a goal and an attachment.
+   */
+  get canAskSide(): boolean {
+    const snapshot = this.scope?.observation?.snapshot;
+    return (
+      !!this.scope?.attachment &&
+      NativeSideChatController.supported(this.bridge) &&
+      !this.view.loading &&
+      !this.view.profileBusy &&
+      !this.view.acting &&
+      !this.view.steering &&
+      !this.view.goalIntent &&
+      !this.view.attachmentDraft &&
+      !!snapshot?.latest &&
+      !snapshot.current &&
+      !snapshot.queuedInputs
+    );
+  }
+
+  /** Composer-only: selecting it adds a badge and starts nothing. */
+  selectSideIntent(enabled: boolean): void {
+    if (this.view.acting) return;
+    if (!enabled || this.canAskSide)
+      this.update({ sideIntent: enabled, error: null });
   }
 
   selectEffort(effort: NativeChatEffort): void {
@@ -1958,9 +2015,13 @@ export class NativeChatController {
     const scope = this.scope;
     if (!scope || scope.id !== scopeId || this.view.profileBusy)
       throw new Error("native_chat_not_ready");
-    const intent = /^\/(plan|goal)(?:\s+|$)/.exec(text.trim());
+    const intent = /^\/(plan|goal|side)(?:\s+|$)/.exec(text.trim());
     if (intent) {
-      if (intent[1] === "plan") {
+      if (intent[1] === "side") {
+        if (!this.view.sideIntent && !this.canAskSide)
+          throw new Error("A side question needs an idle chat with history.");
+        this.selectSideIntent(true);
+      } else if (intent[1] === "plan") {
         if (!this.bridge.submitInRegime || this.view.steering)
           throw new Error("Planning is unavailable in this chat.");
         this.selectOperatingRegime("plan");
@@ -1976,6 +2037,7 @@ export class NativeChatController {
       text = text.trim().slice(intent[0].length).trim();
       if (!text) return;
     }
+    if (this.view.sideIntent) return this.askSide(scope, text);
     const literal = text.trim();
     if (literal === "/compact" || literal === "/fork")
       return this.runCommand(literal === "/compact" ? "compact" : "fork");

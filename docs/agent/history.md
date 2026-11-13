@@ -61,7 +61,18 @@ connection. Deleting data does not reset a connection.
   not available on a message that included an attachment or started a goal.
   Earlier file changes stay in their files; undo them in the file's editor.
 
-Desktop does not offer temporary side chats; ACP clients can open them.
+## Ask a side question
+
+To ask about the conversation without adding to it, type **`/side`** in an
+idle chat that already has a finished turn. Choosing it adds a removable
+**Side** badge and sends nothing. Type the question and send: it goes to a
+temporary, read-only side chat that opens above the composer, and this chat
+does not change. The side chat sees this chat's saved text but no project
+files or tools, takes up to six questions, and is discarded when you choose
+**Close side chat** or leave the chat. Choose **Add to parent draft** to quote
+an answer in your next message. **Side** cannot be combined with a goal or an
+attachment; with **Plan** on, the side question still leaves the plan
+unchanged. ACP clients can open side chats too.
 [Ask in a temporary side chat](./clients.md#ask-in-a-temporary-side-chat)
 
 ## Continue a long conversation

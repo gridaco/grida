@@ -483,8 +483,8 @@ See the [native host request fields](https://github.com/gridaco/grida/blob/main/
 
 ## Ask in a temporary side chat
 
-Side chats are available to private stdio ACP clients; Desktop chat does not
-open them. A private stdio client can open a read-only side chat from an attached parent.
+Side chats are available to private stdio ACP clients; in Desktop, `/side`
+opens one. [Ask a side question](./history.md#ask-a-side-question) A private stdio client can open a read-only side chat from an attached parent.
 It captures committed background, including an installed summary when present.
 The parent can keep working. The selected model treats that snapshot as quoted
 reference and answers the side chat's new questions. The open response identifies

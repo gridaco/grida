@@ -25,6 +25,7 @@ import {
   PlusIcon,
   GoalIcon,
   ListChecksIcon,
+  MessageSquareTextIcon,
   ImageIcon,
   XIcon,
 } from "lucide-react";
@@ -785,7 +786,7 @@ export function NativeAgentPane({
                   },
                 ]
               : []),
-            ...(controller.canStartGoal
+            ...(controller.canStartGoal && !state.sideIntent
               ? [
                   {
                     id: "goal",
@@ -794,6 +795,18 @@ export function NativeAgentPane({
                       "Work toward a goal with automatic continuation",
                     standalone: true as const,
                     run: () => controller.selectGoalIntent(true),
+                  },
+                ]
+              : []),
+            ...(controller.canAskSide && !state.sideIntent
+              ? [
+                  {
+                    id: "side",
+                    title: "side",
+                    description:
+                      "Ask a quick question on the side; this chat is unchanged",
+                    standalone: true as const,
+                    run: () => controller.selectSideIntent(true),
                   },
                 ]
               : []),
@@ -814,6 +827,10 @@ export function NativeAgentPane({
             }
             if (command.id === "goal") {
               controller.selectGoalIntent(true);
+              return true;
+            }
+            if (command.id === "side") {
+              controller.selectSideIntent(true);
               return true;
             }
             return false;
@@ -1015,6 +1032,14 @@ export function NativeAgentPane({
                   label="Goal"
                   disabled={state.acting}
                   onRemove={() => controller.selectGoalIntent(false)}
+                />
+              )}
+              {state.sideIntent && (
+                <IntentChip
+                  icon={<MessageSquareTextIcon />}
+                  label="Side"
+                  disabled={state.acting}
+                  onRemove={() => controller.selectSideIntent(false)}
                 />
               )}
             </>

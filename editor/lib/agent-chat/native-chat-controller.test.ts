@@ -2108,6 +2108,135 @@ it("reads the pending goal from a reopened chat and withholds text replacement",
   controller.disconnect();
 });
 
+function sideFixture(settled: boolean) {
+  const f = fixture();
+  const observe = f.bridge.observe.bind(f.bridge);
+  f.bridge.observe = async (id) => {
+    const observation = await observe(id);
+    return {
+      ...observation,
+      snapshot: {
+        ...observation.snapshot,
+        latest: settled
+          ? {
+              turnId: `settled-${id}`,
+              epoch: 1,
+              journalPosition: 2,
+              historyPosition: 2,
+              controlRevision: 1,
+              paused: false,
+              cancelled: false,
+              disposition: "settled" as const,
+              status: "succeeded" as const,
+            }
+          : null,
+      },
+    };
+  };
+  const ask = vi.fn<NonNullable<DesktopNativeChat["askSideChat"]>>(
+    async () => ({
+      turnId: "side-turn",
+      status: "succeeded",
+      text: "Side answer.",
+      textTruncated: false,
+    })
+  );
+  f.bridge.openSideChat = vi.fn<NonNullable<DesktopNativeChat["openSideChat"]>>(
+    async () => ({
+      sourceRevision: 2,
+      compacted: false,
+      truncated: false,
+      omitted: false,
+    })
+  );
+  f.bridge.askSideChat = ask;
+  f.bridge.closeSideChat = async () => {};
+  return { ...f, ask };
+}
+
+it("adds a Side badge on selection without opening or asking anything", async () => {
+  const { bridge, controller, ask } = sideFixture(true);
+  const submit = vi.spyOn(bridge, "submit");
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.canAskSide).toBe(true));
+  controller.selectSideIntent(true);
+  expect(controller.read().sideIntent).toBe(true);
+  expect(controller.read().sideChat).toBeNull();
+  expect(bridge.openSideChat).not.toHaveBeenCalled();
+  expect(ask).not.toHaveBeenCalled();
+  expect(submit).not.toHaveBeenCalled();
+  // Side and Goal exclude each other; attachments wait for the main chat.
+  bridge.goal = async () => ({ observationId: null, goal: null });
+  bridge.startGoal = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
+  controller.selectGoalIntent(true);
+  expect(controller.read().goalIntent).toBe(false);
+  expect(controller.canAttach("file")).toBe(false);
+  controller.selectSideIntent(false);
+  expect(controller.read().sideIntent).toBe(false);
+  controller.disconnect();
+});
+
+it("asks a Side draft in the side chat and leaves the main conversation unchanged", async () => {
+  const { bridge, controller, ask } = sideFixture(true);
+  const submit = vi.spyOn(bridge, "submit");
+  const inRegime = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>();
+  bridge.submitInRegime = inRegime;
+  await controller.select("chat-a");
+  await vi.waitFor(() => expect(controller.canAskSide).toBe(true));
+  controller.selectOperatingRegime("plan");
+  await controller.submit("/side What did we decide?");
+  const side = controller.read().sideChat!;
+  expect(side.read().phase).toBe("ready");
+  expect(ask).toHaveBeenCalledExactlyOnceWith(
+    "chat-a",
+    expect.any(String),
+    expect.any(String),
+    "What did we decide?"
+  );
+  expect(side.read().exchanges).toHaveLength(1);
+  expect(submit).not.toHaveBeenCalled();
+  expect(inRegime).not.toHaveBeenCalled();
+  expect(controller.read().sideIntent).toBe(false);
+  expect(controller.read().operatingRegime).toBe("plan");
+
+  // A failed ask keeps the badge so the composer keeps its draft.
+  ask.mockRejectedValueOnce(new Error("fixture lost answer"));
+  controller.selectSideIntent(true);
+  await expect(controller.submit("And why?")).rejects.toThrow(
+    /Your question is still here/
+  );
+  expect(controller.read().sideIntent).toBe(true);
+  await controller.submit("And why?");
+  expect(side.read().exchanges).toHaveLength(2);
+  expect(submit).not.toHaveBeenCalled();
+  expect(inRegime).not.toHaveBeenCalled();
+  controller.disconnect();
+});
+
+it("hides Side without committed history or while the chat is busy", async () => {
+  const empty = sideFixture(false);
+  await empty.controller.select("chat-a");
+  expect(empty.controller.canAskSide).toBe(false);
+  empty.controller.selectSideIntent(true);
+  expect(empty.controller.read().sideIntent).toBe(false);
+  await expect(empty.controller.submit("/side Anything?")).rejects.toThrow(
+    "A side question needs an idle chat with history."
+  );
+  empty.controller.disconnect();
+
+  const busy = sideFixture(true);
+  busy.running.add("chat-a");
+  await busy.controller.select("chat-a");
+  expect(busy.controller.canAskSide).toBe(false);
+  busy.controller.disconnect();
+
+  const unsupported = sideFixture(true);
+  unsupported.bridge.openSideChat = undefined;
+  await unsupported.controller.select("chat-a");
+  expect(unsupported.controller.canAskSide).toBe(false);
+  unsupported.controller.disconnect();
+});
+
 it("keeps side retries exact, parent input independent, and late answers out of the next chat", async () => {
   const { bridge, controller } = fixture();
   const context = {

@@ -3,11 +3,11 @@ id: TC-DESKTOP-AGENT-CHAT-016
 title: Composer intent selection preserves the draft and starts no work
 module: desktop
 area: agent-chat
-tags: [agent-chat, composer, plan, goal, keyboard, focus]
-status: verified
+tags: [agent-chat, composer, plan, goal, side, keyboard, focus]
+status: untested
 severity: high
 date: 2026-11-11
-updated: 2026-11-11
+updated: 2026-11-13
 automatable: true
 covered_by:
   - editor/kits/composer/composer-command-selection.browser.ts
@@ -16,9 +16,10 @@ covered_by:
 
 ## Behavior
 
-Plan and Goal are composer intents. Explicit slash-menu selection adds a
+Plan, Goal and Side are composer intents. Explicit slash-menu selection adds a
 removable badge without sending a message, starting inference, or replacing
-the rest of the draft. Keyboard and pointer selection have the same result.
+the rest of the draft. Side is offered only in an idle chat with a finished
+turn and excludes Goal and attachments. Keyboard and pointer selection have the same result.
 Permissions and effort remain independent. Goal limits are visible before
 starting; cancelling customization keeps the unsent intent.
 
@@ -37,6 +38,13 @@ A connection must finish starting before its commands become available.
    the slash trigger disappears, and no turn starts.
 4. Hover the Goal badge: its icon turns into ×. Click it. Goal disappears and
    no message or model request has been created. There is no goal form.
+   4a. In an idle chat with at least one finished turn, type `/side` and choose
+   it. A **Side** badge appears, `/goal` is no longer offered, and nothing
+   opens or sends. Type `What did we decide?` and send. The side chat opens
+   above the composer with the question and its answer; the main conversation
+   gains no message and no turn starts. The badge clears after the answer.
+   In a new chat with no finished turn, or while a turn runs, `/side` is not
+   offered.
 5. Choose Ultra in the model popover. Planning and permission choices remain
    separate. Open chat history and rename a saved chat through Chat options.
 6. Narrow the window. Send, the model picker, the attachment menu, and chat
