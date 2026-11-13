@@ -31,7 +31,6 @@ vi.mock("electron", () => ({
     }
   },
 }));
-vi.mock("./agent-sidecar-client", () => ({ agentSidecarClient: {} }));
 vi.mock("../window", () => ({ open_workspace_window: host.open }));
 vi.mock("../env", () => ({
   EDITOR_BASE_URL: "https://editor.fixture.invalid",

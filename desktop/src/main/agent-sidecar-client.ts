@@ -47,12 +47,7 @@ import { nativeWorkspaceMedia } from "./workspace-media-access";
 import { EDITOR_BASE_URL } from "../env";
 import { AgentTransport } from "@grida/agent/transport";
 import type { Workspace } from "@grida/daemon";
-import type {
-  AgentLifecycleEvent,
-  ChatSessionRow,
-  EndpointProviderConfig,
-  ProbedEndpointModel,
-} from "@grida/agent";
+import type { EndpointProviderConfig, ProbedEndpointModel } from "@grida/agent";
 
 const EDITOR_ORIGIN = new URL(EDITOR_BASE_URL).origin;
 const REFERER = `${EDITOR_ORIGIN}/desktop`;
@@ -271,30 +266,6 @@ export namespace agentSidecarClient {
    * controller signs the shared Grida account out. */
   export async function clearGridaGatewaySession(): Promise<void> {
     await client().gg.clear_session();
-  }
-
-  /**
-   * Read one session row — the notification consumer resolves the
-   * session's title (copy) and workspace binding (focus gate + click
-   * routing) from it. Null when the session is unknown.
-   */
-  export async function getSession(id: string): Promise<ChatSessionRow | null> {
-    return await client().sessions.get(id);
-  }
-
-  /**
-   * Tail the host-wide lifecycle event stream (`GET /events`, RFC
-   * `events.md`). Long-lived SSE; the returned `done` settles when the
-   * subscription ends (caller aborts via `init.signal`, or the socket
-   * drops — e.g. the supervisor restarted the agent sidecar). Throws
-   * {@link AgentSidecarNotReadyError} before the sidecar is up; callers
-   * own their reconnect loop.
-   */
-  export async function subscribeEvents(
-    onEvent: (event: AgentLifecycleEvent) => void,
-    init: { signal?: AbortSignal } = {}
-  ): Promise<{ done: Promise<void> }> {
-    return await client().events.subscribe(onEvent, init);
   }
 
   /**
