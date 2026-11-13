@@ -2507,13 +2507,14 @@ trusted merely because it is “local.”
    before replacement. Grida account sign-out releases the workspace without
    deleting the separate subscription. App shutdown joins exact OAuth attempt
    cancellation and outstanding custody within a bounded wait.
-6. **Session/provider identity is sticky.** A new provider-unqualified
-   compatible conversation may prefer a ready ChatGPT connection. Once
-   persisted, the provider/model pair is reused for continuations and queued
-   turns. Titling and compaction stay on that provider and credential/cost
-   boundary but may use its lower-cost auxiliary model tier; unavailability
-   returns `provider_down` rather than falling through. An explicit provider,
-   or a request-supplied different model, is the intentional switch seam.
+6. **A chat keeps its provider authority.** The native host captures the
+   provider principal and scope a chat runs under. Continuations, retries,
+   queued inputs, compaction and its recovery refuse with a conflict when the
+   live launch authority or provider differs, rather than moving the chat onto
+   another credential or cost boundary. Automatic titles run as a temporary,
+   tool-free request through the same launch's provider execution; a failure
+   leaves the chat untitled. Changing provider is an explicit user selection,
+   never a fallback.
 7. **No credential borrowing and no ACP fallback.** Grida never reads
    `~/.codex/auth.json`, browser cookies, or another app's credential store.
    ChatGPT auth failure never launches or selects Codex ACP.
@@ -2568,6 +2569,12 @@ platform credential store is a separate hardening step.
   bind one private launch to an exact OAuth connection and the fixed Responses
   route. [Process fixtures](desktop/src/main/native-provider-egress.test.ts)
   exercise the ceremony and scoped continuation with synthetic responses.
+- [Native chat host](crates/grida-agent/src/host.rs), its
+  [compaction](crates/grida-agent/src/host/compaction.rs) and
+  [automatic titles](crates/grida-agent/src/host/titles.rs), and the
+  [continuation owner](crates/grida-agent-master/src/lib.rs) — rule 6: a chat's
+  captured provider authority is rechecked before continuation, retry,
+  compaction and recovery, and titles use the same launch execution.
 - [Disposable Desktop composition](desktop/src/main/native-desktop-agent.ts)
   and [its process fixture](desktop/src/main/native-desktop-agent.test.ts)
   connect the guarded ceremony to the selected provider owner and verify
