@@ -9,8 +9,8 @@ const DOCS_URL = process.env.NEXT_PUBLIC_DOCS_URL || "https://docs.grida.co";
 // Blog deployment origin, without /blog; the standalone app owns that base path.
 const BLOG_URL = process.env.NEXT_PUBLIC_BLOG_URL || "https://blog.grida.co";
 // Marketing deployment origin, without /index; gridaco/www owns that base path.
-const WWW_URL =
-  process.env.NEXT_PUBLIC_WWW_URL || "https://grida-www.vercel.app";
+const WWW_INDEX_URL =
+  process.env.NEXT_PUBLIC_WWW_INDEX_URL || "https://grida-www-index.vercel.app";
 const USE_TELEMETRY =
   process.env.NODE_ENV === "production" &&
   process.env.NEXT_PUBLIC_GRIDA_USE_TELEMETRY === "1";
@@ -223,11 +223,11 @@ const nextConfig: NextConfig = {
       // The exact base path avoids an empty wildcard adding a slash upstream.
       {
         source: "/index",
-        destination: `${WWW_URL}/index`,
+        destination: `${WWW_INDEX_URL}/index`,
       },
       {
         source: "/index/:path((?!canvas(?:/|$)).+)",
-        destination: `${WWW_URL}/index/:path*`,
+        destination: `${WWW_INDEX_URL}/index/:path*`,
       },
       // The-Bundle
       {

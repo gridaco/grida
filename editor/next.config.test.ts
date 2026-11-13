@@ -15,7 +15,7 @@ let config: NextConfig;
 beforeAll(async () => {
   vi.stubEnv("NEXT_PUBLIC_GRIDA_USE_TELEMETRY", "0");
   vi.stubEnv("NEXT_PUBLIC_BLOG_URL", "https://blog.example.test");
-  vi.stubEnv("NEXT_PUBLIC_WWW_URL", "https://www.example.test");
+  vi.stubEnv("NEXT_PUBLIC_WWW_INDEX_URL", "https://www.example.test");
   config = (await import("./next.config")).default;
 });
 afterAll(() => vi.unstubAllEnvs());

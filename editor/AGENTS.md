@@ -77,8 +77,8 @@ Tenant sites are primarily accessed via **tenant domains** (e.g. `xyz.grida.site
 
 - [`gridaco/www`](https://github.com/gridaco/www) owns the standalone marketing
   site under `/index`, including its framework assets and `/index/sitemap.xml`.
-  `next.config.ts` forwards these paths to `NEXT_PUBLIC_WWW_URL` (the deployment
-  origin only, without `/index`; defaults to `https://grida-www.vercel.app`).
+  `next.config.ts` forwards these paths to `NEXT_PUBLIC_WWW_INDEX_URL` (the deployment
+  origin only, without `/index`; defaults to `https://grida-www-index.vercel.app`).
 - **Exception: `/index/canvas` stays here**, including its canonical URL, links,
   and root sitemap entry. The external rewrite explicitly excludes that subtree;
   moving it requires a separate migration.
