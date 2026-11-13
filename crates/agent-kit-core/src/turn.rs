@@ -32,7 +32,6 @@ pub struct ControlSnapshot {
     pub revision: ControlRevision,
     pub paused: bool,
     pub cancelled: bool,
-    #[serde(default)]
     pub interruption: Option<ControlInterruption>,
 }
 
@@ -76,9 +75,7 @@ impl OperationInput {
 pub struct OperationRecord {
     pub id: OperationId,
     pub input: OperationInput,
-    #[serde(default)]
     pub origin: Option<OperationId>,
-    #[serde(default)]
     pub source_call: Option<ToolCallId>,
     pub grants: GrantSelection,
 }
@@ -134,7 +131,6 @@ impl OperationOutcome {
 pub struct AttemptRecord {
     pub id: AttemptId,
     pub outcome: Option<OperationOutcome>,
-    #[serde(default)]
     pub prior_outcomes: Vec<OperationOutcome>,
 }
 
@@ -146,7 +142,6 @@ pub struct OperationState {
     pub record: OperationRecord,
     pub attempts: Vec<AttemptRecord>,
     /// The outcome recorded when the operation was refused before any attempt.
-    #[serde(default)]
     pub rejection: Option<OperationOutcome>,
 }
 

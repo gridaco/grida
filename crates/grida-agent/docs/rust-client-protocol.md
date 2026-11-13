@@ -159,8 +159,7 @@ the accepted regime. Queue edits preserve Plan's narrower scope.
 Negotiate `co.grida/session/turn-summary` to read one settled turn using an
 attached `sessionId` and exact `turnId`. Its bounded text, typed outcome, tool
 dispositions, unresolved count, and check statuses come from the retained
-account. Earlier accounts may omit tool counts. A missing summary uses the
-recorded terminal status as a fallback.
+account. A missing summary uses the recorded terminal status as a fallback.
 
 When a settled turn account records inference attempts, the summary may include
 `tokenUsage`. Its `reported` array contains up to seven token categories

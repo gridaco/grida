@@ -78,7 +78,7 @@ impl SummaryResponse {
             text_truncated: end < text.len(),
             steps: account.as_ref().map(|account| account.steps),
             unresolved_operations: account.as_ref().map(|account| account.unresolved.len()),
-            tool_activity: account.as_ref().and_then(|account| account.tool_activity),
+            tool_activity: account.as_ref().map(|account| account.tool_activity),
             token_usage: account
                 .as_ref()
                 .and_then(|account| ReportedTokenUsage::from_usage(&account.inference_usage)),

@@ -1510,16 +1510,6 @@ fn source_call_correlation_is_unique_within_each_inference() {
 }
 
 #[test]
-fn older_operation_records_without_source_call_remain_readable() {
-    let original = operation();
-    let mut value = serde_json::to_value(&original).unwrap();
-    value.as_object_mut().unwrap().remove("source_call");
-    let decoded: OperationRecord = serde_json::from_value(value).unwrap();
-    assert_eq!(decoded.source_call, None);
-    assert_eq!(decoded, original);
-}
-
-#[test]
 fn late_reconciliation_preserves_terminal_account_and_closed_admission() {
     let mut state = TurnState::new(binding()).unwrap();
     state
@@ -1847,26 +1837,6 @@ fn stored_interruption_revision_cannot_exceed_its_control_revision() {
     let mut value = serde_json::to_value(&state).unwrap();
     value["controls"]["interruption"]["revision"] = 999.into();
     assert!(serde_json::from_value::<TurnState>(value).is_err());
-}
-
-#[test]
-fn older_control_snapshots_without_interruption_remain_readable() {
-    let mut state = TurnState::new(binding()).unwrap();
-    state
-        .apply(change(
-            &state,
-            "pause",
-            vec![JournalAction::Control(ControlDirective::Pause)],
-        ))
-        .unwrap();
-    let mut value = serde_json::to_value(&state).unwrap();
-    value["controls"]
-        .as_object_mut()
-        .unwrap()
-        .remove("interruption");
-    let restored: TurnState = serde_json::from_value(value).unwrap();
-    assert!(restored.controls().paused);
-    assert_eq!(restored.controls().interruption, None);
 }
 
 #[tokio::test]

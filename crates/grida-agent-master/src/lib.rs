@@ -84,15 +84,13 @@ pub struct Account {
     pub text: String,
     pub steps: u32,
     pub unresolved: Vec<OperationId>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tool_activity: Option<ToolActivity>,
+    pub tool_activity: ToolActivity,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_reason: Option<StopReason>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failure: Option<Error>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inference_failure: Option<InferenceFailure>,
-    #[serde(default)]
     pub inference_usage: usage::InferenceUsage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub independent_review: Option<effort::ReviewEvidence>,
@@ -189,6 +187,17 @@ enum RequestRefresh {
     Rejected(Error),
 }
 
+/// Every configuration a stored continuation was built under. A resumed turn
+/// continues only under the same identity.
+#[derive(Serialize)]
+struct ConfigurationIdentity<'a> {
+    config: &'a MasterConfig,
+    history: &'a [Message],
+    input_limit: Option<NonZeroU64>,
+    completion_checks: Option<&'a hooks::CompletionChecks>,
+    lifecycle_hooks: Option<&'a lifecycle_hooks::LifecycleHooks>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Continuation {
     configuration: Fingerprint,
@@ -196,9 +205,9 @@ struct Continuation {
     request: Option<PreparedRequest>,
     interrupted: bool,
     outcome: Option<TurnOutcome>,
-    #[serde(default)]
+    /// History position captured with the most recent prepared request.
+    /// None only before the turn prepares its first request.
     request_history: Option<HistoryPosition>,
-    #[serde(default)]
     request_generation: u32,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     hook_diagnostics: Vec<lifecycle_hooks::HookResult>,
@@ -503,8 +512,7 @@ impl Master {
                 }
             }
             if let Some(outcome) = continuation.outcome.clone() {
-                if outcome.status == OutcomeStatus::Succeeded
-                    && has_new_input(&turn, &continuation)?
+                if outcome.status == OutcomeStatus::Succeeded && has_new_input(&turn, &continuation)
                 {
                     continuation.outcome = None;
                     continue;
@@ -998,17 +1006,19 @@ impl Master {
     }
 
     fn continuation(&self, turn: &Turn) -> Result<Continuation> {
-        let fingerprint = match (&self.completion_checks, self.input_limit) {
-            (Some(execution), limit) => {
-                Fingerprint::of(&(&self.config, &self.history, limit, &execution.checks))?
-            }
-            (None, Some(limit)) => Fingerprint::of(&(&self.config, &self.history, limit))?,
-            (None, None) => Fingerprint::of(&(&self.config, &self.history))?,
-        };
-        let fingerprint = match &self.lifecycle_hooks {
-            Some(execution) => Fingerprint::of(&(fingerprint, &execution.hooks))?,
-            None => fingerprint,
-        };
+        let fingerprint = Fingerprint::of(&ConfigurationIdentity {
+            config: &self.config,
+            history: &self.history,
+            input_limit: self.input_limit,
+            completion_checks: self
+                .completion_checks
+                .as_ref()
+                .map(|execution| &execution.checks),
+            lifecycle_hooks: self
+                .lifecycle_hooks
+                .as_ref()
+                .map(|execution| &execution.hooks),
+        })?;
         let view = turn.view();
         match view.state.checkpoint() {
             None => Ok(Continuation {
@@ -1028,13 +1038,7 @@ impl Master {
                 if value.effort != self.effort {
                     return Err(Error::new(ErrorKind::Conflict, "master_effort_changed"));
                 }
-                let legacy = self.completion_checks.is_none()
-                    && self.lifecycle_hooks.is_none()
-                    && self.input_limit.is_none()
-                    && self.effort.is_none()
-                    && self.history.is_empty()
-                    && value.configuration == Fingerprint::of(&self.config)?;
-                if value.configuration != fingerprint && !legacy {
+                if value.configuration != fingerprint {
                     return Err(Error::new(
                         ErrorKind::Conflict,
                         "master_configuration_changed",
@@ -1053,6 +1057,10 @@ impl Master {
         let Some(request) = &continuation.request else {
             return Ok(RequestRefresh::Unchanged);
         };
+        // A prepared request always records the history it was built from.
+        let request_history = continuation
+            .request_history
+            .ok_or_else(|| Error::new(ErrorKind::InvalidState, "master_request_history_missing"))?;
         let key = continuation.step_key();
         let operation = turn.operation(&OperationKey::new(key.clone())?)?;
         if operation
@@ -1070,11 +1078,7 @@ impl Master {
             .enumerate()
             .any(|(index, record)| {
                 let HistoryRecord::Message(message) = record;
-                message.role == Role::User
-                    && match continuation.request_history {
-                        Some(position) => index as u64 >= position.0,
-                        None => !request.request().messages.contains(message),
-                    }
+                message.role == Role::User && index as u64 >= request_history.0
             });
         let missing_limit = self
             .input_limit
@@ -1324,7 +1328,7 @@ impl Master {
                     text: text.into(),
                     steps,
                     unresolved,
-                    tool_activity: Some(ToolActivity::from_turn(&view)),
+                    tool_activity: ToolActivity::from_turn(&view),
                     stop_reason,
                     failure: inference_failure.and_then(|failure| {
                         let kind = match failure.code.as_str() {
@@ -1557,7 +1561,7 @@ impl Master {
         match finished {
             FinishOutcome::Settled(receipt) => Ok(Some(MasterOutcome::Settled(*receipt))),
             FinishOutcome::Continue(error) if error.kind == ErrorKind::Conflict => {
-                if may_continue && has_new_input(turn, continuation)? {
+                if may_continue && has_new_input(turn, continuation) {
                     continuation.outcome = None;
                     continuation.request = None;
                 }
@@ -1594,28 +1598,13 @@ fn paused_before_generation(operation: &OperationState) -> bool {
             if outcome.failure.as_ref().is_some_and(|failure| failure.kind == FailureKind::Cancelled && failure.code == "turn_paused"))
 }
 
-fn has_new_input(turn: &Turn, continuation: &Continuation) -> Result<bool> {
-    let view = turn.view();
-    let Some(after) = continuation.request_history else {
-        let previous = match continuation.step.checked_sub(1) {
-            Some(step) => turn.operation(&OperationKey::new(format!("conversation/{step}"))?)?,
-            None => None,
-        };
-        let consumed = previous.as_ref().and_then(|operation| {
-            let OperationInput::Inference(request) = &operation.record.input else {
-                return None;
-            };
-            matches!(operation.outcome(), Some(OperationOutcome::Inference(outcome))
-                if outcome.status == InferenceStatus::Completed)
-            .then_some(&request.request().messages)
-        });
-        return Ok(view.state.history().records().iter().any(|record| {
-            let HistoryRecord::Message(message) = record;
-            message.role == Role::User
-                && consumed.is_none_or(|messages| !messages.contains(message))
-        }));
-    };
-    Ok(view
+/// Whether a user message arrived after the most recent prepared request.
+/// Before the first request, every user message is new.
+fn has_new_input(turn: &Turn, continuation: &Continuation) -> bool {
+    let after = continuation
+        .request_history
+        .map_or(0, |position| position.0);
+    turn.view()
         .state
         .history()
         .records()
@@ -1623,8 +1612,8 @@ fn has_new_input(turn: &Turn, continuation: &Continuation) -> Result<bool> {
         .enumerate()
         .any(|(index, record)| {
             let HistoryRecord::Message(message) = record;
-            index as u64 >= after.0 && message.role == Role::User
-        }))
+            index as u64 >= after && message.role == Role::User
+        })
 }
 
 pub fn read_account(envelope: &Envelope) -> Result<Account> {

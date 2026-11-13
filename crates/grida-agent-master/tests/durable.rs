@@ -1123,7 +1123,7 @@ async fn recover_completion_check(
     let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
     assert_eq!(account.text, text);
     assert_eq!(account.steps, 2);
-    assert_eq!(account.tool_activity.unwrap().succeeded, 1);
+    assert_eq!(account.tool_activity.succeeded, 1);
     assert_eq!(account.completion_checks.len(), 1);
     assert_eq!(account.completion_checks[0].status, check_result);
     let operation = account.completion_checks[0].operation.as_ref().unwrap();
@@ -1257,7 +1257,7 @@ async fn committed_tool_results_are_reused_and_reach_the_next_model_request() {
         .unwrap();
     let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
     assert_eq!(account.steps, 2);
-    assert_eq!(account.tool_activity.unwrap().succeeded, 1);
+    assert_eq!(account.tool_activity.succeeded, 1);
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 2);
     assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 1);
     let requests = fixture.provider.requests.lock().unwrap();
@@ -1481,7 +1481,7 @@ async fn retained_ultra_replays_exact_policy_or_can_stop_without_the_delegate() 
             ("stop", Ok(MasterOutcome::Settled(receipt))) => {
                 assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
                 let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
-                assert_eq!(account.tool_activity.unwrap().succeeded, 1);
+                assert_eq!(account.tool_activity.succeeded, 1);
             }
             ("different", Err(error)) => assert_eq!(error.code, "master_effort_changed"),
             ("unavailable", Err(error)) => assert_eq!(error.code, "ultra_delegation_unavailable"),
@@ -1542,7 +1542,7 @@ async fn stopping_a_recovered_turn_publishes_tool_result_recorded_before_interru
     };
     assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
     let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
-    assert_eq!(account.tool_activity.unwrap().succeeded, 1);
+    assert_eq!(account.tool_activity.succeeded, 1);
     reopened
         .verify(CommitReceipt::Settled(receipt))
         .await
@@ -1892,19 +1892,6 @@ async fn after_tool_hooks_observe_model_tools_but_not_private_checks() {
     assert_eq!(admission.calls.load(Ordering::SeqCst), 1);
     assert_eq!(completion.calls.load(Ordering::SeqCst), 2);
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
-}
-
-#[test]
-fn accounts_saved_without_a_stop_reason_remain_readable() {
-    let envelope = Envelope::new(
-        SchemaId::new("grida.agent.account").unwrap(),
-        1,
-        br#"{"text":"Finished","steps":1,"unresolved":[]}"#.to_vec(),
-    )
-    .unwrap();
-    let account = read_account(&envelope).unwrap();
-    assert_eq!(account.text, "Finished");
-    assert_eq!(account.stop_reason, None);
 }
 
 #[tokio::test]
@@ -2554,98 +2541,6 @@ async fn steering_racing_uncertain_settlement_never_admits_more_work() {
 }
 
 #[tokio::test]
-async fn legacy_completion_checks_the_original_request_before_settling() {
-    for add_input in [false, true] {
-        let fixture = Fixture::new(Script::Answer);
-        let store = fixture.store();
-        let claim = fixture.claim(&store).await;
-        let lease = intercept_publication(
-            claim.lease,
-            PublicationInterruption::ControlAfterCommit(ControlDirective::Pause),
-        );
-        let opened = fixture.runtime().open(lease).await.unwrap();
-        assert!(matches!(
-            fixture
-                .master(4, "Be concise")
-                .run(opened.turn, input())
-                .await
-                .unwrap(),
-            MasterOutcome::Suspended(_)
-        ));
-        let view = store.inspect(session_id()).await.unwrap();
-        let current = view.current.unwrap();
-        let ClaimOutcome::Acquired(claim) = store
-            .claim(ClaimRequest {
-                id: change_id("resume"),
-                session: session_id(),
-                expected_revision: view.revision,
-                selection: TurnSelection::ResumePaused {
-                    turn: turn_id(),
-                    epoch: current.binding.epoch,
-                    position: current.position,
-                    control_revision: current.controls.revision,
-                },
-            })
-            .await
-            .unwrap()
-        else {
-            panic!("expected resumed owner")
-        };
-        let state = claim.lease.journal().load().await.unwrap();
-        let checkpoint = state.checkpoint().unwrap();
-        let mut legacy: serde_json::Value = serde_json::from_slice(checkpoint.bytes()).unwrap();
-        legacy.as_object_mut().unwrap().remove("request_history");
-        legacy.as_object_mut().unwrap().remove("request_generation");
-        let checkpoint = Envelope::new(
-            checkpoint.schema().clone(),
-            checkpoint.version(),
-            serde_json::to_vec(&legacy).unwrap(),
-        )
-        .unwrap();
-        let mut actions = vec![JournalAction::SetCheckpoint(checkpoint)];
-        if add_input {
-            actions.push(JournalAction::AppendHistory(vec![HistoryRecord::Message(
-                message(
-                    "new-input",
-                    Role::User,
-                    Content::Text("Apply this correction".into()),
-                ),
-            )]));
-        }
-        claim
-            .lease
-            .journal()
-            .commit(
-                JournalChange::new(
-                    change_id("legacy-state"),
-                    state.binding().clone(),
-                    state.position(),
-                    state.controls().revision,
-                    actions,
-                )
-                .unwrap(),
-            )
-            .await
-            .unwrap();
-        let opened = fixture.runtime().open(claim.lease).await.unwrap();
-        let MasterOutcome::Settled(receipt) = fixture
-            .master(4, "Be concise")
-            .run(opened.turn, input())
-            .await
-            .unwrap()
-        else {
-            panic!("expected legacy settlement")
-        };
-        assert_eq!(receipt.outcome.status, OutcomeStatus::Succeeded);
-        assert_eq!(
-            fixture.provider.calls.load(Ordering::SeqCst),
-            if add_input { 2 } else { 1 }
-        );
-        store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
-    }
-}
-
-#[tokio::test]
 async fn stopped_recovered_orphan_keeps_uncertainty_without_redispatch() {
     let fixture = Fixture::new(Script::Answer);
     let store = fixture.store();
@@ -2892,7 +2787,7 @@ async fn a_paused_gate_preserves_the_step_and_its_completed_sibling() {
         );
         let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
         assert!(account.unresolved.is_empty());
-        let tools = account.tool_activity.unwrap();
+        let tools = account.tool_activity;
         assert_eq!(tools.succeeded, expected_work);
         assert_eq!(tools.cancelled, usize::from(stop));
     }
@@ -2953,7 +2848,7 @@ async fn stopping_a_deferred_turn_keeps_completed_results_and_withdraws_input() 
     assert_eq!(receipt.outcome.status, OutcomeStatus::Cancelled);
     let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
     assert!(account.unresolved.is_empty());
-    let tools = account.tool_activity.unwrap();
+    let tools = account.tool_activity;
     assert_eq!(tools.succeeded, 1);
     assert_eq!(tools.cancelled, 1);
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);

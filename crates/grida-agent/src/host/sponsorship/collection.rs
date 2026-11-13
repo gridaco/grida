@@ -434,7 +434,13 @@ mod tests {
         let account = encode(
             "grida.agent.account",
             1,
-            &json!({"text": findings, "steps": 1, "unresolved": []}),
+            &json!({
+                "text": findings,
+                "steps": 1,
+                "unresolved": [],
+                "tool_activity": {"succeeded": 0, "failed": 0, "cancelled": 0, "unresolved": 0},
+                "inference_usage": {"observations": [], "unreported_attempts": []},
+            }),
         )
         .unwrap();
         child

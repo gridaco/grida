@@ -11,8 +11,9 @@ their own execution and ownership contracts.
 
 The host can supply preceding conversation history as an immutable projection.
 It is included in model context without copying it into each turn's records.
-The continuation identity includes this projection so recovery cannot silently
-replace the context on which the turn was based.
+The continuation identity covers this projection, the master configuration,
+the input limit, and any completion checks or lifecycle hooks, so recovery
+cannot silently replace the context or policy on which the turn was based.
 
 Pause-origin interruptions remain distinguishable after a rapid resumption.
 Only a person's Pause or Stop replaces a cut-off response in model context; a
@@ -79,9 +80,9 @@ tool call whose arguments are not valid JSON, ends the turn with an uncertain
 account; the conversation stays available for a new message. Returning a
 malformed call to the model for correction is deliberately deferred, while a
 call to an unavailable tool already receives a correctable error result.
-Each new account also counts tool operations by their recorded final
-disposition. Recovered and stopped turns retain successful partial work without
-counting a replay twice. Earlier accounts can omit those counts.
+Every account counts tool operations by their recorded final disposition.
+Recovered and stopped turns retain successful partial work without counting a
+replay twice.
 Reviewed default-setting definitions live here, while the
 native host owns their persistence and user operations.
 
