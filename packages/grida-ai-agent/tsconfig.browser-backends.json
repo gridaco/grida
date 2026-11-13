@@ -1,8 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "types": [],
-    "lib": ["esnext", "dom", "dom.iterable"]
-  },
-  "include": ["src/fs/backends/opfs.ts"]
-}

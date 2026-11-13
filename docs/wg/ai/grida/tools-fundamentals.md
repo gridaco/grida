@@ -318,9 +318,9 @@ next thing to ship.
 
 ## What lives where
 
-- `packages/grida-ai-agent/src/fs/` — filesystem fundamentals
-  ([source](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/src/fs/index.ts))
-- `packages/grida-ai-agent/src/tool-search/` — _not yet created; see proposal above_
+- `crates/grida-agent/src/file_tools.rs` — filesystem fundamentals
+  ([source](https://github.com/gridaco/grida/blob/main/crates/grida-agent/src/file_tools.rs))
+- `tool_search` — _not yet created; see proposal above_
 - Document-specific tools belong to their editor implementations. See
   [`tools-canvas.md`](./tools-canvas.md) for the canvas capability catalog.
 
@@ -335,8 +335,8 @@ Process:
 
 1. Confirm the RFC carries the shape — if not, propose it to
    [`../agent/tools.md`](../agent/tools.md) first.
-2. Drop the implementation in `packages/grida-ai-agent/src/<name>/`
-   with its own README, class, AI-SDK tool schema, and pure-logic tests.
+2. Implement it in the native agent (`crates/grida-agent`) with its
+   own module, tool schema, and pure-logic tests.
 3. Add a row to the naming map above and a per-tool section below it.
 4. If it's vfs-only (only needed because we lack command execution),
    mark it so — the host can then drop it when command execution is

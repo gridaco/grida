@@ -11,8 +11,6 @@ custody and endpoint settings), the native ChatGPT subscription host, the media
 transport client and client-safe protocol contracts. Shared model operations
 belong to [`@grida/ai`](../grida-ai/README.md).
 
-The `fs` storage core backs the web SVG document store.
-
 ## Exports
 
 Subpath exports gate platform reach: a bare `import "@grida/agent"`
@@ -20,14 +18,12 @@ stays browser-safe, and the Node-only entry points are quarantined
 behind their own subpaths so they never pull `node:*` into a client
 bundle.
 
-| Subpath              | What                                                                                                       | Platform |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- | -------- |
-| `.`                  | provider identity and metadata, ChatGPT subscription status, endpoint contracts, media DTOs                | neutral  |
-| `./fs`               | virtual filesystem (`AgentFs`, `MemoryBackend`, live bindings)                                             | neutral  |
-| `./fs/backends/opfs` | browser OPFS backend                                                                                       | browser  |
-| `./media-server`     | `createMediaTenant` + `createMediaDaemon`, media options and provider transport type                       | Node     |
-| `./chatgpt-host`     | `ChatGptSubscriptionHost` and `ChatGptProviderConfig`; host-owned OAuth and captured subscription requests | Node     |
-| `./media-transport`  | `MediaTransport` namespace — extends `DaemonTransport.Client` with the media service's routes              | neutral  |
+| Subpath             | What                                                                                                       | Platform |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- | -------- |
+| `.`                 | provider identity and metadata, ChatGPT subscription status, endpoint contracts, media DTOs                | neutral  |
+| `./media-server`    | `createMediaTenant` + `createMediaDaemon`, media options and provider transport type                       | Node     |
+| `./chatgpt-host`    | `ChatGptSubscriptionHost` and `ChatGptProviderConfig`; host-owned OAuth and captured subscription requests | Node     |
+| `./media-transport` | `MediaTransport` namespace — extends `DaemonTransport.Client` with the media service's routes              | neutral  |
 
 Only `dist` is included in the package file allowlist.
 

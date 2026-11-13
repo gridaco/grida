@@ -52,26 +52,6 @@
         "types": "./dist/media-transport.d.cts",
         "default": "./dist/media-transport.cjs"
       }
-    },
-    "./fs": {
-      "import": {
-        "types": "./dist/fs/index.d.mts",
-        "default": "./dist/fs/index.mjs"
-      },
-      "require": {
-        "types": "./dist/fs/index.d.ts",
-        "default": "./dist/fs/index.js"
-      }
-    },
-    "./fs/backends/opfs": {
-      "import": {
-        "types": "./dist/fs/backends/opfs.d.mts",
-        "default": "./dist/fs/backends/opfs.mjs"
-      },
-      "require": {
-        "types": "./dist/fs/backends/opfs.d.ts",
-        "default": "./dist/fs/backends/opfs.js"
-      }
     }
   },
   "scripts": {
@@ -80,7 +60,7 @@
     "prepack": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json && tsc --noEmit -p tsconfig.browser-backends.json"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.neutral.json"
   },
   "dependencies": {
     "@grida/ai": "workspace:*",

@@ -36,7 +36,7 @@ function DesktopFilePageInner() {
   // IS the bundle (a `.canvas` opened directly).
   const basePath = params.get("path") ?? "";
   // Key by the active target so navigating between files/decks remounts the
-  // shell cleanly (fresh editor + AgentFs).
+  // shell cleanly (fresh editor + surface host).
   return (
     <div className="h-dvh">
       {workspaceId && !docId && (

@@ -42,7 +42,7 @@ and `$schema` still apply), distinct from JSONCanvas's `*.canvas`.
 import { dotcanvas } from "dotcanvas";
 
 // `fs` is any object with `list()` / `read()` (and `write()` to persist).
-// `AgentFs.Backend` satisfies this structurally; tests use a Map-backed stub.
+// A host's file backend satisfies this structurally; tests use a Map-backed stub.
 const canvas = await dotcanvas.read(fs);
 
 canvas.mode; //=> "declared" | "implicit"

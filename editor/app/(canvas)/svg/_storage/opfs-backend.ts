@@ -1,22 +1,21 @@
 /// <reference lib="dom" />
 /// <reference lib="dom.iterable" />
 
-import type { AgentFs } from "../index";
+import type { BundleBackend } from "./backend";
 
 /**
- * Origin Private File System backend.
+ * Origin Private File System backend for the SVG demo bundle.
  *
- * `AgentFs` logical paths (`/canvas.svg`, `/notes/draft.md`) become OPFS
- * directory + file handles under a fixed root (`baseSegments`). Bumping
- * the trailing segment is the documented "clear all persisted data"
- * lever; old data orphans until the browser garbage-collects.
+ * Logical paths (`/.canvas.json`, `/<id>.svg`) become OPFS directory + file
+ * handles under a fixed root (`baseSegments`). Bumping the trailing segment
+ * is the documented "clear all persisted data" lever; old data orphans until
+ * the browser garbage-collects.
  *
- * FIXME(agent-fs-opfs): demo-grade. Before promoting beyond /svg:
- *   - Real migration story (read old → transform → write new → delete).
- *   - Quarantine for unparseable bytes (mirror canvas playground).
- *   - Surface failures to the user instead of console.warn.
+ * FIXME(svg-demo-opfs): demo-grade. There is no migration story, no
+ * quarantine for unparseable bytes, and failures surface only as
+ * `console.warn` from the store.
  */
-export class OpfsBackend implements AgentFs.Backend {
+export class OpfsBackend implements BundleBackend {
   private root_promise: Promise<FileSystemDirectoryHandle> | null = null;
 
   static isSupported(): boolean {
@@ -28,11 +27,7 @@ export class OpfsBackend implements AgentFs.Backend {
     );
   }
 
-  /**
-   * @param baseSegments  Path segments under the origin's OPFS root. The
-   * canonical demo uses `["grida-svg-demo", "v1"]`; bumping `v1` blows
-   * the cache.
-   */
+  /** @param baseSegments Path segments under the origin's OPFS root. */
   constructor(private readonly baseSegments: readonly string[]) {}
 
   private async getRoot(): Promise<FileSystemDirectoryHandle> {
@@ -61,11 +56,11 @@ export class OpfsBackend implements AgentFs.Backend {
     create: boolean
   ): Promise<{ dir: FileSystemDirectoryHandle; name: string }> {
     if (!p.startsWith("/")) {
-      throw new Error(`agent-fs path must start with "/": ${p}`);
+      throw new Error(`bundle path must start with "/": ${p}`);
     }
     const segments = p.slice(1).split("/").filter(Boolean);
     if (segments.length === 0) {
-      throw new Error(`agent-fs path must include a filename: ${p}`);
+      throw new Error(`bundle path must include a filename: ${p}`);
     }
     const name = segments[segments.length - 1];
     let cur = await this.getRoot();
@@ -77,8 +72,7 @@ export class OpfsBackend implements AgentFs.Backend {
 
   async list(): Promise<string[]> {
     const out: string[] = [];
-    const root = await this.getRoot();
-    await walk(root, "", out);
+    await walk(await this.getRoot(), "", out);
     return out;
   }
 
@@ -86,20 +80,7 @@ export class OpfsBackend implements AgentFs.Backend {
     try {
       const { dir, name } = await this.resolveDir(p, false);
       const fh = await dir.getFileHandle(name);
-      const f = await fh.getFile();
-      return await f.text();
-    } catch (err) {
-      if (isNotFound(err)) return null;
-      throw err;
-    }
-  }
-
-  async readBytes(p: string): Promise<Uint8Array | null> {
-    try {
-      const { dir, name } = await this.resolveDir(p, false);
-      const fh = await dir.getFileHandle(name);
-      const f = await fh.getFile();
-      return new Uint8Array(await f.arrayBuffer());
+      return await (await fh.getFile()).text();
     } catch (err) {
       if (isNotFound(err)) return null;
       throw err;

@@ -4,5 +4,5 @@
     "types": [],
     "lib": ["esnext"]
   },
-  "include": ["src/neutral-globals.d.ts", "src/index.ts", "src/fs/index.ts"]
+  "include": ["src/neutral-globals.d.ts", "src/index.ts"]
 }

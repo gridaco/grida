@@ -339,8 +339,7 @@ changes. Its live binding mutates editor state, while the host separately owns
 disk persistence. The tool host captures the selected endpoint and its
 binding generation so a focus change cannot silently redirect an admitted call.
 The document tool owns the meaning of its arguments, edits, persistence, and any
-content-version checks. [Document surface host](../../../editor/scaffolds/desktop/file/document-surface-host.ts),
-[Filesystem freshness and conditional writes](../src/fs/index.ts).
+content-version checks. [Document surface host](../../../editor/scaffolds/desktop/file/document-surface-host.ts).
 
 The journal preserves invocation arguments and reported outcomes. If the
 original endpoint is gone, the adapter reports unavailability or an uncertain

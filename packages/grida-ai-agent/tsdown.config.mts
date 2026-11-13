@@ -13,7 +13,7 @@ const shared = {
 export default defineConfig([
   {
     ...shared,
-    entry: ["src/index.ts", "src/fs/index.ts", "src/fs/backends/opfs.ts"],
+    entry: ["src/index.ts"],
     platform: "neutral",
   },
   {

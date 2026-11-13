@@ -1,16 +1,10 @@
 /**
  * Public-API guard test. Pins the shape and presence of every symbol
- * the root plus retained host, media transport and fs subpaths export.
+ * the root plus the retained host and media transport subpaths export.
  *
- * This is intentionally separate from the behavioural tests in
- * `fs/fs.test.ts`.
- * Those exercise behaviour; this one exercises the **contract**. A
- * rename, signature change, or accidental drop here = a breaking change
- * for consumers — the test should fail until the README / CHANGELOG has
- * been updated to advertise it.
- *
- * `AgentFs` is a class + same-named namespace. New public additions go
- * inside that namespace.
+ * Behavioural tests live beside each module; this one exercises the
+ * **contract**. A rename, signature change, or accidental drop here = a
+ * breaking change for consumers.
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { MediaItem } from "@grida/daemon";
@@ -44,8 +38,6 @@ import {
 } from "./media-server";
 import { DaemonServer } from "@grida/daemon/server";
 import { MediaTransport } from "./media-transport";
-import { AgentFs } from "./fs";
-import { OpfsBackend } from "./fs/backends/opfs";
 
 describe("@grida/agent public API", () => {
   describe("root protocol exports", () => {
@@ -211,106 +203,6 @@ describe("@grida/agent public API", () => {
       expect("agent" in client).toBe(false);
       expect("events" in client).toBe(false);
       expect("directory_scopes" in client).toBe(false);
-    });
-  });
-
-  describe("AgentFs (class + namespace)", () => {
-    it("is constructible with a Backend", () => {
-      expectTypeOf(AgentFs).toBeConstructibleWith(new AgentFs.MemoryBackend());
-    });
-
-    it("exposes Backend, LiveBinding, Event, Listener", () => {
-      const backend: AgentFs.Backend = new AgentFs.MemoryBackend();
-      const binding: AgentFs.LiveBinding = {
-        serialize: () => "",
-        load: () => {},
-        getVersion: () => 0,
-      };
-      const ev: AgentFs.Event = { type: "write", path: "/x", version: 0 };
-      const listener: AgentFs.Listener = () => {};
-
-      // Runtime check anchors the type-only assertions above.
-      expect(backend).toBeInstanceOf(AgentFs.MemoryBackend);
-      expect(typeof binding.serialize).toBe("function");
-      expect(ev.type).toBe("write");
-      expect(typeof listener).toBe("function");
-    });
-
-    it("exposes result + arg types", () => {
-      // Pure-type guard: the file must compile against every public
-      // result/arg alias. A drop or rename trips the build.
-      type _R = AgentFs.ReadResult;
-      type _WA = AgentFs.WriteArgs;
-      type _W = AgentFs.WriteResult;
-      type _WS = AgentFs.WriteSuccess;
-      type _WF = AgentFs.WriteFailure;
-      type _EA = AgentFs.EditArgs;
-      type _E = AgentFs.EditResult;
-      type _ES = AgentFs.EditSuccess;
-      type _EF = AgentFs.EditFailure;
-      type _D = AgentFs.DeleteResult;
-      type _GA = AgentFs.GrepArgs;
-      type _GM = AgentFs.GrepMatch;
-      type _GR = AgentFs.GrepResult;
-      type _O = AgentFs.Options;
-
-      // Sample value lives on the result-success union — runtime
-      // anchor for the otherwise type-only block.
-      const ok: AgentFs.WriteSuccess = { ok: true, version: 1 };
-      expect(ok.ok).toBe(true);
-    });
-
-    it("exposes failure-reason vocabularies (zod + TS share a source)", () => {
-      // The const tuples are the source of the `*FailureReason` TS unions.
-      // Const tuples — readonly arrays of literal-typed strings.
-      expect(Array.isArray(AgentFs.WRITE_FAILURE_REASONS)).toBe(true);
-      expect(Array.isArray(AgentFs.EDIT_FAILURE_REASONS)).toBe(true);
-      expect(Array.isArray(AgentFs.DELETE_FAILURE_REASONS)).toBe(true);
-      expectTypeOf<AgentFs.WriteFailureReason>().toEqualTypeOf<
-        (typeof AgentFs.WRITE_FAILURE_REASONS)[number]
-      >();
-      expectTypeOf<AgentFs.EditFailureReason>().toEqualTypeOf<
-        (typeof AgentFs.EDIT_FAILURE_REASONS)[number]
-      >();
-      expectTypeOf<AgentFs.DeleteFailureReason>().toEqualTypeOf<
-        (typeof AgentFs.DELETE_FAILURE_REASONS)[number]
-      >();
-
-      // Spot-check membership so a typo in the const ARRAY (not the
-      // type alias) is caught at runtime.
-      expect(AgentFs.WRITE_FAILURE_REASONS).toContain("stale");
-      expect(AgentFs.EDIT_FAILURE_REASONS).toContain("ambiguous");
-      expect(AgentFs.DELETE_FAILURE_REASONS).toContain("mounted");
-    });
-
-    it("exposes MemoryBackend as the default in-process backend", () => {
-      expectTypeOf(AgentFs.MemoryBackend).toBeConstructibleWith();
-      const b: AgentFs.Backend = new AgentFs.MemoryBackend();
-      void b;
-    });
-
-    it("does NOT re-export internal match helpers under the namespace", () => {
-      // `findMatches` etc. live in `./internal/match` and are NOT
-      // public-facing. Catching a leak here = catching it before it
-      // turns into accidental contract.
-      //
-      // We assert that the *intersection* of public keys with the
-      // internal names is `never`, so any single leaked name trips
-      // the guard (a `not.toEqualTypeOf<A | B | C>` check would only
-      // fail if all three leaked simultaneously).
-      type LeakedInternalKeys = Extract<
-        keyof typeof AgentFs,
-        "findMatches" | "collapseWhitespace" | "applyReplacements"
-      >;
-      expectTypeOf<LeakedInternalKeys>().toEqualTypeOf<never>();
-    });
-  });
-
-  describe("AgentFs subpath backends", () => {
-    it("OpfsBackend (./fs/backends/opfs) implements AgentFs.Backend", () => {
-      expectTypeOf(OpfsBackend).toBeConstructibleWith(["x"]);
-      const b: AgentFs.Backend = new OpfsBackend(["x"]);
-      void b;
     });
   });
 });
