@@ -34,13 +34,16 @@ pub struct ConfigurationInspection {
     pub exact_input_counting: bool,
 }
 
-/// The settings file content and whether it is in effect.
+/// The settings file content and whether it is in effect. Only the native
+/// file tools, which exist on macOS and Linux, read the settings file.
+#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
 pub(crate) struct SettingsRead {
     pub bytes: Option<Vec<u8>>,
     pub diagnostic: Option<Error>,
     pub applied: bool,
 }
 
+#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
 pub(crate) enum SettingsWrite {
     Applied,
     Invalid(Error),
@@ -282,6 +285,7 @@ impl Configuration {
 
     /// The settings file as the agent's file tools read it, with whether its
     /// exact content is the active defaults.
+    #[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
     pub(crate) fn read_settings(&self) -> Result<SettingsRead> {
         let active = self
             .active
@@ -303,6 +307,7 @@ impl Configuration {
     /// Invalid content is reported and leaves the file and the active defaults
     /// unchanged. Valid content is published atomically and becomes the active
     /// defaults for later accepted input; accepted work keeps its capture.
+    #[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
     pub(crate) fn replace_settings(
         &self,
         edit: impl FnOnce(Option<&[u8]>) -> Result<Vec<u8>>,

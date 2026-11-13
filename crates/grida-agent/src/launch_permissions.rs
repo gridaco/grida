@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 const MAX_PROFILE_BYTES: u64 = 64 * 1024;
 const COMMAND_LIMITS: CommandLimits = CommandLimits {
     timeout: Duration::from_secs(30),

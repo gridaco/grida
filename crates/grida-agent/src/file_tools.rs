@@ -50,6 +50,7 @@ pub(crate) type ImageCapture = dyn Fn(Vec<u8>) -> Result<MediaRef> + Send + Sync
 type SettingsAuthority = dyn Fn(&Invocation) -> Result<SettingsAccess> + Send + Sync;
 
 /// Current authority over the agent settings file for one admitted action.
+#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
 pub(crate) struct SettingsAccess {
     pub configuration: Arc<crate::configuration::Configuration>,
     pub write: bool,
@@ -67,6 +68,7 @@ pub struct FileTools {
     settings: Option<Arc<SettingsAuthority>>,
     workers: Arc<Semaphore>,
     /// Mutations are serialized so an edit always reads what it replaces.
+    #[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
     mutations: std::sync::Mutex<()>,
 }
 
@@ -353,6 +355,7 @@ pub(crate) struct Request {
     pub(crate) content: Option<String>,
     pub(crate) old_string: Option<String>,
     pub(crate) new_string: Option<String>,
+    #[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
     pub(crate) replace_all: Option<bool>,
 }
 
