@@ -6,11 +6,11 @@
  *
  * Two audiences, one entry:
  *   - HOSTS (the desktop sidecar) construct `DaemonServer` (usually via a
- *     composed factory like `@grida/agent/media-server`'s
+ *     composed factory like `@grida/ai-host/media-server`'s
  *     `createMediaDaemon`) and drive `start()` / `stop()`. A host-owned
  *     transport can select `start({ listen: false })` and deliver standard
  *     Requests through `DaemonServer.fetch` without binding a socket.
- *   - TENANTS (the media tenant in `@grida/agent`) implement `DaemonTenant`
+ *   - TENANTS (the media tenant in `@grida/ai-host`) implement `DaemonTenant`
  *     against `DaemonServices` and use the toolkit below (stores, request
  *     validation) — the daemon depends on nothing tenant-specific; tenants
  *     depend on this package.

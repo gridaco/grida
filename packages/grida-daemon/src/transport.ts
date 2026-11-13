@@ -6,7 +6,7 @@
  * signing, fetch plumbing, typed transport errors, and the client methods
  * for the daemon-owned route groups (handshake, files, recents,
  * workspaces). Tenant route groups extend this client — see
- * `@grida/agent/media-transport`'s `MediaTransport.Client`. Consumers
+ * `@grida/ai-host/media-transport`'s `MediaTransport.Client`. Consumers
  * should not hand-build daemon route strings.
  */
 

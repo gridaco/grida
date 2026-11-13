@@ -19,7 +19,7 @@
  * The daemon owns the perimeter and its capability stores (files,
  * recents, workspaces, secrets store); everything else is a tenant
  * mounted through the `DaemonTenant` seam — the media tenant
- * (`@grida/agent/media-server`) is one such tenant, not the owner. The
+ * (`@grida/ai-host/media-server`) is one such tenant, not the owner. The
  * public surface — `constructor / start / fetch / stop` — does not change
  * when internals move.
  */
@@ -74,7 +74,7 @@ export type DaemonServerOptions = {
   port?: number;
   /**
    * Capability tenants to mount behind the perimeter — a static, typed
-   * list the composer supplies (`@grida/agent/media-server` composes the
+   * list the composer supplies (`@grida/ai-host/media-server` composes the
    * media tenant). An empty list is a valid, bare daemon.
    */
   tenants?: readonly DaemonTenant[];

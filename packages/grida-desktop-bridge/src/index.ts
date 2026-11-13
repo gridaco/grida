@@ -6,7 +6,7 @@
  * This package carries only the `window.grida` contract that a URL-loaded
  * renderer may compile against. Electron IPC channel names and native
  * implementation details stay in the Desktop app; daemon HTTP stays in
- * `@grida/daemon/transport` + `@grida/agent/media-transport`.
+ * `@grida/daemon/transport` + `@grida/ai-host/media-transport`.
  */
 
 import type {
@@ -36,7 +36,7 @@ import type {
   ChatGptSubscriptionStatus,
   GridaGatewaySession,
   GridaGatewaySessionStatus,
-} from "@grida/agent";
+} from "@grida/ai-host";
 import type {
   DaemonHandshakeResponse,
   FileReadResult,

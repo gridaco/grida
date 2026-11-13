@@ -80,7 +80,7 @@ describe("@grida/daemon is AI-free", () => {
     'import ai = require("@grida/ai");',
     'type Image = import("@grida/ai").Image;',
     'import { models } from "@grida/ai/catalogue";',
-    'import { createMediaDaemon } from "@grida/agent/media-server";',
+    'import { createMediaDaemon } from "@grida/ai-host/media-server";',
   ])("detects an AI dependency in %s", (source) => {
     expect(imports(source).some((name) => AI_DEP_PATTERN.test(name))).toBe(
       true

@@ -3,7 +3,7 @@ import {
   allowsLlamaCppInputCounting,
   isValidEndpointProviderId,
   type EndpointProviderConfig,
-} from "@grida/agent";
+} from "@grida/ai-host";
 import { catalog } from "@grida/ai/catalogue";
 import { ProviderCredentialStore } from "@grida/auth/providers";
 import fs from "node:fs/promises";

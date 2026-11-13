@@ -9,7 +9,7 @@ service sidecar keeps files, workspaces, recents, provider settings and media.
 
 The conversation master and durable chat execution live in the Rust workspace.
 Shared retained media operations live in `@grida/ai`; their HTTP adapters remain
-in `@grida/agent`. Desktop stays thin: windows, menus,
+in `@grida/ai-host`. Desktop stays thin: windows, menus,
 protocol routing, app lifecycle, IPC sender validation, and sidecar
 supervision.
 
@@ -36,7 +36,7 @@ Electron main/preload (desktop)
 
 Desktop sidecar composition
   -> @grida/daemon owns the perimeter, shared-provider adapter and local resources
-  -> @grida/agent/media-server serves media through @grida/ai without chat startup
+  -> @grida/ai-host/media-server serves media through @grida/ai without chat startup
   -> never loads a TypeScript chat server; Main is its only spawner
   -> serves authenticated daemon HTTP only on main-transferred sockets
   -> requires a host transport over bounded framed stdin/stdout for provider
@@ -73,7 +73,7 @@ discovery, scratch preparation or command authority is initialized.
 This is a host launch choice, not a renderer setting or fallback after failure.
 
 The separate media entry is an application adapter in the existing package.
-It establishes startup independence; Desktop still bundles the agent package.
+It establishes startup independence; Desktop bundles `@grida/ai-host`.
 The independently usable model SDK is `@grida/ai`, which owns no HTTP routes,
 Desktop lifecycle or chat state.
 
@@ -138,7 +138,7 @@ renderer admission and HTTP authentication do not establish one.
 
 If a bug reproduces in files, workspaces, BYOK providers or media
 operations, add the first test in `packages/grida-daemon` or
-`packages/grida-ai-agent`; agent execution and sessions belong to the native
+`packages/grida-ai-host`; agent execution and sessions belong to the native
 agent crates. Not here. Desktop tests should prove the host
 adapter still wires the core.
 
@@ -350,10 +350,10 @@ pnpm --dir desktop dev
 ## Testing
 
 ```bash
-pnpm --filter @grida/agent test
+pnpm --filter @grida/ai-host test
 pnpm --dir desktop test
 pnpm --dir desktop typecheck
 ```
 
-Use agent package tests for core behavior. Use desktop tests for Electron
+Use `@grida/ai-host` tests for retained-service behavior. Use desktop tests for Electron
 adapter behavior.

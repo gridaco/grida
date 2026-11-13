@@ -1,5 +1,5 @@
 // GRIDA-SEC-008 — native Desktop subscription authority and private launch.
-import { ChatGptSubscriptionHost } from "@grida/agent/chatgpt-host";
+import { ChatGptSubscriptionHost } from "@grida/ai-host/chatgpt-host";
 import {
   CHATGPT_RESPONSES_URL,
   CHATGPT_SUBSCRIPTION_CONFIG,

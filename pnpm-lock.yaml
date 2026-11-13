@@ -421,9 +421,9 @@ importers:
       '@formatjs/intl-localematcher':
         specifier: ^0.6.1
         version: 0.6.2
-      '@grida/agent':
+      '@grida/ai-host':
         specifier: workspace:*
-        version: link:../packages/grida-ai-agent
+        version: link:../packages/grida-ai-host
       '@grida/ai':
         specifier: workspace:*
         version: link:../packages/grida-ai
@@ -1212,7 +1212,7 @@ importers:
         specifier: ^4
         version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.2)(@vitest/browser-playwright@4.0.18)(jiti@2.7.0)(jsdom@20.0.3(canvas@2.11.2(encoding@0.1.13)))(lightningcss@1.30.2)(msw@2.12.10(@types/node@24.12.2)(typescript@6.0.3))(terser@5.39.0)(tsx@4.21.0)(yaml@2.7.0)
 
-  packages/grida-ai-agent:
+  packages/grida-ai-host:
     dependencies:
       '@grida/ai':
         specifier: workspace:*
@@ -1549,9 +1549,9 @@ importers:
 
   packages/grida-desktop-bridge:
     dependencies:
-      '@grida/agent':
+      '@grida/ai-host':
         specifier: workspace:*
-        version: link:../grida-ai-agent
+        version: link:../grida-ai-host
       '@grida/daemon':
         specifier: workspace:*
         version: link:../grida-daemon

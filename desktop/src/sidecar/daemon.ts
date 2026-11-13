@@ -6,7 +6,7 @@ import type { DaemonServer } from "@grida/daemon/server";
 import type {
   MediaDaemonOptions,
   ProviderHttpTransport,
-} from "@grida/agent/media-server";
+} from "@grida/ai-host/media-server";
 
 /** Node host glue only: HTTP adapters and model operations remain package-owned. */
 export namespace DesktopDaemon {
@@ -54,7 +54,7 @@ export namespace DesktopDaemon {
       gg_base_url: opts.editor_base_url,
       provider_http: opts.provider_http,
     };
-    const { createMediaDaemon } = await import("@grida/agent/media-server");
+    const { createMediaDaemon } = await import("@grida/ai-host/media-server");
     return createMediaDaemon(
       opts.agent === "native-chat"
         ? {

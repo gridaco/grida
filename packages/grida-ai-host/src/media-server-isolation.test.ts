@@ -57,12 +57,12 @@ beforeAll(async () => {
   );
   await fs.writeFile(path.join(stage, "probe.mjs"), probe);
   const contract = `
-    import { createMediaDaemon, type MediaDaemonOptions } from "@grida/agent/media-server";
-    import { ChatGptSubscriptionHost, type ChatGptProviderConfig } from "@grida/agent/chatgpt-host";
+    import { createMediaDaemon, type MediaDaemonOptions } from "@grida/ai-host/media-server";
+    import { ChatGptSubscriptionHost, type ChatGptProviderConfig } from "@grida/ai-host/chatgpt-host";
     // @ts-expect-error Historical chat construction is not distributed.
-    import { createAgent, createToolset, composeSystemPrompt } from "@grida/agent";
+    import { createAgent, createToolset, composeSystemPrompt } from "@grida/ai-host";
     // @ts-expect-error Historical chat server is not a public entrypoint.
-    import type { AgentDaemonOptions } from "@grida/agent/server";
+    import type { AgentDaemonOptions } from "@grida/ai-host/server";
     const verify = (configuration: ChatGptProviderConfig, media: MediaDaemonOptions) => {
       const accepts: ConstructorParameters<typeof ChatGptSubscriptionHost>[0]["configuration"] = configuration;
       return [accepts, createMediaDaemon(media)];
@@ -216,15 +216,15 @@ describe("built retained package", () => {
         const manifest = JSON.parse(fs.readFileSync("package.json", "utf8"));
         const load = ${format === "esm" ? "(specifier) => import(specifier)" : "async (specifier) => require(specifier)"};
         for (const subpath of Object.keys(manifest.exports)) {
-          const specifier = "@grida/agent" + (subpath === "." ? "" : subpath.slice(1));
+          const specifier = "@grida/ai-host" + (subpath === "." ? "" : subpath.slice(1));
           await load(specifier);
         }
-        const root = await load("@grida/agent");
+        const root = await load("@grida/ai-host");
         for (const name of ["createAgent", "createToolset", "composeSystemPrompt"])
           assert.equal(name in root, false);
-        await assert.rejects(load("@grida/agent/server"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
-        await assert.rejects(load("@grida/agent/src/server.ts"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
-        assert.equal(typeof (await load("@grida/agent/chatgpt-host")).ChatGptSubscriptionHost, "function");
+        await assert.rejects(load("@grida/ai-host/server"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
+        await assert.rejects(load("@grida/ai-host/src/server.ts"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
+        assert.equal(typeof (await load("@grida/ai-host/chatgpt-host")).ChatGptSubscriptionHost, "function");
       `,
         ],
         {
@@ -361,7 +361,7 @@ for (const key of Object.keys(forbidden)) forbidden[key] = 0;
 for (const name of ["log", "info", "warn", "error"]) console[name] = () => {};
 
 const load = (specifier) => format === "esm" ? import(specifier) : Promise.resolve(require(specifier));
-const { createMediaDaemon, createMediaTenant } = await load("@grida/agent/media-server");
+const { createMediaDaemon, createMediaTenant } = await load("@grida/ai-host/media-server");
 assert.equal(typeof createMediaTenant, "function");
 const password = "synthetic-entry-password";
 const origin = "https://desktop.invalid";
@@ -439,7 +439,7 @@ try {
   assert.deepEqual(await (await call(restart, "/auth/gg/status")).json(), { active: false });
 } finally { await restart.stop(); }
 
-const protocol = await load("@grida/agent");
+const protocol = await load("@grida/ai-host");
 assert.equal(protocol.CHATGPT_PROVIDER_ID, "chatgpt");
 assert.deepEqual(forbidden, { module: 0, process: 0, network: 0, state: 0 });
 assert.equal(byok, 1);

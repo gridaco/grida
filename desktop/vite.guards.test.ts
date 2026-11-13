@@ -32,7 +32,7 @@ describe("externalizedWorkspaceImports", () => {
 
   it("dedupes repeated offenders", () => {
     expect(
-      externalizedWorkspaceImports(["@grida/agent", "@grida/agent"])
-    ).toEqual(["@grida/agent"]);
+      externalizedWorkspaceImports(["@grida/ai-host", "@grida/ai-host"])
+    ).toEqual(["@grida/ai-host"]);
   });
 });

@@ -5,7 +5,7 @@
  * This is intentionally separate from the behavioural tests — those
  * exercise behaviour; this one exercises the **contract**. A rename,
  * signature change, or accidental drop here = a breaking change for
- * consumers (the `@grida/agent` media tenant, the desktop sidecar/preload,
+ * consumers (the `@grida/ai-host` media tenant, the desktop sidecar/preload,
  * `@grida/desktop-bridge`) — the test should fail until the README /
  * CHANGELOG has been updated to advertise it.
  */

@@ -27,7 +27,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@grida/agent": "workspace:*",
+    "@grida/ai-host": "workspace:*",
     "@grida/daemon": "workspace:*"
   },
   "devDependencies": {

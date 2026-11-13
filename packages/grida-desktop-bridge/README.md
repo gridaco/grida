@@ -11,7 +11,7 @@ Desktop source files directly.
 - Owns the renderer-visible bridge protocol version.
 - Owns the typed shape of `window.grida`.
 - Owns Desktop-native capability names exposed to the renderer.
-- Re-exports shared AgentHost DTOs from `@grida/agent` where the bridge forwards
+- Re-exports shared AgentHost DTOs from `@grida/ai-host` where the bridge forwards
   package-owned HTTP contracts.
 
 `chatgpt.connect()` preserves the secret-free

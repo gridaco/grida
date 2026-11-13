@@ -22,7 +22,7 @@ Electron URL-loads it from `http://localhost:3000/desktop/*` in dev and
 Use [`agent-system`](../agent-system/SKILL.md) for the native Rust agent
 (chat, sessions, tools, permissions, providers), its Main integration
 contracts, and the retained daemon and media services in
-`packages/grida-daemon` and `packages/grida-ai-agent`.
+`packages/grida-daemon` and `packages/grida-ai-host`.
 
 > Adjacent: [`security`](../security/SKILL.md) for the GRIDA-SEC-004 trust
 > boundary, [`code-react`](../code-react/SKILL.md) for React code under
@@ -46,7 +46,7 @@ contracts, and the retained daemon and media services in
 
 Use `agent-system` to implement core agent behavior that can be tested without
 Electron: the native agent crates, `packages/grida-daemon/**`,
-`packages/grida-ai-agent/**`, daemon HTTP routes, files/workspaces, media
+`packages/grida-ai-host/**`, daemon HTTP routes, files/workspaces, media
 providers, and BYOK/secrets. Also use this skill when auditing whether that work changes the
 packaged Desktop payload or its compatibility with the hosted renderer.
 

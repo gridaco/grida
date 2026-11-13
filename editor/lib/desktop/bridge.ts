@@ -52,7 +52,7 @@ import {
   type ModelGenerationGenerateResult,
   type VideoGenerateRequest,
   type VideoGenerateResult,
-} from "@grida/agent";
+} from "@grida/ai-host";
 import type {
   DesktopBridge,
   ChatGptConnectResult,
@@ -114,7 +114,7 @@ export {
   type ProviderId,
   type ChatGptSubscriptionAccount,
   type ChatGptSubscriptionStatus,
-} from "@grida/agent";
+} from "@grida/ai-host";
 
 export type {
   ChatGptConnectResult,

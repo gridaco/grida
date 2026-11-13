@@ -24,7 +24,7 @@ ends or is canceled, and shutdown joins it before tenant cleanup.
 
 Node host adapters should use `DaemonTransport.Client` from
 `@grida/daemon/transport` — or `MediaTransport.Client` from
-`@grida/agent/media-transport`, which extends it with the media tenant's
+`@grida/ai-host/media-transport`, which extends it with the media tenant's
 routes — so the Authorization, Origin, Referer, route strings and JSON parsing
 are constructed consistently. Browser renderers
 should normally consume a host-owned bridge instead of constructing these

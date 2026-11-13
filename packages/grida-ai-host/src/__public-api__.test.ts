@@ -39,7 +39,7 @@ import {
 import { DaemonServer } from "@grida/daemon/server";
 import { MediaTransport } from "./media-transport";
 
-describe("@grida/agent public API", () => {
+describe("@grida/ai-host public API", () => {
   describe("root protocol exports", () => {
     it("exposes no agent execution, tool or event vocabulary", () => {
       for (const name of [

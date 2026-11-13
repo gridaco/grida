@@ -13,7 +13,7 @@
   "repository": "https://github.com/gridaco/grida",
   "main": ".vite/build/main.js",
   "scripts": {
-    "build:linked-packages": "pnpm --dir .. exec turbo run build --no-update-notifier --output-logs=errors-only --filter=@grida/agent --filter=@grida/ai --filter=@grida/auth --filter=@grida/daemon --filter=@grida/desktop-bridge --filter=@grida/home",
+    "build:linked-packages": "pnpm --dir .. exec turbo run build --no-update-notifier --output-logs=errors-only --filter=@grida/ai-host --filter=@grida/ai --filter=@grida/auth --filter=@grida/daemon --filter=@grida/desktop-bridge --filter=@grida/home",
     "dev": "pnpm run build:linked-packages && node scripts/prepare-dev-native-agent.mjs && node scripts/prepare-dev-electron-branding.mjs && electron-forge start",
     "dev:insiders": "pnpm run build:linked-packages && node scripts/prepare-dev-native-agent.mjs && node scripts/prepare-dev-electron-branding.mjs --insiders && electron-forge start -- --insiders",
     "make": "pnpm run build:linked-packages && node scripts/prepare-dev-electron-branding.mjs && node scripts/package-with-native-agent.mjs make",
@@ -41,8 +41,8 @@
     "@electron-forge/plugin-vite": "^7.11.1",
     "@electron-forge/shared-types": "^7.11.1",
     "@electron/fuses": "^1.8.0",
-    "@grida/agent": "link:../packages/grida-ai-agent",
     "@grida/ai": "link:../packages/grida-ai",
+    "@grida/ai-host": "link:../packages/grida-ai-host",
     "@grida/auth": "link:../packages/grida-auth",
     "@grida/daemon": "link:../packages/grida-daemon",
     "@grida/desktop-bridge": "link:../packages/grida-desktop-bridge",

@@ -33,7 +33,7 @@ import {
   isValidEndpointProviderId,
   validateEndpointProviderConfig,
   type EndpointProviderConfig,
-} from "@grida/agent";
+} from "@grida/ai-host";
 import { dirtyState } from "./dirty-state";
 import {
   allHostAppIds,

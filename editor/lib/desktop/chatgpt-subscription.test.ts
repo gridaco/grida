@@ -1,5 +1,5 @@
 // GRIDA-SEC-008 — stale status reads cannot restore an older account state.
-import type { ChatGptSubscriptionStatus } from "@grida/agent";
+import type { ChatGptSubscriptionStatus } from "@grida/ai-host";
 import type { ChatGptConnectResult } from "@grida/desktop-bridge";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

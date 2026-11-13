@@ -77,21 +77,21 @@ grida.co  (one Next.js app)
 
 ## What lives where
 
-| Concern                     | Where                                       |
-| --------------------------- | ------------------------------------------- |
-| Editor UI, agent pane       | `editor/scaffolds/desktop/`                 |
-| `/desktop/*` route group    | `editor/app/desktop/`                       |
-| Typed bridge client         | `editor/lib/desktop/bridge.ts`              |
-| Desktop chat seam           | `editor/lib/agent-chat/`                    |
-| Preload + Electron main     | `desktop/src/`                              |
-| `AgentSidecar` agent server | `packages/grida-ai-agent/` (`@grida/agent`) |
-| `window.grida` shape        | `@grida/desktop-bridge`                     |
+| Concern                     | Where                                        |
+| --------------------------- | -------------------------------------------- |
+| Editor UI, agent pane       | `editor/scaffolds/desktop/`                  |
+| `/desktop/*` route group    | `editor/app/desktop/`                        |
+| Typed bridge client         | `editor/lib/desktop/bridge.ts`               |
+| Desktop chat seam           | `editor/lib/agent-chat/`                     |
+| Preload + Electron main     | `desktop/src/`                               |
+| `AgentSidecar` agent server | `packages/grida-ai-host/` (`@grida/ai-host`) |
+| `window.grida` shape        | `@grida/desktop-bridge`                      |
 
 The bridge type shape lives in `@grida/desktop-bridge`. Desktop preload
 and the editor-side typed client both consume that contract — single
 source of truth for what the renderer can see. The package is only the
 renderer-visible bridge protocol; Electron IPC channel names stay in Desktop
-source, and daemon HTTP stays in `@grida/daemon/transport` + `@grida/agent/media-transport`.
+source, and daemon HTTP stays in `@grida/daemon/transport` + `@grida/ai-host/media-transport`.
 
 `window.grida.protocol` is currently `1`. `/desktop/*` routes must distinguish
 a missing bridge from an unsupported protocol before rendering agent UI. Native

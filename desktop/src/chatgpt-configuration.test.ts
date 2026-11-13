@@ -1,7 +1,7 @@
 // GRIDA-SEC-008 — authorization URL origin, query, and attempt correlation.
 import { describe, expect, it } from "vitest";
 import { TIER_MODEL_IDS } from "@grida/ai/catalogue";
-import { CHATGPT_SUBSCRIPTION_MODEL_IDS } from "@grida/agent";
+import { CHATGPT_SUBSCRIPTION_MODEL_IDS } from "@grida/ai-host";
 import {
   CHATGPT_AUTHORIZE_URL,
   CHATGPT_CALLBACK_PATH,

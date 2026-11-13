@@ -56,7 +56,7 @@ Hosts must provide:
   (an empty list is a valid, bare daemon).
 
 Everything AI is a tenant: a `DaemonTenant` (today, the media tenant from
-`@grida/agent/media-server`) registers its route groups against
+`@grida/ai-host/media-server`) registers its route groups against
 `DaemonServices` and reports its capability flags, a `drain` (abort in-flight
 work), and a `cleanup` (close tenant stores). The daemon depends on nothing
 tenant-specific.

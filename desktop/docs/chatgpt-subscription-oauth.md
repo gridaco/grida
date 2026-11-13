@@ -29,7 +29,7 @@ changing provider, callback, or renderer code.
 - public Codex native OAuth client id
   `app_EMoamEEZ73f0CkXaXp7hrann`, replaceable with
   `GRIDA_CHATGPT_OAUTH_CLIENT_ID`;
-- the default and tier choices from the agent package's closed subscription
+- the default and tier choices from `@grida/ai-host`'s closed subscription
   model set.
 
 The client id is public native-app identity, not a secret. Desktop accepts no

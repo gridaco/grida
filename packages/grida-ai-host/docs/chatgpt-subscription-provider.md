@@ -1,6 +1,6 @@
 # ChatGPT subscription provider
 
-`@grida/agent/chatgpt-host` exports `ChatGptSubscriptionHost`, which lets a
+`@grida/ai-host/chatgpt-host` exports `ChatGptSubscriptionHost`, which lets a
 trusted native host use an eligible ChatGPT account as a text-model provider
 for the native agent. The native agent continues to own the model loop, tools,
 approvals, sessions, and persistence. This path never launches Codex

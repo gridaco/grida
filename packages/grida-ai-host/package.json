@@ -1,5 +1,5 @@
 {
-  "name": "@grida/agent",
+  "name": "@grida/ai-host",
   "version": "0.0.0",
   "private": true,
   "description": "Retained Grida host services: shared media generation, provider credential custody, endpoint settings, the ChatGPT subscription transport and client-safe contracts. Native chat execution is owned by the native agent.",

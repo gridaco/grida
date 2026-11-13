@@ -12,9 +12,9 @@
 import type {
   ChatGptSubscriptionAccount,
   ChatGptSubscriptionStatus,
-} from "@grida/agent";
+} from "@grida/ai-host";
 import type { ChatGptConnectResult } from "@grida/desktop-bridge";
-import type { ChatGptAuthStart } from "@grida/agent";
+import type { ChatGptAuthStart } from "@grida/ai-host";
 import {
   CHATGPT_CALLBACK_PATH,
   CHATGPT_CALLBACK_PORTS,

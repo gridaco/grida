@@ -10,7 +10,7 @@ import {
   isValidEndpointProviderId,
   type EndpointProviderConfig,
   type GGModelsView,
-} from "@grida/agent";
+} from "@grida/ai-host";
 import { catalog } from "@grida/ai/catalogue";
 import type { NativeChatProfileChoice } from "@grida/desktop-bridge";
 import type { NativeAgentLaunch } from "./native-agent-process";

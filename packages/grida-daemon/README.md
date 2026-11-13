@@ -4,7 +4,7 @@ Grida's local daemon: the GRIDA-SEC-004 request perimeter and default loopback
 HTTP adapter that host capability tenants. Private, `workspace:*`, in active
 development.
 
-The daemon is the host; the retained media service in `@grida/agent` is a
+The daemon is the host; the retained media service in `@grida/ai-host` is a
 tenant. Chat execution is not a daemon tenant: the native agent owns it.
 
 It owns:

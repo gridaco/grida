@@ -6,7 +6,7 @@ import type { App } from "electron";
 import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
 import { ProtectedRoots } from "@grida/daemon/server";
 import { home } from "@grida/home";
-import { isValidEndpointProviderId } from "@grida/agent";
+import { isValidEndpointProviderId } from "@grida/ai-host";
 import { LegacyAgentPaths } from "./legacy-agent-paths";
 
 export namespace NativeDesktopProfile {

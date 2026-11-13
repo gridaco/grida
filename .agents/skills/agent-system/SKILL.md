@@ -6,7 +6,7 @@ description: >-
   integration (`desktop/src/main/native-*`) and renderer chat controllers
   (`editor/lib/agent-chat/native-*`), plus the retained host services —
   `@grida/daemon` (DaemonServer, loopback perimeter, files/workspaces/recents,
-  secrets store) and `@grida/agent` (media tenant, provider custody, ChatGPT
+  secrets store) and `@grida/ai-host` (media tenant, provider custody, ChatGPT
   subscription host). Use for chat, session, tool, permission, provider,
   compaction or stream bugs, ACP/MCP protocol changes, and sidecar route
   changes. For pure Electron window, preload, menu, deep-link, or CDP work,
@@ -16,7 +16,7 @@ description: >-
 # Grida Agent System
 
 Chat runs in the **native Rust agent**. The TypeScript agent engine is gone;
-`@grida/agent` is now a retained media-services package with no chat loop,
+`@grida/ai-host` is now a retained media-services package with no chat loop,
 sessions, prompts, skills or tool assembly. Do not re-add chat logic to a
 TypeScript package or to `desktop/src/**`.
 
@@ -39,7 +39,7 @@ grida-agent       (crates/grida-agent — host composition, the executable)
    └ agent-kit-{core,runtime,sessions,providers,sandbox,store-sqlite}
 
 Retained media sidecar (AgentSidecar) — separate child of Main, runs no chat
-   DaemonServer (@grida/daemon) + media tenant (@grida/agent/media-server)
+   DaemonServer (@grida/daemon) + media tenant (@grida/ai-host/media-server)
 ```
 
 Crate ownership and cross-crate rules:
@@ -73,7 +73,7 @@ Feature status: [`docs/agent/features.md`](../../../docs/agent/features.md).
   Origin. `@grida/daemon` is AI-free by contract
   (`packages/grida-daemon/src/__boundary__.test.ts`); the tenant list is static.
 - **ChatGPT subscription** custody is Main's in-process
-  `@grida/agent/chatgpt-host`; the sidecar mounts no ChatGPT route and the
+  `@grida/ai-host/chatgpt-host`; the sidecar mounts no ChatGPT route and the
   native host receives only an opaque scope (GRIDA-SEC-008).
 - **Gateway grants** are memory-only (GRIDA-SEC-006); BYOK keys live in the
   shared provider credential file (GRIDA-SEC-014), denied to model commands.
@@ -85,7 +85,7 @@ Feature status: [`docs/agent/features.md`](../../../docs/agent/features.md).
 - Desktop wiring and IPC: `desktop/src/main/native-*.test.ts` — prove Main
   starts, routes and authorizes; do not duplicate crate behavior.
 - Perimeter, files, workspaces, secrets: `packages/grida-daemon/src/**`;
-  media routes: `packages/grida-ai-agent/src/**`.
+  media routes: `packages/grida-ai-host/src/**`.
 - Regression obligations and coverage model:
   [`rust-core-pressure-test.md`](../../../crates/grida-agent/docs/rust-core-pressure-test.md#coverage-model).
 
@@ -97,7 +97,7 @@ cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-features --locked
 
 pnpm --filter @grida/daemon test          # + test:browser for the perimeter
-pnpm --filter @grida/agent test
+pnpm --filter @grida/ai-host test
 ```
 
 Headless end-to-end runs use `grida-agent run` (see the crate README) or the

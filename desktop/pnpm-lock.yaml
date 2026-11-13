@@ -6,7 +6,7 @@ settings:
 
 overrides:
   node-abi: ^4.31.0
-  '@grida/agent': link:../packages/grida-ai-agent
+  '@grida/ai-host': link:../packages/grida-ai-host
   '@grida/daemon': link:../packages/grida-daemon
   '@grida/desktop-bridge': link:../packages/grida-desktop-bridge
   '@grida/ai': link:../packages/grida-ai
@@ -63,9 +63,9 @@ importers:
       '@electron/fuses':
         specifier: ^1.8.0
         version: 1.8.0
-      '@grida/agent':
-        specifier: link:../packages/grida-ai-agent
-        version: link:../packages/grida-ai-agent
+      '@grida/ai-host':
+        specifier: link:../packages/grida-ai-host
+        version: link:../packages/grida-ai-host
       '@grida/ai':
         specifier: link:../packages/grida-ai
         version: link:../packages/grida-ai

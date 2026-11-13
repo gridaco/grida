@@ -279,7 +279,7 @@ describes local enforcement, not product support.
 
 Before merging a PR that touches `/desktop/*` UI, the preload, the
 daemon's HTTP layer, the sidecar sandbox policy, or any source file under
-`packages/grida-ai-agent/`:
+`packages/grida-ai-host/`:
 
 1. **Bridge scope intact?** Preload path-scoping still fails closed. Window
    navigation still blocks exposed desktop pages from leaving `/desktop/*`.

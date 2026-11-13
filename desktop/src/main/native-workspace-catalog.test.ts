@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, it } from "vitest";
-import { createMediaDaemon } from "@grida/agent/media-server";
+import { createMediaDaemon } from "@grida/ai-host/media-server";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import { WorkspaceWriteUnverified } from "./workspace-file-worker";
 

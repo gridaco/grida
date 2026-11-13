@@ -3,7 +3,7 @@
 // GRIDA-EE: billing — see platform-consumers
 /**
  * `POST /api/v1/ai/images/generations` — hosted image generation for
- * the desktop sidecar. Grida-native wire (the agent package's
+ * the desktop sidecar. Grida-native wire (`@grida/ai-host`'s
  * `ImageGenerateRequest`/`ImageGenerateResult` protocol — NOT OpenAI's
  * images API, despite the OpenAI-style path; the sidecar's BYOK image
  * adapters already speak these shapes). Text-to-image only in v1 (the
@@ -17,7 +17,7 @@
  */
 import { generateImage } from "ai";
 import { z } from "zod";
-import type { ImageGenerateResult } from "@grida/agent";
+import type { ImageGenerateResult } from "@grida/ai-host";
 import { verifyGgToken } from "@/lib/auth/gg-token";
 import ai from "@/lib/ai";
 import { computeImageCostMills } from "@/lib/ai/image-cost";

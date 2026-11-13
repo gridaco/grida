@@ -8,7 +8,7 @@ import { defineConfig } from "tsdown";
  *     these; they must never assume Node.
  *   - node:   the DaemonServer HTTP core, sandbox policy intent, and
  *     the transport client (@hono/node-server, node:fs). Consumed by
- *     host adapters (the desktop sidecar) and tenants (the @grida/agent media
+ *     host adapters (the desktop sidecar) and tenants (the @grida/ai-host media
  *     tenant).
  *
  * Subpath exports in package.json gate which entry a consumer can reach.

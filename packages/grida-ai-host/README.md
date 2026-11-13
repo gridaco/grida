@@ -1,4 +1,4 @@
-# `@grida/agent`
+# `@grida/ai-host`
 
 Retained host services and client-safe contracts. Private, `workspace:*`, in
 active development. Chat execution belongs to the native agent; this package
@@ -13,7 +13,7 @@ belong to [`@grida/ai`](../grida-ai/README.md).
 
 ## Exports
 
-Subpath exports gate platform reach: a bare `import "@grida/agent"`
+Subpath exports gate platform reach: a bare `import "@grida/ai-host"`
 stays browser-safe, and the Node-only entry points are quarantined
 behind their own subpaths so they never pull `node:*` into a client
 bundle.
@@ -115,7 +115,7 @@ the retained media composition.
 
 ## Independent media startup
 
-Hosts import `createMediaDaemon` from `@grida/agent/media-server` to run the
+Hosts import `createMediaDaemon` from `@grida/ai-host/media-server` to run the
 media routes. Shared provider custody lazily uses SQLite only for its private
 cross-process lock after startup. It uses the daemon perimeter and host-owned
 credentials, provider transport and media store. Media and BYOK settings
@@ -124,7 +124,7 @@ default on; GG routes require `gg_base_url`; endpoint-provider settings require
 hosts that already own a `DaemonServer`.
 
 ```ts
-import { createMediaDaemon } from "@grida/agent/media-server";
+import { createMediaDaemon } from "@grida/ai-host/media-server";
 
 const daemon = createMediaDaemon({
   password,
@@ -247,7 +247,7 @@ models}` — Ollama is the preset) and resolves media providers. There is no
 - **Not a UI framework.** Rendering, transcript state and history navigation
   are the client's job.
 - **Not a Desktop bridge package.** `@grida/daemon/transport` +
-  `@grida/agent/media-transport` own the daemon HTTP seam. Electron-specific
+  `@grida/ai-host/media-transport` own the daemon HTTP seam. Electron-specific
   window, dialog, shell, host-app, and file-path capabilities stay in
   Desktop's bridge contract.
 - **Not the host layer.** The loopback perimeter and the host capability
@@ -282,8 +282,8 @@ The wider architecture lives in the working-group docs:
 ## Build & test
 
 ```sh
-pnpm --filter @grida/agent build   # tsdown → dist/
-pnpm --filter @grida/agent test    # vitest
+pnpm --filter @grida/ai-host build   # tsdown → dist/
+pnpm --filter @grida/ai-host test    # vitest
 ```
 
 The daemon excludes the provider credential tree from workspace and file grants

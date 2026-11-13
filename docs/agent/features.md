@@ -70,7 +70,7 @@ Desktop versions stay in their original storage and are not listed; see
 
 The [configuration contract](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-config.md) records the reviewed input-limit field and shared inspect/update operations.
 
-Additional media HTTP/SDK operations are documented by the [agent package][package].
+Additional media HTTP/SDK operations are documented by the [retained host package][package].
 Their presence does not make every operation a tool available to the agent.
 
 ## Supported surfaces
@@ -159,7 +159,7 @@ These are required working mechanisms behind the features above.
 [image-preview]: https://github.com/gridaco/grida/blob/main/editor/kits/image-preview/image-transfer.ts
 [refresh-case]: https://github.com/gridaco/grida/blob/main/test/desktop-workbench-canvas-resource-refresh.md
 [external-native]: ./clients.md#run-a-local-external-acp-peer
-[package]: https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/README.md#shared-media-operations
+[package]: https://github.com/gridaco/grida/blob/main/packages/grida-ai-host/README.md#shared-media-operations
 [scratch]: https://github.com/gridaco/grida/blob/main/crates/grida-agent/src/scratch.rs
 [filesystem]: https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#filesystem-services
 [headless-source]: https://github.com/gridaco/grida/blob/main/crates/grida-agent/src/main.rs

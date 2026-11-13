@@ -45,9 +45,12 @@ import { NativeWorkspaceReads } from "./native-workspace-reads";
 import { NativeWorkspaceWrites } from "./native-workspace-writes";
 import { nativeWorkspaceMedia } from "./workspace-media-access";
 import { EDITOR_BASE_URL } from "../env";
-import { MediaTransport } from "@grida/agent/media-transport";
+import { MediaTransport } from "@grida/ai-host/media-transport";
 import type { Workspace } from "@grida/daemon";
-import type { EndpointProviderConfig, ProbedEndpointModel } from "@grida/agent";
+import type {
+  EndpointProviderConfig,
+  ProbedEndpointModel,
+} from "@grida/ai-host";
 
 const EDITOR_ORIGIN = new URL(EDITOR_BASE_URL).origin;
 const REFERER = `${EDITOR_ORIGIN}/desktop`;

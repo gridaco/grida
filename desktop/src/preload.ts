@@ -17,7 +17,7 @@
  */
 
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import { MediaTransport } from "@grida/agent/media-transport";
+import { MediaTransport } from "@grida/ai-host/media-transport";
 import {
   NativeEditorSurfaces,
   NativeEditorSvgText,

@@ -1,6 +1,6 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — bounded media requests from a supervised agent.
 import { createHash } from "node:crypto";
-import type { ImageGenerateRequest } from "@grida/agent";
+import type { ImageGenerateRequest } from "@grida/ai-host";
 import { catalog } from "@grida/ai/catalogue";
 import type { WorkspaceReviewReceipt } from "./native-workspace-review";
 

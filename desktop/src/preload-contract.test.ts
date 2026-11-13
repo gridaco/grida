@@ -27,7 +27,7 @@ describe("Desktop preload agent seam", () => {
   });
   it("delegates media-service HTTP routes to the chat-free MediaTransport.Client", () => {
     expect(preloadSource).toContain("new MediaTransport.Client");
-    expect(preloadSource).not.toContain("@grida/agent/transport");
+    expect(preloadSource).not.toContain("@grida/ai-host/transport");
     expect(preloadSource).not.toContain('"/agent/run"');
     expect(preloadSource).not.toContain('"/secrets/has"');
     expect(preloadSource).not.toContain('"/sessions"');

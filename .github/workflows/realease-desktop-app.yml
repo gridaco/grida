@@ -112,7 +112,7 @@ jobs:
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm turbo run build \
             --filter=@grida/desktop-bridge \
-            --filter=@grida/agent \
+            --filter=@grida/ai-host \
             --filter=@grida/daemon \
             --filter=@grida/home
 

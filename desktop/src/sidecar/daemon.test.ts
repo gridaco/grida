@@ -3,13 +3,13 @@
 // GRIDA-GG: desktop — scoped custody receives the same host origin and transport.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DaemonServer } from "@grida/daemon/server";
-import type { createMediaDaemon } from "@grida/agent/media-server";
+import type { createMediaDaemon } from "@grida/ai-host/media-server";
 import { DesktopDaemon } from "./daemon";
 
 const mocks = vi.hoisted(() => ({
   media: vi.fn<typeof createMediaDaemon>(),
 }));
-vi.mock("@grida/agent/media-server", () => ({
+vi.mock("@grida/ai-host/media-server", () => ({
   createMediaDaemon: mocks.media,
 }));
 

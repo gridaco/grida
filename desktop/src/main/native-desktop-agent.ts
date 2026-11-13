@@ -2,7 +2,7 @@
 // GRIDA-GG: desktop — exact Gateway model and organization for each worker.
 import { randomUUID } from "node:crypto";
 import { lstatSync, realpathSync } from "node:fs";
-import { GG_PROVIDER_ID } from "@grida/agent";
+import { GG_PROVIDER_ID } from "@grida/ai-host";
 import { AGENT_DEFAULT_TIER, TIER_MODEL_IDS } from "@grida/ai/catalogue";
 import type { Workspace } from "@grida/daemon";
 import {

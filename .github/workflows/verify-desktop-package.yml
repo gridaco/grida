@@ -16,7 +16,7 @@ on:
       - "rust-toolchain.toml"
       - "skills/**"
       - "scripts/cli-release/native*.mjs"
-      - "packages/grida-ai-agent/**"
+      - "packages/grida-ai-host/**"
       - "packages/grida-ai/**"
       - "packages/grida-daemon/**"
       - "packages/grida-auth/**"
@@ -79,7 +79,7 @@ jobs:
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm turbo run build \
             --filter=@grida/desktop-bridge \
-            --filter=@grida/agent \
+            --filter=@grida/ai-host \
             --filter=@grida/daemon \
             --filter=@grida/home
 

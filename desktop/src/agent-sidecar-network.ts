@@ -1,7 +1,7 @@
 /** GRIDA-SEC-004 — sandbox-side provider transport over the private channel. */
 import crypto from "node:crypto";
 import type { Readable, Writable } from "node:stream";
-import type { ProviderHttpTransport } from "@grida/agent/media-server";
+import type { ProviderHttpTransport } from "@grida/ai-host/media-server";
 import { AgentNetworkPolicy } from "./agent-network-policy";
 import { AgentSidecarChannel } from "./agent-sidecar-channel";
 
@@ -29,7 +29,7 @@ type PendingResponse = {
 
 /**
  * Sidecar half of the private provider-HTTP channel. This is the only
- * network capability handed to `@grida/agent`; spawned children receive
+ * network capability handed to `@grida/ai-host`; spawned children receive
  * neither the object nor a channel address/token in argv or environment.
  */
 export class AgentSidecarNetwork {

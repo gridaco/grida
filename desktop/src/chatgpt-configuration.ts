@@ -13,7 +13,7 @@
  * environment override is the replacement seam for a Grida registration.
  */
 
-import type { ChatGptProviderConfig } from "@grida/agent/chatgpt-host";
+import type { ChatGptProviderConfig } from "@grida/ai-host/chatgpt-host";
 
 export const CHATGPT_CALLBACK_PATH = "/auth/callback" as const;
 export const CHATGPT_CALLBACK_PORTS = [1455, 1457] as const;
