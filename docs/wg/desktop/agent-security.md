@@ -12,23 +12,21 @@ tags:
 
 # Agent security
 
-> **Status: current implementation record.** The sections below describe the
-> shipping whole-sidecar boundary plus the landed host-routed provider
-> transport. The remaining raw-execution re-scope is specified by
-> [Execution authority](../ai/agent/execution-authority.md) and the
-> [Desktop delta](./agent-sandbox-wrap.md); supervisor-owned shell, ACP, and
-> extension workers must not be represented here as shipped. The current outer
-> sandbox applies on macOS/Linux; Windows is unwrapped, with shell and external
-> ACP withheld but structured local filesystem capabilities still exposed.
+> **Scope.** Chat runs in the native agent host; its command confinement is
+> specified by [Execution authority](../ai/agent/execution-authority.md) and the
+> [Desktop delta](./agent-sandbox-wrap.md). This page covers the renderer
+> bridge, the retained media sidecar's perimeter and outer sandbox, provider
+> transport, and the ChatGPT credential boundary. The outer sandbox applies on
+> macOS/Linux; Windows is unwrapped and starts no chat engine.
 
 > **GRIDA-SEC-008 is active.** The ChatGPT Subscription provider adds the
-> main-owned callback, sidecar-owned credential lifecycle, safe renderer
-> bridge, and exact provider destinations as one registered boundary. The
-> implementation is still an experimental interoperability profile; an active
-> local security boundary is not a claim of OpenAI support or approval.
+> main-owned callback and credential lifecycle, safe renderer bridge, and exact
+> provider destinations as one registered boundary. The implementation is still
+> an experimental interoperability profile; an active local security boundary
+> is not a claim of OpenAI support or approval.
 
 `GRIDA-SEC-004` is the trust boundary between the URL-loaded renderer and the
-long-lived agent server. On supported macOS/Linux hosts, the boundary uses
+retained daemon sidecar. On supported macOS/Linux hosts, the boundary uses
 several distinct controls. They are defense in depth, but they do not all
 protect the same authority: the main-owned socket listener controls entry to
 the daemon protocol, the outer sandbox constrains the process tree, and the
@@ -45,13 +43,13 @@ This page is the desktop-specific landing.
 
 | Control                                   | Where                                                                                                                                                                                            | What it stops                                                                                                    |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| Path-scoped `window.grida`                | Preload (`desktop/src/preload.ts`); exposed iff `location.pathname` is `/desktop` or starts with `/desktop/`; later navigation is blocked by preload history guards and `desktop/src/window.ts`. | XSS on any other `grida.co` page cannot reach the agent server — `window.grida` is `undefined` there.            |
+| Path-scoped `window.grida`                | Preload (`desktop/src/preload.ts`); exposed iff `location.pathname` is `/desktop` or starts with `/desktop/`; later navigation is blocked by preload history guards and `desktop/src/window.ts`. | XSS on any other `grida.co` page cannot reach the daemon — `window.grida` is `undefined` there.                  |
 | CSP-strict `/desktop/*` routes            | `editor/proxy.ts` and the desktop route group.                                                                                                                                                   | Third-party scripts and inline-script injection on privileged desktop pages.                                     |
 | Main-owned daemon socket + HTTP perimeter | Electron main accepts exact-loopback sockets; the socketless daemon applies Basic Auth, `Referer`, `Origin`, and route guards.                                                                   | A sidecar bind/connect escape; cross-origin or cross-process callers without the host credential and provenance. |
-| OS-level outer sandbox (macOS/Linux)      | [`agent-sandbox-wrap`](./agent-sandbox-wrap.md). Wraps the daemon process tree on supported platforms.                                                                                           | A compromised agent server reading SSH keys, writing shell rc files, calling arbitrary hosts.                    |
-| Secrets discipline                        | `auth.json` at chmod `0o600`; preload holds the agent server password in closure; never on `window`.                                                                                             | A non-Grida process on the same machine reading the token file; a renderer script enumerating credentials.       |
+| OS-level outer sandbox (macOS/Linux)      | [`agent-sandbox-wrap`](./agent-sandbox-wrap.md). Wraps the daemon process tree on supported platforms.                                                                                           | A compromised sidecar reading SSH keys, writing shell rc files, calling arbitrary hosts.                         |
+| Secrets discipline                        | `auth.json` at chmod `0o600`; preload holds the daemon password in closure; never on `window`.                                                                                                   | A non-Grida process on the same machine reading the token file; a renderer script enumerating credentials.       |
 | Host-routed provider transport            | Electron main, reached only through bounded framed stdin/stdout.                                                                                                                                 | Provider calls bypassing the system proxy/trust route; turning provider configuration into generic native fetch. |
-| ChatGPT OAuth credential boundary         | Electron main callback + AgentSidecar credential manager + guarded bridge (`GRIDA-SEC-008`).                                                                                                     | Renderer or local callback callers obtaining/replaying provider credentials; provider OAuth widening into ACP.   |
+| ChatGPT OAuth credential boundary         | Electron main callback + main-owned credential host + guarded bridge (`GRIDA-SEC-008`).                                                                                                          | Renderer or local callback callers obtaining/replaying provider credentials; provider OAuth widening into ACP.   |
 
 ## Path-scoped `window.grida`
 
@@ -63,7 +61,7 @@ non-desktop paths. Cross-link:
 
 **What this catches.** A future bug that introduces an `<iframe>` on
 `grida.co/blog/...` to load the same Electron renderer. The bridge stays
-detached; the iframe sees no agent server API.
+detached; the iframe sees no daemon API.
 
 **What this does not catch.** A bug _inside_ `/desktop/*` that runs
 attacker-controlled JS. CSP and the authenticated daemon perimeter remain
@@ -90,8 +88,9 @@ AgentSidecar starts the daemon without a listener and injects that socket into
 an unbound HTTP server. It receives no listener, target field, bind operation,
 or connect operation. Every request on the transferred socket must:
 
-- Carry the per-spawn Basic Auth password (regenerated each agent host
-  start; never persisted).
+- Carry the per-spawn Basic Auth password in the `Authorization` header
+  (regenerated each sidecar start; never persisted, never accepted from the
+  query string).
 - Have a `Referer` header whose path is under the host-declared desktop route root.
 - Have an `Origin` on the host-declared allowlist.
 
@@ -121,14 +120,14 @@ strict construction switches.
 
 Windows currently has no equivalent enabled outer boundary. srt 0.0.65 ships
 an alpha Windows backend, but Desktop withholds it until the argv-based spawn,
-machine provisioning, packaging, and lifecycle contract are supported. The
-host withholds shell and external ACP, but not structured local filesystem
-tools, so the shipping Windows posture is a known gap against the accepted
-fail-closed authority model. The package policy is not a kernel egress fence on
+machine provisioning, packaging, and lifecycle contract are supported. Windows
+starts no chat engine, so no local capability is model-invocable, but the
+retained structured filesystem routes run without a kernel fence — a known gap
+against the accepted fail-closed authority model. The package policy is not a kernel egress fence on
 that unwrapped process; the other controls do not turn it into sandboxed local
 execution.
 
-**What this catches.** A compromised agent server that wants to read
+**What this catches.** A compromised sidecar that wants to read
 `~/.ssh`, write `~/.zshrc`, or exfiltrate to a random host.
 
 **What this does not catch.** A compromised agent that sends data to an origin
@@ -136,67 +135,26 @@ already granted through the provider transport. The RFC's
 [watchdog](../ai/agent/foundations.md#watchdog) is the answer to semantic misuse
 inside a legitimate provider request — host-configured policy, not srt.
 
-## Agent shell execution
+## Command execution
 
-The `run_command` agent tool spawns child processes through the shell
-runner (`packages/grida-daemon/src/shell/runner.ts`) with `shell: false`.
-There is **no command allowlist** — a per-session **permission mode**
-(`protocol/mode.ts`) governs the surface: `accept-edits` (default — read-only
-inspection commands auto-run; so does a narrow, non-overwriting two-path
-`cp`/`mv` whose source and destination stay canonically inside session scratch;
-every other mutating/executing command **pauses for a supervised Allow/Deny
-prompt** and runs only on approval) or `auto` (every command runs; the OS
-sandbox is the guard, the semantic classifier deferred). Scratch-local
-pre-authorization rejects flags, symlinks, overwrites, and paths outside
-scratch, so promotion into the workspace remains supervised.
-The supervised gate is the AI SDK's native `needsApproval` on the tool
-(`tools/run-command.ts`), wired from the mode at `workspace-agent-bindings.ts` —
-not the command backend, which only runs an already-cleared call. The
-approval _answer_ is server-validated: the renderer's Allow/Deny rides an
-explicit `approval_answer` body field (the host owns message state, so the answer
-is not smuggled in a client-mutated message) and `store.answerApproval` (via
-`run-input.ts` `applyApprovalAnswer`) flips a part to `approval-responded` only
-when it was a real pending approval, so the renderer can answer but never forge a
-call. Two structural gates hold in every mode: cwd must be inside this
-session's exact workspace or scratch root, and explicit secret-root args are
-rejected before host execution; the fs-edit tools additionally refuse
-no-clobber paths (`fs/scope.ts`).
+The retained sidecar runs no model command, and its private capability channel
+has no command lane. Model commands run in the native agent host, whose
+sandbox helper confines each one under the captured workspace grants and
+protected paths; a failed or unavailable boundary refuses the command rather
+than selecting an unconfined executor. See the
+[Desktop authority binding](https://github.com/gridaco/grida/blob/main/desktop/docs/agent-authority.md#raw-execution-and-extensions).
 
-Desktop's retained sidecar runs no model command, and its private capability
-channel has no command lane. Model commands run in the native Rust host, whose
-sandbox helper confines each one. See the
-[Desktop authority binding](https://github.com/gridaco/grida/blob/main/desktop/docs/agent-authority.md).
-
-**Secret-dir containment — the srt / in-process split.** There are two
-classes of secret on disk, owned by two different gates:
-
-- **HOME secrets** (`~/.ssh`, `~/.aws`, shell rc files) are denied for the
-  entire tree by the srt `deny_read` policy. The host has no legitimate read
-  there, so a kernel-level deny is safe.
-- **The agent host's own secret dir** — its `userData`, where BYOK
-  `auth.json`, `workspaces.json`, `recent.json`, and the sessions db live —
-  is **not** in the whole-sidecar `deny_read`, because that process must read
-  provider credentials. Electron main executes finite commands separately, so
-  their per-command profiles do deny `userData` at the kernel. The argv check
-  remains defense in depth; an interpreter-computed path is denied as well.
-
-The responsibility split is therefore: the outer profile protects HOME
-secrets from the entire sidecar, while each finite-command profile additionally
-protects the sidecar-owned secret directory and every sibling scratch root.
-
-**`auto` is informed-consent, not a guarantee.** `auto` removes
-command-identity gating; the sandbox still bounds the blast radius (writable
-roots and no direct external networking) but does not judge intent — an
-injected or confused agent can read broadly and run anything within those
-bounds. Intent judgment is the
-[watchdog](../ai/agent/foundations.md#watchdog) layer, deferred.
-`auto` is opt-in; the default `accept-edits` requires approval for mutations
-except the narrow scratch-local copy/move operation described above.
+**Secret-dir containment.** HOME secrets (`~/.ssh`, `~/.aws`, shell rc files)
+are denied to the whole sidecar tree by the outer sandbox. The sidecar's own
+state directory is readable by the sidecar because it must read provider
+credentials; each native command profile denies that directory, the shared
+provider credential root, and the native host's state alongside other
+protected paths.
 
 ## Secrets discipline
 
 - `auth.json` at chmod `0o600` ([agent-storage-layout](./agent-storage-layout.md)).
-- The agent server password is generated per-spawn, passed to the sidecar
+- The daemon password is generated per-spawn, passed to the sidecar
   over stdin, fetched by preload through guarded IPC, held in preload closure,
   **never** placed on argv, env, disk, or `window`.
 - Logs never include tokens, message content, tool args, or model
@@ -242,10 +200,10 @@ in the Chromium cookie jar. Main has transient routing authority, not durable
 credential custody. The host transport is an explicit trust boundary, not a
 claim that main cannot see in-flight authorization.
 
-The ChatGPT credential follows the same routing distinction under
-`GRIDA-SEC-008`: AgentSidecar owns credential lifecycle; main may route an
-in-flight authorized request but gains no durable custody; the renderer
-receives neither.
+The ChatGPT credential is different under `GRIDA-SEC-008`: main's
+subscription host owns its lifecycle and injects it at the provider edge of
+the native host's supervised transport. The sidecar and the renderer receive
+neither the credential nor any ChatGPT route.
 
 **What this catches.** A provider call that would otherwise inherit the
 sidecar's static proxy/SRT route instead of the user's Chromium/system route;
@@ -320,7 +278,7 @@ describes local enforcement, not product support.
 ## Reviewer checklist
 
 Before merging a PR that touches `/desktop/*` UI, the preload, the
-agent server's HTTP layer, `buildAgentDaemonSandboxPolicy()`, or any source file under
+daemon's HTTP layer, the sidecar sandbox policy, or any source file under
 `packages/grida-ai-agent/`:
 
 1. **Bridge scope intact?** Preload path-scoping still fails closed. Window
@@ -329,7 +287,8 @@ agent server's HTTP layer, `buildAgentDaemonSandboxPolicy()`, or any source file
    add third-party scripts.
 3. **Daemon ingress intact?** Main alone owns the exact loopback listener and
    transfers only accepted connected sockets. Every new route handler runs the
-   auth + Referer + Origin guards. No "internal" bypass.
+   auth + Referer + Origin guards; the credential stays header-only. No
+   "internal" bypass.
 4. **Outer sandbox intact?** The Desktop policy keeps direct external egress
    empty and local binding false; filesystem paths cover only what the code
    reads/writes and the mandatory deny set is unmodified.
