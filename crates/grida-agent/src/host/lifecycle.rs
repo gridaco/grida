@@ -802,6 +802,19 @@ impl Host {
             return Ok(view);
         }
         let session = request.session.clone();
+        // A goal's work turn resumes only through goal control. Decide that
+        // before admission, so the refusal does not depend on whether the
+        // paused turn's worker has released the session yet.
+        let goal_turn = self
+            .store
+            .inspect_turn_with(session.clone(), turn.clone(), |state| {
+                Ok(grida_agent_master::goals::Goal::reservation_for_turn(state)?.is_some())
+            })
+            .await?;
+        if goal_turn {
+            let view = self.store.inspect(session.clone()).await?;
+            goals::require_resumable(&view, &turn)?;
+        }
         let ticket = {
             let mut work = self.work.lock().await;
             self.register(
