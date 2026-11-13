@@ -93,6 +93,11 @@ export namespace ipc_admission {
         ) {
           return pathname === "/desktop/workspace";
         }
+        // The Welcome composer lists connections for a chat it hands to the
+        // workspace it opens; it never reaches a workspace chat itself.
+        if (channel === IPC_CHANNELS.WELCOME_CHAT_PROFILES) {
+          return pathname === "/desktop/welcome";
+        }
         if (
           channel === IPC_CHANNELS.DOCUMENT_READ ||
           channel === IPC_CHANNELS.DOCUMENT_WRITE

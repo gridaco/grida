@@ -724,6 +724,11 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
   takeNotificationFocus(): Promise<NativeChatNotificationFocus | null>;
   list(cursor?: string | null): Promise<NativeChatPage>;
   profiles?(): Promise<NativeChatProfileCatalog | null>;
+  /**
+   * On the Welcome screen only: the connections a new chat can choose before a
+   * workspace opens, with nothing active or saved. Listing starts nothing.
+   */
+  welcomeProfiles?(): Promise<NativeChatProfileCatalog | null>;
   /** Inspect reviewed definitions and retained results without running handlers. */
   inspectHooks?(attachmentId?: string): Promise<NativeHookInspection>;
   /** Main owns file selection and the explicit review of executable authority. */

@@ -435,6 +435,25 @@ export class NativeDesktopAgent {
     );
   }
 
+  /**
+   * The choices a Welcome composer can offer before any workspace opens:
+   * built-in provider keys and saved endpoints, whose identities do not depend
+   * on a workspace. The opened workspace resolves the choice again.
+   */
+  async welcomeProfiles() {
+    this.requireProfiles();
+    const { builtIn, configured } = await this.workspaceIndependentProfiles();
+    const defaultWindow = NativeChatProfiles.contextWindow(
+      DEFAULT_GATEWAY_MODEL
+    );
+    return {
+      ...(defaultWindow !== undefined && {
+        defaultContextWindow: defaultWindow,
+      }),
+      choices: [...builtIn, ...configured.choices].map(publicProfile),
+    };
+  }
+
   async selectProfile(
     workspaceId: string,
     selection: NativeChatProfileSelection,
@@ -629,9 +648,8 @@ export class NativeDesktopAgent {
       throw new Error("native_chat_profiles_unavailable");
   }
 
-  private async availableProfiles(workspaceId: string) {
-    const gatewayScope = this.owners?.gatewayScope(workspaceId);
-    const [builtIn, configured, gateway] = await Promise.all([
+  private async workspaceIndependentProfiles() {
+    const [builtIn, configured] = await Promise.all([
       NativeChatProfiles.builtInChoices(agentSidecarClient.nativeBuiltInByok),
       agentSidecarClient
         .listProviderEndpoints()
@@ -641,6 +659,14 @@ export class NativeDesktopAgent {
             agentSidecarClient.nativeConfiguredEndpoint
           )
         ),
+    ]);
+    return { builtIn, configured };
+  }
+
+  private async availableProfiles(workspaceId: string) {
+    const gatewayScope = this.owners?.gatewayScope(workspaceId);
+    const [{ builtIn, configured }, gateway] = await Promise.all([
+      this.workspaceIndependentProfiles(),
       gatewayScope
         ? agentSidecarClient
             .listGatewayModels()

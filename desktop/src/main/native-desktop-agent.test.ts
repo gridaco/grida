@@ -647,6 +647,12 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         "local",
         "local (llama.cpp counting)",
       ]);
+      // Welcome offers the same workspace-independent choices before any
+      // workspace opens, with nothing saved or active.
+      expect(await agent.welcomeProfiles()).toEqual({
+        defaultContextWindow: expect.any(Number),
+        choices,
+      });
       const [{ id: newId }, { id: countedId }] = choices;
       expect(newId).not.toBe(oldId);
       expect(countedId).not.toBe(newId);
@@ -924,6 +930,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         choices,
         saved: [],
       });
+      expect(mints).toBe(1);
+      // Gateway choices depend on a running workspace, so Welcome omits them.
+      expect((await agent.welcomeProfiles()).choices).toEqual([]);
       expect(mints).toBe(1);
 
       const { id } = choices[0]!;

@@ -57,6 +57,7 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_LIST: "grida:native-chat:list",
   NATIVE_CHAT_PROFILES: "grida:native-chat:profiles",
   NATIVE_CHAT_SELECT_PROFILE: "grida:native-chat:select-profile",
+  WELCOME_CHAT_PROFILES: "grida:welcome:chat-profiles",
   NATIVE_CHAT_LIST_ARCHIVED: "grida:native-chat:list-archived",
   NATIVE_CHAT_CATALOG_ENTRY: "grida:native-chat:catalog-entry",
   NATIVE_CHAT_ORGANIZE: "grida:native-chat:organize",

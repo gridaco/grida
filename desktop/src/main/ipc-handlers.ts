@@ -385,6 +385,10 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_CHAT_PROFILES, (event) =>
     nativeChat.profiles(event)
   );
+  guarded(IPC_CHANNELS.WELCOME_CHAT_PROFILES, (event, ...args: unknown[]) => {
+    if (args.length) throw new Error("native_chat_profiles_invalid");
+    return nativeChat.welcomeProfiles(event);
+  });
   guarded(
     IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
     (event, selection: unknown) => nativeChat.selectProfile(event, selection)

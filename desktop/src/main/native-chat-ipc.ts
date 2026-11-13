@@ -252,6 +252,11 @@ export type NativeChatProfileOwner = Readonly<{
   ): Promise<void>;
   /** A usable connection when the default cannot start, if one exists. */
   fallback?(workspaceId: string): Promise<string | null>;
+  /**
+   * Choices whose identity does not depend on a workspace, listed before one
+   * opens. Gateway models need a running workspace and are not included.
+   */
+  welcome?(): Promise<Omit<NativeChatProfileCatalog, "active" | "saved">>;
 }>;
 
 type SelectedProfile = Readonly<{
@@ -845,6 +850,42 @@ export class NativeChatIpc {
       )
         throw new Error("native_chat_scope_changed");
       return { ...result, active: profile?.id ?? null };
+    } finally {
+      stopWatching();
+    }
+  }
+
+  /**
+   * The Welcome composer's connection choices. Admitted only for the current
+   * Welcome main frame; it names no workspace, starts nothing and selects
+   * nothing. The workspace that opens selects the choice as a new connection.
+   */
+  async welcomeProfiles({
+    sender,
+    senderFrame: frame,
+  }: IpcMainInvokeEvent): Promise<NativeChatProfileCatalog | null> {
+    const href = frame?.url;
+    if (
+      !frame ||
+      !href ||
+      sender.isDestroyed() ||
+      sender.isLoadingMainFrame() ||
+      frame !== sender.mainFrame ||
+      !ipc_sender.isAllowed(href, this.editorOrigin) ||
+      ipc_sender.pathname(href) !== "/desktop/welcome"
+    )
+      throw new Error("native_chat_scope_changed");
+    const list = this.profilesOwner?.welcome;
+    if (this.disabled || !list) return null;
+    let admitted = true;
+    const stopWatching = ipc_sender.watchNavigation(sender, () => {
+      admitted = false;
+    });
+    try {
+      const result = await list.call(this.profilesOwner);
+      if (!admitted || frame.url !== href)
+        throw new Error("native_chat_scope_changed");
+      return { ...result, active: null, saved: [] };
     } finally {
       stopWatching();
     }

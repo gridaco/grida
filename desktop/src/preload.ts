@@ -436,6 +436,8 @@ const bridge: DesktopBridge = {
     list: (cursor) => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_LIST, cursor),
     ...(!selectedDocumentChatRoute() && {
       profiles: () => ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_PROFILES),
+      welcomeProfiles: () =>
+        ipcRenderer.invoke(IPC_CHANNELS.WELCOME_CHAT_PROFILES),
       selectProfile: (selection) =>
         ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE, selection),
     }),

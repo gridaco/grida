@@ -56,6 +56,7 @@ describe("ipc_admission", () => {
           !nativeChat.includes(channel) &&
           !nativeExternal.includes(channel) &&
           channel !== workspacePublish &&
+          channel !== IPC_CHANNELS.WELCOME_CHAT_PROFILES &&
           !(documentFiles as readonly IpcChannel[]).includes(channel)
       )
     );
@@ -149,6 +150,30 @@ describe("ipc_admission", () => {
         channel
       );
     }
+  });
+
+  it("admits Welcome connection choices only on the exact Welcome route", () => {
+    const channel = IPC_CHANNELS.WELCOME_CHAT_PROFILES;
+    expect(allowedFor("main", "/desktop/welcome")).toContain(channel);
+    for (const route of [
+      "/desktop/welcome/extra",
+      "/desktop/workspace",
+      "/desktop/file",
+      "/desktop/tools",
+      "/desktop/settings",
+    ])
+      expect(allowedFor("main", route)).not.toContain(channel);
+    expect(allowedFor("onboarding", "/desktop/onboarding")).not.toContain(
+      channel
+    );
+    expect(allowedFor("sign-in", "/desktop/auth/sign-in")).not.toContain(
+      channel
+    );
+    expect(
+      allowedFor("main", "/desktop/welcome").filter((allowed) =>
+        nativeChat.includes(allowed)
+      )
+    ).toEqual([]);
   });
 
   it("admits notification focus consumption only in the main workspace", () => {

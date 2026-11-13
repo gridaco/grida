@@ -908,6 +908,7 @@ app.on("ready", async () => {
             select: (workspaceId, selection, requireCurrent) =>
               native.selectProfile(workspaceId, selection, requireCurrent),
             fallback: () => native.fallbackProfile(),
+            welcome: () => native.welcomeProfiles(),
           }
         : undefined,
       native_chatgpt_oauth: native.chatgptOAuth,

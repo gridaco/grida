@@ -2612,7 +2612,7 @@ describe("native chat IPC", () => {
     );
     for (const key of Object.keys(IPC_CHANNELS).filter(
       (key) =>
-        key.startsWith("NATIVE_CHAT_") &&
+        (key.startsWith("NATIVE_CHAT_") || key === "WELCOME_CHAT_PROFILES") &&
         key !== "NATIVE_CHAT_UPDATE" &&
         key !== "NATIVE_CHAT_EDITOR_SURFACE_OPEN" &&
         key !== "NATIVE_CHAT_EDITOR_SVG_TEXT"
@@ -2624,5 +2624,109 @@ describe("native chat IPC", () => {
         new RegExp(`ipcMain.handle\\(\\s*IPC_CHANNELS\\.${key}\\b`)
       );
     }
+  });
+});
+
+describe("Welcome connection choices", () => {
+  const WELCOME_URL = `${ORIGIN}/desktop/welcome`;
+  const CHOICE = {
+    id: "f".repeat(64),
+    connection: "OpenRouter",
+    model: "Fixture",
+  };
+
+  function welcomeIpc(
+    welcome: () => Promise<{ choices: (typeof CHOICE)[] }>,
+    disabled = false
+  ) {
+    const list = vi.fn<() => Promise<never>>();
+    const select = vi.fn<() => Promise<void>>(async () => {});
+    const ensure = vi.fn<() => Promise<void>>(async () => {});
+    const ipc = new NativeChatIpc(
+      ORIGIN,
+      () => null,
+      { admits: () => true, ensure },
+      undefined,
+      undefined,
+      undefined,
+      { list, select, welcome },
+      undefined,
+      disabled
+    );
+    return { ipc, list, select, ensure };
+  }
+
+  it("lists choices for the Welcome frame without starting or selecting anything", async () => {
+    const welcome = vi.fn<() => Promise<{ choices: (typeof CHOICE)[] }>>(
+      async () => ({ choices: [CHOICE] })
+    );
+    const { ipc, list, select, ensure } = welcomeIpc(welcome);
+    const frame = windowAt(WELCOME_URL);
+    await expect(ipc.welcomeProfiles(frame.event)).resolves.toEqual({
+      active: null,
+      saved: [],
+      choices: [CHOICE],
+    });
+    expect(welcome).toHaveBeenCalledOnce();
+    expect(list).not.toHaveBeenCalled();
+    expect(select).not.toHaveBeenCalled();
+    expect(ensure).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    WORKSPACE_URL,
+    `${ORIGIN}/desktop/welcome/extra`,
+    `${ORIGIN}/desktop/settings`,
+    "https://elsewhere.invalid/desktop/welcome",
+  ])("refuses the choices outside the Welcome frame (%s)", async (url) => {
+    const welcome = vi.fn<() => Promise<{ choices: (typeof CHOICE)[] }>>(
+      async () => ({ choices: [CHOICE] })
+    );
+    const { ipc } = welcomeIpc(welcome);
+    await expect(ipc.welcomeProfiles(windowAt(url).event)).rejects.toThrow(
+      "native_chat_scope_changed"
+    );
+    expect(welcome).not.toHaveBeenCalled();
+  });
+
+  it("refuses a subframe and a loading Welcome frame", async () => {
+    const welcome = vi.fn<() => Promise<{ choices: (typeof CHOICE)[] }>>(
+      async () => ({ choices: [CHOICE] })
+    );
+    const { ipc } = welcomeIpc(welcome);
+    const frame = windowAt(WELCOME_URL);
+    const subframe = {
+      sender: frame.sender,
+      senderFrame: { url: WELCOME_URL },
+    } as unknown as IpcMainInvokeEvent;
+    await expect(ipc.welcomeProfiles(subframe)).rejects.toThrow(
+      "native_chat_scope_changed"
+    );
+    frame.setLoading(true);
+    await expect(ipc.welcomeProfiles(frame.event)).rejects.toThrow(
+      "native_chat_scope_changed"
+    );
+    expect(welcome).not.toHaveBeenCalled();
+  });
+
+  it("drops a listing the Welcome frame navigated away from", async () => {
+    const pending = Promise.withResolvers<{ choices: (typeof CHOICE)[] }>();
+    const { ipc } = welcomeIpc(() => pending.promise);
+    const frame = windowAt(WELCOME_URL);
+    const listing = ipc.welcomeProfiles(frame.event);
+    frame.contents.emit("did-start-navigation", { isMainFrame: true });
+    pending.resolve({ choices: [CHOICE] });
+    await expect(listing).rejects.toThrow("native_chat_scope_changed");
+  });
+
+  it("offers no choices when native chat is disabled", async () => {
+    const welcome = vi.fn<() => Promise<{ choices: (typeof CHOICE)[] }>>(
+      async () => ({ choices: [CHOICE] })
+    );
+    const { ipc } = welcomeIpc(welcome, true);
+    await expect(
+      ipc.welcomeProfiles(windowAt(WELCOME_URL).event)
+    ).resolves.toBeNull();
+    expect(welcome).not.toHaveBeenCalled();
   });
 });

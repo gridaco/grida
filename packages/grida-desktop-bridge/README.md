@@ -42,6 +42,10 @@ start the workspace chat. Known setup failures are fixed readiness values.
 it does not identify a worker or storage failure. `profiles()` remains available
 before startup succeeds. An explicit `selectProfile()` can open a saved or
 configured connection, with no implicit fallback or default retry.
+On the Welcome screen, `welcomeProfiles()` lists the saved-endpoint and
+built-in provider-key connections a first chat can choose before its
+workspace opens. It starts nothing; the opened workspace selects the choice
+as a new connection.
 An unknown result after startup is unavailable. The app issues an attachment for each
 renderer that creates or loads a chat. Submit keeps the caller's input ID.
 Pause, Resume, and Stop use an observation issued for that attachment.

@@ -917,6 +917,14 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   The separate worker verifies the opaque binding against the exact model,
   origin, account and organization of its own scoped grant. It uses the
   existing fixed Gateway chat route.
+  Before a workspace opens, the Welcome composer can list only the
+  workspace-independent choices (built-in provider keys and saved endpoints)
+  through a channel [IPC admission](desktop/src/main/ipc-admission.ts) grants
+  to the exact Welcome route, and to no native chat channel there. [Main](desktop/src/main/native-chat-ipc.ts)
+  answers only the current, loaded Welcome main frame and drops a reply the
+  frame navigated away from. The listing names no workspace, starts no worker,
+  selects nothing and returns no saved receipt. The opened workspace commits the
+  chosen ID through the ordinary selection above, which resolves it again.
   Configured endpoint profiles also distinguish the captured output-limit
   field. An existing profile reopens under its original field, and a new
   profile keeps the same endpoint and custody checks when it uses
