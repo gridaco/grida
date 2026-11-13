@@ -4,10 +4,10 @@ title: Paste a clipboard image into the agent composer
 module: desktop
 area: agent-chat
 tags: [agent-chat, composer, image, paste, multimodal, vision]
-status: untested
+status: deprecated
 severity: high
 date: 2026-06-07
-updated: 2026-07-30
+updated: 2026-11-13
 automatable: false
 covered_by:
   - editor/kits/composer/composer-transfer.test.ts
@@ -72,3 +72,5 @@ instead.
   remain manual.
 - A server-side size guard rejects inline images >~8 MB before persistence
   (`run-input.ts` `normalizeWireParts`).
+
+- Retired with the previous chat. Native Desktop chat accepts one PNG or file of at most 256 KiB per message; see TC-DESKTOP-AGENT-CHAT-021 for pasting or dropping it and TC-DESKTOP-AGENT-CHAT-009 for an oversize file. The covered_by tests exercise the previous chat.

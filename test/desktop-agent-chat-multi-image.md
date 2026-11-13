@@ -4,10 +4,10 @@ title: Attach multiple images in one agent turn
 module: desktop
 area: agent-chat
 tags: [agent-chat, composer, image, multimodal, vision]
-status: untested
+status: deprecated
 severity: medium
 date: 2026-06-07
-updated: 2026-07-30
+updated: 2026-11-13
 automatable: false
 covered_by:
   - editor/kits/composer/composer-transfer.test.ts
@@ -53,3 +53,5 @@ one turn. Removing one chip (hover ✕) leaves the others intact.
 - Watch the context meter: several inlined images add up — large sets can
   approach the context window (and are re-sent each turn until the deferred
   blob-store lands).
+
+- Retired with the previous chat. Native Desktop chat accepts one PNG or file of at most 256 KiB per message; see TC-DESKTOP-AGENT-CHAT-021 for pasting or dropping it and TC-DESKTOP-AGENT-CHAT-009 for an oversize file. The covered_by tests exercise the previous chat.

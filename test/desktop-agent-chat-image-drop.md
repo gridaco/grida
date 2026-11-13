@@ -4,10 +4,10 @@ title: Drag-and-drop an image file into the agent composer
 module: desktop
 area: agent-chat
 tags: [agent-chat, composer, image, drag-drop, multimodal, vision]
-status: verified
+status: deprecated
 severity: high
 date: 2026-06-07
-updated: 2026-07-30
+updated: 2026-11-13
 automatable: false
 covered_by:
   - editor/kits/composer/composer-transfer.test.ts
@@ -57,3 +57,5 @@ where the file lives.
 - 2026-07-30: Manually verified in local Grida Desktop. The dropped raster was
   perceived, its scratch-backed original remained operable on later turns, and
   the agent created the requested byte-for-byte copy without reattachment.
+
+- Retired with the previous chat. Native Desktop chat accepts one PNG or file of at most 256 KiB per message; see TC-DESKTOP-AGENT-CHAT-021 for pasting or dropping it and TC-DESKTOP-AGENT-CHAT-009 for an oversize file. The covered_by tests exercise the previous chat.
