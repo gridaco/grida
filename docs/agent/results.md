@@ -42,8 +42,9 @@ at most 256 KiB. Desktop shows the source path before sending the
 captured PNG. If the file changes while the task is paused, continuing
 uses the captured version. Ask for a new capture to use the updated file.
 
-The result appears below the turn's answer. Desktop keeps a retained image in
-**Tools → Recents**. If the provider generated the image and Desktop could
+The result appears below the turn's answer while that is the latest finished
+turn; once another turn starts, it leaves the chat. Desktop keeps a retained
+image in **Tools → Recents**, where you can find it later. If the provider generated the image and Desktop could
 not retain it, the summary explains what happened and the turn ends without
 another generation.
 

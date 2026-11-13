@@ -15,7 +15,8 @@ Commands start from your login shell's environment, so your usual tools work,
 and they can read the rest of your computer except Grida's own state and
 saved credentials. They cannot write outside the project or reach the
 internet. Version-control and agent metadata such as `.git` stay read-only.
-**Plan** lets the agent investigate without changing anything. The
+**Plan** lets the agent read and ask questions without running commands or
+changing files. The
 [permission policy](https://grida.co/docs/wg/ai/agent/permissions) describes the
 presets and defaults. An editor action can depend on the file or selection you
 attached when you sent the message. [Edit selected SVG text](./clients.md#edit-selected-svg-text)
@@ -34,7 +35,7 @@ a separate interaction from an approval to perform an action.
 
 ## Use a native launch profile
 
-Source-built headless clients can select a trusted permission profile with a
+Headless clients, which you build from source, can select a trusted permission profile with a
 primary folder and additional folders. A profile can require approval for
 reads or enable bounded command execution. Native command confinement has
 been verified on macOS and Linux ARM64. An unattended run that needs your

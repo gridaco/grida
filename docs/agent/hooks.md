@@ -76,8 +76,9 @@ executable cleanup handlers are not offered.
 
 ## Inspect outcomes and recover
 
-**Checks** shows active definitions, saved changes, sources and limits. Refresh
-with a chat selected to see that task's latest check results. A required denial,
+**Lifecycle checks** shows how many checks are active and saved, and each saved
+check's event, tool, mode, source, executable and deadline. Choose **Refresh
+checks** with a chat selected to see that task's latest check results. A required denial,
 invalid reply, timeout or unavailable handler blocks dependent work. Later
 ordered checks are identified as skipped. Observational failures remain
 recorded without changing the original tool result. An after-tool failure never

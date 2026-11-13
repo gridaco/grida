@@ -1,6 +1,6 @@
 ---
 title: Connect another agent to Grida with MCP
-description: Connect a local MCP client to the source-built Grida tool host or a disposable Desktop workbench export.
+description: Connect a local MCP client to the standalone Grida tool host or the isolated Desktop preview's workbench export.
 keywords: [agent, MCP, Grida Desktop, open tabs, Streamable HTTP]
 format: md
 ---
@@ -26,15 +26,16 @@ target/debug/grida-agent serve-mcp \
   --server-token-env GRIDA_MCP_SERVER_TOKEN
 ```
 
-The standalone host offers `surface_open`. It accepts an absolute artifact
-path and reports `not_interactive` because there is no editor attached.
+The standalone host offers `surface_open`. It takes a workspace path beginning
+with `/` and reports `not_interactive` because there is no editor attached.
 The call provides no file access. The same capability is available directly
 in a native headless Act launch with `--headless-surface`.
 
 ## Read open tabs from Desktop
 
-A disposable native Desktop launch can export `surface_list_open` for one
-selected workspace. Prepare the isolated `--native-chat` profile and place a
+The isolated Desktop preview (development or Insiders builds) can export
+`surface_list_open` for one selected workspace. It is read-only; no document
+edit operations are exported yet. Prepare the isolated `--native-chat` profile and place a
 separate 64-character hexadecimal token in `native-mcp-export.bearer` under
 its `--user-data-dir`. Use mode `0600` or `0400` and omit the trailing newline.
 [Desktop launch setup](https://github.com/gridaco/grida/blob/main/desktop/README.md#distributions)

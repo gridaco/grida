@@ -1,49 +1,51 @@
 ---
 title: Work with subagents
-description: Give a named subagent a separate text assignment and review its result in native Desktop chat.
+description: See independent reviews in Desktop chat and give named subagents text assignments from a private ACP client.
 keywords: [agent, subagent, assignment, delegation]
 format: md
 ---
 
 # Work with subagents
 
-Use a named subagent when an independent investigation or second opinion
-would help. Ask for it in your message; delegated work appears in the
-turn's activity. Named subagents are available with a supported Grida Gateway connection or a saved OpenRouter or Vercel AI
-Gateway connection. Named assignments, ordinary Ultra reviews, and Goal-funded
-reviews are available on these supported connections.
+A subagent is a separate conversation that works on a text assignment while
+the main agent continues.
 
-1. Finish an **Act** turn in the parent chat. Open **Chat options → Subagents**, enter a
-   name, choose how many assignments to allow, and select **Create**.
-2. Select the subagent, enter the work to do, and choose **Assign work**.
-   For example, ask a researcher to compare two approaches and explain
-   which assumptions matter. Each assignment is text-only. Include the
-   context you want the subagent to use.
-3. Check the assignment and its result in the panel. To give a follow-up,
-   use the same subagent. It keeps the context of its own earlier work.
-   Follow-ups wait in order and use the remaining assignment allowance.
+## See independent reviews in Desktop
 
-Close the panel or switch chats to continue your own work. When you reopen
-the parent, the panel lists its named subagents and shows the current or most
-recent assignment for the selected child. Choose a queued assignment to
-review its own instructions and status.
+In Desktop, choose **Ultra** effort on a supported Gateway, saved OpenRouter or
+saved Vercel AI Gateway connection to let the agent start one independent
+review. The review appears in the turn's activity, and the finished turn
+records whether the agent collected its findings. An Ultra goal can fund such a
+review from its own allowance.
+[Choose how much effort to use](./effort-and-goals.md#choose-how-much-effort-to-use)
 
-Select the current assignment to control its work. **Pause subagent** holds
-that assignment. **Steer subagent** adds a correction to the running or paused
-assignment. Use **Resume subagent** after it pauses to continue the same work.
-For example, pause a review, ask the reviewer to use the latest draft, then
-resume it. When a control result is unconfirmed, **Retry last subagent control**
-resends the same action for the selected assignment.
+Desktop chat does not create named subagents, and the model cannot create them
+on its own. Deleting a chat also deletes any named subagents it owns.
 
-On connections that show **Send message**, use it to leave context for the
-child's next assignment. Sending a message leaves any current assignment
-running as before and uses no assignment allowance.
+## Give a named subagent assignments
 
-**Stop subagent** ends the displayed active assignment and holds its queue.
-Select a waiting assignment and choose **Withdraw assignment** to remove it.
-Choose **Resume queue** when you want the remaining assignments to start in
-order. If a message or queue control is unconfirmed, the panel can retry it
-with the original request while the chat is still attached.
+A private ACP client connected to a host started with `--subagents` can create
+and manage named subagents.
+[Assign work to a named subagent](./clients.md#assign-work-to-a-named-subagent)
 
-See the [private ACP client guide](./clients.md#assign-work-to-a-named-subagent)
-for automation.
+1. Finish an **Act** turn in the parent chat, then create a subagent with a
+   name and an allowance of one to eight assignments.
+2. Assign work to it. For example, ask a researcher to compare two approaches
+   and explain which assumptions matter. Each assignment is text-only and has
+   no workspace tools, so include the context you want it to use.
+3. Inspect the subagent for its current or latest assignment and result. To
+   give a follow-up, assign more work to the same subagent; it keeps the
+   context of its own earlier work. Follow-ups wait in order and use the
+   remaining allowance.
+
+Pause holds the current assignment, Steer adds a correction to it, and Resume
+continues the same work. Stop ends the current assignment and holds the
+subagent's queue; Resume Queue starts the next waiting assignment, and a
+waiting assignment can be withdrawn.
+
+Send a message to leave context for the subagent's next assignment. An idle
+subagent stays idle, a running one keeps its current assignment, and a message
+uses no allowance.
+
+A named subagent cannot be closed on its own. It stays with the parent chat
+until that chat is deleted.

@@ -8,11 +8,15 @@ format: md
 # Choose models and understand usage
 
 The model connection determines which inputs and tools are available in a
-native workspace chat. Grida Gateway is the default in a managed Desktop profile.
-Native Desktop can use a saved OpenRouter or Vercel key on
-macOS and Linux, or an approved compatible endpoint. On macOS and Linux,
-the endpoint can use a key saved under its own ID.
-[Configure a native Desktop profile](https://github.com/gridaco/grida/blob/main/desktop/README.md#distributions)
+Desktop workspace chat. On macOS and Linux, Desktop can run chat on:
+
+- **Grida Gateway**, the default, under your Grida account;
+- a saved **OpenRouter** or **Vercel AI Gateway** key;
+- an approved compatible endpoint, which can use a key saved under its own ID.
+
+A development or Insiders launch profile can also select your **ChatGPT
+subscription**, which offers text input.
+[Configure a Desktop launch profile](https://github.com/gridaco/grida/blob/main/desktop/README.md#distributions)
 
 Native chat accepts plain HTTP on `localhost` and numeric loopback addresses.
 Use HTTPS for an endpoint on another device, even if you approved its HTTP
@@ -21,8 +25,9 @@ settings, but the endpoint is unavailable for new native chats.
 
 ## Choose a model
 
-Open **Model connection** in the composer of a native workspace chat and choose
-a model under **Models**. You can change the model between turns: the chat and
+Open the model picker at the bottom of the composer. It opens on the
+**Effort** slider; choose the model name above the slider, then pick a model
+under **Select model**. You can change the model between turns: the chat and
 its history stay in place, and your next message uses the new model with the
 earlier turns as context. A turn that is already running finishes with the
 model that started it; wait for it or choose **Stop** before changing models.
@@ -56,15 +61,13 @@ continue.
 
 ## Provider availability
 
-The optimized macOS Apple Silicon headless host has bounded live checks with
-OpenRouter and `openai/gpt-4.1-mini`: text and permission-checked file reads in
-Plan/Act and Standard/Ultra. These checks verify the selected connection and
-retained accounting; they are not a broad model-quality comparison. Other live
-providers and operating systems remain unqualified. The development macOS
-Desktop host also has live OpenRouter `google/gemini-3.8-flash` checks for a reply,
-a workspace-file read, follow-up context and transcript restoration without
-repeating inference. These do not qualify a signed distribution. Connection
-discovery alone does not verify credentials, credits, generation or model access.
+A listed model is not a guarantee: connection discovery does not verify
+credentials, credits, generation or model access.
+
+A Gateway reply is limited to 4,096 output tokens. A long reply, or a large
+file the agent writes in one step, can stop at that limit, and the turn says it
+reached its output limit. Own keys and endpoints use the model's listed output
+limit.
 
 Compatible streaming keeps a valid completed answer when the provider sends its
 final usage record. Additional content or changed completion identity still
@@ -108,8 +111,8 @@ once the model's window is known.
 Desktop does not show per-request charges in the chat. Use the connection's
 billing record for totals and individual charges.
 
-Supported Gateway Goals can also have a maximum spend. The Goal panel shows
-charged, held and remaining amounts, including funded child work. An uncertain
-request keeps its hold until its settlement is known; stopping work does not
-refund a request.
+A native client starting a Gateway goal can set a maximum spend; Desktop goals
+have none. The client's goal inspection reports charged, held and remaining
+amounts, including funded child work. An uncertain request keeps its hold until
+its settlement is known; stopping work does not refund a request.
 [Set a maximum spend](./effort-and-goals.md#set-a-maximum-spend)

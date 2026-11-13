@@ -7,10 +7,9 @@ format: md
 
 # Grida Agent
 
-Use a workspace chat in Grida Desktop to ask about a project, plan a change,
-or carry out a task with the access you grant. The workflows below apply
-to native workspace chat where your Desktop build and connection support
-it. Available controls and inputs vary with the connection.
+Use a workspace chat in Grida Desktop on macOS or Linux to ask about a
+project, plan a change, or carry out a task with the access you grant.
+Available controls and inputs vary with the model connection.
 
 ## Start a workspace chat
 
@@ -36,9 +35,8 @@ ends the current turn and holds the queue. Expand a finished turn to see
 its tool activity; retained images appear below the latest answer.
 [Inspect and save results](./results.md)
 
-Use a temporary side chat for a separate question about the current
-context, or branch a saved chat to explore another approach. A branch
-can still work with the same project files.
+Branch a saved chat to explore another approach. A branch can still work
+with the same project files.
 [Return to work and manage chat history](./history.md)
 
 ## Give independent work a place
@@ -55,8 +53,8 @@ available to headless and ACP clients; Desktop chat does not offer them.
 
 ## Use a native client
 
-Build the native host from source to run a task from a script or connect a
-local ACP client. Select a state directory to keep chats across restarts.
+Run a task from a script or connect a local ACP client with the headless
+`grida-agent` host, which you build from source. Select a state directory to keep chats across restarts.
 The client guide covers provider setup, permissions, supported commands,
 and how to inspect a task after it stops. [Connect an agent client](./clients.md)
 

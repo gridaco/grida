@@ -11,6 +11,13 @@ The native host reads `config.toml` from its selected state directory. The file
 holds user defaults for that host. Each accepted input retains the defaults
 that applied when it was accepted.
 
+Desktop runs one host per workspace. Its state directory is a folder under
+`native-chat/workspaces/` in Desktop's application data folder, named by a
+digest of the workspace. Desktop offers no control for these settings; edit
+that folder's `config.toml` while Desktop is closed, and the change applies
+when Desktop next starts the workspace's agent.
+[Change agent settings](../agent/settings.md)
+
 ## Supported file
 
 ```toml
@@ -33,7 +40,7 @@ Remote counting sends the prepared input to the selected provider under the
 same authority and deadline as generation. An estimate cannot certify this
 hard limit.
 
-Source-built native clients can count requests on Responses connections and
+The native host can count requests on Responses connections and
 on a supported local llama.cpp text connection explicitly launched with
 `--llama-cpp-input-count`. The llama.cpp option requires a direct numeric
 loopback `/v1` endpoint. It does not discover or change the model's capacity.

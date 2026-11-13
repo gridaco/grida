@@ -28,7 +28,9 @@ models whose provider supports a reasoning setting. Other models keep their own
 reasoning and the picker says so. **Ultra** uses the highest reasoning level and
 also gives the work a larger allowance that may include an independent review.
 Any effort can be used with Plan or Act, and changing it affects the next
-request. Ultra can
+request. Steering keeps the current turn's effort, and editing a queued or
+earlier message keeps its original effort; resubmitting an earlier Ultra
+message needs a connection that supports Ultra. Ultra can
 give one reviewer a separate text assignment while the main agent continues.
 For a new ordinary review, the reviewer can read the primary workspace if it is
 already allowed. It does not automatically receive the parent chat or additional
@@ -36,8 +38,8 @@ folder grants; folders inside the readable primary workspace remain accessible.
 The finished turn records whether the agent collected that reviewer’s findings.
 On supported Gateway, saved OpenRouter, and saved Vercel connections, Ultra is
 available for ordinary messages and Goal-funded reviews. The work allowance
-limits inference steps. An optional Gateway spending ceiling is a separate limit.
-[Work with subagents](./subagents.md)
+limits inference steps. A native client starting a Gateway goal can also set a
+spending ceiling, a separate limit.
 
 ## Keep an objective across turns
 

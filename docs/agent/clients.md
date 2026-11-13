@@ -10,27 +10,21 @@ format: md
 
 The native Grida Agent host runs tasks from scripts and serves Agent Client
 Protocol (ACP) clients. Its entrypoints use the same conversation master and
-durable session store. The native executable is available from source.
+durable session store. For headless use, build the executable from source.
 
 ## Use native chat in Desktop
 
-Current macOS and Linux Desktop source selects the native host for Stable,
-Insiders and development. Open a project or deck and start a new chat. macOS also supports
-standalone SVG chat. Model selection, questions, queued input and history use the same
-native session service as headless clients. Availability still depends on the
-selected connection and the capabilities shown in that chat.
+On macOS and Linux, Desktop chat runs on the same native host. Open a project
+or deck and start a new chat. macOS also supports standalone SVG chat. Model
+selection, questions, queued input and history use the same session service as
+headless clients. Availability still depends on the selected connection and
+the capabilities shown in that chat.
 
-Previous chats and their uploaded inputs remain in their original storage.
-New native chats start with fresh history. Closing or restarting Desktop keeps
-those new chats; reopening one does not submit another model request. A host
-startup failure reports unavailable chat rather than selecting another engine.
-
-Windows currently retains file and media workflows with chat unavailable.
-The optimized macOS Apple Silicon candidate has packaged process evidence.
-The headless host has bounded live OpenRouter `openai/gpt-4.1-mini` text and file-read checks.
-The native Linux ARM64 host and retained Desktop service also have isolated
-kernel, process and restart checks. Other live providers, full Linux installer
-delivery, other architectures and signed delivery remain unqualified.
+Closing or restarting Desktop keeps your chats; reopening one does not submit
+another model request. If the host cannot start, Desktop reports that chat is
+unavailable. Chats from earlier Desktop versions stay in their original
+storage. On Windows, Desktop keeps file and media workflows and chat is
+unavailable.
 
 For development, start the local editor and its local authentication services
 before starting the Desktop shell. See the
@@ -154,12 +148,14 @@ available for a manual answer. [Configure automatic read review](https://github.
 
 ### Plan before carrying out a task
 
-In the native Desktop workspace pane, select `/plan` in the composer to add
-planning instructions to the next message. Selection preserves the draft and
-starts no work. The removable **Plan** badge applies to messages you send or
-queue. Steering a queued message into the current turn keeps that turn's accepted instructions. To
-carry out a proposal, remove the badge and send a new request in the same chat.
-Planning does not change the chat’s permissions or effort.
+In the native Desktop workspace pane, select `/plan` in the composer to add a
+removable **Plan** badge to the next message. Selection preserves the draft and
+starts no work. A Plan message can read permitted material and ask questions;
+commands, file changes, editor tools, image generation, settings changes and
+check-ins are unavailable. The badge applies to messages you send or queue, and
+a queued Plan message waits for its own turn rather than being steered into the
+current one. To carry out a proposal, remove the badge and send a new request in
+the same chat. Planning does not change the chat’s permissions or effort.
 
 Use `--mode plan` with `run` or `serve` to investigate and prepare a proposal.
 The agent can read permitted material and ask enabled questions. Commands,
@@ -174,15 +170,10 @@ requires an Act launch.
 
 ### Choose how much effort a task gets
 
-In Desktop, drag the **Effort** slider in the model picker at the bottom of the
-composer: **Low**, **Medium**, **High**, **Extra high** and, in a supported
-Gateway, saved OpenRouter, or saved Vercel chat, **Ultra**. You can use any
-level with **Plan** or **Act**. The choice applies when you send or queue a
-message. Steering keeps the current
-turn's effort. Editing a queued or earlier message keeps its original effort.
-Resubmitting an earlier Ultra message requires a connection that supports Ultra.
+In Desktop, use the **Effort** slider in the model picker.
+[Choose how much effort to use](./effort-and-goals.md#choose-how-much-effort-to-use)
 
-`run --effort standard` uses the ordinary task allowance and is the default.
+For a headless run, `run --effort standard` uses the ordinary task allowance and is the default.
 Use `run --effort ultra` when an independent review could help. Ultra gives
 the main agent more room to work and can start one separate reviewer while it
 continues. When the host is launched with `--reasoning` for a model that
@@ -197,7 +188,7 @@ see that the review is still pending or uncertain.
 The finished record identifies the reviewer and records whether its verified
 findings were collected.
 
-Ultra is available in Plan and Act on the source-built host. It requires a
+Ultra is available in Plan and Act. It requires a
 model with JSON tool calls and a provider that supports a bounded output.
 For compatible Chat Completions endpoints, select the output limit field the
 endpoint accepts using `--compatible-output-limit-field`.
@@ -318,7 +309,8 @@ attachments and working copies. Desktop closes the deleted chat in any open
 workspace window. Project files, saved exports, and independent forks stay
 available. On supported connections, the dialog shows how many owned named
 subagents will be deleted with the chat.
-Running, paused, queued, or unresolved work blocks deletion. You can archive
+Running, paused, queued, unresolved or uncertain work, or an unfinished Goal,
+blocks deletion; Desktop explains a refusal after you confirm. You can archive
 a chat while its work continues.
 
 With the native **Ask me** profile, a read outside the current grants pauses
@@ -332,8 +324,10 @@ sent from the composer joins the queue and leaves the question open.
 
 While a turn is active, the native workspace composer queues text as a
 follow-up. You can edit, move, or remove waiting messages. Choose **Steer**
-on a waiting message when it should guide that turn at its next decision. If
-the turn cannot accept it, the text returns to the composer.
+on a waiting message when it should guide that turn at its next decision.
+Messages queued with Plan, Ultra, a goal or settings permission, and non-text
+messages, wait for their own turn and cannot be steered. If the turn cannot
+accept a steered message, its text returns to the composer as an unsent draft.
 The main button pauses the active turn; ▶ resumes it. Sending while a turn is
 paused ends it as stopped and runs the new message next. A held queue shows
 **Resume** to let waiting messages run.
@@ -417,7 +411,10 @@ Unverified cleanup blocks a replacement run.
 
 ## Run a confined command
 
-Source-built native hosts can run finite commands on macOS and Linux when
+Desktop workspace chats on macOS and Linux run finite commands in the project
+under the **Default** preset. [Understand agent permissions](./permissions.md)
+
+Headless hosts can run finite commands on macOS and Linux when
 the launcher supplies a reviewed permission profile and native helper.
 The command runs with the selected directory access and a separate temporary
 scope. Network access is denied. Plan keeps the command tool unavailable.
@@ -447,13 +444,14 @@ clients on the exact numeric loopback address. It supports MCP revisions
 The headless service offers `surface_open`. Its result reports that no
 presentation was requested because no editor is attached.
 Pass `--headless-surface` to native `run` or unsupervised `serve --stdio`
-to offer the same operation directly in Act. It takes the same workspace
-artifact path and returns the same outcome without an MCP connection.
+to offer the same operation directly in Act. In both places it takes a
+workspace path beginning with `/` and returns the same outcome without an MCP
+connection.
 Plan leaves it unavailable. A resumed turn requires its captured tool set.
 
 ### Read the live Desktop workbench
 
-An explicitly enabled disposable Desktop launch can export `surface_list_open`
+The isolated Desktop preview (development or Insiders builds) can export `surface_list_open`
 for one workspace. It returns the active file and bounded open-tab list as
 workspace-relative paths. The service runs independently of the built-in chat.
 Connect with the same Streamable HTTP authentication described above, using
@@ -466,7 +464,7 @@ replacement frame.
 
 ## Use tools from a local MCP server
 
-Source-built `run` and `serve --stdio` can opt into tools on one trusted
+Headless `run` and `serve --stdio` can opt into tools on one trusted
 numeric-loopback server using the stateless MCP 2026-07-28 profile. Supply
 these options alongside your usual provider, state directory, and model.
 
@@ -484,24 +482,28 @@ variable from any model credential. Repeat `--mcp-tool` for each tool you trust
 the agent to invoke in Act. A Plan-only launch skips discovery. A Plan message
 submitted to an Act host has no MCP tools.
 
-The disposable Desktop Gateway profile can also enable one local peer for a
-selected workspace through [trusted launch options](https://github.com/gridaco/grida/blob/main/desktop/README.md).
+The isolated Desktop preview (development or Insiders builds) on Gateway can
+also enable one local peer for a selected workspace through
+[trusted launch options](https://github.com/gridaco/grida/blob/main/desktop/README.md).
+Desktop shows no list of servers or discovery status.
 Workspace startup can discover the peer before you select Plan. Only Act can
 invoke the allowlisted tools.
 An attached workbench in the selected workspace can use its live editor tools
 and the allowlisted MCP tools in the same Act turn. The peer receives the
 arguments supplied to its own calls.
 
-Retained work keeps its original tool connection. If that connection closes,
-Stop is still available for a suspended turn. A lost reply after a tool call
+Plan messages, goals and side chats have no MCP tools. Retained work keeps its
+original tool connection; restart the host after a lost connection to connect
+again. If that connection closes, Stop is still available for a suspended turn. A lost reply after a tool call
 leaves an uncertain result. Reconcile it before sending new work that would
 repeat the effect.
 
 ## Assign work to a named subagent
 
-For the Desktop workflow, see [Work with subagents](./subagents.md).
+Desktop chat does not create named subagents, and the model cannot create them.
+[Work with subagents](./subagents.md)
 
-Start the source-built host with a direct provider and private stdio.
+Start the host with a direct provider and private stdio.
 
 ```sh
 target/debug/grida-agent serve --stdio --subagents \
@@ -544,16 +546,8 @@ See the [native host request fields](https://github.com/gridaco/grida/blob/main/
 
 ## Ask in a temporary side chat
 
-Desktop chat no longer offers a side chat; ACP clients can still open one. In a client that offers it, ask in its separate
-text composer while the parent continues. Closing the pane or switching
-parent chats discards the side conversation.
-
-Choose **Add to parent draft** under a completed answer to append a labeled
-quote to your unsent message. Long answers contribute a marked excerpt.
-The draft stays editable and remains in the parent composer after closing
-the side chat. Send the draft when ready.
-
-A private stdio client can open a read-only side chat from an attached parent.
+Side chats are available to private stdio ACP clients; Desktop chat does not
+open them. A private stdio client can open a read-only side chat from an attached parent.
 It captures committed background, including an installed summary when present.
 The parent can keep working. The selected model treats that snapshot as quoted
 reference and answers the side chat's new questions. The open response identifies
@@ -562,6 +556,7 @@ the source context and reports omitted material.
 Side chats accept up to six text questions and use the host's selected model.
 They have no workspace tools or scheduled work. Close ends that side chat and discards its conversation.
 A disconnect also discards it. The parent keeps its own history and controls.
+Bringing an answer into the parent is up to the client.
 
 Negotiate version 1 for `co.grida/side-chat/open`, `ask`, and `close` separately.
 Open supplies the parent session and a request ID. Ask supplies the returned side
@@ -570,18 +565,14 @@ the side chat ID. These IDs work only on the connection that opened the chat.
 
 ## Set the context input limit
 
-Open **Context limit** in the native Desktop workspace chat to see its current
-default. A provider that supports exact request counting can use a custom token
-limit. Choose **Save limit** and confirm the value. The new default applies to
-future accepted messages. Work already accepted keeps its captured setting.
-The current Gateway and ChatGPT subscription profiles can inspect the limit
-and return an existing valid override to **Automatic**.
+Desktop has no control for the context input limit; edit the workspace's
+`config.toml` and restart Desktop. [Change agent settings](./settings.md)
 
-To ask the agent to change the default with a compatible provider, remove the **Plan** badge and enable
-**Review settings permission on next Act send** in **Workspace settings…** (chat options menu). Write a short
-message and confirm it when Desktop asks. That permission covers the context
-input limit for this message. To change a queued message with this permission,
-withdraw it and review a new send.
+An ACP client that negotiates the configuration operations can inspect, set,
+reset and reload the limit. To let the agent change it, submit an Act input with
+`allowConfigurationChanges: true`; that permission covers the context input
+limit for that input. To change a queued input with this permission, withdraw it
+and submit a new one. [Agent configuration](../reference/agent-configuration.md#changes-requested-through-the-agent)
 
 ## Attach a PNG to a message
 
@@ -693,8 +684,10 @@ beneath a header such as **Worked for 1m 12s**, and the final answer stays
 visible below it. Select the header to show the recorded commentary and actions
 in order. Consecutive actions appear on one line, such as “Read files, ran
 commands”; select that line to list each call and its outcome. A stopped or
-failed turn shows **You stopped** or **Failed after …** instead. A stopped
-turn is not collapsed: its partial work stays in view. A turn
+failed turn shows **You stopped** or **Failed after …** instead. A turn whose
+outcome Grida could not confirm shows **· result uncertain** after its duration;
+review its partial work before retrying, because an action may already have
+happened. A stopped turn is not collapsed: its partial work stays in view. A turn
 that only answered, without tools or commentary, shows just its answer.
 
 Every turn with recorded work keeps its own header, including after you reopen the chat and on
@@ -706,8 +699,9 @@ or approval stays outside the collapsed work so you can answer it.
 ### Read a finished turn's results
 
 Expand a finished turn to see its recorded tool activity. Images the
-latest turn produced appear below its answer, including after reopening the
-chat. The ring beside the model picker estimates how much of the model's
+latest finished turn produced appear below its answer, including after
+reopening the chat. Once another turn starts they leave the chat; generated
+images stay in **Tools → Recents**. The ring beside the model picker estimates how much of the model's
 context window the visible conversation uses; open it for a breakdown.
 
 Desktop does not show token counts, completion checks or Gateway charges in
@@ -829,12 +823,14 @@ In the native Desktop workspace pane, hover or focus an earlier user message
 and choose **Edit and resubmit**. The editor opens its original text and
 shows how many later messages the edit replaces in the active chat. Use an
 idle chat with an empty queue and resolve any active Goal first. Only ordinary
-retained plain-text inputs in this chat are editable.
+retained plain-text inputs in this chat are editable; a message that started a
+Goal or carried an attachment is not.
 
 Use **Resubmit** to accept the new input in the same chat. If its reply cannot
 be confirmed, choose **Retry edit** to check the exact request. The ordinary
 composer keeps its unsent draft. A paused queue requires **Resume queue** to
-start the replacement. The prior view remains available through ACP history.
+start the replacement. The host keeps the prior view, which ACP history can
+read; Desktop does not show it yet.
 
 Read a history page to select a committed message and its basis. A fork creates
 a separate chat from that prefix while the source can continue running. Open
@@ -948,7 +944,7 @@ authorization.
 Work with an interrupted dispatch remains recorded against its existing turn.
 
 Private ACP clients can allow one check-in when starting a
-**Standard Act** goal. The check-in waits within the first reserved turn and
+non-Ultra **Act** goal. The check-in waits within the first reserved turn and
 uses its remaining inference allowance. After reopening, restore the schedule
 and resume the goal if it is paused. Cancelled check-ins require explicit
 continuation. Later automatic Goal turns receive their own permissions.
@@ -966,7 +962,8 @@ lists their parameters.
 Private ACP clients can opt in on a single Act submission and inspect the
 retained time, reason, status, and whether the host has armed the timer. They
 can cancel the wait, explicitly continue the task, or restore its schedule
-after restart. For the Desktop workflow, see [Schedule a follow-up](./scheduled-work.md).
+after restart. Desktop chat does not offer check-ins.
+[Schedule a follow-up](./scheduled-work.md)
 
 The [feature catalog](./features.md) describes the wider agent experience and
 the availability of its product features.

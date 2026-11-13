@@ -9,8 +9,15 @@ format: md
 
 ## Use a chat command
 
-Type `/` in a native Desktop workspace chat to see commands supported by
-the connected host. Send the command on its own.
+Type `/` in a native Desktop workspace chat to see the commands you can use
+now. Select one; `/fork` and `/compact` are sent on their own.
+
+- **`/plan`** adds a **Plan** badge so the next message investigates and
+  proposes without changing anything. It starts no work and keeps your draft.
+  [Plan before acting](./effort-and-goals.md#decide-what-the-agent-may-do)
+- **`/goal`** adds a **Goal** badge so the next message becomes a persistent
+  objective. It needs an idle chat with an empty queue.
+  [Keep an objective across turns](./effort-and-goals.md#keep-an-objective-across-turns)
 
 - **`/fork`** starts a separate chat from the latest committed message.
   Your current chat stays selected until you choose **Open fork**. If the
@@ -22,7 +29,8 @@ the connected host. Send the command on its own.
 
 ## Give a task a skill
 
-Add `--skill svg` to a source-built native `grida-agent run` command. Repeat
+Desktop chat has no skill picker. Add `--skill svg` to a headless
+`grida-agent run` command. Repeat
 the flag to include more skills. The bundled names are `dotcanvas`, `slides`,
 and `svg`. An attached ACP client can list skills when the host offers
 `co.grida/session/skills`, then include the returned versioned resource link
@@ -42,12 +50,14 @@ ACP skill selection is stale, refresh the catalog and select it again.
 Skills supply guidance within the chat's current access. Choose **Plan** to
 investigate or **Act** to use eligible action tools. If an action needs
 additional access, review the exact request before choosing **Allow once**
-or **Decline**. Finite commands require a native launch profile with a
-supported confinement helper. [Understand agent permissions](./permissions.md)
+or **Decline**. Desktop runs commands in the project inside a sandbox; a headless
+host needs a native launch profile with a supported confinement helper.
+[Understand agent permissions](./permissions.md)
 
-A source-built native host can opt into an explicit list of tools from one
-trusted local MCP server. The isolated Desktop Gateway preview can bind
-such a server to one selected workspace. Only Act can invoke those tools.
-Retained work keeps its original connection. If a call loses its reply,
+The headless host can opt into an explicit list of tools from one trusted local
+MCP server. The isolated Desktop preview (development or Insiders builds) can
+bind such a server to one selected workspace on Gateway. Only Act can invoke
+those tools; Plan messages, goals and side chats have none. Retained work keeps
+its original connection, and a lost connection needs a host restart. If a call loses its reply,
 check the server for its effect before sending work that would repeat it.
 [Configure local MCP tools](./clients.md#use-tools-from-a-local-mcp-server)

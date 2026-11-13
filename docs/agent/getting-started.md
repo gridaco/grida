@@ -44,7 +44,7 @@ chat for that file. Reopen the SVG and choose its saved chat from the sidebar.
 Select plain text in the SVG to [ask the agent to edit it](./clients.md#edit-selected-svg-text).
 The chat has no access to the surrounding folder.
 
-On macOS and Linux, a source-built native run can take one explicitly
+On macOS and Linux, a headless `grida-agent run` can take one explicitly
 selected PNG with `--input-png` and keep its work in private scratch.
 Omit the workspace and permission profile to work without a project grant.
 [Run locally with a PNG](https://github.com/gridaco/grida/blob/main/crates/grida-agent/README.md#run-locally)
