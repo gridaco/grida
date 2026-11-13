@@ -2,9 +2,9 @@
 
 The source-built native host implements **ACP first**, with negotiated
 extensions for product behavior the selected version cannot express. This
-document distinguishes the available wire contract from later Desktop and
-client integrations. The
-[core proposal](./rust-core.md#native-executable-and-headless-host)
+document specifies the wire contract the native host serves to Desktop and other
+ACP clients. The
+[core binding](./rust-core.md#native-executable-and-headless-host)
 owns process lifetime, and the [feature catalog](../../../docs/agent/features.md)
 owns the promised behavior.
 
@@ -95,14 +95,12 @@ Optional capabilities are advertised only when their end-to-end behavior works.
 | Questions                             | Negotiated elicitation where supported. The master chooses waiting or steering. Components retain correlated interactions.    |
 
 ACP supplies structured content and tool progress without prescribing visual
-layout. Zed demonstrates custom native conversation, tool, and subagent views
-on top of ACP data. Its pinned dependency enables experimental protocol support,
-so those views alone do not establish stable interoperability for every feature.
+layout, so a client can build custom conversation, tool, and child views on
+the same data. Views that depend on experimental protocol features do not by
+themselves establish stable interoperability for every feature.
 [ACP content](https://agentclientprotocol.com/protocol/v1/content),
 [tool calls](https://agentclientprotocol.com/protocol/v1/tool-calls),
-[elicitation](https://agentclientprotocol.com/protocol/v1/elicitation),
-[Zed dependency](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/Cargo.toml),
-[Zed conversation UI](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/agent_ui/src/conversation_view/thread_view.rs).
+[elicitation](https://agentclientprotocol.com/protocol/v1/elicitation).
 
 The Grida client owns specialized renderers. It can use optional metadata for
 result kinds, progress grouping, and known view hints. Streamed model content
@@ -122,12 +120,12 @@ extensions produce a defined fallback or unavailable outcome.
 | Capability family  | Additional semantics                                                                                                                                                                                                                                                                         |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Durable sessions   | Identified acceptance, retry reconciliation, snapshots/cursors, queue and steering controls, verified pause/resume/settlement, history derivation, child-session controls. Product-owned goal payloads and host timer operations use these mechanisms. Reuse equivalent standard operations. |
-| Host configuration | Typed persistent-default inspection, set/reset, revision checks, and reload. The [configuration proposal](./rust-config.md) owns the field semantics.                                                                                                                                        |
+| Host configuration | Typed persistent-default inspection, set/reset, revision checks, and reload. The [configuration binding](./rust-config.md) owns the field semantics.                                                                                                                                         |
 | Client surfaces    | Resource access or editor actions missing from standard ACP, plus optional structured view data. Each action has a capability schema and required authority. The adapter preserves call and endpoint correlation. Domain fields follow the capability. Pure styling requires no operation.   |
 
-These families organize the review. They do not enable every listed action as
-one broad capability. Advertise each supported operation/version, constrain its
-target, and implement it only with its feature slice. Standard transcript and
+These families group the extensions. None enables every listed action as one
+broad capability: each supported operation and version is advertised
+separately with a constrained target. Standard transcript and
 tool content remain useful when a client omits the extensions. Grida Desktop
 negotiates the operations needed for its complete experience.
 
@@ -398,11 +396,11 @@ Parent controls and history are independent of side execution.
 ### One-shot task wake-ups
 
 Private stdio clients negotiate `co.grida/session/wakeups`,
-`co.grida/session/cancel-wakeup`, and `co.grida/session/recover-wakeup` version
-
-1. Set `allowWakeups: true` on the identified Submit to offer the schedule
-   tool for that task. The setting is retained and must agree on input retries.
-   The host accepts one wake-up for the same task with a delay up to seven days.
+`co.grida/session/cancel-wakeup`, and `co.grida/session/recover-wakeup` at
+version `1`. Set `allowWakeups: true` on the identified Submit to offer the
+schedule tool for that task. The setting is retained and must agree on input
+retries. The host accepts one wake-up for the same task with a delay up to
+seven days.
 
 | Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                    |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -434,21 +432,41 @@ receipt. A conflicting answer fails. Continuation checks the current profile
 and resource identities before executing the approved action. One-shot `run`
 returns pending `approvals` with `input_required` and exit code `6`.
 
-Subagent observation has an active ACP proposal. Its initial client mutation is
-child cancellation, with direct prompt, steering, configuration, and resume
-restricted. Our richer reusable-child controls therefore need negotiated
-semantics for each target and operation. Observing a child or negotiating
-durable sessions alone grants none of those controls. The fork proposal leaves
-arbitrary checkpoint selection outside its initial scope. Reassess these drafts before implementing the corresponding
-feature, and prefer a matching upstream contract when available.
-[Subagent RFD](https://agentclientprotocol.com/rfds/subagents),
-[fork RFD](https://agentclientprotocol.com/rfds/session-fork).
+### Named subagents
 
-Hook inspection/configuration uses the host-configuration extension when its
-schema is reviewed. Hook progress and failures have ordinary tool/notice
-projections, with optional attributed detail for the Grida client. The host
-advertises actual lifecycle coverage for native and external backends.
-Subscribing to those updates never invokes a hook.
+A host launched with `serve --stdio --subagents` on an Act launch advertises
+each `co.grida/subagent/` operation at version `1`: `create`, `list`, `assign`,
+`send-message`, `inspect`, `pause`, `resume`, `steer`, `stop`, `resume-queue`,
+and `withdraw`. The client negotiates each one separately and calls the
+matching `_co.grida/subagent/` method; all are client-to-agent requests on the
+private supervising connection. Every request names the attached
+`parentSessionId`. Children have their own stable IDs and history and are
+absent from ordinary chat listing and load.
+
+| Method suffix after `_co.grida/subagent/` | Parameters and result                                                                                                                                                             |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create`                                  | `requestId`, `name`, and `workTurns` from 1 through 8. Returns `childId`; an exact retry returns the original child.                                                              |
+| `list`                                    | Optional `afterChildId`. Returns up to 32 `children` with `childId` and `name`, newest first, and `nextAfterChildId` when more remain.                                            |
+| `assign`                                  | `childId`, settled Act `parentTurnId`, `inputId`, and text `instructions`. Queues an assignment within the remaining allowance and returns its receipt with `maxGenerationSteps`. |
+| `send-message`                            | `childId`, `inputId`, and up to 4 KiB of `text`. Retains informational context for the next assignment without changing execution or allowance; up to 16 can wait.                |
+| `inspect`                                 | `childId` and optional `inputId`. Reads an assignment or message, or the current or latest observed assignment, with queue and pause state. Starts no work.                       |
+| `pause`, `stop`                           | `childId`, child `turnId`, `requestId`, `expectedSessionRevision`, and `expectedControlRevision`. Stop also holds the child's queue.                                              |
+| `resume`, `steer`                         | The same fields under `task`. Resume adds `expectedEpoch` and `expectedJournalPosition`; steer adds `expectedHistoryPosition` and text `instructions`.                            |
+| `resume-queue`, `withdraw`                | `childId`, `requestId`, and `expectedSessionRevision`; withdraw nests them under `queue` with a queued `inputId` and releases its place in the allowance.                         |
+
+Observing a child or negotiating durable sessions grants no child control.
+Resuming, steering, new messages, and new assignments require the original
+verified provider principal and scope; without that continuity a client can
+still inspect, retry an existing receipt, withdraw, pause, or stop. The
+[native host README](../../../crates/grida-agent/README.md#run-named-child-work-from-a-private-launcher)
+documents allowance and context behavior. ACP's subagent and session-fork work
+is under upstream discussion; the host adopts a matching upstream contract when
+one covers these semantics.
+
+Lifecycle hook inspection uses the `co.grida/session/hooks` operation below.
+Hook progress and failures have ordinary tool and notice projections, with
+optional attributed detail for the Grida client. Subscribing to those updates
+never invokes a hook.
 
 A client capability may be an executor as well as a presentation surface.
 For a live editor operation, the native Tool adapter sends the admitted request
@@ -461,7 +479,29 @@ public MCP adapter exposes a separately enabled authenticated loopback endpoint
 for independent callers. These bindings share product operations, while their
 wire protocols and connection lifetimes remain distinct.
 
-On the supervised Desktop connection, the client and agent negotiate
+### Editor surfaces
+
+On the private supervising connection of an Act host, a client that hosts
+workspace editors negotiates `co.grida/session/editor-surfaces` version 1, and
+optionally `co.grida/session/editor-surface-open` version 1 for presentation.
+An identified Submit then carries `editorEndpointId`, the opaque UUID of the
+Desktop editor endpoint that owns the workspace view, and may set
+`editorPresentation: true` when the open capability is negotiated. The input
+retains that binding, and the turn's editor tools target only that endpoint.
+
+| Direction      | Method                               | Parameters and result                                                                                                                                                                   |
+| -------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent → client | `_co.grida/editor/surface-list-open` | `sessionId`, `endpointId`. Returns the same identities with `available`, the `active` path or null, up to 50 `open` paths relative to the workspace root, and `truncated`.              |
+| Agent → client | `_co.grida/editor/surface-open`      | `sessionId`, `endpointId`, `callId`, and a workspace-relative `path` with a leading slash. Returns the same identities and `requested`, whether the client dispatched the open request. |
+
+These back the `surface_list_open` and `surface_open` tools. Each reply must
+echo its request identities within two seconds; a missing, late, or
+uncorrelated reply leaves the tool outcome uncertain. Without an attached
+endpoint, listing fails as unavailable and presentation reports
+`requested: false` with reason `editor_unavailable`. A `requested: true` result
+means the request was dispatched, not that a renderer displayed the file.
+
+The client and agent negotiate
 `co.grida/session/editor-svg-text` version 1 alongside editor surfaces.
 An immediate Act text submission may carry `editorSvgTargetId` with its
 `editorEndpointId`. This is the renderer's opaque capture of the current
@@ -558,6 +598,11 @@ and the exact retained `turnId`, `operationId`, and `attemptId`.
 The worker resolves the dispatch receipt under the captured Gateway scope.
 Main reads the current status through its fixed authenticated jobs route.
 
+The worker then asks the client for that job's settlement with the reverse
+`_co.grida/gateway/read-job-billing` request, carrying only the opaque
+`requestId` of the retained dispatch. The client answers within 15 seconds or
+the lookup reports `unavailable`.
+
 A response reports `kind` as `pending`, `unavailable`, or `settled`.
 The settled response includes the exact decimal `chargedMills`. An
 unavailable receipt can result from a missing dispatch identity, changed
@@ -574,6 +619,17 @@ Only a settled row has `chargedMills`. The projection reads retained evidence
 for the captured Gateway scope without a jobs request. Desktop refresh takes
 one eligible row from the attached latest settled turn and returns the current
 observation without changing the original summary evidence.
+
+A client that also negotiates `co.grida/gateway/child-billing` version 1 sees
+named-subagent assignments funded under the same Gateway scope. The settled
+turn summary's `gatewayBilling` then carries `children`: a page of up to 16
+`assignments`, each with `childId`, `inputId`, `name`, input `disposition`, and
+that assignment's bounded `billing` rows when retained. `nextAfter` holds the
+`{childId, inputId}` cursor to pass as `childBillingAfter` on the next summary
+read, and `coverageIncomplete` reports entries the parent's captured scope
+cannot account for. A billing-status lookup for a child attempt adds the same
+`child` reference and requires both capabilities. The page reads retained
+links and makes no jobs request.
 
 ### Persistent goal operations
 
@@ -733,6 +789,32 @@ attach to a session. The private supervising stdio channel is the approval
 writer. The working directory selects a matching native workspace profile
 supplied at launch. It carries no filesystem authority on its own.
 
+### Supervised provider egress
+
+A host launched with `serve --stdio --supervised-provider` has no direct
+network client for model requests. The supervising client negotiates
+`co.grida/provider/egress` version 1, and the native adapter sends each
+prepared provider request to it over the private pipe.
+
+| Direction      | Method                        | Parameters and result                                                                                                                                                                                                                             |
+| -------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent → client | `_co.grida/provider/exchange` | An exchange `id` and an `action`. `open` carries `target`, `headers`, `timeoutMs`, `maxResponseBytes`, and the first base64 body chunk in `initial`; `append` adds a chunk; `dispatch` sends the request; `read` returns the next response chunk. |
+| Agent → client | `_co.grida/provider/cancel`   | Notification with the exchange `id` when the attempt is dropped or cancelled.                                                                                                                                                                     |
+
+Replies report `accepted` for an open or append, `ready` with `httpStatus`,
+optional `requestId`, and optional `retryAfterMs` after dispatch, `chunk` with
+base64 `data` of at most 32 KiB decoded, `end`, `unavailable`, or
+`interrupted`. Request bodies are at most 1 MiB, uploaded in 64 KiB chunks;
+responses are at most 4 MiB within the caller's limit, and an exchange lasts at
+most 120 seconds. A stored credential is revalidated after upload and before
+dispatch. The client authorizes the exact route before dispatching. Any failure
+before `dispatch`, or an `unavailable` reply to it, means the request was not
+sent; a lost or invalid reply to `dispatch` or during reading leaves the
+attempt interrupted. Desktop's Gateway
+profile uses the same pipe and attaches its short-lived grant at dispatch.
+
+### Configuration tools
+
 For model-facing configuration tools, negotiating `co.grida/config/inspect`
 enables inspection on newly accepted enhanced inputs. Mutation tools additionally
 require all three configuration capabilities and an explicit
@@ -745,7 +827,7 @@ Configuration inspection reports `exact_input_counting` for the selected
 provider profile. The flag describes a supported counting route. Each prepared
 request must still return an exact count before an explicit limit can be used.
 
-## Acceptance before claiming compatibility
+## Compatibility acceptance
 
 - Drive ordinary sessions with a standard-only ACP client, including streaming,
   tools, supported permissions, cancellation, and unsupported optional features.
@@ -761,5 +843,6 @@ request must still return an exact count before an explicit limit can be used.
 
 Built-executable fixture tests cover standard text streaming, cancellation,
 replay, negotiated queue and task controls, stale credentials, independent
-loopback clients, and bounded stdio delivery. Desktop presentation and later
-interaction, tool, and child capabilities require their own acceptance.
+loopback clients, and bounded stdio delivery. Desktop rendering and interaction
+have their own acceptance evidence, recorded with each feature in the
+[feature catalog](../../../docs/agent/features.md).
