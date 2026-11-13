@@ -257,12 +257,14 @@ describe("computeContextUsage with a measured context", () => {
     expect(usage.breakdown.assistant).toBe(200);
     // Instructions, tool definitions and tool results the transcript omits.
     expect(usage.breakdown.other).toBe(25_000 - 300);
+    expect(usage.measured).toBe(true);
   });
 
   it("falls back to the visible estimate without a measurement", () => {
     const usage = computeContextUsage(messages, 100_000);
     expect(usage.usedTokens).toBe(300);
     expect(usage.breakdown.other).toBe(0);
+    expect(usage.measured).toBe(false);
   });
 
   it("never reports less than the visible transcript", () => {

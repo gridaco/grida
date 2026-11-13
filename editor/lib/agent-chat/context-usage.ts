@@ -225,6 +225,11 @@ export type ContextUsage = {
   usage: MessageUsage | undefined;
   /** Provider-reported tokens consumed by the latest settled assistant turn. */
   turnUsageTokens: number;
+  /**
+   * Whether `usedTokens` comes from the provider's reported context size
+   * rather than an estimate of the visible transcript.
+   */
+  measured: boolean;
 };
 
 /**
@@ -261,5 +266,13 @@ export function computeContextUsage(
   // Clamp to the documented [0, 1] contract; estimates can still exceed a
   // catalog window for stale model metadata or oversized local transcripts.
   const percent = maxTokens > 0 ? Math.min(1, usedTokens / maxTokens) : 0;
-  return { usedTokens, maxTokens, percent, breakdown, usage, turnUsageTokens };
+  return {
+    usedTokens,
+    maxTokens,
+    percent,
+    breakdown,
+    usage,
+    turnUsageTokens,
+    measured,
+  };
 }

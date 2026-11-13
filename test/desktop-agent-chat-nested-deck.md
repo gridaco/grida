@@ -7,7 +7,7 @@ tags: [chat, deck, canvas, workspace]
 status: untested
 severity: medium
 date: 2026-11-10
-updated: 2026-11-10
+updated: 2026-11-13
 automatable: true
 covered_by: [desktop/src/main/native-chat-ipc.test.ts]
 ---
@@ -28,3 +28,6 @@ available in the workbench chat with that project's access.
    answer appears without resending the request.
 4. Open the other bundle and the project workbench. Verify neither lists the
    first deck's chat.
+5. In the deck window, open the model picker. Verify it shows the effort
+   slider and says the chat uses the default model, with no model list to
+   choose from.

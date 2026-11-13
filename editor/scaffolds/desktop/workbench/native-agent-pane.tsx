@@ -68,7 +68,7 @@ import { NativeTurnActivity } from "./native-turn-activity";
 import { turn_activity } from "@/lib/agent-chat/turn-activity";
 import { native_message_parts } from "@/lib/agent-chat/native-message-parts";
 import { NativeMessageRevisionPanel } from "./native-message-revision-panel";
-import { NativeSubagentsPanel } from "./native-subagents-panel";
+import { NativeHooksPanel } from "./native-hooks-panel";
 
 import {
   Dialog,
@@ -286,7 +286,6 @@ export function NativeAgentPane({
     scope: number;
     selectionId: string;
   } | null>(null);
-  const [subagentsScope, setSubagentsScope] = useState<number | null>(null);
   const side = state.sideChat;
   useEffect(() => {
     const profile =
@@ -687,21 +686,19 @@ export function NativeAgentPane({
         </div>
       )}
       <Dialog
-        open={subagentsScope === state.scope}
+        open={state.hooksOpen}
         onOpenChange={(open) => {
-          if (!open) setSubagentsScope(null);
+          if (!open) controller.closeHooks();
         }}
       >
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Subagents</DialogTitle>
+            <DialogTitle>Lifecycle checks</DialogTitle>
             <DialogDescription>
-              View assignments and continue work with the agents in this chat.
+              Checks that run with every chat in this workspace.
             </DialogDescription>
           </DialogHeader>
-          {state.subagents && (
-            <NativeSubagentsPanel controller={state.subagents} hideToggle />
-          )}
+          <NativeHooksPanel controller={controller} state={state} />
         </DialogContent>
       </Dialog>
       <div className="shrink-0 p-3">
@@ -1087,8 +1084,10 @@ export function NativeAgentPane({
                 profiles={state.profiles}
                 defaultUnavailable={connectionRequired}
                 busy={state.profileBusy || state.acting}
-                onSelect={(selection) =>
-                  void controller.selectProfile(selection)
+                onSelect={
+                  bridge.selectProfile
+                    ? (selection) => void controller.selectProfile(selection)
+                    : undefined
                 }
                 onRefresh={() => void controller.readProfiles()}
                 effort={state.effort}

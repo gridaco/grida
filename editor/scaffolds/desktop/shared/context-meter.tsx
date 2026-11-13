@@ -100,11 +100,14 @@ export function ContextMeter({
   usage: Pick<
     ReturnType<typeof computeContextUsage>,
     "usedTokens" | "maxTokens" | "percent" | "breakdown"
-  >;
+  > &
+    Partial<Pick<ReturnType<typeof computeContextUsage>, "measured">>;
   costUsd?: number;
 }) {
   const { usedTokens, maxTokens, percent: ratio, breakdown } = usage;
   if (maxTokens === 0 || usedTokens === 0) return null;
+  // Experience contract: an estimate is labeled as one.
+  const source = usage.measured ? "Reported by provider" : "Estimated";
 
   const pct = percent.format(ratio);
   const rows = [
@@ -146,6 +149,7 @@ export function ContextMeter({
               {compact.format(usedTokens)} / {compact.format(maxTokens)} tokens
               used
             </div>
+            <div className="text-background/70">{source}</div>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -153,7 +157,12 @@ export function ContextMeter({
       <PopoverContent align="start" className="w-72 p-0">
         <div className="space-y-2 p-3">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-medium">Context · {pct}</span>
+            <span className="font-medium">
+              Context · {pct}{" "}
+              <span className="font-normal text-muted-foreground">
+                · {source}
+              </span>
+            </span>
             <span className="font-mono text-muted-foreground">
               {compact.format(usedTokens)} / {compact.format(maxTokens)}
             </span>

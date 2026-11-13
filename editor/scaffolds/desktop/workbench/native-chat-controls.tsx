@@ -248,6 +248,17 @@ export function NativeChatHeader({
               )}
             </>
           )}
+          {controller.hasHooks && (
+            <>
+              {state.catalogEntry && <DropdownMenuSeparator />}
+              <DropdownMenuItem
+                disabled={state.hooksBusy}
+                onSelect={() => void controller.toggleHooks()}
+              >
+                Lifecycle checks…
+              </DropdownMenuItem>
+            </>
+          )}
           {state.catalogEntry && state.catalogEntryError && (
             <DropdownMenuSeparator />
           )}
@@ -292,7 +303,11 @@ export function NativeModelPicker({
 }: {
   profiles: NativeChatProfileCatalog | null;
   busy: boolean;
-  onSelect: (selection: NativeChatProfileSelection) => void;
+  /**
+   * Choose another model. Absent when this chat runs on a fixed connection,
+   * such as a deck nested in a project; the picker then offers effort only.
+   */
+  onSelect?: (selection: NativeChatProfileSelection) => void;
   onRefresh: () => void;
   effort?: NativeChatEffort;
   onEffort?: (effort: NativeChatEffort) => void;
@@ -310,11 +325,13 @@ export function NativeModelPicker({
     profiles?.choices.find((p) => p.id === profiles.active);
   const label =
     selected?.model ??
-    (!profiles
-      ? "Model"
-      : profiles.active === null && !defaultUnavailable
-        ? "Default model"
-        : "Choose model");
+    (!onSelect
+      ? "Default model"
+      : !profiles
+        ? "Model"
+        : profiles.active === null && !defaultUnavailable
+          ? "Default model"
+          : "Choose model");
   // One list of models. A previously used connection keeps its saved identity.
   const models = [
     ...(profiles?.choices ?? []).map((p) => ({
@@ -330,11 +347,11 @@ export function NativeModelPicker({
   // chat starts. The running connection can also confirm it.
   const ultra = ultraAvailable || selected?.ultra === true;
   const choose = (selection: NativeChatProfileSelection) => {
-    onSelect(selection);
+    onSelect?.(selection);
     setView("effort");
     if (!onEffort) setOpen(false);
   };
-  const showModels = !onEffort || view === "models";
+  const showModels = !!onSelect && (!onEffort || view === "models");
   return (
     <Popover
       open={open}
@@ -380,14 +397,20 @@ export function NativeModelPicker({
                 <span className="text-sm font-medium text-primary">
                   {EFFORT_LABEL[stop]}
                 </span>
-                <button
-                  type="button"
-                  className="flex max-w-full items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setView("models")}
-                >
-                  <span className="truncate">{label}</span>
-                  <ChevronRightIcon className="size-3 shrink-0" />
-                </button>
+                {onSelect ? (
+                  <button
+                    type="button"
+                    className="flex max-w-full items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setView("models")}
+                  >
+                    <span className="truncate">{label}</span>
+                    <ChevronRightIcon className="size-3 shrink-0" />
+                  </button>
+                ) : (
+                  <span className="max-w-full text-center text-xs text-muted-foreground">
+                    This chat uses the default model
+                  </span>
+                )}
               </div>
               <Button
                 type="button"

@@ -1223,23 +1223,8 @@ export class NativeChatController {
     );
   }
 
-  /** Whether this workspace exposes any agent settings. */
-  get hasWorkspaceSettings(): boolean {
-    return this.hasContextLimit || this.hasHooks;
-  }
-
-  /** Open the workspace agent settings and read their current values. */
-  async openWorkspaceSettings(): Promise<void> {
-    await Promise.all([
-      this.hasContextLimit && !this.view.contextLimitOpen
-        ? this.toggleContextLimit()
-        : undefined,
-      this.hasHooks && !this.view.hooksOpen ? this.toggleHooks() : undefined,
-    ]);
-  }
-
-  closeWorkspaceSettings(): void {
-    this.update({ contextLimitOpen: false, hooksOpen: false });
+  closeHooks(): void {
+    this.update({ hooksOpen: false });
   }
 
   async toggleHooks(): Promise<void> {
@@ -2844,7 +2829,6 @@ export class NativeChatController {
       allowance: NativeChatController.goalComposerAllowance,
       automatic: true,
       ...(this.view.effort === "ultra" && { effort: "ultra" }),
-      ...(this.view.allowWakeup && { allowWakeup: true }),
     };
   }
 
@@ -4828,18 +4812,11 @@ function goalRequestProblem(
   request: NativeChatGoalRequest,
   view: Pick<
     NativeChatView,
-    | "goalEffortAvailable"
-    | "wakeupsAvailable"
-    | "observation"
-    | "operatingRegime"
+    "goalEffortAvailable" | "observation" | "operatingRegime"
   >
 ): string | null {
-  if (request.allowWakeup && request.effort === "ultra")
-    return "Choose Standard effort to allow a scheduled goal check-in.";
-  if (request.allowWakeup && view.operatingRegime !== "act")
-    return "Choose Act to allow a scheduled goal check-in.";
-  if (request.allowWakeup && !view.wakeupsAvailable)
-    return "Scheduled goal check-ins are unavailable on this connection.";
+  // A requested check-in's eligibility is the host's decision; its refusal
+  // explains why.
   if (request.effort === "ultra" && !view.goalEffortAvailable)
     return "Ultra is unavailable for goals on this connection.";
   if (

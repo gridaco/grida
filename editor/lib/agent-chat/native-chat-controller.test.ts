@@ -319,13 +319,17 @@ it("inspects the current chat's hooks and removes only an observed saved revisio
   f.bridge.removeHook = remove;
   try {
     await f.controller.select("chat");
+    expect(f.controller.hasHooks).toBe(true);
     await f.controller.toggleHooks();
     expect(inspect).toHaveBeenCalledWith("chat");
+    expect(f.controller.read()).toMatchObject({ hooksOpen: true });
     await f.controller.removeHook(hook.id, "stale");
     expect(remove).not.toHaveBeenCalled();
     await f.controller.removeHook(hook.id, hook.revision);
     expect(remove).toHaveBeenCalledWith(hook.id, hook.revision);
     expect(f.controller.read().hooks?.saved).toEqual([]);
+    f.controller.closeHooks();
+    expect(f.controller.read().hooksOpen).toBe(false);
   } finally {
     f.controller.disconnect();
   }
@@ -1862,14 +1866,7 @@ it.each(["standard", "ultra", "scheduled standard", "standard plan"] as const)(
   }
 );
 
-it.each([
-  [{ effort: "ultra" as const }, "Ultra is unavailable"],
-  [{ allowWakeup: true as const }, "check-ins are unavailable"],
-  [
-    { effort: "ultra" as const, allowWakeup: true as const },
-    "Choose Standard effort",
-  ],
-])(
+it.each([[{ effort: "ultra" as const }, "Ultra is unavailable"]])(
   "refuses unsupported Goal options %j before sending",
   async (options, error) => {
     const { bridge, controller } = fixture();
