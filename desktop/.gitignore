@@ -88,6 +88,8 @@ typings/
 # Vite
 .vite/
 .native-resources/
+# Signing scratch from scripts/prepare-dev-native-agent.mjs
+.native-artifacts-*/
 
 # Electron-Forge
 out/
