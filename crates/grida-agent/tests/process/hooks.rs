@@ -755,7 +755,7 @@ async fn interrupted_before_tool_check_blocks_the_command_and_next_model_request
     assert!(!fixture.primary.join("effect").exists());
     assert!(fs::read_dir(&temporary).unwrap().next().is_none());
     assert!(endpoint.requests.try_recv().is_err());
-    endpoint.task.abort();
+    endpoint.abort().await;
 }
 
 #[tokio::test]
@@ -935,7 +935,7 @@ async fn interrupted_goal_before_tool_check_retains_reservation_through_stop_aft
     assert!(!fixture.primary.join("effect").exists());
     assert!(fs::read_dir(&temporary).unwrap().next().is_none());
     assert!(endpoint.requests.try_recv().is_err());
-    endpoint.task.abort();
+    endpoint.abort().await;
 }
 
 #[tokio::test]

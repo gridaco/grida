@@ -287,21 +287,9 @@ async fn requested_library_selection_survives_restart_and_replays_the_exact_answ
 }
 
 async fn submit_after_library_turn(client: &mut StdioClient, prompt: Value) -> Value {
-    // A terminal snapshot can precede release of its in-memory worker. Retry
-    // only that admission conflict, keeping the identified input unchanged.
-    let response = timeout(WAIT, async {
-        loop {
-            let response = client
-                .request("_co.grida/session/submit", prompt.clone())
-                .await;
-            if response["error"]["data"] != "session_prompt_in_progress" {
-                return response;
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-    })
-    .await
-    .expect("previous Library turn did not release its worker");
+    // A settled turn admits the next identified input on the first attempt.
+    let response = client.request("_co.grida/session/submit", prompt).await;
+    assert!(response.get("error").is_none(), "{response}");
     assert!(response["result"]["turnId"].is_string(), "{response}");
     response
 }
@@ -1485,8 +1473,7 @@ async fn missing_retained_png_after_restart_fails_before_provider_requests() {
             endpoint.requests.try_recv(),
             Err(tokio::sync::mpsc::error::TryRecvError::Empty)
         ));
-        endpoint.task.abort();
-        assert!(endpoint.task.await.unwrap_err().is_cancelled());
+        endpoint.abort().await;
         assert!(!owner.exists());
 
         let store =

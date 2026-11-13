@@ -524,6 +524,52 @@ async fn a_stopped_reply_leaves_an_interruption_note_for_the_next_turn() {
     terminate_shared_server(host).await;
 }
 
+#[tokio::test]
+async fn a_settled_turn_admits_the_next_input_on_the_first_submit() {
+    const ROUNDS: usize = 8;
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint =
+        Endpoint::start((0..ROUNDS).map(|_| Reply::Finished("Settled.")).collect()).await;
+    let (host, url) = shared_server(&state, &endpoint.url).await;
+    let mut socket = initialized_shared_socket(&url).await;
+    let created = ws_rpc(
+        &mut socket,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = created["result"]["sessionId"].as_str().unwrap();
+    // Each submit follows the settled snapshot with no pause, while the
+    // previous turn's worker may still be releasing.
+    for round in 0..ROUNDS {
+        let input = format!("input-{round}");
+        let started = ws_rpc(
+            &mut socket,
+            10 + round as u64,
+            "_co.grida/session/submit",
+            prompt_request(session, &input, "Continue."),
+        )
+        .await;
+        assert!(started.get("error").is_none(), "{started}");
+        assert_eq!(started["result"]["disposition"], "claimed", "{started}");
+        assert_eq!(started["result"]["inputId"], input.as_str(), "{started}");
+        endpoint.request().await;
+        let turn = started["result"]["turnId"].clone();
+        wait_for_snapshot(&mut socket, session, |snapshot| {
+            snapshot["current"].is_null()
+                && snapshot["latest"]["turnId"] == turn
+                && snapshot["latest"]["status"] == "succeeded"
+        })
+        .await;
+    }
+    endpoint.done().await;
+    drop(socket);
+    terminate_shared_server(host).await;
+}
+
 pub(super) async fn wait_for_partial_prompt(socket: &mut SharedSocket, session: &str) {
     use futures_util::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::Message;
@@ -740,8 +786,7 @@ async fn changed_provider_credential_cannot_resume_a_paused_input() {
         endpoint.requests.try_recv(),
         Err(mpsc::error::TryRecvError::Empty)
     ));
-    endpoint.task.abort();
-    let _ = endpoint.task.await;
+    endpoint.abort().await;
     drop(second);
     terminate_shared_server(host).await;
 }

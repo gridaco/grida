@@ -823,7 +823,7 @@ async fn a_reply_may_make_many_parallel_tool_calls() {
     let temporary = TempDir::new().unwrap();
     let state = temporary.path().join("state");
     let workspace = TempDir::new().unwrap();
-    // More parallel calls in one reply than the former cap of eight.
+    // One reply may make more parallel calls than a typical client cap.
     let calls: Vec<Value> = (0..12)
         .map(|index| {
             json!({"index":index,"id":format!("call-{index}"),"type":"function",

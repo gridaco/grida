@@ -358,26 +358,31 @@ async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
         title["tools"].as_array().is_none_or(Vec::is_empty),
         "a title request offers no tools: {title}"
     );
-    let mut titled = Value::Null;
-    for attempt in 0..100 {
-        titled = ws_rpc(
-            &mut client,
-            10 + attempt,
-            "_co.grida/session/catalog-entry",
-            json!({"sessionId":session}),
-        )
-        .await;
-        if !titled["result"]["title"].is_null() {
-            break;
+    let mut attempt = 10;
+    let titled = timeout(WAIT, async {
+        loop {
+            let titled = ws_rpc(
+                &mut client,
+                attempt,
+                "_co.grida/session/catalog-entry",
+                json!({"sessionId":session}),
+            )
+            .await;
+            if !titled["result"]["title"].is_null() {
+                break titled;
+            }
+            attempt += 1;
+            tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
+    })
+    .await
+    .expect("the background title is written");
     assert_eq!(titled["result"]["title"], FIXTURE_TITLE, "{titled}");
 
     // Later requests never retitle, so a rename stays.
     let renamed = ws_rpc(
         &mut client,
-        200,
+        attempt + 1,
         "_co.grida/session/organize",
         json!({
             "sessionId":session,"revision":titled["result"]["revision"],
@@ -386,13 +391,13 @@ async fn a_first_request_titles_an_untitled_chat_without_overriding_a_rename() {
     )
     .await;
     assert_eq!(renamed["result"]["title"], "Spring launch", "{renamed}");
-    let (id, request) = prompt(201, "Now draft the announcement.");
+    let (id, request) = prompt(attempt + 2, "Now draft the announcement.");
     let reply = ws_rpc(&mut client, id, "session/prompt", request).await;
     assert_eq!(reply["result"]["stopReason"], "end_turn");
     endpoint.request().await;
     let after = ws_rpc(
         &mut client,
-        202,
+        attempt + 3,
         "_co.grida/session/catalog-entry",
         json!({"sessionId":session}),
     )

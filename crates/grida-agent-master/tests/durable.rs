@@ -124,8 +124,12 @@ enum Script {
     ToolThenAnswer,
     ToolAndDeferred,
     Tools,
+    /// One reply that makes this many tool calls, then an answer.
+    ParallelTools(usize),
     EffortReview,
-    GoalReport { call: &'static str },
+    GoalReport {
+        call: &'static str,
+    },
 }
 
 struct ScriptProvider {
@@ -239,6 +243,19 @@ impl Provider for ScriptProvider {
         } else {
             vec![Content::Text("Finished".into())]
         };
+        if let Script::ParallelTools(count) = self.script
+            && index == 0
+        {
+            content = (0..count)
+                .map(|call| {
+                    Ok(Content::ToolCall(ToolCall {
+                        id: ToolCallId::new(format!("parallel-{call}"))?,
+                        tool: tool_id(),
+                        arguments: ToolArguments::Json(serde_json::json!({ "value": "echoed" })),
+                    }))
+                })
+                .collect::<Result<_>>()?;
+        }
         if let Script::GoalReport { call } = self.script {
             content = if index == 0 {
                 vec![Content::ToolCall(ToolCall {
@@ -2486,6 +2503,31 @@ async fn a_retained_preparation_limit_settles_without_dispatching_its_replacemen
     assert_eq!(account.failure.unwrap().code, "operation_limit");
     assert!(account.unresolved.is_empty());
     assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 0);
+    store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_reply_with_more_tool_calls_than_operation_slots_settles_at_the_limit() {
+    let mut fixture = Fixture::new(Script::ParallelTools(6));
+    fixture.max_operations = 4;
+    let store = fixture.store();
+    let claim = fixture.claim(&store).await;
+    let opened = fixture.runtime().open(claim.lease).await.unwrap();
+    let MasterOutcome::Settled(receipt) = fixture
+        .master(4, "Use tools")
+        .run(opened.turn, input())
+        .await
+        .unwrap()
+    else {
+        panic!("expected limit settlement")
+    };
+    assert_eq!(receipt.outcome.status, OutcomeStatus::Failed);
+    let account = read_account(receipt.outcome.account.as_ref().unwrap()).unwrap();
+    assert_eq!(account.failure.unwrap().code, "operation_limit");
+    assert!(account.unresolved.is_empty());
+    assert_eq!(fixture.provider.calls.load(Ordering::SeqCst), 1);
+    // The inference and three calls fill the four slots; the rest never run.
+    assert_eq!(fixture.tool.calls.load(Ordering::SeqCst), 3);
     store.verify(CommitReceipt::Settled(receipt)).await.unwrap();
 }
 

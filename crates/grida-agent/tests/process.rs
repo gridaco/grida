@@ -98,6 +98,11 @@ struct Endpoint {
     /// Chat title requests, answered by the endpoint with [`FIXTURE_TITLE`]
     /// without taking a scripted reply.
     titles: mpsc::UnboundedReceiver<Value>,
+    /// Model requests that arrived after the script ran out, each answered
+    /// with a server error.
+    unexpected: mpsc::UnboundedReceiver<String>,
+    /// Ends the endpoint's listening once its script is used.
+    close: Option<tokio::sync::oneshot::Sender<()>>,
     task: tokio::task::JoinHandle<()>,
     wait: Duration,
 }
@@ -173,12 +178,33 @@ impl Endpoint {
         let url = format!("http://{}/{version}", listener.local_addr().unwrap());
         let (sent, requests) = mpsc::unbounded_channel();
         let (titled, titles) = mpsc::unbounded_channel();
+        let (extra, unexpected) = mpsc::unbounded_channel();
+        let (close, mut closed) = tokio::sync::oneshot::channel::<()>();
         let task = tokio::spawn(async move {
             let mut connections = tokio::task::JoinSet::new();
             let mut replies = replies.into_iter().peekable();
-            while replies.peek().is_some() {
-                let (stream, _) = timeout(wait, listener.accept()).await.unwrap().unwrap();
-                let mut stream = BufReader::new(stream);
+            let mut deadline = tokio::time::Instant::now() + wait;
+            loop {
+                let scripted = replies.peek().is_some();
+                // A scripted endpoint keeps listening after its script, so a
+                // model request the test did not expect is answered and
+                // reported instead of silently refused.
+                let accepted = tokio::select! {
+                    biased;
+                    Some(joined) = connections.join_next() => {
+                        if let Err(error) = joined {
+                            std::panic::resume_unwind(error.into_panic());
+                        }
+                        continue;
+                    }
+                    _ = &mut closed, if !scripted => break,
+                    _ = tokio::time::sleep_until(deadline), if scripted => {
+                        panic!("the host made no further model request")
+                    }
+                    accepted = listener.accept() => accepted.unwrap().0,
+                };
+                deadline = tokio::time::Instant::now() + wait;
+                let mut stream = BufReader::new(accepted);
                 let head = read_fixture_request(&mut stream).await;
                 let title = is_title_request(&head.request);
                 let (reply, sent) = if title {
@@ -189,31 +215,51 @@ impl Endpoint {
                         Reply::Finished(FIXTURE_TITLE)
                     };
                     (reply, titled.clone())
+                } else if let Some(reply) = replies.next() {
+                    (reply, sent.clone())
                 } else {
-                    (replies.next().unwrap(), sent.clone())
+                    let extra = extra.clone();
+                    connections.spawn(async move {
+                        unexpected_request(stream, head, &extra).await;
+                    });
+                    continue;
                 };
                 connections.spawn(async move {
                     fixture_request(stream, head, &sent, reply, protocol, credential).await;
                 });
             }
-            while let Some(result) = connections.join_next().await {
-                result.unwrap();
+            drop(listener);
+            while let Some(joined) = connections.join_next().await {
+                if let Err(error) = joined {
+                    std::panic::resume_unwind(error.into_panic());
+                }
             }
         });
         Self {
             url,
             requests,
             titles,
+            unexpected,
+            close: Some(close),
             task,
             wait,
         }
     }
 
     async fn request(&mut self) -> Value {
-        timeout(self.wait, self.requests.recv())
-            .await
-            .unwrap()
-            .unwrap()
+        let ended = match timeout(self.wait, self.requests.recv()).await {
+            Ok(Some(request)) => return request,
+            Ok(None) => true,
+            Err(_) => self.task.is_finished(),
+        };
+        // A fixture assertion ends the endpoint; report it rather than the wait.
+        if ended
+            && let Ok(Err(error)) = timeout(WAIT, &mut self.task).await
+            && error.is_panic()
+        {
+            std::panic::resume_unwind(error.into_panic());
+        }
+        panic!("the host made no further model request");
     }
 
     /// The next chat title request the endpoint answered.
@@ -224,8 +270,37 @@ impl Endpoint {
             .unwrap()
     }
 
-    async fn done(self) {
-        timeout(WAIT, self.task).await.unwrap().unwrap();
+    /// Waits for the script to be used and asserts that the host made no
+    /// model or title request beyond what the test consumed.
+    async fn done(mut self) {
+        if let Some(close) = self.close.take() {
+            let _ = close.send(());
+        }
+        match timeout(WAIT, self.task).await.unwrap() {
+            Ok(()) => {}
+            Err(error) => std::panic::resume_unwind(error.into_panic()),
+        }
+        let unexpected: Vec<_> = std::iter::from_fn(|| self.unexpected.try_recv().ok()).collect();
+        assert!(
+            unexpected.is_empty(),
+            "the host made model requests beyond the script: {unexpected:?}"
+        );
+        let titles: Vec<_> = std::iter::from_fn(|| self.titles.try_recv().ok()).collect();
+        assert!(
+            titles.is_empty(),
+            "the host made title requests the test did not expect: {titles:?}"
+        );
+    }
+
+    /// Stops the endpoint while a reply may still be open, and reports any
+    /// fixture assertion that failed before it stopped.
+    async fn abort(self) {
+        self.task.abort();
+        match self.task.await {
+            Ok(()) => {}
+            Err(error) if error.is_cancelled() => {}
+            Err(error) => std::panic::resume_unwind(error.into_panic()),
+        }
     }
 }
 
@@ -278,6 +353,24 @@ async fn read_fixture_request(stream: &mut BufReader<TcpStream>) -> FixtureHead 
         accept,
         request: serde_json::from_slice(&request).unwrap(),
     }
+}
+
+/// Answers a model request beyond the script with a server error and records it.
+async fn unexpected_request(
+    stream: BufReader<TcpStream>,
+    head: FixtureHead,
+    unexpected: &mpsc::UnboundedSender<String>,
+) {
+    let _ = unexpected.send(format!("{} {}", head.line.trim_end(), head.request));
+    let body =
+        json!({"error":{"code":"unexpected_request","message":"fixture script ended"}}).to_string();
+    let response = format!(
+        "HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    let mut stream = stream.into_inner();
+    let _ = stream.write_all(response.as_bytes()).await;
+    let _ = stream.flush().await;
 }
 
 async fn fixture_request(
@@ -1917,8 +2010,7 @@ async fn abrupt_host_exit_retains_interrupted_turn_and_blocks_replacement() {
         endpoint.requests.try_recv(),
         Err(mpsc::error::TryRecvError::Empty)
     ));
-    endpoint.task.abort();
-    let _ = endpoint.task.await;
+    endpoint.abort().await;
 }
 
 #[tokio::test]
@@ -2042,8 +2134,7 @@ async fn built_gemini_host_replays_signed_history_only_for_unchanged_credentials
         endpoint.requests.try_recv(),
         Err(mpsc::error::TryRecvError::Empty)
     ));
-    endpoint.task.abort();
-    let _ = endpoint.task.await;
+    endpoint.abort().await;
 }
 
 #[tokio::test]

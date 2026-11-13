@@ -191,26 +191,15 @@ async fn the_user_can_confirm_only_exact_accounted_goal_work_after_restart() {
     );
     let early_control = confirm(reviewed, "confirm-goal", turn);
 
-    // A settled snapshot can precede release of the owned worker. Keep the
-    // input identity unchanged while waiting for admission.
-    let ordinary = timeout(WAIT, async {
-        loop {
-            let response = ws_rpc(
-                &mut client,
-                7,
-                "_co.grida/session/submit",
-                json!({"sessionId":session,"inputId":"ordinary-work",
-                    "prompt":[{"type":"text","text":"An unrelated follow-up."}]}),
-            )
-            .await;
-            if response["error"]["data"] != "session_prompt_in_progress" {
-                break response;
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-    })
-    .await
-    .expect("the settled Goal must release its execution slot");
+    let ordinary = ws_rpc(
+        &mut client,
+        7,
+        "_co.grida/session/submit",
+        json!({"sessionId":session,"inputId":"ordinary-work",
+            "prompt":[{"type":"text","text":"An unrelated follow-up."}]}),
+    )
+    .await;
+    assert!(ordinary.get("error").is_none(), "{ordinary}");
     assert_eq!(ordinary["result"]["inputId"], "ordinary-work", "{ordinary}");
     let request = endpoint.request().await;
     assert!(
@@ -948,7 +937,7 @@ async fn manual_goal_resume_authorizes_one_turn_after_a_held_queue_and_restart()
     .await;
     assert_eq!(unchanged["result"], goal["result"]);
     terminate_shared_server(child).await;
-    endpoint.task.abort();
+    endpoint.abort().await;
 }
 
 async fn commit_goal_control_without_wake(

@@ -369,6 +369,20 @@ async fn supervised_stored_vendor_children_keep_the_selected_route_after_restart
 
 #[tokio::test]
 async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_and_restart() {
+    verify_gateway_summary(None).await;
+}
+
+/// A store the previous worker wrote is migrated, and that worker then
+/// refuses the migrated store.
+#[tokio::test]
+#[ignore = "requires GRIDA_TEST_AGENT_SCHEMA_V10 pointing to a reviewed previous worker"]
+async fn gateway_summary_migrates_a_previous_store_that_the_previous_worker_then_refuses() {
+    let previous = std::env::var_os("GRIDA_TEST_AGENT_SCHEMA_V10")
+        .expect("GRIDA_TEST_AGENT_SCHEMA_V10 names the previous worker");
+    verify_gateway_summary(Some(Path::new(&previous))).await;
+}
+
+async fn verify_gateway_summary(previous: Option<&Path>) {
     use base64::{Engine, engine::general_purpose::STANDARD};
 
     async fn serve_gateway(
@@ -484,8 +498,7 @@ async fn gateway_summary_attributes_the_exact_ordinary_assignment_after_reuse_an
     let workspace = TempDir::new().unwrap();
     let state = temporary.path().join("state");
     let scope = "a".repeat(64);
-    let previous = std::env::var_os("GRIDA_TEST_AGENT_SCHEMA_V10").map(std::path::PathBuf::from);
-    let mut first = serve_gateway(&state, &scope, previous.is_none(), previous.as_deref()).await;
+    let mut first = serve_gateway(&state, &scope, previous.is_none(), previous).await;
     let parent = new_session(&mut first, workspace.path()).await;
     let mut child = None;
     let mut parent_turns = Vec::new();
@@ -702,23 +715,34 @@ async fn connect_subagents(mut command: Command) -> PrivateStdio {
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[tokio::test]
 async fn ordinary_ultra_reviewer_reads_only_its_captured_primary_across_restart() {
-    verify_primary_reviewer("act", true).await;
+    verify_primary_reviewer("act", true, None).await;
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[tokio::test]
 async fn ordinary_ultra_plan_reviewer_reads_only_its_captured_primary_across_restart() {
-    verify_primary_reviewer("plan", true).await;
+    verify_primary_reviewer("plan", true, None).await;
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[tokio::test]
 async fn ordinary_ultra_parent_collects_the_primary_review_finding() {
-    verify_primary_reviewer("act", false).await;
+    verify_primary_reviewer("act", false, None).await;
+}
+
+/// A worker from before primary review refuses to resume a reviewer it did
+/// not authorize.
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+#[ignore = "requires GRIDA_AGENT_PRE_PRIMARY_REVIEW_BIN pointing to a reviewed previous worker"]
+async fn a_previous_worker_refuses_to_resume_a_primary_reviewer() {
+    let previous = std::env::var_os("GRIDA_AGENT_PRE_PRIMARY_REVIEW_BIN")
+        .expect("GRIDA_AGENT_PRE_PRIMARY_REVIEW_BIN names the previous worker");
+    verify_primary_reviewer("act", true, Some(Path::new(&previous))).await;
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-async fn verify_primary_reviewer(regime: &str, interrupt: bool) {
+async fn verify_primary_reviewer(regime: &str, interrupt: bool, previous: Option<&Path>) {
     const PRIMARY: &str = "PRIMARY REVIEW FIXTURE CONTENT";
     const PRIVATE: &str = "ADDITIONAL ROOT MUST STAY PRIVATE";
     const FINDING: &str = "The primary file is ready for review.";
@@ -863,7 +887,7 @@ async fn verify_primary_reviewer(regime: &str, interrupt: bool) {
                 .await
                 .is_err()
         );
-        endpoint.task.abort();
+        endpoint.abort().await;
         return;
     }
     let active = inspect(&mut host, &parent, child, input).await;
@@ -877,8 +901,8 @@ async fn verify_primary_reviewer(regime: &str, interrupt: bool) {
     .await;
     host.close().await;
     let resume = resume_basis(&paused, &parent, child, "resume");
-    if let Some(binary) = std::env::var_os("GRIDA_AGENT_PRE_PRIMARY_REVIEW_BIN") {
-        let mut old = open(Some(Path::new(&binary))).await;
+    if let Some(binary) = previous {
+        let mut old = open(Some(binary)).await;
         load_parent(&mut old, &parent, &fixture.primary).await;
         let refused = old.request(RESUME, resume.clone()).await;
         assert_eq!(
@@ -934,7 +958,7 @@ async fn verify_primary_reviewer(regime: &str, interrupt: bool) {
             .await
             .is_err()
     );
-    endpoint.task.abort();
+    endpoint.abort().await;
 }
 
 async fn new_session(client: &mut PrivateStdio, workspace: &Path) -> String {
@@ -1008,17 +1032,19 @@ async fn wait_for(
     input: &str,
     predicate: impl Fn(&Value) -> bool,
 ) -> Value {
-    timeout(WAIT, async {
+    let mut latest = Value::Null;
+    let result = timeout(WAIT, async {
         loop {
             let view = inspect(client, parent, child, input).await;
+            latest = view.clone();
             if predicate(&view) {
                 return view;
             }
-            tokio::task::yield_now().await;
+            tokio::time::sleep(Duration::from_millis(10)).await;
         }
     })
-    .await
-    .unwrap()
+    .await;
+    result.unwrap_or_else(|_| panic!("the child did not reach the expected state: {latest}"))
 }
 
 async fn load_parent(client: &mut PrivateStdio, parent: &str, workspace: &Path) {

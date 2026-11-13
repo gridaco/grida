@@ -156,26 +156,8 @@ async fn plan_withholds_settings_writes_and_preserves_its_scope_through_a_queue_
     let mut act = prompt_request(session, "approved-act", "Apply the planned change.");
     act["allowConfigurationChanges"] = true.into();
     act["operatingRegime"] = "act".into();
-    // Settlement can precede the host releasing the worker's execution slot.
-    let (request_id, accepted) = timeout(Duration::from_secs(2), async {
-        let mut request_id = 6;
-        loop {
-            let response = ws_rpc(
-                &mut socket,
-                request_id,
-                "_co.grida/session/submit",
-                act.clone(),
-            )
-            .await;
-            if response["error"]["data"] != "session_prompt_in_progress" {
-                break (request_id, response);
-            }
-            request_id += 1;
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-    })
-    .await
-    .expect("the settled Plan must release its execution slot");
+    let request_id = 6;
+    let accepted = ws_rpc(&mut socket, request_id, "_co.grida/session/submit", act).await;
     assert!(accepted.get("error").is_none(), "{accepted}");
     let request = endpoint.request().await;
     assert!(

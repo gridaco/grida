@@ -319,7 +319,7 @@ async fn identified_submit_compacts_in_regime(
     );
     drop(socket);
     terminate_shared_server(host).await;
-    endpoint.task.abort();
+    endpoint.abort().await;
 }
 
 #[tokio::test]
@@ -1052,8 +1052,7 @@ async fn automatic_compaction_does_not_omit_a_retained_tool_image_on_overflow() 
     ));
     drop(socket);
     terminate_shared_server(host).await;
-    endpoint.task.abort();
-    assert!(endpoint.task.await.unwrap_err().is_cancelled());
+    endpoint.abort().await;
 }
 
 async fn compact_on_peer(
@@ -1349,8 +1348,7 @@ async fn interrupted_compaction_requires_explicit_recovery_and_failed_candidates
     ));
     drop(foreign_socket);
     terminate_shared_server(foreign_host).await;
-    foreign.task.abort();
-    assert!(foreign.task.await.unwrap_err().is_cancelled());
+    foreign.abort().await;
 
     let (host, url) = shared_server(&state, &endpoint.url).await;
     let mut socket = client(&url).await;
