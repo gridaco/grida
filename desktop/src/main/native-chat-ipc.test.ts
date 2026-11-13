@@ -2277,6 +2277,7 @@ describe("native chat IPC", () => {
       "native_provider_endpoint_not_approved",
       "native-provider-endpoint-approval-required",
     ],
+    ["native_workspace_capacity_reached", "native-workspace-capacity"],
     ["native_provider_byok_key_missing: private details", "native-unavailable"],
     ["gateway_grant_unavailable", "native-unavailable"],
   ])("returns a bounded recovery state for %s", async (message, readiness) => {

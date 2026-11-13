@@ -416,3 +416,31 @@ it("reports the original startup failure if forced termination is observed", asy
   });
   expect(incompatible.kill).toHaveBeenCalledExactlyOnceWith("SIGKILL");
 });
+
+it("releases exited workers' capacity and reports capacity while every worker is live", async () => {
+  const { workspace, owners } = fixture();
+  const workers = Array.from({ length: 10 }, () =>
+    child(1, { closeOnEof: true })
+  );
+  for (const worker of workers) spawn.mockReturnValueOnce(worker.handle);
+  const project = (index: number) => ({ ...workspace, id: `project-${index}` });
+  try {
+    for (let index = 0; index < 8; index++) await owners.open(project(index));
+    await expect(owners.open(project(8))).rejects.toThrow(
+      "native_workspace_capacity_reached"
+    );
+    expect(spawn).toHaveBeenCalledTimes(8);
+
+    workers[0].close("SIGKILL");
+    const opened = await owners.open(project(8));
+    expect(owners.current(project(8).id)).toBe(opened);
+    expect(owners.current(project(0).id)).toBeNull();
+    for (let index = 1; index < 8; index++)
+      expect(owners.current(project(index).id)).not.toBeNull();
+    await expect(owners.open(project(9))).rejects.toThrow(
+      "native_workspace_capacity_reached"
+    );
+  } finally {
+    await owners.close();
+  }
+});

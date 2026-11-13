@@ -159,6 +159,7 @@ export function NativeAgentPaneGate({
     readiness !== "native-ready" &&
     readiness !== null &&
     readiness !== "native-unavailable" &&
+    readiness !== "native-workspace-capacity" &&
     !!workspaceId &&
     !!bridge.profiles &&
     !!bridge.selectProfile;
@@ -210,6 +211,8 @@ const nativeChatConnectionNote: Partial<Record<NativeChatReadiness, string>> = {
     "Native chat requires HTTPS for an endpoint on another device. Update the saved endpoint in Desktop settings, or choose another model.",
   "native-provider-endpoint-approval-required":
     "Save the selected endpoint in Desktop settings and approve its address, or choose another model.",
+  "native-workspace-capacity":
+    "Chat is already running in as many projects as Desktop keeps open at once. Quit and reopen Grida Desktop, then retry.",
 };
 
 export function NativeAgentPane({

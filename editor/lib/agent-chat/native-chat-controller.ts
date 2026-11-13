@@ -497,6 +497,7 @@ export class NativeChatController {
           case "native-provider-endpoint-https-required":
           case "native-provider-endpoint-approval-required":
           case "native-gateway-unavailable":
+          case "native-workspace-capacity":
             publish(result);
             break;
           default:

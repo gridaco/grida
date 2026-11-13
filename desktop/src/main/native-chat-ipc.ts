@@ -733,6 +733,8 @@ export class NativeChatIpc {
                 return "native-provider-endpoint-https-required";
               case "native_provider_endpoint_not_approved":
                 return "native-provider-endpoint-approval-required";
+              case "native_workspace_capacity_reached":
+                return "native-workspace-capacity";
               default:
                 return "native-unavailable";
             }

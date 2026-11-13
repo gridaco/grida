@@ -193,7 +193,8 @@ export type NativeChatReadiness =
   | "native-provider-key-required"
   | "native-provider-model-unavailable"
   | "native-provider-endpoint-https-required"
-  | "native-provider-endpoint-approval-required";
+  | "native-provider-endpoint-approval-required"
+  | "native-workspace-capacity";
 
 export type NativeChatTurn = Readonly<{
   turnId: string;

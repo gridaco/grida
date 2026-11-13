@@ -3432,6 +3432,7 @@ it.each([
     "native-provider-endpoint-approval-required",
     "native-provider-endpoint-approval-required",
   ],
+  ["native-workspace-capacity", "native-workspace-capacity"],
   ["legacy", "native-unavailable"],
   ["native-future-status", "native-unavailable"],
 ] as const)(

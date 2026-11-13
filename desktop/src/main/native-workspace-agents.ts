@@ -9,6 +9,7 @@ import type { NativeAgentCutover } from "./native-agent-cutover";
 import { NativeAgentTerminationPending } from "./native-agent-process";
 import type { ActiveNativeChat } from "./native-chat-ipc";
 
+/** Live agent processes: workspaces, their connections, documents and decks. */
 const MAX_LIVE_WORKSPACES = 8;
 type Project =
   | (Pick<Workspace, "id" | "root"> & {
@@ -136,7 +137,9 @@ export class NativeWorkspaceAgents {
         throw new Error("native_workspace_disconnect_pending");
       existing.stopping.abort();
     } else if (this.slots.size >= MAX_LIVE_WORKSPACES) {
-      throw new Error("native_workspace_capacity_reached");
+      if (this.live() >= MAX_LIVE_WORKSPACES)
+        throw new Error("native_workspace_capacity_reached");
+      this.reclaimExited(key);
     }
 
     // One workspace store admits one worker. Choosing another model
@@ -177,6 +180,24 @@ export class NativeWorkspaceAgents {
     this.slots.set(key, slot);
     void opened.catch((error: unknown) => this.retireSlot(key, slot, error));
     return visible;
+  }
+
+  /** Slots whose agent process can still run work. */
+  private live(): number {
+    let live = 0;
+    for (const slot of this.slots.values())
+      if (!slot.owner?.active.chat.hasExited) live++;
+    return live;
+  }
+
+  /**
+   * An exited agent keeps no work running; release its slot so it does not
+   * hold capacity until the same workspace reopens. A reopen replaces it.
+   */
+  private reclaimExited(except: string): void {
+    for (const [key, slot] of this.slots)
+      if (key !== except && slot.owner?.active.chat.hasExited)
+        void this.drainSlot(key, slot).catch(() => {});
   }
 
   close(): Promise<void> {
