@@ -120,6 +120,7 @@ pub async fn dispatch(command: AgentCommand) -> Result<u8> {
                     input_png,
                     skills,
                     questions,
+                    reasoning: None,
                     timeout: Duration::from_millis(deadline_ms),
                 },
                 input_file,

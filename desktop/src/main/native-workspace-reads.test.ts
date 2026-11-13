@@ -45,7 +45,7 @@ it("queues bounded read bursts in order without acquiring authority for cancelle
   );
   const reads = new NativeWorkspaceReads(
     { fileGrant },
-    { list, open: vi.fn() }
+    { list, open: vi.fn<WorkspaceFileWorkers["open"]>() }
   );
   const owner = new AbortController();
   const launch = (relative: string, signal = owner.signal) =>
@@ -73,9 +73,9 @@ it("queues bounded read bursts in order without acquiring authority for cancelle
   await expect(queuedOwner).rejects.toThrow("frame retired");
   await expect(queuedDeadline).rejects.toThrow("deadline elapsed");
   const trailing = [launch("replacement/0"), launch("replacement/1")];
-  const failed = expect(active[0]).rejects.toThrow("worker refused");
+  const failed = active[0].catch((error: unknown) => error);
   running[0].reject(new Error("worker refused"));
-  await failed;
+  expect(await failed).toEqual(new Error("worker refused"));
   await Promise.all([...queued, ...trailing]);
   expect(starts).toEqual([
     "running/0",
