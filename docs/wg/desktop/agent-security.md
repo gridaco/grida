@@ -105,27 +105,38 @@ boundary fails.
 
 ## OS-level outer sandbox
 
-On macOS and Linux, the daemon runs inside `srt`
-([agent-sandbox-wrap](./agent-sandbox-wrap.md)) with the package-owned
-outer-wrap intent: network limited to an **enumerated allowlist**
-(and `srt` forbids `*` / open patterns), secret-path read/write denies, and
-host-supplied write roots for the sidecar's persisted state and platform temp
-paths. Desktop omits the daemon development-host baseline, disables external
-ACP, and supplies `host_routed_provider_http: true`, so the Desktop sidecar's
-direct external allowlist is empty. Provider/GG calls can leave only through
-the host-routed provider transport. `allow_local_binding` is false: the daemon
-remains reachable only because main transfers a connected socket it already
-accepted. CLI hosts preserve the package defaults unless they opt into the same
-strict construction switches.
+On macOS and Linux, Desktop launches the retained services process under the
+platform's native process confinement: a Seatbelt profile on macOS, and
+bubblewrap namespaces with a seccomp filter on Linux. The launch fails closed.
+If the confinement is unavailable the services do not start, and a failed
+launch is never retried unconfined. The confinement is the process's own: the
+retained process runs no model command, and the native agent host confines
+each command separately (see [Command execution](#command-execution)).
 
-Windows currently has no equivalent enabled outer boundary. srt 0.0.65 ships
-an alpha Windows backend, but Desktop withholds it until the argv-based spawn,
-machine provisioning, packaging, and lifecycle contract are supported. Windows
-starts no chat engine, so no local capability is model-invocable, but the
-retained structured filesystem routes run without a kernel fence — a known gap
-against the accepted fail-closed authority model. The package policy is not a kernel egress fence on
-that unwrapped process; the other controls do not turn it into sandboxed local
-execution.
+- **Network.** The process has no direct network authority: no permitted
+  destinations and no local binding. Desktop refuses to construct the
+  confinement with any other network posture, and on Linux the syscall filter
+  also refuses new sockets. The daemon stays reachable only because Electron
+  main transfers connected sockets it has already accepted, and provider
+  calls leave only through the host-routed provider transport. The retained
+  process has no network route of its own.
+- **Filesystem.** Home secrets such as SSH and cloud credentials and shell
+  startup files are denied for reading and writing. Writes are confined to the
+  user's home, where workspaces live, the process's own persisted state, the
+  media root, the shared provider credential directory and platform temporary
+  paths, always minus the denied paths; a filesystem root is never writable.
+  Desktop's own browser state and the native agent host's chat state are
+  denied for reading and writing, and the workspace catalog is denied for
+  writing. On macOS, the profile permits only metadata on an exact protected
+  root and its ancestors, so file and workspace registration can recheck their
+  identities; their contents and listings stay denied.
+
+Windows has no equivalent boundary yet. The retained file and media services
+run there without kernel confinement and receive no command executor, and
+Windows starts no chat engine until native private storage is supported. The
+structured filesystem routes therefore run without a kernel fence, a known gap
+against the accepted fail-closed authority model. The other controls do not
+turn that process into sandboxed local execution.
 
 **What this catches.** A compromised sidecar that wants to read
 `~/.ssh`, write `~/.zshrc`, or exfiltrate to a random host.
@@ -133,7 +144,8 @@ execution.
 **What this does not catch.** A compromised agent that sends data to an origin
 already granted through the provider transport. The RFC's
 [watchdog](../ai/agent/permissions.md) is the answer to semantic misuse
-inside a legitimate provider request — host-configured policy, not srt.
+inside a legitimate provider request — host-configured policy, not process
+confinement.
 
 ## Command execution
 
@@ -205,8 +217,8 @@ subscription host owns its lifecycle and injects it at the provider edge of
 the native host's supervised transport. The sidecar and the renderer receive
 neither the credential nor any ChatGPT route.
 
-**What this catches.** A provider call that would otherwise inherit the
-sidecar's static proxy/SRT route instead of the user's Chromium/system route;
+**What this catches.** A provider call that would otherwise leave the sidecar
+directly instead of through the user's Chromium/system route;
 an attempt to turn endpoint configuration or a credential-free download into
 unrestricted native HTTP; or a cross-origin credential redirect.
 
@@ -289,9 +301,10 @@ daemon's HTTP layer, the sidecar sandbox policy, or any source file under
    transfers only accepted connected sockets. Every new route handler runs the
    auth + Referer + Origin guards; the credential stays header-only. No
    "internal" bypass.
-4. **Outer sandbox intact?** The Desktop policy keeps direct external egress
-   empty and local binding false; filesystem paths cover only what the code
-   reads/writes and the mandatory deny set is unmodified.
+4. **Outer sandbox intact?** On macOS/Linux the retained process still has no
+   direct network or local binding, an unavailable confinement still refuses
+   the launch, filesystem paths cover only what the code reads/writes, and the
+   mandatory deny set is unmodified.
 5. **Secrets intact?** No new secrets placed on `window`; `auth.json`
    write path still uses `0o600`; logs still elide content.
 6. **Provider transport intact?** Provider traffic has no ambient-fetch fallback in

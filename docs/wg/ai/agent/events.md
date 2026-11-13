@@ -35,13 +35,13 @@ The keywords **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**,
 
 ## Why an event surface
 
-The signals all exist inside the core already. The run-state machine
-observes every turn's busy and idle edge; the approval gate persists
-every pending approval. The gap is not detection — it is
-**fan-out**: the lifecycle edges are observable at exactly one
-internal seam, and that seam historically admitted exactly one
-observer (the run-state machine itself). A second consumer could not
-attach without displacing the first.
+The signals already exist where turns are owned. The turn owner commits a
+turn's settlement and every approval wait to the session before anything else
+learns of them, so both edges are known at the moment of commit. The gap is
+not detection — it is **fan-out**: an edge observed at a single internal seam
+serves only the observer wired there, and any other consumer must hold the
+session open and read it to learn what changed. A second consumer cannot
+attach to a single-observer seam without displacing the first.
 
 The naive fix is to wire the new consumer directly: let the desktop
 shell reach into the runtime, or let the runtime call the
@@ -143,7 +143,7 @@ vocabulary and its notification table together.
   single-observer seam that silently overwrites.
 - **Volatile, no replay.** The channel is a live feed. A late joiner
   sees only future facts; a host restart loses nothing of record
-  because nothing of record lives here. Durable facts (run state,
+  because nothing of record lives here. Durable facts (turn state,
   queue, pending approvals, transcripts) live in their authoritative
   stores; a consumer that needs current state on attach reads those
   stores, then tails the channel.
