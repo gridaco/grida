@@ -786,8 +786,7 @@ export class NativeChatController {
     this.profileRead = undefined;
     if (this.scope?.observation?.snapshot.current) {
       this.update({
-        profileError:
-          "Finish or stop the current turn before changing the model.",
+        profileError: "Change the model after the current turn ends.",
       });
       return;
     }
