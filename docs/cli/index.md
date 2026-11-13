@@ -80,7 +80,9 @@ When a newer `grida` is on npm, commands print one line on stderr naming it,
 including `grida fx`, which updates with `grida`. Grida checks npm's public
 release tags at most once a day, in the background; the request carries
 nothing about you or your command. There is no check or notice in CI, with
-`--json`, when stderr is not a terminal, or with `GRIDA_NO_UPDATE_CHECK=1`.
+`--json`, when stderr is not a terminal, with `GRIDA_NO_UPDATE_CHECK=1`, or
+when `NO_UPDATE_NOTIFIER` is set to any value, the opt-out many command-line
+tools share.
 
 ## Use Grida in scripts
 
