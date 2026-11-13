@@ -34,7 +34,7 @@ bundle.
 | `./vision`              | image perception primitives                                                                                                                   | neutral  |
 | `./tools/design-search` | reference search tool vocabulary and result contracts                                                                                         | neutral  |
 | `./sandbox`             | composed sandbox policy (`buildAgentDaemonSandboxPolicy` — daemon frame + AI upstream hosts)                                                  | Node     |
-| `./media-transport`     | `MediaTransport` namespace — extends `DaemonTransport.Client` with the media service's routes only; no chat code                              | Node     |
+| `./media-transport`     | `MediaTransport` namespace — extends `DaemonTransport.Client` with the media service's routes only; no chat code                              | neutral  |
 | `./transport`           | `AgentTransport` namespace — extends `MediaTransport.Client` with the chat routes                                                             | neutral  |
 
 The Node fs backend (`NodeFsBackend`) is internal + test-only — it is not a
