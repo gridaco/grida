@@ -13,7 +13,7 @@ import { NativeChatIpc } from "./native-chat-ipc";
 const basis = {
   view: 2,
   tail: { turn: "latest", ordinal: 4, position: 6 },
-  fingerprint: Array(32).fill(12),
+  fingerprint: "0c".repeat(32),
 };
 const latestAnchor = { kind: "turn", turn: "latest", message: "answer" };
 

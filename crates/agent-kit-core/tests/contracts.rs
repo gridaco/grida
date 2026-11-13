@@ -234,6 +234,123 @@ fn fingerprints_encode_as_lowercase_hex() {
     );
 }
 
+/// The canonical encoding is compact serde_json text with every object's keys
+/// sorted, whether the object is a struct or a map, at any depth.
+#[test]
+fn fingerprints_hash_compact_json_with_every_object_key_sorted() {
+    use sha2::{Digest as _, Sha256};
+    #[derive(serde::Serialize)]
+    struct Fields<'a> {
+        zeta: u8,
+        alpha: Option<&'a str>,
+        nested: serde_json::Value,
+        variant: Shape,
+        bytes: &'a Envelope,
+    }
+    #[derive(serde::Serialize)]
+    enum Shape {
+        Unit,
+        Wrapped(i64),
+        Pair(bool, f64),
+        Named { y: u8, x: char },
+    }
+    let envelope = Envelope::new(SchemaId::new("data").unwrap(), 1, vec![0, 255, 7]).unwrap();
+    let shapes = [
+        Shape::Unit,
+        Shape::Wrapped(-3),
+        Shape::Pair(true, 0.5),
+        Shape::Named { y: 1, x: 'é' },
+    ];
+    for variant in shapes {
+        let value = Fields {
+            zeta: 9,
+            alpha: None,
+            nested: serde_json::json!({"z": [{"b": 1, "a": "\u{1}\"q"}], "a": null, "m": 1.25}),
+            variant,
+            bytes: &envelope,
+        };
+        let text = serde_json::to_vec(&sorted(serde_json::to_value(&value).unwrap())).unwrap();
+        let expected: [u8; 32] = Sha256::digest(&text).into();
+        assert_eq!(Fingerprint::of(&value).unwrap().bytes(), &expected);
+    }
+    let mut map = std::collections::HashMap::new();
+    map.insert(2u32, "two");
+    map.insert(10u32, "ten");
+    assert_eq!(
+        Fingerprint::of(&map).unwrap(),
+        Fingerprint::of(&serde_json::json!({"2": "two", "10": "ten"})).unwrap()
+    );
+
+    fn sorted(value: serde_json::Value) -> serde_json::Value {
+        match value {
+            serde_json::Value::Object(object) => {
+                let entries: std::collections::BTreeMap<_, _> = object.into_iter().collect();
+                entries
+                    .into_iter()
+                    .map(|(key, value)| (key, sorted(value)))
+                    .collect()
+            }
+            serde_json::Value::Array(values) => values.into_iter().map(sorted).collect(),
+            other => other,
+        }
+    }
+}
+
+#[test]
+fn fingerprints_serialize_as_their_hex_text() {
+    let fingerprint = Fingerprint::of(&"value").unwrap();
+    let text = serde_json::to_value(fingerprint).unwrap();
+    assert_eq!(text, serde_json::Value::String(fingerprint.to_hex()));
+    assert_eq!(
+        serde_json::from_value::<Fingerprint>(text).unwrap(),
+        fingerprint
+    );
+    assert_eq!(
+        Fingerprint::from_hex(&fingerprint.to_hex()),
+        Some(fingerprint)
+    );
+    let upper = fingerprint.to_hex().to_uppercase();
+    let multibyte = format!("{}é{}", "a".repeat(31), "b".repeat(31));
+    assert_eq!(multibyte.len(), 64);
+    for invalid in [upper.as_str(), multibyte.as_str(), "ab", ""] {
+        assert_eq!(Fingerprint::from_hex(invalid), None);
+        assert!(serde_json::from_value::<Fingerprint>(invalid.into()).is_err());
+    }
+    assert!(
+        serde_json::from_value::<Fingerprint>(serde_json::to_value([0u8; 32]).unwrap()).is_err()
+    );
+}
+
+#[test]
+fn envelope_payloads_serialize_as_padded_base64() {
+    let envelope = Envelope::new(SchemaId::new("data").unwrap(), 2, b"hi!?".to_vec()).unwrap();
+    let value = serde_json::to_value(&envelope).unwrap();
+    assert_eq!(
+        value,
+        serde_json::json!({"schema": "data", "version": 2, "bytes": "aGkhPw=="})
+    );
+    assert_eq!(serde_json::from_value::<Envelope>(value).unwrap(), envelope);
+    for invalid in [
+        serde_json::json!("aGkhPw"),
+        serde_json::json!("aGk*Pw=="),
+        serde_json::json!([104, 105]),
+    ] {
+        assert!(
+            serde_json::from_value::<Envelope>(
+                serde_json::json!({"schema": "data", "version": 2, "bytes": invalid})
+            )
+            .is_err()
+        );
+    }
+    let oversized = "A".repeat((Envelope::MAX_BYTES + 3) / 3 * 4 + 4);
+    assert!(
+        serde_json::from_value::<Envelope>(
+            serde_json::json!({"schema": "data", "version": 2, "bytes": oversized})
+        )
+        .is_err()
+    );
+}
+
 #[test]
 fn envelope_rejects_unversioned_or_oversized_payloads() {
     assert!(Envelope::new(SchemaId::new("data").unwrap(), 0, vec![]).is_err());

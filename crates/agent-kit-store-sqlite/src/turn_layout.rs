@@ -29,7 +29,7 @@
 use super::{MAX_STORED_TURN_BYTES, Result, database_error, decode, encode, error, now_ms};
 use agent_kit_core::history::HistoryPosition;
 use agent_kit_core::turn::{ControlSnapshot, JournalPosition, TurnBinding, TurnOutcome, TurnState};
-use agent_kit_core::{ErrorKind, SessionId, TurnId};
+use agent_kit_core::{ErrorKind, Fingerprint, SessionId, TurnId};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -463,7 +463,7 @@ fn externalize(message: &mut Value, bodies: &mut BTreeMap<[u8; 32], Vec<u8>>) ->
     let bytes = encode(&*message)?;
     let digest: [u8; 32] = Sha256::digest(&bytes).into();
     let size = bytes.len();
-    *message = Value::String(hex(&digest));
+    *message = Value::String(Fingerprint::from_bytes(digest).to_hex());
     bodies.entry(digest).or_insert(bytes);
     Ok(size)
 }
@@ -666,7 +666,9 @@ fn assemble_parts(
         let Value::String(reference) = message else {
             return Err(error(ErrorKind::InvalidState, "stored_data_invalid"));
         };
-        let digest = unhex(reference)?;
+        let digest = *Fingerprint::from_hex(reference)
+            .ok_or_else(|| error(ErrorKind::InvalidState, "stored_data_invalid"))?
+            .bytes();
         let (content, size) = match resolved.get(&digest) {
             Some(found) => found.clone(),
             None => {
@@ -742,31 +744,6 @@ fn assemble_parts(
         _ => return Err(error(ErrorKind::InvalidState, "stored_data_invalid")),
     }
     Ok((head, sizes, referenced))
-}
-
-fn hex(bytes: &[u8; 32]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
-/// Decode a stored 64-character hexadecimal reference. Any other text,
-/// including multibyte characters, is invalid stored data.
-fn unhex(text: &str) -> Result<[u8; 32]> {
-    let invalid = || error(ErrorKind::InvalidState, "stored_data_invalid");
-    let text = text.as_bytes();
-    if text.len() != 64 {
-        return Err(invalid());
-    }
-    let nibble = |digit: u8| match digit {
-        b'0'..=b'9' => Ok(digit - b'0'),
-        b'a'..=b'f' => Ok(digit - b'a' + 10),
-        b'A'..=b'F' => Ok(digit - b'A' + 10),
-        _ => Err(invalid()),
-    };
-    let mut bytes = [0u8; 32];
-    for (byte, [high, low]) in bytes.iter_mut().zip(text.as_chunks::<2>().0) {
-        *byte = nibble(*high)? << 4 | nibble(*low)?;
-    }
-    Ok(bytes)
 }
 
 #[cfg(test)]
@@ -997,15 +974,5 @@ mod tests {
         cache.insert(key(3), cached(1_001));
         assert!(cache.get(&key(3)).is_none());
         assert_eq!(cache.bytes, 800);
-    }
-
-    /// A malformed stored reference is invalid data, never a panic.
-    #[test]
-    fn a_reference_with_multibyte_characters_is_invalid() {
-        let reference = format!("{}é{}", "a".repeat(31), "b".repeat(31));
-        assert_eq!(reference.len(), 64);
-        assert_eq!(unhex(&reference).unwrap_err().code, "stored_data_invalid");
-        let digest = [0xab; 32];
-        assert_eq!(unhex(&hex(&digest)).unwrap(), digest);
     }
 }

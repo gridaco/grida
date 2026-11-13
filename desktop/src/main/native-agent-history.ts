@@ -1,4 +1,6 @@
 // GRIDA-SEC-004 — bounded references to committed history from the attached host.
+import { NativeAgentFingerprint } from "./native-agent-fingerprint";
+
 export namespace NativeAgentHistory {
   export type Anchor =
     | { kind: "inherited"; message: string }
@@ -7,7 +9,7 @@ export namespace NativeAgentHistory {
   export type Basis = {
     view: number;
     tail: { turn: string; ordinal: number; position: number } | null;
-    fingerprint: readonly number[];
+    fingerprint: string;
   };
 
   const ID = /^[A-Za-z0-9_.:@/-]{1,256}$/;
@@ -26,12 +28,10 @@ export namespace NativeAgentHistory {
     const result = object(value);
     if (
       !revision(result?.view) ||
-      !Array.isArray(result.fingerprint) ||
-      result.fingerprint.length !== 32 ||
-      !result.fingerprint.every((byte) => revision(byte) && byte <= 255)
+      !NativeAgentFingerprint.is(result.fingerprint)
     )
       return null;
-    const fingerprint: number[] = [...result.fingerprint];
+    const fingerprint = result.fingerprint;
     if (result.tail === null)
       return { view: result.view, tail: null, fingerprint };
     const tail = object(result.tail);

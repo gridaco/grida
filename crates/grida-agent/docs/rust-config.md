@@ -120,8 +120,9 @@ Three operations establish the surface. Each requires its negotiated
 | `_co.grida/config/update`  | `expectedRevision` and one typed `change` (set or reset). | The resulting file revision and active snapshot, persisted and effective values, and diagnostics.                                                          |
 | `_co.grida/config/reload`  | `expectedRevision`.                                       | Validates manually edited content and activates it for future requests, or returns diagnostics while retaining the active snapshot.                        |
 
-`expectedRevision` is the file revision from inspection. It is null exactly
-when no configuration file exists; any other mismatch fails with
+`expectedRevision` is the file revision from inspection, a fingerprint written
+as 64 lowercase hexadecimal characters. It is null exactly when no
+configuration file exists; any other mismatch fails with
 `config_revision_changed`. A `change` carries `operation`
 (`set_context_max_input_tokens` with a positive `value`, or
 `reset_context_max_input_tokens`).

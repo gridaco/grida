@@ -1,4 +1,5 @@
 // GRIDA-SEC-004 — the private client sends only an exact, confirmed retirement.
+import { NativeAgentFingerprint } from "./native-agent-fingerprint";
 
 export type NativeSavedChatDeletion = Readonly<{
   sessionId: string;
@@ -6,14 +7,14 @@ export type NativeSavedChatDeletion = Readonly<{
   requestId: string;
   expectedSessionRevision: number;
   expectedCatalogRevision: number;
-  expectedOwnedChildren?: readonly number[];
+  expectedOwnedChildren?: string;
 }>;
 
 type Target = Pick<NativeSavedChatDeletion, "sessionId" | "cwd">;
 
 export type NativeSavedChatDeletionPreview = Readonly<{
   ownedChildren: number;
-  ownedChildrenBasis: readonly number[];
+  ownedChildrenBasis: string;
 }>;
 
 const UNVERIFIED = "native_chat_deletion_unverified";
@@ -71,27 +72,14 @@ export class NativeAgentDeletion {
       !Number.isInteger(ownedChildren) ||
       ownedChildren < 0 ||
       ownedChildren > 128 ||
-      !Array.isArray(ownedChildrenBasis) ||
-      ownedChildrenBasis.length !== 32
+      !NativeAgentFingerprint.is(ownedChildrenBasis)
     )
       throw invalid();
-    const basis = [...ownedChildrenBasis];
-    if (basis.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255))
-      throw invalid();
-    return Object.freeze({
-      ownedChildren,
-      ownedChildrenBasis: Object.freeze(basis),
-    });
+    return Object.freeze({ ownedChildren, ownedChildrenBasis });
   }
 
   async retire(deletion: NativeSavedChatDeletion): Promise<void> {
-    const { expectedOwnedChildren } = deletion;
-    const request = Object.freeze({
-      ...deletion,
-      ...(expectedOwnedChildren && {
-        expectedOwnedChildren: Object.freeze([...expectedOwnedChildren]),
-      }),
-    });
+    const request = Object.freeze({ ...deletion });
     try {
       await this.verifyReceipt(request);
     } catch (error) {

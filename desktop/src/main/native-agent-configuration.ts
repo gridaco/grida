@@ -1,7 +1,8 @@
 // GRIDA-SEC-004 — keep private configuration revisions in Main.
 import type { NativeContextLimit } from "@grida/desktop-bridge";
+import { NativeAgentFingerprint } from "./native-agent-fingerprint";
 
-type Revision = readonly number[] | null;
+type Revision = string | null;
 export type ContextLimitBasis = Readonly<
   Omit<NativeContextLimit, "reviewId"> & { revision: Revision }
 >;
@@ -34,7 +35,7 @@ export class NativeAgentConfiguration {
     const source =
       inspection.file_diagnostic !== null
         ? "invalid"
-        : sameRevision(fileRevision, active.revision)
+        : fileRevision === active.revision
           ? "active"
           : "pending";
     return Object.freeze({
@@ -83,25 +84,8 @@ export function contextLimitValue(value: unknown): number | null {
 
 function revision(value: unknown): Revision {
   if (value === null) return null;
-  if (
-    !Array.isArray(value) ||
-    value.length !== 32 ||
-    !value.every(
-      (byte: unknown) =>
-        typeof byte === "number" &&
-        Number.isInteger(byte) &&
-        byte >= 0 &&
-        byte <= 255
-    )
-  )
-    throw invalid();
-  return Object.freeze([...value]);
-}
-
-function sameRevision(left: Revision, right: Revision): boolean {
-  return left === null
-    ? right === null
-    : right !== null && left.every((byte, index) => byte === right[index]);
+  if (!NativeAgentFingerprint.is(value)) throw invalid();
+  return value;
 }
 
 function record(value: unknown): Record<string, unknown> {

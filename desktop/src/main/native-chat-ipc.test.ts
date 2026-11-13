@@ -1235,11 +1235,11 @@ describe("native chat IPC", () => {
     Object.defineProperty(chat, "acceptsSavedChatDeletion", { value: true });
     const prior = {
       ownedChildren: 1,
-      ownedChildrenBasis: Object.freeze(Array<number>(32).fill(1)),
+      ownedChildrenBasis: "1".repeat(64),
     };
     const replacement = {
       ownedChildren: 2,
-      ownedChildrenBasis: Object.freeze(Array<number>(32).fill(2)),
+      ownedChildrenBasis: "2".repeat(64),
     };
     const delayed = Promise.withResolvers<NativeSavedChatDeletionPreview>();
     const preview =
@@ -1260,7 +1260,7 @@ describe("native chat IPC", () => {
           snapshot: NativeChatSnapshot,
           catalogRevision: number,
           requestId: string,
-          expectedOwnedChildren?: readonly number[]
+          expectedOwnedChildren?: string
         ) => Promise<void>
       >();
     remove
@@ -1491,7 +1491,7 @@ describe("native chat IPC", () => {
       limit: 2048,
       exactCounting: false,
       source: "active",
-      revision: Array(32).fill(2),
+      revision: "2".repeat(64),
     });
     const update = vi
       .spyOn(chat, "updateContextLimit")
@@ -1505,7 +1505,7 @@ describe("native chat IPC", () => {
       limit: null,
       exactCounting: false,
       source: "active",
-      revision: Array(32).fill(3),
+      revision: "3".repeat(64),
     });
     await expect(
       ipc.saveContextLimit(first.event, initial.reviewId, null)

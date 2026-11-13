@@ -26,6 +26,12 @@ Identities validate at construction and deserialization. Prepared requests and
 invocations retain their exact definition and data fingerprints. Adapter-owned
 opaque values use versioned, bounded envelopes.
 
+`Fingerprint::of` hashes a value's canonical JSON with SHA-256 as it is encoded:
+compact serde_json text with every object's keys, struct or map, in ascending
+byte order. Only the entries of the object being encoded are buffered. A
+fingerprint serializes as 64 lowercase hexadecimal characters, and an envelope's
+payload as padded standard base64.
+
 ## Inference and tools
 
 A provider validates its own settings and authority before creating a
@@ -59,8 +65,10 @@ work have separate identities and paths.
 result. It records stable change, operation, and attempt identities. Replaying an
 identical change returns its receipt. Reusing that identity for different content
 is a conflict. The content fingerprint additionally identifies the action payload
-independently of its original admission positions. A change may carry at most one
-`SetDriverState`. It applies only against the expected driver-state revision,
+independently of its original admission positions. `JournalContent` hashes the
+actions once, so a writer retrying a change at a newer position reuses that
+fingerprint; the change fingerprint covers the binding, expected positions and
+content fingerprint. A change may carry at most one `SetDriverState`. It applies only against the expected driver-state revision,
 fails with `driver_state_revision_changed` otherwise, holds at most 64 KiB, and
 its receipt reports the new revision.
 

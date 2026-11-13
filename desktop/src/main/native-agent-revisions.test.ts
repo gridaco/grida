@@ -18,7 +18,7 @@ const target = {
   basis: {
     view: 4,
     tail: { turn: "latest", ordinal: 4, position: 12 },
-    fingerprint: Array.from({ length: 32 }, () => 4),
+    fingerprint: "04".repeat(32),
   },
   text: "Original wording beyond the preview. ".repeat(16),
   subsequentMessages: 2,

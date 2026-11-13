@@ -241,7 +241,7 @@ async fn preview(client: &mut Client, session: &str, cwd: &Path, count: usize) -
     assert_eq!(reply["result"]["sessionId"], session);
     assert_eq!(reply["result"]["ownedChildren"], count, "{reply}");
     let basis = reply["result"]["ownedChildrenBasis"].clone();
-    assert_eq!(basis.as_array().unwrap().len(), 32);
+    assert_eq!(basis.as_str().map(str::len), Some(64), "{basis}");
     basis
 }
 

@@ -65,6 +65,7 @@ dependencies = [
 name = "agent-kit-core"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "futures-channel",
  "futures-core",
  "futures-util",

@@ -33,6 +33,16 @@ async function privateHome() {
   );
 }
 
+/** The base64 text that must appear wherever `text` is stored inside a
+ * base64 payload, for each of its three possible byte alignments. */
+function base64Forms(text: string): string[] {
+  return [0, 1, 2].map((shift) =>
+    Buffer.concat([Buffer.alloc(shift), Buffer.from(text)])
+      .toString("base64")
+      .slice(shift ? 4 : 0, -4)
+  );
+}
+
 function settings() {
   const dispatch = vi.fn<() => Promise<Response>>();
   const prepare = vi.fn<NativeProviderNetwork["prepare"]>(() => dispatch);
@@ -1123,11 +1133,13 @@ it
       expect(rotated).toBe(true);
       expect(dispatch).toHaveBeenCalledTimes(1);
       await chat.close();
-      expect(
-        (await fs.readFile(path.join(stateDirectory, "agent.sqlite"))).includes(
-          key
-        )
-      ).toBe(false);
+      // Envelope payloads are stored as base64, so search for both forms
+      // at every byte alignment.
+      const stored = await fs.readFile(
+        path.join(stateDirectory, "agent.sqlite")
+      );
+      for (const form of [key, ...base64Forms(key)])
+        expect(stored.includes(form)).toBe(false);
     } finally {
       restoreExchange?.();
       await chat?.close();

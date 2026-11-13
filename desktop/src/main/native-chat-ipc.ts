@@ -198,7 +198,7 @@ type ReviewedDeletion = {
   requestId: string;
   snapshot: NativeChatSnapshot;
   catalogRevision: number;
-  expectedOwnedChildren?: readonly number[];
+  expectedOwnedChildren?: string;
 };
 
 type SideAttachment = {

@@ -628,7 +628,7 @@ export class NativeAgentChat {
     snapshot: NativeChatSnapshot,
     catalogRevision: number,
     requestId: string,
-    expectedOwnedChildren?: readonly number[]
+    expectedOwnedChildren?: string
   ): Promise<void> {
     const sessionId = this.requireObservation(session, snapshot);
     if (!this.acceptsSavedChatDeletion)

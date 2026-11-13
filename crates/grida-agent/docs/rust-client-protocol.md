@@ -68,11 +68,12 @@ pending wake-up, an unfinished Goal, or unresolved execution evidence blocks
 deletion. To include owned named subagents, negotiate
 `co.grida/session/delete-preview` version 1 and call
 `_co.grida/session/delete-preview` with the attached `sessionId` and `cwd`.
-The response contains `sessionId`, `ownedChildren`, and `ownedChildrenBasis`.
-Show the count for review, then pass the unchanged basis as `expectedOwnedChildren`
-when deleting. The host requires the reviewed membership and revisions, and
-all owned work must be idle, resolved, and free of queued input. An older client
-without the basis can delete eligible chats that have no named subagents.
+The response contains `sessionId`, `ownedChildren`, and `ownedChildrenBasis`,
+a fingerprint written as 64 lowercase hexadecimal characters. Show the count for
+review, then pass the unchanged basis as `expectedOwnedChildren` when deleting.
+The host requires the reviewed membership and revisions, and all owned work
+must be idle, resolved, and free of queued input. An older client without the
+basis can delete eligible chats that have no named subagents.
 The host removes verified chat-owned attachment and
 working data before returning success. If the database commit outlives removal,
 restarting the private host or retrying the exact request can complete removal.
@@ -241,9 +242,10 @@ reports selected skill versions and the project instruction revision when
 present. These sources supply model context without changing tool permissions.
 
 History returns `basis`, `sessionRevision`, up to 128 `messages`, `nextOffset`,
-and optional `seed` provenance. It also returns `latestAnchor` for the latest
-visible message in that same basis, or null for an empty view. Older hosts
-may omit this field. Echo the basis as `expectedHistory` on later pages and
+and optional `seed` provenance. The basis carries `view`, `tail` and a
+`fingerprint` of 64 lowercase hexadecimal characters; treat it as opaque. It
+also returns `latestAnchor` for the latest visible message in that same basis,
+or null for an empty view. Older hosts may omit this field. Echo the basis as `expectedHistory` on later pages and
 writes. A changed basis requires a fresh history read. Anchors are
 scoped to the selected view and carry either a local turn and message ID or an
 inherited message ID. `view` can read an earlier retained view. Standard session

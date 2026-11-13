@@ -69,7 +69,10 @@ impl Tool for FixtureTool {
                 assert_eq!(args["occurrence"]["event"], "before_completion");
                 assert_eq!(args["occurrence"]["version"], 1);
                 assert_eq!(args["occurrence"]["turn"], task().as_str());
-                assert!(args["occurrence"]["proposal"].is_array());
+                assert_eq!(
+                    args["occurrence"]["proposal"].as_str().map(str::len),
+                    Some(64)
+                );
                 args["check"]["id"].as_str().unwrap()
             };
             let mut log = std::fs::OpenOptions::new()

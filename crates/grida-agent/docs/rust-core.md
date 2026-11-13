@@ -123,6 +123,13 @@ inventories, and bound execution handles. Durable encodings have explicit schema
 identity and version. Rust struct layout and `Debug` output carry no persistence
 contract.
 
+A fingerprint is the SHA-256 of a value's canonical JSON: compact text with the
+keys of every object, struct or map, in ascending byte order. Object insertion
+order and field declaration order therefore never change it. A fingerprint is
+written as 64 lowercase hexadecimal characters, and any other text is refused.
+An envelope writes its schema, version and payload; the payload is padded
+standard base64 of at most 8 MiB decoded.
+
 ### Error model
 
 Every neutral crate returns `agent_kit_core::Result`, whose `Error` pairs one

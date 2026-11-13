@@ -21,8 +21,8 @@ const deletion = {
 type DeletionRequest = ConstructorParameters<typeof NativeAgentDeletion>[0];
 
 describe("NativeAgentDeletion", () => {
-  it("requests a scoped preview and retains an immutable reviewed membership basis", async () => {
-    const basis = Array.from({ length: 32 }, (_, index) => index);
+  it("requests a scoped preview and retains the reviewed membership basis", async () => {
+    const basis = "0123456789abcdef".repeat(4);
     const request = vi.fn<DeletionRequest>().mockResolvedValue({
       sessionId: deletion.sessionId,
       ownedChildren: 2,
@@ -37,10 +37,8 @@ describe("NativeAgentDeletion", () => {
       { sessionId: deletion.sessionId, cwd: deletion.cwd }
     );
     expect(preview.ownedChildren).toBe(2);
-    expect(preview.ownedChildrenBasis).toEqual(basis);
-    expect(Object.isFrozen(preview.ownedChildrenBasis)).toBe(true);
-    basis[0] = 255;
-    expect(preview.ownedChildrenBasis[0]).toBe(0);
+    expect(preview.ownedChildrenBasis).toBe(basis);
+    expect(Object.isFrozen(preview)).toBe(true);
   });
 
   it.each([
@@ -48,14 +46,14 @@ describe("NativeAgentDeletion", () => {
     { ownedChildren: 129 },
     { ownedChildren: -1 },
     { ownedChildren: 0.5 },
-    { ownedChildrenBasis: [0] },
-    { ownedChildrenBasis: Array(32).fill(256) },
-    { ownedChildrenBasis: Array(32) },
+    { ownedChildrenBasis: "0".repeat(63) },
+    { ownedChildrenBasis: "A".repeat(64) },
+    { ownedChildrenBasis: Array(32).fill(0) },
   ])("refuses a stale or malformed review reply %j", async (change) => {
     const request = vi.fn<DeletionRequest>().mockResolvedValue({
       sessionId: deletion.sessionId,
       ownedChildren: 0,
-      ownedChildrenBasis: Array(32).fill(0),
+      ownedChildrenBasis: "0".repeat(64),
       ...change,
     });
     await expect(
@@ -68,14 +66,12 @@ describe("NativeAgentDeletion", () => {
 
   it("retries a lost reply with the exact immutable request", async () => {
     const request = vi.fn<DeletionRequest>();
-    const basis = Array<number>(32).fill(7);
     const reviewed = {
       ...deletion,
-      expectedOwnedChildren: basis,
+      expectedOwnedChildren: "7".repeat(64),
     };
     request
       .mockImplementationOnce(async () => {
-        basis[0] = 255;
         throw new Error("native_agent_request_timeout");
       })
       .mockResolvedValueOnce({
@@ -86,7 +82,7 @@ describe("NativeAgentDeletion", () => {
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls[0]).toEqual([
       "_co.grida/session/delete",
-      { ...deletion, expectedOwnedChildren: Array(32).fill(7) },
+      { ...deletion, expectedOwnedChildren: "7".repeat(64) },
     ]);
     expect(request.mock.calls[1]?.[1]).toBe(request.mock.calls[0]?.[1]);
     expect(Object.isFrozen(request.mock.calls[0]?.[1])).toBe(true);

@@ -10,7 +10,7 @@ use agent_kit_core::messages::{Content, Message, OutcomeStatus, Provenance, Prov
 use agent_kit_core::tools::{InvocationContext, InvocationRecovery};
 use agent_kit_core::turn::{
     CommitReceipt, ControlSnapshot, InterruptionReason, JournalAction, JournalChange,
-    OperationInput, OperationOutcome, OperationRecord, TurnLease, WaitRecord,
+    JournalContent, OperationInput, OperationOutcome, OperationRecord, TurnLease, WaitRecord,
 };
 use agent_kit_core::{AttemptId, CancellationToken, ChangeId, Fingerprint, MessageId};
 use std::num::NonZeroU64;
@@ -1700,7 +1700,8 @@ impl Inner {
         actions: Vec<JournalAction>,
         basis: Option<CommitBasis<'_>>,
     ) -> Result<CommitReceipt> {
-        let fingerprint = Fingerprint::of(&actions)?;
+        let content = JournalContent::new(actions)?;
+        let fingerprint = content.fingerprint();
         let lease = self.lease()?;
         for _ in 0..8 {
             // The loaded state carries every recorded receipt, so an already
@@ -1733,12 +1734,12 @@ impl Inner {
                 }
                 _ => {}
             }
-            let change = JournalChange::new(
+            let change = JournalChange::with_content(
                 id.clone(),
                 state.binding().clone(),
                 state.position(),
                 state.controls().revision,
-                actions.clone(),
+                content.clone(),
             )?;
             match lease.journal().commit(change).await {
                 Ok(receipt) => {

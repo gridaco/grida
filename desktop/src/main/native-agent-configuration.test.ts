@@ -248,7 +248,7 @@ async function syntheticResponses() {
           output && JSON.parse(output).structured?.configuration;
         if (
           !inspected?.exact_input_counting ||
-          !Array.isArray(inspected.file_revision)
+          typeof inspected.file_revision !== "string"
         ) {
           response.writeHead(400).end();
           return;

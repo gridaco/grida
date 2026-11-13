@@ -267,6 +267,37 @@ impl JournalAction {
     }
 }
 
+/// The actions of one journal change with their content fingerprint, hashed
+/// once. A writer that retries a change against a newer journal position
+/// reuses it instead of hashing the actions again.
+#[derive(Clone, Debug, PartialEq)]
+pub struct JournalContent {
+    actions: Vec<JournalAction>,
+    fingerprint: Fingerprint,
+}
+
+impl JournalContent {
+    pub fn new(actions: Vec<JournalAction>) -> Result<Self> {
+        if actions.is_empty() {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "invalid_journal_change",
+            ));
+        }
+        let fingerprint = Fingerprint::of(&actions)?;
+        Ok(Self {
+            actions,
+            fingerprint,
+        })
+    }
+    pub fn actions(&self) -> &[JournalAction] {
+        &self.actions
+    }
+    pub fn fingerprint(&self) -> Fingerprint {
+        self.fingerprint
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct JournalChange {
     id: ChangeId,
@@ -286,22 +317,38 @@ impl JournalChange {
         control: ControlRevision,
         actions: Vec<JournalAction>,
     ) -> Result<Self> {
-        if binding.epoch == 0 || actions.is_empty() {
+        Self::with_content(
+            id,
+            binding,
+            expected,
+            control,
+            JournalContent::new(actions)?,
+        )
+    }
+
+    /// A change whose identity covers its basis and its content fingerprint.
+    pub fn with_content(
+        id: ChangeId,
+        binding: TurnBinding,
+        expected: JournalPosition,
+        control: ControlRevision,
+        content: JournalContent,
+    ) -> Result<Self> {
+        if binding.epoch == 0 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 "invalid_journal_change",
             ));
         }
-        let fingerprint = Fingerprint::of(&(&binding, expected, control, &actions))?;
-        let content_fingerprint = Fingerprint::of(&actions)?;
+        let fingerprint = Fingerprint::of(&(&binding, expected, control, content.fingerprint))?;
         Ok(Self {
             id,
             binding,
             expected,
             control,
-            actions,
+            actions: content.actions,
             fingerprint,
-            content_fingerprint,
+            content_fingerprint: content.fingerprint,
         })
     }
     pub fn id(&self) -> &ChangeId {
@@ -324,38 +371,6 @@ impl JournalChange {
     }
     pub fn content_fingerprint(&self) -> Fingerprint {
         self.content_fingerprint
-    }
-}
-
-impl<'de> Deserialize<'de> for JournalChange {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        deserializer: D,
-    ) -> std::result::Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        struct Data {
-            id: ChangeId,
-            binding: TurnBinding,
-            expected: JournalPosition,
-            control: ControlRevision,
-            actions: Vec<JournalAction>,
-            fingerprint: Fingerprint,
-            content_fingerprint: Fingerprint,
-        }
-        let data = Data::deserialize(deserializer)?;
-        let value = Self::new(
-            data.id,
-            data.binding,
-            data.expected,
-            data.control,
-            data.actions,
-        )
-        .map_err(serde::de::Error::custom)?;
-        if value.fingerprint != data.fingerprint
-            || value.content_fingerprint != data.content_fingerprint
-        {
-            return Err(serde::de::Error::custom("journal fingerprint mismatch"));
-        }
-        Ok(value)
     }
 }
 
@@ -1156,23 +1171,23 @@ impl MemoryJournal {
         expected: ControlRevision,
         action: JournalAction,
     ) -> Result<CommitReceipt> {
-        let actions = vec![action];
+        let content = JournalContent::new(vec![action])?;
         let mut inner = self
             .inner
             .lock()
             .map_err(|_| Error::new(ErrorKind::Unavailable, "journal_poisoned"))?;
         if let Some(receipt) = inner.state.receipt(&id) {
-            if receipt.record().content_fingerprint == Fingerprint::of(&actions)? {
+            if receipt.record().content_fingerprint == content.fingerprint() {
                 return Ok(receipt.clone());
             }
             return Err(Error::new(ErrorKind::Conflict, "change_identity_reused"));
         }
-        let change = JournalChange::new(
+        let change = JournalChange::with_content(
             id,
             inner.state.binding.clone(),
             inner.state.position,
             expected,
-            actions,
+            content,
         )?;
         inner.apply(change)
     }

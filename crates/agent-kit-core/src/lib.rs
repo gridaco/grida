@@ -4,6 +4,7 @@
 //! callers. These modules own no credentials, filesystem, transport, or policy.
 
 pub mod authority;
+mod canonical;
 pub mod context;
 pub mod driver_state;
 pub mod history;

@@ -244,13 +244,11 @@ it.skipIf(!resourcesPath)(
     });
     const { gatewayScope, gatewayJobBilling, ...generic } =
       connection.launch("fixture");
-    const scope = [
-      ...createHash("sha256")
-        .update(
-          JSON.stringify(["supervised-gg-chat-scope-v1", origin, gatewayScope])
-        )
-        .digest(),
-    ];
+    const scope = createHash("sha256")
+      .update(
+        JSON.stringify(["supervised-gg-chat-scope-v1", origin, gatewayScope])
+      )
+      .digest("hex");
     const observations = [
       { request_id: "req_settled", status: "settled", charged_mills: "0.125" },
       { request_id: "req_pending", status: "pending", charged_mills: null },
@@ -314,7 +312,8 @@ it.skipIf(!resourcesPath)(
         );
         return rows.map(({ id, head }) => {
           const turn = JSON.parse(String(head));
-          type Receipt = { schema: string; bytes: number[] };
+          // Envelope payloads are stored as padded standard base64.
+          type Receipt = { schema: string; bytes: string };
           const operations = parts
             .all(session, String(id))
             .map(({ body }) => JSON.parse(String(body))) as Array<{
@@ -342,10 +341,12 @@ it.skipIf(!resourcesPath)(
               attemptId: operations[0].attempts[0].id,
             },
             receipt: [
-              Buffer.from(receipt.bytes).toString("utf8"),
+              Buffer.from(receipt.bytes, "base64").toString("utf8"),
               terminal_receipt
                 ? JSON.parse(
-                    Buffer.from(terminal_receipt.bytes).toString("utf8")
+                    Buffer.from(terminal_receipt.bytes, "base64").toString(
+                      "utf8"
+                    )
                   )
                 : null,
             ],
