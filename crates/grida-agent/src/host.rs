@@ -1799,10 +1799,13 @@ impl Host {
                 )?
             }
             Some(permissions) => {
+                // Plan withholds changes: a write-capable profile still
+                // offers only the read tools outside Act.
                 permissions.insert_file_tools(
                     &mut inventory,
                     &mut authority.tools,
                     capture_image,
+                    prepared.operating_regime.is_act(),
                 )?;
                 None
             }

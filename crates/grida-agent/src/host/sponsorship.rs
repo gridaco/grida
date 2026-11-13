@@ -972,7 +972,12 @@ impl Host {
             hook_command.as_ref(),
         )?;
         let runtime = if let Some(permissions) = &permission_scope {
-            permissions.insert_file_tools(&mut inventory, &mut authority.tools, None)?;
+            permissions.insert_file_tools(
+                &mut inventory,
+                &mut authority.tools,
+                None,
+                prepared.operating_regime.is_act(),
+            )?;
             let owner = permissions::ToolAuthority::bind(
                 execution.authorization.clone(),
                 Some(permissions.clone()),

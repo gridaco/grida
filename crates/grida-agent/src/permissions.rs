@@ -750,6 +750,9 @@ pub struct TurnPermissions {
 struct PermissionState {
     revoked: BTreeSet<BindingId>,
     ready: BTreeMap<OperationId, Ready>,
+    /// Set when the turn's regime withholds changes, for example Plan.
+    /// File authority then refuses every write whatever the profile allows.
+    read_only: bool,
 }
 
 struct Ready {
@@ -869,12 +872,19 @@ impl TurnPermissions {
         })
     }
 
+    /// Offer only the file tools. `allow_writes` is false when the turn's
+    /// regime withholds changes (Plan): the write tools are then absent and
+    /// file authority refuses any write, whatever the profile allows.
     pub(crate) fn insert_file_tools(
         self: &Arc<Self>,
         inventory: &mut Inventory,
         grants: &mut BTreeMap<ToolId, GrantSelection>,
         capture_image: Option<Arc<ImageCapture>>,
+        allow_writes: bool,
     ) -> Result<()> {
+        if !allow_writes {
+            self.state()?.read_only = true;
+        }
         self.insert_file_tools_with_images(inventory, grants, capture_image, None)
     }
 
@@ -904,6 +914,7 @@ impl TurnPermissions {
                 capture_reference.filter(|_| self.profile.supports_workspace_image_reference()),
             )?);
             let writes = !self.primary_review
+                && !self.state()?.read_only
                 && self
                     .profile
                     .directories
@@ -1173,6 +1184,7 @@ impl TurnPermissions {
         let ready = current(&state, invocation.id(), invocation.fingerprint())?;
         let write = match ready.request.effect {
             ApprovalEffect::Read { .. } => false,
+            ApprovalEffect::Write { .. } if state.read_only => return Err(denied()),
             ApprovalEffect::Write { .. } => true,
             ApprovalEffect::Command { .. } => return Err(denied()),
         };
