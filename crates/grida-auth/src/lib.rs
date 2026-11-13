@@ -24,6 +24,15 @@ pub use custody::{Backend, StorageInfo};
 pub use providers::{Presence, ProviderStore};
 pub use wire::{Identity, Logout, Organization, OrganizationsPage, Status};
 
+/// Refuse a path whose extended access control list grants any access. On
+/// macOS an "allow" entry fails, a deny-only list passes, and a path that
+/// cannot be queried fails closed. Elsewhere private-file checks rely on the
+/// mode bits, so this always passes. The path's final link is not followed.
+#[cfg(unix)]
+pub fn refuse_granting_acl(path: &std::path::Path) -> Result<()> {
+    native::acl(path)
+}
+
 /// Public failures carry only a fixed code. Native/parser/HTTP diagnostics and
 /// source errors never cross this boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -65,7 +65,7 @@ fn owned(meta: &fs::Metadata, directory: bool) -> Result<()> {
 /// other than "no ACL" fails closed.
 #[cfg(target_os = "macos")]
 #[allow(unsafe_code)] // Reviewed: read-only ACL query, freed once; see SAFETY notes.
-fn acl(path: &Path) -> Result<()> {
+pub(crate) fn acl(path: &Path) -> Result<()> {
     use std::ffi::CString;
     use std::os::raw::{c_char, c_int, c_void};
     use std::os::unix::ffi::OsStrExt;
@@ -110,7 +110,7 @@ fn acl(path: &Path) -> Result<()> {
     if grants { Err(failed()) } else { Ok(()) }
 }
 #[cfg(all(unix, not(target_os = "macos")))]
-fn acl(_: &Path) -> Result<()> {
+pub(crate) fn acl(_: &Path) -> Result<()> {
     Ok(())
 }
 

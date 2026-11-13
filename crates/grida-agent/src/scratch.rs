@@ -1184,59 +1184,12 @@ mod native {
         Ok(())
     }
 
-    #[cfg(target_os = "linux")]
-    fn check_acl(_: &Path) -> Result<()> {
-        // POSIX ACL user/group permissions are bounded by the group mask,
-        // which is included in the mode checks on private directories/files.
-        Ok(())
-    }
-
-    #[cfg(target_os = "macos")]
+    /// An "allow" entry in an extended access control list would grant
+    /// access the mode checks cannot see. On Linux, POSIX ACL user/group
+    /// permissions are bounded by the group mask, which the mode checks on
+    /// private directories and files include.
     fn check_acl(path: &Path) -> Result<()> {
-        use std::process::{Command, Stdio};
-        use std::time::{Duration, Instant};
-
-        let mut child = Command::new("/bin/ls")
-            .args(["-lde"])
-            .arg(path)
-            .env_clear()
-            .env("LC_ALL", "C")
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(io_failure)?;
-        let deadline = Instant::now() + Duration::from_secs(2);
-        loop {
-            match child.try_wait() {
-                Ok(Some(_)) => break,
-                Ok(None) if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(5))
-                }
-                _ => {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return Err(invalid_storage());
-                }
-            }
-        }
-        let output = child.wait_with_output().map_err(io_failure)?;
-        let listing = std::str::from_utf8(&output.stdout).map_err(io_failure)?;
-        if !output.status.success()
-            || listing.len() > 65_536
-            || listing.lines().any(|line| {
-                line.trim_start()
-                    .split_once(':')
-                    .is_some_and(|(index, acl)| {
-                        !index.is_empty()
-                            && index.bytes().all(|c| c.is_ascii_digit())
-                            && acl.split_whitespace().any(|word| word == "allow")
-                    })
-            })
-        {
-            return Err(invalid_storage());
-        }
-        Ok(())
+        grida_auth::refuse_granting_acl(path).map_err(|_| invalid_storage())
     }
 
     fn source_unavailable() -> Error {
