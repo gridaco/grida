@@ -83,6 +83,96 @@ it("reuses only the selected file and requires another read after navigation", a
   }
 });
 
+it("shares one worker read between overlapping reads of a selection", async () => {
+  const fixture = await documentFixture();
+  const { selected, docs, owner, workers } = fixture;
+  const gate = holdOpens(workers);
+  try {
+    const id = await docs.register(selected);
+    const navigated = new AbortController();
+    const abandoned = docs.read(id, { signal: navigated.signal, check() {} });
+    const first = docs.read(id, owner);
+    const second = docs.read(id, owner);
+    await gate.opened(1);
+    navigated.abort();
+    await expect(abandoned).rejects.toThrow(
+      "The selected document is unavailable"
+    );
+    gate.releaseAll();
+    expect((await first).content).toBe("\uFEFF<svg>𝄞</svg>");
+    expect((await second).content).toBe("\uFEFF<svg>𝄞</svg>");
+    expect(workers.openDocument).toHaveBeenCalledTimes(1);
+  } finally {
+    gate.releaseAll();
+    await fixture.close();
+  }
+});
+
+it("queues first reads beyond the active document limit", async () => {
+  const fixture = await documentFixture();
+  const { root, docs, owner, workers } = fixture;
+  const gate = holdOpens(workers);
+  try {
+    const ids = [];
+    for (const name of ["a.svg", "b.svg", "c.svg"]) {
+      const file = path.join(root, name);
+      await fs.writeFile(file, "<svg/>");
+      ids.push(await docs.register(file));
+    }
+    const reads = ids.map((id) => docs.read(id, owner));
+    await gate.opened(2);
+    // The third read waits for a slot instead of failing.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(workers.openDocument).toHaveBeenCalledTimes(2);
+    gate.releaseAll();
+    const results = await Promise.all(reads);
+    expect(results.map((result) => result.filename)).toEqual([
+      "a.svg",
+      "b.svg",
+      "c.svg",
+    ]);
+    expect(workers.openDocument).toHaveBeenCalledTimes(3);
+  } finally {
+    gate.releaseAll();
+    await fixture.close();
+  }
+});
+
+it("refuses a read while a save of the same selection is in flight", async () => {
+  const fixture = await documentFixture();
+  const { selected, docs, owner, workers } = fixture;
+  const admitted = Promise.withResolvers<void>();
+  const proceed = Promise.withResolvers<void>();
+  workers.saveDocument.mockImplementationOnce(async () => {
+    admitted.resolve();
+    await proceed.promise;
+    return {
+      mtime: 124,
+      identity: { device: "1", inode: "2", birthTimeNs: "3" },
+    };
+  });
+  try {
+    const id = await docs.register(selected);
+    await docs.read(id, owner);
+    const pending = docs.write(id, "<svg/>", owner);
+    await admitted.promise;
+    await expect(docs.read(id, owner)).rejects.toThrow(
+      "A document operation is still in progress"
+    );
+    proceed.resolve();
+    await pending.catch(() => {});
+    const reading = docs.read(id, owner);
+    await expect(docs.write(id, "<svg/>", owner)).rejects.toThrow(
+      "A document operation is still in progress"
+    );
+    // The fake save reports a new file identity, so only the refusal matters.
+    await reading.catch(() => {});
+  } finally {
+    proceed.resolve();
+    await fixture.close();
+  }
+});
+
 it("holds a closing window's file while the dispatched save remains unverified", async () => {
   const fixture = await documentFixture();
   const { selected, docs, owner, workers } = fixture;
@@ -295,6 +385,31 @@ it.runIf(
     await fixture.close();
   }
 });
+
+/** Hold every worker open until released, counting how many started. */
+function holdOpens(workers: {
+  openDocument: ReturnType<typeof vi.fn<WorkspaceFileWorkers["openDocument"]>>;
+}) {
+  const open = workers.openDocument.getMockImplementation()!;
+  const release = Promise.withResolvers<void>();
+  let started = 0;
+  const waiters: { count: number; resolve: () => void }[] = [];
+  workers.openDocument.mockImplementation(async (...args) => {
+    started++;
+    for (const waiter of waiters) if (started >= waiter.count) waiter.resolve();
+    await release.promise;
+    return await open(...args);
+  });
+  return {
+    opened(count: number) {
+      if (started >= count) return Promise.resolve();
+      const { promise, resolve } = Promise.withResolvers<void>();
+      waiters.push({ count, resolve });
+      return promise;
+    },
+    releaseAll: () => release.resolve(),
+  };
+}
 
 async function replaceFile(selected: string, content: Buffer) {
   const temporary = selected + ".fixture";

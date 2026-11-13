@@ -14,17 +14,31 @@ import {
 } from "./workspace-file-worker";
 import { WorkspaceMediaError } from "./workspace-media-registry";
 
+/** Confined document workers running at once; later operations wait in order. */
 const MAX_ACTIVE_DOCUMENTS = 2;
 const MAX_STRING_LENGTH = bufferLimits.MAX_STRING_LENGTH;
 const DOCUMENT_TIMEOUT_MS = 30_000;
 
-type DocumentOperation = "read" | "write";
+type DocumentText = { content: string; mtime: number };
+
+/** One worker read that every overlapping reader of the same entry joins. */
+type SharedRead = {
+  readonly result: Promise<DocumentText>;
+  readonly controller: AbortController;
+  waiters: number;
+  settled: boolean;
+};
 
 type Entry = {
   readonly id: string;
   grant: DocumentFileGrant;
   mtime?: number;
-  operation?: DocumentOperation;
+  /** A save is in flight, or its unverified worker has not exited yet. */
+  writing: boolean;
+  /** Worker reads still running, including abandoned ones that are draining. */
+  reads: number;
+  /** The read a new reader joins; abandoned reads are detached from here. */
+  reading?: SharedRead;
   resolvingIdentity?: Promise<string>;
   retired: boolean;
 };
@@ -39,6 +53,7 @@ export class NativeDocumentFiles {
   private readonly denials: ProtectedRoots;
   private readonly identities?: NativeDocumentIdentities;
   private active = 0;
+  private readonly waiting: (() => void)[] = [];
 
   constructor(
     protectedPaths: readonly string[],
@@ -78,6 +93,8 @@ export class NativeDocumentFiles {
     const entry: Entry = {
       id: randomUUID(),
       grant,
+      writing: false,
+      reads: 0,
       retired: false,
     };
     this.byId.set(entry.id, entry);
@@ -110,7 +127,7 @@ export class NativeDocumentFiles {
       owner.signal.throwIfAborted();
       owner.check();
       if (entry.retired) throw unavailable();
-      if (entry.operation === "write" || entry.grant !== grant)
+      if (entry.writing || entry.grant !== grant)
         throw new NativeDocumentIdentityBusy();
       if (!sameGrant(grant, current)) throw changed();
     };
@@ -134,29 +151,32 @@ export class NativeDocumentFiles {
   }
 
   async read(id: string, owner: Owner): Promise<FileReadResult> {
-    const entry = this.begin(id, owner, "read");
-    const { grant } = entry;
-    const signal = AbortSignal.any([
-      owner.signal,
-      AbortSignal.timeout(DOCUMENT_TIMEOUT_MS),
-    ]);
+    const entry = this.selected(id, owner);
+    if (entry.writing) throw busy();
+    // Overlapping reads of one selection (a reloaded or re-rendered window)
+    // share one worker read. Each caller still applies its own window checks.
+    const shared = entry.reading ?? this.startRead(entry);
+    shared.waiters++;
+    let joined = true;
+    const leave = () => {
+      if (!joined) return;
+      joined = false;
+      if (--shared.waiters > 0 || shared.settled) return;
+      if (entry.reading === shared) entry.reading = undefined;
+      shared.controller.abort();
+    };
     try {
-      const opened = await this.workers.openDocument(grant, signal);
-      let content: string;
-      try {
-        content = await documentText(opened, signal);
-      } catch (error) {
-        await opened.close().catch(() => {});
-        throw error;
-      }
-      const current = await this.capture(grant.path);
-      signal.throwIfAborted();
+      const { content, mtime } = await untilAborted(
+        shared.result,
+        owner.signal
+      );
+      owner.signal.throwIfAborted();
       owner.check();
-      if (!sameGrant(grant, current)) throw changed();
-      entry.mtime = opened.mtime;
+      entry.mtime = mtime;
+      const { grant } = entry;
       return {
         content,
-        mtime: opened.mtime,
+        mtime,
         filename: path.basename(grant.path),
         display_path: grant.path.startsWith(this.home + path.sep)
           ? "~" + grant.path.slice(this.home.length)
@@ -165,7 +185,7 @@ export class NativeDocumentFiles {
     } catch (error) {
       throw publicError(error);
     } finally {
-      this.finish(entry);
+      leave();
     }
   }
 
@@ -176,12 +196,26 @@ export class NativeDocumentFiles {
   ): Promise<FileWriteResult> {
     if (typeof content !== "string")
       throw new DocumentError("The document text is invalid.");
-    const entry = this.begin(id, owner, "write");
+    const entry = this.selected(id, owner);
+    if (entry.writing || entry.reads > 0) throw busy();
     const { grant, mtime } = entry;
+    if (mtime === undefined)
+      throw new DocumentError("Read the document before saving it.");
+    entry.writing = true;
+    try {
+      await this.admit(
+        AbortSignal.any([
+          owner.signal,
+          AbortSignal.timeout(DOCUMENT_TIMEOUT_MS),
+        ])
+      );
+    } catch (error) {
+      entry.writing = false;
+      this.forgetRetired(entry);
+      throw publicError(error);
+    }
     let draining = false;
     try {
-      if (mtime === undefined)
-        throw new DocumentError("Read the document before saving it.");
       const current = await this.capture(grant.path);
       if (!sameGrant(grant, current)) throw changed();
       const saved = await this.workers.saveDocument(
@@ -210,12 +244,12 @@ export class NativeDocumentFiles {
         entry.mtime = undefined;
         if (error.exited) {
           draining = true;
-          void error.exited.finally(() => this.finish(entry));
+          void error.exited.finally(() => this.finishWrite(entry));
         }
       }
       throw publicError(error);
     } finally {
-      if (!draining) this.finish(entry);
+      if (!draining) this.finishWrite(entry);
     }
   }
 
@@ -226,22 +260,93 @@ export class NativeDocumentFiles {
     return entry;
   }
 
-  private begin(id: string, owner: Owner, operation: DocumentOperation): Entry {
-    const entry = this.selected(id, owner);
-    if (entry.operation || this.active >= MAX_ACTIVE_DOCUMENTS) throw busy();
-    entry.operation = operation;
-    this.active++;
-    return entry;
+  private startRead(entry: Entry): SharedRead {
+    const controller = new AbortController();
+    const signal = AbortSignal.any([
+      controller.signal,
+      AbortSignal.timeout(DOCUMENT_TIMEOUT_MS),
+    ]);
+    const { grant } = entry;
+    const run = async (): Promise<DocumentText> => {
+      await this.admit(signal);
+      try {
+        const opened = await this.workers.openDocument(grant, signal);
+        let content: string;
+        try {
+          content = await documentText(opened, signal);
+        } catch (error) {
+          await opened.close().catch(() => {});
+          throw error;
+        }
+        const current = await this.capture(grant.path);
+        signal.throwIfAborted();
+        if (!sameGrant(grant, current)) throw changed();
+        return { content, mtime: opened.mtime };
+      } finally {
+        this.releaseSlot();
+      }
+    };
+    entry.reads++;
+    const shared: SharedRead = {
+      controller,
+      waiters: 0,
+      settled: false,
+      result: run().finally(() => {
+        shared.settled = true;
+        if (entry.reading === shared) entry.reading = undefined;
+        entry.reads--;
+        this.forgetRetired(entry);
+      }),
+    };
+    // Every reader may have left before the worker settles.
+    shared.result.catch(() => {});
+    entry.reading = shared;
+    return shared;
   }
 
-  private finish(entry: Entry): void {
-    entry.operation = undefined;
-    this.active--;
+  /** Wait in arrival order for one of the bounded document worker slots. */
+  private async admit(signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted();
+    if (this.active < MAX_ACTIVE_DOCUMENTS && this.waiting.length === 0) {
+      this.active++;
+      return;
+    }
+    await new Promise<void>((resolve, reject) => {
+      const admitted = () => {
+        signal.removeEventListener("abort", abort);
+        resolve();
+      };
+      const abort = () => {
+        const index = this.waiting.indexOf(admitted);
+        if (index >= 0) this.waiting.splice(index, 1);
+        reject(signal.reason);
+      };
+      this.waiting.push(admitted);
+      signal.addEventListener("abort", abort, { once: true });
+    });
+  }
+
+  /** Hand the slot to the next waiter, or free it. */
+  private releaseSlot(): void {
+    const next = this.waiting.shift();
+    if (next) next();
+    else this.active--;
+  }
+
+  private finishWrite(entry: Entry): void {
+    entry.writing = false;
+    this.releaseSlot();
     this.forgetRetired(entry);
   }
 
   private forgetRetired(entry: Entry): void {
-    if (!entry.retired || entry.operation || entry.resolvingIdentity) return;
+    if (
+      !entry.retired ||
+      entry.writing ||
+      entry.reads > 0 ||
+      entry.resolvingIdentity
+    )
+      return;
     this.byId.delete(entry.id);
     this.byPath.delete(entry.grant.path);
   }
@@ -293,6 +398,18 @@ function sameGrant(left: DocumentFileGrant, right: DocumentFileGrant): boolean {
     same(left.identity, right.identity) &&
     same(left.parentIdentity, right.parentIdentity)
   );
+}
+
+/** Settle with `promise`, or reject as soon as this caller's signal aborts. */
+function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    signal.addEventListener("abort", abort, { once: true });
+    promise.then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", abort);
+    });
+  });
 }
 
 async function documentText(
