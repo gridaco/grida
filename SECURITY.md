@@ -958,8 +958,8 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   packaged resources, never a PATH lookup. Actual Forge cleanup tests preserve
   the staged worker/helper and retain the same launch-time resource checks.
   Ordinary macOS/Linux launches select native chat in either channel. The
-  supervisor factory starts the historical chat runtime only for an explicitly
-  managed predecessor; unavailable native chat cannot silently enable it.
+  supervisor never starts the historical chat runtime; unavailable native chat
+  cannot silently enable it.
   Windows retains non-chat services and withholds chat until native private
   storage is supported. This does not establish Windows kernel containment.
 
@@ -1546,10 +1546,11 @@ Today:
   Unverified enrollment terminates before readiness. Managed deployment
   enforces a selector-aware minimum version.
 - A historical explicitly provisioned macOS arm64 Stable predecessor enrolled an
-  isolated managed legacy profile. It resumes that source only after a clean
-  claim. A selector-aware Stable successor requires the last acknowledged
+  isolated managed legacy profile with a version-2 receipt. This build only
+  reads such a receipt as a cutover profile; it never writes one or runs as the
+  predecessor. A selector-aware Stable successor requires the last acknowledged
   generation under the source lease and durably records promotion before
-  archive work. Later predecessors refuse the promotion record. Retry binds
+  archive work. Retry binds
   that same source, scratch and claim to the retirement and archive. The
   supervised sidecar is denied access to the promotion and ownership records.
   The managed writer validates its private scratch root and preserves session

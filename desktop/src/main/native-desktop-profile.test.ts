@@ -1,4 +1,5 @@
 // GRIDA-SEC-004 / GRIDA-SEC-005 — keep source-run native profile effects contained.
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -342,9 +343,6 @@ it.runIf(process.platform === "darwin" && process.arch === "arm64")(
 
       vi.stubEnv("GRIDA_AGENT_USER_DATA", path.join(fixture, "agent"));
       profile.prepareFirst(app, true);
-      expect(() => profile.prepareFirst(app, false, true)).toThrow(
-        "native_first_profile_invalid"
-      );
       vi.stubEnv("GRIDA_AGENT_USER_DATA", undefined);
 
       getSwitchValue.mockReturnValueOnce(path.join(fixture, "browser"));
@@ -435,11 +433,7 @@ it.runIf(process.platform === "darwin" && process.arch === "arm64")(
       expect(await fs.readdir(appData)).toEqual(["Grida"]);
 
       const legacyRoots = () => new ProtectedRoots([oldBrowser, oldAgent]);
-      const v2 = NativeFirstProfile.open(appData, legacyRoots, {
-        supported: true,
-        allowBirth: true,
-        legacyPredecessor: true,
-      })!;
+      const v2 = predecessorReceipt(appData, legacyRoots);
       expect(() => profile.prepareFirst(app, false)).toThrow(
         "native_desktop_profile_invalid"
       );
@@ -497,3 +491,19 @@ it.runIf(process.platform === "darwin" && process.arch === "arm64")(
     }
   }
 );
+
+/** A managed predecessor build recorded its profile with a version-2 receipt
+ * over the same directory identities. This build never writes one. */
+function predecessorReceipt(
+  appData: string,
+  legacy: () => ProtectedRoots
+): NativeFirstProfile.Paths {
+  const paths = NativeFirstProfile.open(appData, legacy, {
+    supported: true,
+    allowBirth: true,
+  })!;
+  const record = path.join(paths.root, "profile.json");
+  const bytes = fsSync.readFileSync(record, "utf8");
+  fsSync.writeFileSync(record, bytes.replace('"version":1', '"version":2'));
+  return paths;
+}

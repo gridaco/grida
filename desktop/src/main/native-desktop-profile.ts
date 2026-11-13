@@ -30,13 +30,8 @@ export namespace NativeDesktopProfile {
   let firstMediaOnly = false;
 
   /** Runs before Electron chooses the browser/session store and instance lock. */
-  export function prepareFirst(
-    app: HostApp,
-    allowBirth: boolean,
-    legacyPredecessor = false
-  ): void {
+  export function prepareFirst(app: HostApp, allowBirth: boolean): void {
     if (first) throw invalidProfile();
-    if (allowBirth && legacyPredecessor) throw invalidProfile();
     const mediaOnly = process.argv.includes("--disable-agent");
     const supported =
       process.platform === "darwin" &&
@@ -62,12 +57,8 @@ export namespace NativeDesktopProfile {
       () => (protectedLegacy ??= new ProtectedRoots(legacyLocations())),
       {
         supported,
-        allowBirth:
-          !mediaOnly && (legacyPredecessor || (supported && allowBirth)),
-        legacyPredecessor,
-        hasLegacyInstall: legacyPredecessor
-          ? undefined
-          : () => legacyLocations().some(presentOrUnverified),
+        allowBirth: !mediaOnly && supported && allowBirth,
+        hasLegacyInstall: () => legacyLocations().some(presentOrUnverified),
       }
     );
     if (!scope || !protectedLegacy) return;
@@ -94,10 +85,6 @@ export namespace NativeDesktopProfile {
 
   export function mediaOnly(): boolean {
     return firstMediaOnly;
-  }
-
-  export function managedPredecessor(): boolean {
-    return first?.mode === "legacy";
   }
 
   export function managedCutover(): boolean {
@@ -130,7 +117,7 @@ export namespace NativeDesktopProfile {
 
   export function selected(): boolean {
     return (
-      (first !== undefined && first.mode !== "legacy") ||
+      first !== undefined ||
       (process.argv.includes("--native-chat") &&
         !process.argv.includes("--disable-agent") &&
         (process.defaultApp === true ||
@@ -199,7 +186,6 @@ export namespace NativeDesktopProfile {
         {
           supported: true,
           allowBirth: false,
-          legacyPredecessor: managedPredecessor(),
         }
       );
       if (

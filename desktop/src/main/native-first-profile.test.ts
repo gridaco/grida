@@ -9,7 +9,6 @@ import { NativeFirstProfile } from "./native-first-profile";
 const roots: string[] = [];
 const ordinary = { supported: true, allowBirth: false };
 const provisioning = { ...ordinary, allowBirth: true };
-const predecessor = { ...provisioning, legacyPredecessor: true };
 
 function fixture() {
   const appData = fs.mkdtempSync(
@@ -23,20 +22,28 @@ function fixture() {
   return { appData, source, legacy: () => new ProtectedRoots([old]) };
 }
 
+/** A managed predecessor build recorded its profile with a version-2 receipt
+ * over the same directory identities. This build never writes one. */
+function predecessorReceipt(
+  appData: string,
+  legacy: () => ProtectedRoots
+): void {
+  const paths = NativeFirstProfile.open(appData, legacy, provisioning)!;
+  const record = path.join(paths.root, "profile.json");
+  const bytes = fs.readFileSync(record, "utf8");
+  fs.writeFileSync(record, bytes.replace('"version":1', '"version":2'));
+}
+
 afterEach(() => {
   for (const root of roots.splice(0))
     fs.rmSync(root, { recursive: true, force: true });
 });
 
 it.skipIf(!process.geteuid?.())(
-  "selects a previously enrolled predecessor and makes promotion exact and sticky",
+  "reopens a predecessor-recorded profile for cutover and makes promotion exact and sticky",
   () => {
     const { appData, legacy, source } = fixture();
-    const enrolled = NativeFirstProfile.open(appData, legacy, predecessor)!;
-    expect(enrolled.mode).toBe("legacy");
-    expect(NativeFirstProfile.open(appData, legacy, predecessor)).toEqual(
-      enrolled
-    );
+    predecessorReceipt(appData, legacy);
     const successor = NativeFirstProfile.open(appData, legacy, ordinary)!;
     expect(successor.mode).toBe("cutover");
     const promotion = {
@@ -44,14 +51,8 @@ it.skipIf(!process.geteuid?.())(
       scratchId: "b".repeat(64),
       claimId: "f345a176-3d02-45ab-b2af-1f44f6fa44e1",
     };
-    expect(() =>
-      NativeFirstProfile.beginPromotion(enrolled, promotion)
-    ).toThrow("native_first_profile_invalid");
     NativeFirstProfile.beginPromotion(successor, promotion);
     NativeFirstProfile.beginPromotion(successor, promotion);
-    expect(() => NativeFirstProfile.open(appData, legacy, predecessor)).toThrow(
-      "native_first_profile_invalid"
-    );
     expect(NativeFirstProfile.open(appData, legacy, ordinary)).toEqual(
       successor
     );
@@ -64,6 +65,19 @@ it.skipIf(!process.geteuid?.())(
     expect(fs.readFileSync(source, "utf8")).toBe("existing data");
   }
 );
+
+it.skipIf(!process.geteuid?.())("creates only native receipts", () => {
+  const { appData, legacy } = fixture();
+  const paths = NativeFirstProfile.open(appData, legacy, provisioning)!;
+  expect(paths.mode).toBe("native");
+  expect(() =>
+    NativeFirstProfile.beginPromotion(paths, {
+      sourceId: "a".repeat(64),
+      scratchId: "b".repeat(64),
+      claimId: "f345a176-3d02-45ab-b2af-1f44f6fa44e1",
+    })
+  ).toThrow("native_first_profile_invalid");
+});
 
 it.skipIf(!process.geteuid?.())(
   "only the managed build can create a scope, and ordinary Stable can reopen it",

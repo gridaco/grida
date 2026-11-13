@@ -12,7 +12,7 @@ const PRIVATE_FILE = 0o600n;
 const OPEN_PRIVATE = fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK;
 
 export namespace NativeFirstProfile {
-  type Mode = "native" | "legacy" | "cutover";
+  type Mode = "native" | "cutover";
   export type Promotion = Readonly<{
     sourceId: string;
     scratchId: string;
@@ -43,7 +43,6 @@ export namespace NativeFirstProfile {
     policy: Readonly<{
       supported: boolean;
       allowBirth: boolean;
-      legacyPredecessor?: boolean;
       hasLegacyInstall?: () => boolean;
     }>
   ): Paths | undefined {
@@ -83,10 +82,7 @@ export namespace NativeFirstProfile {
       // scope. Only the invocation that created this exact root may fill it.
       for (const directory of Object.values(paths))
         fs.mkdirSync(directory, { mode: Number(PRIVATE_DIRECTORY) });
-      const bytes = profileReceipt(
-        identities(),
-        policy.legacyPredecessor === true
-      );
+      const bytes = profileReceipt(identities(), false);
       const record = fs.openSync(
         path.join(root, RECORD),
         fs.constants.O_WRONLY |
@@ -109,16 +105,7 @@ export namespace NativeFirstProfile {
     const native = bytes.equals(profileReceipt(current, false));
     if (!native && !bytes.equals(profileReceipt(current, true)))
       throw invalid();
-    if (
-      policy.legacyPredecessor &&
-      (native || statIfPresent(path.join(root, PROMOTION)))
-    )
-      throw invalid();
-    const mode = native
-      ? "native"
-      : policy.legacyPredecessor
-        ? "legacy"
-        : "cutover";
+    const mode = native ? "native" : "cutover";
     return Object.freeze({ ...paths, mode });
   }
 
