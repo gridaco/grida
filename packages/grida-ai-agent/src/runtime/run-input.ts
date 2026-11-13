@@ -875,8 +875,8 @@ function toolCallIdOf(part: AgentRunMessagePart): string | null {
 }
 
 /**
- * GRIDA-SEC-004 — apply a supervised-approval answer (RFC `permission modes`,
- * Phase 2). On resume the client sends the Allow/Deny as an explicit
+ * GRIDA-SEC-004 — apply a supervised-approval answer (see
+ * docs/wg/ai/agent/permissions.md#approval-modes). On resume the client sends the Allow/Deny as an explicit
  * `approval_answer` body field (parsed by {@link coerceApprovalAnswer}), NOT as
  * a mutated assistant message — the server owns message state, so the answer
  * never has to be SDK-part-shaped on the wire. This routes it through

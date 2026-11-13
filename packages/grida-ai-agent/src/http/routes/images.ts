@@ -15,7 +15,7 @@ import type { GGDiscoveryStore } from "@grida/ai";
  *     user-supplied base URL, so this opens no new egress beyond the three
  *     fixed provider hosts (unlike the endpoint routes, issue #806).
  *
- * Billing contract (#908, Phase 4 + GRIDA-SEC-006): the BYOK arms NEVER
+ * Billing contract (GRIDA-SEC-006): the BYOK arms NEVER
  * enter the web Grida-billed image seam (`editor/lib/ai/server.ts`) — the
  * user's own key pays the provider directly, no Grida credit is metered,
  * and this sidecar route never sets the WEB seam's billing trigger. The

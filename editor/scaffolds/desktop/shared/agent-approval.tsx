@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
 import { Button } from "@app/ui/components/button";
 
 /**
- * A supervised command awaiting the user's Allow/Deny (RFC `permission
- * modes`, Phase 2). Both ids ride the answer back so the sidecar can match it
+ * A supervised command awaiting the user's Allow/Deny (see
+ * permissions.md#approval-modes). Both ids ride the answer back so the sidecar can match it
  * to the persisted pending approval.
  */
 export type PendingApproval = {

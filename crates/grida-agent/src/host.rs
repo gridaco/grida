@@ -132,9 +132,9 @@ const PROVIDER_LIMITS: StreamLimits = StreamLimits {
     max_request_bytes: 1024 * 1024,
     max_response_bytes: 4 * 1024 * 1024,
     max_event_bytes: 256 * 1024,
-    // No cap on parallel calls in one reply, as in Codex. The response byte
-    // limit bounds the stream, and the turn's operation guard bounds the work
-    // and ends the turn cleanly when reached.
+    // Parallel calls in one reply are unbounded: the response byte limit
+    // bounds the stream, and the turn's operation guard bounds the work and
+    // ends the turn cleanly when reached.
     max_tool_calls: usize::MAX,
     max_tool_argument_bytes: 64 * 1024,
 };

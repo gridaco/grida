@@ -106,7 +106,7 @@ export type { ChatMessage, ToolCallEntry };
 const CHAT_TEXT = "text-[15px] leading-6";
 
 const markdown = {
-  // Chat text matches Codex's reading size; see CHAT_TEXT.
+  // Markdown uses the shared chat reading size; see CHAT_TEXT.
   className: `grida-ai-response-markdown space-y-2 ${CHAT_TEXT}`,
   controls: {
     code: { copy: true, download: false },

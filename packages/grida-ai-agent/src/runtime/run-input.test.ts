@@ -1322,7 +1322,7 @@ describe("parseRunBody", () => {
     expect(parsed instanceof Response ? parsed.status : 200).toBe(400);
   });
 
-  // Supervised-approval answer (RFC `permission modes`, Phase 2). The Allow/Deny
+  // Supervised-approval answer (permissions.md#approval-modes). The Allow/Deny
   // rides the body as `approval_answer`; parseRunBody shape-gates it (the store
   // is the authority on whether it matches a real pending approval).
   it("parses a well-formed approval_answer", async () => {

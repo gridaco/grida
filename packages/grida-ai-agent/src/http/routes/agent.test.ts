@@ -2503,12 +2503,9 @@ describe("HTTP wire — agent routes (run/stream/abort)", () => {
     }
   });
 
-  // NOTE: the v1 "client re-sends each queued row by id to drain" test was
-  // removed here. That client-driven serial drain is exactly what this
-  // redesign moves into the core (the renderer no longer re-sends queued rows
-  // — see Phase 5). The core serial drain is covered by the test above; the
-  // the conditional claim path stays covered by the focused store/runtime
-  // tests above.
+  // The core owns the serial queue drain; the renderer no longer re-sends
+  // queued rows. The drain is covered by the test above, and the conditional
+  // claim path by the focused store/runtime tests.
 
   it("GET /agent/stream/:id replays full chunk log from index 0, then live-tails", async () => {
     const sid = "ses_replay";

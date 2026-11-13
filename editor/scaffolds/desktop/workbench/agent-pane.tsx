@@ -776,7 +776,7 @@ function AgentPaneContent({
     [onCompact, onForkCommand]
   );
 
-  // Answer a pending tool approval (RFC `permission modes`, Phase 2). The
+  // Answer a pending tool approval (permissions.md#approval-modes). The
   // Allow/Deny rides the run-request body as an explicit `approval_answer` field
   // — exactly how `mode`/`model_id` travel. The sidecar owns message state (it
   // rebuilds the model view from the DB each turn), validates the answer against

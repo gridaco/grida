@@ -1710,8 +1710,8 @@ export class SessionsStore {
   }
 
   /**
-   * GRIDA-SEC-004 — answer a PENDING tool approval (RFC `permission modes`,
-   * Phase 2). The renderer may only ANSWER an approval the server actually
+   * GRIDA-SEC-004 — answer a PENDING tool approval (see
+   * docs/wg/ai/agent/permissions.md#approval-modes). The renderer may only ANSWER an approval the server actually
    * asked. This flips a persisted tool part to `approval-responded` ONLY when
    * it is currently `approval-requested` AND its stamped approval id matches the
    * answer — never creating a part, never touching input/output/tool_call_id.
@@ -2259,8 +2259,8 @@ export class SessionsStore {
 
   /**
    * GRIDA-SEC-004 — does this session have an UNANSWERED supervised approval?
-   * True iff a persisted tool part is still `approval-requested` (RFC
-   * `permission modes`, Phase 2). A turn blocked awaiting the user's Allow/Deny
+   * True iff a persisted tool part is still `approval-requested` (see
+   * permissions.md#approval-modes). A turn blocked awaiting the user's Allow/Deny
    * is NOT a completed turn: the queue drain consults this to stay paused until
    * the user resolves it (RFC `queue` § drain-pause — the same class as a hard
    * error pausing the drain). Read-only existence check against the
