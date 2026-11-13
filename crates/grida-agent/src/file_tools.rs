@@ -2,7 +2,7 @@
 
 use crate::workspace::{DirectoryGrant, ProtectedRoots, WorkspaceSnapshot};
 use agent_kit_core::inference::InputFormat;
-use agent_kit_core::messages::{MediaRef, OutcomeStatus, ResultContent, ToolArguments};
+use agent_kit_core::messages::{MediaRef, OutcomeStatus, ToolArguments};
 use agent_kit_core::tools::{
     Invocation, InvocationContext, RecoveryKind, Tool, ToolDefinition, ToolOutcome,
 };

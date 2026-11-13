@@ -134,12 +134,14 @@ fn no_extended_acl(file: &File) -> bool {
     if unsafe { libc::fstatfs(file.as_raw_fd(), filesystem.as_mut_ptr()) } != 0 {
         return false;
     }
-    let kind = unsafe { filesystem.assume_init() }.f_type;
+    // `f_type` and the magic constants have libc-specific integer types
+    // (glibc `__fsword_t`, musl `c_ulong`), so compare them losslessly.
+    let kind = i128::from(unsafe { filesystem.assume_init() }.f_type);
     if ![
-        libc::EXT4_SUPER_MAGIC,
+        i128::from(libc::EXT4_SUPER_MAGIC),
         0x5846_5342, // XFS_SUPER_MAGIC in Linux <linux/magic.h>.
-        libc::BTRFS_SUPER_MAGIC,
-        libc::OVERLAYFS_SUPER_MAGIC,
+        i128::from(libc::BTRFS_SUPER_MAGIC),
+        i128::from(libc::OVERLAYFS_SUPER_MAGIC),
     ]
     .contains(&kind)
     {

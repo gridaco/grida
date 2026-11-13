@@ -3,6 +3,7 @@
 use super::*;
 use crate::host::MAX_IMAGE_BYTES;
 use crate::workspace::FileAccess;
+use agent_kit_core::messages::ResultContent;
 use agent_kit_core::{Envelope, SchemaId};
 use rustix::fs::{self as unix, AtFlags, Dir, FileType, Mode, OFlags, Stat};
 use rustix::io::Errno;
@@ -854,14 +855,16 @@ fn existing_file(parent: &File, name: &str) -> Result<Option<Stat>> {
 /// place, keeping the previous file's permission bits.
 fn replace_file(parent: &File, name: &str, bytes: &[u8], previous: Option<&Stat>) -> Result<()> {
     use std::io::Write;
-    let mode = previous.map_or(0o644, |stat| (stat.st_mode as u32) & 0o777);
+    let mode = previous.map_or(Mode::from_bits_truncate(0o644), |stat| {
+        Mode::from_raw_mode(stat.st_mode) & Mode::from_bits_truncate(0o777)
+    });
     // A fixed-length name, so any legal target name can be staged.
     let temporary = format!(".grida-write-{}.tmp", uuid::Uuid::new_v4().simple());
     let mut file: File = unix::openat(
         parent,
         temporary.as_str(),
         OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-        Mode::from_raw_mode(mode as _),
+        mode,
     )
     .map_err(open_error)?
     .into();

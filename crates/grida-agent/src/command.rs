@@ -450,13 +450,23 @@ fn resolve_program(program: &Path, environment: &BTreeMap<String, String>) -> Pa
         .flat_map(|search| std::env::split_paths(search).collect::<Vec<_>>())
         .filter(|directory| directory.is_absolute())
         .map(|directory| directory.join(program))
-        .find(|candidate| {
-            use std::os::unix::fs::PermissionsExt;
-            candidate.metadata().is_ok_and(|metadata| {
-                metadata.is_file() && metadata.permissions().mode() & 0o111 != 0
-            })
-        })
+        .find(|candidate| is_executable_file(candidate))
         .unwrap_or_else(|| program.to_owned())
+}
+
+#[cfg(unix)]
+fn is_executable_file(candidate: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    candidate
+        .metadata()
+        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+}
+
+/// Native commands have no sandbox off unix, so a bare name stays unresolved
+/// and the spawn is refused by the sandbox rather than chosen from `PATH`.
+#[cfg(not(unix))]
+fn is_executable_file(_candidate: &Path) -> bool {
+    false
 }
 
 fn valid_path(path: &Path) -> bool {
@@ -852,6 +862,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_supplied_search_path_chooses_the_executable_for_a_bare_name() {
         use std::os::unix::fs::PermissionsExt;

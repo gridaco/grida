@@ -170,6 +170,7 @@ impl RetainedInputs {
         let _access = self.access.lock().unwrap();
         let protected = ProtectedRoots::new(vec![cwd.to_owned()])?;
         protected.check(&self.base)?;
+        #[cfg_attr(not(unix), allow(unused_mut))]
         let mut directory = std::fs::DirBuilder::new();
         #[cfg(unix)]
         {

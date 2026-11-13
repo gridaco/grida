@@ -115,13 +115,16 @@ pub fn serve_stdio() -> Result<()> {
     let mut input = stdin.lock();
     let stdout = io::stdout();
     let mut output = stdout.lock();
-    let request = match frame::<Request>(&mut input)?.ok_or_else(invalid_frame)? {
-        #[cfg(target_os = "macos")]
+    let request = frame::<Request>(&mut input)?.ok_or_else(invalid_frame)?;
+    #[cfg(target_os = "macos")]
+    let request = match request {
         Request::Document(request) => {
             return super::document::serve(&mut input, &mut output, request);
         }
         Request::Workspace(request) => request,
     };
+    #[cfg(not(target_os = "macos"))]
+    let Request::Workspace(request) = request;
     let writes = request.write.is_some() || request.publish.is_some();
     if (request.list_directory && request.include_modified)
         || (writes && (request.list_directory || request.include_modified))
