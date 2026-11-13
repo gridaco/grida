@@ -7,7 +7,7 @@
 Reader/writer for the **`.canvas`** format: a _portable directory_ holding one
 or more standalone documents (SVG by default) plus a single `.canvas.json`
 manifest. It is a _container_ format one layer above
-[`.grida`](https://github.com/gridaco/grida/tree/main/format) and SVG — a folder
+[`.grida`](https://github.com/gridaco/nothing/tree/main/format) and SVG — a folder
 of documents with an order and an optional 2D placement.
 
 Reference page: [grida.co/dotcanvas](https://grida.co/dotcanvas) ·

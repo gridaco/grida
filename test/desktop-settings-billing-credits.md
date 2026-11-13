@@ -11,7 +11,6 @@ updated: 2026-07-31
 automatable: false
 covered_by:
   - editor/app/desktop/billing/summary/route.test.ts
-  - editor/lib/desktop/billing.test.ts
 ---
 
 ## Behavior

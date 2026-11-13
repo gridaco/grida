@@ -12,7 +12,7 @@ automatable: false
 covered_by:
   - editor/lib/agent-chat/input-resource-router.test.ts
   - editor/lib/agent-chat/native-chat-controller.test.ts
-  - packages/grida-ai-agent/src/http/routes/agent.test.ts
+  - crates/grida-agent/tests/process/retained_files.rs
 ---
 
 ## Behavior

@@ -18,22 +18,16 @@ entrypoint establish. The canonical product description therefore retains the
 current fact, intended outcome, and consequential caveat. The harness records
 which part of that description has actually been observed.
 
-| Existing material                                                                                                                                                                                                                         | What it establishes                                                                                                                                                                                                               | Limit of that evidence                                                                                                                                                                                                                                                                       |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Manual interaction cases](../../../test/README.md)                                                                                                                                                                                       | Product situations, rationale, visible outcomes, and known limits. The [pending-answer case](../../../test/desktop-agent-chat-human-input-queue.md) preserves the approval, queued follow-up, and attachment limitation together. | That case is marked untested. Linked automated coverage does not establish that the composed interaction has passed. The [canvas refresh case](../../../test/desktop-workbench-canvas-resource-refresh.md) records a prior verification, which still needs repeating after relevant changes. |
-| [Fake-agent outcome tests](../src/agent-provider/jtbd.test.ts)                                                                                                                                                                            | Ordered reply streaming, session reuse calls, cancellation, and host admission rules under deterministic conditions.                                                                                                              | Reusing a session identifier does not establish model recall or a correct rendered conversation. The header still calls cancellation skipped although its case is active.                                                                                                                    |
-| [Scheduler tests](../src/runtime/session-scheduler.test.ts) and adjacent client tests                                                                                                                                                     | Queue ordering, preservation of pending decisions, read-only status hydration, and specific race handling.                                                                                                                        | These checks exercise selected components. They do not independently establish the complete Desktop interaction or provider charges.                                                                                                                                                         |
-| [Live image tests](../src/runtime/runtime.live.test.ts) and [historical external-agent tests](https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/packages/grida-ai-agent/src/agent-provider/run.live.test.ts) | Opt-in real-model perception, correlated image bytes, follow-up recall, and selected runtime paths.                                                                                                                               | The image suite's restart case reconstructs a miniature runtime host inside the test process. It omits shipped-host scratch cleanup and does not establish working-file survival across a full daemon restart. Live cases need separate opt-in execution.                                    |
+| Existing material                                   | What it establishes                                                                                                                                                                                                               | Limit of that evidence                                                                                                                                                                                                                                                                       |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Manual interaction cases](../../../test/README.md) | Product situations, rationale, visible outcomes, and known limits. The [pending-answer case](../../../test/desktop-agent-chat-human-input-queue.md) preserves the approval, queued follow-up, and attachment limitation together. | That case is marked untested. Linked automated coverage does not establish that the composed interaction has passed. The [canvas refresh case](../../../test/desktop-workbench-canvas-resource-refresh.md) records a prior verification, which still needs repeating after relevant changes. |
 
 The manual registry is a useful writing precedent. Its scope is interaction
 verification, and a fully automated case can be marked deprecated there. The
 underlying product promise must remain in its canonical feature description.
 
-The fake-agent tests run with the command below. The scheduler suite loads only
-after the local `@grida/ai/catalogue` build and its pinned
-`@grida/ai-models/models.json` dependency are available; without them it gives
-no scheduler behavior verdict. Native coverage of the same situations is listed
-under [Regression obligations](#regression-obligations).
+Native coverage of each product situation is listed under
+[Regression obligations](#regression-obligations).
 
 Live provider and platform evidence is bounded. The macOS Apple Silicon headless
 host has live OpenRouter `openai/gpt-4.1-mini` checks of text and
@@ -44,12 +38,6 @@ context and transcript restoration without repeated inference. The Linux ARM64
 host and retained Desktop service have isolated kernel, process and restart
 checks. Other live providers, operating systems and architectures, full Linux
 installer delivery and signed distribution are unqualified.
-
-Run from `packages/grida-ai-agent` after installing and building prerequisites.
-
-```sh
-./node_modules/.bin/vitest run src/agent-provider/jtbd.test.ts src/runtime/session-scheduler.test.ts --reporter=verbose
-```
 
 ## Coverage model
 
@@ -95,8 +83,8 @@ been exercised.
 
 | Case                                                             | Product situation and required outcome                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Existing evidence and limit                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1 — reopen a waiting chat                                       | Reopening a chat shows its queue and pending decisions. Viewing it starts no additional work or chargeable request. [Sessions](https://grida.co/docs/wg/ai/agent/components#sessions) owns observational access.                                                                                                                                                                                                                                                                                                                                                                      | [Native process tests](../../../crates/grida-agent/tests/process/compaction.rs) keep the exact queue across pause and restart until Stop is released, and a [pending question](../../../crates/grida-agent/tests/process/questions.rs) survives restart. [Master tests](../../../crates/grida-agent-master/tests/durable.rs) show that observing a settled answer starts no work, and the [controller](../../../editor/lib/agent-chat/native-chat-controller.test.ts) offers queue recovery only as an explicit action. Billing and the rendered reopened chat are not checked. The earlier [scheduler test](../src/runtime/session-scheduler.test.ts) records the original failure.                                                                                                                                                                                                                                                               |
-| R2 — reconnect after a completed action                          | Reconnecting or retrying preserves the previous result once, and the person can continue without losing it or repeating the action. [Runtime journal](https://grida.co/docs/wg/ai/agent/components#the-execution-journal) owns result identity.                                                                                                                                                                                                                                                                                                                                       | [Master tests](../../../crates/grida-agent-master/tests/durable.rs) reuse committed tool results in the next model request, [summary process tests](../../../crates/grida-agent/tests/process/summaries.rs) reopen settled turns without provider work, and the [external peer test](../../../crates/grida-agent/tests/external_acp.rs) reconciles an unconfirmed dispatch without replay. They do not count real external actions. The earlier [input test](../src/runtime/run-input.test.ts) records the original collision.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| R1 — reopen a waiting chat                                       | Reopening a chat shows its queue and pending decisions. Viewing it starts no additional work or chargeable request. [Sessions](https://grida.co/docs/wg/ai/agent/components#sessions) owns observational access.                                                                                                                                                                                                                                                                                                                                                                      | [Native process tests](../../../crates/grida-agent/tests/process/compaction.rs) keep the exact queue across pause and restart until Stop is released, and a [pending question](../../../crates/grida-agent/tests/process/questions.rs) survives restart. [Master tests](../../../crates/grida-agent-master/tests/durable.rs) show that observing a settled answer starts no work, and the [controller](../../../editor/lib/agent-chat/native-chat-controller.test.ts) offers queue recovery only as an explicit action. Billing and the rendered reopened chat are not checked.                                                                                                                                                                                                                                                                                                                                                                    |
+| R2 — reconnect after a completed action                          | Reconnecting or retrying preserves the previous result once, and the person can continue without losing it or repeating the action. [Runtime journal](https://grida.co/docs/wg/ai/agent/components#the-execution-journal) owns result identity.                                                                                                                                                                                                                                                                                                                                       | [Master tests](../../../crates/grida-agent-master/tests/durable.rs) reuse committed tool results in the next model request, [summary process tests](../../../crates/grida-agent/tests/process/summaries.rs) reopen settled turns without provider work, and the [external peer test](../../../crates/grida-agent/tests/external_acp.rs) reconciles an unconfirmed dispatch without replay. They do not count real external actions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | R3 — switch documents during an edit                             | An accepted call retains its addressed endpoint and document arguments, or reports that endpoint unavailable. [Workspace contract](https://grida.co/docs/wg/ai/agent/workspace#authority-and-changes-during-work) owns the target.                                                                                                                                                                                                                                                                                                                                                    | [Native Main tests](../../../desktop/src/main/native-gateway-svg-text.test.ts) exercise exact selected-text ownership. The rendered nested-deck case verifies stale selection refusal after a slide switch, and explicit save to the addressed bundle.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | R4 — return to uploaded-image work                               | After interruption or restart, the agent restores the exact input promised by its retention policy or explains what must be supplied again before continuing. [Scratch retention](https://grida.co/docs/wg/ai/agent/scratch#s2--declared-retention-and-recoverability) owns availability.                                                                                                                                                                                                                                                                                             | [Native PNG process tests](../../../crates/grida-agent/tests/process/images.rs) verify retained bytes and working copies after reopen. A missing original produces guidance before provider dispatch.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | R5 — retry saving a generated result                             | If generation succeeds and saving fails, retain the result or recovery record. Retrying the save uses the completed generation. [Artifact evidence](https://grida.co/docs/wg/ai/agent/components#integration-capabilities-and-bounds) owns this distinction.                                                                                                                                                                                                                                                                                                                          | [Desktop media fixtures](../../../desktop/src/sidecar/media-startup.test.ts) retry a retained MP3 copy with one provider request and preserve the live result when the library cannot publish a receipt. [Native crop fixture](../../../desktop/src/main/native-agent-images.test.ts) covers retained chat output.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -129,8 +117,8 @@ and provider execution still require their own acceptance evidence.
 | R16 — switch chats during work                | After switching from chat A to B, A's delayed output stays in A. B retains its own activity and controls.                                                                  | [Transport tests](../../../editor/lib/agent-chat/bridge-transport.test.ts) and [ownership tests](../../../editor/lib/agent-chat/stream-attach-owner.test.ts) exercise delayed work against replaced chat bindings. The composed UI still needs verification.                                                                                                                                                                                                                                   |
 | R17 — a submitted message cannot start        | A rejected message remains available to queue or retry. An existing question stays answerable, and repairing the displayed history preserves valid ongoing work.           | [Recovery tests](../../../editor/lib/agent-chat/stream-recovery.test.ts) cover automatic recovery of a text-only tail. The [manual pending-answer case](../../../test/desktop-agent-chat-human-input-queue.md) includes attachment preservation and remains untested.                                                                                                                                                                                                                          |
 | R18 — change models after attaching images    | Same-named images keep their identities. At submission, the selected model and available tools can use the intended image, or the person receives an actionable rejection. | The [native chat controller cases](../../../editor/lib/agent-chat/native-chat-controller.test.ts) preserve the selected PNG during model selection and refuse the switch until the attachment is sent or removed. They check same-named replacements and exact submission bytes. The [older routing cases](../../../editor/lib/agent-chat/input-resource-router.test.ts) cover the separate omission notice and file fallback behavior. Installed model use and display need further evidence. |
-| R9 — a completed change cannot be announced   | A completed change remains effective even if its notification fails. Retrying recognizes that the change already happened.                                                 | The [historical catalogue test](https://github.com/gridaco/grida/blob/5bd69ca22740fcb4b0f4db02210903c8503b7f34/packages/grida-ai-agent/src/providers/model-catalog.test.ts#L324) preserves applied state after a listener throws. Broader action recovery is an unresolved requirement.                                                                                                                                                                                                        |
-| R10 — repeated service failures               | Repeated unavailable or oversized responses leave the application usable, and cancellation releases the work it owns.                                                      | The [historical response-body test](https://github.com/gridaco/grida/blob/3a0966dc116ea2f76845a5abd269f1a4d0939632/packages/grida-ai-agent/src/providers/model-catalog.test.ts#L342) checks cleanup for selected rejected responses. It does not establish long-running UI responsiveness or every exit path.                                                                                                                                                                                  |
+| R9 — a completed change cannot be announced   | A completed change remains effective even if its notification fails. Retrying recognizes that the change already happened.                                                 | The [catalogue test](../../grida-ai/src/model-catalog.test.ts) preserves applied state after a listener throws. Broader action recovery is an unresolved requirement.                                                                                                                                                                                                                                                                                                                          |
+| R10 — repeated service failures               | Repeated unavailable or oversized responses leave the application usable, and cancellation releases the work it owns.                                                      | The [response-body test](../../grida-ai/src/model-catalog.test.ts) checks cleanup for selected rejected responses. It does not establish long-running UI responsiveness or every exit path.                                                                                                                                                                                                                                                                                                    |
 | R11 — replace an image used by an open canvas | The canvas and its previews refresh while preserving unsaved edits. If edits delay refresh, it becomes visible after save or reload.                                       | [Reload tests](../../../editor/scaffolds/desktop/workbench/workspace-file-reload-guard.test.ts) cover races. The [visual case](../../../test/desktop-workbench-canvas-resource-refresh.md) records the composed outcome for editor-owned changes. A file written directly by the agent under the Default preset has no recorded run of this case.                                                                                                                                              |
 | R12 — an attached folder changes destination  | Permission to a folder cannot silently expand to protected content when its underlying destination changes.                                                                | [Native ACP fixture](../../../crates/grida-agent/tests/process/approvals/confinement.rs) retargets an alias during review. On arm64 macOS and Linux, the scoped write succeeds and direct or aliased protected reads and writes are refused. The [permission fixture](../../../crates/grida-agent/tests/permissions.rs) checks replacement of the approved root.                                                                                                                               |
 
@@ -352,7 +340,6 @@ disk persistence. The tool host captures the selected endpoint and its
 binding generation so a focus change cannot silently redirect an admitted call.
 The document tool owns the meaning of its arguments, edits, persistence, and any
 content-version checks. [Active editor binding](../../../editor/scaffolds/desktop/file/active-editor-agent-fs.ts),
-[Live SVG binding](../../../editor/scaffolds/desktop/ai-sidebar/agent-fs-binding.ts),
 [Filesystem freshness and conditional writes](../src/fs/index.ts).
 
 The journal preserves invocation arguments and reported outcomes. If the
@@ -369,7 +356,6 @@ It needs no surface-specific execution framework. [Surface contract](../src/surf
 The product already asks for a meaningful renderable artifact early in a task.
 That is a master policy and a useful performance measure, time to first usable
 artifact. It is distinct from a recovery checkpoint for the master program.
-[Surface behavior tests](../src/agent/surface-capability.test.ts).
 
 ### Rich human results and model input
 
@@ -378,8 +364,7 @@ search and select a different set of references. The returned value contains
 structured asset identities and URLs. Text questions use another schema.
 The requesting tool therefore owns the wait's response schema. A narrow adapter
 to the existing Runtime wait mechanism supplies correlation, durable receipt,
-and cancellation. [Library selection](../src/tools/design-search.ts),
-[Question contract](../src/tools/question.ts).
+and cancellation.
 
 Selected asset titles remain asset-supplied metadata. The user's selection does
 not turn those titles into instructions. Grida's current model projection
@@ -391,8 +376,6 @@ model input from them. A pressure case must verify that the next inference
 receives actual image content and preserves call/result correlation, rather
 than receiving base64 as text. Image-retention policy belongs to the master,
 and the transformation retains source provenance.
-[Image lowering](../src/agent/hoist-tool-result-images.ts),
-[Model-view retention](../src/runtime/message-view.ts).
 
 ### Paid media, artifact retention, and authority
 
@@ -410,11 +393,10 @@ master can retry storage or presentation using an existing result, while a new
 generation is a new operation. If the bytes are no longer available, the record
 must say so. [Generated-media persistence](../src/http/routes/generated-media-persistence.ts).
 
-The current model view also distinguishes a retained descriptor from evidence
-that its content can still be resolved. A scratch path is insufficient reason
-to discard the only surviving image. Reference resolution supplies current
-availability as data before context assembly.
-[Attachment availability](../src/runtime/message-view.ts).
+The model view distinguishes a retained descriptor from evidence that its
+content can still be resolved. A scratch path is insufficient reason to discard
+the only surviving image. Reference resolution supplies current availability as
+data before context assembly.
 
 Hosted execution is scoped beyond an account identity. Tenant, purpose,
 endpoint, token lifetime, and credential generation can matter. The core keeps
@@ -429,13 +411,9 @@ have independent consumers. [Rust media clients](../../../crates/grida-ai/README
 
 ### Existing control boundaries
 
-Grida's scheduler explicitly keeps status hydration observational. Reading or
-subscribing cannot become permission to drain a queue or incur a charge. Its
-current human-input logic also shows why changing visible history must reconcile
-operational waits. These are invariants to retain even though the new storage
-and runtime design differ.
-[Status hydration](../src/runtime/session-scheduler.ts),
-[Pending human-input state and history](../src/session/store.ts).
+Status hydration is observational. Reading or subscribing cannot become
+permission to drain a queue or incur a charge. Changing visible history must
+reconcile operational waits such as pending human input.
 
 ## Working files and project directories
 
@@ -448,14 +426,10 @@ represented in the message, while file tools can use a separate materialization.
 [Send assembly](../../../editor/lib/agent-chat/build-agent-send.ts),
 [Descriptor contract](../src/protocol/context.ts).
 
-Current scratch storage is scoped per session and shared by the filesystem,
-vision, and command bindings. Its host-start sweep and session-deletion cleanup
-can remove files while descriptors remain in history. Staging also currently
-requires a workspace binding. The new contract makes dependency holds and
-rematerialization explicit and supports attachment-only work without a project.
-[Scratch lifecycle](../src/session/scratch.ts),
-[Runtime bindings](../src/runtime/workspace-agent-bindings.ts),
-[Current staging and recovery](../src/runtime/index.ts).
+Scratch storage is shared by the filesystem, vision, and command bindings.
+Cleanup must not remove files while descriptors that depend on them remain in
+history. The contract makes dependency holds and rematerialization explicit and
+supports attachment-only work without a project.
 
 For “add text to this PNG,” the minimum path is an accepted input asset, an
 independent scratch working copy, an edited result, inspection, and publication
@@ -467,8 +441,7 @@ Current Grida workspaces are explicitly single-root. Additional directory
 attachments are read-only, in-memory capabilities. They do not establish a
 multi-directory Project. The new workspace descriptor supplies named directory
 bindings, a primary default, and a revision while Files supplies scoped access.
-[Workspace registry](../../grida-daemon/src/workspaces.ts),
-[Directory reference scopes](../src/session/directory-scopes.ts).
+[Workspace registry](../../grida-daemon/src/workspaces.ts).
 
 In a multi-directory workspace, the primary directory supplies the default
 working directory and instruction discovery, while confinement still governs
@@ -616,13 +589,11 @@ contracts. Manual and automatic review can select the same workspace profile
 while changing only the reviewer, so automatic review is a separate decision
 route for eligible approval requests.
 
-The earlier host had an executor with immutable scope, independently validated
-roots, and OS sandbox creation, and its supervised approval flow preserved the
-exact request and consuming run. These are the execution contracts the native
-host retains, while an automatic reviewer adds a separate decision route.
-[Host executor scope](../../grida-daemon/src/shell/runner.ts),
-[Historical native command host](https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/desktop/src/main/agent-command-host.ts),
-[Approval consumption](../src/session/store.ts).
+The native host keeps an executor with immutable scope, independently validated
+roots, and OS sandbox creation, and its supervised approval flow preserves the
+exact request and consuming run. An automatic reviewer adds a separate decision
+route. [Command confinement](./rust-sandbox.md),
+[Approval confinement tests](../../../crates/grida-agent/tests/process/approvals/confinement.rs).
 
 | Pressure case                                                      | Required result                                                  |
 | ------------------------------------------------------------------ | ---------------------------------------------------------------- |
@@ -725,11 +696,9 @@ mechanisms. It keeps executable handlers separate from volatile observers.
 | Stop or Pause closes admission before an after-tool command hook starts | Record cancellation or deferral, retain the original tool result, and run no hook under an invented cleanup owner. A required deferred check gates resumed work. |
 | A turn has already settled                                              | Its operation handle remains closed. External follow-up needs a separately admitted owner.                                                                       |
 
-The current event tests establish observer isolation, while provider tests
-preserve successful mutations when a follow-up callback fails. These are
-existing invariants to retain. They do not establish a user hook runner.
-[Event tests](../src/runtime/events.test.ts),
-[provider callback tests](../src/providers/endpoints.test.ts).
+Observers are isolated from one another, and a successful mutation is preserved
+when a follow-up callback fails. These invariants do not by themselves
+establish a user hook runner. [Hook process tests](../../../crates/grida-agent/tests/process/hooks.rs).
 
 ### Foreign tool host
 
@@ -787,14 +756,11 @@ capability checks.
 | Host proxy or trust configuration changes                  | The host routing adapter handles the change within authorized destinations. Confinement does not silently widen.                       |
 | A platform cannot enforce the requested profile            | That execution remains unavailable through the existing admission contract.                                                            |
 
-The earlier host separated an immutable shell scope from the executor,
-validated command roots independently, and waited for worker cleanup on
-cancellation. It also documented a macOS process-group revocation limitation.
-These supplied the acceptance cases the native adapter retains.
-[Shell executor](../../grida-daemon/src/shell/runner.ts),
-[Historical command confinement](https://github.com/gridaco/grida/blob/219f40bcd1579d07b0742f63671875c4939bc0d5/desktop/src/main/agent-command-host.ts),
-[Cancellation acknowledgment](../../../desktop/src/agent-sidecar-network.ts),
-[Current host authority and limitations](../../../desktop/docs/agent-authority.md).
+The native adapter separates an immutable command scope from the executor,
+validates command roots independently, and waits for worker cleanup on
+cancellation. macOS process-group revocation has a documented limitation.
+[Command tests](../../../crates/grida-agent/tests/commands.rs),
+[Host authority and limitations](../../../desktop/docs/agent-authority.md).
 
 ## Design decisions
 

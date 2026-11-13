@@ -13,8 +13,8 @@ covered_by:
   - editor/kits/composer/composer-transfer.test.ts
   - editor/lib/agent-chat/image-attachment.test.ts
   - editor/lib/agent-chat/input-resource-router.test.ts
-  - packages/grida-ai-agent/src/http/routes/agent.test.ts
-  - packages/grida-ai-agent/src/runtime/runtime.live.test.ts
+  - desktop/src/main/native-agent-images.test.ts
+  - crates/grida-agent/tests/process/images.rs
 ---
 
 ## Behavior

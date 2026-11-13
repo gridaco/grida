@@ -13,8 +13,8 @@ covered_by:
   - editor/kits/composer/composer-transfer.test.ts
   - editor/lib/agent-chat/image-attachment.test.ts
   - editor/lib/agent-chat/input-resource-router.test.ts
-  - packages/grida-ai-agent/src/http/routes/agent.test.ts
-  - packages/grida-ai-agent/src/runtime/runtime.live.test.ts
+  - desktop/src/main/native-agent-images.test.ts
+  - crates/grida-agent/tests/process/images.rs
 ---
 
 ## Behavior
@@ -63,9 +63,9 @@ instead.
   preserves the gesture provenance and original browser files. The desktop
   wiring and chip render are in
   `editor/scaffolds/desktop/shared/legacy-agent-composer-input.tsx`.
-- The model→image round-trip (incl. multi-turn + resume) is automated against a
-  real model in `packages/grida-ai-agent/src/runtime/runtime.live.test.ts`
-  (gated `GRIDA_LIVE_AGENT=1`); this TC covers the UI gesture that test can't.
+- Native image intake and restart recovery are automated in
+  `crates/grida-agent/tests/process/images.rs`; this TC covers the UI gesture
+  that test can't.
 - Dual routing, raw-byte preservation, scratch budgeting, and provider-only
   fallback are automated in `input-resource-policy.test.ts` and
   `input-resource-router.test.ts`; the clipboard gesture and rendered chip

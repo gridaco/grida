@@ -12,7 +12,7 @@ automatable: false
 covered_by:
   - editor/lib/agent-chat/turn-queue.test.ts
   - editor/lib/agent-chat/use-turn-queue-controller.test.ts
-  - packages/grida-ai-agent/src/runtime/session-scheduler.test.ts
+  - desktop/src/main/native-agent-queue.test.ts
 ---
 
 ## Behavior
