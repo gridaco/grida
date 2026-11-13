@@ -6,7 +6,6 @@ import { clearTimeout, setTimeout } from "node:timers";
 import type { NativeEditorSurfaceSnapshot } from "@grida/desktop-bridge";
 import { NativeAgentArtifacts } from "./native-agent-artifacts";
 import { NativeAgentDeletion } from "./native-agent-deletion";
-import { NativeAgentWakeups } from "./native-agent-wakeups";
 import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeCommandProfiles } from "./native-agent-command-profile";
 import { NativeAgentHooks } from "./native-agent-hooks";
@@ -154,7 +153,6 @@ export class NativeAgentProcess {
   private librarySelection = false;
   private fileInput = false;
   private agentEffort = false;
-  private scheduledWakeups = false;
   private historyRevision = false;
   private transcriptWindow = false;
   private gatewayBillingEnabled = false;
@@ -258,10 +256,6 @@ export class NativeAgentProcess {
 
   get acceptsEffort(): boolean {
     return this.connected && this.agentEffort;
-  }
-
-  get acceptsWakeups(): boolean {
-    return this.connected && this.scheduledWakeups;
   }
 
   get acceptsHistoryRevision(): boolean {
@@ -597,7 +591,6 @@ export class NativeAgentProcess {
                     [NativeAgentGoals.fundedReviewCapability]: 1,
                     [NativeAgentGoals.namedChildCapability]: 1,
                   }),
-                ...NativeAgentWakeups.capabilities,
                 [NativeEditorSurfaceEndpoints.capability]: 1,
                 ...(providerEgress && {
                   [NativeEditorSurfaceEndpoints.openCapability]: 1,
@@ -666,9 +659,6 @@ export class NativeAgentProcess {
         advertised?.["co.grida/session/selected-file"] === 1;
       processOwner.agentEffort =
         options.subagents === true && advertised?.[SESSION_EFFORT] === 1;
-      processOwner.scheduledWakeups = Object.keys(
-        NativeAgentWakeups.capabilities
-      ).every((key) => advertised?.[key] === 1);
       processOwner.historyRevision = Object.keys(
         NativeAgentRevisions.capabilities
       ).every((key) => advertised?.[key] === 1);

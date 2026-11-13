@@ -96,13 +96,8 @@ export const IPC_CHANNELS = {
   NATIVE_CHAT_SUBMIT_LIBRARY_SELECTION:
     "grida:native-chat:submit-library-selection",
   NATIVE_CHAT_ACCEPTS_FILE: "grida:native-chat:accepts-file",
-  NATIVE_CHAT_ACCEPTS_WAKEUPS: "grida:native-chat:accepts-wakeups",
-  NATIVE_CHAT_SUBMIT_WAKEUP: "grida:native-chat:submit-wakeup",
-  NATIVE_CHAT_SCHEDULED_WAKEUP: "grida:native-chat:scheduled-wakeup",
-  NATIVE_CHAT_CONTROL_WAKEUP: "grida:native-chat:control-wakeup",
   NATIVE_CHAT_SUBMIT_IMAGE: "grida:native-chat:submit-image",
   NATIVE_CHAT_SUBMIT_FILE: "grida:native-chat:submit-file",
-  NATIVE_CHAT_CONTEXT_LIMIT: "grida:native-chat:context-limit",
   NATIVE_CHAT_HOOKS: "grida:native-chat:hooks",
   NATIVE_CHAT_IMPORT_HOOK: "grida:native-chat:import-hook",
   NATIVE_CHAT_REMOVE_HOOK: "grida:native-chat:remove-hook",

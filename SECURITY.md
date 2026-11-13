@@ -919,12 +919,10 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   the exact observed revision and history anchor in Main. Its opaque edit
   token belongs to the current attachment. An unverified reply keeps both
   request identities and the exact replacement text and mode for retry.
-  The [configuration adapter](desktop/src/main/native-agent-configuration.ts)
-  only inspects the active value; Desktop negotiates no configuration change
-  and has no settings control or send-time settings permission. A change to
-  the workspace's agent settings file is an ordinary file write (see the agent
-  settings file above), and Main admits a write review only for that exact
-  file.
+  Desktop negotiates no configuration operation and has no settings control
+  or send-time settings permission. A change to the workspace's agent
+  settings file is an ordinary file write (see the agent settings file
+  above), and Main admits a write review only for that exact file.
   The [workspace configuration owner](crates/grida-agent/src/configuration.rs)
   admits shared defaults only for a private supervising launch bound to the
   exact workspace state root and generation. It serializes source and active
@@ -1055,9 +1053,8 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   The [Desktop goal adapter](desktop/src/main/native-agent-goals.ts) retains
   the exact goal, driver, and session revisions behind a frame-scoped token.
   Goal inspection is read-only. Desktop starts work through explicit user
-  acceptance of the objective and allowance. An explicitly selected
-  check-in requires the negotiated scheduling controls and a Standard Act
-  goal. It uses the first turn's captured allowance and authority.
+  acceptance of the objective and allowance. Desktop neither negotiates nor
+  offers check-ins.
   Revising the objective or criteria uses the same attached observation and
   request identity. The worker cancels any affected owned turn and retains
   its recorded work and allowance.
@@ -1068,14 +1065,6 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   A queued goal retains its start request across restart. The Host refuses
   generic replacement while the goal is queued. Withdrawal uses the original
   input identity and the observed queue revision.
-- The [Desktop check-in adapter](desktop/src/main/native-agent-wakeups.ts)
-  projects one bounded timer for the attached chat's observed task. An Act
-  submission must opt in explicitly. The renderer receives the wait identity,
-  due time, reason, and status. The scheduled continuation stays in the host.
-  [Main](desktop/src/main/native-chat-ipc.ts) rechecks the frame and the exact
-  wait before cancel, restore, or continuation after cancellation. The
-  [process fixture](desktop/src/main/native-agent-wakeups.test.ts) covers
-  cancellation, explicit continuation, and restore through a native restart.
 - The [Desktop approval coordinator](desktop/src/main/native-agent-permissions.ts)
   derives a read profile from main-owned workspace selection. An approval
   answer takes a review issued by the coordinator for the exact session,

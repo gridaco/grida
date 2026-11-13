@@ -668,30 +668,6 @@ const bridge: DesktopBridge = {
       ),
     acceptsFile: () =>
       ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE),
-    acceptsWakeups: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_WAKEUPS),
-    submitWithWakeup: (attachmentId, inputId, text, effort) =>
-      ipcRenderer.invoke(
-        IPC_CHANNELS.NATIVE_CHAT_SUBMIT_WAKEUP,
-        attachmentId,
-        inputId,
-        text,
-        ...(effort === undefined ? [] : [effort])
-      ),
-    scheduledWakeup: (attachmentId, observationId) =>
-      ipcRenderer.invoke(
-        IPC_CHANNELS.NATIVE_CHAT_SCHEDULED_WAKEUP,
-        attachmentId,
-        observationId
-      ),
-    controlWakeup: (attachmentId, observationId, waitId, action) =>
-      ipcRenderer.invoke(
-        IPC_CHANNELS.NATIVE_CHAT_CONTROL_WAKEUP,
-        attachmentId,
-        observationId,
-        waitId,
-        action
-      ),
     ...(!selectedDocumentChatRoute() && {
       inspectHooks: (attachmentId?: string) =>
         ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_HOOKS, attachmentId),
@@ -699,8 +675,6 @@ const bridge: DesktopBridge = {
         ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_IMPORT_HOOK),
       removeHook: (id: string, revision: string) =>
         ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_REMOVE_HOOK, id, revision),
-      contextLimit: () =>
-        ipcRenderer.invoke(IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT),
     }),
     submitImage: (attachmentId, input) =>
       ipcRenderer.invoke(

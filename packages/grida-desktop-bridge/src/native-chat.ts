@@ -108,13 +108,6 @@ export type NativeChatFileInput = Readonly<{
   effort?: NativeChatEffort;
 }>;
 
-export type NativeContextLimit = Readonly<{
-  reviewId: string;
-  limit: number | null;
-  exactCounting: boolean;
-  source: "active" | "pending" | "invalid";
-}>;
-
 export type NativeChatPage = Readonly<{
   sessionIds: readonly string[];
   titles?: readonly Readonly<{ sessionId: string; title: string }>[];
@@ -240,17 +233,6 @@ export type NativeChatRevisionReceipt = Readonly<{
   inputId: string;
   inputPosition: number;
 }>;
-
-export type NativeChatWakeup = Readonly<{
-  turnId: string;
-  waitId: string;
-  dueAtMs: number;
-  reason: string;
-  status: "waiting" | "paused" | "delivered" | "cancelled" | "stopped";
-  armed: boolean;
-}>;
-
-export type NativeChatWakeupAction = "cancel" | "recover";
 
 export type NativeChatImageArtifact = Readonly<{
   id: string;
@@ -470,7 +452,6 @@ export type NativeChatControl = Readonly<{
   action: "pause" | "stop" | "resume";
   observationId: string;
   requestId: string;
-  cancelledWakeupId?: string;
 }>;
 
 export type NativeChatQueueItem = Readonly<{
@@ -526,7 +507,6 @@ export type NativeChatGoalRequest = Readonly<{
   operatingRegime?: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
   namedChildId?: string;
-  allowWakeup?: true;
   /** Exact USD mills under a negotiated provider-enforced allocation. */
   maxCostMills?: string;
 }>;
@@ -544,7 +524,7 @@ export type NativeChatGoalStatus =
     };
 
 export type NativeChatGoal = Readonly<
-  Omit<NativeChatGoalRequest, "allowWakeup" | "operatingRegime"> & {
+  Omit<NativeChatGoalRequest, "operatingRegime"> & {
     goalId: string;
     state: NativeChatGoalStatus;
     paused: boolean;
@@ -808,23 +788,6 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     effort?: NativeChatEffort
   ): Promise<NativeChatAcceptance>;
   acceptsFile?(): Promise<boolean>;
-  acceptsWakeups?(): Promise<boolean>;
-  submitWithWakeup?(
-    attachmentId: string,
-    inputId: string,
-    text: string,
-    effort?: NativeChatEffort
-  ): Promise<NativeChatAcceptance>;
-  scheduledWakeup?(
-    attachmentId: string,
-    observationId: string
-  ): Promise<NativeChatWakeup | null>;
-  controlWakeup?(
-    attachmentId: string,
-    observationId: string,
-    waitId: string,
-    action: NativeChatWakeupAction
-  ): Promise<NativeChatWakeup>;
   submitImage?(
     attachmentId: string,
     input: NativeChatImageInput
@@ -833,7 +796,6 @@ export type DesktopNativeChat = Partial<NativeSubagentClient> & {
     attachmentId: string,
     input: NativeChatFileInput
   ): Promise<NativeChatAcceptance>;
-  contextLimit?(): Promise<NativeContextLimit>;
   inputReceipt(
     attachmentId: string,
     inputId: string

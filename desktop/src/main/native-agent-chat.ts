@@ -44,8 +44,6 @@ import type {
   NativeChatTokenUsage,
   NativeChatTurn,
   NativeChatTurnSummary,
-  NativeChatWakeup,
-  NativeChatWakeupAction,
   NativeEditorSurfaceSnapshot,
   NativeSubagentAssignmentInput,
   NativeSubagentCreate,
@@ -58,12 +56,7 @@ import type {
   NativeEditorSurfaceSelection,
   NativeEditorSvgTextDelivery,
 } from "./native-editor-surfaces";
-import { NativeAgentWakeups } from "./native-agent-wakeups";
 import type { NativeApprovalReview } from "./native-agent-permissions";
-import {
-  NativeAgentConfiguration,
-  type ContextLimitBasis,
-} from "./native-agent-configuration";
 import { NativeAgentDeletion } from "./native-agent-deletion";
 import { NativeAgentCommands } from "./native-agent-commands";
 import { NativeAgentRevisions } from "./native-agent-revisions";
@@ -84,7 +77,6 @@ import {
 import { NativeGatewayConnection } from "./native-gateway-connection";
 
 const CAPABILITIES = {
-  ...NativeAgentConfiguration.capabilities,
   "co.grida/session/submit": 1,
   "co.grida/session/operating-regime": 1,
   "co.grida/session/enqueue": 1,
@@ -267,9 +259,6 @@ export class NativeAgentChat {
     (method, params) => this.process.request(method, params),
     turn
   );
-  private readonly configuration = new NativeAgentConfiguration(
-    (method, params) => this.process.request(method, params, 10_000)
-  );
   private readonly deletion = new NativeAgentDeletion((method, params) =>
     this.process.request(method, params, 10_000)
   );
@@ -314,10 +303,6 @@ export class NativeAgentChat {
 
   get acceptsGoalEffort(): boolean {
     return this.connected && this.process.acceptsGoalEffort;
-  }
-
-  get acceptsWakeups(): boolean {
-    return this.connected && this.process.acceptsWakeups;
   }
 
   get acceptsSavedChatDeletion(): boolean {
@@ -823,60 +808,6 @@ export class NativeAgentChat {
     });
   }
 
-  submitWithWakeup(
-    session: NativeChatSession,
-    inputId: string,
-    text: string,
-    editorSurfaces?: NativeEditorSurfaceSelection,
-    effort?: NativeChatEffort
-  ): Promise<NativeChatAcceptance> {
-    if (!this.acceptsWakeups)
-      return Promise.reject(new Error("native_chat_wakeup_unavailable"));
-    return this.send("submit", session, inputId, text, "act", {
-      allowWakeups: true,
-      editorSurfaces,
-      effort,
-    });
-  }
-
-  async scheduledWakeup(
-    session: NativeChatSession,
-    snapshot: NativeChatSnapshot
-  ): Promise<NativeChatWakeup | null> {
-    const sessionId = this.requireObservation(session, snapshot);
-    const selected = NativeAgentWakeups.turn(snapshot);
-    if (!this.acceptsWakeups || !selected) return null;
-    const turnId = selected.turnId;
-    const response = await this.process.request(
-      NativeAgentWakeups.methods.read,
-      { sessionId, turnId },
-      10_000
-    );
-    this.requireAttached(session);
-    return NativeAgentWakeups.decode(response, sessionId, turnId);
-  }
-
-  async controlWakeup(
-    session: NativeChatSession,
-    snapshot: NativeChatSnapshot,
-    waitId: string,
-    action: NativeChatWakeupAction
-  ): Promise<NativeChatWakeup> {
-    const sessionId = this.requireObservation(session, snapshot);
-    const turnId = snapshot.current?.turnId;
-    if (!this.acceptsWakeups || !turnId || snapshot.current?.cancelled)
-      throw new Error("native_chat_wakeup_unavailable");
-    const response = await this.process.request(
-      NativeAgentWakeups.methods[action],
-      { sessionId, turnId, waitId: identity(waitId) },
-      10_000
-    );
-    this.requireAttached(session);
-    const wakeup = NativeAgentWakeups.decode(response, sessionId, turnId);
-    if (wakeup?.waitId !== waitId) throw invalidResponse();
-    return wakeup;
-  }
-
   async submitImage(
     session: NativeChatSession,
     value: unknown
@@ -938,7 +869,6 @@ export class NativeAgentChat {
     options: {
       image?: ReturnType<typeof pngPrompt>;
       file?: ReturnType<typeof selectedFile>;
-      allowWakeups?: true;
       allowLibrarySelection?: true;
       editorSurfaces?: NativeEditorSurfaceSelection;
       effort?: NativeChatEffort;
@@ -946,14 +876,8 @@ export class NativeAgentChat {
   ): Promise<NativeChatAcceptance> {
     const sessionId = this.requireAttached(session);
     identity(inputId);
-    const {
-      image,
-      file,
-      allowWakeups,
-      allowLibrarySelection,
-      editorSurfaces,
-      effort,
-    } = options;
+    const { image, file, allowLibrarySelection, editorSurfaces, effort } =
+      options;
     if (effort === "ultra" && !this.acceptsEffort)
       throw new Error("native_chat_effort_unavailable");
     return acceptance(
@@ -964,7 +888,6 @@ export class NativeAgentChat {
         ...(file && { selectedFile: file }),
         ...(operatingRegime && { operatingRegime }),
         ...hostEffort(effort),
-        ...(allowWakeups && { allowWakeups }),
         ...(allowLibrarySelection && { allowLibrarySelection }),
         ...(mode === "submit" &&
           operatingRegime === "act" &&
@@ -975,11 +898,6 @@ export class NativeAgentChat {
       sessionId,
       inputId
     );
-  }
-
-  inspectContextLimit(): Promise<ContextLimitBasis> {
-    this.requireOpen();
-    return this.configuration.inspect();
   }
 
   async inspectHooks(sessionId?: string): Promise<NativeHookInspection> {
@@ -1436,7 +1354,6 @@ export class NativeAgentChat {
       {
         fundedReview: this.acceptsGoalEffort,
         namedChild: this.process.acceptsGoalNamedChild,
-        wakeups: this.acceptsWakeups,
         spending: this.process.acceptsGoalSpending,
       }
     );
@@ -1773,16 +1690,13 @@ export class NativeAgentChat {
   async resume(
     session: NativeChatSession,
     snapshot: NativeChatSnapshot,
-    requestId: string,
-    cancelledWakeupId?: string
+    requestId: string
   ): Promise<NativeChatTurn> {
     const { task, current } = this.task(session, snapshot, requestId);
     if (
       current.disposition !== "suspended" ||
       current.cancelled ||
-      (cancelledWakeupId === undefined
-        ? !current.paused
-        : current.paused || !this.acceptsWakeups)
+      !current.paused
     )
       throw new Error("native_chat_verified_pause_required");
     const response = object(
@@ -1790,9 +1704,6 @@ export class NativeAgentChat {
         task,
         expectedEpoch: current.epoch,
         expectedJournalPosition: current.journalPosition,
-        ...(cancelledWakeupId !== undefined && {
-          cancelledWakeupId: identity(cancelledWakeupId),
-        }),
       })
     );
     const resumed = turn(response.turn);

@@ -551,27 +551,6 @@ export function registerIpcHandlers(options: RegisterIpcHandlersOptions) {
   guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_FILE, (event) =>
     nativeChat.acceptsFile(event)
   );
-  guarded(IPC_CHANNELS.NATIVE_CHAT_ACCEPTS_WAKEUPS, (event) =>
-    nativeChat.acceptsWakeups(event)
-  );
-  guarded(
-    IPC_CHANNELS.NATIVE_CHAT_SUBMIT_WAKEUP,
-    (event, id: string, input: string, text: string, effort?: unknown) =>
-      nativeChat.submitWithWakeup(event, id, input, text, effort)
-  );
-  guarded(
-    IPC_CHANNELS.NATIVE_CHAT_SCHEDULED_WAKEUP,
-    (event, id: string, observation: string) =>
-      nativeChat.scheduledWakeup(event, id, observation)
-  );
-  guarded(
-    IPC_CHANNELS.NATIVE_CHAT_CONTROL_WAKEUP,
-    (event, id: string, observation: string, wait: unknown, action: unknown) =>
-      nativeChat.controlWakeup(event, id, observation, wait, action)
-  );
-  guarded(IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT, (event) =>
-    nativeChat.contextLimit(event)
-  );
   guarded(IPC_CHANNELS.NATIVE_CHAT_HOOKS, (event, attachmentId?: string) =>
     nativeChat.inspectHooks(event, attachmentId)
   );

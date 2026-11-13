@@ -1303,11 +1303,12 @@ it.skipIf(!resourcesPath)(
           headers: { "content-type": "text/event-stream" },
         });
       });
-      const submitted = await ipc.submitWithWakeup(
+      const submitted = await ipc.submit(
         first.event,
         parent.attachmentId,
         "surface-fixture",
-        "Tell me what is open."
+        "Tell me what is open.",
+        "act"
       );
       accepted.resolve();
       await vi.waitFor(

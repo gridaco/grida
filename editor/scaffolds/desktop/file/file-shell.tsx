@@ -69,7 +69,6 @@ export function DesktopFileShell({
       ...chat,
       profiles: undefined,
       selectProfile: undefined,
-      contextLimit: undefined,
     };
   }, [bridge, mode, basePath]);
 

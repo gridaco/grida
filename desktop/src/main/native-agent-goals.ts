@@ -66,7 +66,6 @@ export class NativeAgentGoals {
             "ultra",
             "standard",
           ] as const);
-    const allowWakeup = input.allowWakeup === true;
     const maxCostMills =
       input.maxCostMills === undefined
         ? undefined
@@ -80,7 +79,6 @@ export class NativeAgentGoals {
         4 +
           Number(operatingRegime !== undefined) +
           Number(effort !== undefined) +
-          Number(allowWakeup) +
           Number(maxCostMills !== undefined) +
           Number(namedChildId !== undefined) ||
       Object.keys(allowance).length !== 2
@@ -102,7 +100,6 @@ export class NativeAgentGoals {
       ...(operatingRegime && { operatingRegime }),
       ...(effort && { effort }),
       ...(namedChildId && { namedChildId }),
-      ...(allowWakeup && { allowWakeup: true }),
       ...(maxCostMills !== undefined && { maxCostMills }),
     };
   }
@@ -146,7 +143,6 @@ export class NativeAgentGoals {
     capabilities: {
       fundedReview: boolean;
       namedChild: boolean;
-      wakeups: boolean;
       spending?: boolean;
     }
   ): Promise<unknown> {
@@ -157,19 +153,11 @@ export class NativeAgentGoals {
       automatic,
       operatingRegime,
       effort,
-      allowWakeup,
       namedChildId,
       maxCostMills,
     } = NativeAgentGoals.readRequest(request);
     if (maxCostMills !== undefined && !capabilities.spending)
       throw new Error("native_chat_goal_spending_unavailable");
-    if (
-      allowWakeup &&
-      (!capabilities.wakeups ||
-        effort === "ultra" ||
-        operatingRegime === "plan")
-    )
-      throw new Error("native_chat_goal_wakeup_unavailable");
     if (effort === "ultra" && !capabilities.fundedReview)
       throw new Error("native_chat_goal_effort_unavailable");
     if (
@@ -179,15 +167,13 @@ export class NativeAgentGoals {
         operatingRegime === "plan")
     )
       throw new Error("native_chat_goal_named_child_unavailable");
-    const regime =
-      operatingRegime ?? (allowWakeup || namedChildId ? "act" : undefined);
+    const regime = operatingRegime ?? (namedChildId ? "act" : undefined);
     return this.request("_co.grida/goal/start", {
       sessionId,
       inputId,
       prompt: [{ type: "text", text: objective }],
       ...(effort === "ultra" && { effort }),
       ...(regime && { operatingRegime: regime }),
-      ...(allowWakeup && { allowWakeups: true }),
       ...(maxCostMills !== undefined && { maxCostMills }),
       goal: {
         objective: { description: objective, criteria },

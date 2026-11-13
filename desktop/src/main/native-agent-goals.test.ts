@@ -24,7 +24,7 @@ it("requires monetary capability and preserves the exact cap in the Goal start e
   const request =
     vi.fn<(method: string, params: unknown) => Promise<unknown>>();
   const goals = new NativeAgentGoals(request);
-  const capabilities = { fundedReview: true, namedChild: true, wakeups: true };
+  const capabilities = { fundedReview: true, namedChild: true };
   expect(() =>
     goals.start(
       "session",
@@ -61,7 +61,7 @@ it("binds a named reviewer only to a negotiated Ultra Goal start", async () => {
     vi.fn<(method: string, params: unknown) => Promise<unknown>>();
   const goals = new NativeAgentGoals(request);
   const named = { ...REQUEST, effort: "ultra", namedChildId: "named-reviewer" };
-  const capabilities = { fundedReview: true, namedChild: true, wakeups: true };
+  const capabilities = { fundedReview: true, namedChild: true };
   expect(() =>
     goals.start("session", "input", named, {
       ...capabilities,
@@ -84,14 +84,6 @@ it("binds a named reviewer only to a negotiated Ultra Goal start", async () => {
       capabilities
     )
   ).toThrow("native_chat_goal_named_child_unavailable");
-  expect(() =>
-    goals.start(
-      "session",
-      "input",
-      { ...REQUEST, operatingRegime: "plan", allowWakeup: true },
-      capabilities
-    )
-  ).toThrow("native_chat_goal_wakeup_unavailable");
   expect(request).not.toHaveBeenCalled();
   await goals.start("session", "input", named, capabilities);
   expect(request).toHaveBeenCalledExactlyOnceWith(

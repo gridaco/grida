@@ -619,7 +619,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         ])
       ).toEqual([[undefined, 4096]]);
       expect(counts).toEqual([]);
-      expect((await newChat.inspectContextLimit()).exactCounting).toBe(false);
 
       // Set the workspace's input limit in its settings file. It applies once
       // Desktop starts the workspace's agent again.
@@ -649,9 +648,6 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       // Chats belong to the workspace: the counted connection lists the chat
       // the other connection started.
       expect((await countedChat.list()).sessionIds).toEqual([session.id]);
-      expect((await countedChat.inspectContextLimit()).exactCounting).toBe(
-        true
-      );
       const countedSession = await countedChat.create();
       await countedChat.submit(countedSession, "counted", "Count this turn.");
       await vi.waitFor(async () =>

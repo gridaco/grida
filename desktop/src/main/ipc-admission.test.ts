@@ -91,7 +91,6 @@ describe("ipc_admission", () => {
     for (const channel of [
       IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
       IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
-      IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT,
       ...nativeExternal,
     ])
       expect(document).not.toContain(channel);
@@ -207,7 +206,6 @@ describe("ipc_admission", () => {
     );
     for (const channel of [
       IPC_CHANNELS.NATIVE_CHAT_SELECT_PROFILE,
-      IPC_CHANNELS.NATIVE_CHAT_CONTEXT_LIMIT,
       IPC_CHANNELS.NATIVE_CHAT_EDITOR_SURFACE_OPEN,
       ...nativeExternal,
     ])

@@ -356,15 +356,6 @@ export function NativeAgentPane({
   const running =
     turn?.disposition === "running" && !turn.paused && !turn.cancelled;
   const canResume = controller.hasPausedTurn;
-  const wakeup = state.scheduledWakeup;
-  const suspendedCheckIn =
-    !!wakeup &&
-    turn?.turnId === wakeup.turnId &&
-    turn.disposition === "suspended" &&
-    !turn.paused &&
-    !turn.cancelled &&
-    (wakeup.status === "waiting" || wakeup.status === "cancelled");
-  const canContinue = suspendedCheckIn && wakeup.status === "cancelled";
   const goalTurn =
     !!turn && state.goal?.goal?.reservation?.turnId === turn.turnId;
   // A paused turn resumes from the composer; a Goal's own pause resumes from
@@ -664,61 +655,6 @@ export function NativeAgentPane({
           >
             {state.librarySelectionRetry ? "Review answer" : "Choose reference"}
           </Button>
-        </div>
-      )}
-      {(wakeup || state.wakeupError) && (
-        <div className="shrink-0 space-y-1 border-t px-3 py-2 text-xs">
-          {wakeup && (
-            <>
-              <p className="font-medium">
-                {wakeup.status === "cancelled"
-                  ? "Check-in cancelled"
-                  : wakeup.status === "stopped"
-                    ? "Check-in stopped"
-                    : wakeup.status === "delivered"
-                      ? "Check-in delivered"
-                      : wakeup.status === "paused"
-                        ? "Check-in paused"
-                        : "Scheduled check-in"}
-              </p>
-              <p className="wrap-anywhere whitespace-pre-wrap">
-                {wakeup.reason}
-              </p>
-              <time
-                className="block text-muted-foreground"
-                dateTime={new Date(wakeup.dueAtMs).toISOString()}
-              >
-                {new Date(wakeup.dueAtMs).toLocaleString()}
-              </time>
-              <div className="flex flex-wrap items-center gap-1">
-                {controller.canControlWakeup("cancel") && (
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => void controller.controlWakeup("cancel")}
-                  >
-                    Cancel check-in
-                  </Button>
-                )}
-                {controller.canControlWakeup("recover") && (
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    onClick={() => void controller.controlWakeup("recover")}
-                  >
-                    Restore schedule
-                  </Button>
-                )}
-              </div>
-            </>
-          )}
-          {state.wakeupError && (
-            <p role="alert" className="text-destructive">
-              {state.wakeupError}
-            </p>
-          )}
         </div>
       )}
       <Dialog
@@ -1081,21 +1017,6 @@ export function NativeAgentPane({
                   onRemove={() => controller.selectGoalIntent(false)}
                 />
               )}
-              {canContinue ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  disabled={state.acting}
-                  aria-label="Continue"
-                  title="Continue"
-                  className="shrink-0"
-                  onClick={() => void controller.control("resume")}
-                >
-                  <PlayIcon className="size-3.5" />
-                  <span className="hidden @md:inline">Continue</span>
-                </Button>
-              ) : null}
             </>
           }
           toolbarEnd={
