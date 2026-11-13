@@ -72,6 +72,8 @@ struct Revise {
     allow_configuration_changes: bool,
     operating_regime: Option<crate::OperatingRegime>,
     effort: Option<crate::EffortPreset>,
+    #[serde(default)]
+    reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonRpcResponse)]
@@ -182,7 +184,7 @@ pub(super) fn handlers(host: Arc<Host>, sessions: Arc<Mutex<ConnectionSessions>>
                                     request.operating_regime,
                                 )?,
                                 effort: effort(&sessions, request.effort)?,
-                                reasoning: Default::default(),
+                                reasoning: request.reasoning,
                             },
                         )
                         .await

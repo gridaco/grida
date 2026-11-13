@@ -62,6 +62,10 @@ pub(crate) struct RevisionTarget {
     text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     effort: Option<EffortPreset>,
+    /// The reasoning level the original message was sent with. A revision
+    /// sends it again so the edited message keeps its original effort.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
     subsequent_messages: usize,
 }
 
@@ -315,7 +319,7 @@ impl Host {
                 &message.id,
             ),
         };
-        let (text, effort) = self
+        let (text, effort, reasoning) = self
             .original_input(session, turn.clone(), original, message)
             .await?;
         Ok(RevisionTarget {
@@ -324,6 +328,7 @@ impl Host {
             anchor,
             text,
             effort,
+            reasoning,
             subsequent_messages,
         })
     }
@@ -334,7 +339,11 @@ impl Host {
         turn: TurnId,
         original: &MessageId,
         visible: &Message,
-    ) -> Result<(String, Option<EffortPreset>)> {
+    ) -> Result<(
+        String,
+        Option<EffortPreset>,
+        Option<agent_kit_core::inference::ReasoningEffort>,
+    )> {
         for input in self.store.turn_submissions(session, turn).await? {
             if input.payload.schema().as_str() != INPUT_SCHEMA
                 || !matches!(input.payload.version(), 2 | 3)
@@ -365,7 +374,11 @@ impl Host {
                 })
                 .collect();
             if !text.trim().is_empty() {
-                return Ok((text, stored.effort.map(|policy| policy.preset())));
+                return Ok((
+                    text,
+                    stored.effort.map(|policy| policy.preset()),
+                    stored.reasoning,
+                ));
             }
         }
         Err(revision_target_unavailable())
@@ -453,6 +466,10 @@ impl Host {
                 (regime, Some(effort)) => Fingerprint::of(&(base, "effort", regime, effort))?,
                 (Some(regime), None) => Fingerprint::of(&(base, regime))?,
                 (None, None) => Fingerprint::of(&base)?,
+            };
+            let intent = match replacement.reasoning {
+                Some(level) => Fingerprint::of(&(intent, "reasoning", level))?,
+                None => intent,
             };
             let previous = host
                 .store

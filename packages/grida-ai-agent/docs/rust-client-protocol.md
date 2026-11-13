@@ -206,27 +206,27 @@ before appending later chunks. A `resyncRequired` notice has no text and
 asks the client to reload committed history. Observation owns neither work
 admission nor cancellation.
 
-| Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                       |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `submit`, `enqueue`                      | `sessionId`, `inputId`, ACP `prompt`. Submit selects idle work. Enqueue accepts waiting work. Both return `inputPosition`, `disposition`, and the `turnId` once selected.   |
-| `snapshot`                               | `sessionId`. Read the bounded session summary without claiming work.                                                                                                        |
-| `input`                                  | `sessionId`, `inputId`. Read the accepted prompt, captured settings, and retained receipt.                                                                                  |
-| `replace`                                | Queue basis in `queue`, `inputId`, `replacementInputId`, ACP `prompt`. Retain the slot and supersede the prior input.                                                       |
-| `withdraw`, `reorder`                    | Queue basis in `queue`, plus `inputId` or the complete ordered `inputIds` list.                                                                                             |
-| `resume-queue`                           | Flat queue basis. Reopen queue admission and schedule eligible waiting work.                                                                                                |
-| `stop`, `pause`                          | Flat task basis. Return the committed control receipt. Stop also pauses queue admission. Pause becomes verified when the turn reports `suspended`.                          |
-| `resume`                                 | Task basis in `task`, `expectedEpoch`, `expectedJournalPosition`. Claim the verified suspension and clear its task pause. Return the claimed turn summary.                  |
-| `steer`                                  | Task basis in `task`, `expectedHistoryPosition`, ACP `prompt`. Append the correction to the targeted turn and return the committed receipt.                                 |
-| `questions`                              | `sessionId`, `turnId`. Read pending question identities, prompts, choices, and the current control/history basis.                                                           |
-| `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed answer and its correlated contribution.                                              |
-| `approvals`                              | `sessionId`, `turnId`. Read pending approval requests and their wait IDs with the current control revision.                                                                 |
-| `answer-approval`                        | Flat task basis plus `waitId` and `decision`. Commit a decision for the exact recorded action. Available on private supervising stdio.                                      |
-| `history`                                | `sessionId`, optional `view`, `offset`, and `expectedHistory`. Read visible message anchors, previews, and any seed lineage.                                                |
-| `revision-target`                        | `sessionId`, visible `messageId`, and `expectedSessionRevision`. Read the original editable text, exact current basis and anchor, and subsequent visible message count.     |
-| `fork`                                   | `sessionId`, `requestId`, `expectedHistory`, and `anchor`. Return the independent `sessionId` for a committed prefix through that message.                                  |
-| `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `allowConfigurationChanges`. Return the installed view and accepted input. |
-| `compact`                                | `sessionId`, `requestId`, and optional `recover`. Run or inspect one retained context compaction. Return its status and available usage/failure evidence.                   |
-| `skills`                                 | `sessionId`. Read names, descriptions, sources, and versioned ACP resource-link URIs for available skills.                                                                  |
+| Method suffix after `_co.grida/session/` | Parameters and result                                                                                                                                                                                   |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `submit`, `enqueue`                      | `sessionId`, `inputId`, ACP `prompt`. Submit selects idle work. Enqueue accepts waiting work. Both return `inputPosition`, `disposition`, and the `turnId` once selected.                               |
+| `snapshot`                               | `sessionId`. Read the bounded session summary without claiming work.                                                                                                                                    |
+| `input`                                  | `sessionId`, `inputId`. Read the accepted prompt, captured settings, and retained receipt.                                                                                                              |
+| `replace`                                | Queue basis in `queue`, `inputId`, `replacementInputId`, ACP `prompt`. Retain the slot and supersede the prior input.                                                                                   |
+| `withdraw`, `reorder`                    | Queue basis in `queue`, plus `inputId` or the complete ordered `inputIds` list.                                                                                                                         |
+| `resume-queue`                           | Flat queue basis. Reopen queue admission and schedule eligible waiting work.                                                                                                                            |
+| `stop`, `pause`                          | Flat task basis. Return the committed control receipt. Stop also pauses queue admission. Pause becomes verified when the turn reports `suspended`.                                                      |
+| `resume`                                 | Task basis in `task`, `expectedEpoch`, `expectedJournalPosition`. Claim the verified suspension and clear its task pause. Return the claimed turn summary.                                              |
+| `steer`                                  | Task basis in `task`, `expectedHistoryPosition`, ACP `prompt`. Append the correction to the targeted turn and return the committed receipt.                                                             |
+| `questions`                              | `sessionId`, `turnId`. Read pending question identities, prompts, choices, and the current control/history basis.                                                                                       |
+| `answer-question`                        | Flat task basis plus `expectedHistoryPosition`, `waitId`, and `answer`. Commit a typed answer and its correlated contribution.                                                                          |
+| `approvals`                              | `sessionId`, `turnId`. Read pending approval requests and their wait IDs with the current control revision.                                                                                             |
+| `answer-approval`                        | Flat task basis plus `waitId` and `decision`. Commit a decision for the exact recorded action. Available on private supervising stdio.                                                                  |
+| `history`                                | `sessionId`, optional `view`, `offset`, and `expectedHistory`. Read visible message anchors, previews, and any seed lineage.                                                                            |
+| `revision-target`                        | `sessionId`, visible `messageId`, and `expectedSessionRevision`. Read the original editable text, its effort and reasoning level, exact current basis and anchor, and subsequent visible message count. |
+| `fork`                                   | `sessionId`, `requestId`, `expectedHistory`, and `anchor`. Return the independent `sessionId` for a committed prefix through that message.                                                              |
+| `revise`                                 | Fork parameters plus `expectedSessionRevision`, `replacementInputId`, ACP `prompt`, and optional `allowConfigurationChanges`, `effort` and `reasoning`. Return the installed view and accepted input.   |
+| `compact`                                | `sessionId`, `requestId`, and optional `recover`. Run or inspect one retained context compaction. Return its status and available usage/failure evidence.                                               |
+| `skills`                                 | `sessionId`. Read names, descriptions, sources, and versioned ACP resource-link URIs for available skills.                                                                                              |
 
 Select a skill by including its catalog URI as an ACP `resource_link` alongside
 the prompt. Skill references use `grida-skill:<name>@<revision>`. The catalog
@@ -270,7 +270,8 @@ retained. Portable seeds expose categorized omission counts and carry no source
 execution grants, pending interactions, or usage. The agent receives a notice
 about omitted media, tool data, or provider continuation in the selected view.
 The revised input captures current settings and uses the same explicit
-configuration-change opt-in as a new submission. Retrying a revision returns
+configuration-change opt-in as a new submission. A client keeps the original
+effort by resending the target's `effort` and `reasoning`. Retrying a revision returns
 its original receipt. Retained queued work after restart needs explicit Resume
 Queue.
 

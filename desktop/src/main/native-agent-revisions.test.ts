@@ -137,7 +137,7 @@ it("preserves the captured Ultra effort and refuses an incompatible retry", asyn
   const requests: unknown[] = [];
   const adapter = new NativeAgentRevisions(async (method, params) => {
     if (method.endsWith("/revision-target"))
-      return { ...target, effort: "ultra" };
+      return { ...target, effort: "ultra", reasoning: "xhigh" };
     requests.push(params);
     if (requests.length === 1) throw new Error("native_agent_request_timeout");
     return {
@@ -173,7 +173,46 @@ it("preserves the captured Ultra effort and refuses an incompatible retry", asyn
   await apply(true);
   expect(requests[0]).toMatchObject({
     effort: "ultra",
+    reasoning: "xhigh",
     operatingRegime: "plan",
   });
   expect(requests[1]).toBe(requests[0]);
+});
+
+it("resends the original reasoning level and refuses an unknown one", async () => {
+  const attachment = {};
+  const check = () => {};
+  const requests: unknown[] = [];
+  let reasoning: unknown = "high";
+  const adapter = new NativeAgentRevisions(async (method, params) => {
+    if (method.endsWith("/revision-target")) return { ...target, reasoning };
+    requests.push(params);
+    return {
+      sessionId: session.id,
+      view: 9,
+      inputId: (params as { replacementInputId: string }).replacementInputId,
+      inputPosition: 5,
+    };
+  });
+  const edit = await adapter.prepare(
+    attachment,
+    session,
+    observation,
+    messageId,
+    check
+  );
+  await adapter.apply(
+    attachment,
+    session,
+    edit.reviewId,
+    "Edited",
+    "act",
+    check
+  );
+  expect(requests[0]).toMatchObject({ reasoning: "high" });
+  expect(requests[0]).not.toHaveProperty("effort");
+  reasoning = "maximum";
+  await expect(
+    adapter.prepare({}, session, observation, messageId, check)
+  ).rejects.toThrow("native_chat_revision_target_invalid");
 });

@@ -39,7 +39,11 @@ type RevisionRequest = Readonly<{
   prompt: readonly [{ type: "text"; text: string }];
   operatingRegime: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
+  reasoning?: Reasoning;
 }>;
+
+type Reasoning = "low" | "medium" | "high" | "xhigh";
+const REASONING = new Set<unknown>(["low", "medium", "high", "xhigh"]);
 
 type Attempt = {
   request: RevisionRequest;
@@ -53,6 +57,8 @@ type Capture = {
   expectedSessionRevision: number;
   expectedHistory: NativeAgentHistory.Basis;
   anchor: NativeAgentHistory.Anchor;
+  /** The original message's reasoning level, resent with the revision. */
+  reasoning?: Reasoning;
   attempt?: Attempt;
 };
 
@@ -105,6 +111,7 @@ export class NativeAgentRevisions {
       expectedHistory.view > expectedSessionRevision ||
       !revision(reply.subsequentMessages) ||
       (reply.effort !== undefined && reply.effort !== "ultra") ||
+      (reply.reasoning !== undefined && !REASONING.has(reply.reasoning)) ||
       !validText(reply.text)
     )
       throw new Error("native_chat_revision_target_invalid");
@@ -121,6 +128,9 @@ export class NativeAgentRevisions {
       expectedSessionRevision,
       expectedHistory,
       anchor: selected,
+      ...(reply.reasoning !== undefined && {
+        reasoning: reply.reasoning as Reasoning,
+      }),
     });
     return target;
   }
@@ -171,6 +181,7 @@ export class NativeAgentRevisions {
           prompt: [{ type: "text", text }],
           operatingRegime,
           ...(selectedEffort && { effort: selectedEffort }),
+          ...(capture.reasoning && { reasoning: capture.reasoning }),
         },
         active: false,
       };

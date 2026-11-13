@@ -501,6 +501,81 @@ mod negotiated {
         assert!(client.finish().await.status.success());
     }
 
+    /// Editing an earlier message resubmits it at the reasoning level it was
+    /// sent with: a High message stays High and an Ultra message keeps the
+    /// highest level.
+    #[tokio::test]
+    async fn a_revised_message_keeps_its_reasoning_level() {
+        let root = TempDir::new().unwrap();
+        let workspace = TempDir::new().unwrap();
+        let mut endpoint = Endpoint::start(vec![
+            Reply::Finished("High answer."),
+            Reply::Finished("Revised high answer."),
+            Reply::Finished("Ultra answer."),
+            Reply::Finished("Revised ultra answer."),
+        ])
+        .await;
+        let mut command = executable();
+        command.args(["serve", "--stdio", "--subagents", "--reasoning"]);
+        configured(&mut command, &root.path().join("state"), &endpoint.url);
+        let child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut client = PrivateStdio::from_child(child);
+        client.request("initialize", capabilities(true)).await;
+        let created = client
+            .request(
+                "session/new",
+                json!({"cwd":workspace.path(),"mcpServers":[]}),
+            )
+            .await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        for (id, text, effort, reasoning) in [
+            ("high", "High task.", "standard", "high"),
+            ("ultra", "Ultra task.", "ultra", "xhigh"),
+        ] {
+            let mut original = input(session, id, text, "act", effort);
+            original["reasoning"] = reasoning.into();
+            let sent = client.request("_co.grida/session/submit", original).await;
+            assert!(sent.get("result").is_some(), "{sent}");
+            assert_eq!(endpoint.request().await["reasoning_effort"], reasoning);
+            let _ = idle(&mut client, session).await;
+
+            let page = client
+                .request("_co.grida/session/history", json!({"sessionId":session}))
+                .await;
+            let page = &page["result"];
+            let message = page["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|message| message["preview"] == text)
+                .unwrap();
+            let target = client.request("_co.grida/session/revision-target", json!({
+                "sessionId":session,"expectedSessionRevision":page["sessionRevision"],"messageId":message["anchor"]["message"],
+            })).await;
+            let target = &target["result"];
+            assert_eq!(target["reasoning"], reasoning, "{target}");
+            let mut revise = json!({"sessionId":session,"requestId":format!("revise-{id}"),
+                "expectedSessionRevision":target["sessionRevision"],"expectedHistory":target["basis"],
+                "anchor":target["anchor"],"replacementInputId":format!("revised-{id}"),
+                "prompt":[{"type":"text","text":format!("Revised {text}")}],"operatingRegime":"act",
+                "reasoning":target["reasoning"]});
+            if let Some(effort) = target["effort"].as_str() {
+                revise["effort"] = effort.into();
+            }
+            let revised = client.request("_co.grida/session/revise", revise).await;
+            assert!(revised.get("result").is_some(), "{revised}");
+            assert_eq!(endpoint.request().await["reasoning_effort"], reasoning);
+            let _ = idle(&mut client, session).await;
+        }
+        assert!(client.finish().await.status.success());
+        endpoint.done().await;
+    }
+
     #[tokio::test]
     async fn per_input_effort_survives_queue_edit_restart_and_revision() {
         let root = TempDir::new().unwrap();
