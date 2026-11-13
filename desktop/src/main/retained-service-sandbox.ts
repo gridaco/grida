@@ -234,10 +234,6 @@ export class RetainedServiceSandbox {
     }
   }
 
-  static ownsMountpoint(target: string): boolean {
-    return RetainedServiceSandbox.MountLease.owns(target);
-  }
-
   static start(
     plan: RetainedServiceSandbox.Plan,
     environment: NodeJS.ProcessEnv
@@ -640,19 +636,6 @@ export namespace RetainedServiceSandbox {
       { identity: string; references: number; directory: boolean }
     >();
     private readonly held: string[] = [];
-    static owns(target: string): boolean {
-      const owned = MountLease.active.get(target);
-      if (!owned) return false;
-      try {
-        return (
-          !owned.directory &&
-          owned.references > 0 &&
-          identity(target) === owned.identity
-        );
-      } catch {
-        return false;
-      }
-    }
     mountpoint(target: string): fs.Stats {
       const shared = MountLease.active.get(target);
       if (shared) {

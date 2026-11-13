@@ -16,7 +16,5 @@ export {};
  */
 declare global {
   const INSIDERS: 0 | 1;
-  /** Packaged Stable build-time authority to create an isolated native profile. */
-  const MANAGED_NATIVE_FIRST: 0 | 1;
   const EDITOR_BASE_URL: string;
 }

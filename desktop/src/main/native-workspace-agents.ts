@@ -5,7 +5,7 @@ import type {
   NativeAgentChat,
   NativeAgentChatLaunch,
 } from "./native-agent-chat";
-import type { NativeAgentCutover } from "./native-agent-cutover";
+import type { NativeChatStore } from "./native-chat-store";
 import { NativeAgentTerminationPending } from "./native-agent-process";
 import type { ActiveNativeChat } from "./native-chat-ipc";
 
@@ -50,8 +50,8 @@ export class NativeWorkspaceAgents {
   private closed: Promise<void> | undefined;
 
   constructor(
-    private readonly cutover: Pick<NativeAgentCutover, "startWorkspace"> &
-      Partial<Pick<NativeAgentCutover, "startDocument">>,
+    private readonly store: Pick<NativeChatStore, "startWorkspace"> &
+      Partial<Pick<NativeChatStore, "startDocument">>,
     private readonly prepare: (
       workspace: Project,
       signal: AbortSignal
@@ -279,13 +279,13 @@ export class NativeWorkspaceAgents {
       workspace.requireDirectoryCurrent?.();
       const options = { ...launch, cwd: workspace.root };
       return profile
-        ? this.cutover.startWorkspace(workspace.id, options, profile.id)
-        : this.cutover.startWorkspace(workspace.id, options);
+        ? this.store.startWorkspace(workspace.id, options, profile.id)
+        : this.store.startWorkspace(workspace.id, options);
     }
-    if (!this.cutover.startDocument || profile)
+    if (!this.store.startDocument || profile)
       throw new Error("native_chat_document_unavailable");
     workspace.requireCurrent();
-    return this.cutover.startDocument(workspace.id, launch);
+    return this.store.startDocument(workspace.id, launch);
   }
 
   private async drain(slots: Iterable<[string, Slot]>): Promise<void> {

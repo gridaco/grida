@@ -1,5 +1,5 @@
 // GRIDA-SEC-004 / GRIDA-SEC-005 — isolated Desktop profiles for native chat.
-import { lstatSync, realpathSync } from "node:fs";
+import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { App } from "electron";
@@ -8,7 +8,6 @@ import { ProtectedRoots } from "@grida/daemon/server";
 import { home } from "@grida/home";
 import { isValidEndpointProviderId } from "@grida/agent";
 import { LegacyAgentPaths } from "./legacy-agent-paths";
-import { NativeFirstProfile } from "./native-first-profile";
 
 export namespace NativeDesktopProfile {
   export const chatStateDirectory = "native-chat";
@@ -26,102 +25,17 @@ export namespace NativeDesktopProfile {
     commandLine: Pick<App["commandLine"], "getSwitchValue">;
   };
   const admitted = new WeakMap<Pick<App, "getPath">, ProtectedRoots>();
-  let first: NativeFirstProfile.Paths | undefined;
-  let firstMediaOnly = false;
-
-  /** Runs before Electron chooses the browser/session store and instance lock. */
-  export function prepareFirst(app: HostApp, allowBirth: boolean): void {
-    if (first) throw invalidProfile();
-    const mediaOnly = process.argv.includes("--disable-agent");
-    const supported =
-      process.platform === "darwin" &&
-      process.arch === "arm64" &&
-      !app.commandLine.getSwitchValue("user-data-dir") &&
-      !process.env.GRIDA_AGENT_USER_DATA &&
-      !process.argv.some(
-        (arg) =>
-          arg === "--native-chat" ||
-          arg.startsWith("--native-chat-") ||
-          arg === "--user-data-dir" ||
-          arg.startsWith("--user-data-dir=")
-      );
-    let protectedLegacy: ProtectedRoots | undefined;
-    let locations: string[] | undefined;
-    const legacyLocations = () =>
-      (locations ??= legacyCandidates(
-        app,
-        realpathSync.native(app.getPath("temp"))
-      ));
-    const scope = NativeFirstProfile.open(
-      app.getPath("appData"),
-      () => (protectedLegacy ??= new ProtectedRoots(legacyLocations())),
-      {
-        supported,
-        allowBirth: !mediaOnly && supported && allowBirth,
-        hasLegacyInstall: () => legacyLocations().some(presentOrUnverified),
-      }
-    );
-    if (!scope || !protectedLegacy) return;
-    // A promotion can select its storage paths. The media launcher separately
-    // verifies completion before granting the sidecar access to those paths.
-    if (
-      mediaOnly &&
-      scope.mode !== "native" &&
-      (scope.mode !== "cutover" || !NativeFirstProfile.hasPromotion(scope))
-    )
-      throw invalidProfile();
-    app.setPath("userData", scope.browser);
-    app.setPath("sessionData", scope.browser);
-    app.setPath("temp", scope.temp);
-    app.setPath("documents", scope.projects);
-    admitted.set(app, protectedLegacy);
-    first = scope;
-    firstMediaOnly = mediaOnly;
-  }
-
-  export function firstSelected(): boolean {
-    return first !== undefined;
-  }
-
-  export function mediaOnly(): boolean {
-    return firstMediaOnly;
-  }
-
-  export function managedCutover(): boolean {
-    return first?.mode === "cutover";
-  }
-
-  export function beginPromotion(
-    promotion: NativeFirstProfile.Promotion
-  ): void {
-    if (!first) throw invalidProfile();
-    NativeFirstProfile.beginPromotion(first, promotion);
-  }
-
-  export function verifyPromotion(
-    promotion: NativeFirstProfile.Promotion
-  ): void {
-    if (!first) throw invalidProfile();
-    NativeFirstProfile.verifyPromotion(first, promotion);
-  }
-
-  export function managedCutoverControls(): readonly string[] {
-    return first && first.mode !== "native"
-      ? NativeFirstProfile.controlFiles(first)
-      : [];
-  }
 
   export function agentData(): string | undefined {
-    return first?.agent ?? process.env.GRIDA_AGENT_USER_DATA;
+    return process.env.GRIDA_AGENT_USER_DATA;
   }
 
   export function selected(): boolean {
     return (
-      first !== undefined ||
-      (process.argv.includes("--native-chat") &&
-        !process.argv.includes("--disable-agent") &&
-        (process.defaultApp === true ||
-          (typeof INSIDERS !== "undefined" && INSIDERS === 1)))
+      process.argv.includes("--native-chat") &&
+      !process.argv.includes("--disable-agent") &&
+      (process.defaultApp === true ||
+        (typeof INSIDERS !== "undefined" && INSIDERS === 1))
     );
   }
 
@@ -129,7 +43,6 @@ export namespace NativeDesktopProfile {
   export function ordinaryChat(): boolean {
     return (
       (process.platform === "darwin" || process.platform === "linux") &&
-      !first &&
       !process.argv.some(
         (arg) =>
           arg === "--disable-agent" ||
@@ -164,7 +77,6 @@ export namespace NativeDesktopProfile {
   }
 
   export function mediaRoot(): string | undefined {
-    if (first) return first.media;
     const agentData = process.env.GRIDA_AGENT_USER_DATA;
     return selected() && agentData && path.isAbsolute(agentData)
       ? path.join(path.dirname(agentData), "media")
@@ -174,32 +86,11 @@ export namespace NativeDesktopProfile {
   /** Shared live path denials for this admitted preview profile. */
   export function legacyRoots(app: Pick<App, "getPath">): ProtectedRoots {
     const roots = admitted.get(app);
-    if ((!first && !selected()) || !roots) throw invalidProfile();
+    if (!selected() || !roots) throw invalidProfile();
     return roots;
   }
 
   export async function configure(app: HostApp): Promise<Provider> {
-    if (first) {
-      const scope = NativeFirstProfile.open(
-        app.getPath("appData"),
-        () => legacyRoots(app),
-        {
-          supported: true,
-          allowBirth: false,
-        }
-      );
-      if (
-        !scope ||
-        scope.root !== first.root ||
-        scope.mode !== first.mode ||
-        app.getPath("userData") !== first.browser ||
-        app.getPath("sessionData") !== first.browser ||
-        app.getPath("temp") !== first.temp ||
-        app.getPath("documents") !== first.projects
-      )
-        throw invalidProfile();
-      return "gateway";
-    }
     const agentData = process.env.GRIDA_AGENT_USER_DATA;
     const browserData = app.commandLine.getSwitchValue("user-data-dir");
     if (
@@ -319,15 +210,6 @@ export namespace NativeDesktopProfile {
       roots.push(path.join(data, "grida"), path.join(data, "grida-insiders"));
     }
     return roots;
-  }
-
-  function presentOrUnverified(location: string): boolean {
-    try {
-      lstatSync(location);
-      return true;
-    } catch (error) {
-      return (error as NodeJS.ErrnoException).code !== "ENOENT";
-    }
   }
 
   async function checkDirectory(directory: string) {

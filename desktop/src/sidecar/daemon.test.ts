@@ -122,21 +122,4 @@ describe("Desktop daemon composition", () => {
       })
     ).rejects.toThrow("ordinary_native_chat_services_invalid");
   });
-
-  it("leaves files and recents to Main without enabling endpoints or chat", async () => {
-    const prepare = vi.fn<() => Promise<void>>();
-    await DesktopDaemon.create({
-      ...common,
-      agent: false,
-      retained_media_scope: true,
-      prepare_provider_custody: prepare,
-    });
-    expect(mocks.media).toHaveBeenCalledWith(
-      expect.objectContaining({
-        capabilities: { recent: false, files: false, workspaces: false },
-        endpoint_settings: false,
-        prepare_provider_custody: prepare,
-      })
-    );
-  });
 });

@@ -14,9 +14,7 @@ export namespace DesktopDaemon {
     password: string;
     user_data_path: string;
     provider_home?: string;
-    prepare_provider_custody?: () => Promise<void>;
     media_root: string;
-    retained_media_scope?: boolean;
     ordinary_native_chat_services?: boolean;
     workspace_catalog?: string;
     protected_file_roots?: readonly string[];
@@ -36,28 +34,15 @@ export namespace DesktopDaemon {
     }
     if (
       opts.ordinary_native_chat_services &&
-      (agent !== "native-chat" ||
-        opts.retained_media_scope ||
-        opts.workspace_catalog)
+      (agent !== "native-chat" || opts.workspace_catalog)
     )
       throw new Error("ordinary_native_chat_services_invalid");
-    if (
-      Boolean(opts.prepare_provider_custody) !==
-      Boolean(opts.retained_media_scope)
-    ) {
-      throw new Error("retained_media_custody_invalid");
-    }
-    if (
-      (opts.workspace_catalog && opts.agent !== "native-chat") ||
-      (opts.retained_media_scope &&
-        (opts.workspace_catalog || opts.protected_file_roots))
-    )
+    if (opts.workspace_catalog && opts.agent !== "native-chat")
       throw new Error("workspace_catalog_scope_invalid");
     const shared: MediaDaemonOptions = {
       password: opts.password,
       user_data_path: opts.user_data_path,
       provider_home: opts.provider_home,
-      prepare_provider_custody: opts.prepare_provider_custody,
       media_root: opts.media_root,
       projects_root: opts.projects_root,
       workspace_catalog: opts.workspace_catalog,
@@ -71,16 +56,13 @@ export namespace DesktopDaemon {
     };
     const { createMediaDaemon } = await import("@grida/agent/media-server");
     return createMediaDaemon(
-      opts.agent === "native-chat" || opts.retained_media_scope
+      opts.agent === "native-chat"
         ? {
             ...shared,
-            endpoint_settings: opts.agent === "native-chat",
+            endpoint_settings: true,
             capabilities: {
               recent: opts.ordinary_native_chat_services === true,
               ...(opts.workspace_catalog ? { workspaces: false } : undefined),
-              ...(opts.retained_media_scope
-                ? { files: false, workspaces: false }
-                : undefined),
             },
           }
         : shared

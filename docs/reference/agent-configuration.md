@@ -64,10 +64,7 @@ version. Unknown fields, unsupported versions, and invalid values are rejected.
 
 In Grida Desktop on macOS and Linux, quit Desktop and set
 `"input_counting": "llama.cpp"` on the saved endpoint in Desktop's endpoint
-file. On most installations it is `~/.grida/agent/endpoints.json`. If Desktop
-keeps its data in `~/Library/Application Support/Grida Native/`, as some
-Apple silicon Mac installations do, the file is
-`~/Library/Application Support/Grida Native/agent/retained-settings/endpoints.json`.
+file, `~/.grida/agent/endpoints.json`.
 This private file holds an array of endpoint entries. An entry can look like
 this.
 

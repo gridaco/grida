@@ -22,7 +22,5 @@ export default defineConfig({
   plugins: [gridaBundleGuard()],
   define: {
     INSIDERS: process.env.INSIDERS === "1" ? 1 : 0,
-    MANAGED_NATIVE_FIRST:
-      process.env.GRIDA_MANAGED_NATIVE_FIRST === "1" ? 1 : 0,
   },
 });

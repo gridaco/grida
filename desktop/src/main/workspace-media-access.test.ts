@@ -14,7 +14,6 @@ const host = vi.hoisted(() => ({
   paths: new Map<string, string>(),
   events: {} as EventEmitter,
   packaged: true,
-  managed: false,
   agent: "",
 }));
 
@@ -37,7 +36,6 @@ vi.mock("./media-root", () => ({
 vi.mock("./native-desktop-profile", () => ({
   NativeDesktopProfile: {
     selected: () => false,
-    firstSelected: () => host.managed,
     agentData: () => host.agent,
     resourcesPath: () => process.resourcesPath,
   },
@@ -120,9 +118,6 @@ it.runIf(
       host.packaged = false;
       expect(ordinarySelectedSvgFiles()).toBeDefined();
       host.packaged = true;
-      host.managed = true;
-      expect(ordinarySelectedSvgFiles()).toBeUndefined();
-      host.managed = false;
       const documents = ordinarySelectedSvgFiles()!;
       expect(nativeWorkspaceMedia()).toBeUndefined();
       const id = await documents.register(selected);

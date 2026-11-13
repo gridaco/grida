@@ -21,10 +21,7 @@ import {
   createChatGptOAuthCoordinator,
   type ChatGptOAuthCoordinator,
 } from "./chatgpt-oauth";
-import {
-  NativeAgentCutover,
-  type ExistingCutoff,
-} from "./native-agent-cutover";
+import { NativeChatStore } from "./native-chat-store";
 import type { NativeChatGptHost } from "./native-chatgpt-host";
 import { NativeChatProfiles } from "./native-chat-profiles";
 import type { NativeDesktopProfile } from "./native-desktop-profile";
@@ -102,7 +99,7 @@ export class NativeDesktopAgent {
   private profileWrites = Promise.resolve();
 
   private constructor(
-    private readonly cutover: NativeAgentCutover,
+    private readonly store: NativeChatStore,
     private readonly account: DesktopAccountSession,
     private readonly resourcesPath: string,
     private readonly subscription?: Subscription,
@@ -166,7 +163,7 @@ export class NativeDesktopAgent {
     options?: LaunchOptions
   ) {
     return this.compose(
-      await NativeAgentCutover.prepareFresh(),
+      await NativeChatStore.prepareFresh(),
       account,
       resourcesPath,
       options
@@ -180,7 +177,7 @@ export class NativeDesktopAgent {
     options: Pick<LaunchOptions, "openExternal" | "onLifecycle" | "chatTitles">
   ) {
     return this.compose(
-      await NativeAgentCutover.prepareOrdinary(protectedPaths),
+      await NativeChatStore.prepareOrdinary(protectedPaths),
       account,
       resourcesPath,
       { ...options, provider: "gateway", selectableProfiles: true },
@@ -188,22 +185,8 @@ export class NativeDesktopAgent {
     );
   }
 
-  static async prepareExisting(
-    account: DesktopAccountSession,
-    resourcesPath: string,
-    existing: ExistingCutoff,
-    options: LaunchOptions
-  ) {
-    return this.compose(
-      await NativeAgentCutover.prepare(existing),
-      account,
-      resourcesPath,
-      options
-    );
-  }
-
   private static async compose(
-    cutover: NativeAgentCutover,
+    store: NativeChatStore,
     account: DesktopAccountSession,
     resourcesPath: string,
     options?: LaunchOptions,
@@ -221,7 +204,7 @@ export class NativeDesktopAgent {
       subscription = { host, oauth };
     }
     return new NativeDesktopAgent(
-      cutover,
+      store,
       account,
       resourcesPath,
       subscription,
@@ -238,24 +221,8 @@ export class NativeDesktopAgent {
     );
   }
 
-  get hasLegacyChatArchive(): boolean {
-    return !this.closed && this.cutover.archive !== null;
-  }
-
   get documentIdentitiesDirectory(): string {
-    return this.cutover.documentIdentitiesDirectory;
-  }
-
-  async revealLegacyChatArchive(
-    reveal: (directory: string) => void
-  ): Promise<void> {
-    if (!this.hasLegacyChatArchive)
-      throw new Error("legacy_chat_archive_unavailable");
-    const generation = this.accountGeneration;
-    await this.cutover.revealLegacyChatArchive((directory) => {
-      if (!this.closed && generation === this.accountGeneration)
-        reveal(directory);
-    });
+    return this.store.documentIdentitiesDirectory;
   }
 
   current(workspaceId: string, profileId?: string) {
@@ -310,7 +277,7 @@ export class NativeDesktopAgent {
           workspaceId: workspace.id,
           root: workspace.root,
           identity: workspace.identity,
-          protected: this.cutover.protectedPaths,
+          protected: this.store.protectedPaths,
         });
         requireCurrent();
         return grant;
@@ -332,7 +299,7 @@ export class NativeDesktopAgent {
             workspaceId: workspace.id,
             root: workspace.root,
             identity: workspace.identity,
-            protected: this.cutover.protectedPaths,
+            protected: this.store.protectedPaths,
           },
           relativePath
         );
@@ -428,7 +395,7 @@ export class NativeDesktopAgent {
     return await this.withWorkspace(
       workspaceId,
       async (workspace, requireCurrent) => {
-        const directory = await this.cutover.workspaceDirectory(
+        const directory = await this.store.workspaceDirectory(
           workspace.id,
           workspace.root
         );
@@ -493,7 +460,7 @@ export class NativeDesktopAgent {
     check: () => void
   ): Promise<void> {
     check();
-    const directory = await this.cutover.workspaceDirectory(
+    const directory = await this.store.workspaceDirectory(
       workspace.id,
       workspace.root
     );
@@ -650,7 +617,7 @@ export class NativeDesktopAgent {
   ) {
     const publish = this.profileWrites.then(async () => {
       check();
-      await this.cutover.workspaceDirectory(workspace.id, workspace.root, true);
+      await this.store.workspaceDirectory(workspace.id, workspace.root, true);
       await NativeChatProfiles.remember(directory, profile, check);
     });
     this.profileWrites = publish.catch(() => {});
@@ -738,7 +705,7 @@ export class NativeDesktopAgent {
         return await use(workspace, requireCurrent);
       const identity = ordinaryDirectoryIdentity(workspace.root);
       if (
-        new ProtectedRoots(this.cutover.protectedPaths).overlaps(workspace.root)
+        new ProtectedRoots(this.store.protectedPaths).overlaps(workspace.root)
       )
         throw new Error("native_workspace_root_denied");
       const requireDirectoryCurrent = () => {
@@ -818,7 +785,7 @@ export class NativeDesktopAgent {
 
   private newOwners(): NativeWorkspaceAgents {
     const owners: NativeWorkspaceAgents = new NativeWorkspaceAgents(
-      this.cutover,
+      this.store,
       async (workspace, signal) => {
         const { provider, release } = await this.prepareProvider(signal);
         try {
@@ -886,7 +853,7 @@ export class NativeDesktopAgent {
     const workspaceConfiguration =
       this.selectableProfiles && !nestedProtectedPaths
         ? {
-            directory: await this.cutover.workspaceDirectory(id, root, true),
+            directory: await this.store.workspaceDirectory(id, root, true),
             epoch: this.configurationEpoch,
           }
         : undefined;
@@ -934,7 +901,7 @@ export class NativeDesktopAgent {
         },
         additionalReadRoots: [],
         protectedPaths: [
-          ...this.cutover.protectedPaths,
+          ...this.store.protectedPaths,
           ...(this.workspaceCatalogRoot ? [this.workspaceCatalogRoot] : []),
           ...(nestedProtectedPaths ?? []),
         ],

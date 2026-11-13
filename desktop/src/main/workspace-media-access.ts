@@ -1,4 +1,4 @@
-// GRIDA-SEC-004 / GRIDA-SEC-014 — packaged native media scope selection.
+// GRIDA-SEC-004 / GRIDA-SEC-014 — native file and media scope selection.
 import { app } from "electron";
 import path from "node:path";
 import { LegacyAgentPaths } from "./legacy-agent-paths";
@@ -24,8 +24,7 @@ export function ordinarySelectedSvgFiles(
 ) {
   if (
     !nativeFilePlatform() ||
-    (!identityDirectory && !process.argv.includes("--disable-agent")) ||
-    NativeDesktopProfile.firstSelected()
+    (!identityDirectory && !process.argv.includes("--disable-agent"))
   )
     return;
   const userHome = app.getPath("home");

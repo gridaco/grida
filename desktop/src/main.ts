@@ -9,20 +9,14 @@ import create_menu, {
   rebuild_application_menu,
 } from "./menu";
 import { open_document_window } from "./window";
-import { DEEP_LINK_SCHEME, EDITOR_BASE_URL, IS_INSIDERS } from "./env";
+import { DEEP_LINK_SCHEME, EDITOR_BASE_URL } from "./env";
 import {
   RUNTIME_APP_NAME,
   USE_DEV_INSIDERS_BRANDING,
   create_runtime_app_icon,
 } from "./branding";
 import {
-  assertCompatibilityChatSourceAvailable,
-  LegacyChatHandoffRequired,
   startAgentSidecar,
-  startRetainedMediaSidecar,
-  closeRetainedMediaSidecar,
-  hasCompletedMediaArchive,
-  revealCompletedMediaArchive,
   getAgentSidecarInfo,
   getAgentSidecarMode,
   stopAgentSidecar,
@@ -108,15 +102,6 @@ app.commandLine.appendSwitch("js-flags", "--expose-gc");
 // #endregion chrome flags
 
 app.setName(RUNTIME_APP_NAME);
-if (app.isPackaged && !IS_INSIDERS) {
-  try {
-    NativeDesktopProfile.prepareFirst(app, MANAGED_NATIVE_FIRST === 1);
-  } catch {
-    console.error("[grida] The managed Desktop profile could not be verified.");
-    // Waiting for ready would let Chromium initialize the default profile.
-    app.exit(1);
-  }
-}
 // GRIDA-SEC-005 / #955 — register this build's channel-specific deep-link scheme
 // (`grida-dev` for local builds, `grida` for production) so dev and an installed
 // production Grida don't fight over one scheme. On macOS the reliable, declarative
@@ -158,7 +143,6 @@ let nativeQuitDrain: Promise<void> | undefined;
 let nativeEditorMcp: NativeEditorMcpExport | undefined;
 let nativeExternalRuns: NativeExternalRuns | undefined;
 let nativeQuitReady = false;
-let archiveRevealGeneration = 0;
 const windowAdmission = {
   can_open: () => entryWindow?.isMain ?? false,
   admits: (window: BrowserWindow) => entryWindow?.ipcRoleFor(window) === "main",
@@ -168,25 +152,6 @@ const windowAdmission = {
       : open_handoff.isSupportedFile(filePath) &&
         nativeDocumentOwner(filePath) !== undefined,
   native_workspaces: () => nativeFileWorkspaces,
-  legacy_chat_archive: {
-    available: () =>
-      nativeDesktopAgent?.hasLegacyChatArchive ?? hasCompletedMediaArchive(),
-    reveal: async () => {
-      const owner = nativeDesktopAgent;
-      const generation = archiveRevealGeneration;
-      if (!entryWindow?.isMain) return;
-      const reveal = (directory: string) => {
-        if (
-          owner === nativeDesktopAgent &&
-          generation === archiveRevealGeneration &&
-          entryWindow?.isMain
-        )
-          shell.showItemInFolder(directory);
-      };
-      if (owner) await owner.revealLegacyChatArchive(reveal);
-      else await revealCompletedMediaArchive(reveal);
-    },
-  },
   register: (window: BrowserWindow) => {
     if (entryWindow) return entryWindow.registerSecondary(window);
     window.close();
@@ -409,8 +374,7 @@ async function openDocumentWindowForPath(filePath: string) {
     base_url: EDITOR_BASE_URL,
     doc_id: docId,
     native: owner !== undefined,
-    native_chat:
-      nativeDesktopAgent !== undefined || NativeDesktopProfile.mediaOnly(),
+    native_chat: nativeDesktopAgent !== undefined,
   });
   if (!entryWindow.registerSecondary(window)) {
     owner?.release(docId);
@@ -558,7 +522,6 @@ app.on("open-url", (event, url) => {
 // menu actions, and the file-handle path. The supervisor maintains
 // the live reference internally for restart-on-crash continuity.
 let agentSidecarInfo: AgentSidecarInfo | null = null;
-let strictRetainedMedia = false;
 let providerApprovalStarted = false;
 
 function approveConfiguredProviderEndpointsWhenReady(): void {
@@ -664,12 +627,11 @@ app.on("ready", async () => {
   const nativeProfile = NativeDesktopProfile.selected();
   const ordinaryNativeChat = NativeDesktopProfile.ordinaryChat();
   const nativeResources = NativeDesktopProfile.resourcesPath(app);
-  const nativeChatProfile = nativeProfile && !NativeDesktopProfile.mediaOnly();
   let externalProfile: string | undefined;
   try {
     externalProfile = NativeExternalRuns.launchProfile(
       process.argv,
-      nativeChatProfile
+      nativeProfile
     );
   } catch {
     dialog.showErrorBox(
@@ -679,26 +641,8 @@ app.on("ready", async () => {
     app.quit();
     return;
   }
-  strictRetainedMedia =
-    nativeProfile &&
-    app.isPackaged &&
-    process.platform === "darwin" &&
-    process.arch === "arm64";
-  // The managed delivery owner selects upgrades for every receipt-bound role,
-  // including the predecessor that still runs the legacy agent.
-  if (!nativeProfile && !NativeDesktopProfile.firstSelected()) {
-    try {
-      await assertCompatibilityChatSourceAvailable();
-    } catch {
-      dialog.showErrorBox(
-        "Grida chat storage is unavailable",
-        "Open this profile using the Desktop build selected for its chat handoff."
-      );
-      app.quit();
-      return;
-    }
-    updateElectronApp({ notifyUser: true });
-  }
+  // A disposable profile stays on the build it was launched to exercise.
+  if (!nativeProfile) updateElectronApp({ notifyUser: true });
 
   if (USE_DEV_INSIDERS_BRANDING && process.platform === "darwin") {
     app.dock?.setIcon(create_runtime_app_icon());
@@ -723,19 +667,17 @@ app.on("ready", async () => {
   if (nativeProfile) {
     try {
       const provider = await NativeDesktopProfile.configure(app);
-      const mcp = nativeChatProfile
-        ? await NativeMcpLaunch.configure(
-            process.argv,
-            app.getPath("userData"),
-            provider
-          )
-        : undefined;
+      const mcp = await NativeMcpLaunch.configure(
+        process.argv,
+        app.getPath("userData"),
+        provider
+      );
       workspaceCatalog = nativeWorkspaceCatalog();
       const catalog = workspaceCatalog;
       const documentWorkers = nativeWorkspaceMedia();
       const media =
         documentWorkers && new MediaStore(DesktopMediaRoot.current());
-      if (nativeChatProfile) {
+      {
         const options = {
           provider,
           mcp,
@@ -775,28 +717,13 @@ app.on("ready", async () => {
                 accept: "Send PNG",
               });
             },
-          selectableProfiles: strictRetainedMedia,
           chatTitles: true,
         };
-        nativeDesktopAgent = NativeDesktopProfile.managedCutover()
-          ? await NativeDesktopAgent.prepareExisting(
-              accountSession,
-              nativeResources,
-              {
-                requireDrainedClaim: true,
-                verifyWriterAdmission: async (identity, claimId) => {
-                  if (!claimId) return false;
-                  NativeDesktopProfile.beginPromotion({ ...identity, claimId });
-                  return true;
-                },
-              },
-              options
-            )
-          : await NativeDesktopAgent.prepareFresh(
-              accountSession,
-              nativeResources,
-              options
-            );
+        nativeDesktopAgent = await NativeDesktopAgent.prepareFresh(
+          accountSession,
+          nativeResources,
+          options
+        );
       }
       await workspaceCatalog.initialize();
       if (externalProfile) {
@@ -823,7 +750,7 @@ app.on("ready", async () => {
         privateFile: true,
       });
       agentSidecarClient.setWorkspaceCatalog(workspaceCatalog);
-      if (nativeChatProfile && process.argv.includes("--native-chat")) {
+      if (process.argv.includes("--native-chat")) {
         const catalog = workspaceCatalog;
         nativeEditorMcp = await NativeEditorMcpExport.start(
           process.argv,
@@ -845,16 +772,10 @@ app.on("ready", async () => {
       dialog.showErrorBox(
         externalProfile
           ? "External agent could not start"
-          : nativeChatProfile
-            ? "Chat could not start"
-            : "Files and media could not start",
+          : "Chat could not start",
         externalProfile
           ? "Check the private launch profile, registered workspace, and installed sandbox helper."
-          : !nativeChatProfile
-            ? "The managed file and media profile could not be verified."
-            : NativeDesktopProfile.managedCutover()
-              ? "Previous chats could not be verified for archiving."
-              : "Use a fresh Desktop profile with a separate Grida agent data directory."
+          : "Use a fresh Desktop profile with a separate Grida agent data directory."
       );
       app.quit();
       return;
@@ -920,7 +841,6 @@ app.on("ready", async () => {
       await authenticatedEntryReady;
     },
     clear_hosted_session: async () => {
-      archiveRevealGeneration += 1;
       nativeEditorMcp?.revoke();
       await Promise.all([
         agentSidecarClient.clearGridaGatewaySession(),
@@ -1035,11 +955,7 @@ app.on("ready", async () => {
   // approval UI—sit in front of the required Grida account entry flow.
   const sidecarStartup = (async (): Promise<boolean> => {
     try {
-      if (strictRetainedMedia) {
-        agentSidecarInfo = await startRetainedMediaSidecar();
-      } else {
-        agentSidecarInfo = await startAgentSidecar(workspaceCatalog?.directory);
-      }
+      agentSidecarInfo = await startAgentSidecar(workspaceCatalog?.directory);
       console.log(
         `[grida] agent sidecar ready on 127.0.0.1:${agentSidecarInfo.port}`
       );
@@ -1049,18 +965,10 @@ app.on("ready", async () => {
       markAuthenticatedEntryReady();
       return true;
     } catch (err) {
-      const handoff =
-        err instanceof LegacyChatHandoffRequired &&
-        NativeDesktopProfile.mediaOnly();
-      console.error(
-        "[grida] agent sidecar failed to start:",
-        handoff ? err.message : err
-      );
+      console.error("[grida] agent sidecar failed to start:", err);
       dialog.showErrorBox(
         "Grida couldn't start",
-        handoff
-          ? "Open the managed profile normally to finish or verify its chat handoff."
-          : "Grida's background service failed to start. Relaunch the app or report this issue."
+        "Grida's background service failed to start. Relaunch the app or report this issue."
       );
       app.quit();
       return false;
@@ -1161,7 +1069,7 @@ app.on("activate", () => {
 app.once("will-quit", () => {
   // A dirty window can cancel quit. Keep shared services available until
   // Electron confirms that all windows have closed.
-  if (!strictRetainedMedia) stopAgentSidecar();
+  stopAgentSidecar();
   disposeAllTerminals();
   void disposeAllWorkspaceWatches();
 });
@@ -1173,10 +1081,7 @@ app.on("will-quit", (event) => {
   }
   entryWindow?.beginShutdown();
   if (
-    (!nativeDesktopAgent &&
-      !nativeEditorMcp &&
-      !nativeExternalRuns &&
-      !strictRetainedMedia) ||
+    (!nativeDesktopAgent && !nativeEditorMcp && !nativeExternalRuns) ||
     nativeQuitReady
   )
     return;
@@ -1185,7 +1090,6 @@ app.on("will-quit", (event) => {
     nativeDesktopAgent?.close(),
     nativeEditorMcp?.close(),
     nativeExternalRuns?.close(),
-    strictRetainedMedia ? closeRetainedMediaSidecar() : undefined,
   ])
     .then((outcomes) => {
       if (outcomes.some((outcome) => outcome.status === "rejected"))

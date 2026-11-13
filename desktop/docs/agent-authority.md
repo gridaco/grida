@@ -23,8 +23,7 @@ lifetime. Native finite commands use their own scoped sandbox helpers.
 A socketless service sidecar retains files, workspaces, recents, provider
 settings and media. Main owns its authenticated loopback listener and transfers
 accepted sockets. Native Seatbelt or bubblewrap/seccomp confines this retained
-composition without direct destinations or socket creation. An admitted managed macOS profile can use the
-native retained-media launcher described below.
+composition without direct destinations or socket creation.
 
 The historical TypeScript chat runtime is absent from distributed entrypoints.
 Main is the retained sidecar's only spawner and selects only retained services.
@@ -278,8 +277,7 @@ Linux bind masks for absent protected paths use exclusively created owned
 mountpoints. Concurrent generations retain them until the last child closes.
 Cleanup checks identity, removes only empty unchanged nodes and leaves changed
 or pre-existing data alone. Abrupt host loss can leave empty mask nodes; they
-are never adopted as removable user data by a later launch. The narrow managed
-macOS retained-media launcher remains independent of ordinary services.
+are never adopted as removable user data by a later launch.
 
 ## Raw execution and extensions
 
@@ -338,51 +336,16 @@ that satisfies the credential-service boundary because they do not expose
 local file or process authority to the model. Missing local-agent containment
 does not authorize those local capabilities.
 
-## Legacy chat cutoff
+## Earlier chat data
 
-Existing-data preparation requires trusted evidence that legacy writers and
-their managed commands are quiescent. A retained exclusive SQLite connection
-backs up the historical database and holds its lock through archive
-verification. It then commits the verified archive ID together with a source
-schema version that the reviewed legacy openers refuse. The archive preserves
-the original schema and records any inputs already missing or unverifiable.
+Ordinary macOS and Linux Desktop keeps chat material from earlier releases in
+place and starts fresh native history in a separate store. The retained
+service sandbox denies the earlier chat database and session scratch. Desktop
+claims neither custody nor retirement of other installed versions. Current
+builds cannot start the earlier writer, and native startup failure never
+selects another chat engine.
 
-If startup is interrupted after the source commit, preparation verifies the
-archive named by the source seal before publishing its local receipt.
-Desktop publishes native readiness after the workspace process completes its
-ACP handshake and Main rechecks the seal and archive. Existing-data
-preparation refuses an absent source. Ordinary macOS and Linux Desktop instead
-keeps previous chat material in place and starts fresh native history in a
-separate store. It claims neither archival custody nor retirement of other
-installed versions. Current builds cannot start a historical writer; native
-startup failure never selects another chat engine.
-The seal relies on the historical forward-version check and requires a
-separate deployment boundary for unreviewed legacy writers.
-
-## Retained media process
-
-The admitted native chat profile in a packaged macOS arm64 app starts
-retained media under a deny-by-default Seatbelt policy. Trusted Main first
-seals the old writer through fresh-profile or managed archive admission.
-It supplies the packaged Electron executable, an
-isolated settings directory, the shared provider custody directory, the
-app-managed media directory, and a private temporary directory. The runtime
-and system libraries are read-only. Only Electron and the fixed macOS ACL
-reader can execute under the profile.
-
-The child inherits the existing framed provider pipes and one Node IPC
-channel for already-accepted sockets. Main still owns the daemon listener.
-The kernel denies direct listening and connections. The retained composition
-serves media and provider settings. It withholds file, workspace, recents,
-chat, and command routes. Main copies the admitted endpoint settings into
-the retained partition. The child asks Main to prepare the original provider
-custody on first credential access over its fixed private channel.
-
-The child acquires a kernel-backed writer lock in its private settings
-directory before loading providers or announcing readiness. A child that
-outlives Main keeps that lock until exit. Main joins the exact child and any
-admitted custody work before same-process replacement. Failure leaves the
-retained role unavailable for that launch.
+## Retained services
 
 Desktop uses the native retained-service launcher for ordinary
 services. Compatibility profiles use the sidecar for standalone document
@@ -426,13 +389,6 @@ Set `GRIDA_DESKTOP_TEST_NATIVE_RESOURCES` to the canonical packaged Resources
 directory containing `native-agent/grida-agent` and run
 `pnpm --dir desktop exec vitest run src/main/workspace-media-protocol.test.ts`
 to exercise the route with real Seatbelt workers on macOS arm64.
-
-The packaged native fixture uses synthetic provider responses and verifies
-retained media, shared custody, transferred sockets, and clean shutdown.
-Its kernel probe exercises denied direct network, unrelated file access,
-symlink traversal, and shell execution. To run the fixture, set
-`GRIDA_TEST_RETAINED_MEDIA_EXECUTABLE` to the packaged executable's absolute
-canonical path and run `pnpm --dir desktop exec vitest run src/sidecar/media-startup.test.ts`.
 
 Linux arm64 Node has a separate feasibility check for Node IPC and socket
 transfer under bubblewrap and native seccomp. A Linux Electron package and

@@ -7,7 +7,7 @@ import path from "node:path";
 import { PassThrough, Writable } from "node:stream";
 import { afterEach, expect, it, vi } from "vitest";
 import { NativeAgentChat } from "./native-agent-chat";
-import type { NativeAgentCutover } from "./native-agent-cutover";
+import type { NativeChatStore } from "./native-chat-store";
 import {
   NativeAgentProcess,
   NativeAgentTerminationPending,
@@ -105,16 +105,15 @@ function fixture() {
     model: "fixture",
   } as const;
   const workspace = { id: "workspace", root };
-  const cutover = {
+  const store = {
     startWorkspace: async (_id, options) => ({
       chat: await NativeAgentChat.start({ ...options, stateDirectory }),
       stateDirectory,
-      archive: null,
     }),
-  } satisfies Pick<NativeAgentCutover, "startWorkspace">;
+  } satisfies Pick<NativeChatStore, "startWorkspace">;
   const release = vi.fn<() => void>();
   const signals: AbortSignal[] = [];
-  const owners = new NativeWorkspaceAgents(cutover, async (_, signal) => {
+  const owners = new NativeWorkspaceAgents(store, async (_, signal) => {
     signals.push(signal);
     return { launch, release };
   });

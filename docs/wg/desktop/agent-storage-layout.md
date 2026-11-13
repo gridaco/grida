@@ -1,6 +1,6 @@
 ---
 title: Agent storage layout
-description: Which Desktop process keeps which files — the native agent host's chat state, the retained sidecar's registries and credentials, and the archive of the earlier chat store.
+description: Which Desktop process keeps which files — the native agent host's chat state, the retained sidecar's registries and credentials, and the chat store of earlier releases.
 keywords: [desktop, native agent host, agent-sidecar, storage, sqlite, userData]
 format: md
 tags:
@@ -42,10 +42,10 @@ Gateway grants are memory-only and never written to disk (`GRIDA-SEC-006`).
 ## The earlier chat store
 
 Desktop builds before native chat kept chats in a `sessions.db` beside the
-sidecar's files. On the first native launch, Desktop seals that store,
-preserves it read-only in a private archive, and records a checkpoint before
-native chat is admitted. The archive is never reopened as a live store; the
-File menu can reveal it after Main re-verifies it.
+sidecar's files, with session scratch under the system temporary directory.
+Native Desktop leaves both in place and starts fresh history in its own store.
+Nothing reopens them: the retained sidecar's sandbox denies them, and no
+current build can start their writer.
 
 ## Backups
 

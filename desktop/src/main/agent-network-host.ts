@@ -2,7 +2,6 @@
 // GRIDA-SEC-006 — transient scoped-GG transport, never account-session custody.
 // GRIDA-GG: token — destination-authorized requests through the private Chromium session.
 import { isIP } from "node:net";
-import { randomUUID } from "node:crypto";
 import { finished, Readable, type Writable } from "node:stream";
 import {
   app,
@@ -19,7 +18,6 @@ import type { NativeGatewayJobNetwork } from "./native-gateway-connection";
 
 const READY_TIMEOUT_MS = 15_000;
 const GRANT_ACK_TIMEOUT_MS = 5_000;
-const DRAIN_TIMEOUT_MS = 8_000;
 const MAX_CONCURRENT_REQUESTS = 32;
 const MAX_DISCARDED_UPLOADS = 32;
 const REQUEST_UPLOAD_TIMEOUT_MS = 30_000;
@@ -85,15 +83,6 @@ export class AgentNetworkHost {
     }
   >();
   private closed = false;
-  private readyObserved = false;
-  private custodyWork?: Promise<void>;
-  private drained = false;
-  private drain:
-    | (PromiseWithResolvers<void> & {
-        requestId: string;
-        timeout: NodeJS.Timeout;
-      })
-    | undefined;
   private readyResolve: ((port: number) => void) | null = null;
   private readyReject: ((error: Error) => void) | null = null;
 
@@ -103,8 +92,7 @@ export class AgentNetworkHost {
     private readonly authority: AgentNetworkAuthority,
     private readonly adapter: NetworkAdapter,
     private readonly onFatal: (error: Error) => void,
-    private readonly maxBufferedRequestBodyBytes = MAX_BUFFERED_REQUEST_BODY_BYTES,
-    private readonly prepareProviderCustody?: () => Promise<void>
+    private readonly maxBufferedRequestBodyBytes = MAX_BUFFERED_REQUEST_BODY_BYTES
   ) {
     this.writer = new AgentSidecarChannel.Writer(output);
     input.on("data", (chunk: Buffer | string) => {
@@ -127,16 +115,13 @@ export class AgentNetworkHost {
     output: Writable;
     authority: AgentNetworkAuthority;
     onFatal: (error: Error) => void;
-    prepareProviderCustody?: () => Promise<void>;
   }): Promise<AgentNetworkHost> {
     return new AgentNetworkHost(
       args.input,
       args.output,
       args.authority,
       AgentNetworkHost.electronAdapter(args.authority),
-      args.onFatal,
-      MAX_BUFFERED_REQUEST_BODY_BYTES,
-      args.prepareProviderCustody
+      args.onFatal
     );
   }
 
@@ -310,43 +295,8 @@ export class AgentNetworkHost {
 
   close(): void {
     if (this.closed) return;
-    if (!this.drain && !this.drained)
-      void this.writer.write({ v: 1, type: "shutdown" }).catch(() => undefined);
+    void this.writer.write({ v: 1, type: "shutdown" }).catch(() => undefined);
     this.fail(new Error("agent provider network stopped"), false);
-  }
-
-  /** Correlate sidecar cleanup on the inherited pipe. The supervisor joins exit separately. */
-  requestDrain(): Promise<void> {
-    if (this.drained) return this.custodyWork ?? Promise.resolve();
-    if (this.closed || !this.readyObserved)
-      return Promise.reject(new Error("agent_sidecar_drain_unverified"));
-    if (this.drain) return this.waitForCustody(this.drain.promise);
-    const requestId = randomUUID();
-    const pending = Promise.withResolvers<void>();
-    this.drain = {
-      ...pending,
-      requestId,
-      timeout: setTimeout(
-        () => this.fail(new Error("agent_sidecar_drain_timeout")),
-        DRAIN_TIMEOUT_MS
-      ),
-    };
-    for (const controller of this.requestControllers.values())
-      controller.abort();
-    void this.send({ v: 1, type: "shutdown", requestId }).catch((error) =>
-      this.fail(asError(error))
-    );
-    return this.waitForCustody(pending.promise);
-  }
-
-  private waitForCustody(drain: Promise<void>): Promise<void> {
-    return this.custodyWork
-      ? Promise.all([drain, this.custodyWork]).then(() => undefined)
-      : drain;
-  }
-
-  joinCustody(): Promise<void> {
-    return this.custodyWork ?? Promise.resolve();
   }
 
   private static electronAdapter(
@@ -402,18 +352,7 @@ export class AgentNetworkHost {
         const resolve = this.readyResolve;
         this.readyResolve = null;
         this.readyReject = null;
-        this.readyObserved = true;
         resolve(frame.port);
-        return;
-      }
-      case "shutdown.complete": {
-        const pending = this.drain;
-        if (!pending || pending.requestId !== frame.requestId)
-          throw new Error("agent sidecar shutdown acknowledgement changed");
-        clearTimeout(pending.timeout);
-        this.drain = undefined;
-        this.drained = true;
-        pending.resolve();
         return;
       }
       case "grant.applied": {
@@ -440,38 +379,9 @@ export class AgentNetworkHost {
       case "response.credit":
         this.onResponseCredit(frame);
         return;
-      case "custody.prepare":
-        this.onCustodyPrepare(frame.requestId);
-        return;
       default:
         throw new Error(`unexpected sidecar frame: ${frame.type}`);
     }
-  }
-
-  private onCustodyPrepare(requestId: string) {
-    const prepare = this.prepareProviderCustody;
-    if (
-      !prepare ||
-      !this.readyObserved ||
-      this.drain ||
-      this.drained ||
-      this.custodyWork
-    )
-      throw new Error("unexpected provider custody request");
-    this.custodyWork = Promise.resolve()
-      .then(async () => {
-        if (this.closed || this.drain || this.drained) return;
-        const ready = await prepare().then(
-          () => true,
-          () => false
-        );
-        if (!this.closed && !this.drain && !this.drained)
-          await this.send({ v: 1, type: "custody.result", requestId, ready });
-      })
-      .catch((error) => this.fail(asError(error)))
-      .finally(() => {
-        this.custodyWork = undefined;
-      });
   }
 
   private onRequestStart(frame: AgentSidecarChannel.RequestStartFrame): void {
@@ -599,7 +509,6 @@ export class AgentNetworkHost {
       return;
     }
     try {
-      if (this.drain || this.drained) throw deniedError();
       // Authorization at request.start limits what we buffer. Re-authorizing
       // against the current authority here makes revocation effective even if
       // a compromised sidecar holds an upload open across grant.update.
@@ -1001,11 +910,6 @@ export class AgentNetworkHost {
     this.readyReject?.(error);
     this.readyResolve = null;
     this.readyReject = null;
-    if (this.drain) {
-      clearTimeout(this.drain.timeout);
-      this.drain.reject(error);
-      this.drain = undefined;
-    }
     for (const controller of this.requestControllers.values())
       controller.abort();
     for (const response of this.active.values()) {
@@ -1023,7 +927,7 @@ export class AgentNetworkHost {
       pending.reject(error);
     }
     this.grantAcks.clear();
-    if (fatal && !this.drained) this.onFatal(error);
+    if (fatal) this.onFatal(error);
   }
 }
 

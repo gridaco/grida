@@ -147,26 +147,6 @@ export namespace AgentSidecarChannel {
   export type ShutdownFrame = Readonly<{
     v: typeof VERSION;
     type: "shutdown";
-    requestId?: string;
-  }>;
-
-  export type ShutdownCompleteFrame = Readonly<{
-    v: typeof VERSION;
-    type: "shutdown.complete";
-    requestId: string;
-  }>;
-
-  export type CustodyPrepareFrame = Readonly<{
-    v: typeof VERSION;
-    type: "custody.prepare";
-    requestId: string;
-  }>;
-
-  export type CustodyResultFrame = Readonly<{
-    v: typeof VERSION;
-    type: "custody.result";
-    requestId: string;
-    ready: boolean;
   }>;
 
   export type HostToSidecarFrame =
@@ -176,19 +156,16 @@ export namespace AgentSidecarChannel {
     | ResponseChunkFrame
     | ResponseEndFrame
     | ResponseErrorFrame
-    | CustodyResultFrame
     | ShutdownFrame;
 
   export type SidecarToHostFrame =
     | ReadyFrame
-    | ShutdownCompleteFrame
     | GrantAppliedFrame
     | RequestStartFrame
     | RequestChunkFrame
     | RequestEndFrame
     | RequestAbortFrame
-    | ResponseCreditFrame
-    | CustodyPrepareFrame;
+    | ResponseCreditFrame;
 
   export type Frame = HostToSidecarFrame | SidecarToHostFrame;
 
@@ -301,26 +278,7 @@ export namespace AgentSidecarChannel {
         expectInteger(frame.bytes, "bytes", 1, MAX_RESPONSE_CREDIT_BYTES);
         break;
       case "shutdown":
-        if ("requestId" in frame) {
-          expectExactKeys(frame, ["v", "type", "requestId"]);
-          expectIdentifier(frame.requestId, "requestId");
-        } else {
-          expectExactKeys(frame, ["v", "type"]);
-        }
-        break;
-      case "shutdown.complete":
-        expectExactKeys(frame, ["v", "type", "requestId"]);
-        expectIdentifier(frame.requestId, "requestId");
-        break;
-      case "custody.prepare":
-        expectExactKeys(frame, ["v", "type", "requestId"]);
-        expectIdentifier(frame.requestId, "requestId");
-        break;
-      case "custody.result":
-        expectExactKeys(frame, ["v", "type", "requestId", "ready"]);
-        expectIdentifier(frame.requestId, "requestId");
-        if (typeof frame.ready !== "boolean")
-          throw protocolError("invalid custody status");
+        expectExactKeys(frame, ["v", "type"]);
         break;
       default:
         throw protocolError(`unknown frame type: ${frame.type}`);

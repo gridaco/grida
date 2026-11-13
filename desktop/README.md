@@ -72,12 +72,6 @@ handshake reports those capabilities as unavailable. No chat database, skill
 discovery, scratch preparation or command authority is initialized.
 This is a host launch choice, not a renderer setting or fallback after failure.
 
-On packaged macOS arm64, `--disable-agent` reuses a verified existing managed
-native profile. Main keeps its file, workspace, and recent-file owners while
-the confined media sidecar uses the same media library and provider custody.
-Saved text-provider settings stay available to the next chat-enabled launch.
-An unfinished managed legacy handoff requires a normal launch.
-
 The separate media entry is an application adapter in the existing package.
 It establishes startup independence; Desktop still bundles the agent package.
 The independently usable model SDK is `@grida/ai`, which owns no HTTP routes,
@@ -136,8 +130,7 @@ durable media stays in the existing media library.
 
 The agent's commands use the separate Rust native sandbox helper and
 per-action permission scope. Neither command nor chat execution is owned by
-the retained sidecar, and its private channel has no command lane. The narrow managed macOS retained-media profile remains
-available independently of ordinary file/workspace services.
+the retained sidecar, and its private channel has no command lane.
 
 Windows retains its existing unwrapped file/media services with chat and local
 agent execution unavailable. Those services have no kernel confinement claim;
@@ -182,32 +175,14 @@ control receipts. The snapshot confirms suspension or cancellation, and
 Resume targets a verified pause. Reconnecting requires loading the session
 again before submitting or controlling work.
 
-The cold-start coordinator selects the non-chat sidecar before starting native
-chat. The source selects native workspace chat on ordinary macOS/Linux launches and
+Main fixes the native chat paths before the non-chat sidecar starts. It selects
+native workspace chat on ordinary macOS/Linux launches and
 selected SVG chat on macOS. They use a separate `native-chat` store and leave
 the previous chat database and scratch in place. Other editions can still
 modify their shared legacy data and settings. Workspace image placement and
 local image references are not available through this ordinary path. Native
 startup failures surface as errors; retained non-chat services keep their
 existing owners.
-
-A managed archival handoff verifies a private archive of the old database and
-its managed scratch before opening a separate native store. Interrupted startup
-can retry after checking that archive. This handoff requires shared-source writer
-custody across editions. Windows handoff requires ACL-aware verification.
-
-An approved managed macOS arm64 Stable build can enroll a fresh native profile.
-The build-time setting `GRIDA_MANAGED_NATIVE_FIRST=1` authorizes creating
-`Grida Native` under Electron's application-data directory. Creation requires
-the known legacy Desktop profiles, Grida home directories, and scratch paths
-to be absent. If any are present, startup keeps using the ordinary profile.
-A private receipt binds its browser, agent, media, project and temporary
-directories. Selector-aware Stable builds reopen the same profile on startup.
-The deployment owner delivers managed upgrades and keeps installed versions at
-or above the first version that understands the receipt. Ordinary profiles use
-the public updater. An invalid or incomplete managed profile stops startup
-before Electron initializes the ordinary browser profile. Enrollment starts an
-isolated Gateway profile.
 
 In the packaged native workspace pane, **Model connection** can start a new
 chat on an approved saved compatible endpoint and reopen its own saved chat
@@ -216,19 +191,6 @@ active context-limit setting applies to new inputs across its connections.
 Up to eight workspace and connection workers can be live per Desktop owner.
 Changing the viewed connection keeps previous workers and their work active.
 Desktop closes those workers on quit or account change.
-
-Existing managed archival receipts remain readable and verified. A successor
-can retry an already admitted handoff and reopen the separate native store.
-Current builds cannot create or launch the historical predecessor chat engine.
-An unverified or undrained source remains unavailable for managed promotion.
-The ordinary fresh-store handoff needs no archive and preserves previous data
-in place. These paths do not claim exclusion of other installed older editions.
-
-On macOS and Linux, Desktop refuses ordinary startup if the configured chat
-source has a handoff record or if Desktop cannot inspect its location. Open the
-profile with the build selected by the deployment owner to continue the handoff.
-The same restriction applies when starting ordinary Desktop with the agent
-disabled. An admitted native profile can still start its separate media service.
 
 For a disposable native chat run, launch a development or Insiders build
 with `--native-chat` and `--user-data-dir` set to a precreated owner-only
@@ -242,8 +204,7 @@ saves use a separate confined writer with the same fractional modification-time
 check and explicit force overwrite. Saves accept up to 64 MiB of UTF-8 and
 refuse to replace symbolic or hard links. Standalone documents, endpoint settings
 and media still use the retained sidecar.
-This profile requires an empty legacy chat source and defaults to the Grida
-account's Gateway connection.
+This profile defaults to the Grida account's Gateway connection.
 
 To give one workspace access to a trusted local MCP server in this disposable
 Gateway profile, put its bearer in `native-mcp.bearer` under `--user-data-dir`.

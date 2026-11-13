@@ -218,7 +218,6 @@ describe("retained service native scope", () => {
       a.mountpoint(target);
       b.mountpoint(target);
       a.release();
-      expect(RetainedServiceSandbox.ownsMountpoint(target)).toBe(true);
       expect(fs.existsSync(target)).toBe(true);
       b.release();
       expect(fs.existsSync(target)).toBe(false);

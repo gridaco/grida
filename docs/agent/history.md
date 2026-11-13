@@ -44,9 +44,7 @@ after you confirm.
 
 After an update, reopening a chat shows its saved messages and work without
 asking the model to repeat anything. Chats from earlier Desktop versions stay
-where they were and do not appear in the chat list. If **File → Show Previous
-Chat Archive** is present, choose it to open the saved copy in your file
-browser; Desktop checks the archive before opening its location.
+where they were and do not appear in the chat list.
 
 If chat is unavailable after an update, keep your application data in place,
 reinstall the current Desktop version, and restore the chat's original model

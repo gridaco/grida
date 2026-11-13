@@ -65,8 +65,8 @@ Feature status: [`docs/agent/features.md`](../../../docs/agent/features.md).
 - **Desktop chat state** lives under Electron `userData/native-chat/`
   (`workspaces/<key>/`, `documents/<key>/runtime/`), one SQLite
   `runtime.sqlite` per state directory with one owning process. The earlier
-  `sessions.db` is sealed into a read-only `chat-archive` at cutover; never
-  reopen it as a live store.
+  TypeScript `sessions.db` and its session scratch stay in place, denied to
+  the retained sidecar; never reopen them.
 - **Retained sidecar perimeter** (GRIDA-SEC-004): Main owns the loopback
   listener and transfers connected sockets; every route needs Basic Auth in
   the `Authorization` header (no query-string credential), plus Referer and

@@ -6,7 +6,6 @@ import { AgentNetworkPolicy } from "./agent-network-policy";
 import { AgentSidecarChannel } from "./agent-sidecar-channel";
 
 const BOOTSTRAP_TIMEOUT_MS = 5_000;
-const CUSTODY_TIMEOUT_MS = 12_000;
 const REQUEST_CHUNK_BYTES = 48 * 1024;
 const RESPONSE_CREDIT_BYTES = 128 * 1024;
 const MAX_CANCELLED_TOMBSTONES = 128;
@@ -40,10 +39,6 @@ export class AgentSidecarNetwork {
   private readonly writer: AgentSidecarChannel.Writer;
   private readonly pending = new Map<string, PendingResponse>();
   private readonly cancelled = new Set<string>();
-  private custody?: PromiseWithResolvers<void> & {
-    requestId: string;
-    timeout: NodeJS.Timeout;
-  };
   private grants: AgentSidecarChannel.NetworkGrant[] = [];
   private revision = -1;
   private bootstrapped = false;
@@ -51,8 +46,8 @@ export class AgentSidecarNetwork {
   private closed = false;
   private bootstrapResolve: ((value: Bootstrap) => void) | null = null;
   private bootstrapReject: ((error: Error) => void) | null = null;
-  private shutdownHandler: ((requestId: string | null) => void) | null = null;
-  private shutdownRequest: { id: string | null } | undefined;
+  private shutdownHandler: (() => void) | null = null;
+  private shutdownRequested = false;
   private shutdownDelivered = false;
   private fatalHandler: ((error: Error) => void) | null = null;
   private fatalValue: Error | null = null;
@@ -102,7 +97,7 @@ export class AgentSidecarNetwork {
     });
   }
 
-  onShutdown(handler: (requestId: string | null) => void): void {
+  onShutdown(handler: () => void): void {
     this.shutdownHandler = handler;
     this.deliverShutdown();
   }
@@ -118,32 +113,6 @@ export class AgentSidecarNetwork {
 
   async ready(port: number): Promise<void> {
     await this.send({ v: 1, type: "ready", port });
-  }
-
-  prepareProviderCustody(): Promise<void> {
-    if (!this.bootstrapped || this.closed || this.shutdownRequest)
-      return Promise.reject(new Error("provider_custody_unavailable"));
-    if (this.custody) return this.custody.promise;
-    const requestId = crypto.randomUUID();
-    const pending = Promise.withResolvers<void>();
-    this.custody = {
-      ...pending,
-      requestId,
-      timeout: setTimeout(
-        () => this.fail(new Error("provider_custody_timeout")),
-        CUSTODY_TIMEOUT_MS
-      ),
-    };
-    void this.send({ v: 1, type: "custody.prepare", requestId }).catch(
-      (error) => this.fail(asError(error))
-    );
-    return pending.promise;
-  }
-
-  async acknowledgeShutdown(requestId: string): Promise<void> {
-    if (!this.shutdownDelivered || this.shutdownRequest?.id !== requestId)
-      throw new Error("agent sidecar shutdown identity changed");
-    await this.send({ v: 1, type: "shutdown.complete", requestId });
   }
 
   close(reason = "agent network channel closed"): void {
@@ -347,18 +316,8 @@ export class AgentSidecarNetwork {
         if (this.ignoreCancelledResponse(frame)) return;
         this.onResponseError(frame);
         return;
-      case "custody.result":
-        if (this.custody?.requestId !== frame.requestId)
-          throw new Error("unexpected provider custody acknowledgement");
-        this.settleCustody(
-          frame.ready ? undefined : new Error("provider_custody_unavailable")
-        );
-        return;
       case "shutdown":
-        if (frame.requestId !== undefined && this.shutdownRequest)
-          throw new Error("duplicate identified sidecar shutdown");
-        this.shutdownRequest ??= { id: frame.requestId ?? null };
-        this.settleCustody(new Error("provider_custody_unavailable"));
+        this.shutdownRequested = true;
         this.deliverShutdown();
         return;
       default:
@@ -499,14 +458,14 @@ export class AgentSidecarNetwork {
 
   private deliverShutdown(): void {
     if (
-      !this.shutdownRequest ||
+      !this.shutdownRequested ||
       this.shutdownDelivered ||
       !this.shutdownHandler
     ) {
       return;
     }
     this.shutdownDelivered = true;
-    this.shutdownHandler(this.shutdownRequest.id);
+    this.shutdownHandler();
   }
 
   private async send(
@@ -519,7 +478,6 @@ export class AgentSidecarNetwork {
   private fail(error: Error): void {
     if (this.closed) return;
     this.closed = true;
-    this.settleCustody(error);
     this.bootstrapReject?.(error);
     this.bootstrapResolve = null;
     this.bootstrapReject = null;
@@ -529,15 +487,6 @@ export class AgentSidecarNetwork {
     this.cancelled.clear();
     if (this.fatalHandler) this.fatalHandler(error);
     else this.fatalValue = error;
-  }
-
-  private settleCustody(error?: Error) {
-    const pending = this.custody;
-    if (!pending) return;
-    this.custody = undefined;
-    clearTimeout(pending.timeout);
-    if (error) pending.reject(error);
-    else pending.resolve();
   }
 }
 

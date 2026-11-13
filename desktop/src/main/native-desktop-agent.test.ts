@@ -17,10 +17,8 @@ import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 
 const sidecar = vi.hoisted(() => ({
-  sealLegacyChatForColdStart:
-    vi.fn<
-      typeof import("./agent-sidecar-supervisor").sealLegacyChatForColdStart
-    >(),
+  selectNativeChat:
+    vi.fn<typeof import("./agent-sidecar-supervisor").selectNativeChat>(),
   nativeAgentSubscriptionSettings:
     vi.fn<
       typeof import("./agent-sidecar-supervisor").nativeAgentSubscriptionSettings
@@ -83,7 +81,7 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "desktop"),
-      scratchBase: path.join(base, "scratch"),
+      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -104,7 +102,7 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
         )
       );
       await fs.mkdir(secret, { recursive: true, mode: 0o700 });
-      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.selectNativeChat.mockReturnValue(source);
       sidecar.nativeAgentSubscriptionSettings.mockResolvedValue({
         userDataPath: source.userDataPath,
         network,
@@ -181,7 +179,7 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "desktop"),
-      scratchBase: path.join(base, "scratch"),
+      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -202,7 +200,7 @@ it.runIf(Boolean(resources) && process.platform === "darwin")(
         )
       );
       await fs.writeFile(path.join(root, ".canvas.json"), "{}");
-      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.selectNativeChat.mockReturnValue(source);
       sidecar.nativeAgentSubscriptionSettings.mockResolvedValue({
         userDataPath: source.userDataPath,
         network,
@@ -469,7 +467,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      scratchBase: path.join(base, "scratch"),
+      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -549,7 +547,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           (directory) => fs.mkdir(directory, { mode: 0o700 })
         )
       );
-      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.selectNativeChat.mockReturnValue(source);
       sidecar.listProviderEndpoints.mockImplementation(async () => [
         savedConfig,
       ]);
@@ -574,9 +572,9 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       const workspace = await workspaces.openSelected(root);
       sidecar.findWorkspace.mockImplementation((id) => workspaces.find(id));
       const { NativeChatProfiles } = await import("./native-chat-profiles");
-      const { NativeAgentCutover } = await import("./native-agent-cutover");
-      const cutover = await NativeAgentCutover.prepareFresh();
-      const directory = await cutover.workspaceDirectory(
+      const { NativeChatStore } = await import("./native-chat-store");
+      const store = await NativeChatStore.prepareFresh();
+      const directory = await store.workspaceDirectory(
         workspace.id,
         root,
         true
@@ -592,7 +590,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         },
         () => {}
       );
-      const { chat } = await cutover.startWorkspace(
+      const { chat } = await store.startWorkspace(
         workspace.id,
         {
           ...(await sidecar.nativeConfiguredEndpoint(config.id)),
@@ -603,7 +601,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
             id: workspace.id,
             primary: { id: "project", name: "Project", path: root },
             additionalReadRoots: [],
-            protectedPaths: [...cutover.protectedPaths],
+            protectedPaths: [...store.protectedPaths],
           },
         },
         oldId
@@ -791,7 +789,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      scratchBase: path.join(base, "scratch"),
+      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -850,7 +848,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           (directory) => fs.mkdir(directory, { mode: 0o700 })
         )
       );
-      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.selectNativeChat.mockReturnValue(source);
       sidecar.listProviderEndpoints.mockResolvedValue([]);
       sidecar.nativeBuiltInByok.mockRejectedValue(new Error("no saved key"));
       sidecar.listGatewayModels.mockResolvedValue([
@@ -1020,7 +1018,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      scratchBase: path.join(base, "scratch"),
+      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -1064,7 +1062,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
       const selected = await catalog.openSelected(parent);
       const one = await catalog.nestedDeck(selected.id, "Launch.canvas");
       const two = await catalog.nestedDeck(selected.id, "Sibling.canvas");
-      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.selectNativeChat.mockReturnValue(source);
       sidecar.forgetWorkspace.mockImplementation((id) => catalog.forget(id));
       sidecar.nativeConfiguredEndpoint.mockResolvedValue({
         provider: "openai-compatible",
@@ -1252,7 +1250,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      scratchBase: path.join(base, "scratch"),
+      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -1283,7 +1281,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32").each([
           source.providerHome,
         ].map((directory) => fs.mkdir(directory, { mode: 0o700 }))
       );
-      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.selectNativeChat.mockReturnValue(source);
       sidecar.nativeBuiltInByok.mockImplementation((id, modelId) =>
         NativeProviderSelection.builtInByok(id, modelId, {
           credentialHome: source.providerHome,
@@ -1418,7 +1416,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      scratchBase: path.join(base, "scratch"),
+      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "agent"),
       mediaRoot: path.join(base, "media"),
     };
@@ -1461,7 +1459,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         )
       );
       await seed("fixture-lineage");
-      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.selectNativeChat.mockReturnValue(source);
       sidecar.nativeAgentSubscriptionSettings.mockResolvedValue({
         userDataPath: source.userDataPath,
         network: { prepare },
@@ -1587,7 +1585,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      scratchBase: path.join(base, "scratch"),
+      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "providers"),
       mediaRoot: path.join(base, "media"),
     };
@@ -1658,7 +1656,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
           source.providerHome,
         ].map((directory) => fs.mkdir(directory, { mode: 0o700 }))
       );
-      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.selectNativeChat.mockReturnValue(source);
       sidecar.listProviderEndpoints.mockResolvedValue([]);
       sidecar.nativeBuiltInByok.mockImplementation((id, selected) =>
         NativeProviderSelection.builtInByok(id, selected, {

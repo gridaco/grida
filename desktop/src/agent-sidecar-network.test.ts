@@ -398,29 +398,6 @@ describe("AgentSidecarNetwork", () => {
     expect(shutdowns).toBe(1);
     harness.network.close();
   });
-
-  it("acknowledges only the exact identified shutdown delivered to the owner", async () => {
-    const harness = createHarness();
-    await harness.bootstrap();
-    const delivered = vi.fn<(requestId: string | null) => void>();
-    harness.network.onShutdown(delivered);
-    await harness.host.write({
-      v: 1,
-      type: "shutdown",
-      requestId: "requested",
-    });
-    expect(delivered).toHaveBeenCalledExactlyOnceWith("requested");
-    await expect(harness.network.acknowledgeShutdown("wrong")).rejects.toThrow(
-      "shutdown identity changed"
-    );
-    await harness.network.acknowledgeShutdown("requested");
-    expect(await harness.untilFrame("shutdown.complete")).toEqual({
-      v: 1,
-      type: "shutdown.complete",
-      requestId: "requested",
-    });
-    harness.network.close();
-  });
 });
 
 function createHarness(sidecarOutput: Transform = new PassThrough()) {

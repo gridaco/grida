@@ -14,10 +14,8 @@ import { NativeChatIpc } from "./native-chat-ipc";
 import { NativeWorkspaceCatalog } from "./native-workspace-catalog";
 
 const sidecar = vi.hoisted(() => ({
-  sealLegacyChatForColdStart:
-    vi.fn<
-      typeof import("./agent-sidecar-supervisor").sealLegacyChatForColdStart
-    >(),
+  selectNativeChat:
+    vi.fn<typeof import("./agent-sidecar-supervisor").selectNativeChat>(),
   nativeAgentGatewayConnection:
     vi.fn<
       typeof import("./agent-sidecar-supervisor").nativeAgentGatewayConnection
@@ -48,7 +46,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
     const source = {
       userDataPath: path.join(base, "agent"),
       desktopUserDataPath: path.join(base, "browser"),
-      scratchBase: path.join(base, "scratch"),
+      legacyScratch: path.join(base, "scratch"),
       providerHome: path.join(base, "agent"),
       mediaRoot: path.join(base, "media"),
     };
@@ -137,7 +135,7 @@ it.runIf(Boolean(resources) && process.platform !== "win32")(
         source.desktopUserDataPath,
         "gateway"
       );
-      sidecar.sealLegacyChatForColdStart.mockResolvedValue(source);
+      sidecar.selectNativeChat.mockReturnValue(source);
       const catalog = new NativeWorkspaceCatalog({
         browserData: source.desktopUserDataPath,
         projectsRoot: path.join(base, "projects"),

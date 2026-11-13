@@ -10,10 +10,9 @@
  * without importing a chat runtime. It uses `@grida/daemon`'s
  * perimeter and the same package-owned media adapters.
  *
- * The Desktop supervisor uses Electron-as-Node under its compatibility
- * native profile on macOS and Linux. The packaged retained-media launcher
- * uses an exact macOS Seatbelt profile and mounts only media and provider
- * settings. Both profiles scope filesystem access and direct networking.
+ * The Desktop supervisor uses Electron-as-Node under its native
+ * retained-service profile on macOS and Linux, which scopes filesystem access
+ * and direct networking.
  *
  * Electron-as-node means the runtime is Node, not the renderer
  * sandbox; no Electron APIs are available here, by design — the
@@ -30,8 +29,6 @@
  *                        --agent=disabled|native-chat
  *                          Host launch choice; disabled by default. Neither
  *                          composition loads chat scratch or skills.
- *                        --retained-media-scope=1
- *                          Private packaged media launcher without chat startup.
  *                        --protected-file-root=<absolute path>
  *                          Main-owned file/workspace denials, one per root.
  *                        --user-data=<absolute path>
@@ -53,7 +50,6 @@
 import path from "node:path";
 import { AgentSidecarNetwork } from "./agent-sidecar-network";
 import { AgentSidecarDaemonSockets } from "./agent-sidecar-daemon-sockets";
-import { RetainedMediaOwner } from "./retained-media-owner";
 
 // Stdout is the private framed channel. Package/runtime diagnostics use
 // console.log in several places, so redirect every stdout-backed console method
@@ -96,10 +92,9 @@ const agentMode = getCliArg("agent") ?? "disabled";
 const runtimeEditorBaseUrl = getCliArg("editor-base-url") ?? EDITOR_BASE_URL;
 // GRIDA-SEC-004 — the supervisor tells us whether it wrapped this spawn with
 // native confinement. Trusted: argv is set by the trusted main process, not the renderer.
-// Native-chat service settings require this attestation unless selected through
-// the separately confined retained-media launcher. Neither path owns commands.
+// Native-chat service settings require this attestation. The service owns no
+// commands.
 const sandboxEnforced = getCliArg("sandbox-enforced") === "1";
-const retainedMediaScope = getCliArg("retained-media-scope");
 const ordinaryNativeChatServices = getCliArg("ordinary-native-chat-services");
 const workspaceCatalog = getCliArg("workspace-catalog");
 if (
@@ -114,8 +109,7 @@ if (
   (ordinaryNativeChatServices !== "1" ||
     agentMode !== "native-chat" ||
     !sandboxEnforced ||
-    workspaceCatalog !== undefined ||
-    retainedMediaScope !== undefined)
+    workspaceCatalog !== undefined)
 ) {
   console.error("[agent-sidecar] fatal: invalid ordinary native chat services");
   process.exit(1);
@@ -128,7 +122,6 @@ const protectedFileRoots = process.argv
 if (
   protectedFileRoots.length > 0 &&
   (protectedFileRoots.length > 64 ||
-    retainedMediaScope !== undefined ||
     protectedFileRoots.some(
       (root) =>
         !path.isAbsolute(root) ||
@@ -137,13 +130,6 @@ if (
     ))
 ) {
   console.error("[agent-sidecar] fatal: invalid protected file root");
-  process.exit(1);
-}
-if (
-  retainedMediaScope !== undefined &&
-  (retainedMediaScope !== "1" || sandboxEnforced)
-) {
-  console.error("[agent-sidecar] fatal: invalid retained media scope");
   process.exit(1);
 }
 // GRIDA-SEC-004 — host-injected managed root for auto-created projects
@@ -179,9 +165,6 @@ async function main() {
     console.error("[agent-sidecar] fatal: missing or short bootstrap password");
     process.exit(1);
   }
-  if (retainedMediaScope === "1")
-    await RetainedMediaOwner.acquire(requiredUserDataPath);
-
   // Dynamic by design: no package top-level console output may run before
   // stdout is reserved for the framed channel above.
   const { DesktopDaemon } = await import("./sidecar/daemon");
@@ -189,12 +172,7 @@ async function main() {
     password,
     user_data_path: requiredUserDataPath,
     provider_home: providerHome,
-    prepare_provider_custody:
-      retainedMediaScope === "1"
-        ? () => network.prepareProviderCustody()
-        : undefined,
     media_root: requiredMediaRoot,
-    retained_media_scope: retainedMediaScope === "1",
     ordinary_native_chat_services: ordinaryNativeChatServices === "1",
     workspace_catalog: workspaceCatalog,
     protected_file_roots: protectedFileRoots.length
@@ -233,33 +211,25 @@ async function main() {
   }
 
   let stopping = false;
-  const shutdown = (signal: string, requestId: string | null = null) => {
+  const shutdown = (signal: string) => {
     if (stopping) return;
     stopping = true;
     console.log(`[agent-sidecar] shutdown (${signal})`);
     daemonSockets?.close();
-    const deadline = setTimeout(
-      () => process.exit(1),
-      requestId ? 8_000 : 1_000
+    const deadline = setTimeout(() => process.exit(1), 1_000);
+    void host.stop().then(
+      () => {
+        clearTimeout(deadline);
+        process.exit(0);
+      },
+      () => {
+        clearTimeout(deadline);
+        console.warn("[agent-sidecar] server close could not be verified");
+        process.exit(1);
+      }
     );
-    void host
-      .stop()
-      .then(async () => {
-        if (requestId) await network.acknowledgeShutdown(requestId);
-      })
-      .then(
-        () => {
-          clearTimeout(deadline);
-          process.exit(0);
-        },
-        () => {
-          clearTimeout(deadline);
-          console.warn("[agent-sidecar] server close could not be verified");
-          process.exit(1);
-        }
-      );
   };
-  network.onShutdown((requestId) => shutdown("host-shutdown", requestId));
+  network.onShutdown(() => shutdown("host-shutdown"));
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 }

@@ -45,115 +45,6 @@ describe("AgentNetworkHost", () => {
     expect(net.request).not.toHaveBeenCalled();
   });
 
-  it("correlates the shutdown acknowledgement and denies new dispatch during drain", async () => {
-    const fetch = vi.fn<() => Promise<Response>>();
-    const harness = createHarness({ fetch });
-    await harness.start();
-    const drained = harness.host.requestDrain();
-    expect(harness.host.requestDrain()).toBe(drained);
-    const shutdown = await harness.untilFrame("shutdown");
-    expect(shutdown.requestId).toEqual(expect.any(String));
-    await harness.sidecar.write({
-      v: 1,
-      type: "request.start",
-      requestId: "pending",
-      grantId: "provider:built-in",
-      method: "GET",
-      url: "https://openrouter.ai/api/v1/models",
-      headers: [],
-      hasBody: false,
-    });
-    await harness.sidecar.write({
-      v: 1,
-      type: "request.end",
-      requestId: "pending",
-      sequence: 0,
-    });
-    expect((await harness.untilFrame("response.error")).code).toBe("denied");
-    expect(fetch).not.toHaveBeenCalled();
-    await harness.sidecar.write({
-      v: 1,
-      type: "shutdown.complete",
-      requestId: shutdown.requestId!,
-    });
-    await drained;
-    harness.host.close();
-    expect(harness.fatal).not.toHaveBeenCalled();
-    expect(
-      harness.frames.filter((frame) => frame.type === "shutdown")
-    ).toHaveLength(1);
-  });
-
-  it("rejects an unrelated cleanup acknowledgement", async () => {
-    const harness = createHarness({ fetch: vi.fn<() => Promise<Response>>() });
-    await harness.start();
-    const result = harness.host.requestDrain();
-    const rejected = result.catch((error: unknown) => error);
-    await harness.untilFrame("shutdown");
-    await harness.sidecar.write({
-      v: 1,
-      type: "shutdown.complete",
-      requestId: "wrong",
-    });
-    expect(await rejected).toMatchObject({
-      message: "agent sidecar shutdown acknowledgement changed",
-    });
-    expect(harness.fatal).toHaveBeenCalledTimes(1);
-  });
-
-  it("refuses provider custody on an ordinary sidecar channel", async () => {
-    const harness = createHarness({ fetch: vi.fn<() => Promise<Response>>() });
-    await harness.start();
-    await harness.sidecar.write({
-      v: 1,
-      type: "custody.prepare",
-      requestId: "wrong-role",
-    });
-    expect(harness.fatal).toHaveBeenCalledWith(
-      new Error("unexpected provider custody request")
-    );
-    expect(harness.frames.some(({ type }) => type === "custody.result")).toBe(
-      false
-    );
-  });
-
-  it("joins admitted provider custody work at drain without acknowledging it late", async () => {
-    const preparation = Promise.withResolvers<void>();
-    const entered = Promise.withResolvers<void>();
-    const harness = createHarness({
-      fetch: vi.fn<() => Promise<Response>>(),
-      prepareProviderCustody: async () => {
-        entered.resolve();
-        await preparation.promise;
-      },
-    });
-    await harness.start();
-    await harness.sidecar.write({
-      v: 1,
-      type: "custody.prepare",
-      requestId: "current",
-    });
-    await entered.promise;
-    const observed = vi.fn<() => void>();
-    const drained = harness.host.requestDrain().then(observed);
-    const shutdown = await harness.untilFrame("shutdown");
-    await harness.sidecar.write({
-      v: 1,
-      type: "shutdown.complete",
-      requestId: shutdown.requestId!,
-    });
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    expect(observed).not.toHaveBeenCalled();
-    preparation.resolve();
-    await drained;
-    expect(observed).toHaveBeenCalledTimes(1);
-    expect(harness.frames.some(({ type }) => type === "custody.result")).toBe(
-      false
-    );
-    harness.host.close();
-    expect(harness.fatal).not.toHaveBeenCalled();
-  });
-
   it("bootstraps and updates control while authorized provider session setup is pending", async () => {
     const pending = Promise.withResolvers<void>();
     const setProxy = vi.fn<() => Promise<void>>(() => pending.promise);
@@ -1227,7 +1118,6 @@ describe("AgentNetworkHost", () => {
 function createHarness(adapter: {
   fetch: (url: string, init: RequestInit) => Promise<Response>;
   maxBufferedRequestBodyBytes?: number;
-  prepareProviderCustody?: () => Promise<void>;
 }) {
   const sidecarOutput = new PassThrough();
   const sidecarInput = new PassThrough();
@@ -1239,8 +1129,7 @@ function createHarness(adapter: {
     authority,
     adapter,
     fatal,
-    adapter.maxBufferedRequestBodyBytes,
-    adapter.prepareProviderCustody
+    adapter.maxBufferedRequestBodyBytes
   );
   return observeHarness(host, sidecarOutput, sidecarInput, authority, fatal);
 }

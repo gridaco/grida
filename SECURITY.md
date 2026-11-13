@@ -294,30 +294,10 @@ TOML owner, with one memory-only GG session and one catalogue per composition.
 The first provider access retires legacy API entries through GRIDA-SEC-014;
 subsequent reads never use that retired source.
 
-Packaged macOS arm64 can reuse an existing verified native profile for
-media-only startup. Main retains its native file, workspace, and recent-file
-owners and confines the media sidecar to its settings, custody, media, and
-temporary roots. A managed legacy handoff can select this role only after
-the native-ready checkpoint, retired writer claim, promotion, frozen source
-and archive have been verified. The supervisor repeats these checks before
-each launch. This role opens neither chat store and cannot admit an
-unfinished legacy profile.
-The [supervisor](desktop/src/main/agent-sidecar-supervisor.ts) selects the
-native retained-media launcher without loading the compatibility sandbox.
-Compatibility startup loads its sandbox before preparing scratch or spawning
-the child. [Startup fixtures](desktop/src/main/retained-media-startup.test.ts)
-verify that an unavailable compatibility sandbox leaves native admission
-independent and refuses the ordinary launch.
-On macOS and Linux, ordinary startup also refuses a legacy chat source whose
-handoff control path exists or cannot be inspected. Main checks before starting
-the public updater, and the supervisor checks before scratch cleanup and child
-launch, including retries. This stop applies to compatibility media-only startup
-as well. The deployment owner must still exclude earlier binaries and drain
-running workers before taking custody of the source.
-After an admitted handoff, the native File menu can reveal the exact retained
-archive. Main re-verifies the bound archive and checks current workbench
-admission before asking the OS to reveal it. The renderer receives no archive
-path or file access through this action.
+The [supervisor](desktop/src/main/agent-sidecar-supervisor.ts) loads its
+native sandbox before spawning the child. On macOS and Linux an unavailable
+sandbox refuses the launch; Windows keeps its explicitly unconfined non-agent
+services.
 
 Shared image, video, audio and 3D operations and provider HTTP belong to
 [`@grida/ai`](packages/grida-ai/README.md). The tenant supplies narrow key/token
@@ -784,7 +764,7 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   negotiate ACP on private pipes, bound frames and outstanding requests, and
   keep the child under ownership through EOF shutdown. Only projected error
   codes cross the process diagnostics boundary. Renderer authorization and
-  cutover are separate from this process contract.
+  chat store selection are separate from this process contract.
 - [Supervised provider HTTP](crates/grida-agent/src/supervised_provider.rs)
   and the [Desktop provider broker](desktop/src/main/native-provider-egress.ts)
   use a negotiated capability on the same private stdio connection. The
@@ -859,15 +839,15 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   remains unavailable to replacement. The
   [development profile](desktop/src/main/native-desktop-profile.ts) requires
   separate canonical browser and agent directories under an owner-only
-  temporary root. Existing legacy chat data or scratch refuses that launch.
+  temporary root outside every known earlier Desktop and Grida home location.
   The ordinary workspace-only launch uses a separate native chat store and
-  leaves the previous chat data in place. It refuses existing handoff markers,
+  leaves the previous chat data in place. It
   applies the established home-secret exclusions to native workspace grants,
   and captures and rechecks the registered directory identity across all live
   or starting connection workers. Ordinary root and nested Deck requests use
   the same path and frame validation as catalog-backed workspaces. The retained
-  service sandbox denies native chat and legacy chat/scratch paths while keeping
-  the ordinary Media owner available. Other editions can still write their own
+  service sandbox denies native chat and the earlier TypeScript agent's chat
+  database and session scratch while keeping the ordinary Media owner available. Other editions can still write their own
   legacy data or shared settings; this launch does not assert exclusive custody.
 - [Native chat IPC](desktop/src/main/native-chat-ipc.ts) is available to
   the current top-level workspace, verified deck, or selected SVG frame under
@@ -1025,7 +1005,7 @@ build-cleanup directory and retain the same fixed-path and binary validation.
   The connection fences transcript replay, live notification delivery, and
   side chat creation before revoking the deleted attachment. The transaction
   retires SQLite records and their execution identity. Authored files,
-  independently retained chats, and the legacy archive have separate custody.
+  and independently retained chats have separate custody.
   Desktop selects the chat through its exact frame attachment, checks the
   observed execution and catalog revisions, and requests Main-owned native
   confirmation. A lost reply reuses the confirmed request. A matching receipt
@@ -1316,14 +1296,6 @@ Today:
 - [Media server entry](packages/grida-ai-agent/src/media-server.ts), [shared host composition](packages/grida-ai-agent/src/media-host.ts), [media server tests](packages/grida-ai-agent/src/media-server.test.ts), and [built-entry isolation tests](packages/grida-ai-agent/src/media-server-isolation.test.ts) — the media composition mounts existing routes behind the daemon perimeter and receives the same narrow credential, provider-HTTP and media-persistence capabilities. It adds no query-string credential, native-provider route or command executor; endpoint-provider routes mount only when the host opts in. It is the only daemon tenant.
 - [Media tenant wiring tests](packages/grida-ai-agent/src/media-tenant-wiring.test.ts) — every generation route group receives the same host media service; music receives no BYOK store and the ElevenLabs groups receive no GG authority.
 - [Desktop composition](desktop/src/sidecar/daemon.ts) and [its tests](desktop/src/sidecar/daemon.test.ts) — select retained services before loading the server; their option types admit only disabled or native-chat service modes. Native OAuth lives in its dedicated host; no command executor is supplied to the retained service. The [supervisor tests](desktop/src/main/agent-sidecar-supervisor.test.ts) pin disabled-mode argv and the absence of scratch preparation while retaining the outer network fence.
-- [Legacy chat archive](desktop/src/main/legacy-chat-archive.ts) and [its fixtures](desktop/src/main/legacy-chat-archive.test.ts) preserve the legacy SQLite store and managed session scratch in a private verified archive. For retirement, one exclusive SQLite connection moves the source out of WAL, retains its lock through backup, and commits the archive ID with a schema version that known legacy openers refuse. The caller still establishes writer admission and command quiescence. The archive keeps the original schema and records missing or unverifiable inputs. A caller that attests a canonical historical SRT temp root and its quiescence can preserve the exact source-derived candidate under a separate archive path. Capture checks only that derived directory and copies only retained sessions. The receipt reports candidate-only matches and differing bytes. It follows no scratch aliases and reads no separate credential, workspace, or media roots. Existing Windows data requires an ACL-aware archive path before cutover.
-- The [legacy chat source lease](desktop/src/main/legacy-chat-source-lease.ts) records a canonical source and exact active generation in a private SQLite transaction before a cooperating writer can proceed. Unverified exit leaves that generation dirty until its owning supervisor verifies the drain. Retirement holds the same exclusion through archive verification, and retries reverify the recorded receipt. The caller supplies deployment evidence for legacy writer admission. Older binaries can bypass this protocol. The [lease fixtures](desktop/src/main/legacy-chat-source-lease.test.ts) exercise process exit, stale drain, and exclusion during retirement.
-- The [verified sidecar drain](desktop/src/main/agent-sidecar-supervisor.ts) withdraws the daemon endpoint, requires a matching cleanup acknowledgment on the inherited private pipe, and waits for the captured child to close cleanly. The sidecar channel has no command lane, so no generation can leave a host-spawned descendant behind. The [built sidecar fixture](desktop/src/sidecar/media-startup.test.ts) exercises the acknowledgment and exit with an actual legacy SQLite writer before lease retirement. This evidence covers that cooperating generation. Older writers require separate deployment evidence.
-- An isolated Main-owned legacy writer configures the private profile and sandbox
-  before claiming an unused source. Its [sidecar](desktop/src/agent-sidecar.ts)
-  withholds command and external ACP execution. The supervisor leaves an
-  unverified claim dirty, with no automatic restart. A clean receipt binds
-  only the exact source, scratch identity, and drained generation.
 - An admitted [native preview](desktop/src/main/native-desktop-profile.ts)
   excludes known legacy Grida homes, Desktop data and derived scratch from
   workspace and standalone document admission and the retained sidecar's read
@@ -1341,37 +1313,17 @@ Today:
   attach only its exact rootless chat and captured text selection; it receives
   no surrounding-directory or general filesystem authority. Disabled-agent
   startup retains its file-only behavior.
-- The [managed first profile](desktop/src/main/native-first-profile.ts) is an
-  owner-only directory with an exact receipt for its isolated data roots. Only
-  an explicitly enabled Stable build can create it. First-time native enrollment
-  probes the [known legacy locations](desktop/src/main/native-desktop-profile.ts)
-  before creating any directories. Existing or inaccessible locations leave
-  ordinary startup in place. An ineligible launch without a managed receipt
-  also uses its ordinary profile. Selector-aware Stable verifies an existing
-  receipt and the eligible launch before setting both Electron storage paths.
-  Unverified enrollment terminates before readiness. Managed deployment
-  enforces a selector-aware minimum version.
-- A historical explicitly provisioned macOS arm64 Stable predecessor enrolled an
-  isolated managed legacy profile with a version-2 receipt. This build only
-  reads such a receipt as a cutover profile; it never writes one or runs as the
-  predecessor. A selector-aware Stable successor requires the last acknowledged
-  generation under the source lease and durably records promotion before
-  archive work. Retry binds
-  that same source, scratch and claim to the retirement and archive. The
-  supervised sidecar is denied access to the promotion and ownership records.
-  The managed writer validates its private scratch root and preserves session
-  inputs across clean restarts. Ordinary legacy startup still sweeps scratch.
-  Managed deployment keeps competing applications out of the managed source.
-- The [Desktop cold-start coordinator](desktop/src/main/native-agent-cutover.ts) takes its source from the primary app's [sidecar supervisor](desktop/src/main/agent-sidecar-supervisor.ts). The supervisor seals itself before any legacy chat launch. Its [retained sidecar composition](desktop/src/sidecar/daemon.ts) provides media and configured endpoint settings without a chat or command tenant. Existing-data preparation requires trusted writer admission and refuses dirty claims, an absent source, or unfinished managed commands. Recovery reverifies the archive bound to the source seal and reconciles the shared retirement and local receipt. Each native store binds the selected workspace identity and canonical root in a private directory. Native readiness requires the ACP handshake and a fresh check of the source seal and archive. Stable and Insiders can share an ordinary legacy store under separate app locks. That shared store requires separate writer admission. [Fixtures](desktop/src/main/native-agent-cutover.test.ts) exercise refused admission, archive failure, interrupted publication, and workspace isolation with real native processes.
-- Historical scratch supplied to the coordinator must match the exact source
-  and primary scratch identities. The caller observes the historical child
-  temp and source-derived scratch directories and establishes command drain.
-  The cutoff binds both directory identities, including observed scratch
-  absence, and adds the candidate path to the native agent's protected roots.
-  Capture rejects a replacement or disappearance before publication. Once
-  retirement is recorded, retry verifies the published archive even if the
-  historical temp directory has since gone away.
-- On macOS existing-data preparation freezes the same source inode as owner-read-only after verifying its archive. The [archive owner](desktop/src/main/legacy-chat-archive.ts) changes mode through a pinned descriptor while the SQLite source guard still excludes writers. Restart verifies the mode and seal without reopening the source for writes. It refuses extended ACLs and WAL sidecars, and leaves a stable inert rollback journal untouched. If the seal was written before lease acceptance, recovery takes a fresh SQLite and scratch archive under the same exclusive guard. It preserves the prior archive and removes only known retirement metadata from the new copy. A writable source after lease acceptance still blocks readiness. Deployment owns admission for installed editions.
+- The [native chat store](desktop/src/main/native-chat-store.ts) takes its
+  path facts from the primary app's [sidecar supervisor](desktop/src/main/agent-sidecar-supervisor.ts),
+  which fixes them before any retained service starts. Its
+  [retained sidecar composition](desktop/src/sidecar/daemon.ts) provides media
+  and configured endpoint settings without a chat or command tenant. The store
+  lives under the browser profile apart from the agent data, provider home,
+  media root and earlier session scratch, and refuses state it did not record
+  or a store recorded for other profile paths. Each workspace store binds the
+  selected workspace identity and canonical root in a private directory.
+  [Fixtures](desktop/src/main/native-chat-store.test.ts) exercise refused
+  state, credential overlap and workspace isolation with real native processes.
 - The [native Plan regime](crates/grida-agent/src/host.rs) selects investigation tools under the existing read grants and keeps command, working-copy mutation, settings changes and timer tools out of the turn inventory. The durable input captures the regime. Queue edits and restart cannot widen Plan to Act. A Plan launch can observe or stop retained Act work and refuses to resume it. [Process tests](crates/grida-agent/tests/process/operating_regime.rs) cover captured authority through queue edit, restart and separate Act submission.
 - The native [turn summary](crates/grida-agent/src/acp/extensions/summaries.rs) requires a negotiated capability and an attached chat. It reads the exact settled turn and projects bounded plain text, tool disposition counts, unresolved counts, check statuses, whether independent review findings were collected, and provider-reported token subtotals in a fixed set of categories. Raw operations, arguments, child identities, provider state, and attempt-level usage attribution stay in the host.
 - [Native goal host](crates/grida-agent/src/host/goals.rs) binds goal tools to the exact session, reserved turn, and goal revision. The tools read captured goal metadata or record a proposal. Their grant cannot authorize workspace, command, or provider operations. Explicit goal acceptance retains the selected permissions and uses the ordinary queue and turn owner.
@@ -1445,34 +1397,6 @@ Today:
   The [process test](crates/grida-agent/tests/process/catalog.rs) verifies a
   tool-free title request and that a rename is never replaced.
 - [Desktop media startup proof](desktop/src/sidecar/media-startup.test.ts), [build fixture](desktop/src/sidecar/testing/media-startup-build.mjs), and [runtime guard](desktop/src/sidecar/testing/media-startup-guard.cjs) — actual Vite sidecar output, private framed provider/control traffic and main-transferred loopback sockets, with synthetic BYOK/GG responses and owned temporary state. Import/network tripwires and absent chat/scratch files test startup isolation; they are not an OS-sandbox, installed-app or provider integration certification.
-- The [packaged retained-media launcher](desktop/src/main/retained-media-launch.ts)
-  supplies canonical disjoint settings, credential, media, and temporary
-  roots to a macOS arm64 Seatbelt profile. The profile keeps the installed
-  runtime read-only and preserves the fixed private pipes and Node IPC socket.
-  After the previous settings writer retires, preparation binds the exact
-  source directory and copies only its bounded endpoint configuration into an
-  owner-only child of the agent data directory. The canonical provider store
-  remains under its own provider home, which can differ from agent data.
-  The child accesses only the retained settings and provider store within
-  those roots. Later endpoint deletions survive preparation retries.
-  [Settings fixtures](desktop/src/main/retained-media-settings.test.ts)
-  cover exact bytes, aliases, interruption, and source identity.
-  The first credential operation asks the current strict child’s private
-  [network host](desktop/src/main/agent-network-host.ts) to prepare shared
-  custody. Main checks the identities of the original agent data, provider
-  home and provider store before using the existing custody operation. The
-  fixed request and correlated result carry no path or key. A failed
-  preparation can retry through the original owner. Drain waits for admitted
-  custody work and suppresses a result after retirement.
-  The [media composition](desktop/src/sidecar/daemon.ts) withholds unrelated
-  routes under that launch scope. Main selects it after admitting a packaged
-  macOS arm64 native chat profile. The [child-held writer lock](desktop/src/retained-media-owner.ts)
-  refuses a second owner before providers or custody start and survives Main
-  loss until the exact child exits. The [supervisor](desktop/src/main/agent-sidecar-supervisor.ts)
-  joins that exit and admitted custody work before a replacement. Packaged
-  fixtures verify provider mediation, accepted-socket transfer, scope denials,
-  Main crash refusal, and clean drain. Ordinary services use their separate
-  native Seatbelt or bubblewrap/seccomp boundary.
 - The isolated native Desktop profile gives Main sole ownership of
   `recent.json` in its private browser directory. Its recents IPC uses the
   current authenticated top-level frame. Paths are remembered metadata and
@@ -1539,7 +1463,7 @@ Today:
 - The [native Open Recent menu](desktop/src/menu.ts) and [recent projects palette](editor/scaffolds/desktop/home/recent-projects-command.tsx)
   reopen a saved project through the existing catalog before navigating.
   After authenticated entry admission, native file and catalog opens can
-  proceed during a retained media restart. Compatibility-only opens still
+  proceed while the retained sidecar restarts. Other opens still
   require a live sidecar, and initial entry still waits for retained readiness.
   A replaced folder requires a fresh native picker selection. [Menu](desktop/src/menu.test.ts)
   and [Range](desktop/src/main/workspace-media-protocol.test.ts) fixtures
@@ -2430,7 +2354,7 @@ trusted merely because it is “local.”
 3. **Secret custody and race-safe persistence.** The selected credential owner
    performs code exchange, refresh, account lookup, and request-time injection.
    Standard Desktop uses the sidecar. The disposable native subscription
-   profile uses one Main-owned instance after the legacy source is sealed.
+   profile uses one Main-owned instance after Main fixes its native chat paths.
    OAuth remains in daemon `AuthStore`
    (`auth.json`, `0600`, atomic replacement). Updated macOS/Linux writers share
    a cross-process lock with API-key retirement under GRIDA-SEC-014, rereading
@@ -3666,7 +3590,7 @@ durable or discard unrelated OAuth records.
    protects the native state and additional custody paths. The profile path
    changes with its contents, so simultaneous launches with different
    selections cannot substitute one another's scope before startup.
-   The [Desktop cutover](desktop/src/main/native-agent-cutover.ts) refuses a
+   The [native chat store](desktop/src/main/native-chat-store.ts) refuses a
    native chat store that overlaps the selected credential home.
 
 8. **Credential continuity stays in private custody.** The native agent can
