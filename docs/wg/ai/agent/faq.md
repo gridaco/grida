@@ -317,31 +317,27 @@ preserves the facts it uses.
 
 #### Can the main agent re-prompt a finished subagent? Can parent and subagent have a multi-turn conversation?
 
-**No, by spec.** The RFC nails this on three fronts:
+**Yes.** A named subagent is a reusable conversation with its own identity,
+context, and work history. Finishing a work turn leaves it available for
+follow-up work within its retained lifetime.
 
-1. **Per-call spawn.** Every `task` MUST "create a child session row"
-   — there is no API to re-enter an existing child.
-2. **Subagent pools are host optimization, not protocol.** "Reusing a
-   long-lived subagent for many calls is a host optimization. The
-   protocol shape is per-call spawn."
-3. **No shared cross-session state at the guide level.** No DAGs, no
-   chains.
+- **Follow-up work reuses context.** A further assignment to the same child
+  starts a new turn on its existing conversation when it is idle, or is
+  explicitly queued or steered into it when it is busy.
+- **Information is separate from work.** Sending a message delivers context
+  for the child's next assignment without starting an idle child.
+- **Results stay attributed.** Each result identifies the work turn and
+  instructions it accounts for, so reusing a child cannot turn an older result
+  into evidence that a newer assignment finished.
+- **The parent stays responsible.** The main agent integrates the child's
+  result; the child works within the limits and permissions it was given.
 
-The child runs its loop to completion; the parent sees the final
-result (or the synthetic completion for background). The child
-cannot address the parent at all — even its caller-is-agent status
-is hidden unless the manifest sets `caller: "agent"`.
-
-**Pattern that approximates multi-turn:** multiple `task` calls,
-with context carried in each prompt. The "conversation" lives in
-the parent's loop; the child is stateless across calls.
+Which clients can create and address named subagents today is a product
+availability question; see the [feature catalog](../../../agent/features.md).
 
 See:
-[`subagents / the task tool`](./subagents.md#the-task-tool),
-[`subagents / implementor checklist`](./subagents.md#implementor-checklist),
-[`subagents / what this guide does not specify`](./subagents.md#what-this-guide-does-not-specify),
-[`subagents / awareness`](./subagents.md#awareness) for the
-`caller: "agent"` framing.
+[`experience / work with subagents`](./experience.md#work-with-subagents),
+[`master / delegation and verification`](./master.md#delegation-and-verification).
 
 ### Tools and filesystem
 

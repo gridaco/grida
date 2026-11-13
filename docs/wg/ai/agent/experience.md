@@ -321,7 +321,10 @@ run next**.
 Sending while a task is busy queues the request; the person does not choose a
 destination before sending. Each waiting request offers to send it into the
 current task instead, which is how a person steers. The request leaves the queue
-only when the current task has accepted it; if that fails, its text is kept.
+before it is offered to the current task, so it can never run twice. If the task
+refuses it, its text returns to the person as an unsent draft. That draft is
+held by the client until it is sent again; closing the client between the
+withdrawal and the refusal loses it.
 
 A queued request is immediately visible as waiting. It retains its place until
 the current task has settled and the queue is allowed to continue. The person can

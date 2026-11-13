@@ -1,10 +1,9 @@
 # Native sandbox proposal
 
-This document specifies the proposed srt replacement for the
-[Rust agent core](./rust-core-proposal.md). It selects a small first implementation
-and records the platform guarantees that still require executable evidence.
-Codex is the primary reference at `6107b9886c114702e5c1cfd1c1b54f7c48bfaf49`.
-Zed supplies a second comparison at `62682ebde9e70b8a77a95863a2b16e9d59bf65eb`.
+This document specifies native command confinement for the
+[Rust agent core](./rust-core-proposal.md). It selects a small first
+implementation and records the platform guarantees that still require
+executable evidence.
 
 ## Decision
 
@@ -18,38 +17,27 @@ validates that scope, establishes native restrictions, owns the launched process
 and returns lifecycle evidence. Product modes, approval decisions, provider
 credentials, model requests, and scheduling remain with their existing owners.
 
-Codex and Zed both have direct native enforcement. Their traced boundaries
-surround launched commands. A universal sandbox around the trusted agent host is
-an additional deployment choice. Grida's existing outer host-containment policy
-describes the current TS deployment. The native host chooses its hardening
+Confinement surrounds launched commands. Containing the trusted agent host
+itself is a separate deployment choice; the native host chooses its hardening
 profile independently while preserving raw-execution confinement and credential
-custody. [Codex launch transformation](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/sandboxing/src/manager.rs),
-[Zed sandbox](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/sandbox/src/sandbox.rs),
-[Current Grida host policy](../../../desktop/docs/agent-authority.md).
+custody. [Host authority policy](../../../desktop/docs/agent-authority.md).
 
-## Source comparison
+## Selected mechanisms
 
-| Concern          | Codex                                                       | Zed                                               | Proposed first implementation                               |
-| ---------------- | ----------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------- |
-| macOS            | Generated Seatbelt profile through `/usr/bin/sandbox-exec`  | Same underlying facility                          | Seatbelt with an explicit scope                             |
-| Linux            | Bubblewrap, namespaces, trusted inner helper, seccomp       | Bubblewrap, namespaces, inner validation, seccomp | One pinned helper and bubblewrap integration                |
-| Linux dependency | System bubblewrap with bundled fallback                     | Usable non-setuid system bubblewrap               | Host-selected trusted non-setuid build with required probes |
-| Raw networking   | Restricted proxy routing and additional modes               | Per-instance restricted proxy                     | Denied initially                                            |
-| Native Windows   | Legacy token/account backends and capability-gated MXC/PSEC | WSL integration                                   | Unavailable initially                                       |
-| Parent host      | Separate process hardening                                  | Trusted application                               | Independent host deployment policy                          |
+| Concern          | First implementation                                                                                  |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| macOS            | A generated deny-default Seatbelt profile with an explicit scope, run through `/usr/bin/sandbox-exec` |
+| Linux            | Bubblewrap namespaces, a trusted inner helper and seccomp                                             |
+| Linux dependency | A host-selected, trusted non-setuid bubblewrap build with required probes                             |
+| Raw networking   | Denied                                                                                                |
+| Native Windows   | Unavailable                                                                                           |
+| Parent host      | Independent host deployment policy                                                                    |
 
-These findings describe each project's implemented boundary. Zed's default broad
-read access is insufficient evidence
-for Grida's narrower credential and cross-session scope. Its external ACP server
-launch also follows a different path from its sandboxed terminal tools.
-[Codex Linux launcher](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/linux-sandbox/src/launcher.rs),
-[Zed Linux launcher](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/sandbox/src/linux_bubblewrap.rs),
-[Zed ACP transport](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/agent_servers/src/acp/transport.rs).
-
-The official Codex permission documentation confirms the current Seatbelt,
-bubblewrap/seccomp, and Windows backend distinctions. Concrete behavior in this
-proposal is checked against the pinned source above.
-[Codex enforcement documentation](https://learn.chatgpt.com/docs/permissions#how-enforcement-works).
+Broad default read access is insufficient for Grida's narrower credential and
+cross-session scope. External agent processes launched over ACP are confined
+like other commands; a separate, unconfined launcher is not acceptable.
+[bubblewrap](https://github.com/containers/bubblewrap),
+[seccomp(2)](https://man7.org/linux/man-pages/man2/seccomp.2.html).
 
 ## Ownership and package boundary
 
@@ -120,7 +108,7 @@ identities. The host resolves authorized secret values just before execution,
 keeping those values out of prepared-input fingerprints, journals, and logs.
 The same projection applies to hook commands and external-agent launchers.
 Permission-profile labels in the environment describe policy and confer no
-access. [Codex environment construction](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/core/src/exec_env.rs).
+access.
 
 The first command adapter supplies bounded complete execution. PTY interaction,
 later stdin, yield/poll handles, and processes retained after a turn require a
@@ -132,9 +120,7 @@ environment and designated setup descriptors. Payload environment travels as
 inert launch data and is installed for the final exec after confinement is active.
 Payload loader variables, startup hooks, and search paths cannot influence
 trusted setup. Cleaning these only inside a dynamically linked helper's entrypoint
-is too late. Codex's hardening source explicitly distinguishes its static Linux
-release binaries when discussing loader-variable cleanup.
-[Codex process hardening](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/process-hardening/src/lib.rs).
+is too late, because the loader has already read them.
 
 | Scope material               | Required meaning                                                                             |
 | ---------------------------- | -------------------------------------------------------------------------------------------- |
@@ -184,8 +170,7 @@ the absolute `/usr/bin/sandbox-exec` executable. Declare runtime reads and
 permitted process creation explicitly. Descendants inherit the restrictions.
 The profile denies raw network access and unauthorized Unix-socket/IPC paths.
 Environment cleanup and descriptor closure happen before the payload receives
-control. [Codex Seatbelt implementation](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/sandboxing/src/seatbelt.rs),
-[Codex base profile](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/sandboxing/src/seatbelt_base_policy.sbpl).
+control.
 
 Use a private process group for normal cancellation and worker reaping. Seatbelt
 inheritance establishes continuing confinement, while a descendant can escape
@@ -203,15 +188,12 @@ temporary filesystem. The trusted inner helper validates mounted identities,
 sets `no_new_privs`, installs seccomp, and then executes the payload.
 Its PID-namespace owner forwards cancellation and reaps descendants. Use
 `--die-with-parent` together with explicit parent-side termination and waiting.
-[Codex Linux stages](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/linux-sandbox/src/linux_run_main.rs),
-[Codex namespace construction](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/linux-sandbox/src/bwrap.rs).
 
 With networking denied, isolate the network stack and block socket families and
 syscalls that could reach privileged host IPC or bypass the network boundary.
 The supported architecture's seccomp policy covers Unix/VSOCK access, relevant
 `io_uring` paths, and process-inspection escape routes. Mount restrictions hide
 host service sockets. The exact syscall set is versioned implementation material.
-[Codex seccomp](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/linux-sandbox/src/seccomp.rs).
 
 Use a trusted, host-selected non-setuid bubblewrap executable with a declared
 supported version and architecture set. Bundling it or accepting a validated
@@ -220,10 +202,9 @@ required namespace operations work under the actual kernel and distribution
 policy. A missing binary, blocked user namespace, unsupported syscall policy,
 or incompatible mount behavior makes the requested profile unavailable.
 
-The first implementation omits system-version compatibility translations and
-legacy Landlock fallback. Current Codex rejects filesystem-restricted legacy
-Landlock execution because it cannot isolate privileged app-server sockets.
-[Codex legacy-policy rejection](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/linux-sandbox/src/linux_run_main.rs#L382).
+The first implementation omits system-version compatibility translations and a
+Landlock-only fallback, because filesystem rules alone cannot isolate privileged
+host sockets.
 
 ## Windows and WSL
 
@@ -233,17 +214,15 @@ candidate is MXC/PSEC with actual creation and per-feature probes, including
 read/write/deny semantics, inherited handles, network posture, and job lifetime.
 OS version detection alone is insufficient.
 
-Codex's MXC path avoids the legacy account, ACL, elevation, and provisioning
-subsystem. It currently accepts documented hard-link limitations and broader
-loopback networking than a proxy-only grant. These require separate evaluation
-against the requested scope. [Codex native Windows design](https://github.com/openai/codex/blob/6107b9886c114702e5c1cfd1c1b54f7c48bfaf49/codex-rs/mxc-sandbox/README.md).
+A candidate backend must also state its hard-link semantics and loopback
+networking reach, which can be broader than a proxy-only grant. These require
+separate evaluation against the requested scope.
 
 WSL2 may be selected explicitly as a Linux execution environment. Its identity,
 filesystem, executable, and network belong to that environment. Windows-drive
 mounts and interop bridges require their own isolation evidence before admission.
-A Windows command is never silently relocated to WSL. Zed documents WSL-specific
-filesystem limitations that reinforce this distinction.
-[Zed platform boundaries](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/docs/src/ai/sandboxing.md).
+A Windows command is never silently relocated to WSL, whose filesystem
+semantics differ from the native ones.
 
 ## Network and filesystem limits
 
@@ -259,7 +238,6 @@ locations with descriptors and verify the mounted object before payload exec.
 Canonical path strings alone leave a check-to-mount race. Protected locations
 that do not yet exist need an enforceable creation restriction or protected
 ancestor. Silently omitting a missing deny path is invalid.
-[Zed filesystem identity](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/sandbox/src/util/host_filesystem_location.rs).
 
 Path restrictions do not establish object confidentiality when the same bytes
 are reachable through an allowed hard-link alias. Each backend declares its
@@ -271,7 +249,6 @@ can require a separate filesystem view or separately held credentials.
 The host must also control later execution of writable project content by
 unsandboxed watchers, hooks, or language services. A tool sandbox cannot confine
 a different trusted process that subsequently executes the generated content.
-[Zed threat-model example](https://github.com/zed-industries/zed/blob/62682ebde9e70b8a77a95863a2b16e9d59bf65eb/crates/sandbox/README.md).
 
 ## Acceptance and lock boundary
 
