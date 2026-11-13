@@ -39,11 +39,11 @@ export namespace chat_vocabulary {
   };
 
   /**
-   * The initial query of a design search call: `initial_search_query`, or
-   * `query` in calls recorded before the rename. Anything else reads as empty.
+   * The initial query of a design search call: `initial_search_query`.
+   * Anything else reads as empty.
    */
   export function initialSearchQuery(input: unknown): string {
-    return only(input, "initial_search_query") || only(input, "query");
+    return only(input, "initial_search_query");
   }
 
   function only(input: unknown, key: string): string {
