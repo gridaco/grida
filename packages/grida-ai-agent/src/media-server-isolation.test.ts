@@ -326,10 +326,13 @@ registerHooks({ resolve(specifier, context, next) {
 } });
 for (const name of ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"])
   child[name] = () => deny("process");
+// Owner checks list ACL metadata of one or more owned paths in one call, each
+// the fixture root, inside it, or one of its ancestors. Mirrors Desktop's
+// media startup guard; this is the sole process allowance.
 child.execFile = (file, args, options, callback) => {
-  const root = fs.realpathSync(base), target = args?.[1];
-  const owned = typeof target === "string" && (target === root || target.startsWith(root + path.sep) || root.startsWith(target.endsWith(path.sep) ? target : target + path.sep));
-  if (!custodyEnabled || file !== "/bin/ls" || args?.length !== 2 || args[0] !== "-lde" || !owned ||
+  const root = fs.realpathSync(base);
+  const owned = (target) => typeof target === "string" && (target === root || target.startsWith(root + path.sep) || root.startsWith(target.endsWith(path.sep) ? target : target + path.sep));
+  if (!custodyEnabled || file !== "/bin/ls" || !Array.isArray(args) || args.length < 2 || args[0] !== "-lde" || !args.slice(1).every(owned) ||
     options?.env?.LC_ALL !== "C" || options?.env?.LANG !== "C" || Object.keys(options.env).length !== 2) deny("process");
   return executeFile(file, args, options, callback);
 };
