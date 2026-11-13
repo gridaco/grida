@@ -371,8 +371,9 @@ export class WorkspaceRegistry {
   }
 
   /**
-   * Lookup by canonical root path. Used by the agent runner to find
-   * the workspace the route handler already resolved by id.
+   * Lookup by canonical root path. Returns `null` when no allowed
+   * workspace is registered at that root — a host reopening a folder it
+   * remembers by path re-resolves the entry here before trusting it.
    */
   async findByRoot(root: string): Promise<Workspace | null> {
     await this.ensureLoaded();
