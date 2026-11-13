@@ -1,8 +1,7 @@
 ---
 title: Built-in subagents
-description: Grida's specialized internal agents (chat titles, context compaction, a future planner) — concrete bindings of the RFC's specialized-subagent pattern with their provider and cost discipline.
-keywords:
-  [agent, subagent, titler, compaction, planner, grida, specialized-subagent]
+description: Grida's specialized internal agents (chat titles and context compaction) — concrete bindings of the specialized-subagent pattern with their provider and cost discipline.
+keywords: [agent, subagent, titler, compaction, grida, specialized-subagent]
 format: md
 tags:
   - internal
@@ -13,9 +12,9 @@ tags:
 
 # Built-in subagents
 
-This page is the **Grida binding** of the agent RFC's specialized
-subagent pattern ([Master / delegation and verification](../agent/master.md#delegation-and-verification)).
-The RFC names the shape: an internal agent the runtime invokes with a
+This page is the **Grida binding** of the specialized subagent pattern
+([Master / delegation and verification](../agent/master.md#delegation-and-verification)).
+The master names the shape: an internal agent the host invokes with a
 constrained prompt and bounded cost. This page records what Grida runs and
 the product decisions for each.
 
@@ -26,11 +25,10 @@ provider.
 
 ## Catalog
 
-| Operation  | Status  | Triggers when                                                  | Output                                                  |
-| ---------- | ------- | -------------------------------------------------------------- | ------------------------------------------------------- |
-| Chat title | shipped | The first text request of an untitled chat is accepted         | The chat's catalogue label                              |
-| Compaction | shipped | Context nears the verified window (automatic) or the user asks | A bounded summary that replaces earlier context         |
-| Planner    | future  | Agent asks for plan/build workflow exit                        | A plan document the parent agent reads as a tool result |
+| Operation  | Triggers when                                                  | Output                                          |
+| ---------- | -------------------------------------------------------------- | ----------------------------------------------- |
+| Chat title | The first text request of an untitled chat is accepted         | The chat's catalogue label                      |
+| Compaction | Context nears the verified window (automatic) or the user asks | A bounded summary that replaces earlier context |
 
 ## Chat title
 
@@ -73,19 +71,14 @@ its recovery, it fails as an authority change instead of continuing elsewhere.
 **Outcome.** An installed summary replaces the covered records; every other
 outcome (stale, stopped, uncertain, failed, no change) leaves history intact.
 
-## Planner (future)
-
-Plan/build is the opinionated pattern specified in
-[Plan mode](../agent/mode-plan.md). Until it
-ships, agents that want a plan step use the locked `todo` tool inline.
-
 ## Adding a built-in subagent
 
 Bar: would every Grida agent want this, regardless of host environment? If
-yes, it is a built-in. Titling, compaction, and plan generation pass;
-canvas-specific extraction or form-builder helpers do not.
+yes, it is a built-in. Titling and compaction pass; canvas-specific extraction
+or form-builder helpers do not. Planning is an operating regime of the chat
+itself ([Plan mode](../agent/mode-plan.md)), not a built-in subagent.
 
-1. Confirm the RFC carries the pattern shape — if not, propose it to
+1. Confirm the master carries the pattern shape — if not, propose it to
    [Master / delegation and verification](../agent/master.md#delegation-and-verification) first.
 2. Add a row to the [catalog](#catalog) and a section here.
 3. State the cost bounds (input, output, timeout, tools) explicitly.

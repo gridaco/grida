@@ -34,7 +34,7 @@ current implementation evidence and earlier domain-tool proposals.
 | [Fundamental Tools (Grida binding)](./tools-fundamentals.md)          | How the locked-tool RFC ([`../agent/tools.md`](../agent/tools.md)) lands in Grida — virtual-fs adapter, in-canvas `bash`, the `view_image` perception extension ([`../agent/vision.md`](../agent/vision.md)), host wiring. |
 | [Canvas Tools](./tools-canvas.md)                                     | The canvas-only tool surface: scene-graph search and selection, specialized inserts, canvas exec / lint / format, resource lookup. Requires an active editor instance.                                                     |
 | [Image Tools](./tools-image.md)                                       | Image-generation tools: text-to-image and image-to-image, provider-agnostic abstraction, credit-aware operations, canvas-image-node integration.                                                                           |
-| [Built-in subagents](./agents-builtin.md)                             | Grida's specialized internal agents (chat titles and compaction today; planner future), with their provider and cost bounds.                                                                                               |
+| [Built-in subagents](./agents-builtin.md)                             | Grida's specialized internal agents (chat titles and compaction), with their provider and cost bounds.                                                                                                                     |
 
 ## See also
 

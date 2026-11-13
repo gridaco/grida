@@ -234,9 +234,9 @@ The contract stays honest about what is actually executed:
 - Expose timeout and truncation metadata so the model does not reason from incomplete or prematurely killed output as if it were complete.
 
 Security expectation: command execution must run under a real
-sandbox boundary. Grida's desktop binding wraps the agent host process
-under the reference sandbox (`srt`); see
-[`../agent/srt.md`](../agent/srt.md).
+sandbox boundary. Every command runs under execution confinement with its own
+authority set; see
+[execution authority](../agent/execution-authority.md#a4--raw-execution-is-capability-scoped-and-fail-closed).
 
 ### `view_image` (Grida extension)
 

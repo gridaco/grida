@@ -64,7 +64,5 @@ verification contract live beside the Desktop code in
 
 - [Execution authority](../ai/agent/execution-authority.md) — the principal,
   grant, route, and confinement model.
-- [Sandbox Runtime (`srt`)](../ai/agent/srt.md) — reference primitive and its
-  host-route/global-policy limits.
 - [Agent security](./agent-security.md) — the current `GRIDA-SEC-004` landing.
 - [Process model](./process-model.md) — the Desktop process roles.

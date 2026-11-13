@@ -103,14 +103,14 @@ state the task, success criteria, available capabilities, and resource allowance
 These pages specify one topic each. They defer to the three contracts above
 for every concept those contracts own.
 
-| Topic                         | Pages                                                                                                                                                                                              |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Environment and authority     | [Environments](./environments.md), [Execution authority](./execution-authority.md), [Permission policy](./permissions.md), [Workspaces](./workspace.md), [Retired sandbox backend study](./srt.md) |
-| Durable work and control      | [Turn authority](./turn-authority.md), [Lifecycle events](./events.md), [Hooks](./hooks.md)                                                                                                        |
-| Capability and context design | [Tools](./tools.md), [Tool design](./tool-design.md), [MCP and connectors](./mcp.md), [Visual perception](./vision.md), [Binary files](./binary.md), [Scratch](./scratch.md)                       |
-| Product behavior              | [Compositor](./compositor.md), [Plan mode](./mode-plan.md), [Triggers](./triggers.md), [Cost optimization](./cost-optimization.md)                                                                 |
-| Hosting                       | [Local daemon](./daemon.md)                                                                                                                                                                        |
-| Protocol and provider studies | [ACP integration](./acp.md), [ACP provider class](./acp-provider.md), [Codex provider profile](./acp-provider-codex.md), [Subscription provider](./chatgpt-subscription-provider.md)               |
+| Topic                         | Pages                                                                                                                                                                                |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Environment and authority     | [Environments](./environments.md), [Execution authority](./execution-authority.md), [Permission policy](./permissions.md), [Workspaces](./workspace.md)                              |
+| Durable work and control      | [Turn authority](./turn-authority.md), [Lifecycle events](./events.md), [Hooks](./hooks.md)                                                                                          |
+| Capability and context design | [Tools](./tools.md), [Tool design](./tool-design.md), [MCP and connectors](./mcp.md), [Visual perception](./vision.md), [Binary files](./binary.md), [Scratch](./scratch.md)         |
+| Product behavior              | [Compositor](./compositor.md), [Plan mode](./mode-plan.md), [Triggers](./triggers.md), [Cost optimization](./cost-optimization.md)                                                   |
+| Hosting                       | [Local daemon](./daemon.md)                                                                                                                                                          |
+| Protocol and provider studies | [ACP integration](./acp.md), [ACP provider class](./acp-provider.md), [Codex provider profile](./acp-provider-codex.md), [Subscription provider](./chatgpt-subscription-provider.md) |
 
 [Grida bindings](../grida/index.md) describe the existing product's concrete
 integration. They remain a separate reference for that implementation.

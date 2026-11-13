@@ -219,7 +219,7 @@ the host's filesystem MUST provide:
   path. The host owns cleanup and declares the retention bounds.
 - **Sandbox-aware**: the directory is bounded by whatever sandbox
   primitive the environment uses
-  ([`environments`](./environments.md), [`srt`](./srt.md)). Writes
+  ([`environments`](./environments.md), [execution authority](./execution-authority.md)). Writes
   outside it fail with the sandbox's usual `EPERM`.
 
 Two reasonable locations, each with trade-offs (the

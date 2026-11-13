@@ -179,7 +179,9 @@ MUST cover at least:
 
 - readable roots and mandatory sensitive-read denials;
 - writable roots and protected-write denials;
-- allowed network destinations, defaulting to none;
+- allowed network destinations, defaulting to none, with no ambient local bind
+  or loopback-connect authority — a runtime that needs one connection receives
+  that connected socket explicitly;
 - subprocess rules;
 - lifetime, cancellation, and output bounds; and
 - the credentials, if any, deliberately delegated to that principal.
@@ -500,8 +502,6 @@ routing while keeping agent authority confined.
 
 - [Runtime environments](./environments.md) — how the authority model lands in
   web, cloud, and computer hosts.
-- [Existing sandbox backend](./srt.md) — evaluated confinement capabilities,
-  limitations, and requirements for its replacement.
 - [Tools](./tools.md) — structured capability checks and the watchdog.
 - [MCP and Connectors](./mcp.md) — extension trust and per-tool permission
   policy.

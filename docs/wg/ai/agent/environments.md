@@ -1,6 +1,6 @@
 ---
 title: Runtime Environments
-description: The three runtime environments an agent can be hosted in — web (limited capabilities), cloud sandbox (ephemeral container/VM), and computer (the user's machine). How the locked tool set degrades and which capabilities each environment provides.
+description: The three environments an agent can be hosted in — web (a browser page), cloud sandbox (an ephemeral container or virtual machine), and computer (the user's machine) — and which capabilities, enforcement, and persistence each can honestly offer.
 keywords:
   [
     agent-system,
@@ -21,263 +21,145 @@ tags:
 
 # Runtime Environments
 
-An agent runs in **one of three environments**. The environment
-determines which capabilities the runtime can offer, how the
-sandbox is enforced, and how the locked tool set
-([Tools](./tools.md))
-degrades. Choosing the environment is the host's call; the agent
-sees only the capabilities the chosen environment exposes.
+An agent runs in one of three environments. The environment decides which
+capabilities a host can offer, what enforces their bounds, and where the
+session record lives. Choosing it is the host's decision; the agent sees only
+the capabilities offered for each step, as [Tools](./tools.md) describes.
+[Execution authority](./execution-authority.md) owns principals, grants, and
+routing in every environment.
 
-| Environment       | Where it runs                                      | Sandbox model                                 | Persistence           |
-| ----------------- | -------------------------------------------------- | --------------------------------------------- | --------------------- |
-| **Web**           | Inside a browser tab — the user's open page        | Browser's same-origin policy + CORS           | Transient (tab close) |
-| **Cloud sandbox** | Ephemeral container or micro-VM in a managed cloud | Container / VM isolation + outbound allowlist | Per-job lifetime      |
-| **Computer**      | The user's own machine (desktop host, IDE, CLI)    | OS-enforced raw execution                     | Local-first, durable  |
+| Environment   | Where it runs                                       | What bounds the agent                           | Session record             |
+| ------------- | --------------------------------------------------- | ----------------------------------------------- | -------------------------- |
+| Web           | A browser page                                      | The browser's origin policy                     | Whatever the host persists |
+| Cloud sandbox | An ephemeral container or virtual machine           | Container or VM isolation with an egress policy | Outside the sandbox        |
+| Computer      | The user's machine: a desktop app, IDE, or terminal | Host grants plus confinement for raw execution  | Local and durable          |
 
-Each environment is described below.
+Capabilities below use five categories: **files** (read and write), **raw
+execution** (commands and processes), **network** (outbound requests),
+**credentials** (provider and service custody), and **output** (streaming to a
+client).
 
 ## Web
 
-The agent runs inside a browser tab — typically as part of a single
-page application, embedded in a product UI, or in a web-based IDE.
+The agent runs inside a browser page, typically embedded in a product.
 
-**Capabilities offered.**
+| Capability    | Offered                                                                |
+| ------------- | ---------------------------------------------------------------------- |
+| Files         | Only through a host-provided virtual project; no general filesystem.   |
+| Raw execution | None.                                                                  |
+| Network       | Requests the browser permits under its origin and cross-origin policy. |
+| Credentials   | Only what the host deliberately exposes to the page; usually none.     |
+| Output        | Yes.                                                                   |
 
-| Capability    | Available?                                                                |
-| ------------- | ------------------------------------------------------------------------- |
-| `fs.read`     | **No** — the browser has no general filesystem.                           |
-| `fs.write`    | **No** — same.                                                            |
-| `shell.run`   | **No** — no shell, no subprocess.                                         |
-| `net.fetch`   | **Yes**, constrained by browser CORS + same-origin policy.                |
-| `secrets.has` | **Yes** if the host stores credentials in browser storage (with caution). |
-| `stream.send` | **Yes**.                                                                  |
-
-**Locked tool availability.**
-
-| Tool          | Web                                                                                   |
-| ------------- | ------------------------------------------------------------------------------------- |
-| `read`        | Not available unless the host exposes a virtual file API (e.g. an in-memory project). |
-| `write`       | Same.                                                                                 |
-| `edit`        | Same.                                                                                 |
-| `glob`        | Same.                                                                                 |
-| `grep`        | Same.                                                                                 |
-| `bash`        | **Not available.**                                                                    |
-| `todo`        | Available.                                                                            |
-| `task`        | Available (subagents share the same environment).                                     |
-| `question`    | Available.                                                                            |
-| `web_search`  | Available via a hosted provider.                                                      |
-| `web_fetch`   | Available, subject to CORS.                                                           |
-| `skill`       | Available (skills index discovered from the host's bundled or fetched skill set).     |
-| `tool_search` | Available.                                                                            |
-
-**Sandbox.** The browser is the sandbox. The agent cannot reach the
-user's filesystem, cannot spawn processes, cannot bind ports. Outbound
-HTTP is bounded by CORS. The agent's only escape is whatever surface
-the host explicitly exposes — typically a postMessage bridge to a
-trusted endpoint, or a virtual project the host maintains in memory.
-
-**Use cases.**
-
-- A product-embedded coding assistant operating on documents the
-  product already loaded.
-- An in-browser IDE with the project mounted into an in-memory virtual
-  filesystem (the host implements `fs.*` against that virtual FS).
-- A "discuss-and-recommend" agent that does not modify anything — pure
-  conversation + web search.
-
-**What this environment cannot do.**
-
-- Run arbitrary user code.
-- Interact with the user's installed tools, version control, or
-  package manager.
-- Persist data beyond the host's storage layer (which the host MUST
-  provide explicitly).
-
-**Persistence.** Browser storage (IndexedDB, localStorage) is the host's
-choice. The session store is durable only if the host writes it; a
-default web host SHOULD treat sessions as ephemeral unless it
-synchronizes to a server.
+The browser is the boundary. The agent reaches nothing the host does not expose
+through an explicit bridge. Work that needs real files, processes, version
+control, or installed tools does not belong here. A session is durable only if
+the host persists it, typically to a server.
 
 ## Cloud sandbox
 
-The agent runs in an ephemeral container or micro-VM provisioned by a
-cloud host. The container is created for the job, lives long enough to
-serve it, and is destroyed (or snapshotted) afterward.
+The agent runs in a container or virtual machine created for the job and
+discarded or snapshotted afterward.
 
-**Capabilities offered.**
+| Capability    | Offered                                                        |
+| ------------- | -------------------------------------------------------------- |
+| Files         | Within the container's writable mounts.                        |
+| Raw execution | Within the container.                                          |
+| Network       | Through an egress allowlist, a forward proxy, or default deny. |
+| Credentials   | Through the host's injection layer, scoped to the job.         |
+| Output        | Yes.                                                           |
 
-| Capability    | Available?                                                            |
-| ------------- | --------------------------------------------------------------------- |
-| `fs.read`     | **Yes**, scoped to the container's filesystem.                        |
-| `fs.write`    | **Yes**, scoped to the container's filesystem.                        |
-| `shell.run`   | **Yes**, scoped to the container.                                     |
-| `net.fetch`   | **Yes**, subject to an outbound allowlist or a forward proxy.         |
-| `secrets.has` | **Yes** via the cloud host's secret-injection layer (env vars, etc.). |
-| `stream.send` | **Yes**.                                                              |
-
-**Locked tool availability.** All locked tools are available; their
-scope is the container.
-
-**Sandbox.** The container or VM is the sandbox. Anything the agent
-does inside is bounded by the container's mounts, its netns, and its
-syscall filter. The host MUST configure the container so that:
-
-- The agent's `fs` capability scope matches the container's writable
-  mounts; nothing else is writable.
-- The agent's `net` capability scope is enforced by the container's
-  network policy (an allowlist, a forward proxy, or a default-deny
-  egress rule).
-- Privileged operations (mounting, raw sockets, ptrace) are denied.
-
-**Use cases.**
-
-- Hosted code review / refactoring / migration agents.
-- "Try this in a sandbox" CI-adjacent runners.
-- Multi-tenant agent services where each user's session gets its own
-  container.
-
-**Persistence.** Per-container. When the container exits, its
-filesystem is gone unless the host snapshots it. The session store
-SHOULD live outside the container so a re-spawned container can
-continue an interrupted session.
-
-**Recommended discipline.**
-
-- Treat the container as untrusted from the host's perspective; a
-  compromised agent that escapes the runtime's capability check is
-  still bounded by the container.
-- Snapshot the container's filesystem at user-message boundaries if
-  side-effect rewind ([Master / branching and editing history](./master.md#branching-and-editing-history))
-  is required.
-- Run one container per session to avoid cross-session interference.
-- Time-bound the container (idle timeout, max lifetime).
+The host configures the container so the agent's file scope equals its writable
+mounts, network scope equals its egress policy, and privileged operations are
+denied. The session record lives outside the container so a replacement can
+continue interrupted work. One container per session avoids interference, and
+idle and total lifetimes are bounded. Snapshotting at input boundaries supports
+[history branching](./master.md#branching-and-editing-history) that must also
+restore side effects.
 
 ## Computer
 
-The agent runs on the user's own machine — as a long-lived local daemon
-process, an IDE plugin, a CLI invocation, or any local process.
+The agent runs on the user's own machine as a long-lived host, an IDE
+extension, or a terminal program.
 
-**Capabilities offered.**
+| Capability    | Offered                                                                                        |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| Files         | Within the effective host-issued grant and the selected [permission preset](./permissions.md). |
+| Raw execution | Only through execution confinement.                                                            |
+| Network       | As a structured capability, or within an explicit destination grant on a host route.           |
+| Credentials   | In the host's private custody; never handed to raw execution unless deliberately delegated.    |
+| Output        | Yes.                                                                                           |
 
-| Capability    | Available?                                                                                  |
-| ------------- | ------------------------------------------------------------------------------------------- |
-| `fs.read`     | **Yes**, scoped by the effective host-issued grant and the selected host profile.           |
-| `fs.write`    | **Yes**, same scoping.                                                                      |
-| `shell.run`   | **Yes**, through one execution-confinement authority.                                       |
-| `net.fetch`   | **Yes**, only as a structured capability or within an explicit execution destination grant. |
-| `secrets.has` | **Yes** via the OS keychain or a local secrets file.                                        |
-| `stream.send` | **Yes**.                                                                                    |
+**Availability follows enforcement.** Each capability is offered only where the
+host can enforce its declared bounds. When the confinement backend is
+unavailable on a platform, commands, external agent runtimes, and extension
+runtimes that need it are withheld; structured file operations and inference
+keep their own requirements.
 
-**Tool availability.** Each capability is available only where the host can
-enforce its declared profile. An unavailable raw-execution backend withholds
-shell, external-runtime, and extension execution that requires it. Structured
-file operations and inference have their own requirements. If the deployment
-also requires whole-host containment, that requirement is checked separately.
-
-**Sandbox.** Raw commands, external agents, and extension runtimes require
-execution confinement. A deployment can add host containment for trusted
-in-process services. Any permitted connection uses a compatible host network
-route within its destination grant. An incompatible opaque client fails closed.
-See [Execution authority](./execution-authority.md).
-
-Native confinement is the current backend: a deny-default platform sandbox
-profile on macOS, and user, mount, PID, IPC and network namespaces with a
-syscall filter on Linux. Raw networking is denied, and native Windows raw
-execution is unavailable. Its platform backends satisfy these authority
-boundaries. The host supplies routing and transport trust, and concurrent
-executions retain independent grants. The
-[retired srt backend study](./srt.md) records the findings that informed it. The
-concrete platform choices and support boundary live in the
+**Raw execution.** Every agent-controlled process tree runs under one immutable
+authority set derived from the host and user ceiling, the declared
+requirements, and what the parent may delegate. Permission review can narrow
+that set; it cannot mint authority. The concrete platform mechanisms and their
+support boundary belong to the
 [native sandbox binding](https://github.com/gridaco/grida/blob/main/crates/grida-agent/docs/rust-sandbox.md).
 
-For `shell.run`, the host creates a confined process tree from the effective
-grant: the host/user ceiling ∩ declared requirements ∩ parent-delegable
-authority. The watchdog may narrow that result; it cannot mint authority
-([Permission policy](./permissions.md)). The trusted agent host
-uses its own authority and selected containment profile. Its provider calls use
-the host-service destination grant and transport.
+**Defense in depth.** Three independent layers:
 
-**Defense in depth.** Three layers:
+1. The host refuses an operation outside the step's offered capabilities and
+   grants.
+2. The permission policy decides whether the operation proceeds, asks, or is
+   denied.
+3. Operating-system confinement refuses anything the first two let through by
+   mistake.
 
-1. The runtime's capability check refuses out-of-scope arguments at
-   the API boundary.
-2. The watchdog inspects the call and may deny / ask.
-3. The OS sandbox refuses anything the runtime mis-let-through.
+**Host discipline.**
 
-Each layer is sufficient for its kind of failure; together they bound
-the agent.
+- One long-lived host per user owns session state and credential custody.
+- A per-launch credential protects the host's local interface, which is never
+  exposed to the network.
+- Host services, structured capabilities, extensions, and raw execution keep
+  separate authority paths.
+- An already-authorized destination is reached through the effective host
+  route. Removing a sandbox does not by itself provide proxy, proxy
+  authentication, or transport-trust compatibility.
 
-**Use cases.**
+The session record is a local durable store
+([Components / storage and recovery](./components.md#storage-and-recovery)).
+Synchronization, if added, is a layer above it.
 
-- Personal-productivity agents acting on the user's projects.
-- Developer-tool agents that need real shell, real version control,
-  real package managers.
-- Long-lived "always-on" assistants that survive across reboots.
+## Choosing and combining
 
-**Persistence.** Local-first, durable. The session store is a
-filesystem-resident database
-([Components / storage and recovery](./components.md#storage-and-recovery)). Sync, if added, is a layer above.
+| If the host is …                                      | Choose        |
+| ----------------------------------------------------- | ------------- |
+| A web product with no install footprint               | Web           |
+| A managed service running agents for many users       | Cloud sandbox |
+| A desktop app, IDE, or terminal on the user's machine | Computer      |
 
-**Recommended discipline.**
+A host MAY offer more than one — for example, a desktop product that runs work
+locally or in a hosted sandbox. A task's capability requirements stay the same;
+only what the environment can offer changes.
 
-- Run one daemon process per user; let it own all session state and
-  secrets.
-- Generate a per-launch credential for the host's IPC perimeter (HTTP
-  loopback / Unix socket / named pipe); do not expose the agent host to
-  the network.
-- Keep host services, structured capabilities, extensions, and raw execution on
-  separate authority paths. Enforce the selected host-containment profile and
-  apply execution confinement to every raw process tree the agent controls,
-  including external agents that own their own tool loop.
-- Resolve an already-authorized destination through the effective host network
-  route. Merely removing a network sandbox does not provide system proxy, PAC,
-  proxy-authentication, or transport-trust compatibility.
+## Invariants across environments
 
-## How a host picks
+- **Offered capabilities are the contract.** Each tool declares what it
+  requires, and the host refuses calls outside the step's grants.
+- **The permission policy applies everywhere**, even where the environment
+  forbids the underlying capability outright.
+- **The session model is the same.** Sessions, turns, and their records have
+  the same meaning wherever the work ran ([Components](./components.md)).
+- **Child tasks share their parent's environment** and receive derived grants,
+  never wider ones.
 
-The decision is mostly forced by product shape:
+## Not specified here
 
-| If the host is …                                  | Pick …        |
-| ------------------------------------------------- | ------------- |
-| A web app with no install footprint               | Web           |
-| A managed service running agents for many users   | Cloud sandbox |
-| A desktop / IDE / CLI installed on the user's box | Computer      |
-
-A host MAY straddle environments — for example, a desktop product
-that offers "run this locally" (Computer) and "run this in our cloud"
-(Cloud sandbox) for the same agent. The agent's capability
-requirements are constant across environments; only what the runtime
-exposes shifts.
-
-## Cross-environment invariants
-
-Regardless of environment:
-
-- **The capability surface is the contract.** Every tool's `requires`
-  is declared upfront, and the runtime refuses any out-of-scope call.
-- **The watchdog runs.** A pre-execute hook on every tool call is
-  available in every environment, even if the environment forbids
-  the underlying capability outright.
-- **The session shape is the same.** A session row from a web host is
-  inspectable next to a session row from a desktop host
-  ([Components / storage and recovery](./components.md#storage-and-recovery)).
-- **The streaming substrate is the same.** AI SDK v6 chunks regardless
-  of where the loop runs ([Components / inference](./components.md#inference)).
-- **Subagents share the parent's environment.** A subagent spawned in
-  a cloud sandbox runs in the same container; a subagent spawned in
-  the web environment is also a browser-side runner.
-
-## What this guide does not specify
-
-- **The container image, the VM bootstrap, or the cloud provider.**
-  Containerization is the host's choice (Docker, Firecracker,
-  gVisor, K8s, …). The guide specifies only the capability surface
-  the runtime exposes.
-- **The browser permission UI.** Browser-host UI for "this agent
-  wants to read clipboard / access file X" is the host's concern.
-- **OS-level sandbox flag tuning.** Specific seatbelt rules, landlock
-  layers, or AppContainer SIDs are implementation details.
+- Container images, virtual machine bootstrap, or the cloud provider.
+- The browser's permission prompts.
+- Platform sandbox profiles and their tuning.
 
 ## See also
 
-- [Tools](./tools.md) — per-tool detail and the result envelope.
+- [Execution authority](./execution-authority.md) — principals, grants, and
+  host routing.
+- [Permission policy](./permissions.md) — presets, approval, and protected
+  paths.
+- [Local daemon](./daemon.md) — the long-lived host on a computer.
