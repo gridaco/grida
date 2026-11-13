@@ -21,12 +21,22 @@ futures-util = "0.3"
 grida-agent-master = { path = "../grida-agent-master" }
 grida-auth = { path = "../grida-auth" }
 http-body-util = "0.1"
-hyper = { version = "1", default-features = false, features = ["http1", "server"] }
+hyper = { version = "1", default-features = false, features = [
+  "http1",
+  "server",
+] }
 hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
 png = "0.18"
 libc = "0.2"
-reqwest = { version = "=0.13.5", default-features = false, features = ["rustls", "stream", "system-proxy"] }
-rmcp = { version = "=3.9.0", default-features = false, features = ["server", "transport-streamable-http-server"] }
+reqwest = { version = "=0.13.5", default-features = false, features = [
+  "rustls",
+  "stream",
+  "system-proxy",
+] }
+rmcp = { version = "=3.9.0", default-features = false, features = [
+  "server",
+  "transport-streamable-http-server",
+] }
 serde = { version = "1", features = ["derive"] }
 serde_json.workspace = true
 sha2 = "0.11"
@@ -34,8 +44,19 @@ sse-stream = "=0.2.6"
 subtle = "2"
 tempfile = "3"
 toml_edit = "=0.25.15"
-tokio = { version = "1", features = ["io-std", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
-tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
+tokio = { version = "1", features = [
+  "io-std",
+  "io-util",
+  "macros",
+  "net",
+  "rt-multi-thread",
+  "signal",
+  "sync",
+  "time",
+] }
+tokio-tungstenite = { version = "=0.30.0", default-features = false, features = [
+  "handshake",
+] }
 uuid = { version = "1", features = ["v4"] }
 zeroize = "1"
 
