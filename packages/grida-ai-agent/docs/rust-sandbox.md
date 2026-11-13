@@ -1,15 +1,15 @@
-# Native sandbox proposal
+# Native sandbox
 
 This document specifies native command confinement for the
-[Rust agent core](./rust-core.md). It selects a small first
-implementation and records the platform guarantees that still require
-executable evidence.
+[Rust agent core](./rust-core.md) and records the platform guarantees each
+backend must evidence. The [`agent-kit-sandbox` README](../../../crates/agent-kit-sandbox/README.md)
+documents its launch sequence, platform requirements, and native fixtures.
 
 ## Decision
 
-Use one `agent-kit-sandbox` crate with private platform modules and one trusted
-helper entrypoint. Implement finite raw commands on macOS and Linux first.
-The initial raw network profile is denied. Native Windows raw execution remains
+One `agent-kit-sandbox` crate with private platform modules and one trusted
+helper executable confines finite raw commands on macOS and Linux. The raw
+network profile is denied. Native Windows raw execution is deferred: it remains
 unavailable until a separate backend meets the same requested profile.
 
 The adapter receives an immutable host-issued execution scope. It resolves and
@@ -24,7 +24,7 @@ custody. [Host authority policy](../../../desktop/docs/agent-authority.md).
 
 ## Selected mechanisms
 
-| Concern          | First implementation                                                                                  |
+| Concern          | Mechanism                                                                                             |
 | ---------------- | ----------------------------------------------------------------------------------------------------- |
 | macOS            | A generated deny-default Seatbelt profile with an explicit scope, run through `/usr/bin/sandbox-exec` |
 | Linux            | Bubblewrap namespaces, a trusted inner helper and seccomp                                             |
@@ -53,23 +53,10 @@ The crate depends on Core authority values and native process/OS libraries.
 It has no dependency on Runtime, Sessions, Electron, provider SDKs, or a database.
 The finite-command tool adapts its result to the existing tool outcome.
 
-```text
-agent-kit-sandbox/
-  src/
-    lib.rs
-    scope.rs
-    process.rs
-    macos.rs
-    linux.rs
-    helper.rs
-```
-
-These are proposed modules, with no scaffolding implied. The helper logic is
-linked into a host executable's private early-dispatch entrypoint or a small
-same-version installed executable. This choice follows packaging needs. The
-helper accepts only the validated internal launch protocol and never opens a
-public command service. Per-platform crates can wait for a real dependency or
-release boundary.
+The helper ships as the crate's same-version `agent-kit-sandbox-helper`
+executable, installed at an absolute path with a pinned SHA-256. It accepts
+only the validated internal launch protocol and never opens a public command
+service. Platform backends are private modules of the one crate.
 
 Helpers and bubblewrap use absolute deployment-owned paths, with version and
 integrity validation. They remain outside raw writable scopes or retain an
@@ -83,10 +70,10 @@ wrapper string that can be launched after discarding its guards.
 
 | Operation                      | Input                                                | Result                                                                                    |
 | ------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `Sandbox::probe`               | Requested native profile                             | Enforceable features or a typed unavailable reason on this host                           |
+| `Sandbox::probe`               | Requested native scope                               | Enforceable features or a typed unavailable reason on this host                           |
 | `Sandbox::prepare`             | Explicit process specification and host-issued scope | A single-use `PreparedProcess` retaining validated identities and setup resources         |
-| `PreparedProcess::spawn`       | The already prepared operation                       | `RunningProcess`, or a launch disposition stating what started and what remains uncertain |
-| `RunningProcess::request_stop` | Stop reason                                          | Idempotent request to stop the owned execution                                            |
+| `PreparedProcess::spawn`       | The prepared operation and a cancellation token      | `RunningProcess`, or a launch disposition stating what started and what remains uncertain |
+| `RunningProcess::request_stop` | None                                                 | Idempotent request to stop the owned execution                                            |
 | `RunningProcess::finish`       | Ownership of the running handle                      | Native exit, output, confinement, descendant, and cleanup evidence                        |
 
 The command tool calls `spawn` after Runtime admits its invocation and completes
@@ -110,9 +97,11 @@ The same projection applies to hook commands and external-agent launchers.
 Permission-profile labels in the environment describe policy and confer no
 access.
 
-The first command adapter supplies bounded complete execution. PTY interaction,
-later stdin, yield/poll handles, and processes retained after a turn require a
-separate adapter capability with an explicit owner and lifetime. A sandbox
+The command adapter supplies bounded complete execution. Trusted embedders can
+also use `PreparedProcess::spawn_streaming` for bidirectional stdio with a
+reviewed, digest-pinned system executable, which the confined external ACP peer
+uses. PTY interaction, yield/poll handles, and processes retained after a turn
+require a separate adapter capability with an explicit owner and lifetime. A sandbox
 launch handle alone does not establish that user-facing process-session contract.
 
 Trusted launchers, bubblewrap, and setup helpers start with a minimal host-owned
@@ -129,7 +118,7 @@ is too late, because the loader has already read them.
 | Protected locations          | Read-denied or write-denied subtrees whose restrictions must survive ancestor grants         |
 | Runtime locations            | Explicit interpreter, library, and system reads needed by the selected executable            |
 | Private temporary location   | Per-execution storage, separate from other sessions and host secrets                         |
-| Network posture              | Denied in the first implementation                                                           |
+| Network posture              | Denied                                                                                       |
 | Inherited descriptors        | Stdio and an explicit host-selected set, each within the scope                               |
 | Bounds and lifetime          | Deadline, output limit, cancellation ownership, and required descendant-termination strength |
 
@@ -174,16 +163,17 @@ control.
 
 Use a private process group for normal cancellation and worker reaping. Seatbelt
 inheritance establishes continuing confinement, while a descendant can escape
-that process group by creating a new session. The initial backend therefore
-cannot claim hard revocation of every hostile descendant. A profile requiring
+that process group by creating a new session. The backend therefore cannot
+claim hard revocation of every hostile descendant and refuses a required
+all-descendant guarantee. A profile requiring
 that guarantee remains unavailable until a stronger mechanism is demonstrated.
 If a descendant may still affect a shared resource, its ownership remains
-unresolved. [Current Grida lifecycle limit](../../../desktop/docs/agent-authority.md).
+unresolved. [Host lifecycle limit](../../../desktop/docs/agent-authority.md).
 
 ## Linux
 
-Use bubblewrap to construct the filesystem view and user, mount, PID, IPC, and
-network namespaces. Drop capabilities and create a private `/proc` view and
+Use bubblewrap to construct the filesystem view and user, mount, PID, IPC, UTS,
+and network namespaces. Drop capabilities and create a private `/proc` view and
 temporary filesystem. The trusted inner helper validates mounted identities,
 sets `no_new_privs`, installs seccomp, and then executes the payload.
 Its PID-namespace owner forwards cancellation and reaps descendants. Use
@@ -202,15 +192,15 @@ required namespace operations work under the actual kernel and distribution
 policy. A missing binary, blocked user namespace, unsupported syscall policy,
 or incompatible mount behavior makes the requested profile unavailable.
 
-The first implementation omits system-version compatibility translations and a
-Landlock-only fallback, because filesystem rules alone cannot isolate privileged
+The backend omits system-version compatibility translations and a Landlock-only
+fallback, because filesystem rules alone cannot isolate privileged
 host sockets.
 
 ## Windows and WSL
 
-Native Windows raw execution is unavailable in the first implementation.
-Structured host capabilities retain their own availability. The next native
-candidate is MXC/PSEC with actual creation and per-feature probes, including
+Native Windows raw execution is deferred and unavailable. Structured host
+capabilities retain their own availability. A native candidate backend is
+MXC/PSEC with actual creation and per-feature probes, including
 read/write/deny semantics, inherited handles, network posture, and job lifetime.
 OS version detection alone is insufficient.
 
@@ -226,10 +216,10 @@ semantics differ from the native ones.
 
 ## Network and filesystem limits
 
-The initial adapter provides denied raw networking. Provider calls, downloads,
-and other structured network operations use their separately authorized host
+The adapter provides denied raw networking. Provider calls, downloads, and
+other structured network operations use their separately authorized host
 capabilities. Commands needing network remain unavailable under this profile.
-A later `ProxyOnly` profile needs an attributable per-execution mediator,
+A `ProxyOnly` profile is deferred; it needs an attributable per-execution mediator,
 destination checks, OS-enforced reachability, and a Linux namespace bridge.
 Proxy environment variables alone cannot establish the boundary.
 
@@ -250,7 +240,7 @@ The host must also control later execution of writable project content by
 unsandboxed watchers, hooks, or language services. A tool sandbox cannot confine
 a different trusted process that subsequently executes the generated content.
 
-## Acceptance and lock boundary
+## Acceptance
 
 | Case                                                                  | Required evidence                                                                                                                                |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -264,11 +254,11 @@ a different trusted process that subsequently executes the generated content.
 | Two sessions run concurrently                                         | Grants, temporary storage, and native resources remain independent                                                                               |
 | A child daemonizes or outlives its root process                       | Descendant and shared-resource disposition remains explicit                                                                                      |
 | The owner crashes                                                     | Recovery retains uncertainty until termination or effective isolation is established                                                             |
-| A network-dependent command runs under the initial profile            | Direct networking remains denied                                                                                                                 |
+| A network-dependent command runs under the denied profile             | Direct networking remains denied                                                                                                                 |
 | Windows or WSL lacks a required guarantee                             | The affected raw execution is unavailable                                                                                                        |
 
-Lock the ownership, single-use launch, denied-network first profile, platform
-selection, and typed lifecycle evidence. Keep exact Rust signatures, helper
-packaging details, syscall lists, minimum tested OS versions, alias coverage,
-and stronger macOS revocation subject to implementation tests. Source review
-and policy-unit tests cannot substitute for native adversarial execution tests.
+The ownership, single-use launch, denied-network profile, platform selection,
+and typed lifecycle evidence are fixed contracts. Syscall lists, minimum tested
+OS versions, alias coverage, and stronger macOS revocation follow the native
+tests. Source review and policy-unit tests cannot substitute for native
+adversarial execution tests.

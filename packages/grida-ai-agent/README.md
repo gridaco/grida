@@ -282,7 +282,7 @@ crosses one of these is the wrong tool, not a missing feature.
   isolated to the node-only `providers/` layer: the BYOK key slots
   (OpenRouter → Vercel AI Gateway) plus ONE generalized OpenAI-compatible
   endpoint type (`{base_url, optional key, registered models}` — Ollama
-  is the preset; issue #806), and the narrowly configured native ChatGPT
+  is the preset), and the narrowly configured native ChatGPT
   subscription provider. Provider selection remains with the reviewed host
   adapters. There is no
   registry for arbitrary third-party providers — new hosted providers are
@@ -306,7 +306,7 @@ crosses one of these is the wrong tool, not a missing feature.
   Desktop's bridge contract.
 - **Not the host layer.** The loopback perimeter, daemon discovery, and
   the host capability routes (files, recents, workspaces, the secrets
-  store) live in `@grida/daemon` (#927). A non-AI host capability never
+  store) live in `@grida/daemon`. A non-AI host capability never
   lands here.
 - **Not a chat-history migration service.** Historical session, message and part
   row types remain in `session/rows.ts` for explicit archive readers. Importing
@@ -314,29 +314,33 @@ crosses one of these is the wrong tool, not a missing feature.
 
 ## Package Docs
 
-Package docs cover the current host contracts and the proposed Rust core.
+Package docs cover the retained host contracts and the native agent's Rust
+bindings.
 
 The [Agent Features catalog](https://github.com/gridaco/grida/blob/main/docs/agent/features.md)
-records current implementation coverage alongside the rebuilt product's feature
-promises and scope.
+records each feature's current behavior, intended outcome, caveats, and
+availability.
 
-- [Rust core proposal](./docs/rust-core.md) — proposed crate layout,
-  dependency graph, and public contracts for the fresh agent implementation.
+- [Rust agent core](./docs/rust-core.md) — crate map, dependency graph,
+  error model, and the cross-crate contracts of the native agent.
 - [Native executable and headless host](./docs/rust-core.md#native-executable-and-headless-host)
-  — the shared engine/server binary, unattended runs, and process-level testing
-  required before Desktop integration.
-- [Rust core pressure test](./docs/rust-core-pressure-test.md) — minimal-master
-  and durable-session walkthroughs, Grida feature checks, and proposed commitments.
-- [Tool-host contract](./docs/tool-host-contract.md) — concrete Rust/Electron
-  ownership, shared native/MCP capabilities, endpoint identity, domain-owned results, and invocation recovery.
-- [Configuration proposal](./docs/rust-config.md) — reviewed settings,
-  conversational inspection and changes, and the minimal host-owned TOML surface.
-- [Client protocol proposal](./docs/rust-client-protocol.md) — ACP-first clients,
+  — the shared engine/server binary, its subcommands, unattended runs, and
+  process-level testing.
+- [Rust core pressure test](./docs/rust-core-pressure-test.md) — coverage
+  model, regression obligations, and minimal-master and durable-session
+  walkthroughs.
+- [Tool-host contract](./docs/tool-host-contract.md) — Rust/Electron
+  ownership, shared native/MCP capabilities, endpoint identity, domain-owned
+  results, and invocation recovery.
+- [Host configuration](./docs/rust-config.md) — reviewed settings,
+  conversational inspection and changes, and the host-owned TOML surface.
+- [Client protocol](./docs/rust-client-protocol.md) — ACP-first clients,
   custom presentation, negotiated durable controls, and compatibility checks.
-- [Lifecycle hooks](./docs/rust-core.md#configured-lifecycle-hooks) —
-  configured checks and context contributions through existing execution contracts.
-- [Native sandbox proposal](./docs/rust-sandbox.md) — concrete srt
-  replacement, minimal launch contract, and native platform boundaries.
+- [Lifecycle hooks](./docs/rust-core.md#configured-lifecycle-hooks) — ordered
+  configured checks and context contributions through existing execution
+  contracts.
+- [Native sandbox](./docs/rust-sandbox.md) — native command confinement, its
+  launch contract, and platform boundaries.
 - [DaemonServer](../grida-daemon/docs/daemon-server.md) — lifecycle,
   ownership, and what hosts must provide (`@grida/daemon`).
 - [HTTP access](../grida-daemon/docs/http-access.md) — Basic Auth, CORS, and
@@ -344,20 +348,18 @@ promises and scope.
 - [Sandbox policy](./docs/sandbox-policy.md) — the composed sandbox intent
   (daemon frame + this tenant's AI upstream hosts).
 - [ChatGPT subscription provider](./docs/chatgpt-subscription-provider.md) —
-  host configuration, private OAuth routes, credential lifecycle, model
-  mapping, provider-resolution behavior, and the active Desktop security
-  binding.
+  the subscription host, private OAuth routes, credential lifecycle, native
+  model mapping, and the Desktop security binding.
 
 The wider architecture lives in the working-group docs:
 
-- [Desktop (WG)](../../docs/wg/desktop/index.md) — one host binding for
-  the daemon, including renderer bridge, GRIDA-SEC-004, storage, and sandbox
-  wrap details.
-- [Agent system RFC](../../docs/wg/ai/agent/index.md) — the abstract
-  contract this implements (protocol, locked tools, sessions, capability
-  surface).
-- [Grida bindings](../../docs/wg/ai/grida/index.md) — how the locked
-  tools and built-in subagents land in Grida.
+- [Desktop (WG)](../../docs/wg/desktop/index.md) — the Desktop host binding,
+  including the renderer bridge, GRIDA-SEC-004, storage, and process
+  confinement.
+- [Agent system](../../docs/wg/ai/agent/index.md) — the behavior, policy, and
+  component contracts the native host implements and this package supports.
+- [Grida bindings](../../docs/wg/ai/grida/index.md) — how Grida's tools and
+  built-in subagents bind to those contracts.
 
 ## Build & test
 
@@ -366,8 +368,9 @@ pnpm --filter @grida/agent build   # tsdown → dist/
 pnpm --filter @grida/agent test    # vitest
 ```
 
-`smoke:sessions:live` exercises the sessions store against a real SQLite
-file — a manual smoke check, not part of `test`.
+`smoke:sessions:live` runs the historical TypeScript sessions-store fixture
+against a real SQLite file. It is a manual check of that source-only fixture,
+not part of `test`, and exercises no native chat path.
 
 The native host excludes the provider credential tree from workspace, scratch and
 attached-directory grants before structured filesystem hydration. The same
