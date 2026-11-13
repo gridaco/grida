@@ -1,9 +1,11 @@
 ---
 title: Start an agent task with files and folders
-description: Open a project, mention or attach files, and work with a deck, an SVG or a single file.
+description: Start from Welcome or a project, mention or attach files, and work with a deck, an SVG or a single file.
 keywords:
   [
     agent workspace,
+    Welcome,
+    slides template,
     PNG attachment,
     file attachment,
     project files,
@@ -16,6 +18,26 @@ format: md
 
 Available in Grida Desktop on macOS and Linux, and from a source-built
 headless host. Windows Desktop has no agent chat.
+
+## Start from Welcome
+
+Describe what you want in the Welcome composer and send. Grida opens the
+default project folder, or the project chosen at the top left, and sends your
+message as the first message of a new chat there. Your message is sent once:
+reloading the window does not send it again.
+
+The model picker on Welcome lists **Default** and the models available
+through your saved provider keys and endpoints. The chat in the project uses
+the model you choose; more Grida models appear in the project's own picker
+once its chat is running. If the chosen model cannot start, or the project
+needs a model choice first, the chat says your message wasn't sent and puts
+it in the composer so you can send it yourself.
+
+To start from a slides template, choose **Slides** on the left, pick a
+template and send, with or without a description. Grida copies the template
+into the project as its own deck, named after the template, and asks the agent
+to adapt that deck. References you add from the gallery are sent as links in
+the first message.
 
 ## Work in a project
 

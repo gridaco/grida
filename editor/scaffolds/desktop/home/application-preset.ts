@@ -10,8 +10,8 @@
  *   - the composer stamps a mode CHIP for it (except neutral `general`),
  *   - the placeholder advertises what the mode makes,
  *   - (next seam) the gallery filters its visual references by the mode, and
- *     the preset rides the `welcome_handoff` so the created project's first
- *     turn already knows the outcome the user was aiming at.
+ *     the preset rides the Welcome message so the project's first turn
+ *     already knows the outcome the user was aiming at.
  *
  * We're "overselling" a mode switch as if it were a destination — the rail
  * items act as the mutator, nothing structural changes underneath.

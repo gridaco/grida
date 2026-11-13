@@ -4,6 +4,7 @@ import { WorkspaceCanvasCreation } from "./workspace-canvas-creation";
 
 class FakeClient implements WorkspaceCanvasCreation.Client {
   readonly files = new Map<string, string>();
+  readonly writes: string[] = [];
 
   constructor(private readonly names: string[] = []) {}
 
@@ -22,6 +23,7 @@ class FakeClient implements WorkspaceCanvasCreation.Client {
   }
 
   async writeFile(_workspaceId: string, relPath: string, content: string) {
+    this.writes.push(relPath);
     this.files.set(relPath, content);
     return { mtime: 1 };
   }
@@ -68,4 +70,43 @@ describe("WorkspaceCanvasCreation.create", () => {
       ).toBe(dotcanvas.serialize({ editor, documents: [] }));
     }
   );
+});
+
+describe("WorkspaceCanvasCreation.copy", () => {
+  const template = {
+    name: "startup-pitch.canvas",
+    files: [
+      { path: dotcanvas.MANIFEST_FILENAME, text: '{"editor":"slides"}' },
+      { path: "001.svg", text: "<svg/>" },
+      { path: "../escape.svg", text: "<svg/>" },
+      { path: "002.svg", text: "<svg></svg>" },
+    ],
+  };
+
+  it("copies the bundle under the next free template name, manifest last", async () => {
+    const client = new FakeClient(["startup-pitch.canvas"]);
+    expect(
+      await WorkspaceCanvasCreation.copy("workspace", template, client)
+    ).toBe("startup-pitch 2.canvas");
+    expect(client.writes).toEqual([
+      "startup-pitch 2.canvas/001.svg",
+      "startup-pitch 2.canvas/002.svg",
+      `startup-pitch 2.canvas/${dotcanvas.MANIFEST_FILENAME}`,
+    ]);
+    expect(client.files.get("startup-pitch 2.canvas/002.svg")).toBe(
+      "<svg></svg>"
+    );
+  });
+
+  it("refuses a template without a manifest and writes nothing", async () => {
+    const client = new FakeClient();
+    await expect(
+      WorkspaceCanvasCreation.copy(
+        "workspace",
+        { name: "broken.canvas", files: [{ path: "001.svg", text: "<svg/>" }] },
+        client
+      )
+    ).rejects.toThrow("manifest");
+    expect(client.writes).toEqual([]);
+  });
 });

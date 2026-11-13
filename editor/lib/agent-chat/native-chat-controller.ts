@@ -72,6 +72,9 @@ const MAX_LIVE_ACTIVITY = 64;
 const EMPTY_TURNS: readonly NativeChatTurnRecord[] = [];
 /** The title of a chat the host has not titled yet. */
 export const NEW_CHAT_TITLE = "New chat";
+/** A message chosen before the chat opened could not be sent. */
+const MESSAGE_NOT_SENT =
+  "Your message from Welcome wasn't sent. It is in the composer; send it when the chat is ready.";
 /** A second look for a background chat title after a turn progresses. */
 const TITLE_RECHECK_MS = 6_000;
 const MAX_LIVE_BYTES = 1024 * 1024;
@@ -208,6 +211,11 @@ export type NativeChatView = Readonly<{
 type Scope = {
   id: number;
   requested: string | null;
+  /**
+   * Opened to send a message chosen elsewhere. The new chat's composer
+   * draft and its Plan, Goal or attachment stay for a later send.
+   */
+  startsWithMessage?: true;
   attachment?: NativeChatAttachment;
   stopEditorSurfaceUpdates?: () => void;
   stopEditorSurfaceOpen?: () => void;
@@ -402,6 +410,10 @@ export class NativeChatController {
   private profileRead?: object;
   private profileSelection?: Promise<void>;
   private pendingFocus?: { sessionId: string; profileId?: string };
+  /** A new chat is opening to send a message chosen before it opened. */
+  private startingChat = false;
+  /** The current {@link startChat} call, until it sends or declines. */
+  private chatStart?: object;
 
   constructor(
     private readonly bridge: DesktopNativeChat,
@@ -454,7 +466,7 @@ export class NativeChatController {
   private async restoreDraft(scope: Scope): Promise<void> {
     const drafts = this.drafts;
     const key = this.draftKey();
-    if (!drafts || !key || !this.owns(scope)) return;
+    if (!drafts || !key || !this.owns(scope) || scope.startsWithMessage) return;
     const modes = drafts.store.readModes(key);
     if (modes.plan && this.bridge.submitInRegime)
       this.update({ operatingRegime: "plan" });
@@ -483,14 +495,15 @@ export class NativeChatController {
   }
 
   /**
-   * Start the workspace's native chat. With a remembered model, that model is
-   * selected first so startup opens it directly instead of opening the
-   * default and switching; if it cannot run, the default starts as usual.
+   * Start the workspace's native chat. With a remembered or newly chosen
+   * model, that model is selected first so startup opens it directly instead
+   * of opening the default and switching; if it cannot run, the default
+   * starts as usual.
    */
   static watchReadiness(
     bridge: DesktopNativeChat,
     publish: (state: NativeChatReadiness | null) => void,
-    remembered: string | null = null
+    selection: NativeChatProfileSelection | null = null
   ): () => void {
     let watching = true;
     const probe = async () => {
@@ -501,10 +514,8 @@ export class NativeChatController {
         if (state === "native-starting") {
           publish(state);
           if (!watching) return;
-          if (remembered && bridge.selectProfile)
-            await bridge
-              .selectProfile({ kind: "saved", id: remembered })
-              .catch(() => {});
+          if (selection && bridge.selectProfile)
+            await bridge.selectProfile(selection).catch(() => {});
           if (!watching) return;
           result = await bridge.status(true);
         }
@@ -546,12 +557,89 @@ export class NativeChatController {
     };
   };
 
-  connect(
-    initial: string | null,
-    profileId?: string | null,
-    startNewChat = false
-  ): void {
+  connect(initial: string | null, profileId?: string | null): void {
+    const saved = this.beginConnection();
+    if (profileId !== null && profileId !== undefined) {
+      if (initial) void this.focusChat(initial, profileId);
+      else void this.selectProfile({ kind: "saved", id: profileId });
+      return;
+    }
+    if (saved.profileId) {
+      void this.restoreProfile(saved.profileId, initial ?? saved.selected);
+      return;
+    }
+    void this.listChats();
+    void this.select(initial ?? saved.selected);
+  }
+
+  /**
+   * Open a new chat on the connection chosen before the workspace opened, or
+   * on the workspace default for `null`, and send its first message there.
+   *
+   * `take` hands the message over at most once. It is called only after the
+   * new chat is ready, immediately before the send, so a reload after that
+   * point cannot send the message again; a pane closed before then leaves
+   * the message for the next connection. When the message cannot be sent,
+   * the chat says why and the taken text is returned so the composer can
+   * keep it.
+   */
+  async startChat(
+    profileId: string | null,
+    take: () => string | null
+  ): Promise<string | null> {
+    this.beginConnection();
+    const run = {};
+    this.chatStart = run;
+    this.startingChat = true;
+    try {
+      if (profileId !== null)
+        await this.selectProfile({ kind: "new", id: profileId }, null);
+      else {
+        void this.listChats();
+        await this.select(null);
+      }
+    } finally {
+      this.startingChat = false;
+    }
+    // Closed or reconnected meanwhile: the message waits for that connection.
+    if (this.chatStart !== run) return null;
+    this.chatStart = undefined;
+    const scope = this.scope;
+    const ready =
+      !!scope &&
+      this.profileId === profileId &&
+      !this.view.profileError &&
+      this.view.selected === null &&
+      scope.requested === null &&
+      !scope.attachment;
+    if (!ready || !scope) return this.declineMessage(take);
+    const text = take();
+    if (!text) return null;
+    try {
+      await this.submit(text, scope.id);
+      return null;
+    } catch {
+      // The send reported why; a refusal before it started has no notice yet.
+      if (this.owns(scope) && !this.view.error)
+        this.update({ error: MESSAGE_NOT_SENT });
+      return text;
+    }
+  }
+
+  /**
+   * Take a message that cannot start a chat here, and say that it was not
+   * sent. Returns its text so the composer can keep it.
+   */
+  declineMessage(take: () => string | null): string | null {
+    const text = take();
+    if (text) this.update({ error: MESSAGE_NOT_SENT });
+    return text;
+  }
+
+  /** Begin listing this workspace's chats and connections. */
+  private beginConnection() {
     const saved = this.restore();
+    this.chatStart = undefined;
     this.pendingFocus = undefined;
     this.catalogConnection = {};
     this.catalog = null;
@@ -567,21 +655,7 @@ export class NativeChatController {
       profileError: null,
     });
     void this.readProfiles();
-    if (profileId !== null && profileId !== undefined) {
-      if (initial) void this.focusChat(initial, profileId);
-      else
-        void this.selectProfile({
-          kind: startNewChat ? "new" : "saved",
-          id: profileId,
-        });
-      return;
-    }
-    if (saved.profileId) {
-      void this.restoreProfile(saved.profileId, initial ?? saved.selected);
-      return;
-    }
-    void this.listChats();
-    void this.select(initial ?? saved.selected);
+    return saved;
   }
 
   /**
@@ -605,6 +679,7 @@ export class NativeChatController {
   disconnect(): void {
     const previous = this.scope;
     this.scope = undefined;
+    this.chatStart = undefined;
     this.catalogConnection = undefined;
     this.profileRead = undefined;
     this.pendingFocus = undefined;
@@ -763,9 +838,14 @@ export class NativeChatController {
     await this.select(request.sessionId);
   }
 
+  /**
+   * Choose the connection for this workspace's chats. `initialSession` opens
+   * that chat on it; `null` opens a new chat; omitted, the selected or last
+   * chat continues.
+   */
   async selectProfile(
     selection: NativeChatProfileSelection,
-    initialSession?: string
+    initialSession?: string | null
   ): Promise<void> {
     const connection = this.catalogConnection;
     if (
@@ -814,10 +894,12 @@ export class NativeChatController {
       void this.listChats();
       void this.readProfiles();
       // The open chat continues with the selected model on its next turn.
-      const continuing = initialSession ?? this.view.selected;
-      await this.select(continuing ?? saved.selected, {
-        reattach: !!continuing,
-      });
+      const continuing =
+        initialSession === undefined ? this.view.selected : initialSession;
+      await this.select(
+        initialSession === null ? null : (continuing ?? saved.selected),
+        { reattach: !!continuing }
+      );
     } catch {
       if (this.catalogConnection === connection)
         this.update({
@@ -856,6 +938,7 @@ export class NativeChatController {
       gaps: new Set(),
       observation: null,
       replay: true,
+      ...(this.startingChat && { startsWithMessage: true as const }),
     };
     this.scope = scope;
     // Every per-chat field starts empty; only what belongs to the workspace

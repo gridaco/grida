@@ -110,37 +110,56 @@ const selectionMemory = {
 /** One store per window, so a draft outlives any composer instance. */
 const COMPOSER_DRAFTS = new ComposerDrafts();
 
+/**
+ * A first message chosen before the workspace opened, with its connection.
+ * `take` hands the text over once (see `welcome-message.ts`); `waiting`
+ * tells whether it is still there to take.
+ */
+export type NativeFirstMessage = Readonly<{
+  profileId: string | null;
+  waiting: () => boolean;
+  take: () => string | null;
+}>;
+
 export function NativeAgentPaneGate({
   bridge,
   selectionKey,
   workspaceId,
   initialSession,
   editorSurfaces,
+  firstMessage,
 }: {
   bridge: DesktopNativeChat;
   selectionKey?: string;
   workspaceId?: string;
   initialSession: string | null;
   editorSurfaces?: NativeChatEditorSurfaces;
+  /** Sent once as a new chat's first turn when the chat is ready. */
+  firstMessage?: NativeFirstMessage;
 }) {
   const [attempt, setAttempt] = useState(0);
+  const [messageDropped, setMessageDropped] = useState(false);
   const [selection, setSelection] = useState<{
     bridge: DesktopNativeChat;
     attempt: number;
     readiness: NativeChatReadiness | null;
   }>();
-  useEffect(
-    () =>
-      NativeChatController.watchReadiness(
-        bridge,
-        (readiness) => setSelection({ bridge, attempt, readiness }),
-        NativeChatController.rememberedProfile(
+  useEffect(() => {
+    // A first message starts on the connection chosen with it, not on the
+    // workspace's remembered model.
+    const message = firstMessage?.waiting() ? firstMessage : undefined;
+    const remembered = message
+      ? message.profileId
+      : NativeChatController.rememberedProfile(
           selectionMemory,
           selectionKey && `grida.nativeChat.${selectionKey}`
-        )
-      ),
-    [bridge, attempt, selectionKey]
-  );
+        );
+    return NativeChatController.watchReadiness(
+      bridge,
+      (readiness) => setSelection({ bridge, attempt, readiness }),
+      remembered ? { kind: message ? "new" : "saved", id: remembered } : null
+    );
+  }, [bridge, attempt, selectionKey, firstMessage]);
   const readiness =
     selection?.bridge === bridge && selection.attempt === attempt
       ? selection.readiness
@@ -159,7 +178,14 @@ export function NativeAgentPaneGate({
     !!workspaceId &&
     !!bridge.profiles &&
     !!bridge.selectProfile;
-  if (!starting && readiness !== "native-ready" && !connectionRequired)
+  const unavailable =
+    !starting && readiness !== "native-ready" && !connectionRequired;
+  // Chat cannot open here, so the message is dropped with a notice instead
+  // of waiting to be sent whenever this workspace opens again.
+  useEffect(() => {
+    if (unavailable && firstMessage?.take()) setMessageDropped(true);
+  }, [unavailable, firstMessage]);
+  if (unavailable)
     return (
       <div className="flex flex-col gap-2 px-3 py-2 text-xs">
         <span role="alert" className="text-destructive">
@@ -167,6 +193,7 @@ export function NativeAgentPaneGate({
             ? "Couldn't check chat availability."
             : (nativeChatConnectionNote[readiness] ??
               "Native chat is unavailable.")}
+          {messageDropped && " Your message from Welcome wasn't sent."}
         </span>
         <Button
           type="button"
@@ -193,6 +220,7 @@ export function NativeAgentPaneGate({
       workspaceId={workspaceId}
       initialSession={initialSession}
       editorSurfaces={editorSurfaces}
+      firstMessage={firstMessage}
     />
   );
 }
@@ -219,9 +247,8 @@ export function NativeAgentPane({
   selectionKey,
   workspaceId,
   initialSession,
-  initialProfileId,
-  startNewChat = false,
   editorSurfaces,
+  firstMessage,
 }: {
   bridge: DesktopNativeChat;
   /** The agent is still starting; the pane shows but does not connect yet. */
@@ -232,9 +259,9 @@ export function NativeAgentPane({
   selectionKey?: string;
   workspaceId?: string;
   initialSession: string | null;
-  initialProfileId?: string;
-  startNewChat?: boolean;
   editorSurfaces?: NativeChatEditorSurfaces;
+  /** Sent once as a new chat's first turn; see {@link NativeAgentPaneGate}. */
+  firstMessage?: NativeFirstMessage;
 }) {
   const controller = useMemo(() => {
     const created = new NativeChatController(
@@ -285,13 +312,21 @@ export function NativeAgentPane({
   const side = state.sideChat;
   useEffect(() => {
     const profile =
-      initialProfileId ??
-      (workspaceId && initialSession
+      workspaceId && initialSession
         ? new URLSearchParams(window.location.hash.slice(1)).get("chat-profile")
-        : null);
+        : null;
     if (starting) return;
-    if (connectionRequired) controller.connectForSelection();
-    else controller.connect(initialSession, profile, startNewChat);
+    // A message that could not be sent stays in the composer.
+    const keep = (text: string | null) => {
+      if (text) draft.current?.appendText(text, MAX_DRAFT_BYTES);
+    };
+    const message = firstMessage?.waiting() ? firstMessage : undefined;
+    if (connectionRequired) {
+      controller.connectForSelection();
+      if (message) keep(controller.declineMessage(message.take));
+    } else if (message && !initialSession)
+      void controller.startChat(message.profileId, message.take).then(keep);
+    else controller.connect(initialSession, profile);
     const stopFocus =
       workspaceId &&
       subscribeToNativeNotificationFocus(
@@ -308,8 +343,7 @@ export function NativeAgentPane({
     bridge,
     controller,
     initialSession,
-    initialProfileId,
-    startNewChat,
+    firstMessage,
     workspaceId,
     connectionRequired,
     starting,

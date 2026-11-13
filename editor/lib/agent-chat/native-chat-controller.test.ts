@@ -183,48 +183,43 @@ it("ignores late connection recovery after the pane closes", async () => {
   controller.disconnect();
 });
 
-it.each([false, true])(
-  "activates a recovered profile, then reopens the workspace chat (new connection: %s)",
-  async (startNewChat) => {
-    const { bridge } = fixture();
-    const memory = {
-      getItem: (key: string) =>
-        key === "project"
-          ? JSON.stringify({
-              selected: "old-default",
-              sessions: ["old-default"],
-            })
-          : null,
-      setItem: () => {},
-    };
-    const controller = new NativeChatController(bridge, memory, "project");
-    const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
-      async () => {}
+it("activates a recovered profile, then reopens the workspace chat", async () => {
+  const { bridge } = fixture();
+  const memory = {
+    getItem: (key: string) =>
+      key === "project"
+        ? JSON.stringify({
+            selected: "old-default",
+            sessions: ["old-default"],
+          })
+        : null,
+    setItem: () => {},
+  };
+  const controller = new NativeChatController(bridge, memory, "project");
+  const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+    async () => {}
+  );
+  const load = vi.fn<DesktopNativeChat["load"]>(bridge.load.bind(bridge));
+  bridge.selectProfile = choose;
+  bridge.load = load;
+  const id = "d".repeat(64);
+  try {
+    controller.connect(null, id);
+    await vi.waitFor(() => expect(controller.read().scope).toBeGreaterThan(0));
+    expect(choose).toHaveBeenCalledExactlyOnceWith({
+      kind: "saved",
+      id,
+    });
+    // Chats belong to the workspace, so the remembered chat reopens under
+    // the chosen connection only after that connection is active.
+    expect(controller.read().selected).toBe("old-default");
+    expect(choose.mock.invocationCallOrder[0]).toBeLessThan(
+      load.mock.invocationCallOrder[0] ?? Infinity
     );
-    const load = vi.fn<DesktopNativeChat["load"]>(bridge.load.bind(bridge));
-    bridge.selectProfile = choose;
-    bridge.load = load;
-    const id = "d".repeat(64);
-    try {
-      controller.connect(null, id, startNewChat);
-      await vi.waitFor(() =>
-        expect(controller.read().scope).toBeGreaterThan(0)
-      );
-      expect(choose).toHaveBeenCalledExactlyOnceWith({
-        kind: startNewChat ? "new" : "saved",
-        id,
-      });
-      // Chats belong to the workspace, so the remembered chat reopens under
-      // the chosen connection only after that connection is active.
-      expect(controller.read().selected).toBe("old-default");
-      expect(choose.mock.invocationCallOrder[0]).toBeLessThan(
-        load.mock.invocationCallOrder[0] ?? Infinity
-      );
-    } finally {
-      controller.disconnect();
-    }
+  } finally {
+    controller.disconnect();
   }
-);
+});
 
 it.each([true, false])(
   "reopens a workspace with the model chosen there before (still available: %s)",
@@ -3581,7 +3576,7 @@ it.each([true, false])(
     const stop = NativeChatController.watchReadiness(
       { ...bridge, status, selectProfile: choose },
       publish,
-      remembered
+      { kind: "saved", id: remembered! }
     );
     await vi.waitFor(() =>
       expect(publish.mock.calls).toEqual([
@@ -4384,4 +4379,229 @@ it("allows a corrected Goal allowance after an explicit pre-admission refusal", 
   expect(start).toHaveBeenCalledTimes(2);
   expect(start.mock.calls[1][1]).not.toBe(start.mock.calls[0][1]);
   controller.disconnect();
+});
+
+describe("a first message chosen before the chat opened", () => {
+  const PROFILE = "9".repeat(64);
+
+  function firstMessage(text = "Make a launch poster") {
+    let waiting: string | null = text;
+    const take = vi.fn<() => string | null>(() => {
+      const taken = waiting;
+      waiting = null;
+      return taken;
+    });
+    return { take };
+  }
+
+  function sending() {
+    const f = fixture();
+    const create = vi.fn<DesktopNativeChat["create"]>(async () => ({
+      attachmentId: "first",
+      sessionId: "first",
+    }));
+    const submit = vi.fn<DesktopNativeChat["submit"]>(
+      f.bridge.submit.bind(f.bridge)
+    );
+    const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+      async () => {}
+    );
+    f.bridge.create = create;
+    f.bridge.submit = submit;
+    f.bridge.selectProfile = choose;
+    return { ...f, create, submit, choose };
+  }
+
+  it("opens a new chat on the chosen connection and sends the message once", async () => {
+    const { bridge, create, submit, choose } = sending();
+    const stored = new Map([
+      [
+        "project",
+        JSON.stringify({
+          selected: "earlier",
+          sessions: ["earlier"],
+          profileId: "e".repeat(64),
+        }),
+      ],
+    ]);
+    const memory = {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => void stored.set(key, value),
+    };
+    const load = vi.fn<DesktopNativeChat["load"]>(bridge.load.bind(bridge));
+    bridge.load = load;
+    const controller = new NativeChatController(bridge, memory, "project");
+    const message = firstMessage();
+    try {
+      expect(await controller.startChat(PROFILE, message.take)).toBeNull();
+      expect(choose).toHaveBeenCalledExactlyOnceWith({
+        kind: "new",
+        id: PROFILE,
+      });
+      // The remembered chat and model are not reopened first.
+      expect(load).not.toHaveBeenCalled();
+      expect(create).toHaveBeenCalledOnce();
+      expect(submit).toHaveBeenCalledExactlyOnceWith(
+        "first",
+        expect.any(String),
+        "Make a launch poster"
+      );
+      expect(choose.mock.invocationCallOrder[0]).toBeLessThan(
+        message.take.mock.invocationCallOrder[0]!
+      );
+      expect(message.take).toHaveBeenCalledOnce();
+      expect(controller.read().selected).toBe("first");
+      expect(controller.read().error).toBeNull();
+      // The workspace remembers the connection the message was sent with.
+      expect(JSON.parse(stored.get("project")!).profileId).toBe(PROFILE);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("keeps the default connection without selecting one", async () => {
+    const { controller, create, submit, choose } = sending();
+    const message = firstMessage("Sketch a logo");
+    try {
+      expect(await controller.startChat(null, message.take)).toBeNull();
+      expect(choose).not.toHaveBeenCalled();
+      expect(create).toHaveBeenCalledOnce();
+      expect(submit).toHaveBeenCalledExactlyOnceWith(
+        "first",
+        expect.any(String),
+        "Sketch a logo"
+      );
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("never sends a message twice, also when the chat starts again", async () => {
+    const { controller, submit } = sending();
+    const message = firstMessage();
+    try {
+      await controller.startChat(null, message.take);
+      controller.disconnect();
+      expect(await controller.startChat(null, message.take)).toBeNull();
+      expect(submit).toHaveBeenCalledOnce();
+      expect(message.take).toHaveBeenCalledTimes(2);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("leaves the message for the next connection when the pane closes first", async () => {
+    const { controller, choose, submit } = sending();
+    const selecting = Promise.withResolvers<void>();
+    choose.mockReturnValueOnce(selecting.promise);
+    const message = firstMessage();
+    const started = controller.startChat(PROFILE, message.take);
+    await vi.waitFor(() => expect(choose).toHaveBeenCalledOnce());
+    controller.disconnect();
+    selecting.resolve();
+    expect(await started).toBeNull();
+    expect(message.take).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("drops the message with a notice when its connection cannot open", async () => {
+    const { controller, choose, create, submit } = sending();
+    choose.mockRejectedValueOnce(new Error("native_chat_profile_unavailable"));
+    const message = firstMessage();
+    try {
+      expect(await controller.startChat(PROFILE, message.take)).toBe(
+        "Make a launch poster"
+      );
+      expect(message.take).toHaveBeenCalledOnce();
+      expect(create).not.toHaveBeenCalled();
+      expect(submit).not.toHaveBeenCalled();
+      expect(controller.read().error).toMatch(/wasn't sent/);
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("returns the message to the composer when the send fails", async () => {
+    const { controller, submit } = sending();
+    submit.mockRejectedValueOnce(new Error("native_chat_unavailable"));
+    const message = firstMessage();
+    try {
+      expect(await controller.startChat(null, message.take)).toBe(
+        "Make a launch poster"
+      );
+      expect(submit).toHaveBeenCalledOnce();
+      expect(controller.read().error).toBeTruthy();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("sends in Act without the new chat's leftover Plan or Goal draft", async () => {
+    const { bridge, controller } = sending();
+    const inRegime = vi.fn<NonNullable<DesktopNativeChat["submitInRegime"]>>(
+      async (_action, id, inputId) => ({
+        sessionId: id,
+        inputId,
+        disposition: "claimed",
+        inputPosition: 1,
+        turnId: `turn-${id}`,
+      })
+    );
+    const startGoal = vi.fn<NonNullable<DesktopNativeChat["startGoal"]>>();
+    bridge.submitInRegime = inRegime;
+    bridge.startGoal = startGoal;
+    const drafts = new ComposerDrafts(null, null);
+    drafts.writeModes("workspace:new", { plan: true, goal: true });
+    controller.keepDrafts(drafts, "workspace");
+    const message = firstMessage();
+    try {
+      expect(await controller.startChat(null, message.take)).toBeNull();
+      expect(inRegime).toHaveBeenCalledExactlyOnceWith(
+        "submit",
+        "first",
+        expect.any(String),
+        "Make a launch poster",
+        "act"
+      );
+      expect(startGoal).not.toHaveBeenCalled();
+    } finally {
+      controller.disconnect();
+    }
+  });
+
+  it("declines a message the chat cannot start, keeping its text", () => {
+    const { controller } = fixture();
+    const message = firstMessage();
+    expect(controller.declineMessage(message.take)).toBe(
+      "Make a launch poster"
+    );
+    expect(controller.read().error).toMatch(/wasn't sent/);
+    expect(controller.declineMessage(message.take)).toBeNull();
+  });
+});
+
+it("starts a workspace on a newly chosen connection before the default", async () => {
+  const { bridge } = fixture();
+  const id = "8".repeat(64);
+  const publish = vi.fn<(state: string | null) => void>();
+  const status = vi.fn<DesktopNativeChat["status"]>();
+  status
+    .mockResolvedValueOnce("native-starting")
+    .mockResolvedValueOnce("native-ready");
+  const choose = vi.fn<NonNullable<DesktopNativeChat["selectProfile"]>>(
+    async () => {}
+  );
+  const stop = NativeChatController.watchReadiness(
+    { ...bridge, status, selectProfile: choose },
+    publish,
+    { kind: "new", id }
+  );
+  await vi.waitFor(() =>
+    expect(publish).toHaveBeenLastCalledWith("native-ready")
+  );
+  expect(choose).toHaveBeenCalledExactlyOnceWith({ kind: "new", id });
+  expect(choose.mock.invocationCallOrder[0]).toBeLessThan(
+    status.mock.invocationCallOrder[1]!
+  );
+  stop();
 });

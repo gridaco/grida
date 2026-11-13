@@ -19,16 +19,12 @@ export namespace chat_vocabulary {
 
   /** On-message context parts that render as chips instead of text. */
   export const CONTEXT_PARTS = {
-    template: "data-user_template_selection",
     files: "data-user_file_attachments",
-    directories: "data-user_directory_references",
   } as const;
 
   /** Context part type → the marker name shown on its chip. */
   export const CONTEXT_MARKERS: Readonly<Record<string, string>> = {
-    [CONTEXT_PARTS.template]: "user_template_selection",
     [CONTEXT_PARTS.files]: "user_file_attachments",
-    [CONTEXT_PARTS.directories]: "user_directory_references",
   };
 
   /** One Library reference a design search shows or picks. */
