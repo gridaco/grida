@@ -1,12 +1,13 @@
 // GRIDA-SEC-014 — explicit shared provider custody and protected native roots.
 /**
- * GRIDA-SEC-004 — Desktop's fail-closed outer-sandbox authority intent.
+ * GRIDA-SEC-004 — Desktop's fail-closed outer-sandbox authority intent for
+ * the retained media sidecar.
  */
-import { buildAgentDaemonSandboxPolicy } from "@grida/agent/sandbox";
+import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
 import path from "node:path";
 
-/** Desktop's complete package-level intent for the outer agent sandbox. */
-export namespace DesktopAgentSandboxPolicy {
+/** Desktop's complete intent for the retained sidecar's outer sandbox. */
+export namespace SidecarSandboxPolicy {
   export function build(input: {
     userData: string;
     providerRoot?: string;
@@ -15,21 +16,18 @@ export namespace DesktopAgentSandboxPolicy {
     workspaceCatalogRoot?: string;
     legacyStateRoots?: readonly string[];
     home: string;
-    ggHost: string;
   }) {
-    const policy = buildAgentDaemonSandboxPolicy({
+    const policy = buildDaemonSandboxPolicy({
       user_data: input.userData,
       home: input.home,
-      gg_host: input.ggHost,
       // Main owns the listener and transfers only already-accepted loopback
       // sockets. The sandboxed sidecar needs no bind or generic local-connect
       // authority.
       allow_local_binding: false,
-      // Provider/GG requests use Electron's system-network session. Keeping
-      // their hosts out of the native profile makes missed injection fail closed.
-      host_routed_provider_http: true,
-      // Raw shell and external children receive no ambient destination.
-      direct_network_access: "none",
+      // Provider/GG requests use Electron's system-network session, so the
+      // sidecar tree has no direct destination and a missed injection fails
+      // closed.
+      include_dev_network_hosts: false,
     });
     const mediaRoot = path.resolve(input.mediaRoot);
     const providerRoot = path.resolve(
@@ -55,7 +53,7 @@ export namespace DesktopAgentSandboxPolicy {
         ]),
         // The long-lived sidecar owns durable media writes. The root remains
         // outside the agent secret directory and is denied again in every
-        // native finite-command profile.
+        // native command profile.
         allow_read: uniquePaths([
           ...(policy.filesystem.allow_read ?? []),
           mediaRoot,

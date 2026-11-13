@@ -5,16 +5,15 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { DesktopAgentSandboxPolicy } from "./agent-sandbox-policy";
+import { SidecarSandboxPolicy } from "./sidecar-sandbox-policy";
 
-describe("DesktopAgentSandboxPolicy", () => {
+describe("SidecarSandboxPolicy", () => {
   it("is socketless and gives the sidecar tree no direct Internet hosts", () => {
-    const policy = DesktopAgentSandboxPolicy.build({
+    const policy = SidecarSandboxPolicy.build({
       userData: "/Users/test/.grida/agent",
       providerRoot: "/isolated-grida/providers",
       mediaRoot: "/Users/test/Library/Application Support/Grida/Media",
       home: "/Users/test",
-      ggHost: "grida.co",
     });
 
     expect(policy.filesystem.allow_read).toContain("/isolated-grida/providers");
@@ -33,12 +32,11 @@ describe("DesktopAgentSandboxPolicy", () => {
 
   it("keeps the native browser profile outside retained sidecar custody", () => {
     const desktopStateRoot = "/isolated-grida/browser";
-    const policy = DesktopAgentSandboxPolicy.build({
+    const policy = SidecarSandboxPolicy.build({
       userData: "/isolated-grida/agent",
       mediaRoot: "/isolated-grida/media",
       desktopStateRoot,
       home: "/Users/test",
-      ggHost: "grida.co",
     });
     expect(policy.filesystem.deny_read).toContain(desktopStateRoot);
     expect(policy.filesystem.deny_write).toContain(desktopStateRoot);
@@ -50,11 +48,10 @@ describe("DesktopAgentSandboxPolicy", () => {
       userData: "/isolated/agent",
       mediaRoot: "/isolated/media",
       home: "/Users/test",
-      ggHost: "grida.co",
     };
     const root = "/Users/test/.grida";
-    const ordinary = DesktopAgentSandboxPolicy.build(launch);
-    const preview = DesktopAgentSandboxPolicy.build({
+    const ordinary = SidecarSandboxPolicy.build(launch);
+    const preview = SidecarSandboxPolicy.build({
       ...launch,
       legacyStateRoots: [root],
     });
@@ -63,7 +60,7 @@ describe("DesktopAgentSandboxPolicy", () => {
     expect(preview.filesystem.deny_read).toContain(root);
     expect(preview.filesystem.deny_write).toContain(root);
     expect(() =>
-      DesktopAgentSandboxPolicy.build({
+      SidecarSandboxPolicy.build({
         ...launch,
         legacyStateRoots: [root + "[old]"],
       })
@@ -116,13 +113,12 @@ describe("DesktopAgentSandboxPolicy", () => {
           }
         `
         );
-        const policy = DesktopAgentSandboxPolicy.build({
+        const policy = SidecarSandboxPolicy.build({
           home: root,
           userData: agent,
           mediaRoot,
           desktopStateRoot: native,
           legacyStateRoots: [legacy, scratch],
-          ggHost: "grida.co",
         });
         const sandbox = new RetainedServiceSandbox({
           network: {

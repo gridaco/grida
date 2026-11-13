@@ -7,7 +7,7 @@ import { expect, it, vi } from "vitest";
 import type { App } from "electron";
 import VitePlugin from "@electron-forge/plugin-vite";
 import type { ResolvedForgeConfig } from "@electron-forge/shared-types";
-import { defaultScratchBase } from "@grida/agent/sandbox";
+import { LegacyAgentPaths } from "./legacy-agent-paths";
 import { ProtectedRoots } from "@grida/daemon/server";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { NativeFirstProfile } from "./native-first-profile";
@@ -281,7 +281,7 @@ it.runIf(process.platform === "darwin" && process.arch === "arm64")(
         path.join(appData, "Grida Insiders"),
         gridaHome,
         configured,
-        defaultScratchBase(path.join(gridaHome, "agent"), fixture),
+        LegacyAgentPaths.scratchBase(path.join(gridaHome, "agent"), fixture),
       ]) {
         await fs.mkdir(location, { mode: 0o700 });
         const data = path.join(location, "retained");

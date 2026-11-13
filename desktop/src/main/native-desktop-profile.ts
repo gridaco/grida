@@ -7,7 +7,7 @@ import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
 import { ProtectedRoots } from "@grida/daemon/server";
 import { home } from "@grida/home";
 import { isValidEndpointProviderId } from "@grida/agent";
-import { defaultScratchBase } from "@grida/agent/sandbox";
+import { LegacyAgentPaths } from "./legacy-agent-paths";
 import { NativeFirstProfile } from "./native-first-profile";
 
 export namespace NativeDesktopProfile {
@@ -304,7 +304,7 @@ export namespace NativeDesktopProfile {
     const roots = [
       ...gridaHomes,
       ...gridaHomes.map((directory) =>
-        defaultScratchBase(path.join(directory, "agent"), systemTemp)
+        LegacyAgentPaths.scratchBase(path.join(directory, "agent"), systemTemp)
       ),
       ...["Grida", "Grida Insiders", "Grida (Insiders)", "desktop"].map(
         (name) => path.join(appData, name)

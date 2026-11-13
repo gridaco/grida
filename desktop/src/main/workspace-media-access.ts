@@ -1,7 +1,7 @@
 // GRIDA-SEC-004 / GRIDA-SEC-014 — packaged native media scope selection.
 import { app } from "electron";
 import path from "node:path";
-import { defaultScratchBase } from "@grida/agent/sandbox";
+import { LegacyAgentPaths } from "./legacy-agent-paths";
 import { buildDaemonSandboxPolicy } from "@grida/daemon/sandbox";
 import { home } from "@grida/home";
 import { DesktopMediaRoot } from "./media-root";
@@ -50,7 +50,7 @@ export function ordinarySelectedSvgFiles(
         agentData,
         path.join(gridaHome, "agent"),
         path.join(userHome, ".grida", "agent"),
-      ].map((directory) => defaultScratchBase(directory, temp)),
+      ].map((directory) => LegacyAgentPaths.scratchBase(directory, temp)),
       DesktopMediaRoot.current(),
       path.dirname(NativeDesktopProfile.resourcesPath(app)),
     ],

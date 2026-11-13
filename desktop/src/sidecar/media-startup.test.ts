@@ -24,7 +24,7 @@ import { NativeWorkspaceCatalog } from "../main/native-workspace-catalog";
 import { NativeDocumentFiles } from "../main/native-document-files";
 import { NativeFirstProfile } from "../main/native-first-profile";
 import { WorkspaceFileWorkers } from "../main/workspace-file-worker";
-import { DesktopAgentSandboxPolicy } from "../main/agent-sandbox-policy";
+import { SidecarSandboxPolicy } from "../main/sidecar-sandbox-policy";
 import { RetainedServiceSandbox } from "../main/retained-service-sandbox";
 
 const desktop = fileURLToPath(new URL("../..", import.meta.url));
@@ -697,13 +697,12 @@ describe("built Desktop media startup", () => {
         const runtime = await sidecarRuntime();
         expect(runtime.electron).toBe(true);
         const project = await catalog.openSelected(workspace);
-        const policy = DesktopAgentSandboxPolicy.build({
+        const policy = SidecarSandboxPolicy.build({
           userData,
           mediaRoot,
           desktopStateRoot: browserData,
           workspaceCatalogRoot: path.dirname(catalog.directory),
           home: root,
-          ggHost: new URL(origin).hostname,
         });
         const sandbox = new RetainedServiceSandbox({
           network: {

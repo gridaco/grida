@@ -1862,7 +1862,8 @@ Today:
 - The native [read-only file adapters](crates/grida-agent/src/file_tools.rs) revalidate the turn's selected directory against current grants and protected roots. [Native path opening](crates/grida-agent/src/file_tools/native.rs) uses pinned directory handles and refuses link traversal. [File tool tests](crates/grida-agent/tests/file_tools.rs) cover grant revocation and protected files.
 - The native [history extension](crates/grida-agent/src/acp/extensions/history.rs) requires a negotiated operation and an attached source session. The [host](crates/grida-agent/src/host/history.rs) binds a derivation to committed history and keeps a fork in the source workspace. The [portable projection](crates/grida-agent-master/src/conversation_seed.rs) copies visible text with omission evidence and keeps raw tool data, provider state, and grants out of the seed. An edit target resolves the visible anchor to the exact retained text-only submission within the attached chat. Inherited context from another chat cannot authorize a source input read. [Native process tests](crates/grida-agent/tests/process/history.rs) cover attachment, source ownership, and fresh tool permissions.
 - Desktop's [bounded transcript read](desktop/src/main/native-agent-chat.ts) rechecks the frame's exact attachment through [Main IPC](desktop/src/main/native-chat-ipc.ts), correlates chunks to the current read, and caps buffered text. The [ACP handler](crates/grida-agent/src/acp.rs) requires the negotiated capability, an attached chat, and its workspace. Cursors select only the attached chat's current history view. Reading grants no execution authority.
-- `desktop/src/main/agent-sandbox-policy.ts` — binds Desktop's strict sandbox posture: empty direct external egress, host-routed provider HTTP, no generic local bind/connect authority, and an exact read/write grant for the long-lived sidecar's app-managed media root.
+- `desktop/src/main/sidecar-sandbox-policy.ts` — binds Desktop's strict sandbox posture for the retained sidecar on the daemon's own policy frame: empty direct external egress (no development baseline and no agent provider hosts), host-routed provider HTTP, no generic local bind/connect authority, and an exact read/write grant for the long-lived sidecar's app-managed media root.
+- `desktop/src/main/legacy-agent-paths.ts` — names the session scratch base earlier TypeScript agent hosts derived, so Main and the sandboxes deny it without importing the agent package.
 - `desktop/src/main/agent-sidecar-supervisor.ts` — generates the per-spawn password; spawns/supervises the daemon sidecar; captures the native retained-service scope; owns both private channels, forwards the one main-owned media-root fact, and grants no direct provider networking. Windows retains explicitly unconfined non-agent compatibility services with native chat unavailable.
 - `desktop/src/main/retained-service-sandbox.ts` and its tests — shell-free Seatbelt or bubblewrap launch, executable identity recheck, literal/canonical protected paths, native-ABI seccomp, inherited IPC, denied new sockets and safe owned mask cleanup. Actual macOS and unprivileged Linux ARM64 fixtures cover filesystem denial and Main-transferred connected sockets. Native setup failure has no unconfined fallback on macOS/Linux.
 - `desktop/src/main/desktop-entry-window.ts` — owns the exact bridge-attached entry window and admits auxiliary native windows only while the authenticated main role is active. Committed quit revokes renderer admission and invalidates queued or in-flight entry reconciliation. The Grida-account transition is additionally bound by GRIDA-SEC-005.
@@ -4060,16 +4061,16 @@ TypeScript custody owner, protocol fixtures and cross-language tests remain.
   [retained-service sandbox](desktop/src/main/retained-service-sandbox.ts),
   [sidecar](desktop/src/agent-sidecar.ts),
   [composition](desktop/src/sidecar/daemon.ts),
-  [outer policy](desktop/src/main/agent-sandbox-policy.ts), and
+  [outer policy](desktop/src/main/sidecar-sandbox-policy.ts), and
   [native permission loader](crates/grida-agent/src/launch_permissions.rs), with
   [supervisor tests](desktop/src/main/agent-sidecar-supervisor.test.ts),
   [retained-service sandbox tests](desktop/src/main/retained-service-sandbox.test.ts),
   [composition tests](desktop/src/sidecar/daemon.test.ts),
-  [outer-policy tests](desktop/src/main/agent-sandbox-policy.test.ts), and
+  [outer-policy tests](desktop/src/main/sidecar-sandbox-policy.test.ts), and
   [native sandbox tests](crates/agent-kit-sandbox/tests).
   The [built startup proof](desktop/src/sidecar/media-startup.test.ts) and
   [its guard](desktop/src/sidecar/testing/media-startup-guard.cjs) distinguish
-  custody-only SQLite access from forbidden chat startup. These retain
+  custody-only SQLite access from any other storage startup. These retain
   GRIDA-SEC-004's channel, sandbox and renderer guarantees. The
   [Desktop contract](desktop/README.md) and
   [agent authority contract](desktop/docs/agent-authority.md) document host custody.

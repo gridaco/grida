@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
-import { defaultScratchBase } from "@grida/agent/sandbox";
+import { LegacyAgentPaths } from "./legacy-agent-paths";
 import {
   nativeWorkspaceMedia,
   ordinarySelectedSvgFiles,
@@ -145,7 +145,7 @@ it.runIf(
       await expect(documents.register(alias)).rejects.toThrow(
         "The selected document is unavailable"
       );
-      const scratch = defaultScratchBase(host.agent, temp);
+      const scratch = LegacyAgentPaths.scratchBase(host.agent, temp);
       await fs.mkdir(scratch);
       const scratchFile = path.join(scratch, "retained.svg");
       await fs.writeFile(scratchFile, "<svg>Retained</svg>");

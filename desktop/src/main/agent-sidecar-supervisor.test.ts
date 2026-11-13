@@ -39,6 +39,7 @@ import { RetainedMediaLaunch } from "./retained-media-launch";
 import { LegacyChatSourceLease } from "./legacy-chat-source-lease";
 import { DesktopMediaRoot } from "./media-root";
 import { RetainedServiceSandbox } from "./retained-service-sandbox";
+import { LegacyAgentPaths } from "./legacy-agent-paths";
 
 const supportsCutover =
   process.platform === "darwin" || process.platform === "linux";
@@ -512,11 +513,10 @@ describe("AgentSidecarSupervisor recovery", () => {
       "legacy_chat_cold_start_required"
     );
     const source = await supervisor.sealLegacyChatForColdStart();
-    const { defaultScratchBase } = await import("@grida/agent/sandbox");
     expect(source).toEqual(
       expect.objectContaining({
         userDataPath: "/synthetic/cold-legacy",
-        scratchBase: defaultScratchBase(
+        scratchBase: LegacyAgentPaths.scratchBase(
           "/synthetic/cold-legacy",
           app.getPath("temp")
         ),

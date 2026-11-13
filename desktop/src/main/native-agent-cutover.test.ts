@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defaultScratchBase } from "@grida/agent/sandbox";
+import { LegacyAgentPaths } from "./legacy-agent-paths";
 import type { NativeAgentChatLaunch } from "./native-agent-chat";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import type { NativeEditorSvgText } from "@grida/desktop-bridge";
@@ -67,7 +67,7 @@ async function fixture() {
   electron.userData = child("desktop");
   electron.media = child("media");
   vi.stubEnv("GRIDA_AGENT_USER_DATA", legacy);
-  const scratchBase = defaultScratchBase(legacy, electron.temp);
+  const scratchBase = LegacyAgentPaths.scratchBase(legacy, electron.temp);
   const nativeState = path.join(electron.userData, "native-chat");
   const checkpoint = path.join(nativeState, "cutover.json");
   const archiveRoot = path.join(legacy, "chat-archive");
@@ -318,7 +318,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
           expect(cutover.protectedPaths).toEqual(
             expect.arrayContaining([
               test.legacy,
-              defaultScratchBase(test.legacy, electron.temp),
+              LegacyAgentPaths.scratchBase(test.legacy, electron.temp),
             ])
           );
           return cutover.startWorkspace("work", {
@@ -562,7 +562,7 @@ describe.skipIf(!supported)("Native Desktop cold start", () => {
   it("binds the attested historical scratch to the retired source and retry", async () => {
     const test = await fixture();
     const tempRoot = test.child("historical-srt");
-    const historicalBase = defaultScratchBase(test.legacy, tempRoot);
+    const historicalBase = LegacyAgentPaths.scratchBase(test.legacy, tempRoot);
     writeLegacy(test.database, historicalBase);
     const source = fs.statSync(test.legacy, { bigint: true });
     const digest = (values: readonly string[]) =>

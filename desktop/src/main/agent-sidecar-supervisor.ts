@@ -20,7 +20,7 @@ import { EDITOR_BASE_URL } from "../env";
 import { AgentNetworkAuthority } from "./agent-network-authority";
 import { AgentNetworkHost } from "./agent-network-host";
 import { AgentDaemonSocketHost } from "./agent-daemon-socket-host";
-import { DesktopAgentSandboxPolicy } from "./agent-sandbox-policy";
+import { SidecarSandboxPolicy } from "./sidecar-sandbox-policy";
 import { DesktopMediaRoot } from "./media-root";
 import type { NativeProviderNetwork } from "./native-provider-egress";
 import type { DesktopAccountSession } from "./account-session";
@@ -29,6 +29,7 @@ import { AgentNetworkPolicy } from "../agent-network-policy";
 import { NativeDesktopProfile } from "./native-desktop-profile";
 import { RetainedMediaLaunch } from "./retained-media-launch";
 import { RetainedServiceSandbox } from "./retained-service-sandbox";
+import { LegacyAgentPaths } from "./legacy-agent-paths";
 
 export type AgentSidecarInfo = {
   /** Electron-main-owned TCP listener port (exact 127.0.0.1, ephemeral). */
@@ -317,10 +318,9 @@ export class AgentSidecarSupervisor {
   private async captureCutoverSource(): Promise<LegacyChatSource> {
     const temp = app.getPath("temp");
     const desktopUserDataPath = app.getPath("userData");
-    const { defaultScratchBase } = await import("@grida/agent/sandbox");
     return Object.freeze({
       userDataPath: this.user_data_path,
-      scratchBase: defaultScratchBase(this.user_data_path, temp),
+      scratchBase: LegacyAgentPaths.scratchBase(this.user_data_path, temp),
       desktopUserDataPath,
       providerHome: this.provider_home,
       mediaRoot: this.media_root,
@@ -625,7 +625,7 @@ export class AgentSidecarSupervisor {
         ...(this.workspaceCatalog ? [path.dirname(this.workspaceCatalog)] : []),
       ]),
     ];
-    const policy = DesktopAgentSandboxPolicy.build({
+    const policy = SidecarSandboxPolicy.build({
       userData: this.user_data_path,
       providerRoot: path.join(this.provider_home, "providers"),
       mediaRoot: this.media_root,
@@ -635,7 +635,6 @@ export class AgentSidecarSupervisor {
         ? path.dirname(this.workspaceCatalog)
         : undefined,
       home: app.getPath("home"),
-      ggHost: new URL(EDITOR_BASE_URL).hostname,
     });
     this.nativeSandbox = new RetainedServiceSandbox({
       network: {
