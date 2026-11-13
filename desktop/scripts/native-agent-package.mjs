@@ -53,7 +53,9 @@ function readExecutable(file, os, cpu, packaged = false) {
       stat.size >= 64 && stat.size <= MAX_BINARY_BYTES,
       "Native agent artifact size is outside the package limit"
     );
-    if (packaged && os !== "win32") {
+    // POSIX mode bits are only observable on a POSIX host; Windows reports
+    // synthesized modes, so a foreign package is checked where it is made.
+    if (packaged && os !== "win32" && process.platform !== "win32") {
       assert(
         (stat.mode & 0o111) !== 0 && (stat.mode & 0o022) === 0,
         "Packaged native agent executable permissions are unsafe"
