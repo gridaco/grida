@@ -1638,7 +1638,7 @@ Today:
   still untitled at the same catalogue revision. A client opts in at launch.
   The [process test](crates/grida-agent/tests/process/catalog.rs) verifies a
   tool-free title request and that a rename is never replaced.
-- [Native-provider auth routes](packages/grida-ai-agent/src/http/routes/chatgpt-auth.ts) — the dedicated native subscription host invokes the existing validated ceremony in-process. Historical full-agent route mounting remains source-only evidence; fixed paths come from their neutral protocol owner. Credential and callback mechanisms remain GRIDA-SEC-008.
+- [Native-provider auth routes](packages/grida-ai-agent/src/http/routes/chatgpt-auth.ts) — mounted only by the historical full-agent server, which remains source-only evidence; the dedicated native subscription host calls the credential manager directly; fixed paths come from their neutral protocol owner. Credential and callback mechanisms remain GRIDA-SEC-008.
 - [Desktop media startup proof](desktop/src/sidecar/media-startup.test.ts), [build fixture](desktop/src/sidecar/testing/media-startup-build.mjs), and [runtime guard](desktop/src/sidecar/testing/media-startup-guard.cjs) — actual Vite sidecar output, private framed provider/control traffic and main-transferred loopback sockets, with synthetic BYOK/GG responses and owned temporary state. Import/network tripwires and absent chat/scratch files test startup isolation; they are not an OS-sandbox, installed-app or provider integration certification.
 - The [packaged retained-media launcher](desktop/src/main/retained-media-launch.ts)
   supplies canonical disjoint settings, credential, media, and temporary
@@ -2725,8 +2725,9 @@ trusted merely because it is “local.”
    identity, and retry timing without upstream response bodies.
    The private native launch carries the opaque scope and selected model.
    Its stdio transport grants only the exact generation route and sends no
-   credentials. The in-process Desktop owner serves the same OAuth ceremony
-   and injects the selected token and account headers at the provider edge.
+   credentials. The in-process Desktop owner exposes the OAuth ceremony as
+   direct start/complete/cancel/status/sign-out calls (no HTTP route or
+   in-process router), bounds their string inputs, and injects the selected token and account headers at the provider edge.
    The opt-in profile fixes the reviewed default model. Signing out withdraws
    workspace admission and waits for the native children and custody work
    before replacement. Grida account sign-out releases the workspace without
@@ -2743,10 +2744,11 @@ trusted merely because it is “local.”
    `~/.codex/auth.json`, browser cookies, or another app's credential store.
    ChatGPT auth failure never launches or selects Codex ACP.
    Media-only startup mounts no ChatGPT auth/provider routes and constructs no
-   native credential manager. Moving the fixed route constants and ceremony
-   DTO to the neutral protocol module changes import ownership only; the
-   ceremony, exact destination grants and secret-free renderer contract remain
-   unchanged in the dedicated native subscription host.
+   native credential manager. The dedicated native subscription host no
+   longer routes the ceremony through the route module or its fixed paths;
+   Main's coordinator calls the host directly, still parses every result
+   field by field and forwards only a safe error code. Exact destination
+   grants and the secret-free renderer contract are unchanged.
 
 **Current experimental trust posture.** The implementation follows the public
 Codex/Zed-compatible native flow: unless
@@ -2785,7 +2787,8 @@ platform credential store is a separate hardening step.
   exact network grants, sidecar construction, guarded bridge, and shutdown.
 - [Desktop composition](desktop/src/sidecar/daemon.ts), [its tests](desktop/src/sidecar/daemon.test.ts), and [built media-entry isolation tests](packages/grida-ai-agent/src/media-server-isolation.test.ts) — retained-service startup never constructs a chat provider; the dedicated native subscription host owns credential use. Fixed auth wire constants remain available without importing the credential manager.
 - [Full-server startup tests](packages/grida-ai-agent/src/server-startup.test.ts) — preserve the single credential-store owner and native-provider configuration while bounding chat allocation by enabled capabilities.
-- [Native subscription custody](packages/grida-ai-agent/src/chatgpt-host.ts),
+- [Native subscription custody](packages/grida-ai-agent/src/chatgpt-host.ts)
+  and [its ceremony tests](packages/grida-ai-agent/src/chatgpt-host.test.ts),
   [Desktop host adapter](desktop/src/main/native-chatgpt-host.ts),
   [native process launcher](desktop/src/main/native-agent-process.ts),
   [private egress](desktop/src/main/native-provider-egress.ts), and

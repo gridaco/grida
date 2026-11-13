@@ -3,7 +3,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { expect, it, vi } from "vitest";
-import { CHATGPT_AUTH_ROUTE_PATHS } from "@grida/agent";
 import {
   CHATGPT_CALLBACK_URIS,
   CHATGPT_RESPONSES_URL,
@@ -360,20 +359,9 @@ it.skipIf(!resourcesPath)(
     const owner = () =>
       new NativeChatGptHost(path.join(root, "oauth"), { prepare });
     let host = owner();
-    const ceremony = async (route: string, body: object) => {
-      const response = await host.ceremonyRequest(route, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      expect(response.ok).toBe(true);
-      return await response.json();
-    };
     const connect = async () => {
-      const start = await ceremony(CHATGPT_AUTH_ROUTE_PATHS.start, {
-        redirect_uri: CHATGPT_CALLBACK_URIS[0],
-      });
-      const result = await ceremony(CHATGPT_AUTH_ROUTE_PATHS.complete, {
+      const start = await host.start(CHATGPT_CALLBACK_URIS[0]);
+      const result = await host.complete({
         attempt_id: start.attempt_id,
         state: start.state,
         code: "synthetic-code",
@@ -437,7 +425,7 @@ it.skipIf(!resourcesPath)(
       expect(dispatch.mock.calls[1][0].toString()).toContain(encrypted);
       await agent.close();
 
-      await ceremony(CHATGPT_AUTH_ROUTE_PATHS.sign_out, {});
+      await host.signOut();
       await connect();
       agent = await start();
       await agent.request("session/load", { sessionId, cwd, mcpServers: [] });

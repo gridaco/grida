@@ -216,7 +216,7 @@ export class NativeDesktopAgent {
       const { NativeChatGptHost } = await import("./native-chatgpt-host");
       const host = new NativeChatGptHost(userDataPath, network);
       const oauth = createChatGptOAuthCoordinator({
-        sidecar_fetch: (route, init) => host.ceremonyRequest(route, init),
+        ceremony: host,
         open_external: options.openExternal,
       });
       subscription = { host, oauth };

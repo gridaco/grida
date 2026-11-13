@@ -3,9 +3,10 @@
  *
  * The renderer may request connect/cancel/status/sign-out through guarded IPC,
  * but every sensitive step stays here: bind the loopback callback, ask the
- * sidecar to mint PKCE state, validate/open the provider URL, and forward one
- * valid code back to the credential owner. Only an explicitly reconstructed
- * secret-free status DTO is returned to the renderer.
+ * Main-owned credential host to mint PKCE state, validate/open the provider
+ * URL, and forward one valid code back to it. The host's results are treated
+ * as untrusted shapes: only an explicitly reconstructed secret-free status DTO
+ * is returned to the renderer.
  */
 
 import type {
@@ -13,7 +14,7 @@ import type {
   ChatGptSubscriptionStatus,
 } from "@grida/agent";
 import type { ChatGptConnectResult } from "@grida/desktop-bridge";
-import { CHATGPT_AUTH_ROUTE_PATHS, type ChatGptAuthStart } from "@grida/agent";
+import type { ChatGptAuthStart } from "@grida/agent";
 import {
   CHATGPT_CALLBACK_PATH,
   CHATGPT_CALLBACK_PORTS,
@@ -30,9 +31,22 @@ type ActiveConnect = {
   completed_status: ChatGptSubscriptionStatus | null;
 };
 
+/** The credential owner's sign-in ceremony. Results are parsed, not trusted. */
+export type ChatGptCeremony = {
+  start(redirectUri: string): Promise<unknown>;
+  complete(input: {
+    attempt_id: string;
+    code: string;
+    state: string;
+  }): Promise<unknown>;
+  cancel(attemptId: string): Promise<unknown>;
+  status(): Promise<unknown>;
+  signOut(): Promise<unknown>;
+};
+
 export type ChatGptOAuthCoordinatorDeps = {
   callback: Pick<OAuthLoopbackCallback, "start" | "close">;
-  sidecar_fetch: (path: string, init?: RequestInit) => Promise<Response>;
+  ceremony: ChatGptCeremony;
   open_external: (url: string) => Promise<void>;
 };
 
@@ -61,20 +75,18 @@ export class ChatGptOAuthCoordinator {
     if (!active) return;
     active.cancelled = true;
     active.attempt.cancel();
-    await this.cancelSidecarAttempt(active);
+    await this.cancelHostAttempt(active);
   }
 
   async status(): Promise<ChatGptSubscriptionStatus> {
-    return parseStatus(
-      await this.postJson(CHATGPT_AUTH_ROUTE_PATHS.status, {})
-    );
+    return parseStatus(await this.call((ceremony) => ceremony.status()));
   }
 
   async signOut(): Promise<ChatGptSubscriptionStatus> {
     // Sign-out is the authoritative credential deletion. A transient failure
     // on the narrower attempt-cancel route must never prevent it from running.
     await this.cancel().catch(() => undefined);
-    await this.postJson(CHATGPT_AUTH_ROUTE_PATHS.sign_out, {});
+    await this.call((ceremony) => ceremony.signOut());
     return await this.status();
   }
 
@@ -114,13 +126,11 @@ export class ChatGptOAuthCoordinator {
         throw new Error("ChatGPT sign-in was cancelled");
       }
       const start = parseStart(
-        await this.postJson(CHATGPT_AUTH_ROUTE_PATHS.start, {
-          redirect_uri: attempt.redirect_uri,
-        })
+        await this.call((ceremony) => ceremony.start(attempt.redirect_uri))
       );
       active.attempt_id = start.attempt_id;
       if (active.cancelled) {
-        await this.cancelSidecarAttempt(active);
+        await this.cancelHostAttempt(active);
         throw new Error("ChatGPT sign-in was cancelled");
       }
 
@@ -134,15 +144,10 @@ export class ChatGptOAuthCoordinator {
       attempt.activate({
         state: start.state,
         complete: async ({ code, state, redirect_uri, signal }) => {
+          if (signal.aborted) throw new Error("ChatGPT sign-in was cancelled");
           const status = parseStatus(
-            await this.postJson(
-              CHATGPT_AUTH_ROUTE_PATHS.complete,
-              {
-                attempt_id: start.attempt_id,
-                code,
-                state,
-              },
-              signal
+            await this.call((ceremony) =>
+              ceremony.complete({ attempt_id: start.attempt_id, code, state })
             )
           );
           if (redirect_uri !== attempt.redirect_uri || !status.ready) {
@@ -153,7 +158,7 @@ export class ChatGptOAuthCoordinator {
       });
 
       if (active.cancelled) {
-        await this.cancelSidecarAttempt(active);
+        await this.cancelHostAttempt(active);
         throw new Error("ChatGPT sign-in was cancelled");
       }
       await this.deps.open_external(authorizationUrl.toString());
@@ -165,7 +170,7 @@ export class ChatGptOAuthCoordinator {
     } catch (error) {
       const cancelled = active.cancelled;
       attempt.cancel();
-      await this.cancelSidecarAttempt(active).catch(() => undefined);
+      await this.cancelHostAttempt(active).catch(() => undefined);
       if (cancelled) {
         return { outcome: "cancelled" };
       }
@@ -175,7 +180,7 @@ export class ChatGptOAuthCoordinator {
     }
   }
 
-  private async cancelSidecarAttempt(active: ActiveConnect): Promise<void> {
+  private async cancelHostAttempt(active: ActiveConnect): Promise<void> {
     const attemptId = active.attempt_id;
     if (!attemptId || active.cancel_sent) return;
     if (active.cancel_in_flight) return await active.cancel_in_flight;
@@ -185,9 +190,7 @@ export class ChatGptOAuthCoordinator {
       let firstError: unknown;
       for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-          await this.postJson(CHATGPT_AUTH_ROUTE_PATHS.cancel, {
-            attempt_id: attemptId,
-          });
+          await this.call((ceremony) => ceremony.cancel(attemptId));
           active.cancel_sent = true;
           return;
         } catch (error) {
@@ -204,29 +207,19 @@ export class ChatGptOAuthCoordinator {
     await task;
   }
 
-  private async postJson(
-    path: string,
-    body: object,
-    signal?: AbortSignal
+  /** Reduce any owner failure to its safe code; never forward its message. */
+  private async call(
+    operation: (ceremony: ChatGptCeremony) => Promise<unknown>
   ): Promise<unknown> {
-    const response = await this.deps.sidecar_fetch(path, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-      signal,
-    });
-    if (!response.ok) {
-      const code = await safeErrorCode(response);
+    try {
+      return await operation(this.deps.ceremony);
+    } catch (error) {
+      const code = safeErrorCode(error);
       throw new Error(
         code
           ? `ChatGPT provider request failed (${code})`
-          : `ChatGPT provider request failed (HTTP ${response.status})`
+          : "ChatGPT provider request failed"
       );
-    }
-    try {
-      return await response.json();
-    } catch {
-      throw new Error("ChatGPT provider returned an invalid response");
     }
   }
 }
@@ -370,15 +363,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-async function safeErrorCode(response: Response): Promise<string | null> {
-  let value: unknown;
-  try {
-    value = await response.json();
-  } catch {
-    return null;
-  }
-  if (!isRecord(value) || typeof value.code !== "string") return null;
-  return /^[a-z0-9_]{1,128}$/.test(value.code) ? value.code : null;
+function safeErrorCode(error: unknown): string | null {
+  if (!isRecord(error) || typeof error.code !== "string") return null;
+  return /^[a-z0-9_]{1,128}$/.test(error.code) ? error.code : null;
 }
 
 function safeCoordinatorError(error: unknown): Error {

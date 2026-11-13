@@ -1,10 +1,14 @@
 // GRIDA-SEC-008 — host-only OAuth ceremony and subscription inference custody.
 import { AuthStore } from "@grida/daemon/server";
-import { Hono } from "hono";
 import path from "node:path";
-import { registerChatGptAuthRoutes } from "./http/routes/chatgpt-auth";
-import { CHATGPT_AUTH_ROUTE_PATHS } from "./protocol/chatgpt";
-import { ChatGptCredentialManager } from "./providers/chatgpt-credentials";
+import type {
+  ChatGptAuthStart,
+  ChatGptSubscriptionStatus,
+} from "./protocol/chatgpt";
+import {
+  ChatGptCredentialError,
+  ChatGptCredentialManager,
+} from "./providers/chatgpt-credentials";
 import {
   ChatGptProvider,
   type ChatGptProviderConfig,
@@ -15,9 +19,6 @@ import { ProviderHttp } from "./providers/http";
 export type { ChatGptProviderConfig } from "./providers/chatgpt";
 
 const MAX_CEREMONY_BYTES = 32 * 1024;
-const CEREMONY_ROUTES = new Set<string>(
-  Object.values(CHATGPT_AUTH_ROUTE_PATHS)
-);
 
 type HostOptions = Readonly<{
   userDataPath: string;
@@ -32,7 +33,7 @@ type HostOptions = Readonly<{
 
 /** One native process owns the ceremony and all subscription requests. */
 export class ChatGptSubscriptionHost {
-  private readonly ceremony = new Hono();
+  private readonly credentials: ChatGptCredentialManager;
   private readonly runtime: ChatGptProviderRuntime;
   private readonly http: ProviderHttp;
   private readonly inFlight = new Set<Promise<unknown>>();
@@ -73,28 +74,43 @@ export class ChatGptSubscriptionHost {
         throw new Error("chatgpt_host_download_unavailable");
       },
     });
-    const credentials = new ChatGptCredentialManager(
+    this.credentials = new ChatGptCredentialManager(
       new AuthStore(userDataPath),
       this.http,
       config.oauth
     );
-    this.runtime = { config, credentials };
-    registerChatGptAuthRoutes(this.ceremony, { credentials });
+    this.runtime = { config, credentials: this.credentials };
   }
 
-  /** Invoke existing ceremony handlers in-process without opening an HTTP listener. */
-  async ceremonyRequest(route: string, init?: RequestInit): Promise<Response> {
-    if (this.closed) return new Response(null, { status: 503 });
-    if (!CEREMONY_ROUTES.has(route)) return new Response(null, { status: 404 });
-    if (
-      init?.method !== "POST" ||
-      typeof init.body !== "string" ||
-      Buffer.byteLength(init.body) > MAX_CEREMONY_BYTES
-    )
-      return new Response(null, { status: 400 });
-    return await this.track(
-      Promise.resolve(this.ceremony.request(route, init))
+  /** Mint PKCE state for one sign-in through the given loopback callback. */
+  start(redirectUri: string): Promise<ChatGptAuthStart> {
+    return this.ceremony([redirectUri], () =>
+      this.credentials.start(redirectUri)
     );
+  }
+
+  /** Exchange one callback code for the exact pending attempt. */
+  complete(input: {
+    attempt_id: string;
+    code: string;
+    state: string;
+  }): Promise<ChatGptSubscriptionStatus> {
+    const { attempt_id, code, state } = input;
+    return this.ceremony([attempt_id, code, state], () =>
+      this.credentials.complete({ attempt_id, code, state })
+    );
+  }
+
+  cancel(attemptId: string): Promise<boolean> {
+    return this.ceremony([attemptId], () => this.credentials.cancel(attemptId));
+  }
+
+  status(): Promise<ChatGptSubscriptionStatus> {
+    return this.ceremony([], () => this.credentials.status());
+  }
+
+  signOut(): Promise<void> {
+    return this.ceremony([], () => this.credentials.signOut());
   }
 
   async capture(modelId: string) {
@@ -121,6 +137,23 @@ export class ChatGptSubscriptionHost {
   close(): Promise<void> {
     this.closed = true;
     return this.drain();
+  }
+
+  /** Bounded, non-empty string inputs; closed hosts admit no ceremony work. */
+  private ceremony<T>(
+    inputs: readonly string[],
+    run: () => Promise<T>
+  ): Promise<T> {
+    if (this.closed) return Promise.reject(new Error("chatgpt_host_closed"));
+    if (
+      inputs.some((value) => typeof value !== "string" || value.length === 0) ||
+      inputs.reduce((bytes, value) => bytes + Buffer.byteLength(value), 0) >
+        MAX_CEREMONY_BYTES
+    )
+      return Promise.reject(
+        new ChatGptCredentialError("chatgpt_oauth_attempt_invalid")
+      );
+    return this.track(run());
   }
 
   private track<T>(task: Promise<T>): Promise<T> {

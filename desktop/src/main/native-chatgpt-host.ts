@@ -27,8 +27,24 @@ export class NativeChatGptHost {
     });
   }
 
-  ceremonyRequest(route: string, init?: RequestInit): Promise<Response> {
-    return this.owner.ceremonyRequest(route, init);
+  start(redirectUri: string) {
+    return this.owner.start(redirectUri);
+  }
+
+  complete(input: { attempt_id: string; code: string; state: string }) {
+    return this.owner.complete(input);
+  }
+
+  cancel(attemptId: string) {
+    return this.owner.cancel(attemptId);
+  }
+
+  status() {
+    return this.owner.status();
+  }
+
+  signOut() {
+    return this.owner.signOut();
   }
 
   drain(): Promise<void> {
