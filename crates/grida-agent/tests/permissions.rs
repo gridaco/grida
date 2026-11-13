@@ -502,6 +502,20 @@ async fn writes_and_edits_stay_inside_the_project_and_off_metadata() {
     );
     assert_eq!(fs::read_to_string(&file).unwrap(), "1 2 2");
 
+    // A long but legal file name is replaced in place.
+    let long = format!("{}.txt", "n".repeat(240));
+    for (id, content) in [("w-long-1", "first"), ("w-long-2", "second")] {
+        let written = completed(
+            run.invoke(id, "write_file", json!({"path":long,"content":content}))
+                .await,
+        );
+        assert_eq!(written.status, OutcomeStatus::Succeeded, "{written:?}");
+    }
+    assert_eq!(
+        fs::read_to_string(fixture.default.join(&long)).unwrap(),
+        "second"
+    );
+
     // Metadata, links and folders without a write rule are refused.
     fs::create_dir(fixture.default.join(".git")).unwrap();
     failed(
@@ -514,6 +528,20 @@ async fn writes_and_edits_stay_inside_the_project_and_off_metadata() {
         "file_protected_path",
     );
     assert!(!fixture.default.join(".git/config").exists());
+    // A case-insensitive volume resolves these names to the metadata folders.
+    for (index, path) in [".GIT/config", ".Grida/settings.json"].iter().enumerate() {
+        failed(
+            run.invoke(
+                &format!("w2-{index}"),
+                "write_file",
+                json!({"path":path,"content":"x"}),
+            )
+            .await,
+            "file_protected_path",
+        );
+    }
+    assert!(!fixture.default.join(".git/config").exists());
+    assert!(!fixture.default.join(".Grida").exists());
     std::os::unix::fs::symlink(
         fixture.additional.join("target"),
         fixture.default.join("link"),
@@ -657,8 +685,9 @@ async fn decline_and_durable_approval_dispatch_only_the_exact_command_once() {
         request.effect,
         ApprovalEffect::Command {
             access: grida_agent::command::CommandAccess::ReadWrite,
+            executable: Some(ref executable),
             ..
-        }
+        } if executable == Path::new("/bin/bash")
     ));
     run.answer(wait, ApprovalDecision::ApproveOnce).await;
     let epoch = run.opened.turn.view().state.binding().epoch;

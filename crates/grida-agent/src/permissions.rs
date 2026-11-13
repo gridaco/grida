@@ -667,7 +667,12 @@ pub enum ApprovalEffect {
     },
     Command {
         access: CommandAccess,
+        /// The program as the model named it.
         program: PathBuf,
+        /// The file that runs: a bare program name resolved on the command's
+        /// `PATH`, which the model's environment may override.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        executable: Option<PathBuf>,
         cwd: PathBuf,
         arguments: Vec<String>,
         environment_names: Vec<String>,
@@ -1049,13 +1054,24 @@ impl TurnPermissions {
                 if rule == AccessRule::Deny {
                     return Err(denied());
                 }
+                let program = input.program.clone();
+                let cwd = input.cwd.clone();
+                let arguments = input.args.clone();
+                let environment_names = input.env.keys().cloned().collect();
+                let stdin_bytes = input.stdin.len();
+                let spec = input.into_spec(
+                    command.limits.timeout,
+                    command.limits.max_output_bytes,
+                    &command.environment,
+                );
                 let effect = ApprovalEffect::Command {
                     access,
-                    program: input.program.clone(),
-                    cwd: input.cwd.clone(),
-                    arguments: input.args.clone(),
-                    environment_names: input.env.keys().cloned().collect(),
-                    stdin_bytes: input.stdin.len(),
+                    program,
+                    executable: Some(spec.executable.clone()),
+                    cwd,
+                    arguments,
+                    environment_names,
+                    stdin_bytes,
                 };
                 let scope = self.profile.command_scope(
                     self.commands.clone(),
@@ -1064,14 +1080,7 @@ impl TurnPermissions {
                 )?;
                 let process = command
                     .sandbox
-                    .prepare(
-                        input.into_spec(
-                            command.limits.timeout,
-                            command.limits.max_output_bytes,
-                            &command.environment,
-                        ),
-                        scope,
-                    )
+                    .prepare(spec, scope)
                     .map_err(|error| problem(error.kind, "command_preparation_refused"))?;
                 validate_working_root(&process, directory)?;
                 let capture = process.capture_fingerprint()?;

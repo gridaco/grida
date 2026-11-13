@@ -189,16 +189,17 @@ pub fn load_permission_profile(
     state_directory: &Path,
     credential_home: Option<&Path>,
 ) -> Result<Arc<PermissionProfile>> {
-    load_permission_profile_excluding(profile_file, state_directory, credential_home, None)
+    load_permission_profile_excluding(profile_file, state_directory, credential_home, &[])
 }
 
-/// As [`load_permission_profile`], also keeping the named provider credential
-/// variable out of any environment programs inherit.
+/// As [`load_permission_profile`], also keeping the named launch secret
+/// variables (provider credential, listener and outbound tokens) out of any
+/// environment programs receive.
 pub fn load_permission_profile_excluding(
     profile_file: &Path,
     state_directory: &Path,
     credential_home: Option<&Path>,
-    credential_env: Option<&str>,
+    launch_secrets: &[&str],
 ) -> Result<Arc<PermissionProfile>> {
     let bytes = read_profile(profile_file)?;
     let profile: ProfileFile = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
@@ -291,8 +292,8 @@ pub fn load_permission_profile_excluding(
             limits: COMMAND_LIMITS,
             disk_read: command.disk_read,
             environment: Arc::new(match command.environment {
-                Some(environment) => without_host_variables(environment, credential_env)?,
-                None if command.inherit_environment => inherited_environment(credential_env),
+                Some(environment) => without_host_variables(environment, launch_secrets)?,
+                None if command.inherit_environment => inherited_environment(launch_secrets),
                 None => BTreeMap::new(),
             }),
         })
@@ -575,11 +576,26 @@ mod tests {
     }
 
     #[test]
-    fn inherited_environment_omits_the_launch_credential_variable() {
-        let inherited = inherited_environment(Some("PATH"));
+    fn program_environments_omit_every_launch_secret_variable() {
+        let inherited = inherited_environment(&["PATH", "HOME"]);
         assert!(!inherited.contains_key("PATH"));
+        assert!(!inherited.contains_key("HOME"));
         assert!(inherited.keys().all(|name| !name.starts_with("GRIDA_")));
-        assert!(inherited_environment(None).contains_key("PATH"));
+        assert!(inherited_environment(&[]).contains_key("PATH"));
+        let supplied = without_host_variables(
+            BTreeMap::from(
+                [
+                    ("ACP_TOKEN", "a"),
+                    ("MCP_TOKEN", "b"),
+                    ("GRIDA_STATE", "c"),
+                    ("LANG", "C"),
+                ]
+                .map(|(name, value)| (name.to_owned(), value.to_owned())),
+            ),
+            &["ACP_TOKEN", "MCP_TOKEN"],
+        )
+        .unwrap();
+        assert_eq!(supplied.keys().collect::<Vec<_>>(), ["LANG"]);
     }
 
     #[test]
@@ -622,17 +638,21 @@ mod tests {
 }
 
 /// The host's environment for programs, without Grida's internal variables
-/// or the provider credential this host was launched with.
-fn inherited_environment(credential_env: Option<&str>) -> BTreeMap<String, String> {
+/// or the secrets this host was launched with.
+fn inherited_environment(launch_secrets: &[&str]) -> BTreeMap<String, String> {
     std::env::vars()
-        .filter(|(name, _)| !name.starts_with("GRIDA_") && Some(name.as_str()) != credential_env)
+        .filter(|(name, _)| program_may_receive(name, launch_secrets))
         .collect()
+}
+
+fn program_may_receive(name: &str, launch_secrets: &[&str]) -> bool {
+    !name.starts_with("GRIDA_") && !launch_secrets.contains(&name)
 }
 
 /// A supplied program environment, validated and filtered like an inherited one.
 fn without_host_variables(
     environment: BTreeMap<String, String>,
-    credential_env: Option<&str>,
+    launch_secrets: &[&str],
 ) -> Result<BTreeMap<String, String>> {
     if environment.len() > 512
         || environment.iter().any(|(name, value)| {
@@ -643,6 +663,6 @@ fn without_host_variables(
     }
     Ok(environment
         .into_iter()
-        .filter(|(name, _)| !name.starts_with("GRIDA_") && Some(name.as_str()) != credential_env)
+        .filter(|(name, _)| program_may_receive(name, launch_secrets))
         .collect())
 }

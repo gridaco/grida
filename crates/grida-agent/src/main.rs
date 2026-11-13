@@ -546,6 +546,21 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
     } else {
         None
     };
+    // Every launch secret stays out of the environment programs receive.
+    let launch_secrets: Vec<&str> = [
+        provider.credential_env.as_deref(),
+        listener
+            .is_some()
+            .then(|| args.get_one::<String>("server-token-env"))
+            .flatten()
+            .map(String::as_str),
+        args.get_one::<String>("mcp-endpoint")
+            .and_then(|_| args.get_one::<String>("mcp-token-env"))
+            .map(String::as_str),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
     let permissions = args
         .get_one::<PathBuf>("permission-profile")
         .map(|path| {
@@ -553,7 +568,7 @@ async fn dispatch(matches: ArgMatches) -> Result<u8> {
                 path,
                 state_dir,
                 provider.credential_home.as_deref(),
-                provider.credential_env.as_deref(),
+                &launch_secrets,
             )
         })
         .transpose()?;
@@ -782,12 +797,7 @@ async fn outbound_mcp(
     let token_env = args
         .get_one::<String>("mcp-token-env")
         .expect("required by the outbound MCP endpoint");
-    if token_env.is_empty()
-        || token_env.len() > 128
-        || !token_env
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
-    {
+    if !grida_agent::loopback_bearer::valid_secret_env_name(token_env) {
         return Err(problem(
             ErrorKind::InvalidInput,
             "invalid_mcp_token_environment_name",

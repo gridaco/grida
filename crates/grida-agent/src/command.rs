@@ -853,6 +853,31 @@ mod tests {
     }
 
     #[test]
+    fn a_supplied_search_path_chooses_the_executable_for_a_bare_name() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = tempfile::tempdir().unwrap();
+        let planted = directory.path().join("git");
+        std::fs::write(&planted, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&planted, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let input = CommandArguments::parse(
+            &ToolArguments::Json(json!({
+                "program": "git", "args": [], "cwd": "/tmp",
+                "env": {"PATH": directory.path()},
+            })),
+            4096,
+            false,
+        )
+        .unwrap();
+        let inherited = BTreeMap::from([("PATH".to_owned(), "/usr/bin:/bin".to_owned())]);
+        assert_eq!(
+            input
+                .into_spec(Duration::from_secs(1), 1, &inherited)
+                .executable,
+            planted
+        );
+    }
+
+    #[test]
     fn closing_signals_active_jobs_and_retains_unverified_cleanup() {
         let activity = Activity::default();
         let identity = identity("command");

@@ -315,7 +315,12 @@ impl FileTools {
                 "file_relative_path_invalid",
             ));
         };
-        if PROTECTED_METADATA.contains(&names[0]) {
+        // Compared without case, because a case-insensitive volume resolves
+        // `.GIT` to `.git`.
+        if PROTECTED_METADATA
+            .iter()
+            .any(|protected| protected.eq_ignore_ascii_case(names[0]))
+        {
             return Err(problem(ErrorKind::Unsupported, "file_protected_path"));
         }
         budget.check()?;
@@ -839,13 +844,8 @@ fn existing_file(parent: &File, name: &str) -> Result<Option<Stat>> {
 fn replace_file(parent: &File, name: &str, bytes: &[u8], previous: Option<&Stat>) -> Result<()> {
     use std::io::Write;
     let mode = previous.map_or(0o644, |stat| (stat.st_mode as u32) & 0o777);
-    let temporary = format!(
-        ".{name}.grida-{}-{}.tmp",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |elapsed| elapsed.as_nanos())
-    );
+    // A fixed-length name, so any legal target name can be staged.
+    let temporary = format!(".grida-write-{}.tmp", uuid::Uuid::new_v4().simple());
     let mut file: File = unix::openat(
         parent,
         temporary.as_str(),

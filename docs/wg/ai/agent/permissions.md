@@ -84,7 +84,8 @@ exist, so a program can initialize a new repository but a later program cannot
 rewrite it. The agent's own configuration directories are protected even before
 they exist, so creating one always needs the person's approval. The host's own
 stores are always protected. The agent's file tools never write any of these
-names.
+names, in any letter case, since a case-insensitive volume resolves `.GIT` to
+`.git`.
 
 ## What a program sees
 
@@ -92,9 +93,10 @@ A program the agent runs should behave as it does in the person's terminal,
 minus the access the sandbox level withholds:
 
 - **Environment.** It inherits the person's environment, including the search
-  path, so ordinary tools resolve by name. The host removes only its own
-  internal variables. Provider credentials are never placed in the environment
-  by the host.
+  path, so ordinary tools resolve by name. The host removes its own internal
+  variables and every secret it was launched with: the provider credential and
+  the bearer tokens of its listeners and tool peers. Provider credentials are
+  never placed in the environment by the host.
 - **Reads.** Under read-only and workspace-write it may read anywhere the person
   can, except the host's own state and credential stores. Toolchains,
   interpreters and shell startup files therefore work without listing them.
