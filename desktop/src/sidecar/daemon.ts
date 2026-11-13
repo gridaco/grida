@@ -34,8 +34,6 @@ export namespace DesktopDaemon {
     ) {
       throw new Error("desktop_provider_transport_required");
     }
-    if (agent !== false && agent !== "native-chat")
-      throw new Error("desktop_chat_runtime_retired");
     if (
       opts.ordinary_native_chat_services &&
       (agent !== "native-chat" ||

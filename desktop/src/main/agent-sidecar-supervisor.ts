@@ -127,8 +127,7 @@ export class AgentSidecarSupervisor {
     this.log.write(stream, line);
   }
 
-  constructor(options: { agent?: boolean } = {}) {
-    if (options.agent === true) throw new Error("desktop_chat_runtime_retired");
+  constructor() {
     app.once("will-quit", () => {
       // Main awaits the exact writer drain for these launch roles.
       if (this.retainedMedia) return;
@@ -994,9 +993,7 @@ export class AgentSidecarSupervisor {
 let supervisor: AgentSidecarSupervisor | undefined;
 
 function sidecar(): AgentSidecarSupervisor {
-  return (supervisor ??= new AgentSidecarSupervisor({
-    agent: false,
-  }));
+  return (supervisor ??= new AgentSidecarSupervisor());
 }
 
 export function startAgentSidecar(

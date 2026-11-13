@@ -93,26 +93,6 @@ if (!mediaRoot) {
 }
 const requiredMediaRoot = mediaRoot;
 const agentMode = getCliArg("agent") ?? "disabled";
-if (agentMode !== "disabled" && agentMode !== "native-chat") {
-  console.error("[agent-sidecar] fatal: TypeScript chat runtime is retired");
-  process.exit(1);
-}
-if (
-  [
-    "scratch-base",
-    "skills-root",
-    "owned-legacy-writer",
-    "legacy-state-root",
-  ].some((name) =>
-    process.argv.some(
-      (argument) =>
-        argument === `--${name}` || argument.startsWith(`--${name}=`)
-    )
-  )
-) {
-  console.error("[agent-sidecar] fatal: retired chat launch option");
-  process.exit(1);
-}
 const runtimeEditorBaseUrl = getCliArg("editor-base-url") ?? EDITOR_BASE_URL;
 // GRIDA-SEC-004 — the supervisor tells us whether it wrapped this spawn with
 // native confinement. Trusted: argv is set by the trusted main process, not the renderer.

@@ -117,7 +117,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   });
 
   it("starts the media sandbox without preparing scratch or command authority", async () => {
-    const supervisor = new AgentSidecarSupervisor({ agent: false });
+    const supervisor = new AgentSidecarSupervisor();
     const state = supervisor as unknown as {
       initSandbox(): Promise<void>;
       scratchBase: string | null;
@@ -248,7 +248,7 @@ describe("AgentSidecarSupervisor recovery", () => {
         .spyOn(RetainedMediaLaunch, "prepareProviderHome")
         .mockResolvedValue(undefined);
       await fs.mkdir(LegacyChatSourceLease.controlRoot(agent), { mode: 0o700 });
-      const supervisor = new AgentSidecarSupervisor({ agent: false });
+      const supervisor = new AgentSidecarSupervisor();
       const observed = new Error("fixture reached the retained launcher");
       const launch = vi
         .spyOn(RetainedMediaLaunch, "start")
@@ -324,7 +324,7 @@ describe("AgentSidecarSupervisor recovery", () => {
             ? browser
             : path.join(root, name)
       );
-      const supervisor = new AgentSidecarSupervisor({ agent: false });
+      const supervisor = new AgentSidecarSupervisor();
       const reveal = vi.fn<(directory: string) => void>();
       expect(supervisor.hasCompletedMediaArchive).toBe(false);
       await expect(supervisor.startRetainedMedia()).rejects.toBe(observed);
@@ -369,14 +369,8 @@ describe("AgentSidecarSupervisor recovery", () => {
     }
   });
 
-  it("refuses a retired chat owner before preparing scratch or spawning", () => {
-    expect(() => new AgentSidecarSupervisor({ agent: true })).toThrow(
-      "desktop_chat_runtime_retired"
-    );
-  });
-
   it("forwards disabled agent startup without scratch or skill arguments", async () => {
-    const supervisor = new AgentSidecarSupervisor({ agent: false });
+    const supervisor = new AgentSidecarSupervisor();
     // Inspect the exact native argv, then stop before spawning a real child.
     const prepare = vi
       .spyOn(RetainedServiceSandbox.prototype, "prepare")
@@ -408,7 +402,7 @@ describe("AgentSidecarSupervisor recovery", () => {
       try {
         await fs.mkdir(agent);
         await fs.symlink(path.join(root, "missing"), marker);
-        const supervisor = new AgentSidecarSupervisor({ agent: false });
+        const supervisor = new AgentSidecarSupervisor();
         await expect(supervisor.start()).rejects.toThrow(
           "legacy_chat_handoff_required"
         );
@@ -438,7 +432,7 @@ describe("AgentSidecarSupervisor recovery", () => {
       );
       vi.stubEnv("GRIDA_AGENT_USER_DATA", root);
       try {
-        const supervisor = new AgentSidecarSupervisor({ agent: false });
+        const supervisor = new AgentSidecarSupervisor();
         Object.assign(supervisor, {
           nativeSandbox: new RetainedServiceSandbox({
             network: {
@@ -560,7 +554,7 @@ describe("AgentSidecarSupervisor recovery", () => {
   it("shares the canonical Grida home and isolates an explicit agent data override", async () => {
     vi.stubEnv("GRIDA_HOME", "/synthetic/grida-home");
     vi.stubEnv("GRIDA_AGENT_USER_DATA", undefined);
-    const shared = new AgentSidecarSupervisor({ agent: false }) as unknown as {
+    const shared = new AgentSidecarSupervisor() as unknown as {
       user_data_path: string;
       provider_home: string;
       stop(): void;
@@ -569,9 +563,7 @@ describe("AgentSidecarSupervisor recovery", () => {
     expect(shared.provider_home).toBe("/synthetic/grida-home");
     shared.stop();
     vi.stubEnv("GRIDA_AGENT_USER_DATA", "/synthetic/isolated-agent");
-    const isolated = new AgentSidecarSupervisor({
-      agent: false,
-    }) as unknown as {
+    const isolated = new AgentSidecarSupervisor() as unknown as {
       user_data_path: string;
       provider_home: string;
       stop(): void;

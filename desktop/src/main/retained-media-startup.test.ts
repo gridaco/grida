@@ -66,7 +66,7 @@ it.each(["managed", "split"])(
         .mockImplementation(() => {
           throw launchObserved;
         });
-      const retained = new AgentSidecarSupervisor({ agent: false });
+      const retained = new AgentSidecarSupervisor();
       await expect(retained.startRetainedMedia()).rejects.toThrow(
         "retained_media_profile_unavailable"
       );

@@ -139,22 +139,4 @@ describe("Desktop daemon composition", () => {
       })
     );
   });
-
-  it.each([
-    true,
-    "enabled",
-    { scratch_base: "/synthetic/scratch", sandbox_enforced: true },
-    { owned_legacy_writer: true },
-  ])(
-    "refuses a retired chat composition before retained services start: %j",
-    async (agent) => {
-      await expect(
-        DesktopDaemon.create({
-          ...common,
-          agent,
-        } as unknown as DesktopDaemon.Options)
-      ).rejects.toThrow("desktop_chat_runtime_retired");
-      expect(mocks.media).not.toHaveBeenCalled();
-    }
-  );
 });
