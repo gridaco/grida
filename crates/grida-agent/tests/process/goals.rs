@@ -321,6 +321,60 @@ async fn the_user_can_confirm_only_exact_accounted_goal_work_after_restart() {
     terminate_shared_server(child).await;
 }
 
+/// A client that names no allowance gets the product default, captured with
+/// the goal and kept on retry.
+#[tokio::test]
+async fn a_goal_without_an_allowance_captures_the_product_default() {
+    let temporary = TempDir::new().unwrap();
+    let state = temporary.path().join("agent-state");
+    let workspace = TempDir::new().unwrap();
+    let mut endpoint = Endpoint::start(vec![Reply::Hold("Working on the goal")]).await;
+    let (child, url) = shared_server(&state, &endpoint.url).await;
+    let mut client = goal_client(&url, true, false).await;
+    let new = ws_rpc(
+        &mut client,
+        2,
+        "session/new",
+        json!({"cwd":workspace.path(),"mcpServers":[]}),
+    )
+    .await;
+    let session = new["result"]["sessionId"].as_str().unwrap();
+    let start = json!({
+        "sessionId":session,"inputId":"default-allowance",
+        "prompt":[{"type":"text","text":"Prepare the export"}],
+        "goal":{
+            "objective":{"description":"Prepare the export","criteria":["The exported file opens"]},
+            "automatic":true
+        }
+    });
+    let accepted = ws_rpc(&mut client, 3, "_co.grida/goal/start", start.clone()).await;
+    assert_eq!(
+        accepted["result"]["inputId"], "default-allowance",
+        "{accepted}"
+    );
+    endpoint.request().await;
+    let inspected = ws_rpc(
+        &mut client,
+        4,
+        "_co.grida/goal/inspect",
+        json!({"sessionId":session}),
+    )
+    .await;
+    assert_eq!(
+        inspected["result"]["goal"]["allowance"],
+        json!({"work_turns":8,"inference_steps":64}),
+        "{inspected}"
+    );
+    let retry = ws_rpc(&mut client, 5, "_co.grida/goal/start", start).await;
+    assert_eq!(
+        retry["result"]["inputPosition"], accepted["result"]["inputPosition"],
+        "{retry}"
+    );
+    drop(client);
+    terminate_shared_server(child).await;
+    endpoint.done().await;
+}
+
 #[tokio::test]
 async fn negotiated_goals_keep_interrupted_continuation_owned_after_restart() {
     let temporary = TempDir::new().unwrap();

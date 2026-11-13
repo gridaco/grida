@@ -13,8 +13,8 @@ const MAX_PENDING_TRANSFERS = 64;
  * Each accepted socket is paused and transferred as an OS capability over the
  * per-spawn Node IPC descriptor. The sidecar can serve that already-connected
  * socket, but it receives no listener and no operation that can choose or open
- * a destination. This works across SRT's Linux network namespace and lets
- * macOS run with `allowLocalBinding: false`.
+ * a destination. This works inside the retained-service sandbox's Linux
+ * network namespace and lets macOS run with no local binding.
  */
 export class ServicesSidecarSocketHost {
   private server: Server | null = null;

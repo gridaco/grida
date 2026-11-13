@@ -7,7 +7,7 @@
  * Its load-bearing behaviors: the root is exactly the opened directory (no
  * git-root expansion — always respect what the user opened), a path-stable id
  * (same dir → same id across launches), and independent coexistence of
- * multiple opened roots — the per-root scopes the future srt fs-policy unions
+ * multiple opened roots — the per-root scopes a filesystem policy unions
  * together.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

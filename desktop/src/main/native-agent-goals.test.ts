@@ -56,6 +56,27 @@ it("requires monetary capability and preserves the exact cap in the Goal start e
   );
 });
 
+it("leaves an omitted allowance to the host's product default", async () => {
+  const request =
+    vi.fn<(method: string, params: unknown) => Promise<unknown>>();
+  const goals = new NativeAgentGoals(request);
+  const { allowance: _, ...withoutAllowance } = REQUEST;
+  await goals.start("session", "input", withoutAllowance, {
+    fundedReview: false,
+    namedChild: false,
+  });
+  const [, params] = request.mock.calls[0] as [string, { goal: object }];
+  expect(params.goal).not.toHaveProperty("allowance");
+  expect(() =>
+    goals.start(
+      "session",
+      "input",
+      { ...REQUEST, allowance: { workTurns: 1 } },
+      { fundedReview: false, namedChild: false }
+    )
+  ).toThrow("native_chat_goal_invalid");
+});
+
 it("binds a named reviewer only to a negotiated Ultra Goal start", async () => {
   const request =
     vi.fn<(method: string, params: unknown) => Promise<unknown>>();

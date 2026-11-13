@@ -4046,10 +4046,10 @@ it("starts a composer goal only on send and reuses its accepted request after a 
   await controller.submit("Prepare an SVG that opens correctly");
   expect(start.mock.calls).toHaveLength(2);
   expect(start.mock.calls[1]).toEqual(start.mock.calls[0]);
+  // The renderer names no allowance; the host applies the product default.
   expect(start).toHaveBeenLastCalledWith("new", expect.any(String), {
     objective: "Prepare an SVG that opens correctly",
     criteria: ["Prepare an SVG that opens correctly"],
-    allowance: { workTurns: 8, inferenceSteps: 64 },
     automatic: true,
     operatingRegime: "act",
   });

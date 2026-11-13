@@ -57,6 +57,20 @@ pub struct Allowance {
     pub inference_steps: NonZeroU32,
 }
 
+impl Allowance {
+    /// The product's allowance for a goal whose client names none.
+    pub const DEFAULT: Self = Self {
+        work_turns: NonZeroU32::new(8).expect("nonzero"),
+        inference_steps: NonZeroU32::new(64).expect("nonzero"),
+    };
+}
+
+impl Default for Allowance {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Usage {
     pub work_turns: u32,

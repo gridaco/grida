@@ -20,6 +20,9 @@ pub(super) fn funded_review_unavailable() -> Error {
 #[serde(deny_unknown_fields)]
 pub struct GoalRequest {
     pub objective: Objective,
+    /// A client that names no allowance receives the product default, which
+    /// is then captured with the goal like an explicit one.
+    #[serde(default)]
     pub allowance: Allowance,
     #[serde(default)]
     pub automatic: bool,

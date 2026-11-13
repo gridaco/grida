@@ -363,10 +363,6 @@ function pickSessionIndependent(
 
 /** Renderer-owned observation and text projection. Work stays in the native host. */
 export class NativeChatController {
-  static readonly goalComposerAllowance = Object.freeze({
-    workTurns: 8,
-    inferenceSteps: 64,
-  });
   private view = EMPTY;
   private readonly listeners = new Set<() => void>();
   private scope?: Scope;
@@ -2638,7 +2634,7 @@ export class NativeChatController {
     return {
       objective: text.trim(),
       criteria: [text.trim()],
-      allowance: NativeChatController.goalComposerAllowance,
+      // The host applies the product's default allowance.
       automatic: true,
       ...(this.view.effort === "ultra" && { effort: "ultra" }),
     };
@@ -4465,12 +4461,11 @@ function goalRequestProblem(
     "goalEffortAvailable" | "observation" | "operatingRegime"
   >
 ): string | null {
-  // A requested check-in's eligibility is the host's decision; its refusal
-  // explains why.
   if (request.effort === "ultra" && !view.goalEffortAvailable)
     return "Ultra is unavailable for goals on this connection.";
   if (
     request.maxCostMills !== undefined &&
+    request.allowance !== undefined &&
     request.allowance.inferenceSteps > 4096
   )
     return "An enforced spending limit supports at most 4,096 inference steps per goal.";
@@ -4487,6 +4482,7 @@ function goalRequestProblem(
   );
   if (objectiveProblem) return objectiveProblem;
   if (
+    request.allowance &&
     [request.allowance.workTurns, request.allowance.inferenceSteps].some(
       (limit) => !Number.isSafeInteger(limit) || limit < 1 || limit > 0xffffffff
     )

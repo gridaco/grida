@@ -50,7 +50,8 @@ export class NativeAgentGoals {
 
   private static readRequest(value: unknown): NativeChatGoalRequest {
     const input = object(value);
-    const allowance = object(input.allowance);
+    const allowance =
+      input.allowance === undefined ? undefined : object(input.allowance);
     const operatingRegime =
       input.operatingRegime === undefined
         ? undefined
@@ -76,26 +77,30 @@ export class NativeAgentGoals {
         : identity(input.namedChildId);
     if (
       Object.keys(input).length !==
-        4 +
+        3 +
+          Number(allowance !== undefined) +
           Number(operatingRegime !== undefined) +
           Number(effort !== undefined) +
           Number(maxCostMills !== undefined) +
           Number(namedChildId !== undefined) ||
-      Object.keys(allowance).length !== 2
+      (allowance !== undefined && Object.keys(allowance).length !== 2)
     )
       throw invalid();
     if (
       maxCostMills !== undefined &&
+      allowance !== undefined &&
       number(allowance.inferenceSteps, 1, MAX_U32) > 4096
     )
       throw new Error("native_chat_goal_spending_allowance_limit");
     return {
       objective: text(input.objective, OBJECTIVE_LIMIT),
       criteria: criteria(input.criteria),
-      allowance: {
-        workTurns: number(allowance.workTurns, 1, MAX_U32),
-        inferenceSteps: number(allowance.inferenceSteps, 1, MAX_U32),
-      },
+      ...(allowance !== undefined && {
+        allowance: {
+          workTurns: number(allowance.workTurns, 1, MAX_U32),
+          inferenceSteps: number(allowance.inferenceSteps, 1, MAX_U32),
+        },
+      }),
       automatic: flag(input.automatic),
       ...(operatingRegime && { operatingRegime }),
       ...(effort && { effort }),
@@ -104,7 +109,10 @@ export class NativeAgentGoals {
     };
   }
 
-  static readStoredRequest(value: unknown): NativeChatGoalRequest {
+  /** A stored goal always carries the allowance it was started with. */
+  static readStoredRequest(
+    value: unknown
+  ): NativeChatGoalRequest & { allowance: NativeChatGoalUsage } {
     const row = object(value);
     const objective = object(row.objective);
     const namedChildId = row.namedChildId ?? row.named_child;
@@ -177,10 +185,13 @@ export class NativeAgentGoals {
       ...(maxCostMills !== undefined && { maxCostMills }),
       goal: {
         objective: { description: objective, criteria },
-        allowance: {
-          work_turns: allowance.workTurns,
-          inference_steps: allowance.inferenceSteps,
-        },
+        // The host applies the product default to an omitted allowance.
+        ...(allowance && {
+          allowance: {
+            work_turns: allowance.workTurns,
+            inference_steps: allowance.inferenceSteps,
+          },
+        }),
         automatic,
         ...(namedChildId && { named_child: namedChildId }),
       },

@@ -502,7 +502,8 @@ export type NativeChatGoalUsage = Readonly<{
 export type NativeChatGoalRequest = Readonly<{
   objective: string;
   criteria: readonly string[];
-  allowance: NativeChatGoalUsage;
+  /** Omitted, the host applies the product's default allowance. */
+  allowance?: NativeChatGoalUsage;
   automatic: boolean;
   operatingRegime?: NativeChatOperatingRegime;
   effort?: NativeChatEffort;
@@ -524,8 +525,9 @@ export type NativeChatGoalStatus =
     };
 
 export type NativeChatGoal = Readonly<
-  Omit<NativeChatGoalRequest, "operatingRegime"> & {
+  Omit<NativeChatGoalRequest, "operatingRegime" | "allowance"> & {
     goalId: string;
+    allowance: NativeChatGoalUsage;
     state: NativeChatGoalStatus;
     paused: boolean;
     progress: string | null;

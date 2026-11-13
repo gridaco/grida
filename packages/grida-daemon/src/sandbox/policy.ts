@@ -9,8 +9,8 @@
  * `allowed_network_hosts`; Desktop passes none because provider HTTP is
  * routed through the host. The daemon itself knows no AI vendor.
  *
- * Secret-read ownership split (the srt policy here confines the WHOLE
- * sidecar, host process included):
+ * Secret-read ownership split (this policy confines the WHOLE sidecar,
+ * host process included):
  *
  *   - HOME secrets (`~/.ssh`, `~/.aws`, shell rc files, …) are denied for
  *     the entire tree via `deny_read` below — the host has no business
@@ -40,17 +40,16 @@ export type DaemonSandboxPolicy = {
 /**
  * Broad dev-network allowlist (RFC `permission modes` / network).
  *
- * srt's network model is allow-only and deliberately FORBIDS `*` / overly-broad
- * patterns ("not allowed for security reasons"), so "open network" is
- * enumerated, not unrestricted — srt's structural sandbox is also its network
- * sandbox and cannot be told "allow everything." This is a denylist's mirror: a
- * maintained allowlist of the package/registry + VCS hosts the shell workload
- * needs for real work (install deps, fetch code, clone). It is intentionally a
- * starter set across the major ecosystems and is meant to grow; a host not
- * listed here is unreachable (the workload surfaces a network failure, not a
- * silent hang).
+ * The network model is allow-only and has no `*` / overly-broad entry, so
+ * "open network" is enumerated, not unrestricted. This is a denylist's mirror:
+ * a maintained allowlist of the package/registry + VCS hosts a workload needs
+ * for real work (install deps, fetch code, clone). It is intentionally a
+ * starter set across the major ecosystems; a host not listed here is
+ * unreachable (the workload surfaces a network failure, not a silent hang).
+ * Desktop's retained services disable this baseline and run with no direct
+ * network at all.
  *
- * Apex AND `*.` are both listed where needed: srt's `*.host` matches
+ * Apex AND `*.` are both listed where needed: a `*.host` entry matches
  * subdomains only, not the bare apex.
  */
 const DEV_NETWORK_HOSTS: readonly string[] = [
@@ -132,7 +131,7 @@ export function buildDaemonSandboxPolicy(opts: {
   include_dev_network_hosts?: boolean;
   /**
    * Host-contributed upstream hosts, merged with the baseline
-   * dev-network allowlist when that baseline is enabled. srt `*.host`
+   * dev-network allowlist when that baseline is enabled. A `*.host` entry
    * matches subdomains only — callers must list apexes explicitly.
    */
   allowed_network_hosts?: readonly string[];
