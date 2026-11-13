@@ -1339,7 +1339,6 @@ class Sidecar {
       { fetch: fetchProvider },
       fatal,
       undefined,
-      undefined,
       prepareProviderCustody
     );
     this.sockets = new AgentDaemonSocketHost(child, fatal);

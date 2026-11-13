@@ -11,11 +11,6 @@ import {
   type IncomingMessage,
   type Session,
 } from "electron";
-import type {
-  ShellExecutionScope,
-  ShellExecutor,
-  ShellRunResult,
-} from "@grida/daemon/server";
 import { AgentNetworkPolicy } from "../agent-network-policy";
 import { AgentSidecarChannel } from "../agent-sidecar-channel";
 import { AgentNetworkAuthority } from "./agent-network-authority";
@@ -33,8 +28,6 @@ const MAX_RESPONSE_BODY_BYTES = 512 * 1024 * 1024;
 const RESPONSE_CHUNK_BYTES = 48 * 1024;
 const MAX_REDIRECTS = 5;
 const MAX_TERMINAL_RESPONSE_TOMBSTONES = 128;
-const MAX_CONCURRENT_COMMANDS = 4;
-const MAX_TERMINAL_COMMAND_TOMBSTONES = 32;
 
 type NetworkAdapter = Readonly<{
   fetch: (url: string, init: RequestInit, grantId: string) => Promise<Response>;
@@ -78,9 +71,6 @@ export class AgentNetworkHost {
   private readonly active = new Map<string, ActiveResponse>();
   private readonly requestControllers = new Map<string, AbortController>();
   private readonly terminalResponses = new Set<string>();
-  private readonly activeCommands = new Map<string, AbortController>();
-  private readonly abortingCommands = new Set<string>();
-  private readonly terminalCommands = new Set<string>();
   private bufferedRequestBodyBytes = 0;
   // Together with `incoming.size`, this gives O(1) accepted/discarded
   // admission accounting. Both classes are independently capped, so hostile
@@ -97,7 +87,6 @@ export class AgentNetworkHost {
   private closed = false;
   private readyObserved = false;
   private custodyWork?: Promise<void>;
-  private dispatchedCommand = false;
   private drained = false;
   private drain:
     | (PromiseWithResolvers<void> & {
@@ -115,11 +104,8 @@ export class AgentNetworkHost {
     private readonly adapter: NetworkAdapter,
     private readonly onFatal: (error: Error) => void,
     private readonly maxBufferedRequestBodyBytes = MAX_BUFFERED_REQUEST_BODY_BYTES,
-    private readonly commandExecutor?: ShellExecutor,
     private readonly prepareProviderCustody?: () => Promise<void>
   ) {
-    if (commandExecutor && prepareProviderCustody)
-      throw new Error("invalid retained media authority");
     this.writer = new AgentSidecarChannel.Writer(output);
     input.on("data", (chunk: Buffer | string) => {
       if (this.closed) return;
@@ -141,7 +127,6 @@ export class AgentNetworkHost {
     output: Writable;
     authority: AgentNetworkAuthority;
     onFatal: (error: Error) => void;
-    commandExecutor?: ShellExecutor;
     prepareProviderCustody?: () => Promise<void>;
   }): Promise<AgentNetworkHost> {
     return new AgentNetworkHost(
@@ -151,7 +136,6 @@ export class AgentNetworkHost {
       AgentNetworkHost.electronAdapter(args.authority),
       args.onFatal,
       MAX_BUFFERED_REQUEST_BODY_BYTES,
-      args.commandExecutor,
       args.prepareProviderCustody
     );
   }
@@ -331,7 +315,7 @@ export class AgentNetworkHost {
   /** Correlate sidecar cleanup on the inherited pipe. The supervisor joins exit separately. */
   requestDrain(): Promise<void> {
     if (this.drained) return this.custodyWork ?? Promise.resolve();
-    if (this.closed || !this.readyObserved || this.dispatchedCommand)
+    if (this.closed || !this.readyObserved)
       return Promise.reject(new Error("agent_sidecar_drain_unverified"));
     if (this.drain) return this.waitForCustody(this.drain.promise);
     const requestId = randomUUID();
@@ -453,12 +437,6 @@ export class AgentNetworkHost {
       case "response.credit":
         this.onResponseCredit(frame);
         return;
-      case "command.request":
-        this.onCommandRequest(frame);
-        return;
-      case "command.abort":
-        this.onCommandAbort(frame.requestId);
-        return;
       case "custody.prepare":
         this.onCustodyPrepare(frame.requestId);
         return;
@@ -491,174 +469,6 @@ export class AgentNetworkHost {
       .finally(() => {
         this.custodyWork = undefined;
       });
-  }
-
-  private onCommandRequest(
-    frame: AgentSidecarChannel.CommandRequestFrame
-  ): void {
-    if (
-      this.activeCommands.has(frame.requestId) ||
-      this.terminalCommands.has(frame.requestId)
-    ) {
-      throw new Error("duplicate host command request");
-    }
-    if (!this.commandExecutor || this.drain || this.drained) {
-      this.rememberTerminalCommand(frame.requestId);
-      void this.commandError(
-        frame.requestId,
-        "host command execution is unavailable"
-      ).catch((error) => this.fail(asError(error)));
-      return;
-    }
-    if (this.activeCommands.size >= MAX_CONCURRENT_COMMANDS) {
-      this.rememberTerminalCommand(frame.requestId);
-      void this.commandError(
-        frame.requestId,
-        "host command execution capacity is temporarily exhausted"
-      ).catch((error) => this.fail(asError(error)));
-      return;
-    }
-
-    const controller = new AbortController();
-    this.dispatchedCommand = true;
-    this.activeCommands.set(frame.requestId, controller);
-    const scope: ShellExecutionScope = Object.freeze({
-      workspace_root: frame.workspaceRoot,
-      scratch_root: frame.scratchDir,
-      // These roots are host facts and therefore are deliberately absent from
-      // the untrusted frame. The executor binds them from trusted construction state.
-      protected_read_roots: [],
-    });
-    void this.executeCommand(frame, scope, controller).catch((error) =>
-      this.fail(asError(error))
-    );
-  }
-
-  private onCommandAbort(requestId: string): void {
-    const controller = this.activeCommands.get(requestId);
-    if (!controller) {
-      if (this.terminalCommands.has(requestId)) {
-        // The result won the race, so cleanup is already complete. Acknowledge
-        // the caller's abort immediately instead of leaving its promise open.
-        void this.commandAborted(requestId).catch((error) =>
-          this.fail(asError(error))
-        );
-        return;
-      }
-      throw new Error("command abort names an unknown request");
-    }
-    if (this.abortingCommands.has(requestId)) {
-      throw new Error("duplicate command abort");
-    }
-    // Keep the request active until the executor returns: for a process owner,
-    // that means its finally block has removed command temp and released SRT's
-    // per-command bookkeeping. Only then may command.aborted settle the tool.
-    this.abortingCommands.add(requestId);
-    controller.abort();
-  }
-
-  private async executeCommand(
-    frame: AgentSidecarChannel.CommandRequestFrame,
-    scope: ShellExecutionScope,
-    controller: AbortController
-  ): Promise<void> {
-    try {
-      let result: ShellRunResult;
-      try {
-        result = await this.commandExecutor!(
-          {
-            cmd: frame.command,
-            args: [...frame.args],
-            cwd: frame.workdir,
-            timeout_ms: frame.timeoutMs,
-          },
-          scope,
-          controller.signal
-        );
-      } catch {
-        if (this.closed) return;
-        if (this.abortingCommands.has(frame.requestId)) {
-          await this.commandAborted(frame.requestId);
-          return;
-        }
-        await this.commandError(
-          frame.requestId,
-          "host command execution was denied or failed"
-        );
-        // command.abort can arrive while the terminal error write is
-        // backpressured. The sidecar then ignores that raced error and waits
-        // for the authoritative post-cleanup acknowledgement.
-        if (this.abortingCommands.has(frame.requestId)) {
-          await this.commandAborted(frame.requestId);
-        }
-        return;
-      }
-      if (this.closed) return;
-      if (this.abortingCommands.has(frame.requestId)) {
-        await this.commandAborted(frame.requestId);
-        return;
-      }
-      await this.sendCommandResult(frame.requestId, result);
-      if (this.closed) return;
-      if (this.abortingCommands.has(frame.requestId)) {
-        await this.commandAborted(frame.requestId);
-      }
-    } finally {
-      this.activeCommands.delete(frame.requestId);
-      this.abortingCommands.delete(frame.requestId);
-      this.rememberTerminalCommand(frame.requestId);
-    }
-  }
-
-  private async sendCommandResult(
-    requestId: string,
-    result: ShellRunResult
-  ): Promise<void> {
-    let sequence = 0;
-    let remainingBytes = AgentSidecarChannel.MAX_COMMAND_OUTPUT_BYTES;
-    let hostTruncated = false;
-    for (const [stream, value] of [
-      ["stdout", result.stdout],
-      ["stderr", result.stderr],
-    ] as const) {
-      const bounded = utf8Prefix(value, remainingBytes);
-      remainingBytes -= bounded.bytes;
-      hostTruncated ||= bounded.truncated;
-      for (const data of utf8Chunks(
-        bounded.value,
-        AgentSidecarChannel.MAX_COMMAND_OUTPUT_CHUNK_BYTES
-      )) {
-        if (this.abortingCommands.has(requestId)) return;
-        await this.send({
-          v: 1,
-          type: "command.output",
-          requestId,
-          stream,
-          sequence,
-          data,
-        });
-        sequence += 1;
-      }
-    }
-    if (this.abortingCommands.has(requestId)) return;
-    await this.send({
-      v: 1,
-      type: "command.end",
-      requestId,
-      sequence,
-      exitCode:
-        result.exit_code === null || Number.isSafeInteger(result.exit_code)
-          ? result.exit_code
-          : -1,
-      signal:
-        result.signal === null ? null : result.signal.slice(0, 64) || null,
-      timedOut: result.timed_out,
-      truncated: result.truncated || hostTruncated,
-      durationMs:
-        Number.isSafeInteger(result.duration_ms) && result.duration_ms >= 0
-          ? result.duration_ms
-          : 0,
-    });
   }
 
   private onRequestStart(frame: AgentSidecarChannel.RequestStartFrame): void {
@@ -1175,28 +985,6 @@ export class AgentNetworkHost {
     await this.send({ v: 1, type: "response.error", requestId, code, message });
   }
 
-  private async commandError(
-    requestId: string,
-    message: string
-  ): Promise<void> {
-    await this.send({ v: 1, type: "command.error", requestId, message });
-  }
-
-  private async commandAborted(requestId: string): Promise<void> {
-    await this.send({ v: 1, type: "command.aborted", requestId });
-  }
-
-  private rememberTerminalCommand(requestId: string): void {
-    this.terminalCommands.add(requestId);
-    while (this.terminalCommands.size > MAX_TERMINAL_COMMAND_TOMBSTONES) {
-      const oldest = this.terminalCommands.values().next().value as
-        | string
-        | undefined;
-      if (oldest === undefined) break;
-      this.terminalCommands.delete(oldest);
-    }
-  }
-
   private async send(
     frame: AgentSidecarChannel.HostToSidecarFrame
   ): Promise<void> {
@@ -1220,7 +1008,6 @@ export class AgentNetworkHost {
     for (const response of this.active.values()) {
       void response.reader.cancel().catch(() => undefined);
     }
-    for (const controller of this.activeCommands.values()) controller.abort();
     for (const request of this.incoming.values()) clearTimeout(request.timeout);
     this.bufferedRequestBodyBytes = 0;
     this.discardedIncomingCount = 0;
@@ -1228,9 +1015,6 @@ export class AgentNetworkHost {
     this.active.clear();
     this.requestControllers.clear();
     this.terminalResponses.clear();
-    this.activeCommands.clear();
-    this.abortingCommands.clear();
-    this.terminalCommands.clear();
     for (const pending of this.grantAcks.values()) {
       clearTimeout(pending.timeout);
       pending.reject(error);
@@ -1238,30 +1022,6 @@ export class AgentNetworkHost {
     this.grantAcks.clear();
     if (fatal && !this.drained) this.onFatal(error);
   }
-}
-
-function utf8Prefix(
-  value: string,
-  maxBytes: number
-): { value: string; bytes: number; truncated: boolean } {
-  if (maxBytes <= 0) {
-    return { value: "", bytes: 0, truncated: value.length > 0 };
-  }
-  let bytes = 0;
-  let end = 0;
-  for (const scalar of value) {
-    const scalarBytes = Buffer.byteLength(scalar, "utf8");
-    if (bytes + scalarBytes > maxBytes) {
-      return {
-        value: value.slice(0, end),
-        bytes,
-        truncated: true,
-      };
-    }
-    bytes += scalarBytes;
-    end += scalar.length;
-  }
-  return { value, bytes, truncated: false };
 }
 
 function sessionWhenReady(
@@ -1290,24 +1050,6 @@ function sessionWhenReady(
       }
     );
   });
-}
-
-function utf8Chunks(value: string, maxBytes: number): string[] {
-  const chunks: string[] = [];
-  let chunk = "";
-  let bytes = 0;
-  for (const scalar of value) {
-    const scalarBytes = Buffer.byteLength(scalar, "utf8");
-    if (bytes > 0 && bytes + scalarBytes > maxBytes) {
-      chunks.push(chunk);
-      chunk = "";
-      bytes = 0;
-    }
-    chunk += scalar;
-    bytes += scalarBytes;
-  }
-  if (chunk.length > 0) chunks.push(chunk);
-  return chunks;
 }
 
 export function requestThroughSession(
