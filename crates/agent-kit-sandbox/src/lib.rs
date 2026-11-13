@@ -95,8 +95,11 @@ pub struct ExecutionScope {
     pub runtime: Vec<PathBuf>,
     /// Protected paths stay unreadable (`ReadWrite`) or unwritable (`Write`),
     /// including paths that do not exist yet. One inside a granted location
-    /// is carved out of that location; one that equals or contains a granted
-    /// location makes the scope unusable (`sandbox_protected_overlap`).
+    /// is carved out of that location. One that equals or contains a granted
+    /// location makes the scope unusable (`sandbox_protected_overlap`) when
+    /// that location grants what it denies: any location under an unreadable
+    /// path, or a writable location under an unwritable one. A read or
+    /// runtime location under an unwritable path stays read-only.
     pub protected: Vec<ProtectedPath>,
     /// A directory only the current user can access (mode `0700` or
     /// stricter), outside every granted location. Each launch gets a private

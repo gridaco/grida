@@ -502,13 +502,16 @@ impl Installation {
         for protected in &scope.protected {
             let path = protected_path(&protected.path)?;
             // A protected path inside a granted location is carved out of it.
-            // A granted location at or inside a protected path cannot be,
-            // whatever either access: the backends express a denial as an
-            // exclusion from grants, not as a narrower grant inside it.
+            // A granted location at or inside a protected path conflicts only
+            // when the location grants what the path denies: any access to an
+            // unreadable path, or writing an unwritable one. A read or runtime
+            // location inside an unwritable path, such as a reviewed program
+            // that is also run, grants nothing the denial forbids.
             let denied = locations.iter().any(|location| {
-                [path.as_path(), protected.path.as_path()]
-                    .into_iter()
-                    .any(|protected| location.bound.path().starts_with(protected))
+                (protected.access == DeniedAccess::ReadWrite || location.access == Access::Write)
+                    && [path.as_path(), protected.path.as_path()]
+                        .into_iter()
+                        .any(|protected| location.bound.path().starts_with(protected))
             });
             if denied
                 || (protected.access == DeniedAccess::ReadWrite

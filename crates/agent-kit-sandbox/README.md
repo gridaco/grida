@@ -65,8 +65,9 @@ The running handle still owns cancellation, cleanup, and native evidence.
 
 The scope uses paths and validated root identities. Hard-link aliases reachable
 through a grant remain readable. A protected path inside a granted location is
-carved out of it, and one that equals or contains a granted location refuses
-the scope. A protected path may not exist yet. Seatbelt denies it by rule.
+carved out of it. One that equals or contains a granted location refuses the
+scope when that location grants what it denies; a read or runtime location
+under an unwritable path stays read-only. A protected path may not exist yet. Seatbelt denies it by rule.
 bubblewrap needs a mount point, so where a writable mount would let the payload
 create the missing path, the supervisor holds an empty, read-only placeholder
 directory there for the launch. It removes the placeholder once no launch can

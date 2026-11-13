@@ -184,20 +184,36 @@ fn preparation_refuses_what_launch_could_not_honour() {
     let fixture = Fixture::new();
     let sandbox = fixture.sandbox();
 
-    // An unwritable path that contains a readable location cannot be carved.
+    // An unreadable path that contains a readable location cannot be carved.
     let mut scope = fixture.scope();
     let inside = fixture.outside.join("inside");
     fs::create_dir(&inside).unwrap();
-    scope.read.push(inside);
+    scope.read.push(inside.clone());
     scope.protected = vec![ProtectedPath {
         path: fixture.outside.clone(),
-        access: DeniedAccess::Write,
+        access: DeniedAccess::ReadWrite,
     }];
     let error = sandbox
         .prepare(fixture.command("exit 0"), scope)
         .err()
         .unwrap();
     assert_eq!(error.code, "sandbox_protected_overlap");
+    // An unwritable path may contain a readable location: it grants nothing
+    // the denial forbids. A reviewed program is both unwritable and run.
+    let mut scope = fixture.scope();
+    scope.read.push(inside);
+    scope.runtime.push(PathBuf::from("/bin/sh"));
+    scope.protected = vec![
+        ProtectedPath {
+            path: fixture.outside.clone(),
+            access: DeniedAccess::Write,
+        },
+        ProtectedPath {
+            path: PathBuf::from("/bin/sh"),
+            access: DeniedAccess::Write,
+        },
+    ];
+    assert!(sandbox.prepare(fixture.command("exit 0"), scope).is_ok());
 
     // A scope realizing no grant is not an expired one.
     let mut scope = fixture.scope();
