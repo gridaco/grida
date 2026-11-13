@@ -51,7 +51,7 @@ impl History {
         Self::default()
     }
     pub fn validate(&self) -> Result<()> {
-        validate_records(&self.records)
+        validate_messages(self.records.iter().map(record_message))
     }
     pub fn position(&self) -> HistoryPosition {
         HistoryPosition(self.records.len() as u64)
@@ -74,10 +74,8 @@ impl History {
         if expected != self.position() {
             return Err(Error::new(ErrorKind::Conflict, "history_position_changed"));
         }
-        let mut combined = self.records.clone();
-        combined.extend_from_slice(records);
-        validate_records(&combined)?;
-        self.records = combined;
+        validate_messages(self.records.iter().chain(records).map(record_message))?;
+        self.records.extend_from_slice(records);
         Ok(self.position())
     }
 
@@ -143,12 +141,16 @@ impl History {
     }
 }
 
-fn validate_records(records: &[HistoryRecord]) -> Result<()> {
+fn record_message(record: &HistoryRecord) -> &Message {
+    let HistoryRecord::Message(message) = record;
+    message
+}
+
+fn validate_messages<'a>(sequence: impl IntoIterator<Item = &'a Message>) -> Result<()> {
     let mut messages = BTreeSet::<&MessageId>::new();
     let mut calls = BTreeSet::<&ToolCallId>::new();
     let mut results = BTreeSet::<&ToolCallId>::new();
-    for record in records {
-        let HistoryRecord::Message(message) = record;
+    for message in sequence {
         if !messages.insert(&message.id) {
             return Err(Error::new(ErrorKind::Conflict, "duplicate_message"));
         }
@@ -171,19 +173,14 @@ fn validate_records(records: &[HistoryRecord]) -> Result<()> {
 
 /// Validate exchanges in a model input. Pending calls may be explicitly allowed.
 pub fn validate_exchanges(messages: &[Message], allow_pending: bool) -> Result<()> {
-    let records: Vec<_> = messages
-        .iter()
-        .cloned()
-        .map(HistoryRecord::Message)
-        .collect();
-    validate_records(&records)?;
+    validate_messages(messages)?;
     if !allow_pending {
         let mut pending = BTreeSet::new();
         for message in messages {
             for content in &message.content {
                 match content {
                     Content::ToolCall(call) => {
-                        pending.insert(call.id.clone());
+                        pending.insert(&call.id);
                     }
                     Content::ToolResult(result) => {
                         pending.remove(&result.call);

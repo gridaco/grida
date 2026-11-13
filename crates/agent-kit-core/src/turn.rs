@@ -91,6 +91,9 @@ pub enum OperationOutcome {
 }
 
 impl OperationOutcome {
+    /// Whether the effect of the work is unknown: an interrupted inference or
+    /// an uncertain tool outcome. An uncertain attempt admits no new attempt
+    /// of the same operation until a `ReconcileAttempt` records what happened.
     pub fn is_uncertain(&self) -> bool {
         match self {
             Self::Inference(outcome) => {
@@ -99,6 +102,7 @@ impl OperationOutcome {
             Self::Tool(outcome) => outcome.status == OutcomeStatus::Uncertain,
         }
     }
+    /// Whether the work completed as requested.
     pub fn is_success(&self) -> bool {
         match self {
             Self::Inference(outcome) => {
@@ -134,23 +138,30 @@ pub struct AttemptRecord {
     pub prior_outcomes: Vec<OperationOutcome>,
 }
 
+/// One admitted operation and its physical attempts, oldest first. A
+/// prepared operation either gains attempts or is rejected before dispatch,
+/// never both.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct OperationState {
     pub record: OperationRecord,
     pub attempts: Vec<AttemptRecord>,
+    /// The outcome recorded when the operation was refused before any attempt.
     #[serde(default)]
     pub rejection: Option<OperationOutcome>,
 }
 
 impl OperationState {
+    /// Whether the latest attempt has started and has no outcome yet.
     pub fn is_running(&self) -> bool {
         self.attempts
             .last()
             .is_some_and(|attempt| attempt.outcome.is_none())
     }
+    /// Whether the current outcome is uncertain and requires reconciliation.
     pub fn is_uncertain(&self) -> bool {
         self.outcome().is_some_and(OperationOutcome::is_uncertain)
     }
+    /// The rejection, or else the latest attempt's outcome.
     pub fn outcome(&self) -> Option<&OperationOutcome> {
         self.rejection.as_ref().or_else(|| {
             self.attempts
@@ -196,39 +207,62 @@ pub struct TurnOutcome {
     pub evidence: Vec<OperationId>,
 }
 
+/// One step of a journal change. A change applies all of its actions or none.
+/// Admission-gated actions fail with `admission_closed` while the turn is
+/// paused, cancelled, suspended or settled. A settled turn accepts only
+/// `ReconcileAttempt`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum JournalAction {
+    /// Admit a new operation before any effect. Admission-gated.
     Prepare(Box<OperationRecord>),
+    /// Begin a physical attempt of a prepared operation. Admission-gated; the
+    /// previous attempt must have ended and must be neither successful nor
+    /// uncertain.
     StartAttempt {
         operation: OperationId,
         attempt: AttemptId,
     },
+    /// Refuse a prepared operation that never started, with a failed or
+    /// cancelled outcome.
     RejectPrepared {
         operation: OperationId,
         outcome: OperationOutcome,
     },
+    /// Record the outcome of the running attempt.
     CompleteAttempt {
         operation: OperationId,
         attempt: AttemptId,
         outcome: OperationOutcome,
     },
+    /// Replace an uncertain outcome with reconciled evidence, retaining the
+    /// previous outcome in the attempt's `prior_outcomes`.
     ReconcileAttempt {
         operation: OperationId,
         attempt: AttemptId,
         outcome: OperationOutcome,
     },
+    /// Append validated records to the turn's history.
     AppendHistory(Vec<HistoryRecord>),
+    /// Open a pending interaction. Admission-gated; advances the control revision.
     OpenWait(WaitRecord),
-    ResolveWait {
-        wait: WaitId,
-        answer: Envelope,
-    },
+    /// Answer a pending interaction with its declared response contract.
+    /// Advances the control revision.
+    ResolveWait { wait: WaitId, answer: Envelope },
+    /// Withdraw a pending interaction. Advances the control revision.
     WithdrawWait(WaitId),
+    /// Replace the driver's opaque checkpoint for this turn.
     SetCheckpoint(Envelope),
+    /// Conditionally replace the session's driver state. At most one per change.
     SetDriverState(DriverStateChange),
+    /// Pause, resume or cancel. Advances the control revision; cancellation
+    /// is final.
     Control(ControlDirective),
+    /// Close admission until `TurnState::rebind` moves the turn to a new
+    /// writer epoch. Requires that no attempt is running.
     Suspend,
+    /// Settle the turn. Every operation must have an outcome and no wait may
+    /// be pending.
     Settle(TurnOutcome),
 }
 
@@ -1060,6 +1094,9 @@ pub trait ControlReader: Send + Sync {
     fn changed(&self, after: ControlRevision) -> BoxFuture<'_, Result<ControlSnapshot>>;
 }
 
+/// Exclusive writer access to one turn: its journal and the control reader
+/// bound to the same session, turn and writer epoch. Created by `bind_lease`;
+/// the issuing adapter keeps its ownership guard alive with the journal.
 pub struct TurnLease {
     journal: Box<dyn TurnJournal>,
     controls: Arc<dyn ControlReader>,
@@ -1093,9 +1130,57 @@ struct MemoryState {
     listeners: Vec<oneshot::Sender<ControlSnapshot>>,
 }
 
+impl MemoryState {
+    /// Apply a change and wake control observers when the controls moved.
+    fn apply(&mut self, change: JournalChange) -> Result<CommitReceipt> {
+        let old = self.state.controls.revision;
+        let receipt = self.state.apply(change)?;
+        if self.state.controls.revision != old {
+            let snapshot = self.state.controls.clone();
+            for listener in self.listeners.drain(..) {
+                let _ = listener.send(snapshot.clone());
+            }
+        }
+        Ok(receipt)
+    }
+}
+
 struct MemoryJournal {
     binding: TurnBinding,
     inner: Arc<Mutex<MemoryState>>,
+}
+
+impl MemoryJournal {
+    /// Record a control-plane action at the current journal position. The
+    /// receipt check, change construction and application share one lock, so
+    /// concurrent driver commits cannot make it stale: it conflicts only when
+    /// its expected control revision is no longer current.
+    fn control(
+        &self,
+        id: ChangeId,
+        expected: ControlRevision,
+        action: JournalAction,
+    ) -> Result<CommitReceipt> {
+        let actions = vec![action];
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| Error::new(ErrorKind::Unavailable, "journal_poisoned"))?;
+        if let Some(receipt) = inner.state.receipt(&id) {
+            if receipt.record().content_fingerprint == Fingerprint::of(&actions)? {
+                return Ok(receipt.clone());
+            }
+            return Err(Error::new(ErrorKind::Conflict, "change_identity_reused"));
+        }
+        let change = JournalChange::new(
+            id,
+            inner.state.binding.clone(),
+            inner.state.position,
+            expected,
+            actions,
+        )?;
+        inner.apply(change)
+    }
 }
 
 impl TurnJournal for MemoryJournal {
@@ -1114,19 +1199,10 @@ impl TurnJournal for MemoryJournal {
     }
     fn commit(&self, change: JournalChange) -> BoxFuture<'_, Result<CommitReceipt>> {
         Box::pin(async move {
-            let mut inner = self
-                .inner
+            self.inner
                 .lock()
-                .map_err(|_| Error::new(ErrorKind::Unavailable, "journal_poisoned"))?;
-            let old = inner.state.controls.revision;
-            let receipt = inner.state.apply(change)?;
-            if inner.state.controls.revision != old {
-                let snapshot = inner.state.controls.clone();
-                for listener in inner.listeners.drain(..) {
-                    let _ = listener.send(snapshot.clone());
-                }
-            }
-            Ok(receipt)
+                .map_err(|_| Error::new(ErrorKind::Unavailable, "journal_poisoned"))?
+                .apply(change)
         })
     }
     fn lookup(&self, change: ChangeId) -> BoxFuture<'_, Result<Option<CommitReceipt>>> {
@@ -1222,8 +1298,8 @@ impl EphemeralControl {
         expected: ControlRevision,
         directive: ControlDirective,
     ) -> Result<CommitReceipt> {
-        self.apply(id, expected, JournalAction::Control(directive))
-            .await
+        self.journal
+            .control(id, expected, JournalAction::Control(directive))
     }
     pub async fn resolve(
         &self,
@@ -1232,25 +1308,7 @@ impl EphemeralControl {
         wait: WaitId,
         answer: Envelope,
     ) -> Result<CommitReceipt> {
-        self.apply(id, expected, JournalAction::ResolveWait { wait, answer })
-            .await
-    }
-    async fn apply(
-        &self,
-        id: ChangeId,
-        expected: ControlRevision,
-        action: JournalAction,
-    ) -> Result<CommitReceipt> {
-        let actions = vec![action];
-        if let Some(receipt) = self.journal.lookup(id.clone()).await? {
-            if receipt.record().content_fingerprint == Fingerprint::of(&actions)? {
-                return Ok(receipt);
-            }
-            return Err(Error::new(ErrorKind::Conflict, "change_identity_reused"));
-        }
-        let state = self.journal.load().await?;
-        let change =
-            JournalChange::new(id, state.binding.clone(), state.position, expected, actions)?;
-        self.journal.commit(change).await
+        self.journal
+            .control(id, expected, JournalAction::ResolveWait { wait, answer })
     }
 }

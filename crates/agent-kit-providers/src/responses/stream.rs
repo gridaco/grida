@@ -3,6 +3,9 @@ use crate::wire::{
     Incoming, RateRejectionEvidence, Usage, WireError, WireStream, classify_error, short_identity,
 };
 use crate::{StreamLimits, StreamingTransport, TransportRequest};
+use agent_kit_core::inference::usage::{
+    CACHED_INPUT_TOKENS, INPUT_TOKENS, OUTPUT_TOKENS, REASONING_OUTPUT_TOKENS,
+};
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
     InferenceUpdate, ProviderEvent,
@@ -318,14 +321,14 @@ impl Response {
                 &self.attempt,
                 self.scope.producer.as_str(),
                 [
-                    ("input_tokens", usage.input_tokens),
-                    ("output_tokens", usage.output_tokens),
+                    (INPUT_TOKENS, usage.input_tokens),
+                    (OUTPUT_TOKENS, usage.output_tokens),
                     (
-                        "cached_input_tokens",
+                        CACHED_INPUT_TOKENS,
                         usage.input_tokens_details.and_then(|d| d.cached_tokens),
                     ),
                     (
-                        "reasoning_output_tokens",
+                        REASONING_OUTPUT_TOKENS,
                         usage.output_tokens_details.and_then(|d| d.reasoning_tokens),
                     ),
                 ],

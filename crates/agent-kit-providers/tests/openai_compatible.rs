@@ -537,13 +537,14 @@ fn compatible_tool_images_refuse_invalid_exchanges_and_unreviewed_profiles() {
         generic.prepare(input.clone()).unwrap_err().code,
         "unsupported_tool_media"
     );
+    // A text-only model refuses tool-returned images like any image input.
     assert_eq!(
         adapter(transport.clone())
             .with_retained_png_tool_results()
             .prepare(input.clone())
             .unwrap_err()
             .code,
-        "unsupported_tool_media"
+        "unsupported_input_modality"
     );
     let mut no_tools = profile();
     no_tools.capabilities.json_tools = false;

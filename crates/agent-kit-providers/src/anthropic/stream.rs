@@ -1,5 +1,8 @@
 use crate::wire::{Incoming, Usage, WireStream, classify_error, short_identity};
 use crate::{StreamLimits, StreamingTransport, TransportRequest};
+use agent_kit_core::inference::usage::{
+    CACHE_CREATION_INPUT_TOKENS, CACHED_INPUT_TOKENS, OUTPUT_TOKENS, UNCACHED_INPUT_TOKENS,
+};
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
     InferenceUpdate, ProviderEvent,
@@ -382,13 +385,13 @@ impl Response {
                 &self.control.attempt,
                 &self.source,
                 [
-                    ("uncached_input_tokens", usage.input_tokens),
-                    ("output_tokens", usage.output_tokens),
+                    (UNCACHED_INPUT_TOKENS, usage.input_tokens),
+                    (OUTPUT_TOKENS, usage.output_tokens),
                     (
-                        "cache_creation_input_tokens",
+                        CACHE_CREATION_INPUT_TOKENS,
                         usage.cache_creation_input_tokens,
                     ),
-                    ("cached_input_tokens", usage.cache_read_input_tokens),
+                    (CACHED_INPUT_TOKENS, usage.cache_read_input_tokens),
                 ],
                 false,
                 &mut self.updates,

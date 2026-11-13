@@ -456,7 +456,7 @@ async fn gemini_replays_signed_parts_and_parallel_result_order_after_serializati
     while let Some(update) = run.next().await {
         assert!(!matches!(
             update,
-            InferenceUpdate::ToolCall(_) | InferenceUpdate::ProviderState(_)
+            InferenceUpdate::ToolCall(_) | InferenceUpdate::ProviderState { .. }
         ));
     }
     let outcome = run.finish().await;

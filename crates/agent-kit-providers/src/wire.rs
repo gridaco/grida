@@ -3,6 +3,7 @@ use crate::{
     InputImageResolver, StreamLimits, StreamingTransport, TransportFailure, TransportRequest,
     TransportResponse,
 };
+use agent_kit_core::inference::usage::TOKENS;
 use agent_kit_core::inference::{
     DispatchEvidence, FailureKind, InferenceControl, InferenceFailure, InferenceStatus,
     InferenceUpdate, InputMeasurement, MeasurementKind, Modality, ModelCapabilities, ProviderEvent,
@@ -525,7 +526,7 @@ impl Usage {
                 attempt: attempt.clone(),
                 source: source.into(),
                 category: category.into(),
-                unit: "tokens".into(),
+                unit: TOKENS.into(),
                 revision: self.revision,
                 quantity,
                 certainty: MeasurementKind::Exact,

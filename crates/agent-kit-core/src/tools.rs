@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::time::Instant;
+use tokio_util::sync::DropGuard;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ToolDefinition {
@@ -42,11 +43,17 @@ impl ToolDefinition {
     }
 }
 
+/// What an executor declares it can do for an attempt whose outcome is unknown.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RecoveryKind {
+    /// The executor cannot establish what happened; the attempt stays uncertain.
     Unavailable,
+    /// Executing the same invocation again has the same effect as executing
+    /// it once.
     Repeatable,
+    /// The executor's `recover` can retrieve or reconcile the prior attempt
+    /// from its checkpoint and receipts without executing new work.
     Reconcile,
 }
 
@@ -90,7 +97,10 @@ impl ToolOutcome {
     }
 }
 
-#[derive(Clone)]
+/// The scope of one tool execution. `invoke` and `recover` replace the
+/// cancellation with a child token and clamp `max_output_bytes` to the
+/// definition before the executor sees it.
+#[derive(Clone, Debug)]
 pub struct InvocationContext {
     pub attempt: AttemptId,
     pub cancellation: CancellationToken,
@@ -289,17 +299,26 @@ impl PreparedInvocation {
     pub fn invocation(&self) -> &Invocation {
         &self.invocation
     }
-    pub async fn invoke(self, mut context: InvocationContext) -> ToolOutcome {
+
+    /// Scope `context` to this one execution: a child cancellation that ends
+    /// when the returned guard drops, and an output allowance within the
+    /// definition's bound. The flag reports that the work can no longer
+    /// start because it was cancelled or its deadline passed.
+    fn scope(&self, context: &mut InvocationContext) -> (DropGuard, bool) {
         context.cancellation = context.cancellation.child_token();
-        let _cancel = context.cancellation.clone().drop_guard();
+        let guard = context.cancellation.clone().drop_guard();
         context.max_output_bytes = context
             .max_output_bytes
             .min(self.invocation.definition.max_output_bytes);
-        if context.cancellation.is_cancelled()
+        let closed = context.cancellation.is_cancelled()
             || context
                 .deadline
-                .is_some_and(|deadline| deadline <= Instant::now())
-        {
+                .is_some_and(|deadline| deadline <= Instant::now());
+        (guard, closed)
+    }
+    pub async fn invoke(self, mut context: InvocationContext) -> ToolOutcome {
+        let (_cancel, closed) = self.scope(&mut context);
+        if closed {
             return ToolOutcome {
                 status: OutcomeStatus::Cancelled,
                 content: vec![],
@@ -328,16 +347,8 @@ impl PreparedInvocation {
         {
             return ToolOutcome::failed("recovery_binding_mismatch");
         }
-        context.cancellation = context.cancellation.child_token();
-        let _cancel = context.cancellation.clone().drop_guard();
-        context.max_output_bytes = context
-            .max_output_bytes
-            .min(self.invocation.definition.max_output_bytes);
-        if context.cancellation.is_cancelled()
-            || context
-                .deadline
-                .is_some_and(|deadline| deadline <= Instant::now())
-        {
+        let (_cancel, closed) = self.scope(&mut context);
+        if closed {
             return ToolOutcome::uncertain();
         }
         let maximum = context.max_output_bytes;

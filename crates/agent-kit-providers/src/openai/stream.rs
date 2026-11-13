@@ -2,6 +2,9 @@ use crate::StreamLimits;
 use crate::wire::short_identity;
 use crate::wire::{Incoming, RateRejectionEvidence, WireError, WireStream, classify_error};
 use crate::{StreamingTransport, TerminalReceiptDecoder, TransportRequest};
+use agent_kit_core::inference::usage::{
+    CACHED_INPUT_TOKENS, INPUT_TOKENS, OUTPUT_TOKENS, REASONING_OUTPUT_TOKENS, TOKENS,
+};
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
     InferenceUpdate, MeasurementKind, ProviderEvent, UsageObservation,
@@ -420,16 +423,16 @@ impl ResponseStream {
     fn observe_usage(&mut self, usage: Usage, final_value: bool) {
         self.usage_revision += 1;
         let values = [
-            ("input_tokens", usage.prompt_tokens),
-            ("output_tokens", usage.completion_tokens),
+            (INPUT_TOKENS, usage.prompt_tokens),
+            (OUTPUT_TOKENS, usage.completion_tokens),
             (
-                "cached_input_tokens",
+                CACHED_INPUT_TOKENS,
                 usage
                     .prompt_tokens_details
                     .and_then(|details| details.cached_tokens),
             ),
             (
-                "reasoning_output_tokens",
+                REASONING_OUTPUT_TOKENS,
                 usage
                     .completion_tokens_details
                     .and_then(|details| details.reasoning_tokens),
@@ -443,7 +446,7 @@ impl ResponseStream {
                 attempt: self.control.attempt.clone(),
                 source: self.source.clone(),
                 category: category.into(),
-                unit: "tokens".into(),
+                unit: TOKENS.into(),
                 revision: self.usage_revision,
                 quantity,
                 certainty: MeasurementKind::Exact,

@@ -6,11 +6,11 @@ use agent_kit_core::history::{History, HistoryPosition, HistoryProjection, Histo
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceOutcome, InferenceRequest, InferenceRun,
     InferenceStatus, InferenceUpdate, InputFormat, MeasurementKind, Modality, ModelCapabilities,
-    ProviderBinding, ProviderEvent, UsageObservation,
+    PreparedRequest, ProviderBinding, ProviderEvent, UsageObservation,
 };
 use agent_kit_core::messages::{
-    Content, Message, OutcomeStatus, Provenance, ProvenanceKind, ResultContent, Role,
-    ToolArguments, ToolCall, ToolResult,
+    Content, MediaRef, Message, OutcomeStatus, Provenance, ProvenanceKind, ProviderState,
+    ResultContent, Retention, Role, ToolArguments, ToolCall, ToolResult,
 };
 use agent_kit_core::tools::{
     Inventory, Invocation, InvocationContext, RecoveryKind, Tool, ToolDefinition, ToolOutcome,
@@ -1907,4 +1907,247 @@ async fn provider_receipt_is_rejected_when_its_evidence_exceeds_the_output_bound
     assert_eq!(result.status, InferenceStatus::Limited);
     assert_eq!(result.failure.unwrap().code, "receipt_byte_limit");
     assert!(result.receipt.is_none());
+}
+
+#[test]
+fn rejected_history_append_keeps_position_and_records() {
+    let mut history = History::new();
+    history
+        .append(
+            HistoryPosition(0),
+            &[HistoryRecord::Message(message("one", "first"))],
+        )
+        .unwrap();
+    let records = history.records().to_vec();
+    let position = history.position();
+    let error = history
+        .append(
+            position,
+            &[
+                HistoryRecord::Message(message("two", "second")),
+                HistoryRecord::Message(message("one", "again")),
+            ],
+        )
+        .unwrap_err();
+    assert_eq!(error.code, "duplicate_message");
+    assert_eq!(history.position(), position);
+    assert_eq!(history.records(), records.as_slice());
+    history
+        .append(
+            position,
+            &[HistoryRecord::Message(message("two", "second"))],
+        )
+        .unwrap();
+    assert_eq!(history.position(), HistoryPosition(2));
+}
+
+#[test]
+fn assembled_fragments_have_no_history_position() {
+    let mut history = History::new();
+    history
+        .append(
+            HistoryPosition(0),
+            &[
+                HistoryRecord::Message(message("one", "first")),
+                HistoryRecord::Message(message("two", "second")),
+            ],
+        )
+        .unwrap();
+    let view = history
+        .project(&HistoryProjection {
+            selection: history.selection(),
+            replacements: vec![],
+        })
+        .unwrap();
+    let fragments = [message("instruction", "extra")];
+    let snapshot = assemble(
+        ContextInput {
+            history: &view,
+            fragments: &fragments,
+            overhead: ContextMeasurement {
+                tokens: 0,
+                kind: MeasurementKind::Exact,
+            },
+        },
+        ContextLimits {
+            max_input_tokens: 100,
+            require_bound: true,
+            allow_pending_tool_calls: false,
+        },
+        ContextTransform::KeepLast(1),
+        &Measure(MeasurementKind::Exact),
+    )
+    .unwrap();
+    assert_eq!(snapshot.messages.len(), snapshot.source_positions.len());
+    assert_eq!(
+        snapshot.source_positions,
+        vec![Some(HistoryPosition(1)), None]
+    );
+    assert_eq!(snapshot.messages[1].id.as_str(), "instruction");
+}
+
+#[tokio::test]
+async fn interrupted_deltas_extend_one_content_element_per_kind() {
+    let answer = MessageId::new("answer").unwrap();
+    let text = |value: &str| {
+        ProviderEvent::Update(InferenceUpdate::TextDelta {
+            message: answer.clone(),
+            text: value.into(),
+        })
+    };
+    let reasoning = |value: &str| {
+        ProviderEvent::Update(InferenceUpdate::ReasoningDelta {
+            message: answer.clone(),
+            text: value.into(),
+        })
+    };
+    let events = vec![
+        reasoning("think"),
+        reasoning("ing"),
+        text("one "),
+        text("two "),
+        text("three"),
+    ];
+    let outcome = InferenceRun::from_stream(inference_control(CancellationToken::new()), |_| {
+        Box::pin(stream::iter(events))
+    })
+    .finish()
+    .await;
+    assert_eq!(outcome.status, InferenceStatus::Interrupted);
+    assert_eq!(outcome.messages.len(), 1);
+    assert_eq!(
+        outcome.messages[0].content,
+        vec![
+            Content::Reasoning("thinking".into()),
+            Content::Text("one two three".into()),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn interrupted_provider_state_stays_with_its_message() {
+    let answer = MessageId::new("answer").unwrap();
+    let state = ProviderState {
+        producer: ProviderId::new("provider").unwrap(),
+        binding: BindingId::new("binding").unwrap(),
+        validity: Fingerprint::of(&"validity").unwrap(),
+        payload: envelope("opaque"),
+    };
+    let events = vec![
+        ProviderEvent::Update(InferenceUpdate::TextDelta {
+            message: answer.clone(),
+            text: "partial".into(),
+        }),
+        ProviderEvent::Update(InferenceUpdate::ProviderState {
+            message: answer.clone(),
+            state: state.clone(),
+        }),
+    ];
+    let outcome = InferenceRun::from_stream(inference_control(CancellationToken::new()), |_| {
+        Box::pin(stream::iter(events))
+    })
+    .finish()
+    .await;
+    assert_eq!(outcome.status, InferenceStatus::Interrupted);
+    assert_eq!(outcome.messages.len(), 1);
+    assert_eq!(outcome.messages[0].id, answer);
+    assert_eq!(
+        outcome.messages[0].content.last(),
+        Some(&Content::ProviderState(state))
+    );
+}
+
+#[test]
+fn tool_result_media_requires_the_models_input_modality() {
+    let binding = ProviderBinding {
+        provider: ProviderId::new("provider").unwrap(),
+        authority: authority(),
+    };
+    let mut call = message("call", "");
+    call.role = Role::Assistant;
+    call.content = vec![Content::ToolCall(ToolCall {
+        id: ToolCallId::new("view").unwrap(),
+        tool: ToolId::new("viewer").unwrap(),
+        arguments: ToolArguments::Text("image".into()),
+    })];
+    let media = |media_type: &str| MediaRef {
+        id: ArtifactId::new("image").unwrap(),
+        media_type: media_type.into(),
+        locator: "artifact://image".into(),
+        access_scope: BindingId::new("scope").unwrap(),
+        retention: Retention::Retained,
+    };
+    let with_result = |media_type: &str| {
+        let mut result = message("result", "");
+        result.role = Role::Tool;
+        result.content = vec![Content::ToolResult(ToolResult {
+            call: ToolCallId::new("view").unwrap(),
+            status: OutcomeStatus::Succeeded,
+            content: vec![
+                ResultContent::Text("viewed".into()),
+                ResultContent::Media(media(media_type)),
+            ],
+            structured: None,
+            truncated: false,
+        })];
+        let mut request = request();
+        request.messages.extend([call.clone(), result]);
+        request
+    };
+    let error =
+        PreparedRequest::from_validated(with_result("image/png"), binding.clone(), capabilities())
+            .unwrap_err();
+    assert_eq!(error.code, "unsupported_input_modality");
+    let error = PreparedRequest::from_validated(
+        with_result("application/x-unknown"),
+        binding.clone(),
+        capabilities(),
+    )
+    .unwrap_err();
+    assert_eq!(error.code, "unsupported_media_type");
+    let mut visual = capabilities();
+    visual.input_modalities.insert(Modality::Image);
+    PreparedRequest::from_validated(with_result("image/png"), binding, visual).unwrap();
+}
+
+#[tokio::test]
+async fn control_changes_conflict_only_on_the_control_revision() {
+    let ephemeral = EphemeralJournal::create(binding()).unwrap();
+    let revision = ephemeral.lease.controls().read().await.unwrap().revision;
+    // The driver advances the journal after the controller read its revision.
+    let state = ephemeral.lease.journal().load().await.unwrap();
+    ephemeral
+        .lease
+        .journal()
+        .commit(change(
+            &state,
+            "driver",
+            vec![JournalAction::AppendHistory(vec![HistoryRecord::Message(
+                message("one", "first"),
+            )])],
+        ))
+        .await
+        .unwrap();
+    let pause = ephemeral
+        .control
+        .change(
+            ChangeId::new("pause").unwrap(),
+            revision,
+            ControlDirective::Pause,
+        )
+        .await
+        .unwrap();
+    assert_eq!(pause.record().position, JournalPosition(2));
+    // A control decided against an older control revision still conflicts.
+    let error = ephemeral
+        .control
+        .change(
+            ChangeId::new("cancel").unwrap(),
+            revision,
+            ControlDirective::Cancel,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Conflict);
+    assert!(!ephemeral.lease.controls().read().await.unwrap().cancelled);
 }

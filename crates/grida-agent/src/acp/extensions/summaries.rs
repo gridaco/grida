@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::host::CropArtifact;
-use agent_kit_core::inference::MeasurementKind;
+use agent_kit_core::inference::{MeasurementKind, usage};
 use agent_kit_core::turn::TurnOutcome;
 use agent_kit_core::{AttemptId, OperationId};
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -139,13 +139,13 @@ enum TokenCategory {
 impl TokenCategory {
     fn from_provider(category: &str) -> Option<Self> {
         match category {
-            "input_tokens" => Some(Self::Input),
-            "output_tokens" => Some(Self::Output),
-            "uncached_input_tokens" => Some(Self::UncachedInput),
-            "cached_input_tokens" => Some(Self::CachedInput),
-            "cache_creation_input_tokens" => Some(Self::CacheCreationInput),
-            "tool_input_tokens" => Some(Self::ToolInput),
-            "reasoning_output_tokens" => Some(Self::ReasoningOutput),
+            usage::INPUT_TOKENS => Some(Self::Input),
+            usage::OUTPUT_TOKENS => Some(Self::Output),
+            usage::UNCACHED_INPUT_TOKENS => Some(Self::UncachedInput),
+            usage::CACHED_INPUT_TOKENS => Some(Self::CachedInput),
+            usage::CACHE_CREATION_INPUT_TOKENS => Some(Self::CacheCreationInput),
+            usage::TOOL_INPUT_TOKENS => Some(Self::ToolInput),
+            usage::REASONING_OUTPUT_TOKENS => Some(Self::ReasoningOutput),
             _ => None,
         }
     }
@@ -157,7 +157,8 @@ impl ReportedTokenUsage {
         let mut categories: BTreeMap<_, BTreeMap<&AttemptId, _>> = BTreeMap::new();
         for observation in &usage.observations {
             attempts.insert(&observation.attempt);
-            if observation.unit != "tokens" || observation.certainty != MeasurementKind::Exact {
+            if observation.unit != usage::TOKENS || observation.certainty != MeasurementKind::Exact
+            {
                 continue;
             }
             let Some(category) = TokenCategory::from_provider(&observation.category) else {

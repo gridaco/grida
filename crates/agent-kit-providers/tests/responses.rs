@@ -864,11 +864,12 @@ async fn user_and_tool_images_share_the_same_resolved_count_and_generation_input
             })],
         )
     };
+    // A text-only model refuses tool-returned images like any image input.
     let mut unsupported = input.clone();
     unsupported.messages.push(output(view.clone()));
     assert_eq!(
         text.prepare(unsupported).unwrap_err().code,
-        "unsupported_tool_media"
+        "unsupported_input_modality"
     );
 
     let mut capabilities = text.capabilities(&input.model).unwrap();

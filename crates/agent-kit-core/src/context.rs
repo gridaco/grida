@@ -27,10 +27,13 @@ pub enum ContextTransform {
     KeepLast(usize),
 }
 
+/// Assembled model input. `source_positions` runs parallel to `messages`:
+/// each history-derived message carries its source position, and each
+/// supplied fragment, which has no history source, carries `None`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ContextSnapshot {
     pub messages: Vec<Message>,
-    pub source_positions: Vec<HistoryPosition>,
+    pub source_positions: Vec<Option<HistoryPosition>>,
     pub occupancy: ContextMeasurement,
 }
 
@@ -72,9 +75,15 @@ pub fn assemble(
     if tokens > limits.max_input_tokens {
         return Err(Error::new(ErrorKind::LimitExceeded, "context_limit"));
     }
+    let source_positions = input.history.source_positions[start..]
+        .iter()
+        .copied()
+        .map(Some)
+        .chain(std::iter::repeat_n(None, input.fragments.len()))
+        .collect();
     Ok(ContextSnapshot {
         messages,
-        source_positions: input.history.source_positions[start..].to_vec(),
+        source_positions,
         occupancy: ContextMeasurement { tokens, kind },
     })
 }

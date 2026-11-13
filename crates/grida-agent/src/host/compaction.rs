@@ -6,6 +6,7 @@ use agent_kit_core::history::HistoryRecord;
 use agent_kit_core::inference::{
     FailureKind, InferenceFailure, InferenceOutcome, InferenceStatus, MeasurementKind,
     PreparedRequest,
+    usage::{INPUT_TOKENS, TOKENS},
 };
 use agent_kit_core::messages::OutcomeStatus;
 use agent_kit_core::turn::{OperationInput, OperationOutcome, TurnState};
@@ -934,8 +935,8 @@ fn previous_context_pressure(
                     .filter(|usage| {
                         usage.attempt == attempt.id
                             && usage.source == binding.provider.as_str()
-                            && usage.category == "input_tokens"
-                            && usage.unit == "tokens"
+                            && usage.category == INPUT_TOKENS
+                            && usage.unit == TOKENS
                     })
                     .max_by_key(|usage| usage.revision)
                     .is_some_and(|usage| {

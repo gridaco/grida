@@ -1,6 +1,9 @@
 use super::{RemoteCall, Replay, ReplayScope};
 use crate::wire::{Incoming, Usage, WireStream, classify_error, short_identity};
 use crate::{StreamLimits, StreamingTransport, TransportRequest};
+use agent_kit_core::inference::usage::{
+    CACHED_INPUT_TOKENS, INPUT_TOKENS, OUTPUT_TOKENS, REASONING_OUTPUT_TOKENS, TOOL_INPUT_TOKENS,
+};
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
     InferenceUpdate, ProviderEvent,
@@ -250,11 +253,11 @@ impl Response {
                 &self.control.attempt,
                 source,
                 [
-                    ("input_tokens", usage.prompt_token_count),
-                    ("output_tokens", usage.candidates_token_count),
-                    ("cached_input_tokens", usage.cached_content_token_count),
-                    ("reasoning_output_tokens", usage.thoughts_token_count),
-                    ("tool_input_tokens", usage.tool_use_prompt_token_count),
+                    (INPUT_TOKENS, usage.prompt_token_count),
+                    (OUTPUT_TOKENS, usage.candidates_token_count),
+                    (CACHED_INPUT_TOKENS, usage.cached_content_token_count),
+                    (REASONING_OUTPUT_TOKENS, usage.thoughts_token_count),
+                    (TOOL_INPUT_TOKENS, usage.tool_use_prompt_token_count),
                 ],
                 false,
                 &mut self.updates,
