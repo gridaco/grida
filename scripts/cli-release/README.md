@@ -40,7 +40,8 @@ local record (`$GRIDA_HOME/cli/update.json`, default `~/.grida`). A detached
 process refreshes the record at most daily with one anonymous GET of
 `https://registry.npmjs.org/-/package/grida/dist-tags`; the command never
 waits for it and failures are silent. It is off in CI, with `--json`, when
-stderr is not a terminal, with `GRIDA_NO_UPDATE_CHECK=1`, and when
+stderr is not a terminal, with `GRIDA_NO_UPDATE_CHECK=1`, when
+`NO_UPDATE_NOTIFIER` is set (any value, including empty), and when
 `GRIDA_HOME` is set but not absolute. `grida fx` is covered because the FX pin
 moves with `grida`'s version; `@grida/fx` alone has no notice.
 
