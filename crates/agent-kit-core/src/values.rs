@@ -84,6 +84,17 @@ impl Fingerprint {
     pub fn bytes(&self) -> &[u8; 32] {
         &self.0
     }
+    /// The digest as 64 lowercase hexadecimal characters, the one encoding
+    /// durable identifiers derived from a fingerprint use.
+    pub fn to_hex(&self) -> String {
+        use std::fmt::Write as _;
+        self.0
+            .iter()
+            .fold(String::with_capacity(64), |mut text, byte| {
+                let _ = write!(text, "{byte:02x}");
+                text
+            })
+    }
 }
 
 /// Owner-defined data with an explicit schema and bounded encoded payload.

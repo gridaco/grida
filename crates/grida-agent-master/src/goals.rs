@@ -12,6 +12,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::num::NonZeroU32;
 
+/// What the model is told while a turn works on a goal.
+pub const INSTRUCTIONS: &str = "This work was explicitly reserved for a persistent goal. Use goal_inspect for the captured objective, criteria, and allowance. Record one goal_report when the work has been assessed. A completion proposal needs verified evidence for every criterion. Existing permissions still apply.";
+
 const SCHEMA: &str = "grida.agent.goal";
 const VERSION: u32 = 1;
 const MAX_OBJECTIVE_BYTES: usize = 8_192;
@@ -38,7 +41,7 @@ pub struct Continuation {
 impl Continuation {
     pub fn input_id(&self, session: &SessionId) -> Result<ChangeId> {
         let fingerprint = Fingerprint::of(&("goal-continuation-v1", session, self))?;
-        ChangeId::new(crate::hex(fingerprint))
+        ChangeId::new(fingerprint.to_hex())
     }
 }
 
@@ -405,6 +408,19 @@ impl Goal {
 
     pub fn explicit_continuation(&self) -> bool {
         self.state.explicit_continuation
+    }
+
+    /// The effort a continuation of this goal runs at. Independent review
+    /// reserves its child generation steps from the goal's remaining
+    /// allowance, so a goal that can no longer cover that reserve continues
+    /// without review.
+    pub fn continuation_effort(
+        &self,
+        effort: Option<crate::effort::Policy>,
+    ) -> Option<crate::effort::Policy> {
+        effort.filter(|effort| {
+            self.remaining().inference_steps > effort.reserved_child_generation_steps()
+        })
     }
 
     /// Work already reserved remains unavailable until the owning turn is reconciled.

@@ -228,7 +228,21 @@ impl Host {
         if view.current.is_none() && !view.admission_paused {
             self.check_ready_capacity(&child).await?;
         }
-        let mut submission = self
+        // An assignment spends from the Goal allowance its parent turn runs under.
+        let parent_inputs = self
+            .store
+            .turn_submissions(parent.clone(), parent_turn.clone())
+            .await?;
+        let spending = match parent_inputs.as_slice() {
+            [parent_input]
+                if parent_input.payload.schema().as_str() == INPUT_SCHEMA
+                    && matches!(parent_input.payload.version(), 2 | 3) =>
+            {
+                decode_input::<StoredPrompt>(parent_input)?.spending
+            }
+            _ => None,
+        };
+        let submission = self
             .capture_input(
                 &view,
                 input.clone(),
@@ -248,24 +262,10 @@ impl Host {
                     subagent: Some(Assignment::new(parent_turn.clone())),
                     effort: None,
                     reasoning: Default::default(),
+                    spending,
                 },
             )
             .await?;
-        let parent_inputs = self
-            .store
-            .turn_submissions(parent.clone(), parent_turn.clone())
-            .await?;
-        if let [parent_input] = parent_inputs.as_slice()
-            && parent_input.payload.schema().as_str() == INPUT_SCHEMA
-            && matches!(parent_input.payload.version(), 2 | 3)
-        {
-            let captured: StoredPrompt = decode_input(parent_input)?;
-            if captured.spending.is_some() {
-                let mut child: StoredPrompt = decode_input(&submission)?;
-                child.spending = captured.spending;
-                submission.payload = encode_stored_prompt(&child)?;
-            }
-        }
         self.store
             .submit_at_revision(child.clone(), submission, view.revision)
             .await?;

@@ -174,7 +174,7 @@ impl Host {
                 Err(error) => return Err(error),
             };
             let ticket = {
-                let mut work = host.work.lock().await;
+                let mut work = host.settled_work(&session).await?;
                 host.register(&mut work, session.clone(), turn.clone(), launch)?
             };
             match ticket

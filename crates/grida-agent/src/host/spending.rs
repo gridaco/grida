@@ -269,12 +269,7 @@ impl Store {
     }
 
     fn path(&self, selection: &Selection) -> PathBuf {
-        let name: String = selection
-            .task
-            .bytes()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
+        let name = selection.task.to_hex();
         self.owner_directory(&selection.owner)
             .expect("validated session identity")
             .join(format!("{name}.json"))
@@ -282,11 +277,7 @@ impl Store {
 
     fn owner_directory(&self, session: &SessionId) -> Result<PathBuf> {
         let fingerprint = Fingerprint::of(&("task-spending-owner-v1", session))?;
-        let name: String = fingerprint
-            .bytes()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
+        let name = fingerprint.to_hex();
         Ok(self.directory.join(name))
     }
 

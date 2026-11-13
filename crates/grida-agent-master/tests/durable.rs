@@ -1230,6 +1230,36 @@ async fn committed_tool_results_are_reused_and_reach_the_next_model_request() {
     assert!(requests[1].messages.iter().flat_map(|message| &message.content).any(|part| matches!(part, Content::ToolResult(result) if result.status == OutcomeStatus::Succeeded && result.content == vec![ResultContent::Text("echoed".into())])));
 }
 
+#[test]
+fn a_goal_continues_without_review_once_its_allowance_cannot_cover_the_reserve() {
+    let mut fixture = Fixture::new(Script::EffortReview);
+    fixture.install_review();
+    let ultra = fixture.effort(Preset::Ultra);
+    assert_eq!(ultra.reserved_child_generation_steps(), 2);
+    let mut goal = Goal::start(
+        change_id("continue-goal"),
+        Objective {
+            description: "Finish the export".into(),
+            criteria: vec!["The export opens".into()],
+        },
+        Allowance {
+            work_turns: NonZeroU32::new(3).unwrap(),
+            inference_steps: NonZeroU32::new(3).unwrap(),
+        },
+    )
+    .unwrap();
+    assert_eq!(goal.continuation_effort(None), None);
+    assert_eq!(
+        goal.continuation_effort(Some(ultra.clone())),
+        Some(ultra.clone())
+    );
+    let basis = goal.basis().clone();
+    goal.reserve(&basis, turn_id(), NonZeroU32::new(1).unwrap())
+        .unwrap();
+    assert_eq!(goal.remaining().inference_steps, 2);
+    assert_eq!(goal.continuation_effort(Some(ultra)), None);
+}
+
 #[tokio::test]
 async fn ultra_requests_and_integrates_independent_review_in_plan_and_act() {
     for regime in [OperatingRegime::Plan, OperatingRegime::Act] {

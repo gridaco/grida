@@ -62,7 +62,7 @@ impl Host {
         let host = self.clone();
         tokio::spawn(async move {
             // A title is a convenience; failure leaves the chat untitled.
-            let _ = tokio::time::timeout(TITLE_TIMEOUT, host.write_title(session, text)).await;
+            let _ = host.write_title(session, text).await;
         });
     }
 
@@ -75,7 +75,9 @@ impl Host {
             return Ok(());
         };
         let current = self.catalog_entry(session.clone()).await?;
-        if current.label.is_some() {
+        // A host that shut down while the title was generated no longer
+        // writes to the chat.
+        if current.label.is_some() || self.work.lock().await.closed {
             return Ok(());
         }
         // The revision check refuses the write if the person renamed meanwhile.
@@ -107,8 +109,10 @@ impl Host {
             })
             .await;
         let title = match run {
-            Ok(run) => match run.completion.await {
-                Ok(Ok(RunResult::Settled(outcome)))
+            // The temporary host shuts down on every path, so a slow title
+            // request stops with it.
+            Ok(run) => match tokio::time::timeout(TITLE_TIMEOUT, run.completion).await {
+                Ok(Ok(Ok(RunResult::Settled(outcome))))
                     if outcome.status == OutcomeStatus::Succeeded =>
                 {
                     outcome

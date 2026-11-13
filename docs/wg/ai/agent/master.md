@@ -657,8 +657,11 @@ A conversation belongs to its workspace, not to a model connection. Each turn
 runs under the route that claimed it. An idle top-level conversation follows the
 person's selection to another route held by the same credential owner. Delegated
 work keeps its parent's route, and an active Goal keeps the route its allowance
-and spending were measured against. A route held by a different account never
-continues another account's conversation.
+and spending were measured against. A queued request keeps the model and
+authority it was accepted under, so a conversation holding one accepted under
+another route stays on that route until the request runs or the person
+withdraws it. A route held by a different account never continues another
+account's conversation.
 
 ### Turn activity presentation
 

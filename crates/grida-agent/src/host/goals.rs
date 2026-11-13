@@ -12,8 +12,6 @@ use grida_agent_master::goals::{
 };
 use std::num::NonZeroU32;
 
-pub(super) const INSTRUCTIONS: &str = "This work was explicitly reserved for a persistent goal. Use goal_inspect for the captured objective, criteria, and allowance. Record one goal_report when the work has been assessed. A completion proposal needs verified evidence for every criterion. Existing permissions still apply.";
-
 pub(super) fn funded_review_unavailable() -> Error {
     problem(ErrorKind::Unsupported, "goal_funded_review_unavailable")
 }
@@ -216,6 +214,9 @@ impl Host {
                     .as_ref()
                     .map_or(EffortPreset::Standard, EffortPolicy::preset)
                     != effort
+                || request
+                    .reasoning
+                    .is_some_and(|level| Some(level) != stored.reasoning)
                 || (stored.configuration_permission == crate::ConfigurationPermission::Change)
                     != (request.configuration_permission == crate::ConfigurationPermission::Change)
             {
@@ -280,6 +281,7 @@ impl Host {
         }
         policy.desktop_image_generation = None;
         policy.allow_image_placement = false;
+        policy.spending = spending.clone();
         if policy.effort.as_ref().is_some_and(|effort| {
             goal.allowance.inference_steps.get() <= effort.reserved_child_generation_steps()
         }) {
@@ -295,7 +297,6 @@ impl Host {
             .capture_input(&view, request.id, request.parts, policy)
             .await?;
         let mut stored: StoredPrompt = decode_input(&input)?;
-        stored.spending = spending.clone();
         stored.allow_reviewer_primary_read = false;
         stored.goal = Some(GoalInput::Start(goal));
         input.payload = encode_stored_prompt(&stored)?;
@@ -420,13 +421,7 @@ impl Host {
         self.store
             .control_driver_state(
                 DriverControlRequest {
-                    id: ChangeId::new(
-                        request
-                            .bytes()
-                            .iter()
-                            .map(|byte| format!("{byte:02x}"))
-                            .collect::<String>(),
-                    )?,
+                    id: ChangeId::new(request.to_hex())?,
                     session: view.session.clone(),
                     expected_revision: view.revision,
                     expected_state: view.driver_state.revision(),
@@ -534,11 +529,7 @@ impl Host {
         {
             return Ok(None);
         }
-        if captured.effort.as_ref().is_some_and(|effort| {
-            goal.remaining().inference_steps <= effort.reserved_child_generation_steps()
-        }) {
-            captured.effort = None;
-        }
+        captured.effort = goal.continuation_effort(captured.effort.take());
         let id = continuation.input_id(&view.session)?;
         captured.parts.clear();
         captured.allow_wakeups = false;
@@ -954,11 +945,7 @@ impl GoalAuthority {
         let goal = Goal::decode(value)?;
         let binding = state.binding();
         let id = Fingerprint::of(&(&binding.session, &binding.turn, goal.basis()))?;
-        let scope = id
-            .bytes()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect::<String>();
+        let scope = id.to_hex();
         Ok(Arc::new(Self {
             selection: GrantSelection {
                 authority: AuthorityBinding {

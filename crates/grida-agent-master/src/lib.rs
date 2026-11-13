@@ -917,7 +917,7 @@ impl Master {
         }
         if !additions.is_empty() {
             let fingerprint = Fingerprint::of(&additions)?;
-            let suffix = hex(fingerprint);
+            let suffix = fingerprint.to_hex();
             turn.append_history(OperationKey::new(format!("input/{suffix}"))?, additions)
                 .await?;
         }
@@ -1410,7 +1410,7 @@ impl Master {
                         turn.checkpoint(
                             OperationKey::new(format!(
                                 "hook/continue/{}",
-                                hex(Fingerprint::of(&outcome)?)
+                                Fingerprint::of(&outcome)?.to_hex()
                             ))?,
                             encode(CONTINUATION_SCHEMA, continuation)?,
                         )
@@ -1708,12 +1708,4 @@ fn answer(messages: &[Message]) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-fn hex(fingerprint: Fingerprint) -> String {
-    fingerprint
-        .bytes()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
 }

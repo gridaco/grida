@@ -333,11 +333,7 @@ fn lower_message(
         None
     } else {
         let fingerprint = Fingerprint::of(&origin)?;
-        let digest: String = fingerprint
-            .bytes()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
+        let digest = fingerprint.to_hex();
         Some(Message {
             id: MessageId::new(format!("seed/{digest}"))?,
             role: if role == Role::Tool {

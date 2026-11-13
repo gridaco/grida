@@ -225,6 +225,16 @@ fn fingerprints_ignore_json_object_insertion_order() {
 }
 
 #[test]
+fn fingerprints_encode_as_lowercase_hex() {
+    assert_eq!(
+        Fingerprint::of(&serde_json::json!({"b": [2, 3], "a": 1}))
+            .unwrap()
+            .to_hex(),
+        "efbd0040190fb0871831e606c581f8a66db79d8e2bb836745a70051306956070"
+    );
+}
+
+#[test]
 fn envelope_rejects_unversioned_or_oversized_payloads() {
     assert!(Envelope::new(SchemaId::new("data").unwrap(), 0, vec![]).is_err());
     assert!(

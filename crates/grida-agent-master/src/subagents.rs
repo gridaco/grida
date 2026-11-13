@@ -163,7 +163,7 @@ impl Profile {
             return sponsored_identity(&self.parent, &sponsor.parent_turn);
         }
         let digest = Fingerprint::of(&("grida-subagent", &self.parent, request))?;
-        SessionId::new(format!("subagent/{}", crate::hex(digest)))
+        SessionId::new(format!("subagent/{}", digest.to_hex()))
     }
 
     pub fn allocation(&self, state: &DriverStateSnapshot) -> Result<Allocation> {
@@ -333,7 +333,7 @@ impl Profile {
 /// The parent turn owns one slot, independently of which tool call reserves it.
 pub fn sponsored_identity(parent: &SessionId, turn: &TurnId) -> Result<SessionId> {
     let digest = Fingerprint::of(&("grida-sponsored-subagent", parent, turn))?;
-    SessionId::new(format!("subagent/{}", crate::hex(digest)))
+    SessionId::new(format!("subagent/{}", digest.to_hex()))
 }
 
 fn sponsored_change(

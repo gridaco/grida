@@ -138,7 +138,7 @@ impl ReadProfile {
         // Message identity binds the exact action and scope without sending
         // operation IDs or authorization material as reviewer prompt text.
         let basis = Fingerprint::of(&(self, target, &intent.id))?;
-        let candidate_id = format!("approval-review/{}", crate::hex(basis));
+        let candidate_id = format!("approval-review/{}", basis.to_hex());
         let mut candidate = message(&candidate_id, Role::User, quoted)?;
         candidate.provenance.fingerprint = Some(target_fingerprint(
             target.operation,

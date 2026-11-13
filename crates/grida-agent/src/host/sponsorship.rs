@@ -1519,6 +1519,7 @@ mod tests {
                     subagent: None,
                     effort: effort.clone(),
                     reasoning: Default::default(),
+                    spending: None,
                 },
             )
             .await

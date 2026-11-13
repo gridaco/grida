@@ -421,7 +421,7 @@ async fn execute(
     grant: Option<&GrantSelection>,
 ) -> Result<(HookResult, HookDecision)> {
     let identity = Fingerprint::of(&(occurrence, &hook.id))?;
-    let key = OperationKey::new(format!("hook/lifecycle/{}", crate::hex(identity)))?;
+    let key = OperationKey::new(format!("hook/lifecycle/{}", identity.to_hex()))?;
     let id = operations.operation_id(&key)?;
     let arguments = ToolArguments::Json(
         serde_json::to_value(HookInvocation {

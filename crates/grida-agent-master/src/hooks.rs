@@ -1,6 +1,6 @@
 //! Reviewed completion checks over ordinary recorded operations.
 
-use crate::{hex, read_account};
+use crate::read_account;
 use agent_kit_core::authority::GrantSelection;
 use agent_kit_core::history::HistoryPosition;
 use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
@@ -281,7 +281,7 @@ async fn execute_check(
     // invocation cannot reuse a result or dispatch over the original record.
     let key = OperationKey::new(format!(
         "hook/{}",
-        hex(Fingerprint::of(&(event.identity, &check.id))?)
+        Fingerprint::of(&(event.identity, &check.id))?.to_hex()
     ))?;
     let id = operations.operation_id(&key)?;
     let arguments = ToolArguments::Json(json!({"check":check, "occurrence":event}));

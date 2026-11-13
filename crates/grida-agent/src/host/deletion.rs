@@ -88,6 +88,9 @@ impl Host {
                 .filter(|_| host.deletion_available())
                 .ok_or_else(|| problem(ErrorKind::Unsupported, "session_deletion_unavailable"))?;
             let (request, cwd) = request.scoped().await?;
+            // Wait out a settled turn's worker before admission, which that
+            // worker's next queued input may need. Idleness is checked below.
+            drop(host.settled_work(&request.session).await);
             let _admission = host.configuration_admission.lock().await;
             if let Some(receipt) = host.store.deletion_receipt(request.clone()).await? {
                 return host.finish_deletion(receipt).await;

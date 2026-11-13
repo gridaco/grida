@@ -178,6 +178,156 @@ mod tests {
         assert_eq!(settled.latest.unwrap().binding.turn, turn);
         host.shutdown().await.unwrap();
     }
+
+    fn fixture_host(state: &std::path::Path, model: &str) -> Host {
+        Host::open(
+            state,
+            Some(ProviderOptions {
+                endpoint: "http://127.0.0.1:9/v1".into(),
+                protocol: ProviderProtocol::OpenAiCompatible,
+                model: ModelId::new(model).unwrap(),
+                credential_env: None,
+                credential_home: None,
+                max_output_tokens: 1024,
+                compatible_output_limit_field: None,
+                llama_cpp_input_count: false,
+                reasoning: Default::default(),
+            }),
+        )
+        .unwrap()
+    }
+
+    fn fixture_prompt(session: &SessionId, id: &str) -> PromptRequest {
+        PromptRequest {
+            id: ChangeId::new(id).unwrap(),
+            session: session.clone(),
+            parts: vec![PromptPart::Text {
+                text: "Fixture".into(),
+            }],
+            questions: false,
+            configuration_permission: crate::ConfigurationPermission::Disabled,
+            operating_regime: None,
+            effort: None,
+            reasoning: Default::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn compaction_waits_for_a_settled_turn_worker_to_release_the_session() {
+        let root = tempfile::tempdir().unwrap();
+        let host = fixture_host(&root.path().join("state"), "fixture");
+        let session = host
+            .new_session(root.path().canonicalize().unwrap())
+            .await
+            .unwrap();
+        // The store shows no turn, while a finishing worker still holds the
+        // session in the work table.
+        let finishing = tokio::spawn(std::future::pending::<()>());
+        host.work.lock().await.active.insert(
+            session.clone(),
+            Active {
+                turn: TurnId::new("finishing").unwrap(),
+                admitted: true,
+                handle: finishing.abort_handle(),
+                pending_stop: None,
+                missed_stop: false,
+            },
+        );
+        let compaction = tokio::spawn({
+            let host = host.clone();
+            let session = session.clone();
+            async move {
+                host.compact(CompactRequest {
+                    session,
+                    request: ChangeId::new("compact-after-answer").unwrap(),
+                    recover: false,
+                })
+                .await
+            }
+        });
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(!compaction.is_finished());
+        host.work.lock().await.active.remove(&session);
+        host.changed.notify_waiters();
+        finishing.abort();
+        let report = tokio::time::timeout(Duration::from_secs(5), compaction)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(report.status, CompactionStatus::NoChange);
+        host.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_chat_keeps_the_route_its_queued_input_was_accepted_under() {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        let first = fixture_host(&state, "fixture");
+        let session = first
+            .new_session(root.path().canonicalize().unwrap())
+            .await
+            .unwrap();
+        let view = first.store.inspect(session.clone()).await.unwrap();
+        let queued = fixture_prompt(&session, "queued");
+        let policy = first.submission_policy(&queued, false).unwrap();
+        let captured = first
+            .capture_input(&view, queued.id, queued.parts, policy)
+            .await
+            .unwrap();
+        first.store.submit(session.clone(), captured).await.unwrap();
+        first.shutdown().await.unwrap();
+        drop(first);
+
+        // The same credential owner, another model.
+        let second = fixture_host(&state, "another-fixture");
+        let view = second.store.inspect(session.clone()).await.unwrap();
+        assert_eq!(
+            second.check_execution(&view).unwrap_err().code,
+            "session_execution_configuration_changed"
+        );
+        let resumed = second
+            .resume_queue(
+                session.clone(),
+                ChangeId::new("resume").unwrap(),
+                view.revision,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(resumed.code, "session_execution_configuration_changed");
+
+        // Withdrawing the queued input lets the chat follow the new model.
+        second
+            .edit_queue(
+                session.clone(),
+                ChangeId::new("withdraw").unwrap(),
+                view.revision,
+                QueueEdit::Withdraw {
+                    input: ChangeId::new("queued").unwrap(),
+                },
+            )
+            .await
+            .unwrap();
+        let view = second.store.inspect(session.clone()).await.unwrap();
+        assert!(view.queued.is_empty());
+        second.check_execution(&view).unwrap();
+
+        // Work accepted under the new route keeps the chat movable.
+        let next = fixture_prompt(&session, "next");
+        let policy = second.submission_policy(&next, false).unwrap();
+        let captured = second
+            .capture_input(&view, next.id, next.parts, policy)
+            .await
+            .unwrap();
+        second
+            .store
+            .submit(session.clone(), captured)
+            .await
+            .unwrap();
+        let view = second.store.inspect(session.clone()).await.unwrap();
+        second.check_execution(&view).unwrap();
+        second.shutdown().await.unwrap();
+    }
 }
 
 pub enum QueueEdit {
@@ -555,36 +705,31 @@ impl Host {
                         .as_ref()
                         .is_some_and(|input| input.allow_image_placement);
                     let spending = stored.as_ref().and_then(|input| input.spending.clone());
+                    let reasoning = stored.as_ref().and_then(|input| input.reasoning);
                     let effort = stored.and_then(|input| input.effort);
-                    let mut captured = self
-                        .capture_input(
-                            &view,
-                            replacement,
-                            parts,
-                            SubmissionPolicy {
-                                questions,
-                                configuration_permission,
-                                allow_wakeups: false,
-                                allow_library_selection: false,
-                                allow_host_tools,
-                                desktop_image_generation,
-                                allow_image_placement,
-                                editor_endpoint: None,
-                                editor_presentation: false,
-                                editor_svg_target: None,
-                                operating_regime,
-                                subagent: None,
-                                effort,
-                                reasoning: Default::default(),
-                            },
-                        )
-                        .await?;
-                    if spending.is_some() {
-                        let mut prompt: StoredPrompt = decode_input(&captured)?;
-                        prompt.spending = spending;
-                        captured.payload = encode_stored_prompt(&prompt)?;
-                    }
-                    captured
+                    self.capture_input(
+                        &view,
+                        replacement,
+                        parts,
+                        SubmissionPolicy {
+                            questions,
+                            configuration_permission,
+                            allow_wakeups: false,
+                            allow_library_selection: false,
+                            allow_host_tools,
+                            desktop_image_generation,
+                            allow_image_placement,
+                            editor_endpoint: None,
+                            editor_presentation: false,
+                            editor_svg_target: None,
+                            operating_regime,
+                            subagent: None,
+                            effort,
+                            reasoning,
+                            spending,
+                        },
+                    )
+                    .await?
                 };
                 SessionControl::ReplaceQueued { input, replacement }
             }
@@ -623,6 +768,8 @@ impl Host {
             }
             let view = host.store.inspect(session.clone()).await?;
             if view.current.is_none() && super::subagents::queued_work(&view).is_some() {
+                // Queued work this route cannot run is withdrawn, not resumed.
+                host.check_execution(&view)?;
                 host.check_ready_capacity(&session).await?;
             }
             let receipt = host.store.control(control).await?;

@@ -339,11 +339,7 @@ impl Host {
             &wait,
             revision,
         ))?;
-        let key: String = identity
-            .bytes()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
+        let key = identity.to_hex();
         let request = ClaimRequest {
             id: ChangeId::new(format!("cancelled-wakeup/{key}"))?,
             session: control.session.clone(),

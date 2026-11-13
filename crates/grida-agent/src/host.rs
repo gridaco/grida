@@ -427,6 +427,36 @@ struct CapturedAuthority {
     scope: ScopeId,
 }
 
+/// The model and inference authority an input was captured under.
+#[derive(Deserialize)]
+struct CapturedRoute {
+    #[serde(default)]
+    model: Option<agent_kit_core::ModelId>,
+    #[serde(default)]
+    authority: Option<CapturedAuthority>,
+}
+
+impl CapturedRoute {
+    /// Whether a retained input would run under this execution, by the same
+    /// model and authority rules that admission applies to it.
+    fn admits(input: &Submission, execution: &Execution) -> bool {
+        if input.payload.schema().as_str() != INPUT_SCHEMA
+            || !matches!(input.payload.version(), 2 | 3)
+        {
+            return false;
+        }
+        let live = &execution.authority.inference.authority;
+        decode_input::<Self>(input).is_ok_and(|route| {
+            route
+                .model
+                .is_none_or(|model| model == execution.config.model)
+                && route.authority.is_some_and(|captured| {
+                    captured.principal == live.principal && captured.scope == live.scope
+                })
+        })
+    }
+}
+
 struct SubmissionPolicy {
     questions: bool,
     configuration_permission: crate::ConfigurationPermission,
@@ -442,6 +472,9 @@ struct SubmissionPolicy {
     subagent: Option<grida_agent_master::subagents::Assignment>,
     effort: Option<EffortPolicy>,
     reasoning: Option<agent_kit_core::inference::ReasoningEffort>,
+    /// The Goal spending selection the input runs under, carried by the
+    /// Goal's own inputs and the assignments and replacements they create.
+    spending: Option<spending::Selection>,
 }
 
 enum InputAuthority {
@@ -1161,9 +1194,10 @@ impl Host {
     }
 
     /// The work table, once a session's settled turn has released its worker.
-    /// A turn is recorded as settled before its worker finishes, so a request
-    /// sent right after the answer could otherwise find the session still
-    /// running. A turn that has not settled is still refused at registration.
+    /// A turn is recorded as settled before its worker finishes, so a request,
+    /// compaction, revision or deletion sent right after the answer could
+    /// otherwise find the session still running. Each caller still refuses a
+    /// session whose turn has not settled.
     async fn settled_work(&self, session: &SessionId) -> Result<MutexGuard<'_, Work>> {
         let deadline = tokio::time::Instant::now() + SETTLING_WORKER_WAIT;
         loop {
@@ -2096,7 +2130,7 @@ impl Host {
         let configuration = session_configuration(view)?;
         if configuration.execution != expected
             && !(configuration.owner == Some(execution.owner)
-                && Self::route_movable(view, &configuration))
+                && Self::route_movable(view, &configuration, execution))
         {
             return Err(problem(
                 ErrorKind::Conflict,
@@ -2110,11 +2144,22 @@ impl Host {
     /// credential owner that created it. A turn
     /// always finishes under the route that claimed it, delegated sessions
     /// keep their parent's route, and an active Goal keeps the route its
-    /// allowance and spending were measured against.
-    fn route_movable(view: &SessionView, configuration: &SessionConfiguration) -> bool {
+    /// allowance and spending were measured against. Queued inputs keep the
+    /// model and authority they were accepted under, so a chat holding one
+    /// captured under another route stays on that route until the input runs
+    /// or is withdrawn.
+    fn route_movable(
+        view: &SessionView,
+        configuration: &SessionConfiguration,
+        execution: &Execution,
+    ) -> bool {
         view.current.is_none()
             && configuration.subagent.is_none()
             && goals::require_resolved_goal(&view.driver_state).is_ok()
+            && view
+                .queued
+                .iter()
+                .all(|queued| CapturedRoute::admits(&queued.input, execution))
     }
 
     fn submission_policy(
@@ -2150,6 +2195,7 @@ impl Host {
             subagent: None,
             effort: self.capture_effort(request.effort.unwrap_or(self.effort))?,
             reasoning: request.reasoning,
+            spending: None,
         })
     }
 
@@ -2175,6 +2221,7 @@ impl Host {
             subagent,
             effort,
             reasoning,
+            spending,
         } = policy;
         if !operating_regime.is_act() && allow_wakeups {
             return Err(problem(ErrorKind::Unsupported, "plan_wakeups_unavailable"));
@@ -2292,7 +2339,7 @@ impl Host {
             id,
             payload: encode_stored_prompt(&StoredPrompt {
                 lifecycle_hooks,
-                spending: None,
+                spending,
                 parts,
                 configuration,
                 max_output_tokens: execution.config.max_output_tokens,
@@ -2633,7 +2680,10 @@ impl Host {
                     config.instructions.push_str(permission.context());
                 }
                 if stored.allow_reviewer_primary_read {
-                    config.instructions.push_str("\nThe independent reviewer returns findings in text and may inspect the primary workspace using read-only tools.");
+                    config.instructions.push('\n');
+                    config
+                        .instructions
+                        .push_str(grida_agent_master::effort::PRIMARY_READ_REVIEW_INSTRUCTIONS);
                 }
                 let guidance = stored
                     .guidance
@@ -2646,7 +2696,9 @@ impl Host {
                 }
                 if stored.goal.is_some() {
                     config.instructions.push_str("\n\n");
-                    config.instructions.push_str(goals::INSTRUCTIONS);
+                    config
+                        .instructions
+                        .push_str(grida_agent_master::goals::INSTRUCTIONS);
                 }
                 config.max_steps = stored.max_steps.unwrap_or(1);
                 config.max_output_tokens = stored.max_output_tokens.or(config.max_output_tokens);

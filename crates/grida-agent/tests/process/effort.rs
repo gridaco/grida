@@ -436,6 +436,72 @@ mod negotiated {
     }
 
     #[tokio::test]
+    async fn an_edited_queued_input_keeps_its_reasoning_level() {
+        let root = TempDir::new().unwrap();
+        let workspace = TempDir::new().unwrap();
+        let mut endpoint = Endpoint::start(vec![
+            Reply::Hold("Current task."),
+            Reply::Finished("Edited answer."),
+        ])
+        .await;
+        let mut command = executable();
+        command.args(["serve", "--stdio", "--subagents", "--reasoning"]);
+        configured(&mut command, &root.path().join("state"), &endpoint.url);
+        let child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut client = PrivateStdio::from_child(child);
+        client.request("initialize", capabilities(true)).await;
+        let created = client
+            .request(
+                "session/new",
+                json!({"cwd":workspace.path(),"mcpServers":[]}),
+            )
+            .await;
+        let session = created["result"]["sessionId"].as_str().unwrap();
+        let started = client
+            .request(
+                "_co.grida/session/submit",
+                input(session, "active", "First task.", "act", "standard"),
+            )
+            .await;
+        assert!(started.get("result").is_some(), "{started}");
+        let _ = endpoint.request().await;
+
+        let mut queued = input(session, "queue", "Queued original.", "act", "standard");
+        queued["reasoning"] = "high".into();
+        let queued = client.request("_co.grida/session/enqueue", queued).await;
+        assert_eq!(queued["result"]["disposition"], "queued", "{queued}");
+        let view = snapshot(&mut client, session).await;
+        let edit = client.request("_co.grida/session/replace", json!({
+            "queue":{"sessionId":session,"requestId":"edit-queue","expectedSessionRevision":view["sessionRevision"]},
+            "inputId":"queue","replacementInputId":"edited","prompt":[{"type":"text","text":"Edited queued task."}],
+        })).await;
+        assert!(edit.get("result").is_some(), "{edit}");
+        let view = snapshot(&mut client, session).await;
+        let stopped = client
+            .request(
+                "_co.grida/session/stop",
+                task_basis(&view, session, "stop-first"),
+            )
+            .await;
+        assert!(stopped.get("result").is_some(), "{stopped}");
+        let view = idle(&mut client, session).await;
+        let resumed = client.request("_co.grida/session/resume-queue", json!({
+            "sessionId":session,"requestId":"resume-queue","expectedSessionRevision":view["sessionRevision"],
+        })).await;
+        assert!(resumed.get("result").is_some(), "{resumed}");
+        let next = endpoint.request().await;
+        assert!(next["messages"].to_string().contains("Edited queued task."));
+        assert_eq!(next["reasoning_effort"], "high", "{next}");
+        let _ = idle(&mut client, session).await;
+        assert!(client.finish().await.status.success());
+    }
+
+    #[tokio::test]
     async fn per_input_effort_survives_queue_edit_restart_and_revision() {
         let root = TempDir::new().unwrap();
         let state = root.path().join("state");

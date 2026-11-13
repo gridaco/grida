@@ -1,6 +1,6 @@
 //! One-shot timed continuation of an existing task.
 
-use crate::{decode, encode, hex};
+use crate::{decode, encode};
 use agent_kit_core::inference::InputFormat;
 use agent_kit_core::messages::{OutcomeStatus, ResultContent, ToolArguments};
 use agent_kit_core::tools::{
@@ -172,7 +172,7 @@ pub fn prepare_delivery(
         disposition,
     };
     Ok(Delivery::Resolve(Resolution {
-        request: ChangeId::new(hex(Fingerprint::of(&(RESPONSE, &answer))?))?,
+        request: ChangeId::new(Fingerprint::of(&(RESPONSE, &answer))?.to_hex())?,
         wait: wait.clone(),
         expected_control: state.controls().revision,
         answer: encode(RESPONSE, &answer)?,
@@ -380,7 +380,7 @@ fn recorded_invocation<'a>(
 fn wait_id(session: &SessionId, turn: &TurnId) -> Result<WaitId> {
     WaitId::new(format!(
         "wakeup/{}",
-        hex(Fingerprint::of(&(REQUEST, session, turn))?)
+        Fingerprint::of(&(REQUEST, session, turn))?.to_hex()
     ))
 }
 

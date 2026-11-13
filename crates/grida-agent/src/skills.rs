@@ -144,7 +144,7 @@ impl CapturedGuidance {
 
     pub(crate) fn message(&self, input: &ChangeId) -> Result<Message> {
         let source = "selected-task-guidance";
-        let identity = hex(&Fingerprint::of(&(source, input))?);
+        let identity = Fingerprint::of(&(source, input))?.to_hex();
         let text = serde_json::to_string(self)
             .map_err(|_| problem(ErrorKind::InvalidState, "skill_context_encoding_failed"))?;
         Ok(Message {
@@ -221,7 +221,7 @@ pub(crate) fn capture(
             .map(|body| {
                 Ok(ProjectGuidance {
                     source: "AGENTS.md".into(),
-                    revision: hex(&Fingerprint::of(&("AGENTS.md", &body))?),
+                    revision: Fingerprint::of(&("AGENTS.md", &body))?.to_hex(),
                     body,
                 })
             })
@@ -300,7 +300,7 @@ fn parse(name: &str, source: SkillSource, document: &str) -> Result<Option<Captu
     if declared != name || description.is_empty() || description.len() > MAX_DESCRIPTION {
         return Ok(None);
     }
-    let revision = hex(&Fingerprint::of(&(name, source, &description, body))?);
+    let revision = Fingerprint::of(&(name, source, &description, body))?.to_hex();
     Ok(Some(CapturedSkill {
         descriptor: SkillDescription {
             name: name.to_owned(),
@@ -398,14 +398,6 @@ fn valid_name(name: &str) -> bool {
         && name
             .bytes()
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
-}
-
-fn hex(fingerprint: &Fingerprint) -> String {
-    fingerprint
-        .bytes()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
 }
 
 fn problem(kind: ErrorKind, code: &'static str) -> Error {

@@ -436,8 +436,11 @@ impl Host {
     ) -> Result<HistoryRevised> {
         self.owned_control(move |host| async move {
             prompt_input(&replacement.id, &replacement.parts)?;
-            let _admission = host.configuration_admission.lock().await;
             let session = replacement.session.clone();
+            // Wait out a settled turn's worker before admission, which that
+            // worker's next queued input may need. Idleness is checked below.
+            drop(host.settled_work(&session).await);
+            let _admission = host.configuration_admission.lock().await;
             let cut = ConversationCut::BeforeEditableUser(derivation.anchor);
             // The explicit write opt-in is caller intent. Read and question
             // capabilities are captured settings of the original acceptance.

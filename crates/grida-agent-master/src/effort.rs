@@ -15,6 +15,9 @@ use std::fmt::Write as _;
 use std::num::NonZeroU32;
 
 pub const COLLECT_REVIEW: &str = "collect_review";
+/// What the model is told when its independent reviewer may read the
+/// primary workspace.
+pub const PRIMARY_READ_REVIEW_INSTRUCTIONS: &str = "The independent reviewer returns findings in text and may inspect the primary workspace using read-only tools.";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReviewEvidence {

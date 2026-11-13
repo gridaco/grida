@@ -547,12 +547,7 @@ impl PermissionProfile {
             principal: PrincipalId::new("grida-local")?,
             binding: BindingId::new(format!(
                 "native-permissions/{}",
-                hex(&Fingerprint::of(&(
-                    session,
-                    turn,
-                    capture.profile,
-                    workspace_identity
-                ))?)
+                Fingerprint::of(&(session, turn, capture.profile, workspace_identity))?.to_hex()
             ))?,
             scope: capture.scope.clone(),
         };
@@ -1392,7 +1387,7 @@ fn response_contract() -> Result<ResponseContract> {
 }
 
 fn wait_id(operation: &OperationId) -> Result<WaitId> {
-    WaitId::new(format!("approval/{}", hex(&Fingerprint::of(operation)?)))
+    WaitId::new(format!("approval/{}", Fingerprint::of(operation)?.to_hex()))
 }
 
 fn encode(schema: &str, value: &impl Serialize) -> Result<Envelope> {
@@ -1414,14 +1409,6 @@ fn decode<T: serde::de::DeserializeOwned>(schema: &str, envelope: &Envelope) -> 
         return Err(approval_invalid());
     }
     serde_json::from_slice(envelope.bytes()).map_err(|_| approval_invalid())
-}
-
-fn hex(value: &Fingerprint) -> String {
-    value
-        .bytes()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
 }
 
 fn denied() -> Error {

@@ -509,6 +509,13 @@ async fn explicit_goal_uses_owned_queue_and_keeps_ordinary_work_separate() {
             .code,
         "input_identity_reused"
     );
+    // A retry naming another reasoning level is another request, too.
+    let mut reasoned = input.clone();
+    reasoned.reasoning = Some(agent_kit_core::inference::ReasoningEffort::High);
+    assert_eq!(
+        host.start_goal(reasoned, goal()).await.unwrap_err().code,
+        "input_identity_reused"
+    );
     assert_eq!(
         host.enqueue(input.clone()).await.unwrap_err().code,
         "submission_input_changed"

@@ -62,7 +62,7 @@ impl LifecycleAccess {
                 let grant = GrantSelection {
                     authority: AuthorityBinding {
                         principal: PrincipalId::new("grida-local")?,
-                        binding: BindingId::new(format!("hook/{}", hex(authority)))?,
+                        binding: BindingId::new(format!("hook/{}", authority.to_hex()))?,
                         scope: ScopeId::new("lifecycle-hook")?,
                     },
                     grants: vec![GrantId::new(format!("hook/{}", hook.id))?],
@@ -343,7 +343,7 @@ impl Host {
                     .as_millis()
                     .try_into()
                     .unwrap_or(u64::MAX),
-                revision: hex(hook.command.revision),
+                revision: hook.command.revision.to_hex(),
             })
             .collect();
         let results = match session {
@@ -377,7 +377,7 @@ impl Host {
                                 .map(|account|account.lifecycle_hooks)
                                 .filter(|results|!results.is_empty())
                                 .unwrap_or_else(||selected.results(&agent_kit_runtime::TurnView {state:state.clone(),active:Vec::new(),admission_closed:true}));
-                            Ok(results.into_iter().take(64).map(|result|json!({"id":result.id,"revision":hex(result.revision),"event":result.event,"operation":result.operation,"status":result.status,"reason":result.reason})).collect())
+                            Ok(results.into_iter().take(64).map(|result|json!({"id":result.id,"revision":result.revision.to_hex(),"event":result.event,"operation":result.operation,"status":result.status,"reason":result.reason})).collect())
                         }).await?
                     }
                     None => Vec::new(),
@@ -391,12 +391,4 @@ impl Host {
             results,
         })
     }
-}
-
-fn hex(value: Fingerprint) -> String {
-    value
-        .bytes()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
 }
