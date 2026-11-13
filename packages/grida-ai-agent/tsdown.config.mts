@@ -2,8 +2,8 @@ import { defineConfig } from "tsdown";
 
 /**
  * The renderer imports the neutral bindings. Host adapters import the Node
- * service, transport and sandbox exports. The package manifest declares
- * each public entry point.
+ * media service, media transport and ChatGPT host. The package manifest
+ * declares each public entry point.
  */
 const shared = {
   format: ["cjs", "esm"],
@@ -20,10 +20,6 @@ export default defineConfig([
       "src/fs/backends/opfs.ts",
       "src/todos/index.ts",
       "src/surface/index.ts",
-      "src/vision/index.ts",
-      // Web-safe: the renderer resolves `design_search` client-side, so it needs
-      // the tool's name + result types (only `ai` + zod, no node).
-      "src/tools/design-search.ts",
     ],
     platform: "neutral",
   },
@@ -33,8 +29,6 @@ export default defineConfig([
       "src/chatgpt-host.ts",
       "src/media-server.ts",
       "src/media-transport.ts",
-      "src/sandbox/index.ts",
-      "src/transport.ts",
     ],
     platform: "node",
   },

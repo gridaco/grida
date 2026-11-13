@@ -6,4 +6,3 @@ export {
   type GridaGatewaySessionStatus,
   type GridaGatewayOrganization,
 } from "@grida/ai";
-export { liveGgMediaDeps } from "@grida/ai/providers";

@@ -59,15 +59,14 @@ beforeAll(async () => {
   const contract = `
     import { createMediaDaemon, type MediaDaemonOptions } from "@grida/agent/media-server";
     import { ChatGptSubscriptionHost, type ChatGptProviderConfig } from "@grida/agent/chatgpt-host";
-    import { RUN_COMMAND_TOOL_NAME, type AgentToolName, type AgentRunOptions, type ChatSessionRow } from "@grida/agent";
+    import type { AgentRunOptions, ChatSessionRow } from "@grida/agent";
     // @ts-expect-error Historical chat construction is not distributed.
     import { createAgent, createToolset, composeSystemPrompt } from "@grida/agent";
     // @ts-expect-error Historical chat server is not a public entrypoint.
     import type { AgentDaemonOptions } from "@grida/agent/server";
-    const name: AgentToolName = RUN_COMMAND_TOOL_NAME;
     const verify = (configuration: ChatGptProviderConfig, media: MediaDaemonOptions, run: AgentRunOptions, row: ChatSessionRow) => {
       const accepts: ConstructorParameters<typeof ChatGptSubscriptionHost>[0]["configuration"] = configuration;
-      return [accepts, createMediaDaemon(media), run.messages, row.id, name];
+      return [accepts, createMediaDaemon(media), run.messages, row.id];
     };
     void verify;
   `;
@@ -168,7 +167,7 @@ describe("built retained package", () => {
     expect(manifest.exports).not.toHaveProperty("./server");
     for (const dependency of ["@agentclientprotocol/sdk", "drizzle-orm"]) {
       expect(manifest.dependencies).not.toHaveProperty(dependency);
-      expect(typeof manifest.devDependencies[dependency]).toBe("string");
+      expect(manifest.devDependencies).not.toHaveProperty(dependency);
     }
     await expect(
       fs.access(path.join(stage, "dist", "server.cjs"))
@@ -228,40 +227,6 @@ describe("built retained package", () => {
         await assert.rejects(load("@grida/agent/src/server.ts"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
         assert.equal(typeof (await load("@grida/agent/chatgpt-host")).ChatGptSubscriptionHost, "function");
       `,
-        ],
-        {
-          cwd: stage,
-          timeout: 10_000,
-          env: {
-            PATH: process.env.PATH,
-            HOME: path.join(stage, "home"),
-            TMPDIR: stage,
-          },
-        }
-      );
-      expect(stderr).toBe("");
-    });
-
-    it(`imports sandbox helpers through public ${format} exports without the daemon server`, async () => {
-      const { stderr } = await execute(
-        process.execPath,
-        [
-          "--input-type=module",
-          "--eval",
-          String.raw`
-          import assert from "node:assert/strict";
-          import { createRequire, registerHooks } from "node:module";
-          const require = createRequire(import.meta.url);
-          registerHooks({ resolve(specifier, context, next) {
-            if (/^(?:@grida\/daemon\/server|hono|@hono\/node-server)(?:\/|$)/.test(specifier))
-              throw new Error("server dependency forbidden");
-            return next(specifier, context);
-          } });
-          assert.throws(() => require("@grida/daemon/server"), /server dependency forbidden/);
-          const helpers = ${format === "esm" ? 'await import("@grida/agent/sandbox")' : 'require("@grida/agent/sandbox")'};
-          assert.equal(typeof helpers.defaultScratchBase, "function");
-          assert.equal(typeof helpers.prepareScratchAuthority, "function");
-        `,
         ],
         {
           cwd: stage,
@@ -447,8 +412,8 @@ const daemon = createMediaDaemon(options);
 await daemon.start({ listen: false });
 try {
   const handshake = await (await call(daemon, "/handshake")).json();
-  assert.equal(handshake.capabilities.agent, false);
-  assert.equal(handshake.capabilities.sessions, false);
+  assert.equal("agent" in handshake.capabilities, false);
+  assert.equal("sessions" in handshake.capabilities, false);
   assert.equal(handshake.capabilities.providers, true);
   assert.equal(handshake.capabilities.sound_effects, true);
   assert.equal(handshake.capabilities.music, true);
@@ -472,14 +437,8 @@ try {
   assert.deepEqual(await (await call(restart, "/auth/gg/status")).json(), { active: false });
 } finally { await restart.stop(); }
 
-// Desktop imports these helpers without using the heavyweight /server barrel.
-// Merely importing scratch preparation must not prepare any scratch directory.
-const sandbox = await load("@grida/agent/sandbox");
-assert.equal(typeof sandbox.defaultScratchBase, "function");
-assert.equal(typeof sandbox.prepareScratchAuthority, "function");
 const protocol = await load("@grida/agent");
-assert.equal(protocol.CHATGPT_AUTH_ROUTE_PATHS.status, "/auth/chatgpt/status");
-assert.equal(Object.isFrozen(protocol.CHATGPT_AUTH_ROUTE_PATHS), true);
+assert.equal(protocol.CHATGPT_PROVIDER_ID, "chatgpt");
 assert.deepEqual(forbidden, { module: 0, process: 0, network: 0, state: 0 });
 assert.equal(byok, 1);
 assert.equal(gg, 1);

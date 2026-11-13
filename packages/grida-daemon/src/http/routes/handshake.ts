@@ -6,21 +6,20 @@ import type {
 } from "../../protocol/handshake";
 
 /**
- * Agent server route capability flags: which HTTP route groups the
- * host mounts. Sent from agent server to client via the handshake
- * response. The client uses this to gate UI on routes that may be
- * absent in a stripped build.
+ * Daemon route capability flags: which HTTP route groups the host mounts.
+ * Sent to the client via the handshake response. The client uses this to
+ * gate UI on routes that may be absent in a stripped build.
  *
  * Distinct from any host bridge surface: native namespaces such as
- * `window`, `dialog`, and platform `shell` helpers have no agent-server
- * route equivalent.
+ * `window`, `dialog`, and platform `shell` helpers have no daemon route
+ * equivalent.
  */
 export type { DaemonCapabilities };
 export type HandshakeResponse = DaemonHandshakeResponse;
 
 /**
  * Lookup-table form of the `supports` strings; each entry pairs a
- * capability flag with the feature tag the agent server advertises
+ * capability flag with the feature tag the daemon advertises
  * when that flag is true. Adding a new `@2` upgrade is one entry, not
  * one new `if` arm.
  */
@@ -28,9 +27,7 @@ const SUPPORTS_TAGS: Record<keyof DaemonCapabilities, string> = {
   files: "files@1",
   recent: "recent@1",
   secrets: "secrets@1",
-  agent: "agent@1",
   workspaces: "workspaces@1",
-  sessions: "sessions@1",
   gg: "gg",
   providers: "providers@1",
   images: "images@1",
@@ -39,7 +36,6 @@ const SUPPORTS_TAGS: Record<keyof DaemonCapabilities, string> = {
   music: "music@1",
   sound_effects: "sound-effects@1",
   text_to_speech: "text-to-speech@1",
-  shell: "shell@1",
 };
 
 export function registerHandshakeRoute(

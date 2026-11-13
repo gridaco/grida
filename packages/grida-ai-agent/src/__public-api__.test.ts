@@ -1,9 +1,10 @@
 /**
  * Public-API guard test. Pins the shape and presence of every symbol
- * the root plus retained host, sandbox, transport, fs, and todos subpaths export.
+ * the root plus retained host, media transport, fs, todos and surface
+ * subpaths export.
  *
  * This is intentionally separate from the behavioural tests in
- * `fs/fs.test.ts`, `fs/backends/node.test.ts`, `todos/todos.test.ts`.
+ * `fs/fs.test.ts` and `todos/todos.test.ts`.
  * Those exercise behaviour; this one exercises the **contract**. A
  * rename, signature change, or accidental drop here = a breaking change
  * for consumers — the test should fail until the README / CHANGELOG has
@@ -17,20 +18,12 @@ import type { MediaItem } from "@grida/daemon";
 
 import * as root from ".";
 import {
-  AGENT_DEFAULT_TIER,
   AGENT_SESSION_AGENT,
   AGENT_TIERS,
   BYOK_PROVIDER_METADATA,
   BYOK_PROVIDER_IDS,
-  GRIDA_STATUS_SSE_EVENT,
-  SURFACE_LIST_OPEN_TOOL_NAME,
-  SURFACE_OPEN_TOOL_NAME,
-  type AgentModelId,
-  type AgentRunMessage,
-  type AgentRunMessagePart,
   type AgentRunOptions,
   type AgentUIMessageChunk,
-  type ByokProviderMetadata,
   type ByokProviderId,
   type ImageGenerateResult,
   type VideoGenerateResult,
@@ -44,19 +37,16 @@ import {
   type TextToSpeechGenerateResult,
   type TextToSpeechListVoicesResult,
   type TextToSpeechVoice,
-  type ChatMessageRow,
   type ChatMessageWithParts,
-  type ChatModel,
-  type ChatPartRow,
   type ChatSessionRow,
   type CreateSessionOptions,
-  type ModelTier,
   type PatchSessionOptions,
   type SessionListFilter,
   type SessionListPage,
   type SessionRunState,
   type SessionStatus,
 } from ".";
+import { AGENT_DEFAULT_TIER, type ModelTier } from "./tiers";
 import {
   ChatGptSubscriptionHost,
   type ChatGptProviderConfig,
@@ -67,14 +57,6 @@ import {
   type MediaDaemonOptions,
 } from "./media-server";
 import { DaemonServer } from "@grida/daemon/server";
-import {
-  buildAgentDaemonSandboxPolicy,
-  defaultScratchBase,
-  prepareScratchAuthority,
-  hostFromUrl,
-  type AgentDaemonSandboxPolicy,
-} from "./sandbox";
-import { AgentTransport } from "./transport";
 import { MediaTransport } from "./media-transport";
 import { AgentFs } from "./fs";
 import { AgentTodos } from "./todos";
@@ -92,8 +74,7 @@ describe("@grida/agent public API", () => {
       expect(run.feature).toBe("grida");
       expect(run.surface?.active).toBe("/canvas.canvas");
 
-      // Session status back-channel (RFC `session` / `queue`).
-      expect(GRIDA_STATUS_SSE_EVENT).toBe("grida-status");
+      // Session status shapes the earlier chat pane still reads.
       const idle: SessionStatus = { state: "idle" };
       const state: SessionRunState = idle.state;
       expect(state).toBe("idle");
@@ -101,20 +82,23 @@ describe("@grida/agent public API", () => {
       expect(waiting.state).toBe("waiting_on_approval");
     });
 
-    it("keeps presentation vocabulary without exposing execution factories", () => {
+    it("exposes no agent execution, tool or event vocabulary", () => {
       for (const name of [
         "createAgent",
         "createToolset",
         "composeSystemPrompt",
-        "createAgentWithUrlPartDownload",
+        "GRIDA_EVENTS_SSE_EVENT",
+        "GRIDA_STATUS_SSE_EVENT",
+        "RUN_COMMAND_TOOL_NAME",
+        "QUESTION_TOOL_NAME",
+        "SURFACE_OPEN_TOOL_NAME",
+        "CHATGPT_AUTH_ROUTE_PATHS",
       ]) {
         expect(name in root).toBe(false);
       }
-      expect(SURFACE_OPEN_TOOL_NAME).toBe("surface_open");
-      expect(SURFACE_LIST_OPEN_TOOL_NAME).toBe("surface_list_open");
     });
 
-    it("exposes BYOK provider identity, wire vocab, tiers, and session-row types", () => {
+    it("exposes BYOK provider identity, media shapes, tiers, and session-row types", () => {
       // Media-only providers remain excluded from the text resolver via their
       // modality markers while still joining the closed secrets vocabulary.
       expect(BYOK_PROVIDER_IDS).toEqual([
@@ -144,9 +128,8 @@ describe("@grida/agent public API", () => {
         { id: "tripo", modalities: [] },
       ]);
       const byok: ByokProviderId = "vercel";
-      const metadata: ByokProviderMetadata = BYOK_PROVIDER_METADATA[0];
       expect(byok).toBe("vercel");
-      expect(metadata.id).toBe("openrouter");
+      expect(BYOK_PROVIDER_METADATA[0].id).toBe("openrouter");
 
       expectTypeOf<
         ImageGenerateResult["images"][number]["stored_media"]
@@ -202,26 +185,19 @@ describe("@grida/agent public API", () => {
       // Tier constants.
       expect(AGENT_TIERS).toContain(AGENT_DEFAULT_TIER);
       const tier: ModelTier = AGENT_DEFAULT_TIER;
-      const modelId: AgentModelId = "anthropic/claude-sonnet-5";
       expect(typeof tier).toBe("string");
-      expect(modelId).toContain("/");
 
-      // Wire vocab — the shipped stream contract is the AI-SDK frame alias.
+      // Earlier chat pane wire vocabulary.
       type _U = AgentUIMessageChunk;
-      const part: AgentRunMessagePart = { type: "text", text: "hello" };
-      const message: AgentRunMessage = { role: "user", parts: [part] };
       const run: AgentRunOptions = {
-        messages: [message],
+        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
         tier: "pro",
         provider_id: "openrouter",
-        model_id: modelId,
+        model_id: "anthropic/claude-sonnet-5",
       };
       expect(run.messages[0]?.role).toBe("user");
 
       // Session-layer row contract (the persisted chat-history shapes).
-      type _M = ChatModel;
-      type _Msg = ChatMessageRow;
-      type _P = ChatPartRow;
       type _MW = ChatMessageWithParts;
       type _LF = SessionListFilter;
       type _LP = SessionListPage;
@@ -261,27 +237,17 @@ describe("@grida/agent public API", () => {
       expect(typeof root.isValidEndpointProviderId).toBe("function");
       expect(typeof root.validateEndpointProviderConfig).toBe("function");
       expect(typeof root.mergeProbedModels).toBe("function");
-      expect(root.isByokProviderId("openrouter")).toBe(true);
-      expect(root.isByokProviderId("ollama")).toBe(false);
       const config: root.EndpointProviderConfig = {
         ...root.OLLAMA_ENDPOINT_PRESET,
         models: [{ id: "llama3.1:8b", tool_call: true }],
       };
       const model: root.EndpointModelSpec = config.models[0];
       expect(model.id).toBe("llama3.1:8b");
-      // The model-id and provider-id wire types are open: a registered
-      // local id type-checks (the runtime gate still validates it).
-      const localModel: AgentModelId = "llama3.1:8b";
-      const localRun: AgentRunOptions = {
-        messages: [],
-        provider_id: "ollama",
-        model_id: localModel,
-      };
-      expect(localRun.provider_id).toBe("ollama");
     });
 
     it("does not expose internal runtime/provider/server modules from the root", () => {
       expect("AgentRuntime" in root).toBe(false);
+      expect("createAgentDaemon" in root).toBe(false);
       expect("StreamRegistry" in root).toBe(false);
       expect("buildServer" in root).toBe(false);
       expect("resolveProvider" in root).toBe(false);
@@ -307,116 +273,6 @@ describe("@grida/agent public API", () => {
         endpoint_settings: true,
       };
       expect(options.endpoint_settings).toBe(true);
-      expect(defaultScratchBase("/agent", "/native-temp")).toMatch(
-        /^[/\\]native-temp[/\\]grida-agent-[0-9a-f]{16}$/
-      );
-      expect(typeof prepareScratchAuthority).toBe("function");
-    });
-
-    it("exposes the package-owned sandbox policy intent", () => {
-      expect(hostFromUrl("https://example.com/path")).toBe("example.com");
-
-      const policy: AgentDaemonSandboxPolicy = buildAgentDaemonSandboxPolicy({
-        user_data: "/tmp/grida",
-        home: "/Users/example",
-        gg_host: "grida.co",
-      });
-      expect(policy.network.allowed_domains).toContain("openrouter.ai");
-      expect(policy.network.allowed_domains).toContain("openapi.tripo3d.ai");
-      expect(policy.network.allowed_domains).toContain("cdn.tripo3d.ai");
-      expect(policy.network.allowed_domains).toContain(
-        "tripo-data.rg1.data.tripo3d.com"
-      );
-      expect(policy.network.allowed_domains).toEqual(
-        expect.arrayContaining(["grida.co", "*.grida.co"])
-      );
-      // BYOK image provider fal (#908): queue API + media CDN must be reachable.
-      expect(policy.network.allowed_domains).toEqual(
-        expect.arrayContaining(["*.fal.run", "fal.media", "*.fal.media"])
-      );
-      // Agent-provider class (issue #813): the external agent's vendor backend
-      // must be reachable through the srt allowlist. Pin the full host set so a
-      // dropped domain fails here, not at runtime egress.
-      expect(policy.network.allowed_domains).toEqual(
-        expect.arrayContaining([
-          "api.anthropic.com",
-          "anthropic.com",
-          "*.anthropic.com",
-          "claude.ai",
-          "*.claude.ai",
-        ])
-      );
-      expect(policy.filesystem.deny_read.some((p) => p.includes(".ssh"))).toBe(
-        true
-      );
-    });
-
-    it("removes direct provider egress in host-routed HTTP mode", () => {
-      const policy = buildAgentDaemonSandboxPolicy({
-        user_data: "/tmp/grida",
-        home: "/Users/example",
-        gg_host: "grida.co",
-        host_routed_provider_http: true,
-      });
-
-      // BYOK + hosted GG must leave through the host callback. Pin every
-      // provider family, not only one representative host.
-      for (const host of [
-        "openrouter.ai",
-        "ai-gateway.vercel.sh",
-        "*.vercel-ai.com",
-        "fal.run",
-        "*.fal.run",
-        "fal.media",
-        "*.fal.media",
-        "api.elevenlabs.io",
-        "openapi.tripo3d.ai",
-        "cdn.tripo3d.ai",
-        "tripo-data.rg1.data.tripo3d.com",
-        "grida.co",
-        "*.grida.co",
-      ]) {
-        expect(policy.network.allowed_domains).not.toContain(host);
-      }
-      // ACP owns a separate network stack inside the same outer sandbox; the
-      // daemon frame's baseline hosts also remain available to sandboxed work.
-      expect(policy.network.allowed_domains).toEqual(
-        expect.arrayContaining([
-          "api.anthropic.com",
-          "*.anthropic.com",
-          "registry.npmjs.org",
-          "github.com",
-        ])
-      );
-    });
-
-    it("can deny all direct outbound network to shell and child processes", () => {
-      const policy = buildAgentDaemonSandboxPolicy({
-        user_data: "/tmp/grida",
-        home: "/Users/example",
-        gg_host: "grida.co",
-        direct_network_access: "none",
-      });
-
-      // This suppresses all three sources: daemon development hosts,
-      // in-process provider/GG hosts, and external ACP vendor hosts.
-      expect(policy.network.allowed_domains).toEqual([]);
-      // The daemon still needs to listen on its loopback HTTP perimeter. This
-      // option governs outbound destinations, not local server binding.
-      expect(policy.network.allow_local_binding).toBe(true);
-    });
-
-    it("can independently deny local socket binding", () => {
-      const policy = buildAgentDaemonSandboxPolicy({
-        user_data: "/tmp/grida",
-        home: "/Users/example",
-        allow_local_binding: false,
-      });
-
-      // Binding authority is independent of outbound allowlisted domains. A
-      // socketless host can remove it without changing provider egress policy.
-      expect(policy.network.allow_local_binding).toBe(false);
-      expect(policy.network.allowed_domains).toContain("openrouter.ai");
     });
   });
 
@@ -433,34 +289,6 @@ describe("@grida/agent public API", () => {
       expect("agent" in client).toBe(false);
       expect("events" in client).toBe(false);
       expect("directory_scopes" in client).toBe(false);
-    });
-  });
-
-  describe("transport subpath", () => {
-    it("exposes the AgentClient transport helpers", async () => {
-      expect(AgentTransport.USERNAME).toBe("agent");
-      expect(AgentTransport.baseUrl(49152)).toBe("http://127.0.0.1:49152");
-      expect(AgentTransport.buildBasicAuthHeader("pw")).toBe(
-        "Basic YWdlbnQ6cHc="
-      );
-      // The auth_token SSE query value is the SAME credential payload.
-      expect(AgentTransport.buildAuthToken("pw")).toBe("YWdlbnQ6cHc=");
-      const fetcher: AgentTransport.Fetcher = AgentTransport.makeFetcher({
-        port: 49152,
-        password: "pw",
-      });
-      expect(typeof fetcher).toBe("function");
-      const opts: AgentTransport.ClientOptions = {
-        base_url: "http://127.0.0.1:49152",
-        password: "pw",
-      };
-      expectTypeOf(AgentTransport.Client).toBeConstructibleWith(opts);
-      expect(typeof AgentTransport.HttpError).toBe("function");
-
-      const res = new Response(JSON.stringify({ ok: true }), { status: 200 });
-      await expect(
-        AgentTransport.parseJson<{ ok: true }>(res, "/x")
-      ).resolves.toEqual({ ok: true });
     });
   });
 
@@ -574,8 +402,6 @@ describe("@grida/agent public API", () => {
       const b: AgentFs.Backend = new OpfsBackend(["x"]);
       void b;
     });
-    // NodeFsBackend is intentionally NOT pinned: it's no longer a public
-    // subpath (internal + test-only, see fs/backends/node.test.ts).
   });
 
   describe("AgentTodos (class + namespace)", () => {
@@ -607,7 +433,7 @@ describe("@grida/agent public API", () => {
   });
 
   describe("AgentSurface namespace", () => {
-    it("exposes the tool family and browser observer", () => {
+    it("exposes the surface names, host contract and browser observer", () => {
       expect(AgentSurface.TOOL_NAMES).toEqual({
         surface_open: "surface_open",
         surface_list_open: "surface_list_open",
@@ -615,15 +441,7 @@ describe("@grida/agent public API", () => {
       expectTypeOf<AgentSurface.ToolName>().toEqualTypeOf<
         "surface_open" | "surface_list_open"
       >();
-      expectTypeOf(AgentSurface.createTools).toBeFunction();
       expectTypeOf(AgentSurface.observeToolCall).toBeFunction();
-      expectTypeOf(AgentSurface.parseSnapshot).toBeFunction();
-      expectTypeOf<AgentSurface.Tools>().toEqualTypeOf<
-        ReturnType<typeof AgentSurface.createTools>
-      >();
-    });
-
-    it("exposes the snapshot and acknowledgement contracts", () => {
       const host: AgentSurface.Host = {
         open: () => undefined,
         listOpen: () => ({
@@ -632,21 +450,14 @@ describe("@grida/agent public API", () => {
         }),
       };
       const snapshot: AgentSurface.Snapshot = host.listOpen();
-      const opened: AgentSurface.OpenOutput = {
-        path: "/canvas.canvas",
-        requested: true,
-        reason: "requested",
-      };
-      const listed: AgentSurface.ListOpenOutput = {
-        interactive: true,
-        active: "/canvas.canvas",
-        open: ["/canvas.canvas"],
-      };
-
-      expect(typeof host.open).toBe("function");
       expect(snapshot.active).toBe("/canvas.canvas");
-      expect(opened.reason).toBe("requested");
-      expect(listed.active).toBe("/canvas.canvas");
+      for (const name of [
+        "createTools",
+        "parseSnapshot",
+        "toModelOpenOutput",
+      ]) {
+        expect(name in AgentSurface).toBe(false);
+      }
     });
   });
 });

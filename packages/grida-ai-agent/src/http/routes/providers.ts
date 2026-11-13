@@ -26,11 +26,9 @@ import {
 } from "../../protocol/endpoints";
 import type { EndpointProvidersStore } from "../../providers/endpoints";
 import { probeEndpointModels } from "../../providers/probe";
-import type { detectClaude } from "../../agent-provider/detect";
 import type { SecretsStore } from "@grida/daemon/server";
 import { body, v } from "@grida/daemon/server";
 import { ProviderHttp } from "../../providers/http";
-import { ProviderReady } from "./provider-ready";
 
 export type ProvidersRoutesDeps = {
   endpoints: EndpointProvidersStore;
@@ -46,16 +44,11 @@ export type ProvidersRoutesDeps = {
   provider_http?: ProviderHttp;
   /** Probe override for tests. Defaults to {@link probeEndpointModels}. */
   probe?: typeof probeEndpointModels;
-  /** Mount local CLI detection only when the host supplies it. */
-  detect?: typeof detectClaude;
-  /** Trusted host edge after an endpoint config becomes resolvable. */
-  on_provider_ready?: ProviderReady.Hook;
 };
 
 export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
   const { endpoints, secrets } = deps;
   const probe = deps.probe ?? probeEndpointModels;
-  const detect = deps.detect;
   const providerHttp = deps.provider_http ?? new ProviderHttp();
 
   app.post("/providers/endpoints/list", async (c) => {
@@ -98,7 +91,6 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
     console.log(
       `[agent-host-providers] endpoint set id=${result.config.id} models=${result.config.models.length}`
     );
-    ProviderReady.notify(deps.on_provider_ready);
     return c.json({ ok: true });
   });
 
@@ -135,18 +127,4 @@ export function registerProvidersRoutes(app: Hono, deps: ProvidersRoutesDeps) {
     );
     return c.json({ source: result.source, models: result.models });
   });
-
-  // Zero-config Claude detection (issue #813): is the user's `claude` CLI
-  // resolvable on the augmented PATH? Cheap filesystem probe — does NOT
-  // verify login (that's surfaced by the first real run). Only the host can
-  // answer: the resolver searches the machine's well-known install dirs.
-  if (detect) {
-    app.post("/providers/claude/detect", (c) => {
-      const result = detect();
-      console.log(
-        `[agent-host-providers] claude detect installed=${result.installed}`
-      );
-      return c.json(result);
-    });
-  }
 }

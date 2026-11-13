@@ -5,7 +5,8 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { MediaStore } from "@grida/daemon/server";
 import { createMediaDaemon } from "./media-server";
-import { AgentTransport } from "./transport";
+import { DaemonTransport } from "@grida/daemon/transport";
+import { MediaTransport } from "./media-transport";
 import type {
   ModelGenerationGenerateRequest,
   ModelGenerationGenerateResult,
@@ -37,7 +38,7 @@ it("transports the explicit feature request and safe task receipt unchanged", as
     },
     task: { id: "task_complete", credits_consumed: 100 },
   };
-  const client = new AgentTransport.Client({
+  const client = new MediaTransport.Client({
     fetcher: async (route, init) => {
       expect(route).toBe("/model-generation/generate");
       expect(init?.method).toBe("POST");
@@ -93,7 +94,7 @@ describe("model-generation media daemon", () => {
       provider_http: { request, download: async () => new Response(bytes) },
     });
     const headers = {
-      authorization: AgentTransport.buildBasicAuthHeader(password),
+      authorization: DaemonTransport.buildBasicAuthHeader(password),
       origin,
       referer: origin + "/desktop/tools",
       "content-type": "application/json",

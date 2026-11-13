@@ -2,24 +2,20 @@
 // star. Anything not listed here is internal; promote on dogfooding.
 // GRIDA-SEC-008 — neutral ChatGPT wire facts expose no credential implementation.
 
-// Outward protocol — provider identity, handshake, run options, wire vocab.
+// Provider identity, ChatGPT subscription status, GG session DTOs, endpoint
+// configuration and media request/result shapes.
 export {
   BYOK_PROVIDER_METADATA,
   BYOK_PROVIDER_IDS,
   byokProvidersFor,
-  isByokProviderId,
   GG_PROVIDER_ID,
   GG_PROVIDER_METADATA,
-  isGgProviderId,
   CHATGPT_PROVIDER_ID,
-  CHATGPT_PROVIDER_METADATA,
   CHATGPT_SUBSCRIPTION_MODEL_IDS,
   CHATGPT_SUBSCRIPTION_MODEL_METADATA,
-  isChatGptProviderId,
   isChatGptSubscriptionModelId,
-  type ByokModality,
-  type ByokProviderMetadata,
   type ByokProviderId,
+  type ByokProviderMetadata,
   type ProviderId,
 } from "./protocol/provider-ids";
 export type {
@@ -28,33 +24,24 @@ export type {
   ChatGptSubscriptionModelId,
   ChatGptSubscriptionStatus,
 } from "./protocol/chatgpt";
-export { CHATGPT_AUTH_ROUTE_PATHS } from "./protocol/chatgpt";
 // GRIDA-SEC-006 — hosted-session wire shapes (types only; the store is
 // internal daemon state).
 // GRIDA-GG: provider — neutral status and session DTOs, no credential store.
 export type {
   GridaGatewaySession,
   GridaGatewaySessionStatus,
-  GridaGatewayOrganization,
 } from "./providers/gg-session";
 export type {
-  ImageGenProvider,
   ImageGenerateRequest,
-  ImageGeneratedImage,
   ImageGenerateResult,
 } from "./protocol/images";
 export type {
-  VideoGenProvider,
   VideoGenerateRequest,
-  GeneratedVideo,
   VideoGenerateResult,
 } from "./protocol/video";
 export type {
-  FalTextToThreeDModelId,
-  FalImageToThreeDModelId,
   ThreeDInputImage,
   ThreeDGenerateRequest,
-  ThreeDGeneratedGlb,
   ThreeDGenerateResult,
 } from "./protocol/three-d";
 export type {
@@ -67,7 +54,7 @@ export type {
   RiggingGenerateRequest,
   RiggingGenerateResult,
 } from "./protocol/rigging";
-export type { GeneratedMp3 } from "./protocol/generated-mp3";
+
 export type {
   MusicGenerateRequest,
   MusicGenerateResult,
@@ -95,27 +82,23 @@ export {
   type EndpointModelSpec,
   type EndpointProviderConfig,
   type ProbedEndpointModel,
-  type ProbeMergeResult,
 } from "./protocol/endpoints";
+// Earlier chat client contract (run options, context parts, modes, session
+// rows and status). Only the renderer's earlier chat pane consumes these; they
+// leave with that pane.
 export {
   AGENT_SESSION_AGENT,
   SCRATCH_SEED_LIMITS,
-  type AgentModelId,
-  type AgentRunMessage,
-  type AgentRunMessagePart,
   type AgentRunOptions,
   type ScratchSeedEntry,
 } from "./protocol/run";
 export { normalizeSdkToolPartFields } from "./protocol/tool-part-fields";
 export {
-  CONTEXT_MARKERS,
   DIRECTORY_SCOPE_MOUNT_ROOT,
   USER_TEMPLATE_SELECTION,
   USER_FILE_ATTACHMENTS,
   USER_DIRECTORY_REFERENCES,
   type DirectoryScopeDescriptor,
-  type UserDirectoryReferencesData,
-  type UserFileAttachmentDescriptor,
   type UserFileAttachmentsData,
 } from "./protocol/context";
 export {
@@ -124,34 +107,11 @@ export {
   asAgentMode,
   type AgentMode,
 } from "./protocol/mode";
-export {
-  GRIDA_STATUS_SSE_EVENT,
-  type SessionRunState,
-  type SessionStatus,
-} from "./protocol/session-status";
-export {
-  GRIDA_EVENTS_SSE_EVENT,
-  type AgentApprovalRequestedEvent,
-  type AgentLifecycleEvent,
-  type AgentTurnEndReason,
-  type AgentTurnFinishedEvent,
-  type AgentTurnStartedEvent,
-} from "./protocol/events";
+export type { SessionRunState, SessionStatus } from "./protocol/session-status";
 export type { AgentUIMessageChunk } from "./protocol/wire";
-// Daemon handshake + local-resource DTOs moved to `@grida/daemon` (#927) —
-// import them from there.
-
-// Session-layer row contract (the persisted chat-history shapes).
 export type {
-  ChatModel,
   ChatSessionRow,
-  ChatMessageRow,
-  ChatPartRow,
   ChatMessageWithParts,
-  MessageUsage,
-  AssistantTurnAccounting,
-  PermissionRule,
-  ForkSessionOptions,
   RewindResult,
   SessionListFilter,
   SessionListPage,
@@ -159,14 +119,6 @@ export type {
   PatchSessionOptions,
 } from "./session/rows";
 
-// Presentation vocabulary survives independently of the historical agent factory.
-export {
-  RUN_COMMAND_TOOL_NAME,
-  QUESTION_TOOL_NAME,
-  SURFACE_OPEN_TOOL_NAME,
-  SURFACE_LIST_OPEN_TOOL_NAME,
-  type AgentToolName,
-} from "./tools/names";
-export { AGENT_DEFAULT_TIER, AGENT_TIERS, type ModelTier } from "./tiers";
+export { AGENT_TIERS } from "./tiers";
 
 export type { GGModelsView } from "./protocol/gg-models";

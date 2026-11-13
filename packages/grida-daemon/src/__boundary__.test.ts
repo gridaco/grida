@@ -1,8 +1,8 @@
 /**
- * The #927 invariant, enforced: `@grida/daemon` depends on NOTHING
- * AI-specific. The daemon is the host layer; AI (the agent runtime,
- * model catalogs, provider SDKs) is a tenant that depends on this
- * package — never the reverse.
+ * The invariant, enforced: `@grida/daemon` depends on NOTHING
+ * AI-specific. The daemon is the host layer; AI media generation (model
+ * catalogs, provider SDKs) is a tenant that depends on this package —
+ * never the reverse.
  *
  * Two probes:
  *   1. package.json dependencies contain no AI packages.
@@ -10,7 +10,7 @@
  *      a hoisted node_modules without a manifest entry).
  *
  * If this test is in your way, the change is in the wrong package —
- * put the AI-flavored code in `@grida/ai` or an agent tenant and hand
+ * put the AI-flavored code in `@grida/ai` or the media tenant and hand
  * it what it needs through `DaemonServices` / tenant options.
  */
 import { describe, expect, it } from "vitest";
@@ -30,7 +30,7 @@ function imports(source: string): string[] {
     .importedFiles.map((file) => file.fileName);
 }
 
-describe("@grida/daemon is AI-free (#927)", () => {
+describe("@grida/daemon is AI-free", () => {
   it("declares no AI dependency", async () => {
     const pkg = JSON.parse(
       await fs.readFile(path.join(pkgDir, "package.json"), "utf8")
@@ -80,7 +80,7 @@ describe("@grida/daemon is AI-free (#927)", () => {
     'import ai = require("@grida/ai");',
     'type Image = import("@grida/ai").Image;',
     'import { models } from "@grida/ai/catalogue";',
-    'import { createAgent } from "@grida/agent";',
+    'import { createMediaDaemon } from "@grida/agent/media-server";',
   ])("detects an AI dependency in %s", (source) => {
     expect(imports(source).some((name) => AI_DEP_PATTERN.test(name))).toBe(
       true

@@ -2,10 +2,8 @@ import type { GGDiscoveryStore } from "@grida/ai";
 // GRIDA-GG: provider — agent defaults and legacy auto selection over the shared image operation.
 // GRIDA-SEC-004 / GRIDA-SEC-006 — host credentials and transport stay inside the operation.
 import { ImageClient, ProviderHttp } from "@grida/ai";
-import { catalog as models } from "@grida/ai/catalogue";
 import type { SecretsStore } from "@grida/daemon/server";
-import { byokProvidersFor } from "../protocol/provider-ids";
-import { liveGgMediaDeps, type GridaGatewaySessionStore } from "./gg-session";
+import type { GridaGatewaySessionStore } from "./gg-session";
 import type { ModelCatalogStore } from "./model-catalog";
 
 export type ResolvedImageModel = ImageClient.Resolved;
@@ -44,30 +42,6 @@ export class ImageModelUnavailableError extends Error {
     );
     this.name = "ImageModelUnavailableError";
   }
-}
-
-/** Service recommendation from the effective view; explicit choices bypass it. */
-export function defaultImageModelId(
-  view: models.snapshot.View = models.snapshot.view()
-): string | undefined {
-  return view.image.default_id ?? view.image.listed()[0]?.id;
-}
-
-/**
- * Whether the user has a key for ANY image provider — the cheap presence gate
- * the host uses to decide whether to advertise the `generate_image` tool at all
- * (mirrors vision's `bytesReadable`: don't offer a capability that would refuse
- * every call). Reuses the same precedence source as {@link resolveImageModel}.
- */
-export async function hasUsableImageProvider(
-  deps: ResolveImageDeps
-): Promise<boolean> {
-  for (const p of byokProvidersFor("image")) {
-    if (await deps.secrets._getKey(p.id)) return true;
-  }
-  // Grida hosted (GRIDA-SEC-006): a live session serves the curated list
-  // too — a signed-in keyless user gets in-chat image generation.
-  return liveGgMediaDeps(deps) !== null;
 }
 
 /** The agent deliberately retains its existing BYOK-then-GG automatic choice. */

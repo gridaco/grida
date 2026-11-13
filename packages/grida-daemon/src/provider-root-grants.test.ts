@@ -65,8 +65,6 @@ describe("native provider-root grants", () => {
     expect(await registry.findById(ancestor.id)).toBeNull();
     expect(await registry.findByRoot(ancestor.root)).toBeNull();
     expect(await registry.list()).toEqual([]);
-    expect(registry.rootsSnapshot()).toEqual([]);
-    expect(registry.containsPath(credential)).toBe(false);
     const app = new Hono();
     registerWorkspacesRoutes(app, registry);
     const response = await app.request("/workspaces/readfile", {
@@ -247,10 +245,6 @@ describe("native provider-root grants", () => {
       expect(await services!.workspaces.findById(workspace.id)).toBeNull();
       expect(await services!.workspaces.findByRoot(selected)).toBeNull();
       expect(await services!.workspaces.list()).toEqual([]);
-      expect(services!.workspaces.rootsSnapshot()).toEqual([]);
-      expect(
-        services!.workspaces.containsPath(path.join(selected, "private.txt"))
-      ).toBe(false);
       for (const route of ["/workspaces/readfile", "/workspaces/writefile"]) {
         const response = await post(route, {
           workspace_id: workspace.id,

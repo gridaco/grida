@@ -1,87 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import {
-  makeEndpointFactory,
-  makeOpenRouterFactory,
-  makeVercelAiGatewayFactory,
-} from "./byok";
 import { ProviderHttp } from "./http";
 import { probeEndpointModels } from "./probe";
 import { ImageClient, VideoClient } from "@grida/ai";
 
-const PROMPT = {
-  prompt: [{ role: "user", content: [{ type: "text", text: "hello" }] }],
-};
-
-async function attemptModelRequest(model: unknown): Promise<void> {
-  await (model as { doGenerate: (options: unknown) => Promise<unknown> })
-    .doGenerate(PROMPT)
-    .catch(() => undefined);
-}
-
 describe("ProviderHttp", () => {
-  it("every in-process text provider uses request, never download", async () => {
-    // The thrown sentinel stops each real SDK immediately after it crosses the
-    // transport seam; URL assertions prove OpenRouter, Vercel AI Gateway, and the
-    // generalized OpenAI-compatible endpoint all reached the supplied request.
-    const urls: string[] = [];
-    const request: typeof globalThis.fetch = async (input) => {
-      urls.push(String(input));
-      throw new Error("transport sentinel");
-    };
-    const download = vi.fn<typeof globalThis.fetch>(async () => {
-      throw new Error("text providers must not download public media");
-    });
-    const http = new ProviderHttp({ request, download });
-
-    await attemptModelRequest(makeOpenRouterFactory("sk-or", http)("pro"));
-    await attemptModelRequest(makeVercelAiGatewayFactory("sk-v", http)("pro"));
-    await attemptModelRequest(
-      makeEndpointFactory(
-        {
-          id: "local",
-          base_url: "http://localhost:11434/v1",
-          default_model_id: "local-model",
-        },
-        http
-      )("pro")
-    );
-
-    expect(urls).toEqual([
-      "https://openrouter.ai/api/v1/chat/completions",
-      "https://ai-gateway.vercel.sh/v3/ai/language-model",
-      "http://localhost:11434/v1/chat/completions",
-    ]);
-    expect(download).not.toHaveBeenCalled();
-  });
-
-  it("leaves concrete request authorization to the host with no fallback", async () => {
-    let observed: Request | undefined;
-    const request = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-      observed = new Request(input, init);
-      throw new Error("host policy denied provider request");
-    });
-    const download = vi.fn<typeof globalThis.fetch>();
-    const http = new ProviderHttp({ request, download });
-    const model = makeOpenRouterFactory("sk-host-policy", http)("pro");
-
-    await expect(
-      (
-        model as unknown as {
-          doGenerate: (options: unknown) => PromiseLike<unknown>;
-        }
-      ).doGenerate(PROMPT)
-    ).rejects.toThrow(/host policy denied provider request/);
-
-    expect(observed?.url).toBe("https://openrouter.ai/api/v1/chat/completions");
-    expect(observed?.method).toBe("POST");
-    expect(observed?.headers.get("authorization")).toBe(
-      "Bearer sk-host-policy"
-    );
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(download).not.toHaveBeenCalled();
-  });
-
   it("endpoint discovery uses request, never download", async () => {
     const request = vi.fn<typeof globalThis.fetch>(async (input) => {
       const url = String(input);
@@ -220,17 +143,11 @@ describe("ProviderHttp", () => {
     expect(download).not.toHaveBeenCalled();
   });
 
-  it("stays out of neutral APIs, tools, shell, and external-agent execution", () => {
+  it("stays out of the neutral client API", () => {
     // These are capability boundaries, not merely call-site conventions. A
     // future import would hand network execution to code outside the provider
     // layer and must be an explicit contract review.
-    const foreignSurfaces = [
-      "../index.ts",
-      "../tools/index.ts",
-      "../tools/run-command.ts",
-      "../runtime/command-backend.ts",
-      "../agent-provider/index.ts",
-    ];
+    const foreignSurfaces = ["../index.ts"];
 
     for (const path of foreignSurfaces) {
       const source = readFileSync(new URL(path, import.meta.url), "utf8");

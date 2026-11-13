@@ -67,10 +67,3 @@ export type SessionStatus = {
    */
   message_id?: string;
 };
-
-/**
- * SSE event name for a session-status frame on `GET /sessions/:id/status`.
- * Each frame's `data:` is a {@link SessionStatus} JSON body. Mirrors
- * `GRIDA_SESSION_SSE_EVENT` (the run stream's in-band session-id frame).
- */
-export const GRIDA_STATUS_SSE_EVENT = "grida-status" as const;

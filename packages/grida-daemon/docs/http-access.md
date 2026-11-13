@@ -22,12 +22,10 @@ and body when it reconstructs the Request. The daemon retains lifecycle
 ownership after headers are returned: a streaming body stays active until it
 ends or is canceled, and shutdown joins it before tenant cleanup.
 
-Node host adapters and CLI clients should use `DaemonTransport.Client` from
-`@grida/daemon/transport` — or `AgentTransport.Client` from
-`@grida/agent/transport`, which extends it with the agent tenant's routes —
-so the Authorization, Origin, Referer, route strings,
-JSON parsing, stream headers, SSE frames (including the in-band
-`grida-session` id frame), and `last-event-id` handling are constructed
-consistently. Browser renderers
+Node host adapters should use `DaemonTransport.Client` from
+`@grida/daemon/transport` — or `MediaTransport.Client` from
+`@grida/agent/media-transport`, which extends it with the media tenant's
+routes — so the Authorization, Origin, Referer, route strings and JSON parsing
+are constructed consistently. Browser renderers
 should normally consume a host-owned bridge instead of constructing these
 headers or route paths directly.

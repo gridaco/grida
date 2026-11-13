@@ -235,7 +235,7 @@ export class WorkspaceRegistry {
     // Containment assert (the one new trust check): the minted dir's realpath
     // MUST be STRICTLY under the managed root (`containsPath` also accepts
     // root-equals-root, which here would mean the mint escaped). Same shared
-    // discipline as the shell runner's root gates and the scratch assert;
+    // discipline as the media store's containment asserts;
     // catches a symlinked root or any residual escape.
     const realDir = await fs.realpath(dir);
     if (!containsPath(realRoot, realDir) || realDir === realRoot) {
@@ -395,33 +395,6 @@ export class WorkspaceRegistry {
     const before = this.entries.length;
     this.entries = this.entries.filter((e) => e.id !== id);
     if (this.entries.length !== before) await this.persist();
-  }
-
-  /**
-   * Sync check: is `absPath` under any currently-registered workspace?
-   * Used by the shell runner to validate that a child process's cwd
-   * sits inside an opened workspace. Compares using
-   * `path` semantics — caller must pass an already-`realpath`'d
-   * absolute path for a robust check (otherwise symlinks slip through).
-   */
-  containsPath(absPath: string): boolean {
-    // Caller guarantees loaded — this is a sync check used in routes
-    // where the list has already been touched on this request.
-    for (const w of this.entries) {
-      if (!this.allowed(w.root)) continue;
-      // Use `path.sep`-terminated prefix match to avoid false positives
-      // like `/Users/x/docs2` matching workspace `/Users/x/docs`.
-      const prefix = w.root.endsWith(path.sep) ? w.root : w.root + path.sep;
-      if (absPath === w.root || absPath.startsWith(prefix)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /** Snapshot of currently-registered workspace roots. */
-  rootsSnapshot(): readonly string[] {
-    return this.entries.filter((e) => this.allowed(e.root)).map((e) => e.root);
   }
 
   /**

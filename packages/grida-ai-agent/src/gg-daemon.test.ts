@@ -1,35 +1,34 @@
 // GRIDA-GG: provider — see docs/wg/platform/hosted-ai.md
 /**
  * GRIDA-SEC-006 — composed-daemon pins for the hosted "included" AI
- * surface. Caught live: `createAgentDaemon` forwards tenant options
- * EXPLICITLY, so forgetting `gg_base_url` ships the whole
- * provider silently dormant — the with-URL daemon here pins the
- * forwarding, the without-URL daemon pins dormancy (no routes, no
- * capability).
+ * surface. `createMediaDaemon` forwards tenant options EXPLICITLY, so
+ * forgetting `gg_base_url` ships the whole provider silently dormant — the
+ * with-URL daemon here pins the forwarding, the without-URL daemon pins
+ * dormancy (no routes, no capability).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createAgentDaemon, type DaemonServer } from "./server";
-import { AgentTransport } from "./transport";
+import type { DaemonServer } from "@grida/daemon/server";
+import { DaemonTransport } from "@grida/daemon/transport";
+import { createMediaDaemon } from "./media-server";
 
 const PASSWORD = "test-password-abc123";
 const VALID_REFERER = "https://client.example/client/doc";
 const VALID_ORIGIN = "https://client.example";
 
 const authed = (): Record<string, string> => ({
-  authorization: AgentTransport.buildBasicAuthHeader(PASSWORD),
+  authorization: DaemonTransport.buildBasicAuthHeader(PASSWORD),
   referer: VALID_REFERER,
   origin: VALID_ORIGIN,
   "content-type": "application/json",
 });
 
 function makeDaemon(baseDir: string, gridaBaseUrl?: string): DaemonServer {
-  return createAgentDaemon({
+  return createMediaDaemon({
     password: PASSWORD,
     user_data_path: baseDir,
-    scratch_base: `${baseDir}-scratch`,
     http_access: {
       allowed_origins: [VALID_ORIGIN],
       allowed_referer_paths: ["/client"],

@@ -4,11 +4,8 @@ Grida's local daemon: the GRIDA-SEC-004 request perimeter and default loopback
 HTTP adapter that host capability tenants. Private, `workspace:*`, in active
 development.
 
-Promoted out of `@grida/agent` (issue #927): the host layer existed
-inside the AI package, named as if the agent owned it, while the code
-mounted the agent as one capability flag among nine. This package makes
-the boundary match the role — the daemon is the host; the agent
-(`@grida/agent`) is a tenant.
+The daemon is the host; the retained media service in `@grida/agent` is a
+tenant. Chat execution is not a daemon tenant: the native agent owns it.
 
 It owns:
 
@@ -25,11 +22,8 @@ It owns:
   secrets store, optional host-rooted media persistence, `user_data_path`) and
   reports capability flags + `drain`/`cleanup`. A static, typed list — not a
   plugin registry.
-- **Daemon discovery.** The `Daemon` namespace (WG spec
-  [daemon.md](../../docs/wg/ai/agent/daemon.md), #798): registration
-  record, persistent credential, authenticated probe, connect-or-spawn.
-- **Host primitives tenants build on.** The shell runner (structural
-  GRIDA-SEC-004 gates), `SecretsStore` (shared native BYOK adapter) and
+- **Host primitives tenants build on.** `SecretsStore` (shared native BYOK
+  adapter) and
   `AuthStore` (tenant OAuth custody; raw reads stay server-side), `MediaPersistence` (path-free binary-media
   publication backed by a separately injected host store), path containment,
   request validation, and the sandbox policy frame.
@@ -87,7 +81,7 @@ dual-write, or select another backend after failure. The host-local writer keeps
 its existing in-process queue and inherited Windows ACLs; it does not validate
 Windows DACLs or treat POSIX stat bits as an access check. This is not Windows
 support for the shared protocol or the CLI file store. Keyless
-Windows users can still resolve GG and prepare optional agent tools.
+Windows users can still resolve GG for hosted media generation.
 Account logout and memory-only GG grants do not change provider custody.
 
 ## Exports
@@ -95,7 +89,7 @@ Account logout and memory-only GG grants do not change provider custody.
 | Subpath       | What                                                                                                              | Platform |
 | ------------- | ----------------------------------------------------------------------------------------------------------------- | -------- |
 | `.`           | handshake vocabulary (`DaemonCapabilities`, `DAEMON_PROTOCOL`), local-resource DTOs                               | neutral  |
-| `./server`    | `DaemonServer`, `buildServer`, the tenant seam, `Daemon` discovery, host stores/toolkit                           | Node     |
+| `./server`    | `DaemonServer`, `buildServer`, the tenant seam, host stores/toolkit                                               | Node     |
 | `./transport` | `DaemonTransport` — Basic-Auth signing, fetch/SSE helpers, the daemon route client                                | neutral  |
 | `./sandbox`   | sandbox policy frame (`buildDaemonSandboxPolicy`, `hostFromUrl`) and `containsPath` — AI-free, server-independent | Node     |
 

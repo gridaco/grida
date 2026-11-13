@@ -159,11 +159,10 @@ describe("media-only public composition", () => {
       music: true,
       sound_effects: true,
       text_to_speech: true,
-      agent: false,
-      sessions: false,
       providers: false,
-      shell: false,
     });
+    for (const retired of ["agent", "sessions", "shell"])
+      expect(handshake.capabilities).not.toHaveProperty(retired);
     for (const route of [
       "/agent/run",
       "/providers/endpoints/list",
@@ -216,12 +215,8 @@ describe("media-only public composition", () => {
     cleanups.push(() => restarted.stop());
     await restarted.start({ listen: false });
     const handshake = await (await call(restarted, "/handshake")).json();
-    expect(handshake.capabilities).toMatchObject({
-      providers: true,
-      agent: false,
-      sessions: false,
-      shell: false,
-    });
+    expect(handshake.capabilities).toMatchObject({ providers: true });
+    expect(handshake.capabilities).not.toHaveProperty("agent");
     const response = await call(restarted, "/providers/endpoints/list");
     const text = await response.text();
     expect(JSON.parse(text)).toEqual([expect.objectContaining(config)]);
@@ -342,7 +337,6 @@ describe("media-only public composition", () => {
       files: false,
       video: true,
       three_d: true,
-      agent: false,
     });
     for (const route of [
       "/images/generate",

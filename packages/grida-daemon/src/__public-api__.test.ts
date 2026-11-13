@@ -5,7 +5,7 @@
  * This is intentionally separate from the behavioural tests — those
  * exercise behaviour; this one exercises the **contract**. A rename,
  * signature change, or accidental drop here = a breaking change for
- * consumers (`@grida/agent` the tenant, the desktop sidecar/preload,
+ * consumers (the `@grida/agent` media tenant, the desktop sidecar/preload,
  * `@grida/desktop-bridge`) — the test should fail until the README /
  * CHANGELOG has been updated to advertise it.
  */
@@ -30,12 +30,9 @@ import type {
 import {
   buildServer,
   containsPath,
-  Daemon,
   DaemonServer,
   MediaStore,
-  runUnsandboxedShell,
   SecretsStore,
-  validateShellRequest,
   WorkspaceRegistry,
   workspaceFs,
   type BuiltServer,
@@ -45,10 +42,8 @@ import {
   type DaemonTenant,
   type DaemonTenantHandle,
   type MediaPersistence,
-  type ShellExecutionScope,
-  type ShellExecutor,
-  type ShellRunOptions,
 } from "./server";
+import * as server from "./server";
 import {
   buildDaemonSandboxPolicy,
   hostFromUrl,
@@ -70,8 +65,9 @@ describe("@grida/daemon public API", () => {
       expect(caps.files).toBe(true);
       expect(caps.recent).toBe(true);
       expect(caps.workspaces).toBe(true);
-      expect(caps.agent).toBe(false);
-      expect(caps.sessions).toBe(false);
+      expect("agent" in caps).toBe(false);
+      expect("sessions" in caps).toBe(false);
+      expect("shell" in caps).toBe(false);
       expect(caps.secrets).toBe(false);
       expect(caps.three_d).toBe(false);
       expect(caps.music).toBe(false);
@@ -122,7 +118,7 @@ describe("@grida/daemon public API", () => {
       const tenant: DaemonTenant = {
         register: (_app, services: DaemonServices) => {
           const handle: DaemonTenantHandle = {
-            capabilities: { sessions: true },
+            capabilities: { images: true },
             drain: () => void services,
             cleanup: () => {},
           };
@@ -139,29 +135,6 @@ describe("@grida/daemon public API", () => {
       type _B = BuiltServer;
     });
 
-    it("exposes the Daemon discovery contract (WG daemon.md, #798)", () => {
-      expect(Daemon.REGISTRATION_FILENAME).toBe("daemon.json");
-      expect(Daemon.CREDENTIAL_FILENAME).toBe("daemon.credential");
-      expect(Daemon.LOCAL_CLIENT_ORIGIN).toBe("http://127.0.0.1");
-      const p: Daemon.Paths = Daemon.paths("/tmp/state");
-      expect(p.registration.endsWith("daemon.json")).toBe(true);
-      const reg: Daemon.Registration = Daemon.mintRegistration({
-        version: "0.0.0",
-        url: "http://127.0.0.1:1",
-        pid: 1,
-      });
-      expect(reg.id.length).toBeGreaterThan(0);
-      expect(typeof Daemon.publish).toBe("function");
-      expect(typeof Daemon.read).toBe("function");
-      expect(typeof Daemon.unpublish).toBe("function");
-      expect(typeof Daemon.checkOwnership).toBe("function");
-      expect(typeof Daemon.readCredential).toBe("function");
-      expect(typeof Daemon.readOrCreateCredential).toBe("function");
-      expect(typeof Daemon.probe).toBe("function");
-      expect(typeof Daemon.connect).toBe("function");
-      expect(typeof Daemon.connectOrSpawn).toBe("function");
-    });
-
     it("exposes the tenant toolkit", () => {
       expect(typeof WorkspaceRegistry).toBe("function");
       expect(typeof MediaStore).toBe("function");
@@ -169,16 +142,20 @@ describe("@grida/daemon public API", () => {
       expect(typeof workspaceFs.readDir).toBe("function");
       expect(typeof workspaceFs.iterateDir).toBe("function");
       expect(containsPath("/a", "/a/b")).toBe(true);
-      const executor: ShellExecutor = runUnsandboxedShell;
-      const scope: ShellExecutionScope = {
-        workspace_root: "/workspace",
-        protected_read_roots: [],
-      };
-      const runOptions: ShellRunOptions = {};
-      expect(typeof executor).toBe("function");
-      expect(typeof validateShellRequest).toBe("function");
-      expect(scope.workspace_root).toBe("/workspace");
-      expect(runOptions).toEqual({});
+    });
+
+    it("exposes no discovery, shell, command-approval or scan toolkit", () => {
+      for (const name of [
+        "Daemon",
+        "runShell",
+        "runUnsandboxedShell",
+        "validateShellRequest",
+        "isReadOnlyCommand",
+        "SCAN_MAX_DEPTH",
+        "isIgnoredScanDir",
+      ]) {
+        expect(name in server).toBe(false);
+      }
     });
   });
 
@@ -197,8 +174,8 @@ describe("@grida/daemon public API", () => {
       expect(policy.filesystem.deny_read.some((p) => p.includes(".ssh"))).toBe(
         true
       );
-      // Boundary (#927): the daemon frame knows NO AI vendor — those hosts
-      // are the agent tenant's contribution (`@grida/agent/sandbox`).
+      // Boundary: the daemon frame knows NO AI vendor — a host injects
+      // tenant hosts explicitly.
       expect(policy.network.allowed_domains).not.toContain("openrouter.ai");
       expect(policy.network.allowed_domains).not.toContain("api.anthropic.com");
     });
@@ -238,8 +215,7 @@ describe("@grida/daemon public API", () => {
       };
       expectTypeOf(DaemonTransport.Client).toBeConstructibleWith(opts);
       expect(typeof DaemonTransport.HttpError).toBe("function");
-      expect(typeof DaemonTransport.readFrames).toBe("function");
-      expect(DaemonTransport.MAX_FRAME_BYTES).toBe(16 * 1024 * 1024);
+      expect("readFrames" in DaemonTransport).toBe(false);
 
       const res = new Response(JSON.stringify({ ok: true }), { status: 200 });
       await expect(

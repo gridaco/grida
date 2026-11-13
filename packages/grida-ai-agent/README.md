@@ -1,18 +1,19 @@
 # `@grida/agent`
 
-Retained services and client-safe contracts for Grida's native agent hosts.
-Private, `workspace:*`, in active development. Native chat execution belongs to
-the application host; this package distributes no chat scheduler or session store.
+Retained host services and client-safe contracts. Private, `workspace:*`, in
+active development. Chat execution belongs to the native agent; this package
+contains no chat loop, scheduler, session store, prompts, skills or tool
+assembly.
 
 The daemon owns the loopback perimeter and file/workspace services. This package
-supplies media HTTP operations, provider settings and custody, the native ChatGPT
-subscription host, sandbox intent, transport and presentation contracts. Shared
-model operations belong to [`@grida/ai`](../grida-ai/README.md).
+supplies the media tenant (shared media HTTP operations, provider credential
+custody and endpoint settings), the native ChatGPT subscription host, the media
+transport client and client-safe protocol contracts. Shared model operations
+belong to [`@grida/ai`](../grida-ai/README.md).
 
-Storage-agnostic [`fs`](./src/fs/README.md), [`todos`](./src/todos/README.md),
-artifact surfaces and vision primitives remain available independently of a chat
-loop. Neutral protocol and historical session-row types remain readable without
-opening or migrating a database.
+The `fs`, `todos` and `surface` subpaths and the run, mode, context and
+session-row contracts serve the renderer's earlier chat pane. The `fs` storage
+core also backs the web SVG document store.
 
 ## Exports
 
@@ -21,49 +22,19 @@ stays browser-safe, and the Node-only entry points are quarantined
 behind their own subpaths so they never pull `node:*` into a client
 bundle.
 
-| Subpath                 | What                                                                                                                                          | Platform |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `.`                     | protocol contracts, native/BYOK provider metadata, safe status, run/stream DTOs, tool-name vocabulary, tiers and historical session-row types | neutral  |
-| `./tiers`               | model tier constants (`AGENT_TIERS`, `AGENT_DEFAULT_TIER`)                                                                                    | neutral  |
-| `./fs`                  | virtual fs + file tools ([README](./src/fs/README.md))                                                                                        | neutral  |
-| `./fs/backends/opfs`    | browser OPFS backend                                                                                                                          | browser  |
-| `./todos`               | plan store + `todo_write` ([README](./src/todos/README.md))                                                                                   | neutral  |
-| `./surface`             | server-executed artifact-surface tools, turn snapshot, and browser observer                                                                   | neutral  |
-| `./media-server`        | `createMediaTenant` + `createMediaDaemon`, media options and provider transport type; no chat startup                                         | Node     |
-| `./chatgpt-host`        | `ChatGptSubscriptionHost` and `ChatGptProviderConfig`; host-owned OAuth and captured subscription requests                                    | Node     |
-| `./vision`              | image perception primitives                                                                                                                   | neutral  |
-| `./tools/design-search` | reference search tool vocabulary and result contracts                                                                                         | neutral  |
-| `./sandbox`             | composed sandbox policy (`buildAgentDaemonSandboxPolicy` — daemon frame + AI upstream hosts)                                                  | Node     |
-| `./media-transport`     | `MediaTransport` namespace — extends `DaemonTransport.Client` with the media service's routes only; no chat code                              | neutral  |
-| `./transport`           | `AgentTransport` namespace — extends `MediaTransport.Client` with the chat routes                                                             | neutral  |
+| Subpath              | What                                                                                                                | Platform |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- | -------- |
+| `.`                  | provider identity and metadata, ChatGPT subscription status, endpoint contracts, media DTOs, earlier chat contracts | neutral  |
+| `./tiers`            | model tier constants (`AGENT_TIERS`, `AGENT_DEFAULT_TIER`)                                                          | neutral  |
+| `./fs`               | virtual filesystem (`AgentFs`, `MemoryBackend`, live bindings)                                                      | neutral  |
+| `./fs/backends/opfs` | browser OPFS backend                                                                                                | browser  |
+| `./todos`            | plan store used by the earlier chat pane                                                                            | neutral  |
+| `./surface`          | artifact-surface host contract and browser observer used by the earlier chat pane                                   | neutral  |
+| `./media-server`     | `createMediaTenant` + `createMediaDaemon`, media options and provider transport type                                | Node     |
+| `./chatgpt-host`     | `ChatGptSubscriptionHost` and `ChatGptProviderConfig`; host-owned OAuth and captured subscription requests          | Node     |
+| `./media-transport`  | `MediaTransport` namespace — extends `DaemonTransport.Client` with the media service's routes                       | neutral  |
 
-The Node fs backend (`NodeFsBackend`) is internal + test-only — it is not a
-public subpath; workspace bindings use it in-process.
-
-## Retired chat execution
-
-`@grida/agent/server` is no longer exported or built. The root no longer exports
-`createAgent`, `createToolset`, `composeSystemPrompt`, or their construction types
-(`Agent`, `AgentCallOptions`, `AgentMessage`, `CreateAgentOptions`, `ModelFactory`,
-`RunCommandBackend`, `RunCommandOutcome`, `ToolsetCapabilities`). Hosts use their
-native conversation owner for chat and `media-server` for retained HTTP services.
-Daemon lifecycle, discovery and shell contracts come from `@grida/daemon/server`.
-Scratch preparation remains at `@grida/agent/sandbox`; subscription configuration
-comes from `@grida/agent/chatgpt-host`. There is no disabled compatibility wrapper.
-
-Only `dist` is included in the package file allowlist. Drizzle and the ACP SDK
-are development dependencies for the historical database fixtures and ACP
-harness; retained runtime and declaration artifacts import neither library.
-Source-only historical execution remains owned by this package's regression fixtures: `src/server.ts`,
-`src/runtime/`, `src/agent/`, `src/session/` database/store code, and the agent,
-session and directory-scope HTTP routes. The source-only ACP development harness
-is owned by `src/agent-provider/`. These fixtures preserve prior behavior and
-readability for explicit migration studies; they are not supported application
-entrypoints. Retained scratch preparation and row types share `src/session/`
-but do not load its database/store. Historical tool assembly, prompts and skills remain with those fixtures.
-Retained provider adapters and standalone tool primitives are built only through
-the public entrypoints listed above. Never start a historical fixture against personal state as a
-fallback for a failed native host.
+Only `dist` is included in the package file allowlist.
 
 ## Shared media operations
 
@@ -127,7 +98,7 @@ by this route. Future 3D workflows need their own reviewed host wire adaptations
 
 The model-generation route uses `TripoClient` for explicit Tripo BYOK or Grida credits. Model
 identity (H3.1, P1 or P2 Preview) is separate from the explicit model-generation
-feature and its text, image or named multiview input. `AgentTransport.Client`'s
+feature and its text, image or named multiview input. `MediaTransport.Client`'s
 `modelGeneration.generate` accepts the SDK JSON input, with base64 in image
 `data` fields, under a 48 MiB total request limit. The SDK validates inputs
 before credential access and returns an uncompressed, self-contained GLB.
@@ -139,7 +110,7 @@ they are not advertised by this generation route. The existing `three_d` host
 capability gates the 3D generation and mesh-processing route groups.
 
 The rigging routes independently use the neutral SDK `RiggingClient` and
-`RiggingOperations`. `AgentTransport.Client.rigging.check` returns structured
+`RiggingOperations`. `MediaTransport.Client.rigging.check` returns structured
 eligibility and a safe task receipt without creating media or inventing a model
 identity. `rigging.generate` accepts an explicit rig model, rig type and spec,
 then returns portable GLB bytes and an optional media receipt. Both requests
@@ -153,14 +124,13 @@ the retained media composition.
 
 ## Independent media startup
 
-Hosts can import `createMediaDaemon` from `@grida/agent/media-server` to run the
-existing media routes without importing the chat runtime, opening a chat
-SQLite database, discovering skills or starting ACP. Shared provider custody
-lazily uses SQLite only for its private cross-process lock after startup. It uses the same daemon perimeter and host-owned credentials,
-provider transport and media store. Media and BYOK settings default on; GG
-routes require `gg_base_url`. Chat, sessions, endpoint-provider settings,
-native ChatGPT auth and shell remain absent. `createMediaTenant` supplies the
-same composition for hosts that already own a `DaemonServer`.
+Hosts import `createMediaDaemon` from `@grida/agent/media-server` to run the
+media routes. Shared provider custody lazily uses SQLite only for its private
+cross-process lock after startup. It uses the daemon perimeter and host-owned
+credentials, provider transport and media store. Media and BYOK settings
+default on; GG routes require `gg_base_url`; endpoint-provider settings require
+`endpoint_settings`. `createMediaTenant` supplies the same composition for
+hosts that already own a `DaemonServer`.
 
 ```ts
 import { createMediaDaemon } from "@grida/agent/media-server";
@@ -182,16 +152,14 @@ await daemon.stop();
 ```
 
 Choose one media composition per launch to avoid duplicate credential stores or
-routes. The native host can prepare scratch through `@grida/agent/sandbox` and
-use `CHATGPT_AUTH_ROUTE_PATHS` and `ChatGptAuthStart` from the neutral root.
-The separate `ChatGptSubscriptionHost` owns the private OAuth ceremony and
-subscription requests; route names and DTOs grant no credential authority.
+routes. The separate `ChatGptSubscriptionHost` owns the private OAuth ceremony
+and subscription requests; the `ChatGptAuthStart` and status DTOs from the
+neutral root grant no credential authority.
 
-The daemon's `SecretsStore` now delegates BYOK persistence to the shared
-native TOML owner (GRIDA-SEC-014). The native host supplies `provider_home`;
-media and agent code continue to receive only a key reader. Hosts select their provider home explicitly. ChatGPT OAuth remains in the daemon's separate `auth.json` and GG stays
-in memory. Directory references and finite-command scopes protect both the
-agent state root and the shared provider directory.
+The daemon's `SecretsStore` delegates BYOK persistence to the shared native
+TOML owner (GRIDA-SEC-014). The host supplies `provider_home`; media code
+receives only a key reader. ChatGPT OAuth remains in the separate `auth.json`
+and GG stays in memory.
 
 ## Provider HTTP
 
@@ -236,7 +204,7 @@ responses are base64 strings on the provider request lane and
 never open the download lane.
 
 Image generation accepts optional native `background` intent (`auto`, `opaque`,
-or `transparent`) through `/images/generate` and `generate_image`. Omitted/auto
+or `transparent`) through `/images/generate`. Omitted/auto
 retains provider defaults. Explicit modes require verified native-background
 support on the selected catalogue binding, independently of any reference-image
 capability; unknown or unsupported routes fail before generation. Selection
@@ -257,61 +225,47 @@ All three accept the six quality levels through their own provider namespace.
 Typed SDK seed is unsupported on GPT Image 2.5's OpenRouter and fal routes; fal
 also rejects typed aspect ratio, using explicit dimensions or auto size instead.
 
-The callbacks are never exposed to tools, shell commands, or external-agent
-processes. There is deliberately no public fixed-destination manifest: hosted
-and BYOK endpoints are selected dynamically, and the host authorizes the
-concrete request it receives while the package's sandbox policy remains the
-coarse declarative allowlist. A host that routes these callbacks outside the
-sidecar sandbox should build that policy with
-`host_routed_provider_http: true`; direct BYOK/GG egress is then removed,
-making missed ambient provider calls fail closed.
-
-Hosts that require the sandboxed process tree—including raw shell and ACP
-children—to have no direct outbound destinations can additionally select
-`direct_network_access: "none"`. This empties `allowed_domains` across daemon
-development hosts and all agent-contributed hosts. Local socket binding is
-orthogonal: it remains enabled by default for compatibility, and a host with a
-listener-independent request transport can pass `allow_local_binding: false`.
-The outbound default for this TypeScript policy is `"allowlisted"`.
+The callbacks are never exposed to renderer code. There is deliberately no
+public fixed-destination manifest: hosted and BYOK endpoints are selected
+dynamically, and the host authorizes the concrete request it receives. Desktop
+routes these callbacks through Main and builds the sidecar's sandbox policy
+from `@grida/daemon/sandbox` with no direct provider hosts, so a missed ambient
+provider call fails closed.
 
 ## Anti-goals
 
 The perimeter that keeps this package small. A feature request that
 crosses one of these is the wrong tool, not a missing feature.
 
-- **Not a general model-provider router.** Provider selection is
-  isolated to the node-only `providers/` layer: the BYOK key slots
-  (OpenRouter → Vercel AI Gateway) plus ONE generalized OpenAI-compatible
-  endpoint type (`{base_url, optional key, registered models}` — Ollama
-  is the preset), and the narrowly configured native ChatGPT
-  subscription provider. Provider selection remains with the reviewed host
-  adapters. There is no
+- **Not a model-provider router.** Chat model selection belongs to the native
+  agent host. This package stores BYOK keys and ONE generalized
+  OpenAI-compatible endpoint type (`{base_url, optional key, registered
+models}` — Ollama is the preset) and resolves media providers. There is no
   registry for arbitrary third-party providers — new hosted providers are
   reviewed adapters, not renderer-defined config.
 - **Not a hosted model gateway or general OAuth broker.** The package does not
   proxy ChatGPT subscription calls through grida.co or mint hosted provider
   tokens. Its one refreshable OAuth session is the optional, host-configured
-  native ChatGPT provider described below; auth routes remain private to the
-  native host and expose only secret-free status.
+  native ChatGPT subscription host; its ceremony stays private to the native
+  host and exposes only secret-free status.
 - **Not a billing or entitlement engine.** Media adapters preserve operation
   receipts and reported usage; metering, pricing, plan gates and invoicing live
   outside this package.
-- **Not a chat runtime.** Native hosts own chat execution, scheduling, sessions,
-  prompts and tool assembly. Historical TypeScript execution is source-only
-  regression evidence, never a shipped fallback.
+- **Not a chat runtime.** The native agent owns chat execution, scheduling,
+  sessions, prompts and tool assembly.
 - **Not a UI framework.** The protocol retains AI-SDK UI-message frame types;
   rendering, transcript state and history navigation are the client's job.
 - **Not a Desktop bridge package.** `@grida/daemon/transport` +
   `@grida/agent/media-transport` own the daemon HTTP seam. Electron-specific
   window, dialog, shell, host-app, and file-path capabilities stay in
   Desktop's bridge contract.
-- **Not the host layer.** The loopback perimeter, daemon discovery, and
-  the host capability routes (files, recents, workspaces, the secrets
+- **Not the host layer.** The loopback perimeter and the host capability
+  routes (files, recents, workspaces, the secrets
   store) live in `@grida/daemon`. A non-AI host capability never
   lands here.
-- **Not a chat-history migration service.** Historical session, message and part
-  row types remain in `session/rows.ts` for explicit archive readers. Importing
-  those contracts opens no store and starts no recovery or queued work.
+- **Not a chat-history store.** Session, message and part row types in
+  `session/rows.ts` are type-only contracts for the earlier chat pane.
+  Importing them opens no store and starts no work.
 
 ## Package Docs
 
@@ -346,8 +300,6 @@ availability.
   ownership, and what hosts must provide (`@grida/daemon`).
 - [HTTP access](../grida-daemon/docs/http-access.md) — Basic Auth, CORS, and
   Referer policy supplied by a host adapter (`@grida/daemon`).
-- [Sandbox policy](./docs/sandbox-policy.md) — the composed sandbox intent
-  (daemon frame + this tenant's AI upstream hosts).
 - [ChatGPT subscription provider](./docs/chatgpt-subscription-provider.md) —
   the subscription host, private OAuth routes, credential lifecycle, native
   model mapping, and the Desktop security binding.
@@ -369,17 +321,11 @@ pnpm --filter @grida/agent build   # tsdown → dist/
 pnpm --filter @grida/agent test    # vitest
 ```
 
-`smoke:sessions:live` runs the historical TypeScript sessions-store fixture
-against a real SQLite file. It is a manual check of that source-only fixture,
-not part of `test`, and exercises no native chat path.
-
-The native host excludes the provider credential tree from workspace, scratch and
-attached-directory grants before structured filesystem hydration. The same
-`ProtectedRoots` owner from `@grida/daemon/server` rechecks those roots before
-backend I/O and revalidates pending or cached directory grants. An ancestor such
-as the entire Grida home is refused too; ordinary workspace symlinks continue to
-use the daemon filesystem's containment checks. These are application authority
-checks, not protection against a hostile local process racing path mutations.
+The daemon excludes the provider credential tree from workspace and file grants
+through `ProtectedRoots` from `@grida/daemon/server`, rechecking those roots
+before I/O. An ancestor such as the entire Grida home is refused too. These are
+application authority checks, not protection against a hostile local process
+racing path mutations.
 
 Tripo generation and rigging requests preserve their byte/base64 input schemas
 and explicitly select `provider: "tripo" | "gg"`. The media host passes its existing memory-only GG session store and configured gateway origin

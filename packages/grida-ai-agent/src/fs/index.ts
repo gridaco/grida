@@ -25,12 +25,9 @@
  *   const tools = AgentFs.tools;
  *   const output = AgentFs.resolveToolCall(fs, toolCall);
  *
- * Env-restricted backends (`./backends/opfs`, `./backends/node`) live
- * under their own subpaths so a bare `import "@grida/agent/fs"`
- * never pulls `navigator.storage` or `node:fs`. They implement
- * `AgentFs.Backend`.
- *
- * See `./README.md` for the full contract.
+ * The env-restricted OPFS backend (`./backends/opfs`) lives under its own
+ * subpath so a bare `import "@grida/agent/fs"` never pulls
+ * `navigator.storage`. It implements `AgentFs.Backend`.
  */
 
 import { tool } from "ai";

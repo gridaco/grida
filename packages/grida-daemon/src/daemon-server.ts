@@ -18,8 +18,8 @@
  *
  * The daemon owns the perimeter and its capability stores (files,
  * recents, workspaces, secrets store); everything else is a tenant
- * (issue #927) mounted through the `DaemonTenant` seam — the Grida AI
- * agent is one such tenant (`@grida/agent/server`), not the owner. The
+ * mounted through the `DaemonTenant` seam — the media tenant
+ * (`@grida/agent/media-server`) is one such tenant, not the owner. The
  * public surface — `constructor / start / fetch / stop` — does not change
  * when internals move.
  */
@@ -75,8 +75,8 @@ export type DaemonServerOptions = {
   port?: number;
   /**
    * Capability tenants to mount behind the perimeter — a static, typed
-   * list the composer supplies (`@grida/agent/server` composes the agent
-   * tenant). An empty list is a valid, bare daemon.
+   * list the composer supplies (`@grida/agent/media-server` composes the
+   * media tenant). An empty list is a valid, bare daemon.
    */
   tenants?: readonly DaemonTenant[];
 };
@@ -335,10 +335,9 @@ export class DaemonServer {
   /**
    * Stop the daemon. Order matters:
    *   1. Refuse new Requests and close the socket when one is present.
-   *   2. Drain in-flight tenant work — e.g. the agent tenant aborts each
-   *      upstream model call. Done BEFORE tenant cleanup so any recorder
-   *      reacting to the abort can finalize its partial assistant message
-   *      against an open SQLite handle.
+   *   2. Drain in-flight tenant work — e.g. the media tenant aborts each
+   *      upstream provider call. Done BEFORE tenant cleanup so work reacting
+   *      to the abort still finds its tenant stores open.
    *   3. Abort direct Request handlers, cancel their returned Response bodies,
    *      and wait for both to settle.
    *   4. Close tenant + daemon per-launch state via the BuiltServer

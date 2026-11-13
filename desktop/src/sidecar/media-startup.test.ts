@@ -108,9 +108,6 @@ describe.skipIf(
         files: false,
         recent: false,
         workspaces: false,
-        agent: false,
-        sessions: false,
-        shell: false,
         providers: true,
         sound_effects: true,
       });
@@ -263,9 +260,6 @@ describe.skipIf(
       );
       const handshake = await active.post("/handshake");
       expect((await handshake.json()).capabilities).toMatchObject({
-        agent: false,
-        sessions: false,
-        shell: false,
         providers: false,
         files: false,
         recent: false,
@@ -951,8 +945,6 @@ describe("built Desktop media startup", () => {
       expect(await handshake.json()).toEqual(
         expect.objectContaining({
           capabilities: expect.objectContaining({
-            agent: false,
-            sessions: false,
             providers: false,
             secrets: true,
             images: true,
@@ -962,7 +954,6 @@ describe("built Desktop media startup", () => {
             sound_effects: true,
             text_to_speech: true,
             gg: true,
-            shell: false,
           }),
         })
       );
@@ -1118,10 +1109,7 @@ describe("built Desktop media startup", () => {
       expect(retained.status).toBe(200);
       expect((await retained.json()).capabilities).toMatchObject({
         recent: false,
-        agent: false,
-        sessions: false,
         providers: true,
-        shell: false,
       });
       expect((await active.post("/recent/list")).status).toBe(404);
       await fs.writeFile(path.join(root, "allow-custody"), "enabled", {

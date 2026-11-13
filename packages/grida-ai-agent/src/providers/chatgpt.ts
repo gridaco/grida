@@ -1,24 +1,16 @@
 /**
  * GRIDA-SEC-008 — exact native-provider request and sanitized-error boundary.
  *
- * Native ChatGPT subscription model provider.
+ * Native ChatGPT subscription transport.
  *
- * This is a normal `ModelFactory`: Grida owns the loop, tools, sessions, and
- * persistence, while the user's subscription supplies Responses inference.
- * It does not use ACP or Codex app-server.
+ * The native agent owns the loop, tools, sessions and persistence. This module
+ * binds one durable OAuth connection to one subscription model and forwards
+ * only exact, validated Responses requests. It does not use ACP or Codex
+ * app-server.
  */
 
-import { createOpenAI } from "@ai-sdk/openai";
 import { createHash } from "node:crypto";
-import type {
-  JSONObject,
-  LanguageModelV3CallOptions,
-  LanguageModelV3Middleware,
-} from "@ai-sdk/provider";
-import { wrapLanguageModel } from "ai";
-import type { ModelFactory } from "../agent";
 import {
-  CHATGPT_PROVIDER_ID,
   isChatGptSubscriptionModelId,
   type ChatGptSubscriptionModelId,
 } from "../protocol/chatgpt";
@@ -29,7 +21,7 @@ import {
   type ChatGptCredentialManager,
   type ChatGptOAuthConfig,
 } from "./chatgpt-credentials";
-import { ProviderHttp } from "./http";
+import type { ProviderHttp } from "./http";
 
 const RESPONSES_SUFFIX = "/responses";
 const MAX_NATIVE_REQUEST_BYTES = 1024 * 1024;
@@ -66,13 +58,7 @@ export type NativeChatGptConnection = Readonly<{
   request(body: Uint8Array, signal: AbortSignal): Promise<Response | null>;
 }>;
 
-export type ChatGptProviderErrorCode =
-  | "chatgpt_subscription_unavailable"
-  | "chatgpt_rate_limited"
-  | "chatgpt_model_not_available"
-  | "chatgpt_request_rejected"
-  | "chatgpt_service_unavailable"
-  | "chatgpt_unexpected_endpoint";
+export type ChatGptProviderErrorCode = "chatgpt_model_not_available";
 
 /** Code-led, body-free inference failures safe to cross the daemon boundary. */
 export class ChatGptProviderError extends Error {
@@ -80,25 +66,6 @@ export class ChatGptProviderError extends Error {
     super(`${code}: ${providerErrorDescription(code)}`);
     this.name = "ChatGptProviderError";
   }
-}
-
-/**
- * The subscription model a tier resolves to. The subscription serves its
- * own model set, so this is deliberately NOT the catalogue's
- * `TIER_MODEL_IDS` — the host configures a parallel table and a tier with
- * no entry falls back to the configured default.
- *
- * Single owner on purpose: the model factory picks the model to CALL and
- * the compactor needs the same answer to size the summarizer's input cap.
- * Two copies of this fallback chain would drift silently, and the tier
- * that drifts is `nano` — the one every background titler/compactor call
- * rides. See `summarizerInputCap` in `runtime/index.ts`.
- */
-export function tierModelId(
-  config: ChatGptProviderConfig,
-  tier: ModelTier
-): ChatGptSubscriptionModelId {
-  return config.tier_model_ids?.[tier] ?? config.default_model_id;
 }
 
 export namespace ChatGptProvider {
@@ -134,98 +101,6 @@ export namespace ChatGptProvider {
         );
       }
     }
-  }
-
-  export function supportsModel(
-    config: ChatGptProviderConfig,
-    modelId: string | undefined
-  ): boolean {
-    return modelId === undefined || isChatGptSubscriptionModelId(modelId);
-  }
-
-  export async function isReady(
-    runtime: ChatGptProviderRuntime
-  ): Promise<boolean> {
-    return runtime.credentials.supportsAccount();
-  }
-
-  export function makeFactory(
-    runtime: ChatGptProviderRuntime,
-    providerHttp: ProviderHttp = new ProviderHttp()
-  ): ModelFactory {
-    const providerFetch = makeFetch(runtime, providerHttp);
-    const exactResponsesUrl = new URL(runtime.config.responses_url).toString();
-    const baseUrl = exactResponsesUrl.slice(0, -RESPONSES_SUFFIX.length);
-    const provider = createOpenAI({
-      // Keep the SDK's provider-metadata namespace as `openai`: encrypted
-      // reasoning emitted by one Responses step is parsed from that namespace
-      // when the next tool step is serialized. The outer wrapped model still
-      // advertises `chatgpt` as Grida's provider identity.
-      name: "openai",
-      baseURL: baseUrl,
-      // Prevent ambient OPENAI_API_KEY lookup. This non-secret sentinel is
-      // always overwritten by request-time OAuth injection below.
-      apiKey: "oauth-managed-by-grida",
-      fetch: providerFetch,
-    });
-
-    return (tier, modelId) => {
-      const selected = modelId ?? tierModelId(runtime.config, tier);
-      if (!isChatGptSubscriptionModelId(selected)) {
-        throw new ChatGptProviderError("chatgpt_model_not_available");
-      }
-      return wrapLanguageModel({
-        model: provider.responses(toWireModelId(selected)),
-        middleware: CHATGPT_RESPONSES_MIDDLEWARE,
-        providerId: CHATGPT_PROVIDER_ID,
-        modelId: selected,
-      });
-    };
-  }
-
-  export function makeFetch(
-    runtime: ChatGptProviderRuntime,
-    providerHttp: ProviderHttp = new ProviderHttp()
-  ): typeof fetch {
-    validate(runtime.config);
-    const exactResponsesUrl = new URL(runtime.config.responses_url).toString();
-    return async (input, init) => {
-      const requestUrl = requestUrlOf(input);
-      if (requestUrl !== exactResponsesUrl) {
-        throw new ChatGptProviderError("chatgpt_unexpected_endpoint");
-      }
-      const response = await requestWithRetry(
-        runtime.credentials,
-        () => runtime.credentials.getAccessCredentials(),
-        (credential) =>
-          requestWithCredential(
-            providerHttp,
-            input,
-            init,
-            runtime.config.originator,
-            credential
-          )
-      );
-      if (response.status === 403) {
-        await discardBody(response);
-        throw new ChatGptProviderError("chatgpt_subscription_unavailable");
-      }
-      if (response.status === 429) {
-        await discardBody(response);
-        throw new ChatGptProviderError("chatgpt_rate_limited");
-      }
-      if (!response.ok) {
-        const code =
-          response.status === 404
-            ? "chatgpt_model_not_available"
-            : response.status >= 400 && response.status < 500
-              ? "chatgpt_request_rejected"
-              : "chatgpt_service_unavailable";
-        await discardBody(response);
-        throw new ChatGptProviderError(code);
-      }
-      return response;
-    };
   }
 
   /** Bind the native transport to one model and one durable OAuth connection. */
@@ -316,56 +191,6 @@ function toWireModelId(modelId: ChatGptSubscriptionModelId): string {
   return CHATGPT_WIRE_MODEL_BY_ID[modelId];
 }
 
-const CHATGPT_RESPONSES_MIDDLEWARE: LanguageModelV3Middleware = {
-  specificationVersion: "v3",
-  transformParams: async ({ params }) => responsesParams(params),
-};
-
-/**
- * The subscription Responses wire requires instructions at the top level and
- * rejects stored response state. AI SDK normally lowers system messages into
- * `input`; this middleware hoists them into OpenAI provider options instead.
- */
-function responsesParams(
-  params: LanguageModelV3CallOptions
-): LanguageModelV3CallOptions {
-  const instructions = params.prompt
-    .filter((message) => message.role === "system")
-    .map((message) => message.content)
-    .join("\n\n");
-  const existing = params.providerOptions?.openai ?? {};
-  const openai: JSONObject = {
-    ...existing,
-    store: false,
-    systemMessageMode: "remove",
-    // Future Codex model ids are unknown to this AI SDK release. Force the
-    // reasoning path so store:false requests include/replay opaque encrypted
-    // reasoning across multi-step tool turns and omit unsupported sampling.
-    forceReasoning: true,
-    reasoningEffort: existing.reasoningEffort ?? "medium",
-    // Codex Responses expects the field even for prompt-only auxiliary calls.
-    instructions,
-  };
-  return {
-    ...params,
-    // The ChatGPT/Codex subscription backend rejects this public Responses
-    // API setting. Titling and compaction set SDK output caps, so strip the
-    // generic option before the provider serializes `max_output_tokens`.
-    maxOutputTokens: undefined,
-    prompt: params.prompt.filter((message) => message.role !== "system"),
-    providerOptions: {
-      ...params.providerOptions,
-      openai,
-    },
-  };
-}
-
-function requestUrlOf(input: string | URL | Request): string {
-  return new URL(
-    input instanceof Request ? input.url : input.toString()
-  ).toString();
-}
-
 async function requestWithRetry(
   manager: ChatGptCredentialManager,
   access: () => Promise<ChatGptAccessCredentials>,
@@ -454,17 +279,7 @@ async function discardBody(response: Response): Promise<void> {
 
 function providerErrorDescription(code: ChatGptProviderErrorCode): string {
   switch (code) {
-    case "chatgpt_subscription_unavailable":
-      return "the signed-in account cannot use subscription inference";
-    case "chatgpt_rate_limited":
-      return "the ChatGPT subscription is temporarily rate limited";
     case "chatgpt_model_not_available":
       return "the selected model is not available through this subscription";
-    case "chatgpt_request_rejected":
-      return "the subscription backend rejected the model request";
-    case "chatgpt_service_unavailable":
-      return "the subscription backend is temporarily unavailable";
-    case "chatgpt_unexpected_endpoint":
-      return "the provider attempted an unconfigured endpoint";
   }
 }

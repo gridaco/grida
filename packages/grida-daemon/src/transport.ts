@@ -3,10 +3,10 @@
  * clients, and Desktop preload.
  *
  * This module owns the daemon half of the public HTTP seam: Basic-Auth
- * signing, fetch plumbing, SSE frame decoding, typed transport errors,
- * and the client methods for the daemon-owned route groups (handshake,
- * files, recents, workspaces). Tenant route groups extend this client —
- * see `@grida/agent/transport`'s `AgentTransport.Client`. Consumers
+ * signing, fetch plumbing, typed transport errors, and the client methods
+ * for the daemon-owned route groups (handshake, files, recents,
+ * workspaces). Tenant route groups extend this client — see
+ * `@grida/agent/media-transport`'s `MediaTransport.Client`. Consumers
  * should not hand-build daemon route strings.
  */
 
@@ -332,82 +332,4 @@ export namespace DaemonTransport {
         }),
     } as const;
   }
-
-  export type FrameHandler = (event: string, data: string) => void;
-
-  /**
-   * Ceiling on a single UN-TERMINATED SSE frame's tail — a stall detector (an
-   * upstream that streams forever without a `\n\n` boundary). It must clear
-   * the LARGEST LEGITIMATE single frame any tenant emits: the agent tenant's
-   * image-bearing tool results (`view_image`, `generate_image`) carry the
-   * image as base64 in ONE frame, up to `AgentVision.MAX_BYTES` (8 MiB) of
-   * source → ~11 MiB base64 + the JSON envelope. 16 MiB leaves headroom while
-   * still bounding a real stall. If the image ceiling rises, this must too —
-   * pinned by a contract test in `@grida/agent`'s `transport.test.ts`
-   * (`MAX_FRAME_BYTES > base64(AgentVision.MAX_BYTES)`). Exported so that
-   * test can assert the relationship directly.
-   */
-  export const MAX_FRAME_BYTES = 16 * 1024 * 1024;
-
-  export async function readFrames(
-    body: ReadableStream<Uint8Array>,
-    onFrame: FrameHandler
-  ): Promise<void> {
-    const reader = body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (!value || value.length === 0) continue;
-        buffer += decoder.decode(value, { stream: true });
-        for (;;) {
-          const sep = buffer.indexOf("\n\n");
-          if (sep === -1) break;
-          const frame = buffer.slice(0, sep);
-          buffer = buffer.slice(sep + 2);
-          let event = "message";
-          // Accumulate consecutive `data:` lines joined with "\n", mirroring
-          // the server's join (the agent runtime's sse.ts). Overwriting on
-          // each line would silently drop all but the last line of a
-          // multi-line payload.
-          const dataLines: string[] = [];
-          for (const line of frame.split("\n")) {
-            if (line.length === 0 || line.startsWith(":")) continue;
-            if (line.startsWith("event:")) {
-              // SSE field value: strip a single leading space after the colon.
-              event = line.slice("event:".length).replace(/^ /, "");
-            } else if (line.startsWith("data:")) {
-              dataLines.push(line.slice("data:".length).replace(/^ /, ""));
-            }
-          }
-          const data = dataLines.join("\n");
-          if (data.length > 0) onFrame(event, data);
-        }
-        // Cap only the UN-TERMINATED tail (what's left after the last "\n\n"),
-        // not the whole buffer — complete frames have already been drained, so
-        // a large legitimate replay burst on reconnect must not false-trip.
-        if (buffer.length > MAX_FRAME_BYTES) {
-          throw new Error(
-            `[grida-sse] frame exceeds ${MAX_FRAME_BYTES} bytes — upstream stalled`
-          );
-        }
-      }
-    } catch (err) {
-      if (isAbortError(err)) return;
-      throw err;
-    } finally {
-      try {
-        reader.releaseLock();
-      } catch {
-        // ignore
-      }
-    }
-  }
-}
-
-function isAbortError(err: unknown): boolean {
-  if (typeof err !== "object" || err === null) return false;
-  return (err as { name?: unknown }).name === "AbortError";
 }

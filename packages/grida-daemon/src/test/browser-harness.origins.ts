@@ -22,8 +22,7 @@ export const BROWSER_HARNESS_ORIGINS = [
  * The perimeter contract under test includes the tenant seam: a tenant
  * declares its GET SSE routes for `auth_token` query carriage
  * (GRIDA-SEC-004; `DaemonTenant.sse_query_token_paths`). A minimal stub
- * proves that mechanism without pulling any real tenant in — the agent
- * tenant's own routes are covered by `@grida/agent`'s Node tests.
+ * proves that mechanism without pulling any real tenant in.
  */
 export const STUB_SSE_EVENT = "grida-stub" as const;
 export const STUB_STREAM_PATH = "/stub/stream" as const;

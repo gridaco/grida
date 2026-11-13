@@ -1214,49 +1214,22 @@ importers:
 
   packages/grida-ai-agent:
     dependencies:
-      '@ai-sdk/gateway':
-        specifier: 3.0.125
-        version: 3.0.125(zod@4.3.6)
-      '@ai-sdk/openai':
-        specifier: 3.0.0
-        version: 3.0.0(zod@4.3.6)
-      '@ai-sdk/openai-compatible':
-        specifier: 2.0.48
-        version: 2.0.48(zod@4.3.6)
-      '@ai-sdk/provider':
-        specifier: 3.0.10
-        version: 3.0.10
       '@grida/ai':
         specifier: workspace:*
         version: link:../grida-ai
       '@grida/daemon':
         specifier: workspace:*
         version: link:../grida-daemon
-      '@grida/home':
-        specifier: workspace:*
-        version: link:../grida-home
-      '@hono/node-server':
-        specifier: ^1.13.7
-        version: 1.19.9(hono@4.11.8)
       ai:
         specifier: 6.0.197
         version: 6.0.197(zod@4.3.6)
       hono:
         specifier: ^4.6.14
         version: 4.11.8
-      yaml:
-        specifier: ^2.7.0
-        version: 2.7.0
       zod:
         specifier: ^4
         version: 4.3.6
     devDependencies:
-      '@agentclientprotocol/sdk':
-        specifier: 0.25.0
-        version: 0.25.0(zod@4.3.6)
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.36.2)
       tsdown:
         specifier: ^0.22.1
         version: 0.22.1(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.36)
@@ -1979,11 +1952,6 @@ importers:
         version: 4.81.0
 
 packages:
-
-  '@agentclientprotocol/sdk@0.25.0':
-    resolution: {integrity: sha512-wU1VgXNtMvdVotX49txc3WJUDV+/QbLpsgjMvFhlRmp37osdLbI7L7y+iwAlQATwfjLxcv1r1p3ZxZBcXlGhcQ==}
-    peerDependencies:
-      zod: ^3.25.0 || ^4.0.0
 
   '@ai-sdk/gateway@3.0.0':
     resolution: {integrity: sha512-JcjePYVpbezv+XOxkxPemwnorjWpgDiiKWMYy6FXTCG2rFABIK2Co1bFxIUSDT4vYO6f1448x9rKbn38vbhDiA==}
@@ -16558,10 +16526,6 @@ packages:
 
 snapshots:
 
-  '@agentclientprotocol/sdk@0.25.0(zod@4.3.6)':
-    dependencies:
-      zod: 4.3.6
-
   '@ai-sdk/gateway@3.0.0(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.0
@@ -26124,6 +26088,7 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@types/pg': 8.15.6
       '@upstash/redis': 1.36.2
+    optional: true
 
   dts-resolver@3.0.0: {}
 
@@ -33556,7 +33521,8 @@ snapshots:
 
   yaml@1.10.2: {}
 
-  yaml@2.7.0: {}
+  yaml@2.7.0:
+    optional: true
 
   yargs-parser@21.1.1: {}
 

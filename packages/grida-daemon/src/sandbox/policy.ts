@@ -3,12 +3,11 @@
  *
  * The package owns the capability intent: which high-value secret paths
  * are denied, the broad read/write shape used by the OS sandbox, and the
- * baseline dev-network allowlist the shell workload needs. Host adapters
- * own concrete sandbox initialization, wrapping, process spawning, and
- * host facts such as `userData` and `home`. TENANTS contribute their own
- * upstream hosts via `allowed_network_hosts` — e.g. `@grida/agent/sandbox`
- * composes the BYOK provider + external-agent vendor hosts on top of this
- * frame. The daemon itself knows no AI vendor.
+ * optional baseline dev-network allowlist. Host adapters own concrete
+ * sandbox initialization, wrapping, process spawning, and host facts such
+ * as `userData` and `home`. A host contributes any upstream hosts via
+ * `allowed_network_hosts`; Desktop passes none because provider HTTP is
+ * routed through the host. The daemon itself knows no AI vendor.
  *
  * Secret-read ownership split (the srt policy here confines the WHOLE
  * sidecar, host process included):
@@ -17,12 +16,10 @@
  *     the entire tree via `deny_read` below — the host has no business
  *     reading them, so a kernel-level deny is safe.
  *   - The daemon's OWN secret dir (`userData`, where BYOK `auth.json`,
- *     `workspaces.json`, `recent.json`, and the sessions db live) is NOT in
- *     `deny_read`: the daemon process itself must read `auth.json` for
- *     provider calls, and it must read/write the rest. Denying it here would
- *     break host auth. Instead, the shell CHILD is kept out of it IN-PROCESS
- *     by the runner's per-arg check (see `shell/runner.ts`, gate 3), which
- *     rejects any command arg that resolves inside that root.
+ *     `workspaces.json` and `recent.json` live) is NOT in `deny_read`: the
+ *     daemon process itself must read `auth.json` for provider calls, and it
+ *     must read/write the rest. Denying it here would break host auth. The
+ *     daemon and media routes run no commands.
  */
 import path from "node:path";
 
@@ -134,8 +131,7 @@ export function buildDaemonSandboxPolicy(opts: {
    */
   include_dev_network_hosts?: boolean;
   /**
-   * Tenant-contributed upstream hosts (e.g. the agent tenant's BYOK
-   * provider + external-agent vendor endpoints), merged with the baseline
+   * Host-contributed upstream hosts, merged with the baseline
    * dev-network allowlist when that baseline is enabled. srt `*.host`
    * matches subdomains only — callers must list apexes explicitly.
    */

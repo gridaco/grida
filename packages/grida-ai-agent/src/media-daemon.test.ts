@@ -5,8 +5,9 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MediaStore } from "@grida/daemon/server";
 import type { ThreeDGenerateResult } from "./protocol/three-d";
-import { createAgentDaemon, type DaemonServer } from "./server";
-import { AgentTransport } from "./transport";
+import type { DaemonServer } from "@grida/daemon/server";
+import { DaemonTransport } from "@grida/daemon/transport";
+import { createMediaDaemon } from "./media-server";
 
 const PASSWORD = "media-test-password";
 const ORIGIN = "https://client.example";
@@ -35,14 +36,13 @@ afterEach(async () => {
   for (const dispose of cleanup.splice(0).reverse()) await dispose();
 });
 
-describe("createAgentDaemon media-root forwarding", () => {
+describe("createMediaDaemon media-root forwarding", () => {
   it("forwards the host root through DaemonServices into generation", async () => {
     const base = await fs.mkdtemp(
       path.join(os.tmpdir(), "grida-agent-media-daemon-")
     );
     const userData = path.join(base, "agent");
     const mediaRoot = path.join(base, "media");
-    const scratchBase = path.join(base, "scratch");
     cleanup.push(() => fs.rm(base, { recursive: true, force: true }));
 
     const request = vi.fn<typeof globalThis.fetch>(async (input) => {
@@ -72,11 +72,10 @@ describe("createAgentDaemon media-root forwarding", () => {
     });
     let daemon: DaemonServer | undefined;
     cleanup.push(async () => daemon?.stop());
-    daemon = createAgentDaemon({
+    daemon = createMediaDaemon({
       password: PASSWORD,
       user_data_path: userData,
       media_root: mediaRoot,
-      scratch_base: scratchBase,
       provider_http: { request, download },
       http_access: {
         allowed_origins: [ORIGIN],
@@ -86,9 +85,6 @@ describe("createAgentDaemon media-root forwarding", () => {
         files: false,
         recent: false,
         workspaces: false,
-        agent: false,
-        sessions: false,
-        providers: false,
         images: false,
         video: false,
         music: false,
@@ -96,7 +92,6 @@ describe("createAgentDaemon media-root forwarding", () => {
         text_to_speech: false,
         three_d: true,
         secrets: true,
-        shell: false,
       },
     });
     await daemon.start({ listen: false });
@@ -146,7 +141,7 @@ function post(daemon: DaemonServer, pathname: string, payload: unknown) {
     new Request(`http://127.0.0.1${pathname}`, {
       method: "POST",
       headers: {
-        authorization: AgentTransport.buildBasicAuthHeader(PASSWORD),
+        authorization: DaemonTransport.buildBasicAuthHeader(PASSWORD),
         origin: ORIGIN,
         referer: REFERER,
         "content-type": "application/json",

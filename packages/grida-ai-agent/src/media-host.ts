@@ -23,7 +23,7 @@ import { registerMusicRoutes } from "./http/routes/music";
 import { registerSoundEffectsRoutes } from "./http/routes/sound-effects";
 import { registerTextToSpeechRoutes } from "./http/routes/text-to-speech";
 
-/** Private composition shared by the media entry and the full agent tenant. */
+/** Private composition behind the media tenant. */
 export class MediaHost {
   readonly providerHttp: ProviderHttp;
   readonly gridaSession = new GridaGatewaySessionStore();
@@ -35,10 +35,7 @@ export class MediaHost {
   constructor(
     private readonly services: DaemonServices,
     opts: MediaTenantOptions,
-    private readonly agent: {
-      endpoints?: EndpointProvidersStore;
-      on_provider_ready?: () => void;
-    } = {}
+    private readonly settings: { endpoints?: EndpointProvidersStore } = {}
   ) {
     this.providerHttp = new ProviderHttp(opts.provider_http);
     this.gridaGatewayBaseUrl =
@@ -57,7 +54,6 @@ export class MediaHost {
     };
     this.ggCatalog = new GGDiscoveryStore({
       fetch: this.providerHttp.request,
-      on_change: agent.on_provider_ready,
       disabled:
         !this.gridaGatewayBaseUrl ||
         process.env.GRIDA_AGENT_DISABLE_MODELS_FETCH === "1",
@@ -66,7 +62,6 @@ export class MediaHost {
       // Native BYOK facts are the reviewed installed release. The schema-1
       // endpoint remains compatibility for old installations, not this store's authority.
       snapshot: models.snapshot.seed(),
-      on_change: agent.on_provider_ready,
     });
   }
 
@@ -139,16 +134,12 @@ export class MediaHost {
           ),
         });
       });
-      registerGridaAuthRoutes(app, {
-        store: gridaSession,
-        on_provider_ready: this.agent.on_provider_ready,
-      });
+      registerGridaAuthRoutes(app, { store: gridaSession });
     }
     if (caps.secrets) {
       registerSecretsRoutes(app, {
         store: services.secrets,
-        endpoints: this.agent.endpoints,
-        on_provider_ready: this.agent.on_provider_ready,
+        endpoints: this.settings.endpoints,
       });
     }
     if (caps.images) {
@@ -221,7 +212,7 @@ export class MediaHost {
     }
   }
 
-  /** Start only after the full composition has installed its ready callback. */
+  /** Start catalogue refresh after the routes are mounted. */
   start(): void {
     this.modelCatalog.start();
     if (this.capabilities.gg) this.ggCatalog.start();

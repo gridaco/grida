@@ -375,17 +375,17 @@ describe("DaemonServer tenant seam", () => {
   });
 
   it("stop() drains tenant work BEFORE tenant cleanup, then refuses connections", async () => {
-    // Stands in for the agent tenant: `drain` aborts in-flight upstream
-    // model calls; `cleanup` closes SQLite. The seam contract is the
-    // ordering — a recorder reacting to the abort must still find its
-    // store open (see DaemonServer.stop()).
+    // Stands in for a tenant: `drain` aborts in-flight upstream work;
+    // `cleanup` releases tenant stores. The seam contract is the ordering —
+    // work reacting to the abort must still find its store open (see
+    // DaemonServer.stop()).
     const order: string[] = [];
     const tenant: DaemonTenant = {
       register: (app) => {
         app.post("/tenant/ping", (c) => c.json({ ok: true }));
         return {
           capabilities: {
-            sessions: true,
+            images: true,
             three_d: true,
             music: true,
             sound_effects: false,
@@ -424,13 +424,13 @@ describe("DaemonServer tenant seam", () => {
         capabilities: DaemonCapabilities;
         supports: string[];
       };
-      expect(body.capabilities.sessions).toBe(true);
-      expect(body.capabilities.agent).toBe(false);
+      expect(body.capabilities.images).toBe(true);
+      expect(body.capabilities.secrets).toBe(false);
       expect(body.capabilities.three_d).toBe(true);
       expect(body.capabilities.music).toBe(true);
       expect(body.capabilities.sound_effects).toBe(false);
       expect(body.capabilities.text_to_speech).toBe(true);
-      expect(body.supports).toContain("sessions@1");
+      expect(body.supports).toContain("images@1");
       expect(body.supports).toContain("three-d@1");
       expect(body.supports).toContain("music@1");
       expect(body.supports).not.toContain("sound-effects@1");
@@ -467,8 +467,9 @@ describe("DaemonServer tenant seam", () => {
       expect(body.capabilities.files).toBe(true);
       expect(body.capabilities.recent).toBe(true);
       expect(body.capabilities.workspaces).toBe(true);
-      expect(body.capabilities.agent).toBe(false);
-      expect(body.capabilities.sessions).toBe(false);
+      expect("agent" in body.capabilities).toBe(false);
+      expect("sessions" in body.capabilities).toBe(false);
+      expect("shell" in body.capabilities).toBe(false);
       expect(body.capabilities.secrets).toBe(false);
       expect(body.capabilities.three_d).toBe(false);
       expect(body.capabilities.music).toBe(false);

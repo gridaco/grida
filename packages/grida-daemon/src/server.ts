@@ -5,15 +5,15 @@
  * tenants.
  *
  * Two audiences, one entry:
- *   - HOSTS (desktop sidecar, CLI) construct `DaemonServer` (usually via a
- *     composed factory like `@grida/agent/server`'s `createAgentDaemon`)
- *     and drive `start()` / `stop()`. A host-owned transport can select
- *     `start({ listen: false })` and deliver standard Requests through
- *     `DaemonServer.fetch` without binding a socket.
- *   - TENANTS (`@grida/agent`) implement `DaemonTenant` against
- *     `DaemonServices` and use the toolkit below (stores, shell runner,
- *     request validation) — the daemon depends on nothing tenant-specific;
- *     tenants depend on this package (issue #927).
+ *   - HOSTS (the desktop sidecar) construct `DaemonServer` (usually via a
+ *     composed factory like `@grida/agent/media-server`'s
+ *     `createMediaDaemon`) and drive `start()` / `stop()`. A host-owned
+ *     transport can select `start({ listen: false })` and deliver standard
+ *     Requests through `DaemonServer.fetch` without binding a socket.
+ *   - TENANTS (the media tenant in `@grida/agent`) implement `DaemonTenant`
+ *     against `DaemonServices` and use the toolkit below (stores, request
+ *     validation) — the daemon depends on nothing tenant-specific; tenants
+ *     depend on this package.
  */
 
 export {
@@ -32,10 +32,6 @@ export {
   type DaemonTenantHandle,
   type ServerOptions,
 } from "./http/server";
-// Daemon discovery contract (WG spec docs/wg/ai/agent/daemon.md, #798):
-// registration record + persistent credential + authenticated probe +
-// connect-or-spawn. Node-only (fs), so it ships from the server entry.
-export { Daemon } from "./daemon";
 // Sandbox policy is not re-exported here — it lives on its own
 // `@grida/daemon/sandbox` subpath (see src/sandbox/index.ts) so hosts can
 // compute their OS-sandbox wrap without pulling the whole server entry.
@@ -53,12 +49,6 @@ export {
   workspaceFileResponse,
   type WorkspaceFileBody,
 } from "./http/workspace-file-response";
-export {
-  SCAN_MAX_DEPTH,
-  SCAN_MAX_FILES,
-  isIgnoredScanDir,
-  isIgnoredScanFile,
-} from "./workspaces/scan";
 export { FileRegistry } from "./files/registry";
 export { RecentStore } from "./files/recent";
 export { MediaStore, type MediaPersistence } from "./media";
@@ -71,20 +61,6 @@ export {
   type AuthInfo,
   type OAuthEntry,
 } from "./auth/file";
-export {
-  runShell,
-  runUnsandboxedShell,
-  validateShellRequest,
-  type AllowedCwdRoots,
-  type ProtectedReadRoots,
-  type ShellExecutionScope,
-  type ShellExecutor,
-  type ShellRunError,
-  type ShellRunOptions,
-  type ShellRunRequest,
-  type ShellRunResult,
-} from "./shell/runner";
 export { containsPath } from "./path-contains";
-export { isReadOnlyCommand } from "./permissions";
 export { atomicWrite, type AtomicWriteOptions } from "./storage/atomic-write";
 export { body, v, type Validator } from "./http/validate";

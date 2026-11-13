@@ -26,9 +26,9 @@ import type { DaemonCapabilities } from "../protocol/handshake";
 /**
  * The per-launch services the daemon owns and hands to every tenant.
  *
- * This is the tenant seam's service contract (issue #927): a tenant gets
- * the daemon's stores — never the other way around. The daemon depends on
- * nothing tenant-specific; a tenant (e.g. `@grida/agent`) depends on this
+ * This is the tenant seam's service contract: a tenant gets the daemon's
+ * stores — never the other way around. The daemon depends on nothing
+ * tenant-specific; a tenant (e.g. the `@grida/agent` media tenant) depends on this
  * package. Keep this record host-shaped: adding an AI-flavored field here
  * is a boundary violation, not a convenience.
  */
@@ -91,8 +91,8 @@ export type DaemonTenantHandle = {
 /**
  * A capability tenant: registers its route groups on the daemon's Hono
  * app using the daemon's services. Tenants are a STATIC, typed list the
- * composer supplies (see `@grida/agent/server`'s agent tenant) — this is
- * deliberately not a plugin registry (issue #927).
+ * composer supplies (see `@grida/agent/media-server`'s media tenant) — this
+ * is deliberately not a plugin registry.
  */
 export type DaemonTenant = {
   /**

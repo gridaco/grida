@@ -4,11 +4,10 @@
  *
  * Pins: set→status→clear roundtrip (status never echoes the token),
  * validation 400s (empty token, past expiry), and the DELIBERATE gate
- * split — the run-input accepts `grida` as a provider pick while
- * `/secrets/set` keeps REJECTING it (nobody may store a key under the
+ * split — `/secrets/set` keeps REJECTING the hosted provider's id (nobody may store a key under the
  * hosted provider's id).
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { registerGridaAuthRoutes } from "./gg-auth";
 import { registerSecretsRoutes } from "./secrets";
@@ -17,7 +16,6 @@ import type { SecretsStore } from "@grida/daemon/server";
 
 let app: Hono;
 let store: GridaGatewaySessionStore;
-let onProviderReady: () => void;
 
 function post(path: string, body?: unknown): Promise<Response> {
   return Promise.resolve(
@@ -32,11 +30,7 @@ function post(path: string, body?: unknown): Promise<Response> {
 beforeEach(() => {
   app = new Hono();
   store = new GridaGatewaySessionStore();
-  onProviderReady = vi.fn<() => void>();
-  registerGridaAuthRoutes(app, {
-    store,
-    on_provider_ready: onProviderReady,
-  });
+  registerGridaAuthRoutes(app, { store });
 });
 
 describe("/auth/gg/*", () => {
@@ -58,7 +52,6 @@ describe("/auth/gg/*", () => {
     });
     expect(JSON.stringify(body)).not.toContain("jwt-abc");
     expect(store.getAccessToken()).toBe("jwt-abc");
-    expect(onProviderReady).toHaveBeenCalledOnce();
 
     const clear = await post("/auth/gg/clear");
     expect(clear.status).toBe(200);
@@ -87,7 +80,6 @@ describe("/auth/gg/*", () => {
       ).status
     ).toBe(400);
     expect(store.getAccessToken()).toBeNull();
-    expect(onProviderReady).not.toHaveBeenCalled();
   });
 
   it("malformed organization is dropped, not fatal", async () => {
@@ -98,32 +90,6 @@ describe("/auth/gg/*", () => {
     });
     expect(res.status).toBe(200);
     expect(store.status().organization).toBeUndefined();
-  });
-
-  it("keeps a successful token mutation successful when queue recovery throws", async () => {
-    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
-    app = new Hono();
-    store = new GridaGatewaySessionStore();
-    registerGridaAuthRoutes(app, {
-      store,
-      on_provider_ready: () => {
-        throw new Error("recovery failed");
-      },
-    });
-
-    const res = await post("/auth/gg/set", {
-      access_token: "jwt-stored",
-      expires_at: Date.now() + 900_000,
-    });
-
-    expect(res.status).toBe(200);
-    expect(store.getAccessToken()).toBe("jwt-stored");
-    await vi.waitFor(() =>
-      expect(warning).toHaveBeenCalledWith(
-        expect.stringContaining("provider-ready hook failed: recovery failed")
-      )
-    );
-    warning.mockRestore();
   });
 });
 

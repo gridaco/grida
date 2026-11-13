@@ -22,7 +22,6 @@
  *   const tools = AgentTodos.tools;
  *   const output = AgentTodos.resolveToolCall(todos, toolCall);
  *
- * See `./README.md` for the full contract.
  */
 
 import { tool } from "ai";

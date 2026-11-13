@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentTransport } from "./transport";
+import { MediaTransport } from "./media-transport";
 import type {
   VideoGenerateRequest,
   VideoGenerateResult,
@@ -22,7 +22,7 @@ import type {
   ThreeDGenerateResult,
 } from "./protocol/three-d";
 
-describe("AgentTransport media generation routes", () => {
+describe("MediaTransport media generation routes", () => {
   it.each<ThreeDGenerateRequest>([
     {
       model_id: "fal-ai/hunyuan-3d/v3.1/pro/text-to-3d",
@@ -55,7 +55,7 @@ describe("AgentTransport media generation routes", () => {
           created_at: 1,
         },
       };
-      const client = new AgentTransport.Client({
+      const client = new MediaTransport.Client({
         fetcher: async (path, init) => {
           expect(path).toBe("/three-d/generate");
           expect(init?.method).toBe("POST");
@@ -96,7 +96,7 @@ describe("AgentTransport media generation routes", () => {
         },
       ],
     };
-    const client = new AgentTransport.Client({
+    const client = new MediaTransport.Client({
       fetcher: async (path, init) => {
         expect(path).toBe("/video/generate");
         expect(init?.method).toBe("POST");
@@ -129,7 +129,7 @@ describe("AgentTransport media generation routes", () => {
         created_at: 1,
       },
     };
-    const client = new AgentTransport.Client({
+    const client = new MediaTransport.Client({
       fetcher: async (path, init) => {
         expect(path).toBe("/audio/music/generate");
         expect(init?.method).toBe("POST");
@@ -164,7 +164,7 @@ describe("AgentTransport media generation routes", () => {
         created_at: 2,
       },
     };
-    const client = new AgentTransport.Client({
+    const client = new MediaTransport.Client({
       fetcher: async (path, init) => {
         expect(path).toBe("/audio/sound-effects/generate");
         expect(init?.method).toBe("POST");
@@ -203,7 +203,7 @@ describe("AgentTransport media generation routes", () => {
       },
     };
     const seen: Array<{ path: string; method?: string; body: unknown }> = [];
-    const client = new AgentTransport.Client({
+    const client = new MediaTransport.Client({
       fetcher: async (path, init) => {
         seen.push({
           path,
@@ -229,7 +229,7 @@ describe("AgentTransport media generation routes", () => {
 
   it("owns the 3D, music, sound-effect, and text-to-speech paths", async () => {
     const seen: Array<{ path: string; body: unknown }> = [];
-    const client = new AgentTransport.Client({
+    const client = new MediaTransport.Client({
       fetcher: async (path, init) => {
         seen.push({
           path,
