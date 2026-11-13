@@ -269,6 +269,83 @@ fn anthropic_rejects_missing_required_token_limit_before_dispatch() {
     assert!(transport.requests.lock().unwrap().is_empty());
 }
 
+#[test]
+fn native_profiles_without_a_thinking_field_refuse_declared_reasoning_levels() {
+    let reasoning = ModelCapabilities {
+        reasoning: agent_kit_core::inference::ReasoningEffort::ALL
+            .into_iter()
+            .collect(),
+        ..capabilities()
+    };
+    let claude = Anthropic::new(
+        binding("anthropic"),
+        [(ModelId::new("model").unwrap(), reasoning.clone())].into(),
+        FixtureTransport::new([]),
+        limits(),
+    );
+    assert_eq!(claude.err().unwrap().code, "unsupported_model_profile");
+    let gemini = Gemini::new(
+        binding("gemini"),
+        BindingId::new("stable-lineage").unwrap(),
+        [(
+            ModelId::new("model").unwrap(),
+            GeminiProfile {
+                capabilities: reasoning,
+                requires_tool_signatures: false,
+            },
+        )]
+        .into(),
+        FixtureTransport::new([]),
+        limits(),
+    );
+    assert_eq!(gemini.err().unwrap().code, "unsupported_model_profile");
+}
+
+#[tokio::test]
+async fn anthropic_omits_display_only_reasoning_from_assistant_history() {
+    let transport = FixtureTransport::new([Ok(response(
+        [
+            claude_start(),
+            json!({"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":1}}),
+            json!({"type":"message_stop"}),
+        ]
+        .into_iter()
+        .map(frame),
+        false,
+    ))]);
+    let provider = anthropic(transport.clone());
+    let mut history = request();
+    history.messages.extend([
+        message(
+            "answer",
+            Role::Assistant,
+            vec![
+                Content::Reasoning("private-thought".into()),
+                Content::Text("Earlier answer".into()),
+            ],
+        ),
+        message(
+            "follow-up",
+            Role::User,
+            vec![Content::Text("Continue".into())],
+        ),
+    ]);
+    provider
+        .start(
+            provider.prepare(history).unwrap(),
+            control("reasoning-history"),
+        )
+        .unwrap()
+        .finish()
+        .await;
+    let body = sent(&transport, 0, TransportOperation::AnthropicMessages);
+    assert_eq!(
+        body["messages"][1],
+        json!({"role":"assistant","content":[{"type":"text","text":"Earlier answer"}]})
+    );
+    assert!(!body.to_string().contains("private-thought"));
+}
+
 // Source: Google GenerateContent REST and the parallel thought-signature
 // examples. Preserve the original Part order and return any provider call ID.
 fn gemini_parts() -> Vec<Value> {
@@ -668,5 +745,63 @@ async fn anthropic_distinguishes_context_exhaustion_from_output_limit() {
             .await;
         assert_eq!(outcome.status, InferenceStatus::Limited);
         assert_eq!(outcome.failure.map(|failure| failure.kind), expected);
+    }
+}
+
+fn http_failure(status: u16, body: Value) -> agent_kit_providers::TransportResponse {
+    let mut reply = response([body.to_string().into_bytes()], false);
+    reply.status = status;
+    reply
+}
+
+#[tokio::test]
+async fn native_rejections_distinguish_unavailable_models_from_oversized_requests() {
+    let anthropic_transport = FixtureTransport::new([
+        Ok(http_failure(
+            404,
+            json!({"type":"error","error":{"type":"not_found_error","message":"private-model"}}),
+        )),
+        Ok(http_failure(
+            413,
+            json!({"type":"error","error":{"type":"request_too_large","message":"private-size"}}),
+        )),
+    ]);
+    let claude = anthropic(anthropic_transport);
+    let gemini_transport = FixtureTransport::new([Ok(http_failure(
+        404,
+        json!({"error":{"code":404,"message":"private-model","status":"NOT_FOUND"}}),
+    ))]);
+    let gemini = gemini(gemini_transport, binding("gemini"));
+    let mut outcomes = Vec::new();
+    for attempt in ["claude-model", "claude-size"] {
+        outcomes.push(
+            claude
+                .start(claude.prepare(request()).unwrap(), control(attempt))
+                .unwrap()
+                .finish()
+                .await,
+        );
+    }
+    outcomes.push(
+        gemini
+            .start(gemini.prepare(request()).unwrap(), control("gemini-model"))
+            .unwrap()
+            .finish()
+            .await,
+    );
+    for (outcome, code) in outcomes.into_iter().zip([
+        "model_unavailable",
+        "provider_request_rejected",
+        "model_unavailable",
+    ]) {
+        assert_eq!(outcome.status, InferenceStatus::Failed);
+        assert!(
+            !serde_json::to_string(&outcome)
+                .unwrap()
+                .contains("private-")
+        );
+        let failure = outcome.failure.unwrap();
+        assert_eq!(failure.kind, FailureKind::Configuration);
+        assert_eq!(failure.code, code);
     }
 }

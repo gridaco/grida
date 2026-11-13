@@ -28,16 +28,11 @@ pub(super) fn events(
     limits: StreamLimits,
     scope: ReplayScope,
     names: BTreeMap<String, ToolId>,
-    rate_rejection_evidence: bool,
+    rate_rejection_evidence: RateRejectionEvidence,
 ) -> BoxStream<'static, ProviderEvent> {
-    let evidence = if rate_rejection_evidence {
-        RateRejectionEvidence::Code
-    } else {
-        RateRejectionEvidence::None
-    };
     let state = Response {
         wire: WireStream::new(transport, request, control.clone(), limits)
-            .with_rate_rejection_evidence(evidence),
+            .with_rate_rejection_evidence(rate_rejection_evidence),
         attempt: control.attempt,
         limits,
         scope,

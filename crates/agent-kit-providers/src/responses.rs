@@ -1,14 +1,15 @@
 mod stream;
 
 use crate::wire::{
-    check_count_control, count_failure, count_openai_input, function_name, image_data_url,
-    image_profile, short_identity, text_profile, tool_result,
+    EncodedRequest, RateRejectionEvidence, check_count_control, count_failure, count_openai_input,
+    function_name, image_data_url, image_profile, lower_tool_offers, short_identity, text_profile,
+    tool_result,
 };
 use crate::{
     InputImageResolver, StreamLimits, StreamingTransport, TransportOperation, TransportRequest,
 };
 use agent_kit_core::inference::{
-    FailureKind, InferenceControl, InferenceFailure, InferenceRequest, InferenceRun, InputFormat,
+    FailureKind, InferenceControl, InferenceFailure, InferenceRequest, InferenceRun,
     InputMeasurement, ModelCapabilities, PreparedRequest, Provider, ProviderBinding,
     RequestControl,
 };
@@ -24,31 +25,50 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+/// The wire facets a Responses endpoint accepts. The serialized identity is a
+/// capability-revision and replay-scope input, so it stays fixed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponsesEndpoint {
+    /// Accepts an explicit output-token limit, images through a resolver,
+    /// input-token measurement and complete admission-rejection evidence.
     Api,
-    Subscription,
+    /// Accepts none of the optional facets: a request must omit the output
+    /// limit, carries text only, and has no input-token measurement or
+    /// admission-rejection evidence.
+    #[serde(rename = "subscription")]
+    Restricted,
 }
 
+/// A model's default wire reasoning effort. A per-request portable reasoning
+/// level takes precedence over it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum ReasoningEffort {
+pub enum ResponsesReasoningEffort {
+    /// `none`: no reasoning.
     #[serde(rename = "none")]
     Disabled,
+    /// `minimal`.
     Minimal,
+    /// `low`.
     Low,
+    /// `medium`.
     Medium,
+    /// `high`.
     High,
+    /// `xhigh`.
     XHigh,
 }
 
+/// A registry model's capabilities and fixed wire settings.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResponsesProfile {
     /// The adapter derives a revision from this revision and the wire profile.
     pub capabilities: ModelCapabilities,
+    /// The model name sent on the wire for the registry model.
     pub wire_model: ModelId,
-    pub reasoning_effort: Option<ReasoningEffort>,
+    /// The default wire reasoning effort; `None` leaves the endpoint default.
+    pub reasoning_effort: Option<ResponsesReasoningEffort>,
 }
 
 /// Stateless Responses SSE with text, optional images, and client-executed JSON functions.
@@ -84,6 +104,8 @@ impl Responses {
         )
     }
 
+    /// Permit retained images only on the API endpoint and on model profiles
+    /// with the image modality.
     pub fn with_image_resolver(
         binding: ProviderBinding,
         replay_binding: BindingId,
@@ -160,7 +182,7 @@ impl Responses {
                 "unsupported_request_extension",
             ));
         }
-        if self.endpoint == ResponsesEndpoint::Subscription && request.max_output_tokens.is_some() {
+        if self.endpoint == ResponsesEndpoint::Restricted && request.max_output_tokens.is_some() {
             return Err(Error::new(
                 ErrorKind::Unsupported,
                 "responses_output_limit_unsupported",
@@ -227,22 +249,9 @@ impl Responses {
                 }
             }
         }
-        let mut names = BTreeMap::new();
+        let (names, offers) = lower_tool_offers(&request.tools, function_name)?;
         let mut tools = Vec::new();
-        for offer in &request.tools {
-            let InputFormat::Json(schema) = &offer.input else {
-                return Err(Error::new(
-                    ErrorKind::Unsupported,
-                    "unsupported_tool_format",
-                ));
-            };
-            if !schema.is_object() {
-                return Err(Error::new(ErrorKind::InvalidInput, "invalid_tool_schema"));
-            }
-            let name = function_name(&offer.id)?;
-            if names.insert(name.clone(), offer.id.clone()).is_some() {
-                return Err(Error::new(ErrorKind::Conflict, "wire_tool_name_collision"));
-            }
+        for (name, offer, schema) in offers {
             tools.push(json!({
                 "type": "function", "name": name, "description": offer.description,
                 "parameters": schema, "strict": false
@@ -449,7 +458,11 @@ impl Provider for Responses {
         let encoded = self.encode(request.request(), profile, &scope, true)?;
         let transport = Arc::clone(&self.transport);
         let limits = self.limits;
-        let rate_rejection_evidence = self.endpoint == ResponsesEndpoint::Api;
+        let rate_rejection_evidence = if self.endpoint == ResponsesEndpoint::Api {
+            RateRejectionEvidence::Code
+        } else {
+            RateRejectionEvidence::None
+        };
         let request = TransportRequest {
             binding: self.binding.clone(),
             operation: TransportOperation::OpenAiResponses,
@@ -470,11 +483,6 @@ impl Provider for Responses {
     }
 }
 
-struct EncodedRequest {
-    body: Vec<u8>,
-    names: BTreeMap<String, ToolId>,
-}
-
 const REPLAY_SCHEMA: &str = "openai.responses.item";
 
 #[derive(Serialize)]
@@ -484,7 +492,7 @@ struct ReplayScope {
     model: ModelId,
     wire_model: ModelId,
     endpoint: ResponsesEndpoint,
-    reasoning_effort: Option<ReasoningEffort>,
+    reasoning_effort: Option<ResponsesReasoningEffort>,
 }
 
 impl ReplayScope {

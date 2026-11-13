@@ -6,8 +6,8 @@ use crate::{
 use agent_kit_core::inference::usage::TOKENS;
 use agent_kit_core::inference::{
     DispatchEvidence, FailureKind, InferenceControl, InferenceFailure, InferenceStatus,
-    InferenceUpdate, InputMeasurement, MeasurementKind, Modality, ModelCapabilities, ProviderEvent,
-    RequestControl, UsageObservation,
+    InferenceUpdate, InputFormat, InputMeasurement, MeasurementKind, Modality, ModelCapabilities,
+    ProviderEvent, RequestControl, ToolOffer, UsageObservation,
 };
 use agent_kit_core::messages::{MediaRef, ResultContent, ToolResult};
 use agent_kit_core::{
@@ -370,7 +370,11 @@ pub(crate) fn classify_error(
     let (kind, code) = match (status, code) {
         (402, _) => (FailureKind::Quota, "payment_required"),
         (401, _) => (FailureKind::Authentication, "authentication_required"),
-        (_, Some("model_not_found")) => (FailureKind::Configuration, "model_unavailable"),
+        // Every caller targets a model's generation or count route, where a
+        // missing resource is the selected model.
+        (_, Some("model_not_found" | "not_found_error" | "NOT_FOUND")) => {
+            (FailureKind::Configuration, "model_unavailable")
+        }
         (403, _)
         | (
             _,
@@ -409,10 +413,17 @@ pub(crate) fn classify_error(
                 | "UNAVAILABLE",
             ),
         ) => (FailureKind::Transient, "provider_unavailable"),
-        (400 | 404 | 422, _)
-        | (_, Some("invalid_request_error" | "invalid_prompt" | "INVALID_ARGUMENT")) => {
-            (FailureKind::Configuration, "provider_request_rejected")
-        }
+        // A request-size rejection is a byte bound, not a token context limit.
+        (400 | 404 | 413 | 422, _)
+        | (
+            _,
+            Some(
+                "invalid_request_error"
+                | "invalid_prompt"
+                | "request_too_large"
+                | "INVALID_ARGUMENT",
+            ),
+        ) => (FailureKind::Configuration, "provider_request_rejected"),
         _ => (FailureKind::Protocol, "provider_response_error"),
     };
     InferenceFailure {
@@ -421,6 +432,43 @@ pub(crate) fn classify_error(
         retry_after_ms,
         dispatch: None,
     }
+}
+
+/// An encoded request body and the wire-name map for its offered tools.
+pub(crate) struct EncodedRequest {
+    pub(crate) body: Vec<u8>,
+    pub(crate) names: BTreeMap<String, ToolId>,
+}
+
+/// An offer accepted for lowering: its wire name, the offer and its JSON schema.
+pub(crate) type LoweredOffer<'a> = (String, &'a ToolOffer, &'a Value);
+
+/// Accept only JSON-object function schemas and give every offer a distinct
+/// wire name under the adapter's naming rule. Each adapter maps the accepted
+/// offers to its own declaration shape.
+pub(crate) fn lower_tool_offers<'a>(
+    tools: &'a [ToolOffer],
+    name: fn(&ToolId) -> Result<String>,
+) -> Result<(BTreeMap<String, ToolId>, Vec<LoweredOffer<'a>>)> {
+    let mut names = BTreeMap::new();
+    let mut offers = Vec::with_capacity(tools.len());
+    for offer in tools {
+        let InputFormat::Json(schema) = &offer.input else {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "unsupported_tool_format",
+            ));
+        };
+        if !schema.is_object() {
+            return Err(Error::new(ErrorKind::InvalidInput, "invalid_tool_schema"));
+        }
+        let wire_name = name(&offer.id)?;
+        if names.insert(wire_name.clone(), offer.id.clone()).is_some() {
+            return Err(Error::new(ErrorKind::Conflict, "wire_tool_name_collision"));
+        }
+        offers.push((wire_name, offer, schema));
+    }
+    Ok((names, offers))
 }
 
 pub(crate) fn function_name(tool: &ToolId) -> Result<String> {
@@ -537,7 +585,14 @@ impl Usage {
         }
     }
 
+    /// Returns the retained observations. A final finish promotes provisional
+    /// values under one new revision; values already reported final keep theirs.
     pub(crate) fn finish(&mut self, final_value: bool) -> Vec<UsageObservation> {
+        let final_value = final_value
+            && self
+                .values
+                .values()
+                .any(|observation| !observation.final_value);
         std::mem::take(&mut self.values)
             .into_values()
             .map(|mut observation| {

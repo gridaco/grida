@@ -1,13 +1,15 @@
 use crate::StreamLimits;
 use crate::wire::short_identity;
-use crate::wire::{Incoming, RateRejectionEvidence, WireError, WireStream, classify_error};
+use crate::wire::{
+    Incoming, RateRejectionEvidence, Usage as UsageLedger, WireError, WireStream, classify_error,
+};
 use crate::{StreamingTransport, TerminalReceiptDecoder, TransportRequest};
 use agent_kit_core::inference::usage::{
-    CACHED_INPUT_TOKENS, INPUT_TOKENS, OUTPUT_TOKENS, REASONING_OUTPUT_TOKENS, TOKENS,
+    CACHED_INPUT_TOKENS, INPUT_TOKENS, OUTPUT_TOKENS, REASONING_OUTPUT_TOKENS,
 };
 use agent_kit_core::inference::{
     FailureKind, InferenceControl, InferenceFailure, InferenceOutcome, InferenceStatus,
-    InferenceUpdate, MeasurementKind, ProviderEvent, UsageObservation,
+    InferenceUpdate, ProviderEvent,
 };
 use agent_kit_core::messages::{
     Content, Message, Provenance, ProvenanceKind, Role, ToolArguments, ToolCall,
@@ -48,8 +50,8 @@ pub(super) fn events(
         refusal: String::new(),
         call_parts: BTreeMap::new(),
         calls: Vec::new(),
-        usage: BTreeMap::new(),
-        usage_revision: 0,
+        usage: UsageLedger::default(),
+        usage_at_finish: false,
         finish_reason: None,
         native_finish_reason: None,
         finished: false,
@@ -76,8 +78,9 @@ struct ResponseStream {
     refusal: String,
     call_parts: BTreeMap<usize, CallParts>,
     calls: Vec<ToolCall>,
-    usage: BTreeMap<&'static str, UsageObservation>,
-    usage_revision: u64,
+    usage: UsageLedger,
+    /// Usage was reported in the finishing chunk or a later accounting chunk.
+    usage_at_finish: bool,
     finish_reason: Option<FinishReason>,
     native_finish_reason: Option<String>,
     finished: bool,
@@ -187,7 +190,7 @@ impl ResponseStream {
                     FailureKind::Protocol,
                     "missing_terminal_event",
                 ),
-                Incoming::Failure(status, failure) => self.finish(status, Some(failure)),
+                Incoming::Failure(status, failure) => self.finish(status, Some(failure), false),
             }
         }
     }
@@ -207,13 +210,15 @@ impl ResponseStream {
                 FinishReason::Stop if !self.refusal.is_empty() => InferenceStatus::Refused,
                 FinishReason::Stop | FinishReason::ToolCalls => InferenceStatus::Completed,
             };
-            self.finish(status, None);
+            // A clean `[DONE]` confirms usage reported with or after the finish
+            // reason. Usage seen only before the finish remains provisional.
+            self.finish(status, None, self.usage_at_finish);
             return Ok(());
         }
         let chunk: Chunk = serde_json::from_str(event).map_err(|_| "invalid_completion_chunk")?;
         if let Some(error) = chunk.error {
             let failure = classify_error(200, error.code(), None);
-            self.finish(InferenceStatus::Interrupted, Some(failure));
+            self.finish(InferenceStatus::Interrupted, Some(failure), false);
             return Ok(());
         }
         if let Some(id) = chunk.id {
@@ -252,6 +257,7 @@ impl ResponseStream {
             }
         }
         if let Some(usage) = chunk.usage {
+            self.usage_at_finish |= self.finish_reason.is_some();
             self.observe_usage(usage, final_usage);
         }
         Ok(())
@@ -421,41 +427,28 @@ impl ResponseStream {
     }
 
     fn observe_usage(&mut self, usage: Usage, final_value: bool) {
-        self.usage_revision += 1;
-        let values = [
-            (INPUT_TOKENS, usage.prompt_tokens),
-            (OUTPUT_TOKENS, usage.completion_tokens),
-            (
-                CACHED_INPUT_TOKENS,
-                usage
-                    .prompt_tokens_details
-                    .and_then(|details| details.cached_tokens),
-            ),
-            (
-                REASONING_OUTPUT_TOKENS,
-                usage
-                    .completion_tokens_details
-                    .and_then(|details| details.reasoning_tokens),
-            ),
-        ];
-        for (category, quantity) in values {
-            let Some(quantity) = quantity else {
-                continue;
-            };
-            let observation = UsageObservation {
-                attempt: self.control.attempt.clone(),
-                source: self.source.clone(),
-                category: category.into(),
-                unit: TOKENS.into(),
-                revision: self.usage_revision,
-                quantity,
-                certainty: MeasurementKind::Exact,
-                final_value,
-            };
-            self.usage.insert(category, observation.clone());
-            self.updates
-                .push_back(ProviderEvent::Update(InferenceUpdate::Usage(observation)));
-        }
+        self.usage.observe(
+            &self.control.attempt,
+            &self.source,
+            [
+                (INPUT_TOKENS, usage.prompt_tokens),
+                (OUTPUT_TOKENS, usage.completion_tokens),
+                (
+                    CACHED_INPUT_TOKENS,
+                    usage
+                        .prompt_tokens_details
+                        .and_then(|details| details.cached_tokens),
+                ),
+                (
+                    REASONING_OUTPUT_TOKENS,
+                    usage
+                        .completion_tokens_details
+                        .and_then(|details| details.reasoning_tokens),
+                ),
+            ],
+            final_value,
+            &mut self.updates,
+        );
     }
 
     fn fail(&mut self, status: InferenceStatus, kind: FailureKind, code: &str) {
@@ -467,10 +460,16 @@ impl ResponseStream {
                 retry_after_ms: None,
                 dispatch: None,
             }),
+            false,
         );
     }
 
-    fn finish(&mut self, status: InferenceStatus, failure: Option<InferenceFailure>) {
+    fn finish(
+        &mut self,
+        status: InferenceStatus,
+        failure: Option<InferenceFailure>,
+        final_usage: bool,
+    ) {
         self.finished = true;
         self.wire.close();
         let mut content = Vec::new();
@@ -512,7 +511,7 @@ impl ResponseStream {
             .push_back(ProviderEvent::Finished(InferenceOutcome {
                 status,
                 messages,
-                usage: std::mem::take(&mut self.usage).into_values().collect(),
+                usage: self.usage.finish(final_usage),
                 failure,
                 receipt: self.receipt.take(),
                 terminal_receipt,

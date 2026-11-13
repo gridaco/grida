@@ -12,7 +12,7 @@ use agent_kit_core::messages::{
 };
 use agent_kit_core::{ArtifactId, BindingId, ModelId, PrincipalId, ProviderId, ScopeId};
 use agent_kit_providers::{
-    ReasoningEffort, Responses, ResponsesEndpoint, ResponsesProfile, StreamLimits,
+    Responses, ResponsesEndpoint, ResponsesProfile, ResponsesReasoningEffort, StreamLimits,
     TransportFailure, TransportOperation,
 };
 use serde_json::{Value, json};
@@ -50,7 +50,7 @@ fn make_adapter(
         ModelId::new("model").unwrap(),
         ResponsesProfile {
             wire_model: ModelId::new(wire_model).unwrap(),
-            reasoning_effort: Some(ReasoningEffort::XHigh),
+            reasoning_effort: Some(ResponsesReasoningEffort::XHigh),
             capabilities: ModelCapabilities {
                 revision: BindingId::new("profile").unwrap(),
                 input_modalities: [Modality::Text].into(),
@@ -191,7 +191,7 @@ async fn subscription_replays_completed_encrypted_items_and_remote_call_identity
     ]);
     let first = adapter(
         transport.clone(),
-        ResponsesEndpoint::Subscription,
+        ResponsesEndpoint::Restricted,
         "lineage",
         "first",
     );
@@ -208,7 +208,7 @@ async fn subscription_replays_completed_encrypted_items_and_remote_call_identity
     let prepared = first.prepare(request.clone()).unwrap();
     let changed_wire = make_adapter(
         transport.clone(),
-        ResponsesEndpoint::Subscription,
+        ResponsesEndpoint::Restricted,
         "lineage",
         "first",
         "other-model",
@@ -290,7 +290,7 @@ async fn subscription_replays_completed_encrypted_items_and_remote_call_identity
 
     let fresh = adapter(
         transport.clone(),
-        ResponsesEndpoint::Subscription,
+        ResponsesEndpoint::Restricted,
         "lineage",
         "second",
     );
@@ -298,7 +298,7 @@ async fn subscription_replays_completed_encrypted_items_and_remote_call_identity
     for rejected in [
         adapter(
             transport.clone(),
-            ResponsesEndpoint::Subscription,
+            ResponsesEndpoint::Restricted,
             "changed",
             "third",
         ),
@@ -310,7 +310,7 @@ async fn subscription_replays_completed_encrypted_items_and_remote_call_identity
         ),
         make_adapter(
             transport.clone(),
-            ResponsesEndpoint::Subscription,
+            ResponsesEndpoint::Restricted,
             "lineage",
             "third",
             "other-model",
@@ -368,7 +368,7 @@ async fn only_api_profile_accepts_explicit_output_bound() {
     ))]);
     let subscription = adapter(
         transport.clone(),
-        ResponsesEndpoint::Subscription,
+        ResponsesEndpoint::Restricted,
         "lineage",
         "live",
     );
@@ -560,7 +560,7 @@ async fn only_a_complete_typed_api_rate_rejection_proves_no_generation() {
         ),
         (ResponsesEndpoint::Api, true, "code", None),
         (ResponsesEndpoint::Api, false, "type", None),
-        (ResponsesEndpoint::Subscription, false, "code", None),
+        (ResponsesEndpoint::Restricted, false, "code", None),
     ] {
         let body =
             serde_json::to_vec(&json!({"error":{(code_key):"rate_limit_exceeded"}})).unwrap();
@@ -576,7 +576,7 @@ async fn only_a_complete_typed_api_rate_rejection_proves_no_generation() {
         let transport = FixtureTransport::new([Ok(reply)]);
         let provider = adapter(transport.clone(), endpoint, "lineage", "live");
         let mut input = request();
-        if endpoint == ResponsesEndpoint::Subscription {
+        if endpoint == ResponsesEndpoint::Restricted {
             input.max_output_tokens = None;
         }
         let outcome = run(&provider, input, "attempt").await;
@@ -892,7 +892,7 @@ async fn user_and_tool_images_share_the_same_resolved_count_and_generation_input
             ResponsesProfile {
                 capabilities,
                 wire_model: ModelId::new("wire-model").unwrap(),
-                reasoning_effort: Some(ReasoningEffort::XHigh),
+                reasoning_effort: Some(ResponsesReasoningEffort::XHigh),
             },
         )]
         .into(),
@@ -1015,7 +1015,7 @@ async fn count_requires_the_api_profile_and_the_original_binding() {
     let transport = FixtureTransport::new([]);
     let subscription = adapter(
         transport.clone(),
-        ResponsesEndpoint::Subscription,
+        ResponsesEndpoint::Restricted,
         "replay",
         "live",
     );

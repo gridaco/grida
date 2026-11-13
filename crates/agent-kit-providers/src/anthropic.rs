@@ -1,13 +1,15 @@
 mod stream;
 
-use crate::wire::{function_name, short_identity, text_profile, tool_result};
+use crate::wire::{
+    EncodedRequest, function_name, lower_tool_offers, short_identity, text_profile, tool_result,
+};
 use crate::{StreamLimits, StreamingTransport, TransportOperation, TransportRequest};
 use agent_kit_core::inference::{
-    InferenceControl, InferenceRequest, InferenceRun, InputFormat, ModelCapabilities,
-    PreparedRequest, Provider, ProviderBinding,
+    InferenceControl, InferenceRequest, InferenceRun, ModelCapabilities, PreparedRequest, Provider,
+    ProviderBinding,
 };
 use agent_kit_core::messages::{Content, OutcomeStatus, Role, ToolArguments};
-use agent_kit_core::{Error, ErrorKind, MessageId, ModelId, Result, ToolId};
+use agent_kit_core::{Error, ErrorKind, MessageId, ModelId, Result};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -21,6 +23,8 @@ pub struct Anthropic {
 }
 
 impl Anthropic {
+    /// A text adapter for the bound endpoint. Profiles must be text-only and
+    /// declare no reasoning levels.
     pub fn new(
         binding: ProviderBinding,
         models: BTreeMap<ModelId, ModelCapabilities>,
@@ -28,7 +32,13 @@ impl Anthropic {
         limits: StreamLimits,
     ) -> Result<Self> {
         limits.validate()?;
-        if models.is_empty() || !models.values().all(text_profile) {
+        // This profile has no thinking field, so declared reasoning levels
+        // could pass request validation and then be silently ignored.
+        if models.is_empty()
+            || !models
+                .values()
+                .all(|profile| text_profile(profile) && profile.reasoning.is_empty())
+        {
             return Err(Error::new(
                 ErrorKind::Unsupported,
                 "unsupported_model_profile",
@@ -75,6 +85,8 @@ impl Anthropic {
                     (Role::User | Role::Assistant, Content::Text(text)) => {
                         blocks.push(json!({"type": "text", "text": text}));
                     }
+                    // Plain Messages has no portable reasoning-input field.
+                    (Role::Assistant, Content::Reasoning(_)) => {}
                     (Role::Assistant, Content::ToolCall(call)) if tools_supported => {
                         let ToolArguments::Json(input) = &call.arguments else {
                             return Err(Error::new(
@@ -134,22 +146,9 @@ impl Anthropic {
                 }
             }
         }
-        let mut names = BTreeMap::new();
+        let (names, offers) = lower_tool_offers(&request.tools, function_name)?;
         let mut tools = Vec::new();
-        for offer in &request.tools {
-            let InputFormat::Json(schema) = &offer.input else {
-                return Err(Error::new(
-                    ErrorKind::Unsupported,
-                    "unsupported_tool_format",
-                ));
-            };
-            if !schema.is_object() {
-                return Err(Error::new(ErrorKind::InvalidInput, "invalid_tool_schema"));
-            }
-            let name = function_name(&offer.id)?;
-            if names.insert(name.clone(), offer.id.clone()).is_some() {
-                return Err(Error::new(ErrorKind::Conflict, "wire_tool_name_collision"));
-            }
+        for (name, offer, schema) in offers {
             tools.push(
                 json!({"name": name, "description": offer.description, "input_schema": schema}),
             );
@@ -210,9 +209,4 @@ impl Provider for Anthropic {
             stream::events(transport, request, control, limits, encoded.names, message)
         }))
     }
-}
-
-struct EncodedRequest {
-    body: Vec<u8>,
-    names: BTreeMap<String, ToolId>,
 }

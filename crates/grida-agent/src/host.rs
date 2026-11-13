@@ -3527,7 +3527,7 @@ impl Execution {
         let provider = Arc::new(Responses::new(
             binding.clone(),
             connection.replay_binding.clone(),
-            ResponsesEndpoint::Subscription,
+            ResponsesEndpoint::Restricted,
             BTreeMap::from([(
                 model.clone(),
                 ResponsesProfile {
@@ -3538,7 +3538,7 @@ impl Execution {
                         ..text_capabilities("chatgpt-subscription")?
                     },
                     wire_model: connection.wire_model.clone(),
-                    reasoning_effort: Some(agent_kit_providers::ReasoningEffort::Medium),
+                    reasoning_effort: Some(agent_kit_providers::ResponsesReasoningEffort::Medium),
                 },
             )]),
             connection.clone(),

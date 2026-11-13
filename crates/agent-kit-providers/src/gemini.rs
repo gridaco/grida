@@ -1,12 +1,15 @@
 mod stream;
 
-use crate::wire::{append_image_base64, image_profile, short_identity, text_profile, tool_result};
+use crate::wire::{
+    EncodedRequest, append_image_base64, image_profile, lower_tool_offers, short_identity,
+    text_profile, tool_result,
+};
 use crate::{
     InputImageResolver, StreamLimits, StreamingTransport, TransportOperation, TransportRequest,
 };
 use agent_kit_core::inference::{
-    InferenceControl, InferenceRequest, InferenceRun, InputFormat, ModelCapabilities,
-    PreparedRequest, Provider, ProviderBinding,
+    InferenceControl, InferenceRequest, InferenceRun, ModelCapabilities, PreparedRequest, Provider,
+    ProviderBinding,
 };
 use agent_kit_core::messages::{Content, Message, ProviderState, Role};
 use agent_kit_core::{
@@ -18,8 +21,10 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+/// A registry model's capabilities and tool-signature requirement.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GeminiProfile {
+    /// The capabilities requests are validated against; no reasoning levels.
     pub capabilities: ModelCapabilities,
     /// Require the first function-call part of a tool step to carry its signature.
     pub requires_tool_signatures: bool,
@@ -70,6 +75,9 @@ impl Gemini {
                     })
                     && (text_profile(&profile.capabilities)
                         || (images.is_some() && image_profile(&profile.capabilities)))
+                    // This profile has no thinking configuration, so declared
+                    // reasoning levels would otherwise be silently ignored.
+                    && profile.capabilities.reasoning.is_empty()
             })
         {
             return Err(Error::new(
@@ -152,22 +160,9 @@ impl Gemini {
         }
         flush_results(&mut pending, &mut results, &mut contents)?;
 
-        let mut names = BTreeMap::new();
+        let (names, offers) = lower_tool_offers(&request.tools, function_name)?;
         let mut declarations = Vec::new();
-        for offer in &request.tools {
-            let InputFormat::Json(schema) = &offer.input else {
-                return Err(Error::new(
-                    ErrorKind::Unsupported,
-                    "unsupported_tool_format",
-                ));
-            };
-            if !schema.is_object() {
-                return Err(Error::new(ErrorKind::InvalidInput, "invalid_tool_schema"));
-            }
-            let name = function_name(&offer.id)?;
-            if names.insert(name.clone(), offer.id.clone()).is_some() {
-                return Err(Error::new(ErrorKind::Conflict, "wire_tool_name_collision"));
-            }
+        for (name, offer, schema) in offers {
             declarations.push(json!({
                 "name": name, "description": offer.description, "parametersJsonSchema": schema
             }));
@@ -288,11 +283,6 @@ impl Provider for Gemini {
     }
 }
 
-struct EncodedRequest {
-    body: Vec<u8>,
-    names: BTreeMap<String, ToolId>,
-}
-
 const REPLAY_SCHEMA: &str = "gemini.generate-content.parts";
 
 #[derive(Default, Deserialize, Serialize)]
@@ -346,6 +336,8 @@ impl ReplayScope {
     }
 }
 
+// Gemini function names must also begin with a letter or underscore, so this
+// rule is stricter than the shared one.
 fn function_name(tool: &ToolId) -> Result<String> {
     let id = tool.as_str();
     if id.len() <= 64

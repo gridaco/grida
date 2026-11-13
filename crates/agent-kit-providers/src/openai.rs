@@ -1,42 +1,50 @@
 mod stream;
 
 use crate::wire::{
-    RateRejectionEvidence, check_count_control, count_failure, count_openai_input, function_name,
-    image_data_url, image_profile, short_identity, text_profile, tool_result, tool_result_payload,
+    EncodedRequest, RateRejectionEvidence, check_count_control, count_failure, count_openai_input,
+    function_name, image_data_url, image_profile, lower_tool_offers, short_identity, text_profile,
+    tool_result, tool_result_payload,
 };
 use crate::{
     InputImageResolver, StreamLimits, StreamingTransport, TransportOperation, TransportRequest,
 };
 use agent_kit_core::inference::{
-    FailureKind, InferenceControl, InferenceFailure, InferenceRequest, InferenceRun, InputFormat,
+    FailureKind, InferenceControl, InferenceFailure, InferenceRequest, InferenceRun,
     InputMeasurement, ModelCapabilities, PreparedRequest, Provider, ProviderBinding,
     RequestControl,
 };
 use agent_kit_core::messages::{
     Content, Message, ResultContent, Retention, Role, ToolArguments, ToolResult,
 };
-use agent_kit_core::{BoxFuture, Error, ErrorKind, ModelId, Result, ToolId};
+use agent_kit_core::{BoxFuture, Error, ErrorKind, ModelId, Result};
 use serde_json::{Value, json};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
+/// Where an endpoint reads the requested output-token limit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OutputLimitField {
+    /// `max_completion_tokens`, as in OpenAI Chat Completions.
     CompletionTokens,
+    /// `max_tokens`, for endpoints that read the earlier field.
     Tokens,
 }
 
 /// Explicit capabilities of a model on the selected compatible endpoint.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModelProfile {
+    /// The capabilities requests are validated against.
     pub capabilities: ModelCapabilities,
+    /// The field that carries the output-token limit.
     pub output_limit: OutputLimitField,
+    /// Request streamed usage with `stream_options.include_usage`.
     pub include_usage: bool,
     /// Where this endpoint reads a requested reasoning level.
     pub reasoning_field: ReasoningField,
 }
 
+/// Where an endpoint reads a requested reasoning level.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ReasoningField {
     /// Top-level `reasoning_effort`, as in OpenAI Chat Completions.
@@ -46,6 +54,7 @@ pub enum ReasoningField {
     Object,
 }
 
+/// Chat Completions SSE with text, optional PNGs and client-executed JSON tools.
 pub struct OpenAiCompatible {
     binding: ProviderBinding,
     models: BTreeMap<ModelId, ModelProfile>,
@@ -58,6 +67,7 @@ pub struct OpenAiCompatible {
 }
 
 impl OpenAiCompatible {
+    /// A text adapter for the bound endpoint and its explicit model registry.
     pub fn new(
         binding: ProviderBinding,
         models: BTreeMap<ModelId, ModelProfile>,
@@ -217,22 +227,9 @@ impl OpenAiCompatible {
                 lower_message(message, model.capabilities.json_tools, &mut messages)?;
             }
         }
-        let mut names = BTreeMap::new();
+        let (names, offers) = lower_tool_offers(&request.tools, function_name)?;
         let mut tools = Vec::new();
-        for offer in &request.tools {
-            let InputFormat::Json(parameters) = &offer.input else {
-                return Err(Error::new(
-                    ErrorKind::Unsupported,
-                    "unsupported_tool_format",
-                ));
-            };
-            if !parameters.is_object() {
-                return Err(Error::new(ErrorKind::InvalidInput, "invalid_tool_schema"));
-            }
-            let name = function_name(&offer.id)?;
-            if names.insert(name.clone(), offer.id.clone()).is_some() {
-                return Err(Error::new(ErrorKind::Conflict, "wire_tool_name_collision"));
-            }
+        for (name, offer, parameters) in offers {
             tools.push(json!({ "type": "function", "function": {
                 "name": name, "description": offer.description, "parameters": parameters
             }}));
@@ -335,11 +332,6 @@ impl Provider for OpenAiCompatible {
             )
         }))
     }
-}
-
-struct EncodedRequest {
-    body: Vec<u8>,
-    names: BTreeMap<String, ToolId>,
 }
 
 fn lower_image_message(

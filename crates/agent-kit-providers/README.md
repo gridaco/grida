@@ -15,6 +15,7 @@ and resolves it to the approved destination.
 | Operation                     | Relative route for the corresponding API       |
 | ----------------------------- | ---------------------------------------------- |
 | `ChatCompletions`             | `chat/completions`                             |
+| `LlamaCppChatInputTokens`     | `chat/completions/input_tokens`                |
 | `OpenAiResponses`             | `responses`                                    |
 | `OpenAiResponsesInputTokens`  | `responses/input_tokens`                       |
 | `AnthropicMessages`           | `messages`                                     |
@@ -25,6 +26,11 @@ credentials, and bounds the response. It validates Gemini's model against
 its registry and encodes it as a single path segment. Transport must disable
 automatic retries and redirects. Dropping the body releases its stream.
 
+A transport can also supply `terminal_receipt_decoder`, which projects its own
+terminal evidence from the request receipt and the validated finish frame. Only
+the OpenAI-compatible adapter consults it, and only a completed stream keeps
+the decoded receipt.
+
 Preparation performs no I/O. The adapters validate input and tool history
 before dispatch. A prepared request captures the binding and model
 capabilities. Change the supplied capability revision when wire profile
@@ -34,9 +40,13 @@ expose a classification and a fixed code.
 
 Inference distinguishes a transport failure known to precede dispatch from an
 interrupted attempt. HTTP timeouts and server errors preserve dispatch
-uncertainty. Recognized provider codes distinguish unavailable models, quota,
-rate limits, and context limits. An HTTP retry delay is advisory. Each adapter
-issues a single transport request per inference attempt.
+uncertainty. Recognized provider codes distinguish unavailable models, quota
+and rate limits for every adapter. A context limit is recognized where the
+protocol reports a distinct signal: the `context_length_exceeded` error code,
+or the Anthropic `model_context_window_exceeded` stop reason. A request-size
+rejection is a configuration failure, not a context limit. An HTTP retry delay
+is advisory. Each adapter issues a single transport request per inference
+attempt.
 
 The Responses API profile records an admission rejection when generation
 returns a complete HTTP 429 body with the explicit `rate_limit_exceeded`
@@ -66,31 +76,36 @@ Cache-related counters retain their provider-specific meanings.
   fields. Accounting updates the same attempt's final counters without emitting
   another call or replacing the original terminal receipt. `[DONE]` remains
   required; malformed late frames preserve the valid prefix and interrupt the
-  attempt. [Compatible terminal usage](https://openrouter.ai/docs/api_reference/streaming)
-  The Ollama profile uses the `max_tokens` field. [Ollama compatibility](https://docs.ollama.com/api/openai-compatibility) · [Chat Completions streaming](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
+  attempt. An accounting chunk after the finish reports final usage. Usage in
+  the finishing chunk becomes final with `[DONE]`, and usage reported only
+  before the finish stays provisional.
+  [Compatible terminal usage](https://openrouter.ai/docs/api_reference/streaming)
+  Endpoints that read `max_tokens` (for example Ollama) use
+  `OutputLimitField::Tokens`. [Ollama compatibility](https://docs.ollama.com/api/openai-compatibility) · [Chat Completions streaming](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
 - `Responses` uses stateless SSE with top-level instructions, `store: false`,
   and explicitly requested encrypted reasoning. It keeps completed output
   item order and remote function call IDs for replay. Tool calls become
-  eligible after the verified terminal response. The API profile accepts an
-  explicit output-token bound. The subscription profile rejects that field,
-  so a host using it must select an effective output policy before preparing
-  the request. The API profile can also accept image references when the host
-  supplies an immutable image resolver. The resolver reads bounded bytes only
+  eligible after the verified terminal response. `ResponsesEndpoint` names
+  the accepted wire facets. The API profile accepts an explicit output-token
+  bound. The restricted profile rejects that field, so a host using it must
+  select an effective output policy before preparing the request. The API
+  profile can also accept image references when the host supplies an
+  immutable image resolver. The resolver reads bounded bytes only
   during authorized counting or generation. Both operations send the same
   image content, while the prepared request keeps just the references. The
   adapter provides protocol fixtures for both profiles.
-  Subscription account setup and native host activation are separate.
   [Responses migration](https://developers.openai.com/api/docs/guides/migrate-to-responses)
 - `Anthropic` requires an explicit output-token limit and lowers leading
   instructions to the system field. It emits a call after its complete
   tool-use block. Completion requires a stop reason and `message_stop`.
-  Extended thinking blocks and server-side tools require a different adapter
-  profile. [Anthropic Messages streaming](https://platform.claude.com/docs/en/build-with-claude/streaming)
+  Assistant reasoning in history is display-only and is not sent. Reasoning
+  levels, extended thinking blocks and server-side tools require a different
+  adapter profile. [Anthropic Messages streaming](https://platform.claude.com/docs/en/build-with-claude/streaming)
 - `Gemini` preserves original part order, thought signatures and remote call
   IDs in opaque continuation state. It emits calls only with a completed
   response and a clean stream end. Results are sent in original call order,
-  with the provider ID when available. Streamed function arguments and media
-  parts require a different profile. [Gemini thought signatures](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/thinking/thought-signatures)
+  with the provider ID when available. Reasoning levels, streamed function
+  arguments and media parts require a different profile. [Gemini thought signatures](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/thinking/thought-signatures)
 
 Gemini and Responses use an opaque replay binding for each endpoint and
 provider-account lineage. Recreating live execution authority can reuse that
@@ -115,8 +130,14 @@ It sends the same model, input items, instructions, tool definitions, and
 reasoning settings to the input token count endpoint. Generation controls such
 as streaming and the output limit are separate. The adapter reads a bounded
 JSON response and preserves the provider's failure classification. A host must
-authorize this operation at the approved API destination. The subscription
+authorize this operation at the approved API destination. The restricted
 profile leaves this measurement unavailable. [Token counting guide](https://developers.openai.com/api/docs/guides/token-counting) · [Count endpoint reference](https://developers.openai.com/api/reference/resources/responses/subresources/input_tokens/methods/count)
+
+An OpenAI-compatible endpoint offers input measurement only after the host
+opts in with `with_llama_cpp_input_count` for a text profile. The adapter sends
+the encoded chat request to the llama.cpp count route and accepts only a
+bounded `response.input_tokens` JSON response. Without the opt-in, measurement
+is unavailable.
 
 Completed calls still require executor schema preflight and authority checks.
 A stream failure retains the valid prefix and available usage and request
@@ -130,6 +151,6 @@ outcomes, attempt-scoped usage, redacted failures, cancellation and limits,
 and opaque tool-history continuation across live authority generations.
 
 ```sh
-cargo test -p agent-kit-providers --locked
-cargo clippy -p agent-kit-providers --all-targets --locked -- -D warnings
+cargo test -p agent-kit-providers --all-features --locked
+cargo clippy -p agent-kit-providers --all-targets --all-features --locked -- -D warnings
 ```

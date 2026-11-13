@@ -145,6 +145,48 @@ async fn prepare_is_read_only_and_dispatch_uses_the_bound_route() {
 }
 
 #[tokio::test]
+async fn opted_in_input_count_measures_the_encoded_chat_request() {
+    let transport = FixtureTransport::new([
+        Ok(response(
+            [br#"{"object":"response.input_tokens","input_tokens":21}"#.to_vec()],
+            false,
+        )),
+        Ok(response(
+            [br#"{"object":"chat.completion","input_tokens":21}"#.to_vec()],
+            false,
+        )),
+    ]);
+    let provider = adapter(transport.clone())
+        .with_llama_cpp_input_count()
+        .unwrap();
+    let prepared = provider.prepare(request()).unwrap();
+    let measured = provider
+        .measure_input_async(&prepared, control("count").request_control())
+        .await
+        .unwrap();
+    assert_eq!(measured.tokens, 21);
+    assert_eq!(
+        measured.kind,
+        agent_kit_core::inference::MeasurementKind::Exact
+    );
+    let failure = provider
+        .measure_input_async(&prepared, control("count").request_control())
+        .await
+        .unwrap_err();
+    assert_eq!(failure.kind, FailureKind::Protocol);
+    assert_eq!(failure.code, "input_measurement_invalid");
+    let requests = transport.requests.lock().unwrap();
+    assert_eq!(requests.len(), 2);
+    let (request, _) = &requests[0];
+    assert_eq!(
+        request.operation,
+        TransportOperation::LlamaCppChatInputTokens
+    );
+    let body: Value = serde_json::from_slice(&request.body).unwrap();
+    assert_eq!(body["messages"][0]["content"], "Respond briefly");
+}
+
+#[tokio::test]
 async fn model_profile_selects_legacy_token_field_without_implied_usage_support() {
     let transport = FixtureTransport::new([Ok(response(text_response("hello"), false))]);
     let provider = configured(
@@ -1174,6 +1216,78 @@ async fn first_party_usage_frames_preserve_missing_counts_and_reported_zero() {
             .collect::<Vec<_>>(),
         [("cached_input_tokens", 0), ("output_tokens", 7)]
     );
+}
+
+#[tokio::test]
+async fn usage_in_the_finishing_chunk_becomes_final_only_with_done() {
+    for marker in [true, false] {
+        let mut script = vec![frame(json!({
+            "id": "response-local",
+            "choices": [{ "index": 0, "delta": { "content": "ok" }, "finish_reason": "stop" }],
+            "usage": { "prompt_tokens": 900, "completion_tokens": 5 }
+        }))];
+        if marker {
+            script.push(done());
+        }
+        let provider = adapter(FixtureTransport::new([Ok(response(script, false))]));
+        let mut run = provider
+            .start(
+                provider.prepare(request()).unwrap(),
+                control("finish-usage"),
+            )
+            .unwrap();
+        let mut updates = Vec::new();
+        while let Some(update) = run.next().await {
+            if let InferenceUpdate::Usage(usage) = update {
+                updates.push(usage);
+            }
+        }
+        let result = run.finish().await;
+        // The live observation precedes the terminal marker.
+        assert!(updates.iter().all(|entry| !entry.final_value));
+        assert_eq!(
+            result
+                .usage
+                .iter()
+                .map(|entry| (entry.category.as_str(), entry.quantity))
+                .collect::<Vec<_>>(),
+            [("input_tokens", 900), ("output_tokens", 5)]
+        );
+        if marker {
+            assert_eq!(result.status, InferenceStatus::Completed);
+            assert!(
+                result
+                    .usage
+                    .iter()
+                    .all(|entry| entry.final_value && entry.revision == 2)
+            );
+        } else {
+            assert_eq!(result.status, InferenceStatus::Interrupted);
+            assert!(result.usage.iter().all(|entry| !entry.final_value));
+        }
+    }
+}
+
+#[tokio::test]
+async fn usage_reported_only_before_the_finish_remains_provisional() {
+    let script = vec![
+        frame(json!({
+            "id": "response-local",
+            "choices": [{ "index": 0, "delta": { "content": "ok" } }],
+            "usage": { "prompt_tokens": 4, "completion_tokens": 1 }
+        })),
+        choice(json!({}), Some("stop")),
+        done(),
+    ];
+    let result = execute(
+        &adapter(FixtureTransport::new([Ok(response(script, false))])),
+        request(),
+        "early-usage",
+    )
+    .await;
+    assert_eq!(result.status, InferenceStatus::Completed);
+    assert_eq!(result.usage.len(), 2);
+    assert!(result.usage.iter().all(|entry| !entry.final_value));
 }
 
 #[tokio::test]
