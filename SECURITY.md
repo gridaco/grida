@@ -423,17 +423,14 @@ http://localhost:*`. The nonce is generated in the proxy, exposed
    the main-owned loopback port across Bubblewrap's private Linux network
    namespace.
 
-   **Authenticated liveness and query-token carriage.** Liveness probing is
-   the **authenticated** `/handshake`; there is deliberately no
+   **Authenticated liveness and header-only credential.** Liveness probing
+   is the **authenticated** `/handshake`; there is deliberately no
    unauthenticated health route for local malware to port-scan against.
-   Two carriages, one credential: the `Authorization: Basic` header
-   everywhere, plus an `auth_token` query parameter that `@grida/daemon`'s
-   `http/auth.ts` accepts ONLY on GET event-stream routes a tenant declares
-   through `sse_query_token_paths` on the `DaemonTenant` seam. The media
-   tenant declares none, so every current route requires the header. A
-   present header always wins — a wrong header never falls back to the
-   token — and the token is never accepted on mutating routes. CORS/Referer
-   layers still apply unchanged to token-authed requests.
+   The `Authorization: Basic` header is the only credential carriage:
+   `@grida/daemon`'s `http/auth.ts` never reads a credential from the query
+   string, and the `DaemonTenant` seam offers no way for a tenant to declare
+   one. A credential in a URL can land in logs and history, so adding a
+   query carriage for any route is a change to this contract.
 
 4. **Defense-in-depth `Referer` check** — the daemon rejects any request
    whose `Referer` path is not under the host-declared desktop route root. Catches a same-origin
@@ -1341,7 +1338,7 @@ The [network policy](desktop/src/agent-network-policy.ts),
 
 Today:
 
-- [Media server entry](packages/grida-ai-agent/src/media-server.ts), [shared host composition](packages/grida-ai-agent/src/media-host.ts), [media server tests](packages/grida-ai-agent/src/media-server.test.ts), and [built-entry isolation tests](packages/grida-ai-agent/src/media-server-isolation.test.ts) — the media composition mounts existing routes behind the daemon perimeter and receives the same narrow credential, provider-HTTP and media-persistence capabilities. It adds no SSE query-token exception, native-provider route or command executor; endpoint-provider routes mount only when the host opts in. It is the only daemon tenant.
+- [Media server entry](packages/grida-ai-agent/src/media-server.ts), [shared host composition](packages/grida-ai-agent/src/media-host.ts), [media server tests](packages/grida-ai-agent/src/media-server.test.ts), and [built-entry isolation tests](packages/grida-ai-agent/src/media-server-isolation.test.ts) — the media composition mounts existing routes behind the daemon perimeter and receives the same narrow credential, provider-HTTP and media-persistence capabilities. It adds no query-string credential, native-provider route or command executor; endpoint-provider routes mount only when the host opts in. It is the only daemon tenant.
 - [Media tenant wiring tests](packages/grida-ai-agent/src/media-tenant-wiring.test.ts) — every generation route group receives the same host media service; music receives no BYOK store and the ElevenLabs groups receive no GG authority.
 - [Desktop composition](desktop/src/sidecar/daemon.ts) and [its tests](desktop/src/sidecar/daemon.test.ts) — select retained services before loading the server; their option types admit only disabled or native-chat service modes. Native OAuth lives in its dedicated host; no command executor is supplied to the retained service. The [supervisor tests](desktop/src/main/agent-sidecar-supervisor.test.ts) pin disabled-mode argv and the absence of scratch preparation while retaining the outer network fence.
 - [Legacy chat archive](desktop/src/main/legacy-chat-archive.ts) and [its fixtures](desktop/src/main/legacy-chat-archive.test.ts) preserve the legacy SQLite store and managed session scratch in a private verified archive. For retirement, one exclusive SQLite connection moves the source out of WAL, retains its lock through backup, and commits the archive ID with a schema version that known legacy openers refuse. The caller still establishes writer admission and command quiescence. The archive keeps the original schema and records missing or unverifiable inputs. A caller that attests a canonical historical SRT temp root and its quiescence can preserve the exact source-derived candidate under a separate archive path. Capture checks only that derived directory and copies only retained sessions. The receipt reports candidate-only matches and differing bytes. It follows no scratch aliases and reads no separate credential, workspace, or media roots. Existing Windows data requires an ACL-aware archive path before cutover.
@@ -1694,7 +1691,7 @@ Today:
 - `packages/grida-daemon/src/http/server.ts` — daemon route registration and the `DaemonTenant` seam behind shared guards; the media tenant from `packages/grida-ai-agent/src/media-server.ts` is the only tenant.
 - `packages/grida-ai-agent/src/http/routes/secrets.ts` — BYOK key presence/set/delete route group; no key-read route.
 - `packages/grida-daemon/src/transport.ts` — Basic Auth signing, fetch plumbing, typed HTTP errors, and the daemon route methods; `packages/grida-ai-agent/src/media-transport.ts` — the media tenant client extending it.
-- `packages/grida-daemon/src/http/auth.ts` — Basic Auth middleware.
+- `packages/grida-daemon/src/http/auth.ts` — Basic Auth middleware; the header is the only credential carriage. [Guard tests](packages/grida-daemon/src/http/auth.test.ts) and the [browser perimeter harness](packages/grida-daemon/src/http/perimeter.browser.test.ts) refuse a query-string credential.
 - `packages/grida-daemon/src/http/origin.ts` — Origin allowlist and host-declared Referer-path guard.
 - `packages/grida-daemon/src/auth/file.ts` — `auth.json` chmod 0o600 read/write.
 - `packages/grida-daemon/src/secrets.ts` — `auth.json`-backed BYOK key store; exposes only `has`, `set`, and `delete` to routes.

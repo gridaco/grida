@@ -202,8 +202,6 @@ describe("@grida/daemon public API", () => {
       expect(DaemonTransport.buildBasicAuthHeader("pw")).toBe(
         "Basic YWdlbnQ6cHc="
       );
-      // The auth_token SSE query value is the SAME credential payload.
-      expect(DaemonTransport.buildAuthToken("pw")).toBe("YWdlbnQ6cHc=");
       const fetcher: DaemonTransport.Fetcher = DaemonTransport.makeFetcher({
         port: 49152,
         password: "pw",

@@ -95,13 +95,6 @@ export type DaemonTenantHandle = {
  * is deliberately not a plugin registry.
  */
 export type DaemonTenant = {
-  /**
-   * GRIDA-SEC-004 — GET event-stream routes (and ONLY those) where the
-   * credential may ride the `auth_token` query parameter (header-less
-   * `EventSource` attach; WG daemon spec §auth-model). Declared up front
-   * because the auth guard is installed before tenant routes mount.
-   */
-  sse_query_token_paths?: readonly RegExp[];
   register: (app: Hono, services: DaemonServices) => DaemonTenantHandle;
 };
 
@@ -185,10 +178,9 @@ export function buildServer(opts: ServerOptions): BuiltServer {
 
   // 1. CORS — `hono/cors`. Answers preflight; sets `Access-Control-Allow-Origin`
   //    on every downstream response regardless of shape (buffered, streaming, SSE).
-  //    Rolling our own with `c.header()` ran into Hono lifecycle gotchas where
-  //    mutations relative to `next()` interacted differently across response
-  //    shapes (CORS errors landed on `/agent/run`, then `/files/read`
-  //    once a docId was opened). The official middleware sidesteps that.
+  //    The official middleware applies the headers consistently across
+  //    response shapes, which hand-rolled `c.header()` calls around `next()`
+  //    did not.
   app.use("*", makeCorsMiddleware(opts.http_access));
 
   // 2. Referer-path guard — defense-in-depth so a same-origin XSS that
@@ -197,14 +189,9 @@ export function buildServer(opts: ServerOptions): BuiltServer {
 
   // 3. Basic Auth — runs after CORS + referer clear. Preflights are handled
   //    by `corsMiddleware` upstream and never reach this guard.
-  // GRIDA-SEC-004 — the ONLY routes where the credential may ride the
-  // `auth_token` query parameter are the GET event-stream routes each
-  // tenant declares (`sse_query_token_paths`); the daemon itself serves
-  // none. Declared before mount because this guard wraps every route.
-  const basicAuthGuard = makeBasicAuthGuard(opts.password, {
-    query_token_paths: tenants.flatMap((t) => t.sse_query_token_paths ?? []),
-  });
-  app.use("*", basicAuthGuard);
+  // GRIDA-SEC-004 — the `Authorization` header is the only credential
+  // carriage on every route, tenant routes included.
+  app.use("*", makeBasicAuthGuard(opts.password));
 
   // Per-launch daemon state (registry is in-memory and resets on restart;
   // recent.json / auth.json / workspaces.json are on disk and persist).

@@ -279,9 +279,10 @@ A conforming daemon implementation can demonstrate:
    **browser-engine tests** — a real browser context driving the
    daemon: a preflighted, authenticated request from an
    allowlisted origin succeeds end-to-end; a non-allowlisted
-   origin is blocked by CORS; an event-stream attach (including
-   the header-less query-token affordance) delivers ordered frames
-   and survives detach/reattach. This harness is a **system
+   origin is blocked by CORS; where the daemon serves event
+   streams, an attach (including any header-less query-token
+   affordance it offers) delivers ordered frames and survives
+   detach/reattach. This harness is a **system
    harness**, not product end-to-end testing: it proves the
    perimeter contract for the one client class that server-side
    tests cannot impersonate.

@@ -90,7 +90,7 @@ Account logout and memory-only GG grants do not change provider custody.
 | ------------- | ----------------------------------------------------------------------------------------------------------------- | -------- |
 | `.`           | handshake vocabulary (`DaemonCapabilities`, `DAEMON_PROTOCOL`), local-resource DTOs                               | neutral  |
 | `./server`    | `DaemonServer`, `buildServer`, the tenant seam, host stores/toolkit                                               | Node     |
-| `./transport` | `DaemonTransport` — Basic-Auth signing, fetch/SSE helpers, the daemon route client                                | neutral  |
+| `./transport` | `DaemonTransport` — Basic-Auth signing, fetch helpers, the daemon route client                                    | neutral  |
 | `./sandbox`   | sandbox policy frame (`buildDaemonSandboxPolicy`, `hostFromUrl`) and `containsPath` — AI-free, server-independent | Node     |
 
 ### Sandbox network baseline
@@ -123,9 +123,9 @@ pnpm --filter @grida/daemon test           # vitest (node)
 pnpm --filter @grida/daemon test:browser   # perimeter system harness (Chromium)
 ```
 
-The browser suite boots two real daemons (with a stub tenant) and proves
-the CORS / Referer / query-token rules from a real browser context —
-things a forged-header Node test cannot prove.
+The browser suite boots two real daemons and proves the CORS, Referer and
+header-only credential rules from a real browser context — things a
+forged-header Node test cannot prove.
 
 `@grida/daemon/server` exports the Node-only `ProtectedRoots` topology gate. It
 accepts fixed absolute protected roots and checks an absolute candidate with

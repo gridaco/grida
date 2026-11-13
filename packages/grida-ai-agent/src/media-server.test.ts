@@ -8,11 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ggContractFixture } from "../../grida-ai/src/testing/gg-contract";
 import { MediaStore } from "@grida/daemon/server";
 import { DaemonTransport } from "@grida/daemon/transport";
-import {
-  createMediaDaemon,
-  createMediaTenant,
-  type MediaDaemonOptions,
-} from "./media-server";
+import { createMediaDaemon, type MediaDaemonOptions } from "./media-server";
 
 const PASSWORD = "synthetic-media-daemon-password";
 const ORIGIN = "https://desktop.invalid";
@@ -179,7 +175,6 @@ describe("media-only public composition", () => {
       (await entries(base)).some((entry) => /scratch|skills/.test(entry))
     ).toBe(false);
     expect(request).not.toHaveBeenCalled();
-    expect(createMediaTenant().sse_query_token_paths ?? []).toEqual([]);
   });
 
   it("retains custom endpoint settings and keys without starting chat", async () => {

@@ -48,16 +48,6 @@ export namespace DaemonTransport {
     return `Basic ${base64(`${USERNAME}:${password}`)}`;
   }
 
-  /**
-   * GRIDA-SEC-004 — the `auth_token` query value for header-less
-   * event-stream attaches (native `EventSource`). The SAME base64 payload
-   * the Basic header carries; the server accepts it on GET SSE routes
-   * only. URL-encode when interpolating into a query string.
-   */
-  export function buildAuthToken(password: string): string {
-    return base64(`${USERNAME}:${password}`);
-  }
-
   export function baseUrl(port: number): string {
     return `http://127.0.0.1:${port}`;
   }
