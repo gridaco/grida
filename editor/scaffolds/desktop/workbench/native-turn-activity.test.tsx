@@ -27,7 +27,7 @@ describe("NativeTurnActivity", () => {
     ];
     const [block] = turn_activity.group(
       messages,
-      [{ turnId: "t", status: null }],
+      [{ turnId: "t", status: null, startedAtMs: 0 }],
       { turnId: "t" },
       null
     );

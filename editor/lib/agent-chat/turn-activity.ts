@@ -125,7 +125,7 @@ export namespace turn_activity {
         finished,
         outcome,
         durationMs:
-          record?.startedAtMs !== undefined && record.settledAtMs !== undefined
+          record?.settledAtMs !== undefined
             ? record.settledAtMs - record.startedAtMs
             : null,
         work: items(rest.filter((message) => !answers.includes(message))),

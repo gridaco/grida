@@ -116,7 +116,7 @@ describe("turn_activity.group", () => {
     ];
     const [block] = turn_activity.group(
       messages,
-      [{ turnId: "a", status: null }],
+      [{ turnId: "a", status: null, startedAtMs: 0 }],
       { turnId: "a" }
     );
     if (block.kind !== "turn") throw new Error("expected a turn");
@@ -153,20 +153,18 @@ describe("turn_activity.group", () => {
     const work = turn("a").slice(0, 3);
     const [block] = turn_activity.group(
       work,
-      [{ turnId: "a", status: "cancelled" }],
+      [{ turnId: "a", status: "cancelled", startedAtMs: 0 }],
       null
     );
     expect(block).toMatchObject({ kind: "turn", answers: [] });
-    const legacy: NativeChatMessage[] = [
+    const unrecorded: NativeChatMessage[] = [
       { messageId: "u", role: "user", text: "Hi", turnId: "old" },
       { messageId: "r", role: "assistant", text: "Hello", turnId: "old" },
       { messageId: "seed", role: "assistant", text: "Inherited" },
     ];
-    expect(turn_activity.group(legacy, [], null).map((b) => b.kind)).toEqual([
-      "message",
-      "message",
-      "message",
-    ]);
+    expect(
+      turn_activity.group(unrecorded, [], null).map((b) => b.kind)
+    ).toEqual(["message", "message", "message"]);
   });
 
   it("gives a recorded turn its header even when it failed before replying", () => {
@@ -229,13 +227,14 @@ describe("turn_activity compaction notes", () => {
         message("reply-2", "t3", "assistant"),
       ],
       [
-        { turnId: "t1", status: "succeeded" },
+        { turnId: "t1", status: "succeeded", startedAtMs: 0 },
         {
           turnId: "t2",
           status: "succeeded",
+          startedAtMs: 0,
           compaction: { summary: "Earlier work on the cart.", automatic: true },
         },
-        { turnId: "t3", status: "succeeded" },
+        { turnId: "t3", status: "succeeded", startedAtMs: 0 },
       ],
       null,
       null
@@ -255,10 +254,11 @@ describe("turn_activity compaction notes", () => {
     const blocks = turn_activity.group(
       [{ messageId: "ask", role: "user", text: "ask", turnId: "t1" }],
       [
-        { turnId: "t1", status: "succeeded" },
+        { turnId: "t1", status: "succeeded", startedAtMs: 0 },
         {
           turnId: "t2",
           status: "succeeded",
+          startedAtMs: 0,
           compaction: { summary: "Summary.", automatic: false },
         },
       ],
@@ -276,16 +276,32 @@ describe("turn_activity.measuredContext", () => {
   it("uses the latest turn's reported size and resets after a compaction", () => {
     expect(
       turn_activity.measuredContext([
-        { turnId: "a", status: "succeeded", contextTokens: 30_000 },
-        { turnId: "b", status: "succeeded", contextTokens: 42_000 },
+        {
+          turnId: "a",
+          status: "succeeded",
+          startedAtMs: 0,
+          contextTokens: 30_000,
+        },
+        {
+          turnId: "b",
+          status: "succeeded",
+          startedAtMs: 0,
+          contextTokens: 42_000,
+        },
       ])
     ).toBe(42_000);
     expect(
       turn_activity.measuredContext([
-        { turnId: "a", status: "succeeded", contextTokens: 42_000 },
+        {
+          turnId: "a",
+          status: "succeeded",
+          startedAtMs: 0,
+          contextTokens: 42_000,
+        },
         {
           turnId: "c",
           status: "succeeded",
+          startedAtMs: 0,
           contextTokens: 872,
           compaction: { summary: "s", automatic: false },
         },
@@ -296,9 +312,15 @@ describe("turn_activity.measuredContext", () => {
         {
           turnId: "c",
           status: "succeeded",
+          startedAtMs: 0,
           compaction: { summary: "s", automatic: false },
         },
-        { turnId: "d", status: "succeeded", contextTokens: 18_000 },
+        {
+          turnId: "d",
+          status: "succeeded",
+          startedAtMs: 0,
+          contextTokens: 18_000,
+        },
       ])
     ).toBe(18_000);
   });

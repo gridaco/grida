@@ -299,21 +299,21 @@ it.skipIf(!resourcesPath)(
         stateDirectory: directory,
       });
     const retainedTurns = (directory: string, session: string) => {
-      const db = new DatabaseSync(path.join(directory, "runtime.sqlite"), {
+      const db = new DatabaseSync(path.join(directory, "agent.sqlite"), {
         readOnly: true,
       });
       try {
         const rows = db
           .prepare(
-            "SELECT id, CAST(snapshot AS TEXT) AS snapshot FROM turns WHERE session = ? ORDER BY ordinal"
+            "SELECT id, CAST(head AS TEXT) AS head FROM turns WHERE session = ? ORDER BY ordinal"
           )
           .all(session);
         // Each operation is its own row beside the turn's head.
         const parts = db.prepare(
           "SELECT CAST(body AS TEXT) AS body FROM turn_parts WHERE session = ? AND turn = ? AND key LIKE 'o/%' ORDER BY key"
         );
-        return rows.map(({ id, snapshot }) => {
-          const turn = JSON.parse(String(snapshot));
+        return rows.map(({ id, head }) => {
+          const turn = JSON.parse(String(head));
           type Receipt = { schema: string; bytes: number[] };
           const operations = parts
             .all(session, String(id))

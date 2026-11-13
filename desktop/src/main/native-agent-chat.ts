@@ -2373,12 +2373,9 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
       throw invalidResponse();
     const time = (field: unknown) =>
       field === undefined || field === null ? undefined : revision(field);
-    const startedAtMs = time(record.startedAtMs);
+    const startedAtMs = revision(record.startedAtMs);
     const settledAtMs = time(record.settledAtMs);
-    if (
-      settledAtMs !== undefined &&
-      (startedAtMs === undefined || settledAtMs < startedAtMs)
-    )
+    if (settledAtMs !== undefined && settledAtMs < startedAtMs)
       throw invalidResponse();
     if (record.goalStart !== undefined && record.goalStart !== true)
       throw invalidResponse();
@@ -2387,7 +2384,7 @@ function turnRecords(value: unknown): NativeChatTurnRecord[] | undefined {
     return Object.freeze({
       turnId: identity(record.turnId),
       status: status as NativeChatTurnRecord["status"],
-      ...(startedAtMs !== undefined && { startedAtMs }),
+      startedAtMs,
       ...(settledAtMs !== undefined && { settledAtMs }),
       ...(record.goalStart === true && { goalStart: true as const }),
       ...(contextTokens !== undefined && { contextTokens }),

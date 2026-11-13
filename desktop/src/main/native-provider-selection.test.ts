@@ -1124,9 +1124,9 @@ it
       expect(dispatch).toHaveBeenCalledTimes(1);
       await chat.close();
       expect(
-        (
-          await fs.readFile(path.join(stateDirectory, "runtime.sqlite"))
-        ).includes(key)
+        (await fs.readFile(path.join(stateDirectory, "agent.sqlite"))).includes(
+          key
+        )
       ).toBe(false);
     } finally {
       restoreExchange?.();

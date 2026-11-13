@@ -91,7 +91,7 @@ describe("SidecarSandboxPolicy", () => {
           )
         );
         const protectedFiles = [
-          path.join(native, "runtime.sqlite"),
+          path.join(native, "agent.sqlite"),
           legacy,
           path.join(scratch, "input.png"),
         ];

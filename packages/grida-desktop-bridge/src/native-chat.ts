@@ -442,8 +442,9 @@ export type NativeChatMessageAttachment = Readonly<{
 export type NativeChatTurnRecord = Readonly<{
   turnId: string;
   status: NonNullable<NativeChatTurn["status"]> | null;
-  /** UTC milliseconds. Absent for turns recorded before timing was kept. */
-  startedAtMs?: number;
+  /** UTC milliseconds at which the turn started. */
+  startedAtMs: number;
+  /** UTC milliseconds at which the turn first settled; absent until then. */
   settledAtMs?: number;
   /** The turn's input started a goal. */
   goalStart?: true;
