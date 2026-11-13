@@ -309,3 +309,197 @@ async fn a_store_written_before_this_layout_upgrades_and_reads_its_turns() {
         .unwrap();
     assert_eq!(version, 13);
 }
+
+/// Replace the stored head of the only turn.
+fn rewrite_head(path: &Path, head: &[u8]) {
+    let connection = Connection::open(path).unwrap();
+    connection
+        .execute("UPDATE turns SET snapshot=?1", [head])
+        .unwrap();
+}
+
+fn stored_head(path: &Path) -> Vec<u8> {
+    Connection::open(path)
+        .unwrap()
+        .query_row("SELECT snapshot FROM turns", [], |row| row.get(0))
+        .unwrap()
+}
+
+/// The same head held by a later writer of the turn.
+fn superseded(head: &[u8]) -> Vec<u8> {
+    let mut head: serde_json::Value = serde_json::from_slice(head).unwrap();
+    head["binding"]["epoch"] = serde_json::json!(2);
+    head["controls"]["binding"]["epoch"] = serde_json::json!(2);
+    serde_json::to_vec(&head).unwrap()
+}
+
+/// Controls and views read from a turn's head equal those of the assembled
+/// turn, in both layouts.
+async fn assert_head_reads(store: &SqliteStore, claim: Option<&ClaimedTurn>) {
+    let assembled = store.inspect_turn(session(), turn()).await.unwrap();
+    let view = store.inspect(session()).await.unwrap();
+    assert_eq!(view.latest.as_ref(), Some(&assembled));
+    match claim {
+        Some(claim) => {
+            assert_eq!(view.current.as_ref(), Some(&assembled));
+            let state = claim.lease.journal().load().await.unwrap();
+            assert_eq!(assembled.history_position, state.history().position());
+            assert_eq!(
+                claim.lease.controls().read().await.unwrap(),
+                state.controls().clone()
+            );
+        }
+        None => assert_eq!(view.current, None),
+    }
+}
+
+#[tokio::test]
+async fn controls_and_views_of_a_running_turn_are_read_from_its_head() {
+    let directory = private_directory();
+    let path = directory.path().join("sessions.sqlite");
+    let store = create(&path).await;
+    let (claim, states) = run_turn(&store, 3).await;
+    assert_head_reads(&store, Some(&claim)).await;
+
+    // A head another writer now holds is refused to the earlier lease.
+    let head = stored_head(&path);
+    rewrite_head(&path, &superseded(&head));
+    let error = claim.lease.controls().read().await.unwrap_err();
+    assert_eq!(error.code, "stale_writer_epoch");
+    rewrite_head(&path, &head);
+
+    // A turn written as one value reads the same.
+    let whole = serde_json::to_vec(states.last().unwrap()).unwrap();
+    rewrite_head(&path, &whole);
+    assert_head_reads(&store, Some(&claim)).await;
+    rewrite_head(&path, &superseded(&whole));
+    let error = claim.lease.controls().read().await.unwrap_err();
+    assert_eq!(error.code, "stale_writer_epoch");
+}
+
+#[tokio::test]
+async fn the_view_of_a_settled_turn_is_read_from_its_head() {
+    use agent_kit_core::messages::OutcomeStatus;
+    use agent_kit_core::turn::TurnOutcome;
+
+    let directory = private_directory();
+    let path = directory.path().join("sessions.sqlite");
+    let store = create(&path).await;
+    let (claim, _) = run_turn(&store, 3).await;
+    commit(
+        &claim,
+        "settle",
+        vec![JournalAction::Settle(TurnOutcome {
+            status: OutcomeStatus::Succeeded,
+            account: None,
+            evidence: vec![],
+        })],
+    )
+    .await;
+    let settled = claim.lease.journal().load().await.unwrap();
+    drop(claim);
+    assert_head_reads(&store, None).await;
+    let view = store.inspect(session()).await.unwrap().latest.unwrap();
+    assert_eq!(view.history_position, settled.history().position());
+    assert_eq!(
+        view.disposition,
+        agent_kit_sessions::TurnDisposition::Settled
+    );
+
+    rewrite_head(&path, &serde_json::to_vec(&settled).unwrap());
+    assert_head_reads(&store, None).await;
+}
+
+/// Every message an inference operation holds, in its request, its attempts'
+/// outcomes, the outcomes reconciliation replaced and a rejection, is stored
+/// once apart from the operation, which refers to it by digest.
+#[tokio::test]
+async fn an_operation_part_refers_to_every_message_it_holds() {
+    let directory = private_directory();
+    let path = directory.path().join("sessions.sqlite");
+    let store = create(&path).await;
+    let input = submission("input", "start");
+    store.submit(session(), input.clone()).await.unwrap();
+    let claim = claim(&store, "claim", vec![input.id]).await;
+    let outcome = |status, id: &str| {
+        OperationOutcome::Inference(InferenceOutcome {
+            status,
+            messages: vec![message(id, Role::Assistant)],
+            usage: vec![],
+            failure: None,
+            receipt: None,
+            terminal_receipt: None,
+        })
+    };
+    let prepare = |id: &str, sent: &str| {
+        JournalAction::prepare(OperationRecord {
+            id: OperationId::new(id).unwrap(),
+            input: OperationInput::Inference(request(vec![message(sent, Role::User)])),
+            origin: None,
+            source_call: None,
+            grants: GrantSelection {
+                authority: authority(),
+                grants: vec![],
+            },
+        })
+    };
+    let (operation, attempt) = (
+        OperationId::new("call").unwrap(),
+        AttemptId::new("attempt").unwrap(),
+    );
+    commit(
+        &claim,
+        "start",
+        vec![
+            prepare("call", "sent-message"),
+            JournalAction::StartAttempt {
+                operation: operation.clone(),
+                attempt: attempt.clone(),
+            },
+            JournalAction::CompleteAttempt {
+                operation: operation.clone(),
+                attempt: attempt.clone(),
+                outcome: outcome(InferenceStatus::Interrupted, "interrupted-reply"),
+            },
+            JournalAction::ReconcileAttempt {
+                operation,
+                attempt,
+                outcome: outcome(InferenceStatus::Completed, "reconciled-reply"),
+            },
+            prepare("refused", "refused-request"),
+            JournalAction::RejectPrepared {
+                operation: OperationId::new("refused").unwrap(),
+                outcome: outcome(InferenceStatus::Failed, "rejection-reply"),
+            },
+        ],
+    )
+    .await;
+    let state = claim.lease.journal().load().await.unwrap();
+    let connection = Connection::open(&path).unwrap();
+    let mut statement = connection
+        .prepare("SELECT body FROM turn_parts WHERE key LIKE 'o/%'")
+        .unwrap();
+    let parts: Vec<String> = statement
+        .query_map([], |row| row.get::<_, Vec<u8>>(0))
+        .unwrap()
+        .map(|body| String::from_utf8(body.unwrap()).unwrap())
+        .collect();
+    assert_eq!(parts.len(), 2);
+    for id in [
+        "sent-message",
+        "interrupted-reply",
+        "reconciled-reply",
+        "refused-request",
+        "rejection-reply",
+    ] {
+        assert!(parts.iter().all(|part| !part.contains(id)), "{id} inline");
+    }
+    let messages: i64 = connection
+        .query_row("SELECT COUNT(*) FROM turn_messages", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(messages, 5);
+    drop(claim);
+    drop(store);
+    let reopened = SqliteStore::open(&path).unwrap();
+    assert_eq!(same(&read(&reopened).await), same(&state));
+}

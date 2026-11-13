@@ -33,16 +33,22 @@ pub(super) const REPROJECT_UNSCOPED: &str = "UPDATE session_catalog SET scope=NU
 /// Return a stable scope for an immutable configuration this owner recognizes.
 pub type ScopeProjection = fn(&Envelope) -> Option<Fingerprint>;
 
+/// A session's owner-defined catalog placement and display label.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CatalogEntry {
     pub session: SessionId,
+    /// Owner-defined group within the scope, such as active or archived.
     pub bucket: u8,
+    /// Optional bounded display label.
     pub label: Option<String>,
+    /// Advances with every change to this entry; updates are conditional on it.
     pub revision: u64,
 }
 
+/// One page of a scoped catalog listing in reverse creation order.
 pub struct CatalogPage<T = CatalogEntry> {
     pub entries: Vec<T>,
+    /// The anchor for the next page, absent after the last page.
     pub next_after: Option<SessionId>,
 }
 
@@ -135,7 +141,7 @@ impl SqliteStore {
                 return Ok(current);
             }
             if current.revision != entry.revision {
-                return Err(error(ErrorKind::InvalidInput, "session_catalog_revision_changed"));
+                return Err(error(ErrorKind::Conflict, "session_catalog_revision_changed"));
             }
             transaction
                 .execute(

@@ -3204,3 +3204,33 @@ async fn a_derived_control_replays_original_intent_without_recomputing_new_state
 fn plain(records: &[agent_kit_store_sqlite::history::ReplayRecord]) -> Vec<HistoryRecord> {
     records.iter().map(|item| item.record.clone()).collect()
 }
+
+/// A projection that panics fails its own read; the store stays usable,
+/// because the open transaction rolled back as the panic unwound.
+#[tokio::test]
+async fn a_panicking_projection_leaves_the_store_usable() {
+    let (_directory, store) = store().await;
+    store
+        .submit(session(), submission("input", "hello"))
+        .await
+        .unwrap();
+    let acquired = claim(&store, "claim", vec![change("input")]).await;
+    let error = store
+        .inspect_turn_with(session(), turn(), |_| -> agent_kit_core::Result<()> {
+            panic!("projection failed")
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, "store_task_interrupted");
+    commit(
+        &acquired,
+        "checkpoint",
+        vec![JournalAction::SetCheckpoint(payload("after"))],
+    )
+    .await;
+    store
+        .submit(session(), submission("later", "again"))
+        .await
+        .unwrap();
+    assert_eq!(store.inspect(session()).await.unwrap().queued.len(), 1);
+}

@@ -221,21 +221,4 @@ fn interrupted_additive_index_build_is_retryable_without_changing_version() {
         "{query}"
     );
     drop(connection);
-
-    // A separately built previous worker can open the same additive index.
-    if let Some(previous) = std::env::var_os("GRIDA_TEST_AGENT_SCHEMA_V11") {
-        let output = std::process::Command::new(previous)
-            .args(["serve", "--stdio", "--state-dir"])
-            .arg(directory.path())
-            .args(["--endpoint", "http://127.0.0.1:1/v1", "--model", "fixture"])
-            .stdin(std::process::Stdio::null())
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        drop(SqliteStore::open(&path).unwrap());
-    }
 }

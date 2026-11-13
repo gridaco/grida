@@ -35,6 +35,9 @@ pub struct DeleteDependents {
     pub basis: Fingerprint,
 }
 
+/// The sessions of one owner-defined scope and a basis over their membership
+/// and revisions. A dependent deletion names the basis and fails if either
+/// changed.
 pub struct RetirementDependencies {
     pub sessions: Vec<SessionId>,
     pub basis: Fingerprint,

@@ -193,7 +193,8 @@ impl SqliteStore {
             let (source_view, ordinal) = select_view(
                 &transaction, id, HistorySelection::BeforeTurn(request.turn.clone()),
             )?;
-            let ordinal = ordinal.expect("before turn has ordinal");
+            let ordinal = ordinal
+                .ok_or_else(|| error(ErrorKind::InvalidState, "stored_data_invalid"))?;
             let view = sql_number(source_view.id.0)?;
             let identity = encode(&Fingerprint::of(&request)?)?;
             let existing: Option<Vec<u8>> = transaction.query_row(

@@ -17,10 +17,14 @@ use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+/// Which history view of a session a read selects.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HistorySelection {
+    /// The session's current view.
     Current,
+    /// The view that owned this turn, read through the turn before it.
     BeforeTurn(TurnId),
+    /// The view with this identity, as a history basis reports it.
     View(SessionRevision),
 }
 

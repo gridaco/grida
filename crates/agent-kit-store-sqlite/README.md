@@ -1,10 +1,5 @@
 # agent-kit-store-sqlite
 
-Conditional resume keeps pause changes and replacement ownership in one
-transaction. Read-only claim receipt lookup recognizes repeated requests
-without issuing a lease. Turn snapshots expose their history position for
-conditional contributions.
-
 SQLite implementation of durable session acceptance, claims, controls, and the
 shared execution journal. It accepts an explicit database path in an existing
 application-owned directory.
@@ -24,7 +19,15 @@ only while the turn's stored generation token and head still match it; a newly
 opened store, a rolled-back write or any other change reads the stored rows.
 Reading assembles the same state, so recovery, identity and evidence checks are
 unchanged. A turn written before this layout is read as it was and converts on
-its next commit.
+its next commit. A process keeps at most 16 such turns, within the largest
+assembled size of one turn, releases the least recently used first, and
+releases a store's turns when the store closes.
+
+A lease's control reads, session inspection and claim receipts read a turn's
+head and the count of its history records rather than assembling the turn, so
+watching controls or inspecting an idle session costs the same however long
+its turns grew. Inspecting one turn assembles it and refuses malformed
+stored data.
 
 One opened database holds an exclusive operating-system lock for its lifetime.
 Store clones and bound journal handles share that owner. Another process or store
@@ -64,10 +67,12 @@ available. The caller chooses the same destination identity for competing
 claims. The store preserves opaque driver state and issues no lease.
 Exact retries return the original pair receipt even after later controls.
 `operation_pair_receipt` reads a committed pair by its original source control.
-`control_receipt` reads the ordinary control receipt. An independently
+`control_receipt` reads the ordinary control receipt, and `claim_receipt`
+observes the turn of an exactly repeated claim, both without issuing a lease. An independently
 recorded control cannot be joined into a pair later.
 
-`resume_with` reclaims an exact paused turn with one opaque driver state
+A paused, suspended turn resumes with its pause lifted in the same
+transaction that issues the new lease. `resume_with` reclaims an exact paused turn with one opaque driver state
 change or one related destination control or observation. Both changes
 commit before the source lease is returned. Reopening the related turn
 requires a committed paused suspension and release of its previous owner.
@@ -81,6 +86,8 @@ records without reading their turns. A scoped page returns at most 32 entries
 from an owner-selected bucket in reverse creation order. Its anchor must
 already belong to that scope. An entry has an optional bounded display label
 and its own revision. Updating it leaves execution and history unchanged.
+An update or deletion at a stale entry revision is a conflict to reload and
+retry.
 
 An optional owner projection links an immutable submission to an exact retained
 source turn in the acceptance transaction. Historical submissions are projected
@@ -167,5 +174,7 @@ malformed snapshots even in the unprojected suffix.
 
 Caller-owned pure projections can inspect a committed turn or transform each
 turn's history within those bounded reads. They acquire no execution lease.
+A turn view reports its history position, and a history contribution or
+answer-with-contribution applies only while that position is unchanged.
 External answers and history contributions are rejected after cancellation,
 while the turn owner can still record already-observed outcomes.

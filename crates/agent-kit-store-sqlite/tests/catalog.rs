@@ -193,10 +193,10 @@ async fn catalog_organization_upgrades_an_existing_index_and_fences_edits() {
         archived
     );
     draft.label = Some("A stale rename".to_owned());
-    assert_eq!(
-        store.replace_catalog_entry(draft).await.unwrap_err().code,
-        "session_catalog_revision_changed"
-    );
+    // A stale revision is a conflict to reload and retry, as for deletion.
+    let stale = store.replace_catalog_entry(draft).await.unwrap_err();
+    assert_eq!(stale.code, "session_catalog_revision_changed");
+    assert_eq!(stale.kind, ErrorKind::Conflict);
     assert!(
         store
             .list_catalog(scope, 0, None)

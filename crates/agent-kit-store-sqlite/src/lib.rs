@@ -36,7 +36,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use std::time::Duration;
 use tokio::sync::Notify;
 
@@ -207,6 +207,19 @@ struct Inner {
     turn_links: Option<turn_links::TurnLinkProjection>,
     // Drop SQLite before releasing the writer lock.
     _lock: Option<WriterLock>,
+}
+
+impl Drop for Inner {
+    /// Turns this store kept in memory are released with the store.
+    fn drop(&mut self) {
+        let connection = self
+            .connection
+            .get_mut()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Some(path) = connection.path().filter(|path| !path.is_empty()) {
+            turn_layout::forget(path);
+        }
+    }
 }
 
 struct WriterLock(File);
@@ -546,7 +559,7 @@ impl SqliteStore {
                     let turn = match &input.disposition {
                         InputDisposition::Claimed { turn }
                         | InputDisposition::Completed { turn } => {
-                            Some(turn_view(inner, &load_turn(connection, &session, turn)?)?)
+                            Some(view_turn(inner, connection, &session, turn)?)
                         }
                         _ => None,
                     };
@@ -583,10 +596,7 @@ impl SqliteStore {
                 Fingerprint::of(&request)?,
             )?;
             receipt
-                .map(|receipt| {
-                    let state = load_turn(connection, &request.session, &receipt.turn)?;
-                    turn_view(inner, &state)
-                })
+                .map(|receipt| view_turn(inner, connection, &request.session, &receipt.turn))
                 .transpose()
         })
         .await
@@ -768,6 +778,10 @@ impl SqliteStore {
         .await
     }
 
+    /// Accept one input into an existing idle session and claim its turn from
+    /// a live tool operation, with the same source checks and one-destination
+    /// rule as `claim_from_operation`. Repeat the exact request to inspect the
+    /// committed claim without another lease.
     pub async fn claim_existing_from_operation(
         &self,
         request: ExistingOperationClaim,
@@ -931,8 +945,12 @@ fn prepare_claim(
         &request.id,
         fingerprint,
     )? {
-        let state = load_turn(transaction, &request.session, &receipt.turn)?;
-        return Ok(PreparedClaim::Existing(turn_view(inner, &state)?));
+        return Ok(PreparedClaim::Existing(view_turn(
+            inner,
+            transaction,
+            &request.session,
+            &receipt.turn,
+        )?));
     }
     Ok(PreparedClaim::Acquired(prepare_pending_claim(
         inner,
@@ -1086,13 +1104,7 @@ fn prepare_pending_claim(
                 }
                 actions.push(JournalAction::Control(ControlDirective::Resume));
                 state.apply(JournalChange::new(
-                    ChangeId::new(
-                        Fingerprint::of(&("resume-control", &request.id))?
-                            .bytes()
-                            .iter()
-                            .map(|byte| format!("{byte:02x}"))
-                            .collect::<String>(),
-                    )?,
+                    fingerprint_change_id(&("resume-control", &request.id))?,
                     state.binding().clone(),
                     state.position(),
                     *control_revision,
@@ -1364,9 +1376,14 @@ impl ControlReader for SqliteControls {
     fn read(&self) -> BoxFuture<'_, Result<ControlSnapshot>> {
         let binding = self.binding.clone();
         execute(Arc::clone(&self.inner), move |_, connection| {
-            let state = load_turn(connection, &binding.session, &binding.turn)?;
-            require_binding(&state, &binding)?;
-            Ok(state.controls().clone())
+            // Watchers read controls after every commit in the store. The
+            // head holds them, so the turn's operations and messages are not read.
+            let (stored, controls) =
+                turn_layout::read_controls(connection, &binding.session, &binding.turn)?;
+            if stored != binding {
+                return Err(error(ErrorKind::Conflict, "stale_writer_epoch"));
+            }
+            Ok(controls)
         })
     }
 
@@ -1415,9 +1432,15 @@ fn execute<T: Send + 'static>(
 ) -> BoxFuture<'static, Result<T>> {
     Box::pin(async move {
         tokio::task::spawn_blocking(move || {
-            let result = match inner.connection.lock() {
-                Ok(mut connection) => operation(&inner, &mut connection),
-                Err(_) => Err(error(ErrorKind::Unavailable, "store_connection_poisoned")),
+            // A panic inside an earlier operation unwinds its open
+            // transaction, which rolls back on drop, so the connection is
+            // consistent and the store stays usable.
+            let result = {
+                let mut connection = inner
+                    .connection
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner);
+                operation(&inner, &mut connection)
             };
             // Release transient ownership before publishing the blocking task's
             // result. An awaited operation must not retain the database lock
@@ -1472,14 +1495,13 @@ fn record_creation(
 }
 
 fn operation_claim_key(turn: &TurnId, operation: &OperationId) -> Result<ChangeId> {
-    let fingerprint = Fingerprint::of(&(turn, operation))?;
-    ChangeId::new(
-        fingerprint
-            .bytes()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect::<String>(),
-    )
+    fingerprint_change_id(&(turn, operation))
+}
+
+/// A change identity derived from a value: its fingerprint in hexadecimal.
+/// Stored request keys depend on this exact derivation.
+fn fingerprint_change_id(value: &impl Serialize) -> Result<ChangeId> {
+    ChangeId::new(Fingerprint::of(value)?.to_hex())
 }
 
 fn require_operation_owner(
@@ -1587,7 +1609,7 @@ fn apply_control(
     transaction: &Transaction<'_>,
     request: &ControlRequest,
     mut session: SessionRecord,
-    active: Option<TurnState>,
+    mut active: Option<TurnState>,
 ) -> Result<ControlReceipt> {
     let state_revision = session.driver_state.revision();
     let action = match &request.action {
@@ -1644,7 +1666,7 @@ fn apply_control(
             expected_history,
             records,
         } => {
-            let state = load_turn(transaction, &request.session, turn)?;
+            let state = loaded_turn(&mut active, transaction, &request.session, turn)?;
             if state.history().position() != *expected_history {
                 return Err(error(ErrorKind::Conflict, "history_position_changed"));
             }
@@ -1683,7 +1705,7 @@ fn apply_control(
             answer,
             records,
         } => {
-            let state = load_turn(transaction, &request.session, turn)?;
+            let state = loaded_turn(&mut active, transaction, &request.session, turn)?;
             if state.history().position() != *expected_history {
                 return Err(error(ErrorKind::Conflict, "history_position_changed"));
             }
@@ -1736,10 +1758,10 @@ fn apply_control(
         if session.active_turn.as_ref() != Some(turn) {
             return Err(error(ErrorKind::Conflict, "active_turn_mismatch"));
         }
-        let mut state = match active {
-            Some(state) => state,
-            None => load_turn(transaction, &request.session, turn)?,
-        };
+        loaded_turn(&mut active, transaction, &request.session, turn)?;
+        let mut state = active
+            .take()
+            .ok_or_else(|| error(ErrorKind::InvalidState, "turn_missing"))?;
         if state.driver_state() != &session.driver_state {
             return Err(error(ErrorKind::Conflict, "driver_state_snapshot_mismatch"));
         }
@@ -1778,6 +1800,23 @@ fn apply_control(
             .then_some(session.driver_state.revision()),
     };
     Ok(receipt)
+}
+
+/// The turn a control acts on, loaded once and kept for the rest of the control.
+fn loaded_turn<'a>(
+    slot: &'a mut Option<TurnState>,
+    connection: &Connection,
+    session: &SessionId,
+    turn: &TurnId,
+) -> Result<&'a TurnState> {
+    if slot
+        .as_ref()
+        .is_none_or(|state| &state.binding().turn != turn)
+    {
+        *slot = Some(load_turn(connection, session, turn)?);
+    }
+    slot.as_ref()
+        .ok_or_else(|| error(ErrorKind::InvalidState, "turn_missing"))
 }
 
 fn record_control(
@@ -1907,7 +1946,13 @@ fn session_view(
     connection: &Connection,
     session_id: SessionId,
 ) -> Result<SessionView> {
-    session_view_with(inner, connection, session_id, |_| Ok(())).map(|(view, ())| view)
+    let session = load_session(connection, &session_id)?;
+    let current = session
+        .active_turn
+        .as_ref()
+        .map(|turn| view_turn(inner, connection, &session_id, turn))
+        .transpose()?;
+    session_view_from(inner, connection, session_id, session, current)
 }
 
 fn session_view_with<T>(
@@ -1917,6 +1962,30 @@ fn session_view_with<T>(
     project: impl FnOnce(Option<&TurnState>) -> Result<T>,
 ) -> Result<(SessionView, T)> {
     let session = load_session(connection, &session_id)?;
+    let state = session
+        .active_turn
+        .as_ref()
+        .map(|id| load_turn(connection, &session_id, id))
+        .transpose()?;
+    let projection = project(state.as_ref())?;
+    let current = state
+        .as_ref()
+        .map(|state| turn_view(inner, state))
+        .transpose()?;
+    let view = session_view_from(inner, connection, session_id, session, current)?;
+    Ok((view, projection))
+}
+
+/// Complete a session view around its current turn's view. The latest turn
+/// is the current one while a turn is active; otherwise its view comes from
+/// its head, so an idle session does not assemble its last turn.
+fn session_view_from(
+    inner: &Inner,
+    connection: &Connection,
+    session_id: SessionId,
+    session: SessionRecord,
+    current: Option<TurnView>,
+) -> Result<SessionView> {
     let mut statement = connection.prepare(
         "SELECT id FROM submissions WHERE session=?1 AND queue_order IS NOT NULL ORDER BY queue_order",
     ).map_err(database_error)?;
@@ -1929,19 +1998,6 @@ fn session_view_with<T>(
         .into_iter()
         .map(|id| load_input(connection, &session_id, &ChangeId::new(id)?))
         .collect::<Result<Vec<_>>>()?;
-    let (current, projection) = {
-        let state = session
-            .active_turn
-            .as_ref()
-            .map(|id| load_turn(connection, &session_id, id))
-            .transpose()?;
-        let projection = project(state.as_ref())?;
-        let current = state
-            .as_ref()
-            .map(|state| turn_view(inner, state))
-            .transpose()?;
-        (current, projection)
-    };
     let latest_id: Option<String> = connection
         .query_row(
             "SELECT id FROM turns WHERE session=?1 ORDER BY ordinal DESC LIMIT 1",
@@ -1950,13 +2006,17 @@ fn session_view_with<T>(
         )
         .optional()
         .map_err(database_error)?;
-    let latest = latest_id
-        .map(|id| {
-            load_turn(connection, &session_id, &TurnId::new(id)?)
-                .and_then(|state| turn_view(inner, &state))
-        })
-        .transpose()?;
-    let view = SessionView {
+    let latest = match (latest_id, &current) {
+        (Some(id), Some(current)) if current.binding.turn.as_str() == id => Some(current.clone()),
+        (Some(id), _) => Some(view_turn(
+            inner,
+            connection,
+            &session_id,
+            &TurnId::new(id)?,
+        )?),
+        (None, _) => None,
+    };
+    Ok(SessionView {
         session: session_id,
         revision: session.revision,
         configuration: session.configuration,
@@ -1965,8 +2025,7 @@ fn session_view_with<T>(
         queued,
         current,
         latest,
-    };
-    Ok((view, projection))
+    })
 }
 
 fn load_input(connection: &Connection, session: &SessionId, id: &ChangeId) -> Result<InputView> {
@@ -2159,23 +2218,53 @@ fn save_request(
 }
 
 fn turn_view(inner: &Inner, state: &TurnState) -> Result<TurnView> {
-    let disposition = if state.outcome().is_some() {
+    view_from(
+        inner,
+        turn_layout::HeadFacts {
+            binding: state.binding().clone(),
+            position: state.position(),
+            history_position: state.history().position(),
+            controls: state.controls().clone(),
+            suspended: state.is_suspended(),
+            outcome: state.outcome().cloned(),
+        },
+    )
+}
+
+/// A stored turn's view from its head, without assembling the turn.
+fn view_turn(
+    inner: &Inner,
+    connection: &Connection,
+    session: &SessionId,
+    turn: &TurnId,
+) -> Result<TurnView> {
+    view_from(inner, turn_layout::read_facts(connection, session, turn)?)
+}
+
+fn view_from(inner: &Inner, facts: turn_layout::HeadFacts) -> Result<TurnView> {
+    let disposition = if facts.outcome.is_some() {
         TurnDisposition::Settled
-    } else if state.is_suspended() {
+    } else if facts.suspended {
         TurnDisposition::Suspended
-    } else if has_owner(inner, state.binding())? {
+    } else if has_owner(inner, &facts.binding)? {
         TurnDisposition::Running
     } else {
         TurnDisposition::Interrupted
     };
     Ok(TurnView {
-        binding: state.binding().clone(),
-        position: state.position(),
-        history_position: state.history().position(),
-        controls: state.controls().clone(),
+        binding: facts.binding,
+        position: facts.position,
+        history_position: facts.history_position,
+        controls: facts.controls,
         disposition,
-        outcome: state.outcome().cloned(),
+        outcome: facts.outcome,
     })
+}
+
+/// The live turn owners. Every update leaves the map consistent, so a panic
+/// elsewhere while it was held does not invalidate it.
+fn owners(inner: &Inner) -> MutexGuard<'_, BTreeMap<(SessionId, TurnId), Weak<()>>> {
+    inner.owners.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 fn has_owner(inner: &Inner, binding: &TurnBinding) -> Result<bool> {
@@ -2183,10 +2272,7 @@ fn has_owner(inner: &Inner, binding: &TurnBinding) -> Result<bool> {
 }
 
 fn live_owner(inner: &Inner, binding: &TurnBinding) -> Result<Option<Arc<()>>> {
-    let owners = inner
-        .owners
-        .lock()
-        .map_err(|_| error(ErrorKind::Unavailable, "store_owners_poisoned"))?;
+    let owners = owners(inner);
     Ok(owners
         .get(&(binding.session.clone(), binding.turn.clone()))
         .and_then(Weak::upgrade))
@@ -2200,10 +2286,7 @@ fn require_released(inner: &Inner, binding: &TurnBinding) -> Result<()> {
 }
 
 fn register_owner(inner: &Inner, binding: &TurnBinding) -> Result<Arc<()>> {
-    let mut owners = inner
-        .owners
-        .lock()
-        .map_err(|_| error(ErrorKind::Unavailable, "store_owners_poisoned"))?;
+    let mut owners = owners(inner);
     owners.retain(|_, owner| owner.strong_count() > 0);
     let key = (binding.session.clone(), binding.turn.clone());
     if owners.contains_key(&key) {
@@ -2222,10 +2305,7 @@ fn require_revision(session: &SessionRecord, revision: SessionRevision) -> Resul
 }
 
 fn has_live_session_owner(inner: &Inner, session: &SessionId) -> Result<bool> {
-    Ok(inner
-        .owners
-        .lock()
-        .map_err(|_| error(ErrorKind::Unavailable, "store_owners_poisoned"))?
+    Ok(owners(inner)
         .iter()
         .any(|((owner_session, _), owner)| owner_session == session && owner.strong_count() > 0))
 }
