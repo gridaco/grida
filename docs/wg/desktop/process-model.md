@@ -20,8 +20,13 @@ tags:
 
 # Process model
 
-> **Status: V1.x in flight.** Core lives in `@grida/agent`; desktop is
-> the host adapter. The RFC contract for an agent host lives in
+> **Status.** Chat runs in the native agent host, a separate executable that
+> Electron main supervises over private stdio. `AgentSidecar` is now the
+> retained media sidecar: the daemon frame and its perimeter composed with
+> the media routes (image, video, and audio generation and their provider
+> custody). It runs no agent loop. Passages below that place sessions or the
+> agent loop in the sidecar describe the retired TypeScript agent deployment.
+> The RFC contract for an agent host lives in
 > [`../ai/agent/environments.md#computer`](../ai/agent/environments.md).
 
 `AgentSidecar` is the **agent host process** Electron main spawns and
@@ -36,8 +41,10 @@ The experimental ChatGPT Subscription provider is not ACP: **“Sign in with
 your ChatGPT account” connects eligible model capacity while Grida retains the
 session, tools, approvals, sandbox, transcript, and loop.**
 
-Naming: the agent sidecar is `AgentSidecar`; the npm packages are
-`@grida/daemon` (host layer) + `@grida/agent` (agent tenant); the **class inside** is `DaemonServer`, composed via `createAgentDaemon`. The name says
+Naming: the sidecar is `AgentSidecar`; the npm packages are
+`@grida/daemon` (host layer) + `@grida/agent` (retained media and provider
+code); the **class inside** is `DaemonServer`, composed with the media routes.
+The retired deployment composed it with the agent tenant instead. The name says
 what owns lifecycle and capability policy. See [god class](#god-class)
 below.
 
@@ -178,14 +185,16 @@ needed.
 
 ## God class
 
-`DaemonServer` (`packages/grida-daemon/src/daemon-server.ts`, composed with the agent tenant via `@grida/agent/server`) is the
-one class that wires the services. Lifecycle:
+`DaemonServer` (`packages/grida-daemon/src/daemon-server.ts`) is the one
+class that wires the sidecar's services. Desktop composes it with the media
+routes through `@grida/agent/media-server`; the retired deployment composed it
+with the agent tenant. Lifecycle:
 
 ```ts
-const host = createAgentDaemon({
+const host = createMediaDaemon({
   password,
-  userDataPath,
-  httpAccess,
+  user_data_path,
+  http_access,
 });
 await host.start({ listen: false }); // build routes, open state, no socket bind
 // Electron main accepts loopback sockets and delivers each connected request.

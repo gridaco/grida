@@ -44,11 +44,14 @@ For the user-facing app and the security boundary:
 
 ## God class
 
-The desktop's agent system is wired by **one composed server** — `createAgentDaemon` (`DaemonServer` + the agent tenant) in
+Desktop chat runs in the native agent host, which Electron main supervises
+over private stdio. The retained sidecar is wired by **one composed server** —
+`DaemonServer` composed with the media routes, in
 [`packages/grida-daemon/src/daemon-server.ts`](https://github.com/gridaco/grida/blob/main/packages/grida-daemon/src/daemon-server.ts).
-It owns the lifetime of every
-long-lived service: sessions store, stream registry, provider registry,
-workspace registry, secrets, files, shell, runtime. Public API:
+It owns the lifetime of the sidecar's long-lived services: provider custody for
+media generation, files, recents, and secrets. The retired TypeScript
+deployment composed the same server with the agent tenant, which also owned the
+sessions store, stream registry, and runtime. Public API:
 `constructor(opts) / start({ listen? }) / fetch(Request) / stop()`. HTTP routes
 are thin wrappers — business logic lives behind the class. The Electron-side
 [`agent-sidecar-supervisor.ts`](https://github.com/gridaco/grida/blob/main/desktop/src/main/agent-sidecar-supervisor.ts)

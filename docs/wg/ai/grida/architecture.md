@@ -1,6 +1,6 @@
 ---
 title: Architecture — Grida's agent system implementation
-description: Exposed contract of Grida's local agent system, the package boundary, and the tests that pin it during refactor.
+description: How Grida composes its local agent system — the native agent host, the retained media sidecar, and Desktop — with the retired TypeScript agent deployment kept as historical reference.
 keywords:
   [grida, agent, architecture, blueprint, daemon, tenant, contract, blackbox]
 format: md
@@ -13,9 +13,34 @@ tags:
 
 # Architecture — Grida's Agent System Implementation
 
-This is the exposed contract for Grida's local agent system. The protocol
-itself is [the agent RFC](../agent/index.md); this page records how Grida
-binds it into `@grida/daemon`, `@grida/agent`, Desktop, and the editor bridge.
+This page records how Grida composes its local agent system. The behavior,
+policy, and component contracts are [the agent RFC](../agent/index.md).
+
+## Current composition
+
+| Process                | Owns                                                                                                                                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native agent host      | Chat execution: the master, runtime, durable sessions, tools, permissions, confinement, and the ACP client protocol. Desktop supervises it over private stdio; headless runs use it directly. |
+| Retained media sidecar | Image, video, and audio generation, provider custody for those operations, and host capabilities such as recents, behind the loopback daemon perimeter. It runs no chat.                      |
+| Desktop main           | Supervision, UI and IPC routing, editor endpoint registration, the supervised provider transport, and the subscription sign-in ceremony.                                                      |
+| Desktop renderer       | Presentation of chat state received through main.                                                                                                                                             |
+
+Native chat reaches model providers either directly or through main's
+supervised transport, which owns Gateway grants and subscription credentials.
+The [native client protocol](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/rust-client-protocol.md)
+and the [tool-host contract](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/tool-host-contract.md)
+bind the native host to Desktop. Package and module inventories live in each
+package's README.
+
+## Historical TypeScript agent deployment
+
+The rest of this page describes the retired TypeScript agent deployment, in
+which the agent ran as a tenant of the local daemon. Native execution has
+replaced it. The daemon frame, its perimeter, and the media routes remain in
+the retained sidecar; the agent tenant, its chat routes, runtime, and sessions
+survive only as source-only regression fixtures. The shapes below are kept as
+reference for those fixtures and for migration studies, not as the current
+contract.
 
 The local daemon runs BYOK model providers and — for signed-in users —
 [Grida Gateway (GG)](../../platform/hosted-ai.md), the first-party hosted
@@ -29,7 +54,7 @@ sandboxing, and the loop. It is not Codex ACP. Its adapter and local
 `GRIDA-SEC-008` boundary are implemented, while the stable legal/support
 contract with OpenAI remains an external release gate.
 
-**Host/tenant split (#927).** The local privileged process is a general
+**Host/tenant split.** The local privileged process is a general
 **daemon** (`@grida/daemon`): the loopback HTTP server, the GRIDA-SEC-004
 perimeter, and the host capability route groups (files, recents, workspaces,
 the secrets store). The AI agent is one **tenant** of that daemon
@@ -44,10 +69,9 @@ package.
 the shared agent package and is exercised through the headless executable.
 Editor-specific capabilities can execute in the owning editor process. Controlled
 headless adapters prove their protocol and lifecycle contracts, while real editor
-document behavior and rendering require Desktop checks. The proposed
+document behavior and rendering require Desktop checks. The
 [Rust/Electron tool-host contract](https://github.com/gridaco/grida/blob/main/packages/grida-ai-agent/docs/tool-host-contract.md)
-separates those responsibilities for the rebuild. The remaining package and HTTP
-shapes on this page describe the current TypeScript deployment.
+separates those responsibilities in the native host.
 
 Sibling docs:
 
@@ -204,7 +228,7 @@ packages/grida-daemon/src/
 ├── server.ts                # Node/server exports (DaemonServer, seam, tenant toolkit)
 ├── transport.ts             # DaemonTransport namespace (signing, SSE, daemon routes)
 ├── daemon-server.ts         # lifecycle owner
-├── daemon.ts                # discovery contract (WG daemon.md, #798)
+├── daemon.ts                # discovery contract (WG daemon.md)
 ├── protocol/                # handshake + local-resource DTOs
 ├── http/                    # perimeter guards, daemon routes, the DaemonTenant seam
 ├── workspaces/              # opened workspace registry + guarded fs
