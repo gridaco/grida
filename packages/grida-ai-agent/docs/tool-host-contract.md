@@ -1,13 +1,13 @@
 # Grida tool-host contract
 
-This is the proposed Rust/Electron binding for Grida capabilities. The
+This is the Rust/Electron binding for Grida capabilities. The
 [component contract](https://grida.co/docs/wg/ai/agent/components) owns generic
 execution semantics. This document defines the product boundary used by the
 built-in agent, independent MCP clients, and headless callers.
 
 ## Composition and ownership
 
-Use one Grida capability dispatcher in the concrete Rust host. The native Tool
+The concrete Rust host has one Grida capability dispatcher. The native Tool
 adapter calls it directly. The MCP adapter maps public calls onto it. Both use
 the same definitions, argument validation, authorization, routing, and results.
 The dispatcher can run without constructing the Grida agent master, model
@@ -37,18 +37,18 @@ in an editor or headlessly. Any required versions, preconditions, or edit result
 belong to that capability's input/output schema. The agent and dispatcher carry
 those values without defining a common document state or editing model.
 
-These are roles within existing packages. The Rust host can start with
-`tool_host.rs` and `mcp.rs` modules. Electron uses a narrow main/preload/editor
-bridge. Share the boundary schema across languages and check it with contract
-fixtures. Internal document objects stay with their owning implementation.
+These are roles within existing packages. In the Rust host, the
+[capability host](../../../crates/grida-agent/src/tool_host.rs) owns the
+dispatcher and the [MCP service](../../../crates/grida-agent/src/mcp.rs) its
+public binding. Electron uses a narrow main/preload/editor bridge. Internal
+document objects stay with their owning implementation.
 
-The [native capability host](../../../crates/grida-agent/src/tool_host.rs)
-issues a lease for one capability at one registered endpoint. The native
-adapter and direct callers use the same invocation method. The first
-executor implements the non-interactive `surface_open` result. Its
-`requested: false` result reports that no presentation was requested.
-The standalone MCP service exposes this definition through the same lease.
-Production editor registration remains a separate binding.
+The capability host issues a lease for one capability at one registered
+endpoint. The native adapter and direct callers use the same invocation
+method. The headless executor implements the non-interactive `surface_open`
+result, and the standalone MCP service exposes the same definition through the
+same lease. Desktop registers its live workbench as an editor endpoint for the
+editor-context and presentation capabilities below.
 
 ## Catalog and capability requirements
 
@@ -69,8 +69,8 @@ selection changes update editor-context data. Context payloads and document
 references follow their owning capability's schema.
 
 Optional presentation retains the [workspace surface behavior](https://grida.co/docs/wg/ai/grida/workspace-surfaces).
-A headless `surface.open` can return `not_presented` with reason
-`non_interactive`. An operation requiring a live editor reports an unavailable
+A headless `surface_open` succeeds with the structured result
+`{path, requested: false, reason: "not_interactive"}`. An operation requiring a live editor reports an unavailable
 endpoint when that editor is missing. Any saved-file or headless alternative is
 an explicitly supported operation with its own declared inputs.
 
@@ -124,14 +124,24 @@ remain inside the document implementation.
 
 ## Host operations
 
-Start with three logical operations. Fix transport spellings and limits in the
-first fixtures.
+The capability host exposes three logical operations.
 
-| Operation | Input                      | Result                                                    |
-| --------- | -------------------------- | --------------------------------------------------------- |
-| Describe  | Optional capability filter | Authorized definitions and available execution endpoints. |
-| Invoke    | Identified capability call | Correlated progress and a typed result or failure.        |
-| Cancel    | Active call ID             | Cancellation request delivered or its unavailable status. |
+| Operation | Spelling                                                                                                           | Result                                                                               |
+| --------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Describe  | A grant's `describe`; MCP `tools/list` over the same catalog                                                       | The authorized definition, or an unavailable endpoint once the grant or host closes. |
+| Invoke    | A grant's `invoke` with definition revision, arguments, cancellation, deadline, and output limit; MCP `tools/call` | A typed outcome with a call-evidence receipt, or a structural error before dispatch. |
+| Cancel    | The call's cancellation token, MCP request cancellation, or revoking the grant or closing the endpoint             | Cancellation delivered to the executor; any later reply is discarded.                |
+
+| Limit                       | Value                                                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Capability input and output | At most 512 KiB each per definition; larger arguments fail with `host_capability_input_limit`               |
+| Concurrent calls            | At most 8 per registered endpoint; further calls fail with `host_capability_concurrency_limit`              |
+| Call duration               | The caller's deadline, capped at 120 seconds                                                                |
+| Output                      | The smaller of the caller's and the definition's limit; an oversized result is cleared and marked truncated |
+
+A changed definition revision fails with `host_capability_changed` before
+dispatch. Every host capability declares unavailable recovery, so an
+interrupted call is never repeated automatically.
 
 Context reads are ordinary capabilities under Invoke. Describe does not
 serialize private document contents.
@@ -142,10 +152,12 @@ arguments, and a bounded deadline. Caller identity and grants come from
 authenticated request context. A native adapter correlates the call with its
 agent invocation. An MCP caller needs no Grida agent session or turn.
 
-Call IDs correlate requests and replies. Deduplication and effect recovery
-depend on capabilities supplied by the executor. The native dispatcher
-retains a versioned receipt with the original call binding and whether it
-verified a reply. Results retain the capability's structured output, bounded
+The host mints the call ID; it never comes from arguments. Call IDs correlate
+requests and replies, and a reply that does not echo the exact call binding is
+discarded as unverified. Deduplication and effect recovery depend on
+capabilities supplied by the executor. The native dispatcher retains a
+versioned receipt with the original call binding, whether it verified a reply,
+and any owner receipt the executor returned. Results retain the capability's structured output, bounded
 readable content, and any artifacts. Domain errors pass through with their
 meaning intact. A request to present an artifact and observed display remain
 separate evidence.
@@ -188,11 +200,10 @@ map to call correlation and cancellation. Executor-specific job controls are
 ordinary advertised capabilities. Tool search remains the built-in master's
 exposure policy. MCP clients can use standard discovery directly.
 
-The public transport starts with an explicitly enabled, authenticated
-loopback MCP Streamable HTTP endpoint owned by the Rust host. Desktop's ACP
-stdio connection has its own lifecycle. Apply the selected MCP transport's origin
-and authentication checks before dispatch. Remote exposure and a stdio bridge
-can be added as deployment bindings when required.
+The public transport is an explicitly enabled, authenticated loopback MCP
+Streamable HTTP endpoint owned by the Rust host. Desktop's ACP stdio connection
+has its own lifecycle. The MCP transport's origin and authentication checks
+run before dispatch. Remote exposure and a stdio bridge are not provided.
 
 The service pins the official Rust SDK and supports the 2026-07-28 and
 2025-11-25 wire revisions without retaining MCP sessions. The
@@ -204,7 +215,7 @@ binding.
 Public exposure includes only reviewed Grida capabilities. Credential storage,
 agent-internal controls, and renderer evaluation have separate authorization.
 
-## Initial acceptance cases
+## Acceptance cases
 
 | Situation                                            | Required observation                                                               |
 | ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -219,11 +230,9 @@ agent-internal controls, and renderer evaluation have separate authorization.
 
 Document editing tests belong to the relevant document implementation. These
 fixtures verify the tool-host boundary and faithful transport of domain results.
-Current source provides useful seams. The toolset selects server/client
-executors, the live SVG binding owns its document behavior, and Electron gates
-IPC senders. The current external-agent configuration reserves an MCP server but
-passes an empty server list.
-[Toolset](../src/tools/index.ts),
-[live binding](../../../editor/scaffolds/desktop/ai-sidebar/agent-fs-binding.ts),
-[IPC gate](../../../desktop/src/main/ipc-handlers.ts),
-[external configuration](../src/agent-provider/config.ts).
+The [tool-host tests](../../../crates/grida-agent/tests/tool_host.rs) and
+[MCP tests](../../../crates/grida-agent/tests/mcp.rs) exercise the native
+boundary. Desktop's [editor surface binding](../../../desktop/src/main/native-editor-surfaces.ts),
+[editor MCP export](../../../desktop/src/main/native-editor-mcp-export.ts), and
+[IPC gate](../../../desktop/src/main/ipc-handlers.ts) own sender validation and
+routing to the registered workbench.
