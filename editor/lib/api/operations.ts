@@ -8,7 +8,7 @@ export namespace apiOperations {
     cache: "no-store" | "owner" | "public";
   }>;
 
-  // The six legacy bindings preserve existing gateway/catalogue contracts.
+  // The seven legacy bindings preserve existing gateway/catalogue contracts.
   // Their exact paths and method exports are also pinned by the source audit;
   // adding another exception is a deliberate boundary change.
   export const definitions = {
@@ -58,6 +58,15 @@ export namespace apiOperations {
     },
     "gg.chat": {
       path: "/api/v1/ai/chat/completions",
+      methods: ["POST"],
+      authority: "gg",
+      binding: "legacy",
+      cache: "owner",
+    },
+    // GRIDA-SEC-006 — the capped Goal wire shares gg.chat's request owner;
+    // a server without it must refuse rather than fall back to gg.chat.
+    "gg.chat.capped": {
+      path: "/api/v1/ai/chat/completions/capped",
       methods: ["POST"],
       authority: "gg",
       binding: "legacy",

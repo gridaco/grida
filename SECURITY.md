@@ -3146,7 +3146,7 @@ browser cookies, UI code or request-global state into account operations.
    are encoded in aligned chunks rather than one buffered base64 response.
 4. **Source checks reject drift.** `audit-api.ts` compares real App/Pages route
    placements with the inventory and verifies the complete native binding AST.
-   New handlers cannot use the six pinned legacy GG/catalogue exceptions.
+   New handlers cannot use the seven pinned legacy GG/catalogue exceptions.
    Resolved import traversal checks API/account/GG owners, including aliases,
    re-exports and installed package runtime entries, for Next/React, browser/UI,
    dynamic-loader and environment-ownership violations. Invalid fixture trees
