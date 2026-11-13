@@ -58,6 +58,11 @@ export namespace NativeProviderSelection {
     return Object.hasOwn(builtInEndpoints, providerId);
   }
 
+  /** Whether `endpoint` is the base URL of a built-in stored-key provider. */
+  export function isBuiltInEndpoint(endpoint: string): boolean {
+    return Object.values<string>(builtInEndpoints).includes(endpoint);
+  }
+
   export async function builtInByok(
     providerId: string,
     model: string,

@@ -18,6 +18,7 @@ import {
   type ImageReferenceReview,
 } from "./native-image-generation";
 import { NativeImagePlacement } from "./native-image-placement";
+import { NativeProviderSelection } from "./native-provider-selection";
 import {
   NativeEditorSurfaceEndpoints,
   type NativeEditorSurfaceDelivery,
@@ -383,8 +384,7 @@ export class NativeAgentProcess {
       throw new Error("native_workspace_configuration_requires_supervision");
     const storedSubagents =
       options.provider === "openai-compatible" &&
-      (options.endpoint === "https://openrouter.ai/api/v1" ||
-        options.endpoint === "https://ai-gateway.vercel.sh/v1") &&
+      NativeProviderSelection.isBuiltInEndpoint(options.endpoint) &&
       options.credentialHome !== undefined &&
       options.providerNetwork !== undefined &&
       options.configuredEndpointKey === undefined &&
@@ -1085,11 +1085,14 @@ export class NativeAgentProcess {
   }
 
   private providerRequest(id: number | string, params: unknown): void {
-    if (
-      this.providerRequests.has(id) ||
-      this.providerRequests.size >= REQUEST_LIMIT
-    )
-      throw new Error("native_agent_provider_request_limit");
+    if (this.providerRequests.has(id))
+      throw new Error("native_agent_provider_request_id_reused");
+    if (this.providerRequests.size >= REQUEST_LIMIT) {
+      // Too many concurrent exchanges fail only this request; the agent
+      // reports it as an unavailable transport and other chats keep running.
+      this.write({ jsonrpc: "2.0", id, result: { status: "unavailable" } });
+      return;
+    }
     this.providerRequests.add(id);
     void this.providerEgress!.exchange(params)
       .then((result) => {

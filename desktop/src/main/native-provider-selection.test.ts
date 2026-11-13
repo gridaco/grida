@@ -1136,3 +1136,17 @@ it
   },
   15_000
 );
+
+it("recognizes exactly the built-in stored-key endpoints", () => {
+  for (const endpoint of [
+    "https://openrouter.ai/api/v1",
+    "https://ai-gateway.vercel.sh/v1",
+  ])
+    expect(NativeProviderSelection.isBuiltInEndpoint(endpoint)).toBe(true);
+  for (const endpoint of [
+    "https://openrouter.ai/api/v1/other",
+    "http://127.0.0.1:1/v1",
+    "https://chatgpt.com/backend-api/codex",
+  ])
+    expect(NativeProviderSelection.isBuiltInEndpoint(endpoint)).toBe(false);
+});

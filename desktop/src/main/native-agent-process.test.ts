@@ -327,6 +327,55 @@ describe.skipIf(process.platform === "win32")("Native agent process", () => {
     }
   );
 
+  it("answers a provider exchange beyond the concurrency bound without disconnecting", async () => {
+    const test = fixture(
+      `
+      if (request.method === 'fixture/flood') {
+        globalThis.flood = request.id;
+        globalThis.replies = [];
+        let lines = '';
+        for (let index = 1; index <= 17; index++)
+          lines += JSON.stringify({jsonrpc:'2.0',id:'exchange-'+index,method:'_co.grida/provider/exchange',params:{id:'unknown',action:'read'}}) + '\\n';
+        process.stdout.write(lines);
+      } else if (request.method === undefined && String(request.id).startsWith('exchange-')) {
+        globalThis.replies.push([request.id, request.result && request.result.status]);
+        if (globalThis.replies.length === 17)
+          send({id:globalThis.flood,result:{replies:globalThis.replies}});
+      } else if (request.method === 'fixture/ping') {
+        send({id:request.id,result:{pong:true}});
+      }
+    `,
+      1,
+      {}
+    );
+    let agent: NativeAgentProcess | undefined;
+    try {
+      agent = await NativeAgentProcess.start({
+        ...test.options,
+        providerNetwork: { prepare: () => null },
+      });
+      const { replies } = (await agent.request("fixture/flood", {})) as {
+        replies: [string, string][];
+      };
+      // The bound is answered at once; admitted exchanges answer after it.
+      expect(replies[0]).toEqual(["exchange-17", "unavailable"]);
+      expect(replies).toHaveLength(17);
+      expect(new Set(replies.map(([, status]) => status))).toEqual(
+        new Set(["unavailable"])
+      );
+      expect(agent.connected).toBe(true);
+      await expect(agent.request("fixture/ping", {})).resolves.toEqual({
+        pong: true,
+      });
+    } finally {
+      try {
+        await agent?.close();
+      } finally {
+        test.close();
+      }
+    }
+  });
+
   it("keeps a transcript page intact when a legacy replay overlaps it", async () => {
     const test = fixture(
       `
